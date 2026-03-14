@@ -1,0 +1,105 @@
+/**
+ * Stripe payment: create PaymentIntent, confirm; create Payment + PaymentAllocation records.
+ * Idempotency by idempotencyKey.
+ */
+import { prisma } from "@/lib/db";
+import { stripe } from "@/lib/stripe";
+import { buildIdempotencyKey } from "@/lib/idempotency";
+
+/** Development-only: bypass real Stripe when key is missing or placeholder. Not used in production. */
+function isDevPaymentBypass(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  const key = process.env.STRIPE_SECRET_KEY ?? "";
+  if (!key.trim()) return true;
+  if (/^sk_test_\.\.\.$/i.test(key.trim()) || key.trim() === "sk_test_...") return true;
+  return !stripe;
+}
+
+export async function createPaymentIntent(
+  orderId: string,
+  totalCents: number,
+  idempotencyKey: string
+): Promise<{ clientSecret: string; paymentIntentId: string }> {
+  // Development-only payment bypass when Stripe keys missing or placeholder.
+  if (isDevPaymentBypass()) {
+    const paymentIntentId = `dev_bypass_${orderId}`;
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { stripePaymentIntentId: paymentIntentId },
+    });
+    return { clientSecret: "dev_bypass", paymentIntentId };
+  }
+
+  if (!stripe) throw new Error("Stripe not configured");
+  const key = buildIdempotencyKey("payment_intent", idempotencyKey);
+  const existingPayment = await prisma.payment.findUnique({
+    where: { idempotencyKey: key },
+  });
+  if (existingPayment?.stripePaymentIntentId) {
+    const pi = await stripe.paymentIntents.retrieve(existingPayment.stripePaymentIntentId);
+    const secret = pi.client_secret;
+    if (!secret) throw new Error("Missing client_secret");
+    return { clientSecret: secret, paymentIntentId: pi.id };
+  }
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: totalCents,
+    currency: "usd",
+    automatic_payment_methods: { enabled: true },
+    metadata: { orderId },
+  }, { idempotencyKey: key });
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { stripePaymentIntentId: paymentIntent.id },
+  });
+
+  const clientSecret = paymentIntent.client_secret;
+  if (!clientSecret) throw new Error("Missing client_secret");
+  return { clientSecret, paymentIntentId: paymentIntent.id };
+}
+
+export async function recordPaymentAndAllocations(
+  orderId: string,
+  stripePaymentIntentId: string,
+  idempotencyKey: string
+): Promise<void> {
+  const key = buildIdempotencyKey("payment", idempotencyKey);
+  const existing = await prisma.payment.findUnique({
+    where: { idempotencyKey: key },
+  });
+  if (existing) return;
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { vendorOrders: true },
+  });
+  if (!order) throw new Error("Order not found");
+  if (order.status !== "pending_payment") return; // already processed
+
+  const amountCents = order.totalCents;
+  await prisma.$transaction(async (tx) => {
+    const payment = await tx.payment.create({
+      data: {
+        orderId,
+        stripePaymentIntentId,
+        amountCents,
+        status: "succeeded",
+        idempotencyKey: key,
+      },
+    });
+    for (const vo of order.vendorOrders) {
+      await tx.paymentAllocation.create({
+        data: {
+          paymentId: payment.id,
+          vendorOrderId: vo.id,
+          subtotalCents: vo.subtotalCents,
+          tipCents: vo.tipCents,
+          taxCents: vo.taxCents,
+          serviceFeeCents: vo.serviceFeeCents,
+          totalCents: vo.totalCents,
+        },
+      });
+    }
+  });
+}

@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mennyu brand palette – single source of truth for accent colors */
+:root {
+  --mennyu-primary: #FFBD59;
+  --mennyu-secondary: #E5A84D;
+  --mennyu-accent: #FFBD59;
+  --mennyu-gray: #eeece1;
+  --mennyu-muted: #eeece1;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+}
