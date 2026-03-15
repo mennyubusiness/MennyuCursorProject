@@ -2,6 +2,7 @@
  * Order creation and splitting: one parent order + N vendor orders + allocations.
  * Idempotent by idempotencyKey. Persist status history.
  */
+import { type OrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { computeOrderTotals } from "@/domain/fees";
 import type { Order, VendorOrder as VendorOrderType, CheckoutInput } from "@/domain/types";
@@ -599,7 +600,7 @@ export async function setOrderStripePaymentIntent(
 
 export async function setOrderStatus(
   orderId: string,
-  status: string,
+  status: OrderStatus,
   source: string,
   note?: string
 ): Promise<void> {

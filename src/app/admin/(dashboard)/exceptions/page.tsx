@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { VendorRoutingStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   getExceptionType,
@@ -18,7 +19,7 @@ export default async function AdminExceptionsPage() {
 
   const [failed, stuckPending] = await Promise.all([
     prisma.vendorOrder.findMany({
-      where: { routingStatus: "failed" },
+      where: { routingStatus: VendorRoutingStatus.failed },
       include: {
         order: { select: { id: true, customerPhone: true, pod: { select: { name: true } } } },
         vendor: { select: { name: true } },
@@ -28,7 +29,7 @@ export default async function AdminExceptionsPage() {
     }),
     prisma.vendorOrder.findMany({
       where: {
-        routingStatus: "pending",
+        routingStatus: VendorRoutingStatus.pending,
         createdAt: { lt: stuckBefore },
       },
       include: {

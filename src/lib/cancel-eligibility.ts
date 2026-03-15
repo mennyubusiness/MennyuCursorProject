@@ -11,7 +11,8 @@ const PRE_PREPARATION_FULFILLMENT = new Set<string>(["pending", "accepted"]);
 export type VendorOrderForCancelEligibility = {
   routingStatus: string;
   fulfillmentStatus: string;
-  manuallyRecoveredAt?: string | null;
+  /** Accept Date (Prisma) or string; eligibility logic does not use this. */
+  manuallyRecoveredAt?: Date | string | null;
   statusHistory?: Array<{ source?: string | null }> | null;
 };
 

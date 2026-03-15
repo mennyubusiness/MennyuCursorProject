@@ -116,8 +116,8 @@ model Vendor {
   description String?
   imageUrl    String?
   isActive    Boolean  @default(true)
-  /// When true, block new Mennyu orders for this vendor (intake only); existing orders still visible. */
-  mennyuOrdersPaused Boolean @default(false)
+  /// When true, block new Mennyu orders for this vendor (intake only); existing orders still visible.
+mennyuOrdersPaused Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

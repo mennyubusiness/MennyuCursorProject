@@ -26,6 +26,8 @@ export interface AdminActionState {
 }
 
 export interface VOForAdminActions {
+  id: string;
+  orderId: string;
   routingStatus: string;
   fulfillmentStatus: string;
   createdAt: Date;

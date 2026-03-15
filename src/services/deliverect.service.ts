@@ -3,6 +3,7 @@
  * Live submission is gated by ROUTING_MODE=deliverect; mock mode only audits payload.
  * One VendorOrder at a time; retry-safe status transitions; full request/response audit.
  */
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { submitOrder } from "@/integrations/deliverect/client";
@@ -97,7 +98,7 @@ export async function submitVendorOrderToDeliverect(
     data: {
       deliverectAttempts: vendorOrder.deliverectAttempts + 1,
       lastDeliverectPayload: payload as unknown as object,
-      lastDeliverectResponse: responsePayload,
+      lastDeliverectResponse: responsePayload != null ? (responsePayload as Prisma.InputJsonValue) : Prisma.DbNull,
       deliverectSubmittedAt: now,
       deliverectLastError: failureMessage,
       ...statusUpdate,

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { VendorFulfillmentStatus, VendorRoutingStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { ROUTING_STUCK_THRESHOLD_MINUTES } from "@/lib/admin-exceptions";
 
@@ -23,18 +24,18 @@ export default async function AdminOverviewPage() {
   ] = await Promise.all([
     prisma.order.count({ where: { createdAt: { gte: since } } }),
     prisma.vendorOrder.count({
-      where: { routingStatus: "failed", fulfillmentStatus: "pending" },
+      where: { routingStatus: VendorRoutingStatus.failed, fulfillmentStatus: VendorFulfillmentStatus.pending },
     }),
     prisma.vendorOrder.count({
       where: {
-        routingStatus: "pending",
-        fulfillmentStatus: "pending",
+        routingStatus: VendorRoutingStatus.pending,
+        fulfillmentStatus: VendorFulfillmentStatus.pending,
         createdAt: { lt: routingStuckBefore },
       },
     }),
     prisma.vendorOrder.count({
       where: {
-        fulfillmentStatus: "cancelled",
+        fulfillmentStatus: VendorFulfillmentStatus.cancelled,
         updatedAt: { gte: startOfToday },
       },
     }),
@@ -42,11 +43,11 @@ export default async function AdminOverviewPage() {
     prisma.pod.count({ where: { isActive: true } }),
     prisma.vendorOrder.findMany({
       where: {
-        fulfillmentStatus: "pending",
+        fulfillmentStatus: VendorFulfillmentStatus.pending,
         OR: [
-          { routingStatus: "failed" },
+          { routingStatus: VendorRoutingStatus.failed },
           {
-            routingStatus: "pending",
+            routingStatus: VendorRoutingStatus.pending,
             createdAt: { lt: routingStuckBefore },
           },
         ],

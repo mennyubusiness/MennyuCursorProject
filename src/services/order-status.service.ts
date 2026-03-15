@@ -2,6 +2,7 @@
  * Unified order status: derive parent status from child vendor orders; update on webhook.
  * POS (Deliverect) is source of truth when available; fallback flow scaffolded.
  */
+import { Prisma, VendorRoutingStatus, VendorFulfillmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   deriveParentStatusFromChildren,
@@ -26,10 +27,10 @@ export async function updateVendorOrderStatus(
   source: string = "deliverect",
   rawPayload?: unknown
 ): Promise<void> {
-  const updates: { routingStatus?: string; fulfillmentStatus?: string; lastWebhookPayload?: object } = {};
-  if (routingStatus) updates.routingStatus = routingStatus;
-  if (fulfillmentStatus) updates.fulfillmentStatus = fulfillmentStatus;
-  if (rawPayload) updates.lastWebhookPayload = rawPayload as object;
+  const updates: Prisma.VendorOrderUncheckedUpdateInput = {};
+  if (routingStatus) updates.routingStatus = routingStatus as VendorRoutingStatus;
+  if (fulfillmentStatus) updates.fulfillmentStatus = fulfillmentStatus as VendorFulfillmentStatus;
+  if (rawPayload) updates.lastWebhookPayload = rawPayload as Prisma.InputJsonValue;
 
   await prisma.vendorOrder.update({
     where: { id: vendorOrderId },

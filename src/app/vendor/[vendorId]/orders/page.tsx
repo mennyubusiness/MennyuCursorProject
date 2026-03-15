@@ -47,6 +47,7 @@ export default async function VendorOrdersPage({
 
   const initialVendorOrdersForClient = vendorOrders.map((vo) => ({
     ...vo,
+    manuallyRecoveredAt: vo.manuallyRecoveredAt?.toISOString() ?? null,
     order: {
       ...vo.order,
       createdAt: vo.order.createdAt.toISOString(),

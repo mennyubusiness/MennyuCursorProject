@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { Prisma, VendorRoutingStatus, VendorFulfillmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { parentStatusLabel } from "@/domain/order-state";
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
+
+type OrderFindManyArgs = NonNullable<Parameters<typeof prisma.order.findMany>[0]>;
+type OrderWhere = NonNullable<OrderFindManyArgs["where"]>;
 
 type SearchParams = Promise<{
   pod?: string;
@@ -43,24 +47,23 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
     : null;
   const resetAllHref = hasSearch || hasFilters ? "/admin/orders" : null;
 
-  const where: Parameters<typeof prisma.order.findMany>[0]["where"] = {};
+  const where: OrderWhere = {};
   if (podId) where.podId = podId;
-  if (statusFilter) where.status = statusFilter as Parameters<typeof prisma.order.findMany>[0]["where"]["status"];
+  if (statusFilter) where.status = statusFilter as OrderWhere["status"];
 
   let orderIds: string[] | undefined;
   if (vendorId || attentionOnly) {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-    const voWhere: {
-      vendorId?: string;
-      OR?: Array<{ routingStatus: string } | { fulfillmentStatus: string; routingStatus: { in: string[] }; createdAt: { lt: Date } }>;
-    } = {};
+    const voWhere: Prisma.VendorOrderWhereInput = {};
     if (vendorId) voWhere.vendorId = vendorId;
     if (attentionOnly) {
       voWhere.OR = [
-        { routingStatus: "failed" },
+        { routingStatus: VendorRoutingStatus.failed },
         {
-          fulfillmentStatus: "pending",
-          routingStatus: { in: ["sent", "confirmed"] },
+          fulfillmentStatus: VendorFulfillmentStatus.pending,
+          routingStatus: {
+            in: [VendorRoutingStatus.sent, VendorRoutingStatus.confirmed],
+          },
           createdAt: { lt: twoHoursAgo },
         },
       ];
@@ -85,7 +88,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
   else if (orderIds) where.id = { in: orderIds };
 
   if (searchTerm) {
-    const searchConditions: Parameters<typeof prisma.order.findMany>[0]["where"][] = [
+    const searchConditions: OrderWhere[] = [
       { id: { contains: searchTerm, mode: "insensitive" } },
       { customerPhone: { contains: searchTerm, mode: "insensitive" } },
       { pod: { name: { contains: searchTerm, mode: "insensitive" } } },

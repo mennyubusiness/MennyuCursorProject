@@ -179,7 +179,7 @@ export async function addCartItem(
     }
   }
 
-  return getCartById(cartId);
+  return getCartByIdOrThrow(cartId);
 }
 
 export async function updateCartItem(
@@ -191,13 +191,13 @@ export async function updateCartItem(
 ): Promise<Cart> {
   if (quantity <= 0) {
     await prisma.cartItem.deleteMany({ where: { id: cartItemId, cartId } });
-    return getCartById(cartId);
+    return getCartByIdOrThrow(cartId);
   }
   const existingItem = await prisma.cartItem.findFirst({
     where: { id: cartItemId, cartId },
     include: { menuItem: true },
   });
-  if (!existingItem) return getCartById(cartId);
+  if (!existingItem) return getCartByIdOrThrow(cartId);
 
   if (selections != null) {
     const modResult = await validateCartItemModifiers({
@@ -239,7 +239,7 @@ export async function updateCartItem(
       where: { id: cartItemId, cartId },
       data: { quantity, priceCents: priceCentsToStore, ...(specialInstructions !== undefined ? { specialInstructions: specialInstructions === "" ? null : specialInstructions } : {}) },
     });
-    return getCartById(cartId);
+    return getCartByIdOrThrow(cartId);
   }
 
   const data: { quantity: number; specialInstructions?: string | null } = { quantity };
@@ -250,12 +250,12 @@ export async function updateCartItem(
     where: { id: cartItemId, cartId },
     data,
   });
-  return getCartById(cartId);
+  return getCartByIdOrThrow(cartId);
 }
 
 export async function removeCartItem(cartId: string, cartItemId: string): Promise<Cart> {
   await prisma.cartItem.deleteMany({ where: { id: cartItemId, cartId } });
-  return getCartById(cartId);
+  return getCartByIdOrThrow(cartId);
 }
 
 /**
@@ -287,6 +287,13 @@ export async function getCartById(cartId: string): Promise<Cart | null> {
     },
   });
   return cart ? toCartWithGroups(cart) : null;
+}
+
+/** Like getCartById but throws if cart not found. Use when caller contract is Promise<Cart>. */
+async function getCartByIdOrThrow(cartId: string): Promise<Cart> {
+  const cart = await getCartById(cartId);
+  if (!cart) throw new Error("Cart not found");
+  return cart;
 }
 
 function toCartWithGroups(

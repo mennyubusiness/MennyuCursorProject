@@ -52,7 +52,11 @@ function selectionToModifier(sel: Selection): Omit<DeliverectModifier, "nestedMo
 function buildModifiersForLine(selections: Selection[]): DeliverectModifier[] | undefined {
   if (selections.length === 0) return undefined;
 
-  const topLevel: DeliverectModifier[] = [];
+  type ModifierWithInternalId = Omit<DeliverectModifier, "nestedModifiers"> & {
+    _mennyuOptionId: string;
+    nestedModifiers?: DeliverectModifier[] | undefined;
+  };
+  const topLevel: ModifierWithInternalId[] = [];
   const byParentId = new Map<string, Selection[]>();
 
   for (const sel of selections) {

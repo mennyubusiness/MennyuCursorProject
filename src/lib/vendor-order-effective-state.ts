@@ -4,6 +4,9 @@
  * restores active flow without erasing routing failure in audit.
  */
 
+import type { ChildOrderState } from "@/domain/order-state";
+import type { VendorOrderFulfillmentStatus } from "@/domain/types";
+
 export type VendorOrderForEffectiveState = {
   routingStatus: string;
   fulfillmentStatus: string;
@@ -50,7 +53,6 @@ export function isVendorOrderRecoverableFailure(
 ): boolean {
   if (vo.routingStatus !== "failed") return false;
   if (vo.fulfillmentStatus !== "pending") return false;
-  if (vo.fulfillmentStatus === "cancelled") return false;
   return !isVendorOrderManuallyRecovered(vo);
 }
 
@@ -95,13 +97,10 @@ export function getVendorOrderEffectiveDisplayState(
 export function getEffectiveChildStateForParentDerivation(
   vo: VendorOrderForEffectiveState,
   statusHistory?: Array<{ source?: string | null }> | null
-): {
-  routingStatus: "pending" | "sent" | "confirmed" | "failed";
-  fulfillmentStatus: string;
-} {
+): ChildOrderState {
   const recovered = isVendorOrderManuallyRecovered(vo, statusHistory);
-  const routing = (vo.routingStatus || "pending") as "pending" | "sent" | "confirmed" | "failed";
-  const fulfillment = vo.fulfillmentStatus || "pending";
+  const routing = (vo.routingStatus || "pending") as ChildOrderState["routingStatus"];
+  const fulfillment = (vo.fulfillmentStatus || "pending") as VendorOrderFulfillmentStatus;
   if (recovered) {
     return { routingStatus: "confirmed", fulfillmentStatus: fulfillment };
   }
