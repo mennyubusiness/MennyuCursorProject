@@ -405,7 +405,7 @@ model RefundAttempt {
   reason          String   // RefundReason from decision layer
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  /// When set, this failed attempt was dismissed as legacy/test; excluded from Needs Attention. */
+  /// When set, this failed attempt was dismissed as legacy/test; excluded from Needs Attention.
   dismissedAsLegacyAt DateTime?
   dismissedAsLegacyBy String?  // e.g. "admin"
 

@@ -36,10 +36,13 @@ export default async function AdminOrderDetailPage({
       vendorOrders: {
         select: {
           id: true,
+          orderId: true,
           vendorId: true,
+          createdAt: true,
           routingStatus: true,
           fulfillmentStatus: true,
           totalCents: true,
+          manuallyRecoveredAt: true,
           deliverectAttempts: true,
           deliverectSubmittedAt: true,
           deliverectLastError: true,
