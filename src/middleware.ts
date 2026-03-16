@@ -9,12 +9,14 @@ import {
 
 export function middleware(request: NextRequest) {
   let response: NextResponse;
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+
   const sessionCookie = request.cookies.get(COOKIE_NAME);
   if (sessionCookie?.value) {
-    response = NextResponse.next();
+    response = NextResponse.next({ request: { headers: requestHeaders } });
   } else {
     const sessionId = crypto.randomUUID();
-    const requestHeaders = new Headers(request.headers);
     requestHeaders.set(SESSION_HEADER, sessionId);
     response = NextResponse.next({ request: { headers: requestHeaders } });
     response.headers.set("Set-Cookie", buildSessionCookieHeader(sessionId));

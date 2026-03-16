@@ -5,17 +5,25 @@ import { useState } from "react";
 import type { ExceptionType } from "@/lib/admin-exceptions";
 
 export function ExceptionRowActions({
+  itemId,
   vendorOrderId,
   orderId,
   exceptionType,
   routingAvailable,
   canCancel,
+  onActionSuccess,
+  hideViewOrderLink,
 }: {
+  /** When provided with onActionSuccess, successful action removes this item from the list instead of refreshing. */
+  itemId?: string;
   vendorOrderId: string;
   orderId: string;
   exceptionType: ExceptionType;
   routingAvailable: boolean;
   canCancel: boolean;
+  onActionSuccess?: (itemId: string) => void;
+  /** When true, omit the "View order" link (e.g. when parent card already has order # as main link). */
+  hideViewOrderLink?: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
@@ -36,7 +44,10 @@ export function ExceptionRowActions({
       const data = await res.json().catch(() => ({}));
       const msg = data.message ?? data.error ?? (res.ok ? "Submitted" : "Failed");
       setMessage({ text: msg, error: !res.ok || data.ok === false });
-      if (res.ok && data.ok !== false) router.refresh();
+      if (res.ok && data.ok !== false) {
+        if (itemId && onActionSuccess) onActionSuccess(itemId);
+        else router.refresh();
+      }
     } catch {
       setMessage({ text: "Error", error: true });
     } finally {
@@ -56,7 +67,10 @@ export function ExceptionRowActions({
         ? data.message
         : (data.message ?? data.error ?? (res.ok ? "Marked manually received" : "Failed"));
       setMessage({ text: msg, error: !res.ok || data.ok === false });
-      if (res.ok && data.ok !== false) router.refresh();
+      if (res.ok && data.ok !== false) {
+        if (itemId && onActionSuccess) onActionSuccess(itemId);
+        else router.refresh();
+      }
     } catch {
       setMessage({ text: "Error", error: true });
     } finally {
@@ -76,7 +90,10 @@ export function ExceptionRowActions({
       const data = await res.json().catch(() => ({}));
       const msg = data.message ?? data.error ?? (res.ok ? "Cancelled" : "Cancel failed");
       setMessage({ text: msg, error: !res.ok || data.ok === false });
-      if (res.ok && data.ok !== false) router.refresh();
+      if (res.ok && data.ok !== false) {
+        if (itemId && onActionSuccess) onActionSuccess(itemId);
+        else router.refresh();
+      }
     } catch {
       setMessage({ text: "Error", error: true });
     } finally {
@@ -88,12 +105,14 @@ export function ExceptionRowActions({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-        <a
-          href={`/admin/orders/${orderId}`}
-          className="text-sm text-stone-600 hover:underline"
-        >
-          View order
-        </a>
+        {!hideViewOrderLink && (
+          <a
+            href={`/admin/orders/${orderId}`}
+            className="text-sm text-stone-600 hover:underline"
+          >
+            View order
+          </a>
+        )}
         {showRetry && (
           <button
             type="button"

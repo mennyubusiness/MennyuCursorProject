@@ -41,9 +41,10 @@ export function getExceptionType(vo: VendorOrderForException): ExceptionType | n
 /**
  * Whether routing is "stuck" (pending for too long since order creation).
  */
+import { isOlderThanMinutes } from "@/lib/date-utils";
+
 function isRoutingStuck(vo: VendorOrderForException): boolean {
-  const thresholdMs = ROUTING_STUCK_MINUTES * 60 * 1000;
-  return Date.now() - vo.createdAt.getTime() > thresholdMs;
+  return isOlderThanMinutes(vo.createdAt, ROUTING_STUCK_MINUTES);
 }
 
 /**

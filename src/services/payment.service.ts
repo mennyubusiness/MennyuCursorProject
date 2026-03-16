@@ -63,19 +63,19 @@ export async function recordPaymentAndAllocations(
   orderId: string,
   stripePaymentIntentId: string,
   idempotencyKey: string
-): Promise<void> {
+): Promise<{ created: boolean }> {
   const key = buildIdempotencyKey("payment", idempotencyKey);
   const existing = await prisma.payment.findUnique({
     where: { idempotencyKey: key },
   });
-  if (existing) return;
+  if (existing) return { created: false };
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { vendorOrders: true },
   });
   if (!order) throw new Error("Order not found");
-  if (order.status !== "pending_payment") return; // already processed
+  if (order.status !== "pending_payment") return { created: false }; // already processed
 
   const amountCents = order.totalCents;
   await prisma.$transaction(async (tx) => {
@@ -102,4 +102,47 @@ export async function recordPaymentAndAllocations(
       });
     }
   });
+  return { created: true };
+}
+
+const REDIRECT_RECONCILE_IDEMPOTENCY_PREFIX = "redirect_reconcile_";
+
+/**
+ * Fallback: when user lands with ?payment=success but webhook hasn't run yet, verify PI with Stripe
+ * and run the same post-payment flow as the webhook (payment, status, routing, SMS). Idempotent.
+ */
+export async function reconcilePaymentFromRedirect(orderId: string): Promise<{
+  reconciled: boolean;
+  error?: string;
+}> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { status: true, stripePaymentIntentId: true },
+  });
+  if (!order || order.status !== "pending_payment") return { reconciled: false };
+  const piId = order.stripePaymentIntentId;
+  if (!piId || piId.startsWith("dev_bypass_")) return { reconciled: false };
+  if (!stripe) return { reconciled: false, error: "Stripe not configured" };
+
+  let pi: { status: string };
+  try {
+    pi = await stripe.paymentIntents.retrieve(piId);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { reconciled: false, error: msg };
+  }
+  if (pi.status !== "succeeded") return { reconciled: false };
+
+  try {
+    const { processSuccessfulPayment } = await import("@/services/post-payment.service");
+    await processSuccessfulPayment({
+      orderId,
+      paymentIntentId: piId,
+      idempotencyKey: `${REDIRECT_RECONCILE_IDEMPOTENCY_PREFIX}${orderId}`,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { reconciled: false, error: message };
+  }
+  return { reconciled: true };
 }

@@ -7,10 +7,13 @@ export function OrderCancelButton({
   orderId,
   disabled,
   disabledMessage,
+  onSuccess,
 }: {
   orderId: string;
   disabled: boolean;
   disabledMessage?: string;
+  /** When provided, called on success instead of router.refresh() so parent can update local state. */
+  onSuccess?: (data: { status: string }) => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -33,7 +36,11 @@ export function OrderCancelButton({
         setError(data.error ?? "Could not cancel order");
         return;
       }
-      router.refresh();
+      if (onSuccess && data.status != null) {
+        onSuccess({ status: data.status });
+      } else {
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

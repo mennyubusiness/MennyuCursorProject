@@ -2,6 +2,7 @@
  * Order age / urgency for the vendor dashboard (New orders, active sections).
  * Centralized thresholds; aligns conceptually with admin exception urgency.
  */
+import { ageMinutes as ageMinutesUtil } from "@/lib/date-utils";
 
 const NEW_MAX_MINUTES = 5;
 const AGING_MAX_MINUTES = 15;
@@ -23,9 +24,9 @@ export function formatOrderAge(ageMinutes: number): string {
   return mins === 0 ? `${hours}h old` : `${hours}h ${mins}m old`;
 }
 
-export function getVendorOrderUrgency(createdAt: Date): VendorOrderUrgency {
-  const ageMs = Date.now() - createdAt.getTime();
-  const ageMinutes = Math.floor(ageMs / (60 * 1000));
+/** createdAt may be Date or string (e.g. from serialized API response). */
+export function getVendorOrderUrgency(createdAt: Date | string): VendorOrderUrgency {
+  const ageMinutes = ageMinutesUtil(createdAt);
   const ageText = formatOrderAge(ageMinutes);
 
   if (ageMinutes < NEW_MAX_MINUTES) {
@@ -37,10 +38,10 @@ export function getVendorOrderUrgency(createdAt: Date): VendorOrderUrgency {
   return { level: "urgent", label: "Urgent", ageMinutes, ageText };
 }
 
-/** History entry with fulfillmentStatus and createdAt (e.g. VendorOrderStatusHistory). */
+/** History entry with fulfillmentStatus and createdAt (e.g. VendorOrderStatusHistory). createdAt may be Date or string. */
 export interface ReadyHistoryEntry {
   fulfillmentStatus?: string | null;
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 /**
@@ -54,8 +55,7 @@ export function getReadyWaitMinutes(
   const readyEntries = statusHistory.filter((e) => e.fulfillmentStatus === "ready");
   if (readyEntries.length === 0) return null;
   const firstReady = readyEntries[0];
-  const readyAt = firstReady.createdAt instanceof Date ? firstReady.createdAt : new Date(firstReady.createdAt);
-  return Math.floor((Date.now() - readyAt.getTime()) / (60 * 1000));
+  return ageMinutesUtil(firstReady.createdAt);
 }
 
 /** Escalation for "ready for pickup" wait time: under 5m neutral, 5–10m yellow, 10+ red. */

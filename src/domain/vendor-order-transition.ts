@@ -83,8 +83,8 @@ export function validateTransition(
       return currentFulfillment !== "ready" ? "Only ready can transition to completed." : null;
     case "cancelled":
       if (adminCancel) return null;
-      if (routingOkForFulfillment) return null;
-      return "Routing must be confirmed to cancel fulfillment.";
+      if (currentFulfillment === "pending" || currentFulfillment === "accepted") return null;
+      return "Cannot cancel once preparation has started.";
     default:
       return "Unknown target state.";
   }

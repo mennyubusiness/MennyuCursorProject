@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Prisma, VendorRoutingStatus, VendorFulfillmentStatus } from "@prisma/client";
+import { getOrderIdsNeedingAttention } from "@/lib/admin-attention";
 import { prisma } from "@/lib/db";
 import { parentStatusLabel } from "@/domain/order-state";
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
@@ -53,33 +54,37 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
 
   let orderIds: string[] | undefined;
   if (vendorId || attentionOnly) {
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-    const voWhere: Prisma.VendorOrderWhereInput = {};
-    if (vendorId) voWhere.vendorId = vendorId;
-    if (attentionOnly) {
-      voWhere.OR = [
-        { routingStatus: VendorRoutingStatus.failed },
-        {
-          fulfillmentStatus: VendorFulfillmentStatus.pending,
-          routingStatus: {
-            in: [VendorRoutingStatus.sent, VendorRoutingStatus.confirmed],
+    if (attentionOnly && !vendorId) {
+      orderIds = await getOrderIdsNeedingAttention();
+    } else {
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const voWhere: Prisma.VendorOrderWhereInput = {};
+      if (vendorId) voWhere.vendorId = vendorId;
+      if (attentionOnly) {
+        voWhere.OR = [
+          { routingStatus: VendorRoutingStatus.failed },
+          {
+            fulfillmentStatus: VendorFulfillmentStatus.pending,
+            routingStatus: {
+              in: [VendorRoutingStatus.sent, VendorRoutingStatus.confirmed],
+            },
+            createdAt: { lt: twoHoursAgo },
           },
-          createdAt: { lt: twoHoursAgo },
-        },
-      ];
+        ];
+      }
+      const [vos, openIssueOrderIds] = await Promise.all([
+        prisma.vendorOrder.findMany({
+          where: Object.keys(voWhere).length ? voWhere : undefined,
+          select: { orderId: true },
+          take: attentionOnly ? 500 : undefined,
+        }),
+        attentionOnly ? getOrderIdsWithOpenIssues() : Promise.resolve([]),
+      ]);
+      const fromVo = [...new Set(vos.map((v) => v.orderId))];
+      orderIds = attentionOnly
+        ? [...new Set([...fromVo, ...openIssueOrderIds])]
+        : fromVo.length > 0 ? fromVo : undefined;
     }
-    const [vos, openIssueOrderIds] = await Promise.all([
-      prisma.vendorOrder.findMany({
-        where: Object.keys(voWhere).length ? voWhere : undefined,
-        select: { orderId: true },
-        take: attentionOnly ? 500 : undefined,
-      }),
-      attentionOnly ? getOrderIdsWithOpenIssues() : Promise.resolve([]),
-    ]);
-    const fromVo = [...new Set(vos.map((v) => v.orderId))];
-    orderIds = attentionOnly
-      ? [...new Set([...fromVo, ...openIssueOrderIds])]
-      : fromVo.length > 0 ? fromVo : undefined;
     if (orderIds?.length === 0 && (vendorId || attentionOnly)) {
       orderIds = [];
     }
@@ -106,10 +111,20 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
   const [orders, pods, vendors] = await Promise.all([
     prisma.order.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        createdAt: true,
+        customerPhone: true,
+        status: true,
+        totalCents: true,
         pod: { select: { id: true, name: true } },
         vendorOrders: {
-          include: { vendor: { select: { id: true, name: true } } },
+          select: {
+            id: true,
+            routingStatus: true,
+            fulfillmentStatus: true,
+            vendor: { select: { id: true, name: true } },
+          },
         },
       },
       orderBy: { createdAt: "desc" },

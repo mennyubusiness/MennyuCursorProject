@@ -2,13 +2,16 @@
  * POST /api/order/[orderId]/vendor-orders/[vendorOrderId]/cancel
  * Customer-initiated cancellation of a single vendor's portion of an order.
  * Uses existing applyVendorOrderTransition; parent status is recomputed by the service.
+ * When eligible, attempts automatic refund for that vendor portion (Phase 2).
  */
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { getCustomerPhoneFromHeaders } from "@/lib/session";
 import { canCustomerCancelVendorOrder } from "@/lib/cancel-eligibility";
+import { getRefundDecision } from "@/lib/refund-decision";
 import { applyVendorOrderTransition } from "@/services/order-status.service";
+import { executeRefund } from "@/services/refund.service";
 
 export async function POST(
   _request: Request,
@@ -91,10 +94,40 @@ export async function POST(
     );
   }
 
+  let refundResult: { success: boolean; code?: string; message?: string; amountCents?: number } | undefined;
+  const orderForRefund = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      status: true,
+      totalCents: true,
+      vendorOrders: {
+        select: { id: true, totalCents: true, routingStatus: true, fulfillmentStatus: true },
+      },
+    },
+  });
+  if (orderForRefund) {
+    const decision = getRefundDecision({
+      orderId: orderForRefund.id,
+      trigger: "customer_cancel_vendor_order",
+      vendorOrderId: vo.id,
+      order: orderForRefund,
+    });
+    if (decision.required && decision.canAutoRefund) {
+      const exec = await executeRefund(decision);
+      refundResult = exec.success
+        ? { success: true, amountCents: exec.amountCents }
+        : { success: false, code: exec.code, message: exec.message, amountCents: exec.amountCents };
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     message: "Vendor order cancelled.",
     orderId: order.id,
     vendorOrderId: vo.id,
+    fulfillmentStatus: result.fulfillmentStatus,
+    routingStatus: result.routingStatus,
+    ...(refundResult !== undefined && { refund: refundResult }),
   });
 }

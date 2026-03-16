@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 interface CheckoutFormProps {
   cartId: string;
@@ -9,6 +11,90 @@ interface CheckoutFormProps {
   totalCents: number;
   subtotalCents: number;
   serviceFeeCents: number;
+}
+
+type Step = "form" | "payment";
+
+const stripePublishableKey = typeof window !== "undefined"
+  ? (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "")
+  : (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "");
+
+function PaymentStep({
+  orderId,
+  clientSecret,
+  cartId,
+  totalWithTip,
+  onSuccess,
+}: {
+  orderId: string;
+  clientSecret: string;
+  cartId: string;
+  totalWithTip: number;
+  onSuccess: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handlePay(e: React.FormEvent) {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        setError(submitError.message ?? "Validation failed");
+        setLoading(false);
+        return;
+      }
+      const { error: confirmError } = await stripe.confirmPayment({
+        elements,
+        clientSecret,
+        confirmParams: {
+          return_url: `${typeof window !== "undefined" ? window.location.origin : ""}/order/${orderId}?payment=success`,
+          payment_method_data: {
+            billing_details: { address: { country: "US" } },
+          },
+        },
+      });
+      if (confirmError) {
+        setError(confirmError.message ?? "Payment failed");
+        setLoading(false);
+        return;
+      }
+      await fetch("/api/cart/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartId }),
+      });
+      onSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handlePay} className="mt-6 space-y-4">
+      <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+        <p className="text-stone-600">
+          Total: ${(totalWithTip / 100).toFixed(2)}
+        </p>
+      </div>
+      <PaymentElement options={{ layout: "tabs" }} />
+      {error && <p className="text-red-600" role="alert">{error}</p>}
+      <button
+        type="submit"
+        disabled={!stripe || !elements || loading}
+        className="rounded-lg bg-mennyu-primary px-6 py-2 font-medium text-black hover:bg-mennyu-secondary disabled:opacity-50"
+      >
+        {loading ? "Processing…" : "Pay now"}
+      </button>
+    </form>
+  );
 }
 
 export function CheckoutForm({
@@ -19,6 +105,8 @@ export function CheckoutForm({
   serviceFeeCents,
 }: CheckoutFormProps) {
   const router = useRouter();
+  const [step, setStep] = useState<Step>("form");
+  const [paymentData, setPaymentData] = useState<{ orderId: string; clientSecret: string; paymentIntentId: string } | null>(null);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const TIP_PRESETS_CENTS = [200, 500, 1000];
@@ -32,6 +120,11 @@ export function CheckoutForm({
   const totalWithTip = totalCents + tipCents;
 
   const isCustomTipSelected = !TIP_PRESETS_CENTS.includes(tipCents);
+
+  const stripePromise = useMemo(
+    () => (stripePublishableKey ? loadStripe(stripePublishableKey) : null),
+    []
+  );
 
   function parseCustomTip(value: string): number | null {
     const trimmed = value.trim();
@@ -108,33 +201,63 @@ export function CheckoutForm({
         setError(data.error ?? "Missing payment intent");
         return;
       }
-      // MVP: redirect to order status; with real Stripe, confirm on client then redirect.
-      const orderRes = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId,
-          paymentIntentId,
-          idempotencyKey: `confirm_${idempotencyKey}`,
-        }),
-      });
-      const orderText = await orderRes.text();
-      if (!orderRes.ok) {
-        const orderData = (orderText && (() => { try { return JSON.parse(orderText); } catch { return {}; } })()) ?? {};
-        setError(orderData.error ?? "Order confirmation failed");
+
+      if (clientSecret === "dev_bypass") {
+        const orderRes = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId,
+            paymentIntentId,
+            idempotencyKey: `confirm_${idempotencyKey}`,
+          }),
+        });
+        const orderText = await orderRes.text();
+        if (!orderRes.ok) {
+          const orderData = (orderText && (() => { try { return JSON.parse(orderText); } catch { return {}; } })()) ?? {};
+          setError(orderData.error ?? "Order confirmation failed");
+          return;
+        }
+        await fetch("/api/cart/clear", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cartId }),
+        });
+        router.push(`/order/${orderId}`);
         return;
       }
-      await fetch("/api/cart/clear", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cartId }),
-      });
-      router.push(`/order/${orderId}`);
+
+      if (!stripePromise) {
+        setError("Stripe is not configured for payments. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.");
+        return;
+      }
+      setPaymentData({ orderId, clientSecret, paymentIntentId });
+      setStep("payment");
+      if (typeof document !== "undefined") {
+        document.cookie = `mennyu_checkout=${encodeURIComponent(JSON.stringify({ orderId, cartId }))}; path=/; max-age=3600; SameSite=Lax`;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (step === "payment" && paymentData && stripePromise) {
+    return (
+      <div className="mt-6">
+        <p className="text-stone-600">Complete payment for your order.</p>
+        <Elements stripe={stripePromise} options={{ clientSecret: paymentData.clientSecret }}>
+          <PaymentStep
+            orderId={paymentData.orderId}
+            clientSecret={paymentData.clientSecret}
+            cartId={cartId}
+            totalWithTip={totalWithTip}
+            onSuccess={() => router.push(`/order/${paymentData!.orderId}`)}
+          />
+        </Elements>
+      </div>
+    );
   }
 
   return (
@@ -213,7 +336,9 @@ export function CheckoutForm({
           Total: ${(totalWithTip / 100).toFixed(2)} (includes service fee + tip)
         </p>
         <p className="mt-1 text-xs text-stone-500">
-          MVP: Payment is simulated. In production, Stripe Elements would collect card details here.
+          {stripePromise
+            ? "Next: enter card details to complete payment (use test card 4242… in test mode)."
+            : "Payment is simulated when Stripe is not configured."}
         </p>
       </div>
       {error && <p className="text-red-600">{error}</p>}

@@ -2,6 +2,7 @@
  * Unified order status: derive parent status from child vendor orders; update on webhook.
  * POS (Deliverect) is source of truth when available; fallback flow scaffolded.
  */
+import { cache } from "react";
 import { Prisma, VendorRoutingStatus, VendorFulfillmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
@@ -187,8 +188,9 @@ export async function recomputeAndPersistParentStatus(
 /**
  * Fallback: when POS confirmation is delayed or fails, preserve order and expose fallback.
  * Future: manual/SMS confirmation or dashboard action.
+ * Cached per request to avoid duplicate fetches when React Strict Mode double-renders in dev.
  */
-export async function getOrderWithUnifiedStatus(orderId: string) {
+async function getOrderWithUnifiedStatusImpl(orderId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
@@ -201,17 +203,30 @@ export async function getOrderWithUnifiedStatus(orderId: string) {
       },
       pod: true,
       statusHistory: { orderBy: { createdAt: "asc" } },
+      refundAttempts: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!order) return null;
-  const derived = deriveParentStatusFromChildren(
+  const derivedFromChildren = deriveParentStatusFromChildren(
     order.vendorOrders.map((vo) =>
       getEffectiveChildStateForParentDerivation(vo, vo.statusHistory)
     )
   );
+  // Current status = latest we recorded (last in statusHistory). Derivation from children never
+  // returns pending_payment/paid; when those are the latest, use parent order.status.
+  const lastFromHistory =
+    order.statusHistory.length > 0
+      ? (order.statusHistory[order.statusHistory.length - 1].status as ParentOrderStatus)
+      : null;
+  const derived =
+    lastFromHistory ??
+    (order.status === "pending_payment" || order.status === "paid" ? order.status : derivedFromChildren) ??
+    derivedFromChildren;
   return {
     ...order,
     derivedStatus: derived,
     statusLabel: parentStatusLabel(derived),
   };
 }
+
+export const getOrderWithUnifiedStatus = cache(getOrderWithUnifiedStatusImpl);

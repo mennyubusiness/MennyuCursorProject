@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getVendorOrderSourceLabel } from "@/lib/vendor-order-source";
 import { getVendorOrderEffectiveDisplayState } from "@/lib/vendor-order-effective-state";
 import {
@@ -83,6 +83,19 @@ export function VendorDashboardLiveOrders({
   const [newlyArrivedOrderIds, setNewlyArrivedOrderIds] = useState<Set<string>>(new Set());
   const [isVisible, setIsVisible] = useState(true);
 
+  const onStatusSuccess = useCallback(
+    (vendorOrderId: string, update: { routingStatus: string; fulfillmentStatus: string }) => {
+      setVendorOrders((prev) =>
+        prev.map((vo) =>
+          vo.id === vendorOrderId
+            ? { ...vo, routingStatus: update.routingStatus, fulfillmentStatus: update.fulfillmentStatus }
+            : vo
+        )
+      );
+    },
+    []
+  );
+
   useEffect(() => {
     const onVisibility = () => setIsVisible(document.visibilityState === "visible");
     document.addEventListener("visibilitychange", onVisibility);
@@ -92,9 +105,10 @@ export function VendorDashboardLiveOrders({
 
   useEffect(() => {
     if (!isVisible) return;
+    const ac = new AbortController();
     const fetchOrders = async () => {
       try {
-        const res = await fetch(`/api/vendor/${vendorId}/orders`);
+        const res = await fetch(`/api/vendor/${vendorId}/orders`, { signal: ac.signal });
         if (!res.ok) return;
         const data = await res.json();
         const list: VendorOrderFromApi[] = data.vendorOrders ?? [];
@@ -108,12 +122,15 @@ export function VendorDashboardLiveOrders({
           setNewlyArrivedOrderIds((prev) => new Set([...prev, ...newIds]));
         }
       } catch {
-        // ignore
+        // ignore (e.g. aborted when effect re-runs)
       }
     };
 
     const id = setInterval(fetchOrders, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
+    return () => {
+      ac.abort();
+      clearInterval(id);
+    };
   }, [vendorId, isVisible]);
 
   const grouped = vendorOrders.reduce<Record<GroupKey, VendorOrderFromApi[]>>(
@@ -167,6 +184,7 @@ export function VendorDashboardLiveOrders({
                     <VendorOrderCard
                       key={vo.id}
                       vendorId={vendorId}
+                      onStatusSuccess={onStatusSuccess}
                       pickupCode={pickupCode}
                       vendorOrder={{
                         id: vo.id,

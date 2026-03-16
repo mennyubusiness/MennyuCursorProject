@@ -25,7 +25,13 @@ export async function GET(
 
   const vendorOrders = await prisma.vendorOrder.findMany({
     where: { vendorId },
-    include: {
+    select: {
+      id: true,
+      orderId: true,
+      routingStatus: true,
+      fulfillmentStatus: true,
+      manuallyRecoveredAt: true,
+      totalCents: true,
       order: {
         select: {
           id: true,
@@ -37,15 +43,22 @@ export async function GET(
         },
       },
       lineItems: {
-        include: {
+        select: {
+          id: true,
+          name: true,
+          quantity: true,
+          priceCents: true,
+          specialInstructions: true,
           selections: {
-            include: {
+            select: {
+              nameSnapshot: true,
+              quantity: true,
               modifierOption: { select: { name: true } },
             },
           },
         },
       },
-      statusHistory: { orderBy: { createdAt: "asc" } },
+      statusHistory: { orderBy: { createdAt: "asc" }, select: { source: true, fulfillmentStatus: true, createdAt: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 100,

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { cache } from "react";
 import "./globals.css";
 import Link from "next/link";
 import { getCustomerPhoneFromHeaders } from "@/lib/session";
@@ -10,14 +11,19 @@ export const metadata: Metadata = {
   description: "Order from multiple food cart vendors in one place. One cart, one payment.",
 };
 
+const getActiveOrderCached = cache(getActiveOrderByCustomerPhone);
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const headersList = await headers();
+  const pathname = headersList.get("x-pathname") ?? "";
+  const isAdmin = pathname.startsWith("/admin");
   const customerPhone = getCustomerPhoneFromHeaders(headersList);
-  const activeOrder = customerPhone ? await getActiveOrderByCustomerPhone(customerPhone) : null;
+  const activeOrder =
+    !isAdmin && customerPhone ? await getActiveOrderCached(customerPhone) : null;
 
   return (
     <html lang="en">

@@ -2,6 +2,7 @@
  * Exception aging / urgency for the Needs Attention queue.
  * Time-based buckets derived from VendorOrder.createdAt (or equivalent).
  */
+import { ageMinutes as ageMinutesUtil } from "@/lib/date-utils";
 
 // TODO: Tune thresholds based on operations. Current buckets: New 0–5 min, Stuck 5–15 min, Critical 15+ min.
 const NEW_MAX_MINUTES = 5;
@@ -18,9 +19,9 @@ export interface ExceptionUrgency {
   ageText: string;
 }
 
-export function getExceptionUrgency(createdAt: Date): ExceptionUrgency {
-  const ageMs = Date.now() - createdAt.getTime();
-  const ageMinutes = Math.floor(ageMs / (60 * 1000));
+/** createdAt may be Date or string (e.g. after serialization). */
+export function getExceptionUrgency(createdAt: Date | string): ExceptionUrgency {
+  const ageMinutes = ageMinutesUtil(createdAt);
 
   if (ageMinutes < NEW_MAX_MINUTES) {
     return {

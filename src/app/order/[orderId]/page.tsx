@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getOrderStatusAction } from "@/actions/order.actions";
+import { cookies } from "next/headers";
+import {
+  getOrderStatusAction,
+  reconcilePaymentIfSucceededAction,
+  clearCartAfterOrderSuccessAction,
+} from "@/actions/order.actions";
 import { parentStatusLabel } from "@/domain/order-state";
 import { getPickupCode } from "@/lib/pickup-code";
 import { isVendorOrderManuallyRecovered } from "@/lib/vendor-order-effective-state";
@@ -125,6 +130,7 @@ type InternalTimelineEvent = TimelineEvent & { type: "order" | "vendor" };
 /**
  * Build customer-facing timeline: hide noisy events, collapse duplicate order labels,
  * preserve chronological order. Does not change backend or history data.
+ * Includes refund-issued entry when latest RefundAttempt succeeded.
  */
 function buildTimelineEvents(order: {
   statusHistory: Array<{ status: string; createdAt: Date }>;
@@ -136,6 +142,7 @@ function buildTimelineEvents(order: {
       createdAt: Date;
     }>;
   }>;
+  refundAttempts?: Array<{ status: string; amountCents: number; createdAt: Date }>;
 }): TimelineEvent[] {
   const raw: InternalTimelineEvent[] = [];
 
@@ -143,6 +150,14 @@ function buildTimelineEvents(order: {
     raw.push({
       createdAt: e.createdAt,
       label: timelineEntryLabel(null, null, null, e.status),
+      type: "order",
+    });
+  }
+  const latestRefund = order.refundAttempts?.[0];
+  if (latestRefund?.status === "succeeded") {
+    raw.push({
+      createdAt: latestRefund.createdAt,
+      label: `Refund of $${(latestRefund.amountCents / 100).toFixed(2)} issued`,
       type: "order",
     });
   }
@@ -179,17 +194,56 @@ function formatTimestamp(d: Date): string {
   }).format(d);
 }
 
+/** Customer-facing refund message from latest RefundAttempt; null if none or not relevant. */
+function refundDisplayMessage(
+  latestAttempt: { status: string; amountCents: number; createdAt: Date } | null | undefined
+): { line: string; timelineLabel?: string } | null {
+  if (!latestAttempt) return null;
+  const amountFormatted = `$${(latestAttempt.amountCents / 100).toFixed(2)}`;
+  if (latestAttempt.status === "succeeded") {
+    return {
+      line: `Refunded. Refund of ${amountFormatted} issued.`,
+      timelineLabel: `Refund of ${amountFormatted} issued`,
+    };
+  }
+  if (latestAttempt.status === "attempted") return { line: "Refund pending.", timelineLabel: undefined };
+  if (latestAttempt.status === "failed") return { line: "Refund issue — under review.", timelineLabel: undefined };
+  return null;
+}
+
 export default async function OrderStatusPage({
   params,
   searchParams,
 }: {
   params: Promise<{ orderId: string }>;
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; payment?: string }>;
 }) {
   const { orderId } = await params;
-  const { from } = await searchParams;
-  const order = await getOrderStatusAction(orderId);
+  const { from, payment } = await searchParams;
+  let order = await getOrderStatusAction(orderId);
   if (!order) notFound();
+  if (payment === "success" && order.status === "pending_payment") {
+    await reconcilePaymentIfSucceededAction(orderId);
+    order = (await getOrderStatusAction(orderId)) ?? order;
+  }
+
+  if (payment === "success" && order.status !== "pending_payment") {
+    const cookieStore = await cookies();
+    const checkoutCookie = cookieStore.get("mennyu_checkout")?.value;
+    if (checkoutCookie) {
+      try {
+        const { orderId: cookieOrderId, cartId } = JSON.parse(decodeURIComponent(checkoutCookie)) as {
+          orderId?: string;
+          cartId?: string;
+        };
+        if (cookieOrderId === orderId && cartId) {
+          await clearCartAfterOrderSuccessAction(cartId);
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+  }
 
   const derivedStatus = order.derivedStatus ?? order.status;
   const failedButRecoverable =
@@ -209,6 +263,8 @@ export default async function OrderStatusPage({
   const isMultiVendor = order.vendorOrders.length > 1;
   const customerCanCancel = canCustomerCancelOrder(order);
   const isOrderCancelled = derivedStatus === "cancelled";
+  const latestRefundAttempt = order.refundAttempts?.[0] ?? null;
+  const refundMessage = refundDisplayMessage(latestRefundAttempt);
   const readyCount = order.vendorOrders.filter((vo) => vo.fulfillmentStatus === "ready").length;
   const completedCount = order.vendorOrders.filter((vo) => vo.fulfillmentStatus === "completed").length;
 
@@ -265,6 +321,9 @@ export default async function OrderStatusPage({
       <div className="mt-6 rounded-xl border border-stone-200 bg-white p-5">
         <p className="text-lg font-medium text-mennyu-primary">{statusLabel}</p>
         <p className="mt-2 text-sm text-stone-600">{explanation}</p>
+        {isOrderCancelled && refundMessage && (
+          <p className="mt-2 text-sm font-medium text-stone-700">{refundMessage.line}</p>
+        )}
         <p className="mt-3 text-xs text-stone-500">
           Updates will be sent to {order.customerPhone}.
         </p>

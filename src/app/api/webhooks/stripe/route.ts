@@ -4,11 +4,7 @@ import { env } from "@/lib/env";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import { webhookIdempotencyKey } from "@/lib/idempotency";
-import { recordPaymentAndAllocations } from "@/services/payment.service";
-import { setOrderStatus } from "@/services/order.service";
-import { submitVendorOrderToDeliverect } from "@/services/deliverect.service";
-import { sendOrderConfirmation } from "@/services/sms.service";
-import { deriveParentRoutingStatusFromAttempts } from "@/domain/order-state";
+import { processSuccessfulPayment } from "@/services/post-payment.service";
 
 export async function POST(request: NextRequest) {
   if (!stripe || !env.STRIPE_WEBHOOK_SECRET) {
@@ -55,33 +51,11 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await recordPaymentAndAllocations(orderId, pi.id, `stripe_${event.id}`);
-      await setOrderStatus(orderId, "paid", "stripe");
-      await setOrderStatus(orderId, "routing", "system");
-
-      const order = await prisma.order.findUnique({
-        where: { id: orderId },
-        include: { vendorOrders: true },
+      await processSuccessfulPayment({
+        orderId,
+        paymentIntentId: pi.id,
+        idempotencyKey: `stripe_${event.id}`,
       });
-      if (order) {
-        for (const vo of order.vendorOrders) {
-          await submitVendorOrderToDeliverect(
-            vo.id,
-            order.customerPhone,
-            order.customerEmail,
-            15
-          );
-        }
-        const updatedOrder = await prisma.order.findUnique({
-          where: { id: orderId },
-          include: { vendorOrders: { select: { routingStatus: true } } },
-        });
-        const routingStatus = deriveParentRoutingStatusFromAttempts(
-          (updatedOrder?.vendorOrders ?? []).map((vo) => vo.routingStatus as "pending" | "sent" | "confirmed" | "failed")
-        );
-        await setOrderStatus(orderId, routingStatus, "system");
-        await sendOrderConfirmation(order.customerPhone, orderId, order.totalCents);
-      }
 
       await prisma.webhookEvent.updateMany({
         where: { idempotencyKey: idemKey },

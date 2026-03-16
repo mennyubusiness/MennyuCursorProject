@@ -92,6 +92,7 @@ export function VendorOrderCard({
   isNew = false,
   siblingFirstReadyMinutesAgo = null,
   siblingBehindEscalation = "yellow",
+  onStatusSuccess,
 }: {
   vendorId: string;
   vendorOrder: VendorOrderForCard;
@@ -111,6 +112,8 @@ export function VendorOrderCard({
   siblingFirstReadyMinutesAgo?: number | null;
   /** Escalation for behind-other-vendors display. */
   siblingBehindEscalation?: BehindSiblingEscalation;
+  /** When set, status change success updates this VO in parent state instead of full router.refresh(). */
+  onStatusSuccess?: (vendorOrderId: string, update: { routingStatus: string; fulfillmentStatus: string }) => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -160,7 +163,14 @@ export function VendorOrderCard({
         setError(data.error ?? "Request failed");
         return;
       }
-      router.refresh();
+      if (onStatusSuccess && data.routingStatus != null && data.fulfillmentStatus != null) {
+        onStatusSuccess(vendorOrder.id, {
+          routingStatus: data.routingStatus,
+          fulfillmentStatus: data.fulfillmentStatus,
+        });
+      } else {
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error");
     } finally {

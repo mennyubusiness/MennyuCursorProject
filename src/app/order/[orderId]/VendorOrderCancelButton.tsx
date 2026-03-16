@@ -7,10 +7,13 @@ export function VendorOrderCancelButton({
   orderId,
   vendorOrderId,
   vendorName,
+  onSuccess,
 }: {
   orderId: string;
   vendorOrderId: string;
   vendorName: string;
+  /** When provided, called on success with updated VO state instead of router.refresh(). */
+  onSuccess?: (data: { vendorOrderId: string; fulfillmentStatus: string; routingStatus: string }) => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -30,7 +33,20 @@ export function VendorOrderCancelButton({
         setError(data.error ?? "Could not cancel this portion.");
         return;
       }
-      router.refresh();
+      if (
+        onSuccess &&
+        data.vendorOrderId != null &&
+        data.fulfillmentStatus != null &&
+        data.routingStatus != null
+      ) {
+        onSuccess({
+          vendorOrderId: data.vendorOrderId,
+          fulfillmentStatus: data.fulfillmentStatus,
+          routingStatus: data.routingStatus,
+        });
+      } else {
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

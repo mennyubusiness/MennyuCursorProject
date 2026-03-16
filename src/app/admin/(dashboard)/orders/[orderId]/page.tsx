@@ -20,22 +20,44 @@ export default async function AdminOrderDetailPage({
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: {
-      pod: true,
-      issues: { orderBy: { createdAt: "desc" } },
+    select: {
+      id: true,
+      createdAt: true,
+      status: true,
+      customerPhone: true,
+      customerEmail: true,
+      orderNotes: true,
+      subtotalCents: true,
+      totalCents: true,
+      pod: { select: { id: true, name: true } },
+      statusHistory: { orderBy: { createdAt: "asc" }, select: { id: true, status: true, createdAt: true, source: true } },
+      issues: { orderBy: { createdAt: "desc" }, select: { id: true, type: true, severity: true, status: true, notes: true, createdAt: true, resolvedAt: true } },
+      refundAttempts: { orderBy: { createdAt: "asc" }, select: { id: true, vendorOrderId: true, amountCents: true, status: true, stripeRefundId: true, failureCode: true, failureMessage: true, createdAt: true, dismissedAsLegacyAt: true, dismissedAsLegacyBy: true } },
       vendorOrders: {
-        include: {
-          vendor: true,
-          issues: { orderBy: { createdAt: "desc" } },
+        select: {
+          id: true,
+          vendorId: true,
+          routingStatus: true,
+          fulfillmentStatus: true,
+          totalCents: true,
+          deliverectAttempts: true,
+          deliverectSubmittedAt: true,
+          deliverectLastError: true,
+          vendor: { select: { id: true, name: true } },
+          issues: { orderBy: { createdAt: "desc" }, select: { id: true, type: true, severity: true, status: true, notes: true, createdAt: true, resolvedAt: true } },
+          statusHistory: { orderBy: { createdAt: "asc" }, select: { id: true, createdAt: true, source: true, routingStatus: true, fulfillmentStatus: true } },
           lineItems: {
-            include: {
-              selections: { include: { modifierOption: { select: { name: true } } } },
+            select: {
+              id: true,
+              name: true,
+              quantity: true,
+              priceCents: true,
+              specialInstructions: true,
+              selections: { select: { nameSnapshot: true, quantity: true, modifierOption: { select: { name: true } } } },
             },
           },
-          statusHistory: { orderBy: { createdAt: "asc" } },
         },
       },
-      statusHistory: { orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -46,6 +68,60 @@ export default async function AdminOrderDetailPage({
   function formatDate(d: Date) {
     return new Intl.DateTimeFormat("en-US", { dateStyle: "short", timeStyle: "short" }).format(d);
   }
+
+  function refundTimelineLabel(
+    ra: { amountCents: number; status: string; vendorOrderId: string | null; failureMessage: string | null; failureCode: string | null; stripeRefundId: string | null; dismissedAsLegacyAt: Date | null; dismissedAsLegacyBy: string | null },
+    vendorNameForVo: (vendorOrderId: string) => string | null
+  ): string {
+    const amount = `$${(ra.amountCents / 100).toFixed(2)}`;
+    const vendorSuffix = ra.vendorOrderId ? ` (${vendorNameForVo(ra.vendorOrderId) ?? "vendor order"})` : "";
+    const dismissedSuffix = ra.dismissedAsLegacyAt != null ? " (dismissed as legacy)" : "";
+    if (ra.status === "succeeded") {
+      const stripe = ra.stripeRefundId ? ` — ${ra.stripeRefundId}` : "";
+      return `Refund completed — ${amount}${vendorSuffix}${stripe}${dismissedSuffix}`;
+    }
+    if (ra.status === "failed") {
+      const msg = ra.failureMessage
+        ? ` — ${ra.failureMessage.slice(0, 60)}${ra.failureMessage.length > 60 ? "…" : ""}`
+        : ra.failureCode
+          ? ` — ${ra.failureCode}`
+          : "";
+      return `Refund failed — ${amount}${vendorSuffix}${msg}${dismissedSuffix}`;
+    }
+    return `Refund attempted — ${amount}${vendorSuffix}${dismissedSuffix}`;
+  }
+
+  const hasHistory =
+    order.statusHistory.length > 0 ||
+    order.issues.length > 0 ||
+    order.vendorOrders.some((vo) => vo.issues.length > 0) ||
+    order.refundAttempts.length > 0;
+
+  const vendorNameByVoId = (vendorOrderId: string) =>
+    order.vendorOrders.find((vo) => vo.id === vendorOrderId)?.vendor.name ?? null;
+
+  const timelineEntries = [
+    ...order.statusHistory.map((h) => ({
+      date: h.createdAt.getTime(),
+      key: `status-${h.id}`,
+      label: `${h.status}${h.source ? ` (${h.source})` : ""}`,
+    })),
+    ...order.issues.flatMap((i) => [
+      { date: i.createdAt.getTime(), key: `oi-created-${i.id}`, label: `Order issue: ${i.type.replace(/_/g, " ")} (${i.status})` },
+      ...(i.resolvedAt ? [{ date: i.resolvedAt.getTime(), key: `oi-resolved-${i.id}`, label: `Order issue resolved: ${i.type.replace(/_/g, " ")}` }] : []),
+    ]),
+    ...order.vendorOrders.flatMap((vo) =>
+      vo.issues.flatMap((i) => [
+        { date: i.createdAt.getTime(), key: `voi-created-${i.id}`, label: `Vendor issue (${vo.vendor.name}): ${i.type.replace(/_/g, " ")} (${i.status})` },
+        ...(i.resolvedAt ? [{ date: i.resolvedAt.getTime(), key: `voi-resolved-${i.id}`, label: `Vendor issue resolved (${vo.vendor.name}): ${i.type.replace(/_/g, " ")}` }] : []),
+      ])
+    ),
+    ...order.refundAttempts.map((ra) => ({
+      date: ra.createdAt.getTime(),
+      key: `refund-${ra.id}`,
+      label: refundTimelineLabel(ra, vendorNameByVoId),
+    })),
+  ].sort((a, b) => a.date - b.date);
 
   return (
     <div className="space-y-8">
@@ -96,33 +172,15 @@ export default async function AdminOrderDetailPage({
         </dl>
       </section>
 
-      {(order.statusHistory.length > 0 || order.issues.length > 0 || order.vendorOrders.some((vo) => vo.issues.length > 0)) && (
+      {hasHistory && (
         <section className="rounded-lg border border-stone-200 bg-white p-4">
           <h2 className="font-medium text-stone-900">Order status history</h2>
           <ul className="mt-2 space-y-1 text-sm">
-            {[
-              ...order.statusHistory.map((h) => ({
-                date: h.createdAt.getTime(),
-                key: `status-${h.id}`,
-                label: `${h.status}${h.source ? ` (${h.source})` : ""}`,
-              })),
-              ...order.issues.flatMap((i) => [
-                { date: i.createdAt.getTime(), key: `oi-created-${i.id}`, label: `Order issue: ${i.type.replace(/_/g, " ")} (${i.status})` },
-                ...(i.resolvedAt ? [{ date: i.resolvedAt.getTime(), key: `oi-resolved-${i.id}`, label: `Order issue resolved: ${i.type.replace(/_/g, " ")}` }] : []),
-              ]),
-              ...order.vendorOrders.flatMap((vo) =>
-                vo.issues.flatMap((i) => [
-                  { date: i.createdAt.getTime(), key: `voi-created-${i.id}`, label: `Vendor issue (${vo.vendor.name}): ${i.type.replace(/_/g, " ")} (${i.status})` },
-                  ...(i.resolvedAt ? [{ date: i.resolvedAt.getTime(), key: `voi-resolved-${i.id}`, label: `Vendor issue resolved (${vo.vendor.name}): ${i.type.replace(/_/g, " ")}` }] : []),
-                ])
-              ),
-            ]
-              .sort((a, b) => a.date - b.date)
-              .map((e) => (
-                <li key={e.key}>
-                  {formatDate(new Date(e.date))} — {e.label}
-                </li>
-              ))}
+            {timelineEntries.map((e) => (
+              <li key={e.key}>
+                {formatDate(new Date(e.date))} — {e.label}
+              </li>
+            ))}
           </ul>
         </section>
       )}
@@ -279,15 +337,44 @@ export default async function AdminOrderDetailPage({
                 )}
               </section>
 
-              {vo.fulfillmentStatus === "cancelled" && (
-                <section className="mt-3 rounded border border-amber-200 bg-amber-50/50 p-2">
-                  <p className="text-xs font-medium text-amber-800">Financial follow-up may be required</p>
-                  <p className="mt-0.5 text-xs text-stone-600">
-                    This vendor order was cancelled. Refund or reconciliation may be needed — handle outside this dashboard.
-                  </p>
-                  <p className="mt-1 text-xs text-stone-500">TODO: Refund workflow when available.</p>
-                </section>
-              )}
+              {vo.fulfillmentStatus === "cancelled" && (() => {
+                const voRefunds = order.refundAttempts.filter((ra) => ra.vendorOrderId === vo.id);
+                const latestRefund = voRefunds.length > 0 ? voRefunds[voRefunds.length - 1] : null;
+                const amount = latestRefund ? `$${(latestRefund.amountCents / 100).toFixed(2)}` : "";
+                if (latestRefund?.status === "succeeded") {
+                  return (
+                    <section className="mt-3 rounded border border-stone-200 bg-stone-50/80 p-2">
+                      <p className="text-xs font-medium text-stone-800">Refund completed — {amount}</p>
+                    </section>
+                  );
+                }
+                if (latestRefund?.status === "attempted") {
+                  return (
+                    <section className="mt-3 rounded border border-stone-200 bg-stone-50/80 p-2">
+                      <p className="text-xs font-medium text-stone-800">Refund pending — {amount}</p>
+                    </section>
+                  );
+                }
+                if (latestRefund?.status === "failed") {
+                  return (
+                    <section className="mt-3 rounded border border-amber-200 bg-amber-50/50 p-2">
+                      <p className="text-xs font-medium text-amber-800">Refund failed — {amount}</p>
+                      {latestRefund.failureMessage && (
+                        <p className="mt-0.5 text-xs text-stone-600">{latestRefund.failureMessage.slice(0, 120)}{latestRefund.failureMessage.length > 120 ? "…" : ""}</p>
+                      )}
+                      <p className="mt-1 text-xs text-stone-500">Manual follow-up may be required (e.g. Stripe dashboard or support).</p>
+                    </section>
+                  );
+                }
+                return (
+                  <section className="mt-3 rounded border border-amber-200 bg-amber-50/50 p-2">
+                    <p className="text-xs font-medium text-amber-800">Financial follow-up may be required</p>
+                    <p className="mt-0.5 text-xs text-stone-600">
+                      This vendor order was cancelled. Refund or reconciliation may be needed — handle outside this dashboard.
+                    </p>
+                  </section>
+                );
+              })()}
 
               <div className="mt-4">
                 <p className="text-sm font-medium text-stone-700">Line items</p>

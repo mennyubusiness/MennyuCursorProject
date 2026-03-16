@@ -3,11 +3,14 @@
  * Body: { targetState, vendorId }
  * Verifies the vendor order belongs to the vendor, then applies the same transition used by the dev simulator.
  * Updates customer order tracking and can trigger SMS when parent status changes.
+ * When vendor denies (cancelled), runs refund decision and auto-refund for that vendor portion.
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { applyVendorOrderTransition } from "@/services/order-status.service";
 import { canVendorRejectVendorOrder } from "@/lib/cancel-eligibility";
+import { getRefundDecision } from "@/lib/refund-decision";
+import { executeRefund } from "@/services/refund.service";
 import type { VendorOrderTargetState } from "@/domain/vendor-order-transition";
 
 const VENDOR_DASHBOARD_SOURCE = "vendor_dashboard";
@@ -93,7 +96,42 @@ export async function POST(
     );
 
     if (result.success) {
-      return NextResponse.json(result);
+      let refundPayload: { refund?: { success: boolean; code?: string; message?: string; amountCents?: number } } = {};
+      if (targetState === "cancelled" && result.orderId) {
+        const orderForRefund = await prisma.order.findUnique({
+          where: { id: result.orderId },
+          select: {
+            id: true,
+            status: true,
+            totalCents: true,
+            vendorOrders: {
+              select: { id: true, totalCents: true, routingStatus: true, fulfillmentStatus: true },
+            },
+          },
+        });
+        if (orderForRefund) {
+          const decision = getRefundDecision({
+            orderId: orderForRefund.id,
+            trigger: "vendor_denial",
+            vendorOrderId,
+            order: orderForRefund,
+          });
+          if (decision.required && decision.canAutoRefund) {
+            const exec = await executeRefund(decision);
+            refundPayload = {
+              refund: exec.success
+                ? { success: true, amountCents: exec.amountCents }
+                : {
+                    success: false,
+                    code: exec.code,
+                    message: exec.message,
+                    amountCents: exec.amountCents,
+                  },
+            };
+          }
+        }
+      }
+      return NextResponse.json({ ...result, ...refundPayload });
     }
 
     if (result.code === "NOT_FOUND") {

@@ -290,11 +290,12 @@ model Order {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  pod           Pod              @relation(fields: [podId], references: [id], onDelete: Restrict)
-  vendorOrders  VendorOrder[]
-  payments      Payment[]
-  statusHistory OrderStatusHistory[]
-  issues        OrderIssue[]
+  pod             Pod              @relation(fields: [podId], references: [id], onDelete: Restrict)
+  vendorOrders    VendorOrder[]
+  payments        Payment[]
+  refundAttempts  RefundAttempt[]
+  statusHistory   OrderStatusHistory[]
+  issues          OrderIssue[]
 
   @@index([stripePaymentIntentId])
 }
@@ -388,6 +389,30 @@ model Payment {
 
   order        Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
   allocations  PaymentAllocation[]
+}
+
+// Refund attempt audit + idempotency (one row per refund context; prevents duplicate refunds).
+model RefundAttempt {
+  id              String   @id @default(cuid())
+  idempotencyKey  String   @unique // e.g. customer_cancel:orderId or customer_cancel:orderId:vendorOrderId
+  orderId         String
+  vendorOrderId   String?
+  amountCents     Int
+  status          String   // attempted | succeeded | failed
+  stripeRefundId  String?
+  failureCode     String?
+  failureMessage  String?
+  reason          String   // RefundReason from decision layer
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  /// When set, this failed attempt was dismissed as legacy/test; excluded from Needs Attention. */
+  dismissedAsLegacyAt DateTime?
+  dismissedAsLegacyBy String?  // e.g. "admin"
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([orderId, status])
 }
 
 // How the single payment is split (subtotal/tip/tax/fee per vendor for reporting)
