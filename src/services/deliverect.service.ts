@@ -192,7 +192,7 @@ export async function submitVendorOrderToDeliverect(
         vendorOrderId,
         routingStatus: "sent",
         source: "deliverect",
-        rawPayload: responsePayload ?? {},
+        rawPayload: (responsePayload ?? {}) as unknown as Prisma.InputJsonValue,
       },
     });
   }
