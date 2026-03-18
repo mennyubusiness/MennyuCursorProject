@@ -90,9 +90,7 @@ export async function submitVendorOrderToDeliverect(
   });
 
   const now = new Date();
-  let result:
-    | Awaited<ReturnType<typeof submitOrder>>
-    | { success: false; error: string; raw: object; responseAudit?: DeliverectResponseAudit };
+  let result: DeliverectSubmitResult;
 
   if (env.ROUTING_MODE === "mock") {
     result = {
