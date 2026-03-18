@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { getVendorOrderSourceLabel } from "@/lib/vendor-order-source";
 import { getVendorOrderEffectiveDisplayState } from "@/lib/vendor-order-effective-state";
+import {
+  getVendorOrderOperatingMode,
+  type VendorOrderOperatingMode,
+} from "@/lib/vendor-order-operating-mode";
 import {
   getVendorOrderUrgency,
   getReadyWaitMinutes,
@@ -32,10 +35,10 @@ function groupKey(vo: {
 }
 
 const GROUP_LABELS: Record<GroupKey, string> = {
-  new: "New orders",
-  preparing: "Preparing",
+  new: "Needs action",
+  preparing: "In progress",
   ready: "Ready for pickup",
-  completed: "Recent completed",
+  completed: "Completed",
   cancelled_failed: "Cancelled / Failed",
 };
 
@@ -46,9 +49,11 @@ type VendorOrderFromApi = {
   fulfillmentStatus: string;
   manuallyRecoveredAt?: string | null;
   totalCents: number;
+  tipCents: number;
   order: {
     id: string;
     orderNotes: string | null;
+    customerPhone: string | null;
     createdAt: string;
     _count?: { vendorOrders: number };
   };
@@ -67,21 +72,40 @@ type VendorOrderFromApi = {
   statusHistory: Array<{ source?: string | null; fulfillmentStatus?: string | null; createdAt: string }>;
   /** Minutes since first sibling vendor in same order became ready; null if N/A. From API. */
   siblingFirstReadyMinutesAgo?: number | null;
+  /** True when Deliverect routing missed the healthy window; show manual confirm. */
+  deliverectRoutingDegraded?: boolean;
 };
 
 const POLL_INTERVAL_MS = 5000;
 
+const AGE_UPDATE_INTERVAL_MS = 60_000;
+
 export function VendorDashboardLiveOrders({
   vendorId,
   initialVendorOrders,
+  initialNowMs,
+  isDeliverectLive = false,
 }: {
   vendorId: string;
   initialVendorOrders: VendorOrderFromApi[];
+  /** Stable "now" from server for initial render so SSR and hydration match. */
+  initialNowMs: number;
+  /** Pass from server (e.g. isRoutingRetryAvailable()) so POS vs Mennyu mode is correct. */
+  isDeliverectLive?: boolean;
 }) {
   const [vendorOrders, setVendorOrders] = useState<VendorOrderFromApi[]>(initialVendorOrders);
+  const [nowMs, setNowMs] = useState(initialNowMs);
   const seenOrderIdsRef = useRef<Set<string>>(new Set(initialVendorOrders.map((vo) => vo.id)));
-  const [newlyArrivedOrderIds, setNewlyArrivedOrderIds] = useState<Set<string>>(new Set());
+  /** Vendor order id → highlight ring expires at this timestamp (ms). ~60s from first seen via poll. */
+  const [highlightExpireAtById, setHighlightExpireAtById] = useState<Record<string, number>>({});
+  /** Periodic tick so highlight rings clear without full page refresh. */
+  const [, setHighlightTick] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    const id = setInterval(() => setHighlightTick((t) => t + 1), 3000);
+    return () => clearInterval(id);
+  }, []);
 
   const onStatusSuccess = useCallback(
     (vendorOrderId: string, update: { routingStatus: string; fulfillmentStatus: string }) => {
@@ -95,6 +119,11 @@ export function VendorDashboardLiveOrders({
     },
     []
   );
+
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), AGE_UPDATE_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const onVisibility = () => setIsVisible(document.visibilityState === "visible");
@@ -119,7 +148,12 @@ export function VendorDashboardLiveOrders({
         const newIds = list.filter((vo: VendorOrderFromApi) => !seen.has(vo.id)).map((vo: VendorOrderFromApi) => vo.id);
         newIds.forEach((id: string) => seen.add(id));
         if (newIds.length > 0) {
-          setNewlyArrivedOrderIds((prev) => new Set([...prev, ...newIds]));
+          const exp = Date.now() + 60_000;
+          setHighlightExpireAtById((prev) => {
+            const next = { ...prev };
+            for (const id of newIds) next[id] = exp;
+            return next;
+          });
         }
       } catch {
         // ignore (e.g. aborted when effect re-runs)
@@ -145,11 +179,32 @@ export function VendorDashboardLiveOrders({
 
   const order: GroupKey[] = ["new", "preparing", "ready", "completed", "cancelled_failed"];
 
+  const highlightNow = Date.now();
   const newOrderIdsForSound = grouped.new?.map((vo) => vo.id) ?? [];
+  const needsActionCount = grouped.new?.length ?? 0;
+  const inProgressCount = (grouped.preparing?.length ?? 0) + (grouped.ready?.length ?? 0);
+  const readyCount = grouped.ready?.length ?? 0;
+  const completedCount = grouped.completed?.length ?? 0;
 
   return (
     <>
       <NewOrderSoundAlert newOrderIds={newOrderIdsForSound} />
+      {vendorOrders.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-4 rounded-lg border border-stone-200 bg-stone-50/50 px-3 py-2 text-sm">
+          <span className="font-medium text-stone-700">
+            Needs action: <strong>{needsActionCount}</strong>
+          </span>
+          <span className="text-stone-600">
+            In progress: <strong>{inProgressCount}</strong>
+          </span>
+          <span className="text-stone-600">
+            Ready: <strong>{readyCount}</strong>
+          </span>
+          <span className="text-stone-500">
+            Completed today: <strong>{completedCount}</strong>
+          </span>
+        </div>
+      )}
       {vendorOrders.length === 0 ? (
         <p className="text-sm text-stone-500">No orders yet.</p>
       ) : (
@@ -164,15 +219,19 @@ export function VendorDashboardLiveOrders({
               </h2>
               <div className="space-y-4">
                 {list.map((vo) => {
-                  const sourceLabel = getVendorOrderSourceLabel(vo, vo.statusHistory);
-                  const urgency = getVendorOrderUrgency(new Date(vo.order.createdAt));
+                  const operatingMode = getVendorOrderOperatingMode(
+                    vo,
+                    vo.statusHistory,
+                    isDeliverectLive
+                  ) as VendorOrderOperatingMode;
+                  const urgency = getVendorOrderUrgency(new Date(vo.order.createdAt), nowMs);
                   const readyWaitMinutes = getReadyWaitMinutes(
-                    vo.statusHistory?.map((h) => ({ ...h, createdAt: new Date(h.createdAt) }))
+                    vo.statusHistory?.map((h) => ({ ...h, createdAt: new Date(h.createdAt) })),
+                    nowMs
                   );
                   const readyWaitEscalation =
                     readyWaitMinutes != null ? getReadyWaitEscalation(readyWaitMinutes) : "neutral";
                   const vendorOrderCount = vo.order._count?.vendorOrders ?? 1;
-                  const isPosManaged = sourceLabel === "POS / Deliverect synced";
                   const pickupCode = getPickupCode(vo.order.id);
                   const siblingFirstReadyMinutesAgo = vo.siblingFirstReadyMinutesAgo ?? null;
                   const siblingBehindEscalation =
@@ -184,6 +243,8 @@ export function VendorDashboardLiveOrders({
                     <VendorOrderCard
                       key={vo.id}
                       vendorId={vendorId}
+                      isDeliverectLive={isDeliverectLive}
+                      deliverectRoutingDegraded={vo.deliverectRoutingDegraded === true}
                       onStatusSuccess={onStatusSuccess}
                       pickupCode={pickupCode}
                       vendorOrder={{
@@ -194,9 +255,11 @@ export function VendorDashboardLiveOrders({
                         manuallyRecoveredAt: vo.manuallyRecoveredAt ?? undefined,
                         statusHistory: vo.statusHistory?.map((h) => ({ source: h.source })) ?? undefined,
                         totalCents: vo.totalCents,
+                        tipCents: vo.tipCents ?? 0,
                         order: {
                           id: vo.order.id,
                           orderNotes: vo.order.orderNotes,
+                          customerPhone: vo.order.customerPhone,
                           createdAt: vo.order.createdAt,
                         },
                         lineItems: vo.lineItems.map((line) => ({
@@ -212,15 +275,14 @@ export function VendorDashboardLiveOrders({
                           })),
                         })),
                       }}
-                      sourceLabel={sourceLabel}
+                      operatingMode={operatingMode}
                       urgencyLabel={urgency.label}
                       urgencyLevel={urgency.level}
                       ageText={urgency.ageText}
                       readyWaitMinutes={readyWaitMinutes}
                       readyWaitEscalation={readyWaitEscalation}
                       vendorOrderCount={vendorOrderCount}
-                      isPosManaged={isPosManaged}
-                      isNew={newlyArrivedOrderIds.has(vo.id)}
+                      isNew={(highlightExpireAtById[vo.id] ?? 0) > highlightNow}
                       siblingFirstReadyMinutesAgo={siblingFirstReadyMinutesAgo}
                       siblingBehindEscalation={siblingBehindEscalation}
                     />

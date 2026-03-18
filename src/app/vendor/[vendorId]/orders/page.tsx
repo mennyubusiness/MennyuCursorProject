@@ -1,6 +1,11 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { isRoutingRetryAvailable } from "@/lib/routing-availability";
+import {
+  isDeliverectVendorOrderRoutingDegraded,
+  shouldOmitVendorOrderFromDeliverectDashboard,
+} from "@/lib/vendor-deliverect-dashboard-visibility";
 import { VendorAvailabilityStatusSection } from "../dashboard/VendorAvailabilityStatusSection";
 import { VendorPauseToggle } from "../dashboard/VendorPauseToggle";
 import { VendorDashboardLiveOrders } from "../dashboard/VendorDashboardLiveOrders";
@@ -12,7 +17,10 @@ const getVendorOrdersPageData = cache(async (vendorId: string) => {
   });
   if (!vendor) return null;
   const vendorOrders = await prisma.vendorOrder.findMany({
-    where: { vendorId },
+    where: {
+      vendorId,
+      order: { status: { not: "pending_payment" } },
+    },
     select: {
       id: true,
       orderId: true,
@@ -20,14 +28,18 @@ const getVendorOrdersPageData = cache(async (vendorId: string) => {
       fulfillmentStatus: true,
       manuallyRecoveredAt: true,
       totalCents: true,
+      tipCents: true,
       order: {
         select: {
           id: true,
           orderNotes: true,
+          customerPhone: true,
           createdAt: true,
+          updatedAt: true,
           _count: { select: { vendorOrders: true } },
         },
       },
+      deliverectAttempts: true,
       lineItems: {
         select: {
           id: true,
@@ -62,8 +74,15 @@ export default async function VendorOrdersPage({
   const data = await getVendorOrdersPageData(vendorId);
   if (!data) notFound();
   const { vendor, vendorOrders } = data;
+  const isDeliverectLive = isRoutingRetryAvailable();
 
-  const initialVendorOrdersForClient = vendorOrders.map((vo) => ({
+  const initialNowMs = Date.now();
+  const visibleVendorOrders = vendorOrders.filter(
+    (vo) =>
+      !shouldOmitVendorOrderFromDeliverectDashboard(vo, vendor, isDeliverectLive, initialNowMs)
+  );
+
+  const initialVendorOrdersForClient = visibleVendorOrders.map((vo) => ({
     ...vo,
     manuallyRecoveredAt: vo.manuallyRecoveredAt?.toISOString() ?? null,
     order: {
@@ -74,6 +93,12 @@ export default async function VendorOrdersPage({
       ...h,
       createdAt: h.createdAt.toISOString(),
     })),
+    deliverectRoutingDegraded: isDeliverectVendorOrderRoutingDegraded(
+      vo,
+      vendor,
+      isDeliverectLive,
+      initialNowMs
+    ),
   }));
 
   return (
@@ -95,7 +120,12 @@ export default async function VendorOrdersPage({
         initialPaused={vendor.mennyuOrdersPaused ?? false}
       />
 
-      <VendorDashboardLiveOrders vendorId={vendor.id} initialVendorOrders={initialVendorOrdersForClient} />
+      <VendorDashboardLiveOrders
+        vendorId={vendor.id}
+        initialVendorOrders={initialVendorOrdersForClient}
+        initialNowMs={initialNowMs}
+        isDeliverectLive={isDeliverectLive}
+      />
     </div>
   );
 }

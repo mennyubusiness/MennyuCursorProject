@@ -24,13 +24,10 @@ export interface TransformInput {
 type LineItem = NonNullable<HydratedVendorOrder>["lineItems"][number];
 type Selection = LineItem["selections"][number];
 
-function centsToDecimal(cents: number): number {
-  return Math.round(cents) / 100;
-}
-
 /**
  * Build one Deliverect modifier from a selection. Prefer external ID when mapped.
  * Nested modifiers are attached by the caller. mennyuOptionId is used for nested grouping only.
+ * Price: integer cents (Deliverect expects integer).
  */
 function selectionToModifier(sel: Selection): Omit<DeliverectModifier, "nestedModifiers"> & { _mennyuOptionId: string } {
   const externalId = sel.modifierOption.deliverectModifierId ?? null;
@@ -39,7 +36,7 @@ function selectionToModifier(sel: Selection): Omit<DeliverectModifier, "nestedMo
     ...(externalId ? { externalModifierId: externalId } : {}),
     name: sel.nameSnapshot,
     quantity: sel.quantity,
-    price: centsToDecimal(sel.priceCentsSnapshot),
+    price: Math.round(sel.priceCentsSnapshot),
     _mennyuOptionId: sel.modifierOptionId,
   };
 }
@@ -88,47 +85,80 @@ function buildModifiersForLine(selections: Selection[]): DeliverectModifier[] | 
 
 /**
  * Map one Mennyu line item to Deliverect order item. Prefer external product ID when mapped.
+ * Price: integer cents (Deliverect expects integer).
  */
 function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
   const modifiers = buildModifiersForLine(line.selections);
   const externalProductId = line.menuItem?.deliverectProductId ?? null;
+  const itemNote = line.specialInstructions?.trim();
   return {
     plu: externalProductId ?? line.menuItemId,
     ...(externalProductId ? { externalProductId } : {}),
     name: line.name,
     quantity: line.quantity,
-    price: centsToDecimal(line.priceCents),
-    remarks: line.specialInstructions ?? undefined,
+    price: Math.round(line.priceCents),
+    ...(itemNote ? { remark: itemNote, remarks: itemNote } : {}),
     ...(modifiers && modifiers.length > 0 ? { modifiers } : {}),
   };
 }
 
 /**
  * Build Deliverect order request from a hydrated VendorOrder.
- * Prices: stored in cents internally; converted to decimal for payload.
+ * Prices: sent as integer cents (Deliverect expects integer).
+ * Top-level field names match Deliverect API: channelOrderId, channelOrderDisplayId, items, orderType.
  */
 export function mennyuVendorOrderToDeliverectPayload(input: TransformInput): DeliverectOrderRequest {
   const { vendorOrder } = input;
-  const orderItems: DeliverectOrderItem[] = vendorOrder.lineItems.map(lineItemToDeliverectItem);
+  const items: DeliverectOrderItem[] = vendorOrder.lineItems.map(lineItemToDeliverectItem);
+
+  const prepMin = input.preparationTimeMinutes ?? 15;
+  const pickupAt = new Date(Date.now() + prepMin * 60 * 1000);
+  /** Deliverect sample format without ms: yyyy-MM-ddTHH:mm:ssZ */
+  const pickupTime = pickupAt.toISOString().replace(/\.\d{3}Z$/, "Z");
 
   const payload: DeliverectOrderRequest = {
     channelLinkId: input.channelLinkId,
-    orderId: vendorOrder.id,
-    mennyuVendorOrderId: vendorOrder.id,
-    orderItems,
-    preparationTime: input.preparationTimeMinutes ?? 15,
+    channelOrderId: vendorOrder.id,
+    channelOrderDisplayId: vendorOrder.id,
+    items,
+    orderType: 1, // pickup
+    preparationTime: prepMin,
+    pickupTime,
+    isASAP: prepMin <= 30,
   };
 
-  if (vendorOrder.order.orderNotes) {
-    payload.orderNotes = vendorOrder.order.orderNotes;
+  const orderNote = vendorOrder.order.orderNotes?.trim();
+  if (orderNote) {
+    payload.note = orderNote;
+    payload.orderNotes = orderNote;
   }
   if (input.locationId) payload.locationId = input.locationId;
-  if (input.customerPhone || input.customerEmail) {
-    payload.customerInfo = {
-      phone: input.customerPhone,
-      email: input.customerEmail ?? undefined,
+
+  /** Deliverect channel API expects `customer.phoneNumber`, not `customerInfo.phone`. */
+  const phoneNumber =
+    input.customerPhone?.trim() || vendorOrder.order.customerPhone?.trim() || undefined;
+  const email =
+    (input.customerEmail ?? vendorOrder.order.customerEmail)?.trim() || undefined;
+  if (phoneNumber || email) {
+    payload.customer = {
+      ...(phoneNumber ? { phoneNumber } : {}),
+      ...(email ? { email } : {}),
     };
   }
+
+  const taxCents = Math.max(0, Math.round(vendorOrder.taxCents));
+  const totalCents = Math.max(0, Math.round(vendorOrder.totalCents));
+  payload.taxTotal = taxCents;
+  payload.taxes = [{ taxClassId: 0, name: "Tax", total: taxCents }];
+
+  /** Stripe checkout completed → treat as pre-paid online in Deliverect. */
+  const isStripePaid = Boolean(vendorOrder.order.stripePaymentIntentId);
+  payload.decimalDigits = 2;
+  payload.orderIsAlreadyPaid = isStripePaid;
+  payload.payment = {
+    amount: totalCents,
+    type: isStripePaid ? 0 : 1,
+  };
 
   return payload;
 }

@@ -7,6 +7,7 @@ import type { CartForValidation } from "@/services/order.service";
 import { prisma } from "@/lib/db";
 import { serializeModifierConfig } from "@/lib/modifier-config";
 import { CartItemActions } from "./CartItemActions";
+import { CheckoutProgress } from "../checkout/CheckoutProgress";
 
 export default async function CartPage({
   searchParams,
@@ -68,11 +69,19 @@ export default async function CartPage({
       : carts[0];
   if (!cart || cart.items.length === 0) {
     return (
-      <div className="mx-auto max-w-md text-center py-12">
-        <h1 className="text-2xl font-semibold text-stone-900">Your cart is empty</h1>
-        <p className="mt-2 text-stone-600">Add items from a pod to get started. Your cart is saved as you browse.</p>
-        <Link href="/explore" className="mt-6 inline-block rounded-lg bg-mennyu-primary px-4 py-2 font-medium text-black hover:bg-mennyu-secondary">
-          Browse vendors
+      <div className="mx-auto max-w-lg px-2 py-12 text-center">
+        <p className="text-4xl" aria-hidden>
+          🛒
+        </p>
+        <h1 className="mt-4 text-2xl font-semibold text-stone-900">Your cart is empty</h1>
+        <p className="mt-2 text-stone-600">
+          Add items from vendors in a pod. You can order from multiple vendors in one checkout and pay once.
+        </p>
+        <Link
+          href="/explore"
+          className="mt-8 inline-block rounded-xl bg-mennyu-primary px-6 py-3 font-semibold text-black hover:bg-mennyu-secondary"
+        >
+          Browse pods
         </Link>
       </div>
     );
@@ -97,6 +106,7 @@ export default async function CartPage({
     }
   }
   const totalCents = Array.from(byVendor.values()).reduce((a, v) => a + v.subtotalCents, 0);
+  const vendorCount = byVendor.size;
 
   const cartForValidation: CartForValidation = {
     podId: cart.podId,
@@ -138,98 +148,150 @@ export default async function CartPage({
   const canCheckout = cartValid;
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-stone-900">Cart</h1>
-      <p className="mt-1 text-stone-600">{cart.pod.name}</p>
+    <div className="mx-auto max-w-2xl">
+      <CheckoutProgress activeStep={1} />
+      <header className="border-b border-stone-200 pb-4">
+        <h1 className="text-2xl font-semibold text-stone-900">Review your order</h1>
+        <p className="mt-1 text-stone-600">
+          <span className="font-medium text-stone-800">{cart.pod.name}</span>
+          {vendorCount > 1 && (
+            <span className="text-stone-500"> · {vendorCount} vendors</span>
+          )}
+        </p>
+        <p className="mt-2 text-sm text-stone-500">
+          Vendors are notified only after your payment succeeds.
+        </p>
+      </header>
+
       {checkoutErrorCode && (
-        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
-          {getCartValidationMessage(checkoutErrorCode)} Please update or remove items below, then try checkout again.
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+          {getCartValidationMessage(checkoutErrorCode)} Update or remove items below, then try again.
         </p>
       )}
       {!cartValid && validationErrors.length > 0 && (
-        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
-          Some items in your cart need attention. Remove or update them to checkout.
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+          Some items need attention before you can continue.
         </p>
       )}
       {reorderSkipped > 0 && (
-        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           {reorderAdded > 0 && `${reorderAdded} item(s) from your previous order were added. `}
           {reorderSkipped} item(s) could not be added (no longer available).
         </p>
       )}
-      <div className="mt-6 space-y-8">
+
+      <div className="mt-6 space-y-6">
         {Array.from(byVendor.entries()).map(([vendorId, group]) => (
-          <div key={vendorId} className="rounded-xl border border-stone-200 bg-white p-5">
-            <h2 className="font-medium text-stone-900">{group.name}</h2>
-            <ul className="mt-4 space-y-3">
+          <section
+            key={vendorId}
+            className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
+          >
+            <div className="border-b border-stone-100 bg-stone-50/80 px-4 py-3">
+              <h2 className="font-semibold text-stone-900">{group.name}</h2>
+              <p className="text-xs text-stone-500">
+                {group.items.length} line{group.items.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+            <ul className="divide-y divide-stone-100 px-4 py-2">
               {group.items.map((item) => {
                 const itemError = errorByCartItemId.get(item.id);
+                const modText = item.selections
+                  ?.map((s) =>
+                    s.quantity > 1
+                      ? `${s.modifierOption.name} ×${s.quantity}`
+                      : s.modifierOption.name
+                  )
+                  .filter(Boolean)
+                  .join(" · ");
                 return (
-                <li
-                  key={item.id}
-                  className={`flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-3 last:border-0 ${itemError ? "rounded bg-amber-50/50 p-2 -mx-2" : ""}`}
-                >
-                  <div>
-                    <span className="font-medium">{item.menuItem.name}</span>
-                    <span className="ml-2 text-stone-500">× {item.quantity}</span>
-                    {itemError && (
-                      <p className="mt-1 text-sm text-amber-800">{itemError}</p>
-                    )}
-                    {item.specialInstructions && (
-                      <p className="text-sm text-stone-500">{item.specialInstructions}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-mennyu-primary">
-                      ${((item.priceCents * item.quantity) / 100).toFixed(2)}
-                    </span>
-                    <CartItemActions
-                      cartId={cart.id}
-                      cartItemId={item.id}
-                      quantity={item.quantity}
-                      specialInstructions={item.specialInstructions}
-                      modifierConfig={
-                        item.menuItem.modifierGroups?.length
-                          ? serializeModifierConfig(item.menuItem)
-                          : undefined
-                      }
-                      initialSelections={item.selections?.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity }))}
-                    />
-                  </div>
-                </li>
-              ); })}
+                  <li
+                    key={item.id}
+                    className={`flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between ${itemError ? "rounded-lg bg-amber-50/60 -mx-2 px-2" : ""}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-stone-900">
+                        {item.menuItem.name}
+                        <span className="ml-2 font-normal text-stone-500">× {item.quantity}</span>
+                      </p>
+                      {modText && (
+                        <p className="mt-1 text-sm text-stone-600">{modText}</p>
+                      )}
+                      {item.specialInstructions && (
+                        <p className="mt-1 text-sm text-stone-500">Note: {item.specialInstructions}</p>
+                      )}
+                      {itemError && (
+                        <p className="mt-2 text-sm font-medium text-amber-800">{itemError}</p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end">
+                      <span className="text-lg font-semibold tabular-nums text-mennyu-primary">
+                        ${((item.priceCents * item.quantity) / 100).toFixed(2)}
+                      </span>
+                      <CartItemActions
+                        cartId={cart.id}
+                        cartItemId={item.id}
+                        quantity={item.quantity}
+                        specialInstructions={item.specialInstructions}
+                        modifierConfig={
+                          item.menuItem.modifierGroups?.length
+                            ? serializeModifierConfig(item.menuItem)
+                            : undefined
+                        }
+                        initialSelections={item.selections?.map((s) => ({
+                          modifierOptionId: s.modifierOptionId,
+                          quantity: s.quantity,
+                        }))}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
-            <p className="mt-3 text-sm text-stone-600">
-              Subtotal: ${(group.subtotalCents / 100).toFixed(2)}
-            </p>
-          </div>
+            <div className="border-t border-stone-100 bg-stone-50/50 px-4 py-2 text-right text-sm text-stone-600">
+              Vendor subtotal{" "}
+              <span className="font-semibold text-stone-900">
+                ${(group.subtotalCents / 100).toFixed(2)}
+              </span>
+            </div>
+          </section>
         ))}
       </div>
-      <div className="mt-8 flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 p-4">
-        <span className="font-medium">Cart total</span>
-        <span className="text-lg font-semibold text-mennyu-primary">
-          ${(totalCents / 100).toFixed(2)}
-        </span>
+
+      <div className="mt-8 rounded-xl border-2 border-stone-200 bg-stone-50 p-5">
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-sm font-medium uppercase tracking-wide text-stone-500">
+            Food subtotal
+          </span>
+          <span className="text-xl font-bold tabular-nums text-stone-900">
+            ${(totalCents / 100).toFixed(2)}
+          </span>
+        </div>
+        <p className="mt-2 text-xs text-stone-500">
+          Service fee and tip are added at checkout. One payment covers all vendors.
+        </p>
       </div>
-      <div className="mt-6 flex flex-wrap items-center gap-4">
+
+      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <Link
           href={`/pod/${cart.podId}`}
-          className="rounded-lg border border-stone-300 px-4 py-2 font-medium text-stone-700 hover:bg-stone-100"
+          className="order-2 rounded-xl border-2 border-stone-300 px-5 py-3 text-center font-medium text-stone-700 hover:bg-stone-100 sm:order-1"
         >
-          Continue browsing
+          Add more items
         </Link>
-        {canCheckout ? (
-          <Link
-            href={`/checkout?cartId=${cart.id}`}
-            className="rounded-lg bg-mennyu-primary px-4 py-2 font-medium text-black hover:bg-mennyu-secondary"
-          >
-            Checkout
-          </Link>
-        ) : (
-          <span className="rounded-lg bg-stone-200 px-4 py-2 font-medium text-stone-500">
-            Fix items above to checkout
-          </span>
-        )}
+        <div className="order-1 sm:order-2 sm:text-right">
+          {canCheckout ? (
+            <Link
+              href={`/checkout?cartId=${cart.id}`}
+              className="inline-flex w-full justify-center rounded-xl bg-mennyu-primary px-8 py-3 text-center font-semibold text-black hover:bg-mennyu-secondary sm:w-auto"
+            >
+              Continue to checkout
+            </Link>
+          ) : (
+            <span className="inline-flex w-full justify-center rounded-xl bg-stone-200 px-8 py-3 font-medium text-stone-500 sm:w-auto">
+              Fix items above to continue
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -7,27 +7,39 @@ import {
   verifyDeliverectSignature,
   getDeliverectEventId,
   resolveWebhookStatusUpdate,
+  flattenDeliverectWebhookPayload,
 } from "@/integrations/deliverect/webhook-handler";
-import { updateVendorOrderStatus } from "@/services/order-status.service";
+import { applyDeliverectStatusWebhook } from "@/services/order-status.service";
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const payload = parseDeliverectWebhookBody(body);
-  const signature = request.headers.get("x-deliverect-signature") ?? request.headers.get("x-signature") ?? null;
-  const secret = env.DELIVERECT_WEBHOOK_SECRET;
+  const flat = flattenDeliverectWebhookPayload(payload);
+  const signature =
+    request.headers.get("x-deliverect-signature") ??
+    request.headers.get("x-signature") ??
+    request.headers.get("X-Deliverect-Hmac-Signature") ??
+    null;
 
-  if (!verifyDeliverectSignature(body, signature, secret)) {
+  if (!verifyDeliverectSignature(body, signature, env.DELIVERECT_WEBHOOK_SECRET)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  const eventId = getDeliverectEventId(payload);
+  const eventId = getDeliverectEventId(payload, flat, body);
   const idemKey = webhookIdempotencyKey("deliverect", eventId, body);
 
   const existing = await prisma.webhookEvent.findUnique({
     where: { idempotencyKey: idemKey },
   });
   if (existing) {
-    return NextResponse.json({ received: true, processed: existing.processed });
+    return NextResponse.json({ received: true, duplicate: true, processed: existing.processed });
+  }
+
+  let parsedPayload: object;
+  try {
+    parsedPayload = JSON.parse(body) as object;
+  } catch {
+    parsedPayload = {};
   }
 
   await prisma.webhookEvent.create({
@@ -35,11 +47,12 @@ export async function POST(request: NextRequest) {
       provider: "deliverect",
       eventId: eventId ?? undefined,
       idempotencyKey: idemKey,
-      payload: JSON.parse(body) as object,
+      payload: parsedPayload,
     },
   });
 
   const { internalVendorOrderId, externalOrderId, update } = resolveWebhookStatusUpdate(payload);
+
   let vendorOrderId: string | null = null;
   if (internalVendorOrderId) {
     const byId = await prisma.vendorOrder.findUnique({
@@ -55,22 +68,22 @@ export async function POST(request: NextRequest) {
     });
     if (byExternal) vendorOrderId = byExternal.id;
   }
+
   if (!vendorOrderId) {
     await prisma.webhookEvent.updateMany({
       where: { idempotencyKey: idemKey },
-      data: { processed: true, processedAt: new Date(), errorMessage: "Could not resolve vendor order (internal or external id)" },
+      data: {
+        processed: true,
+        processedAt: new Date(),
+        errorMessage:
+          "Could not resolve vendor order (need channelOrderId / mennyuVendorOrderId or known deliverectOrderId)",
+      },
     });
-    return NextResponse.json({ received: true });
+    return NextResponse.json({ received: true, resolved: false });
   }
 
   try {
-    await updateVendorOrderStatus(
-      vendorOrderId,
-      update.routingStatus,
-      update.fulfillmentStatus,
-      "deliverect",
-      payload
-    );
+    await applyDeliverectStatusWebhook(vendorOrderId, update, externalOrderId, payload);
     await prisma.webhookEvent.updateMany({
       where: { idempotencyKey: idemKey },
       data: { processed: true, processedAt: new Date() },
@@ -84,5 +97,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  return NextResponse.json({ received: true });
+  return NextResponse.json({ received: true, resolved: true });
 }

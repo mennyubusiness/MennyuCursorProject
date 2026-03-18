@@ -5,6 +5,11 @@
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { isRoutingRetryAvailable } from "@/lib/routing-availability";
+import {
+  isDeliverectVendorOrderRoutingDegraded,
+  shouldOmitVendorOrderFromDeliverectDashboard,
+} from "@/lib/vendor-deliverect-dashboard-visibility";
 
 export async function GET(
   _request: Request,
@@ -17,14 +22,17 @@ export async function GET(
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { id: true, name: true, slug: true },
+    select: { id: true, name: true, slug: true, deliverectChannelLinkId: true },
   });
   if (!vendor) {
     return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
   }
 
   const vendorOrders = await prisma.vendorOrder.findMany({
-    where: { vendorId },
+    where: {
+      vendorId,
+      order: { status: { not: "pending_payment" } },
+    },
     select: {
       id: true,
       orderId: true,
@@ -32,6 +40,7 @@ export async function GET(
       fulfillmentStatus: true,
       manuallyRecoveredAt: true,
       totalCents: true,
+      tipCents: true,
       order: {
         select: {
           id: true,
@@ -39,9 +48,11 @@ export async function GET(
           customerPhone: true,
           customerEmail: true,
           createdAt: true,
+          updatedAt: true,
           _count: { select: { vendorOrders: true } },
         },
       },
+      deliverectAttempts: true,
       lineItems: {
         select: {
           id: true,
@@ -64,9 +75,15 @@ export async function GET(
     take: 100,
   });
 
+  const now = Date.now();
+  const isDeliverectLive = isRoutingRetryAvailable();
+  const visibleVendorOrders = vendorOrders.filter(
+    (vo) => !shouldOmitVendorOrderFromDeliverectDashboard(vo, vendor, isDeliverectLive, now)
+  );
+
   const multiVendorOrderIds = [
     ...new Set(
-      vendorOrders
+      visibleVendorOrders
         .filter((vo) => (vo.order._count?.vendorOrders ?? 1) > 1)
         .map((vo) => vo.orderId)
     ),
@@ -103,7 +120,7 @@ export async function GET(
       ids.push(v.id);
       allVoIdsForOrder.set(v.orderId, ids);
     }
-    for (const vo of vendorOrders) {
+    for (const vo of visibleVendorOrders) {
       if ((vo.order._count?.vendorOrders ?? 1) <= 1) continue;
       const siblingVoIds = (allVoIdsForOrder.get(vo.orderId) ?? []).filter((id) => id !== vo.id);
       let earliest: Date | null = null;
@@ -122,8 +139,7 @@ export async function GET(
     }
   }
 
-  const now = Date.now();
-  const serialized = vendorOrders.map((vo) => {
+  const serialized = visibleVendorOrders.map((vo) => {
     const orderCount = vo.order._count?.vendorOrders ?? 1;
     const isActive = !["ready", "completed", "cancelled"].includes(vo.fulfillmentStatus);
     const siblingFirstReady = orderCount > 1 && isActive
@@ -145,6 +161,12 @@ export async function GET(
         createdAt: h.createdAt.toISOString(),
       })),
       siblingFirstReadyMinutesAgo,
+      deliverectRoutingDegraded: isDeliverectVendorOrderRoutingDegraded(
+        vo,
+        vendor,
+        isDeliverectLive,
+        now
+      ),
     };
   });
 

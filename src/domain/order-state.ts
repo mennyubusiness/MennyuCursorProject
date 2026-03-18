@@ -143,7 +143,21 @@ export function mapDeliverectEventToStatus(
 }
 
 /**
- * Human-readable label for customer-facing order status.
+ * Admin dashboards: operational wording aligned with how orders behave in the product
+ * (vendor approval / routing), not internal transport jargon like "partially sent to vendors".
+ */
+export function adminOperationalParentStatusLabel(
+  status: ParentOrderStatus,
+  vendorOrders: Array<{ routingStatus: string; fulfillmentStatus: string }>
+): string {
+  if (status === "routed" || status === "routed_partial") {
+    return customerOrderHeaderStatus(status, vendorOrders);
+  }
+  return parentStatusLabel(status);
+}
+
+/**
+ * Human-readable label for order status (admin, internal).
  */
 export function parentStatusLabel(status: ParentOrderStatus): string {
   const labels: Record<ParentOrderStatus, string> = {
@@ -162,6 +176,89 @@ export function parentStatusLabel(status: ParentOrderStatus): string {
     failed: "Order failed",
   };
   return labels[status] ?? status;
+}
+
+/**
+ * Customer-facing header status: approval/progress wording, not internal routing transport.
+ */
+export function customerOrderHeaderStatus(
+  status: ParentOrderStatus,
+  vendorOrders: Array<{ routingStatus: string; fulfillmentStatus: string }>
+): string {
+  const n = vendorOrders.length;
+  switch (status) {
+    case "routing":
+      return n > 1
+        ? "Connecting with each vendor"
+        : "Sending your order to the vendor";
+    case "routed":
+      return "Waiting on vendor approval";
+    case "routed_partial": {
+      if (n <= 1) return "Waiting on vendor approval";
+      const confirmed = vendorOrders.filter((v) => v.routingStatus === "confirmed").length;
+      const sent = vendorOrders.filter((v) => v.routingStatus === "sent").length;
+      const failed = vendorOrders.filter((v) => v.routingStatus === "failed").length;
+      if (confirmed > 0 && (sent > 0 || failed > 0))
+        return "Some vendors have confirmed your order";
+      if (failed > 0 && confirmed + sent > 0) return "We're still confirming with each vendor";
+      return "Waiting on remaining vendor approval";
+    }
+    case "pending_payment":
+      return "Awaiting payment";
+    case "paid":
+      return "Payment received";
+    case "accepted":
+    case "preparing":
+      return "In progress";
+    case "ready":
+      return "Ready for pickup";
+    case "in_progress":
+      return n > 1 ? "Your order is in progress" : "In progress";
+    case "partially_completed":
+      return "Partially complete";
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Cancelled";
+    case "failed":
+      return "Order issue";
+    default:
+      return parentStatusLabel(status);
+  }
+}
+
+/** @deprecated Use customerOrderHeaderStatus with vendor order rows for multi-vendor accuracy */
+export function customerStatusLabelForRouted(
+  status: ParentOrderStatus,
+  vendorOrderCount: number
+): string {
+  const stub = Array.from({ length: Math.max(1, vendorOrderCount) }, () => ({
+    routingStatus: "sent",
+    fulfillmentStatus: "pending",
+  }));
+  return customerOrderHeaderStatus(status, stub);
+}
+
+/**
+ * Customer-facing labels for parent order rows in "Recent updates" timeline (not admin parentStatusLabel).
+ */
+export function customerOrderTimelineParentLabel(status: ParentOrderStatus): string {
+  const labels: Record<ParentOrderStatus, string> = {
+    pending_payment: "Order placed",
+    paid: "Payment received",
+    routing: "Shared with each vendor",
+    routed_partial: "Vendor confirmations in progress",
+    routed: "Each vendor has your order",
+    accepted: "In progress",
+    preparing: "In progress",
+    ready: "Ready for pickup",
+    in_progress: "In progress",
+    partially_completed: "Partially complete",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    failed: "Order could not be completed",
+  };
+  return labels[status] ?? parentStatusLabel(status);
 }
 
 /**

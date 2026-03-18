@@ -3,24 +3,55 @@
  * Adjust to actual Deliverect API docs when integrating.
  */
 
-/** Order-level notes (Deliverect order notes). */
+/** Deliverect create-order request (top-level fields per API validation). */
 export interface DeliverectOrderRequest {
   channelLinkId: string;
+  /** Channel’s order id (required). We use Mennyu vendor order id. */
+  channelOrderId: string;
+  /** Human-readable order reference for display (required). We use vendor order id. */
+  channelOrderDisplayId: string;
+  /** Line items (required). API expects "items". */
+  items: DeliverectOrderItem[];
+  /** Order type: 1=pickup, 2=delivery, 3=eat-in, 4=curbside (required). */
+  orderType: number;
   /** External store/location ID when Deliverect requires it. Populate from Vendor.deliverectLocationId. */
   locationId?: string;
-  orderId: string; // External reference for Deliverect; we also send mennyuVendorOrderId
-  /** Internal Mennyu VendorOrder id for webhook resolution */
-  mennyuVendorOrderId?: string;
-  orderType?: number; // e.g. takeaway
   preparationTime?: number; // minutes
-  orderItems: DeliverectOrderItem[];
-  /** Order-level notes. Mapped from Order.orderNotes. */
+  /** ISO8601 UTC (e.g. 2020-03-09T17:17:38Z). Drives Deliverect Orders tab date range. */
+  pickupTime?: string;
+  /** When true, order treated as ASAP (Deliverect docs: use if pickup within ~30m). */
+  isASAP?: boolean;
+  /** Order-level notes (legacy/alternate key some stacks accept). */
   orderNotes?: string;
+  /** Deliverect channel API: order-level note parameter name. */
+  note?: string;
+  /**
+   * Deliverect channel API customer block (`phoneNumber`, not `phone`).
+   * See https://developers.deliverect.com/page/channel-orders
+   */
+  customer?: {
+    name?: string;
+    phoneNumber?: string;
+    email?: string;
+    companyName?: string;
+    note?: string;
+  };
+  /** @deprecated Prefer `customer` — Deliverect expects `customer.phoneNumber`. */
   customerInfo?: {
     phone?: string;
     email?: string;
     name?: string;
   };
+  /** Total tax in minor units (vendor-order tax allocation). */
+  taxTotal?: number;
+  /** Tax-exclusive: required line items; one entry minimum (total may be 0). */
+  taxes?: Array<{ taxClassId: number; name: string; total: number }>;
+  /** Minor units per major currency unit (e.g. 2 for cents). */
+  decimalDigits?: number;
+  /** When true, order is pre-paid online (Deliverect shows paid). */
+  orderIsAlreadyPaid?: boolean;
+  /** Total in minor units; type 0 = card/online paid, 1 = cash / pay at pickup. */
+  payment?: { amount: number; type: number };
 }
 
 /** Single line item (product) in the order. */
@@ -31,7 +62,7 @@ export interface DeliverectOrderItem {
   externalProductId?: string;
   name: string;
   quantity: number;
-  /** Unit price in currency units (e.g. USD). Converted from Mennyu priceCents. */
+  /** Unit price in integer cents (minor units). From Mennyu priceCents. */
   price: number;
   /** Item-level notes (Deliverect item notes). Mapped from OrderLineItem.specialInstructions. */
   remarks?: string;
@@ -47,18 +78,22 @@ export interface DeliverectModifier {
   externalModifierId?: string;
   name: string;
   quantity: number;
-  /** Price in currency units. From OrderLineItemSelection.priceCentsSnapshot. */
+  /** Price in integer cents (minor units). From OrderLineItemSelection.priceCentsSnapshot. */
   price: number;
+  /** Modifier-level note when present (Deliverect `subItems` use same item shape as `remark`). */
+  remark?: string;
   remarks?: string;
   /** Nested modifier selections (e.g. "Drizzle" under "Extra cheese"). */
   nestedModifiers?: DeliverectModifier[];
 }
 
 export interface DeliverectOrderResponse {
-  id?: string; // Deliverect order ID
+  id?: string;
+  _id?: string;
+  orderId?: string;
   success?: boolean;
   error?: string;
-  // Add fields per Deliverect API
+  [key: string]: unknown;
 }
 
 export interface DeliverectWebhookPayload {

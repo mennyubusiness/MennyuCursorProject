@@ -55,6 +55,7 @@ export function validateTransition(
   const routingOkForFulfillment =
     isReceiptConfirmed === true ||
     currentRouting === "confirmed" ||
+    currentRouting === "sent" ||
     (currentRouting === "failed" && currentFulfillment !== "pending");
 
   switch (target) {
@@ -70,7 +71,8 @@ export function validateTransition(
     case "accepted":
       if (adminManualRecovery && (currentRouting === "failed" || currentRouting === "pending"))
         return null;
-      if (currentRouting !== "confirmed") return "Routing must be confirmed before accepted.";
+      if (currentRouting !== "confirmed" && currentRouting !== "sent")
+        return "Routing must be sent or confirmed before accepted.";
       return currentFulfillment !== "pending" ? "Only pending fulfillment can transition to accepted." : null;
     case "preparing":
       if (!routingOkForFulfillment) return "Routing must be confirmed.";

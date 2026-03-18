@@ -46,8 +46,8 @@ export function canCustomerCancelWholeOrder(order: Parameters<typeof canCustomer
 
 /**
  * True when the vendor can deny/reject this vendor order (before preparing).
- * Must be in pending or accepted fulfillment, and receipt must be confirmed
- * (so we don't allow "deny" when routing is still pending with no confirmation).
+ * Vendor can deny when order is in their hands: routing sent or confirmed (or manually recovered),
+ * and fulfillment is still pending or accepted.
  */
 export function canVendorRejectVendorOrder(
   vo: VendorOrderForCancelEligibility
@@ -55,7 +55,11 @@ export function canVendorRejectVendorOrder(
   if (vo.fulfillmentStatus === "cancelled") return false;
   if (vo.fulfillmentStatus === "completed") return false;
   if (!PRE_PREPARATION_FULFILLMENT.has(vo.fulfillmentStatus)) return false;
-  return isVendorReceiptConfirmed(vo, vo.statusHistory);
+  const canAct =
+    vo.routingStatus === "sent" ||
+    vo.routingStatus === "confirmed" ||
+    isVendorReceiptConfirmed(vo, vo.statusHistory);
+  return !!canAct;
 }
 
 /**

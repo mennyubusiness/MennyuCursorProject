@@ -20,6 +20,7 @@ export function getVendorOrderHistoryEventLabel(entry: HistoryEntryForLabel): st
   const fulfillment = (entry.fulfillmentStatus ?? "").toLowerCase();
 
   if (src.includes("admin_manual_recovery")) return "Manually recovered by admin";
+  if (src === "manual" && routing === "confirmed") return "Routed manually";
 
   if (fulfillment === "cancelled") return "Cancelled";
   if (fulfillment === "completed") return "Completed";

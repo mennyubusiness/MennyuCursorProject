@@ -24,9 +24,9 @@ export function formatOrderAge(ageMinutes: number): string {
   return mins === 0 ? `${hours}h old` : `${hours}h ${mins}m old`;
 }
 
-/** createdAt may be Date or string (e.g. from serialized API response). */
-export function getVendorOrderUrgency(createdAt: Date | string): VendorOrderUrgency {
-  const ageMinutes = ageMinutesUtil(createdAt);
+/** createdAt may be Date or string (e.g. from serialized API response). nowMs optional for stable SSR/hydration. */
+export function getVendorOrderUrgency(createdAt: Date | string, nowMs?: number): VendorOrderUrgency {
+  const ageMinutes = ageMinutesUtil(createdAt, nowMs);
   const ageText = formatOrderAge(ageMinutes);
 
   if (ageMinutes < NEW_MAX_MINUTES) {
@@ -47,15 +47,17 @@ export interface ReadyHistoryEntry {
 /**
  * Returns minutes since the order entered "ready" state, or null if not ready or no history.
  * Pass statusHistory ordered by createdAt asc; uses the first entry where fulfillmentStatus === "ready".
+ * nowMs optional for stable SSR/hydration.
  */
 export function getReadyWaitMinutes(
-  statusHistory: ReadyHistoryEntry[] | null | undefined
+  statusHistory: ReadyHistoryEntry[] | null | undefined,
+  nowMs?: number
 ): number | null {
   if (!statusHistory?.length) return null;
   const readyEntries = statusHistory.filter((e) => e.fulfillmentStatus === "ready");
   if (readyEntries.length === 0) return null;
   const firstReady = readyEntries[0];
-  return ageMinutesUtil(firstReady.createdAt);
+  return ageMinutesUtil(firstReady.createdAt, nowMs);
 }
 
 /** Escalation for "ready for pickup" wait time: under 5m neutral, 5–10m yellow, 10+ red. */

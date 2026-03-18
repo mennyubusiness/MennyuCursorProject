@@ -1,14 +1,14 @@
 /**
  * Shared post-payment processing: one idempotent flow for webhook and redirect reconciliation.
- * Records payment, moves order out of pending_payment, submits to Deliverect (only when pending),
- * updates parent routing status, sends confirmation SMS only when this call recorded the payment.
+ * Records payment, moves order out of pending_payment, submits vendor orders via routing layer
+ * (only when pending), updates parent routing status, sends confirmation SMS when this call recorded the payment.
  */
 import { prisma } from "@/lib/db";
 import { recordPaymentAndAllocations } from "@/services/payment.service";
 import { setOrderStatus } from "@/services/order.service";
-import { submitVendorOrderToDeliverect } from "@/services/deliverect.service";
+import { submitVendorOrder } from "@/services/routing.service";
 import { sendOrderConfirmation } from "@/services/sms.service";
-import { deriveParentRoutingStatusFromAttempts } from "@/domain/order-state";
+import { deriveParentStatusFromVendorOrders } from "@/services/order-status.service";
 
 /**
  * Run full post-payment flow: record payment (or skip if already recorded), set status,
@@ -49,22 +49,29 @@ export async function processSuccessfulPayment(params: {
   if (order) {
     for (const vo of order.vendorOrders) {
       if (vo.routingStatus === "pending") {
-        await submitVendorOrderToDeliverect(
-          vo.id,
-          order.customerPhone,
-          order.customerEmail,
-          15
-        );
+        await submitVendorOrder(vo.id, {
+          customerPhone: order.customerPhone,
+          customerEmail: order.customerEmail ?? null,
+          preparationTimeMinutes: 15,
+        });
       }
     }
     const updatedOrder = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { vendorOrders: { select: { routingStatus: true } } },
+      include: {
+        vendorOrders: {
+          select: {
+            routingStatus: true,
+            fulfillmentStatus: true,
+            statusHistory: { select: { source: true } },
+          },
+        },
+      },
     });
-    const routingStatus = deriveParentRoutingStatusFromAttempts(
-      (updatedOrder?.vendorOrders ?? []).map((vo) => vo.routingStatus as "pending" | "sent" | "confirmed" | "failed")
+    const parentStatus = deriveParentStatusFromVendorOrders(
+      updatedOrder?.vendorOrders ?? []
     );
-    await setOrderStatus(orderId, routingStatus, "system");
+    await setOrderStatus(orderId, parentStatus, "system");
 
     if (paymentCreated) {
       await sendOrderConfirmation(order.customerPhone, orderId, order.totalCents);

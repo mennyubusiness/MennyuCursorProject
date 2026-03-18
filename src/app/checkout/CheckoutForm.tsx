@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { CheckoutProgress } from "./CheckoutProgress";
 
 interface CheckoutFormProps {
   cartId: string;
@@ -15,21 +16,34 @@ interface CheckoutFormProps {
 
 type Step = "form" | "payment";
 
-const stripePublishableKey = typeof window !== "undefined"
-  ? (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "")
-  : (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "");
+const stripePublishableKey =
+  typeof window !== "undefined"
+    ? (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "")
+    : (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "");
+
+const TIP_PRESET_PERCENTAGES = [15, 20, 25] as const;
+
+function tipCentsForPercent(subtotalCents: number, percent: number): number {
+  return Math.round((subtotalCents * percent) / 100);
+}
 
 function PaymentStep({
   orderId,
   clientSecret,
   cartId,
   totalWithTip,
+  subtotalCents,
+  serviceFeeCents,
+  tipCents,
   onSuccess,
 }: {
   orderId: string;
   clientSecret: string;
   cartId: string;
   totalWithTip: number;
+  subtotalCents: number;
+  serviceFeeCents: number;
+  tipCents: number;
   onSuccess: () => void;
 }) {
   const stripe = useStripe();
@@ -78,22 +92,55 @@ function PaymentStep({
   }
 
   return (
-    <form onSubmit={handlePay} className="mt-6 space-y-4">
-      <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-        <p className="text-stone-600">
-          Total: ${(totalWithTip / 100).toFixed(2)}
+    <div className="mt-8 space-y-6">
+      <CheckoutProgress activeStep={3} />
+      <div className="rounded-xl border border-stone-200 bg-stone-50 p-5">
+        <h2 className="text-lg font-semibold text-stone-900">Pay securely</h2>
+        <p className="mt-2 text-sm text-stone-600">
+          Your card is processed by Stripe. Vendors receive this order only after payment succeeds.
         </p>
+        <dl className="mt-4 space-y-2 border-t border-stone-200 pt-4 text-sm">
+          <div className="flex justify-between gap-4">
+            <dt className="text-stone-600">Subtotal</dt>
+            <dd className="tabular-nums">${(subtotalCents / 100).toFixed(2)}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-stone-600">Service fee</dt>
+            <dd className="tabular-nums">${(serviceFeeCents / 100).toFixed(2)}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-stone-600">Tip</dt>
+            <dd className="tabular-nums">${(tipCents / 100).toFixed(2)}</dd>
+          </div>
+          <div className="flex justify-between gap-4 border-t border-stone-200 pt-2 text-base font-bold text-stone-900">
+            <dt>Total due</dt>
+            <dd className="tabular-nums">${(totalWithTip / 100).toFixed(2)}</dd>
+          </div>
+        </dl>
       </div>
-      <PaymentElement options={{ layout: "tabs" }} />
-      {error && <p className="text-red-600" role="alert">{error}</p>}
-      <button
-        type="submit"
-        disabled={!stripe || !elements || loading}
-        className="rounded-lg bg-mennyu-primary px-6 py-2 font-medium text-black hover:bg-mennyu-secondary disabled:opacity-50"
-      >
-        {loading ? "Processing…" : "Pay now"}
-      </button>
-    </form>
+      <form onSubmit={handlePay} className="space-y-4">
+        <div className="rounded-xl border border-stone-200 bg-white p-4">
+          <PaymentElement options={{ layout: "tabs" }} />
+        </div>
+        {error && (
+          <p className="text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={!stripe || !elements || loading}
+          className="w-full rounded-xl bg-mennyu-primary py-4 text-base font-semibold text-black hover:bg-mennyu-secondary disabled:opacity-50 sm:py-3"
+        >
+          {loading ? "Processing…" : "Pay and place order"}
+        </button>
+        {process.env.NODE_ENV === "development" && (
+          <p className="text-center text-xs text-stone-400">
+            Test mode: use card 4242 4242 4242 4242, any future expiry, any CVC.
+          </p>
+        )}
+      </form>
+    </div>
   );
 }
 
@@ -106,11 +153,17 @@ export function CheckoutForm({
 }: CheckoutFormProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("form");
-  const [paymentData, setPaymentData] = useState<{ orderId: string; clientSecret: string; paymentIntentId: string } | null>(null);
+  const [paymentData, setPaymentData] = useState<{
+    orderId: string;
+    clientSecret: string;
+    paymentIntentId: string;
+  } | null>(null);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const TIP_PRESETS_CENTS = [200, 500, 1000];
-  const [tipCents, setTipCents] = useState(0);
+  /** 15 | 20 | 25 when a preset is active; custom otherwise */
+  const [tipPresetPercent, setTipPresetPercent] = useState<number | null>(20);
+  const defaultTipCents = tipCentsForPercent(subtotalCents, 20);
+  const [tipCents, setTipCents] = useState(defaultTipCents);
   const [customTipInput, setCustomTipInput] = useState("");
   const [customTipError, setCustomTipError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -119,7 +172,13 @@ export function CheckoutForm({
   const idempotencyKeyRef = useRef(crypto.randomUUID());
   const totalWithTip = totalCents + tipCents;
 
-  const isCustomTipSelected = !TIP_PRESETS_CENTS.includes(tipCents);
+  const isCustomTipSelected = tipPresetPercent === null;
+
+  useEffect(() => {
+    if (tipPresetPercent !== null) {
+      setTipCents(tipCentsForPercent(subtotalCents, tipPresetPercent));
+    }
+  }, [subtotalCents, tipPresetPercent]);
 
   const stripePromise = useMemo(
     () => (stripePublishableKey ? loadStripe(stripePublishableKey) : null),
@@ -137,6 +196,7 @@ export function CheckoutForm({
   function handleCustomTipChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
     setCustomTipInput(value);
+    setTipPresetPercent(null);
     setCustomTipError(null);
     const cents = parseCustomTip(value);
     if (cents !== null) setTipCents(cents);
@@ -144,7 +204,8 @@ export function CheckoutForm({
 
   function handleCustomTipBlur() {
     if (customTipInput.trim() === "") {
-      setTipCents(0);
+      setTipPresetPercent(20);
+      setTipCents(tipCentsForPercent(subtotalCents, 20));
       setCustomTipError(null);
       return;
     }
@@ -159,8 +220,9 @@ export function CheckoutForm({
     }
   }
 
-  function selectPreset(cents: number) {
-    setTipCents(cents);
+  function selectPercentPreset(percent: number) {
+    setTipPresetPercent(percent);
+    setTipCents(tipCentsForPercent(subtotalCents, percent));
     setCustomTipInput("");
     setCustomTipError(null);
   }
@@ -191,7 +253,16 @@ export function CheckoutForm({
         }),
       });
       const text = await res.text();
-      const data = (text && (() => { try { return JSON.parse(text); } catch { return {}; } })()) ?? {};
+      const data =
+        (text &&
+          (() => {
+            try {
+              return JSON.parse(text);
+            } catch {
+              return {};
+            }
+          })()) ??
+        {};
       if (!res.ok) {
         setError(data.error?.message ?? data.error ?? "Checkout failed");
         return;
@@ -214,7 +285,15 @@ export function CheckoutForm({
         });
         const orderText = await orderRes.text();
         if (!orderRes.ok) {
-          const orderData = (orderText && (() => { try { return JSON.parse(orderText); } catch { return {}; } })()) ?? {};
+          const orderData =
+            (orderText &&
+              (() => {
+                try {
+                  return JSON.parse(orderText);
+                } catch {
+                  return {};
+                }
+              })()) ?? {};
           setError(orderData.error ?? "Order confirmation failed");
           return;
         }
@@ -228,7 +307,7 @@ export function CheckoutForm({
       }
 
       if (!stripePromise) {
-        setError("Stripe is not configured for payments. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.");
+        setError("Stripe is not configured. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.");
         return;
       }
       setPaymentData({ orderId, clientSecret, paymentIntentId });
@@ -245,54 +324,92 @@ export function CheckoutForm({
 
   if (step === "payment" && paymentData && stripePromise) {
     return (
-      <div className="mt-6">
-        <p className="text-stone-600">Complete payment for your order.</p>
-        <Elements stripe={stripePromise} options={{ clientSecret: paymentData.clientSecret }}>
-          <PaymentStep
-            orderId={paymentData.orderId}
-            clientSecret={paymentData.clientSecret}
-            cartId={cartId}
-            totalWithTip={totalWithTip}
-            onSuccess={() => router.push(`/order/${paymentData!.orderId}`)}
-          />
-        </Elements>
-      </div>
+      <Elements stripe={stripePromise} options={{ clientSecret: paymentData.clientSecret }}>
+        <PaymentStep
+          orderId={paymentData.orderId}
+          clientSecret={paymentData.clientSecret}
+          cartId={cartId}
+          totalWithTip={totalWithTip}
+          subtotalCents={subtotalCents}
+          serviceFeeCents={serviceFeeCents}
+          tipCents={tipCents}
+          onSuccess={() => router.push(`/order/${paymentData!.orderId}`)}
+        />
+      </Elements>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-      <div>
-        <label htmlFor="phone" className="block text-sm font-medium text-stone-700">
-          Phone (required for order updates)
-        </label>
-        <input
-          id="phone"
-          type="tel"
-          required
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="mt-1 w-full max-w-xs rounded-lg border border-stone-300 px-3 py-2"
-          placeholder="+1 555 123 4567"
-        />
-      </div>
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium text-stone-700">
-          Email (optional)
-        </label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full max-w-xs rounded-lg border border-stone-300 px-3 py-2"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-stone-700">Tip</label>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
+    <form onSubmit={handleSubmit} className="mt-8 space-y-8">
+      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+          Contact
+        </h2>
+        <p className="mt-1 text-sm text-stone-500">
+          We&apos;ll text order updates to your phone.
+        </p>
+        <div className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="phone" className="block text-sm font-medium text-stone-800">
+              Mobile number <span className="text-red-600">*</span>
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              required
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="mt-1.5 w-full max-w-md rounded-lg border border-stone-300 px-3 py-2.5 text-stone-900"
+              placeholder="(555) 123-4567"
+            />
+          </div>
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-stone-800">
+              Email <span className="font-normal text-stone-500">(optional)</span>
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1.5 w-full max-w-md rounded-lg border border-stone-300 px-3 py-2.5"
+              placeholder="you@example.com"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Tip</h2>
+        <p className="mt-1 text-sm text-stone-500">
+          Based on food subtotal (${(subtotalCents / 100).toFixed(2)}). Shared across vendors.
+        </p>
+        <div className="mt-4 flex flex-wrap items-stretch gap-2">
+          {TIP_PRESET_PERCENTAGES.map((pct) => {
+            const amt = tipCentsForPercent(subtotalCents, pct);
+            const selected = tipPresetPercent === pct;
+            return (
+              <button
+                key={pct}
+                type="button"
+                onClick={() => selectPercentPreset(pct)}
+                className={`min-h-[44px] flex-1 rounded-lg border px-3 py-2 text-sm font-medium sm:flex-none sm:px-4 ${
+                  selected
+                    ? "border-mennyu-primary bg-mennyu-muted text-stone-900"
+                    : "border-stone-300 text-stone-700 hover:bg-stone-50"
+                }`}
+              >
+                <span className="block">{pct}%</span>
+                <span className="block text-xs font-normal text-stone-600">
+                  (${(amt / 100).toFixed(2)})
+                </span>
+              </button>
+            );
+          })}
           <div
-            className={`flex shrink-0 rounded-lg border px-3 py-2 ${
+            className={`flex min-h-[44px] min-w-[7rem] flex-1 items-center rounded-lg border px-3 sm:flex-none ${
               isCustomTipSelected
                 ? "border-mennyu-primary bg-mennyu-muted"
                 : "border-stone-300 bg-white"
@@ -302,52 +419,65 @@ export function CheckoutForm({
             <input
               type="text"
               inputMode="decimal"
-              placeholder="0.00"
+              placeholder="Other"
               value={customTipInput}
               onChange={handleCustomTipChange}
               onBlur={handleCustomTipBlur}
-              className="w-20 border-0 bg-transparent p-0 text-sm outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              aria-label="Custom tip amount (dollars)"
+              onFocus={() => {
+                if (tipPresetPercent !== null) {
+                  setCustomTipInput((tipCents / 100).toFixed(2));
+                }
+                setTipPresetPercent(null);
+              }}
+              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              aria-label="Custom tip in dollars"
             />
           </div>
-          {TIP_PRESETS_CENTS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => selectPreset(c)}
-              className={`rounded-lg border px-3 py-2 text-sm ${
-                !isCustomTipSelected && tipCents === c
-                  ? "border-mennyu-primary bg-mennyu-muted text-mennyu-primary"
-                  : "border-stone-300 hover:bg-stone-100"
-              }`}
-            >
-              ${(c / 100).toFixed(2)}
-            </button>
-          ))}
         </div>
         {customTipError && (
-          <p className="mt-1 text-sm text-red-600" role="alert">
+          <p className="mt-2 text-sm text-red-600" role="alert">
             {customTipError}
           </p>
         )}
-      </div>
-      <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-        <p className="text-stone-600">
-          Total: ${(totalWithTip / 100).toFixed(2)} (includes service fee + tip)
-        </p>
-        <p className="mt-1 text-xs text-stone-500">
+      </section>
+
+      <section className="rounded-xl border-2 border-stone-200 bg-stone-50 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+          Total before payment
+        </h2>
+        <dl className="mt-3 space-y-2 text-sm">
+          <div className="flex justify-between">
+            <dt className="text-stone-600">Food + service fee</dt>
+            <dd className="tabular-nums">${(totalCents / 100).toFixed(2)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-stone-600">Tip</dt>
+            <dd className="tabular-nums">${(tipCents / 100).toFixed(2)}</dd>
+          </div>
+          <div className="flex justify-between border-t border-stone-200 pt-2 text-lg font-bold text-stone-900">
+            <dt>Estimated charge</dt>
+            <dd className="tabular-nums">${(totalWithTip / 100).toFixed(2)}</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-stone-500">
           {stripePromise
-            ? "Next: enter card details to complete payment (use test card 4242… in test mode)."
-            : "Payment is simulated when Stripe is not configured."}
+            ? "Next step: secure card payment with Stripe."
+            : "Without Stripe keys, checkout uses the dev payment path."}
         </p>
-      </div>
-      {error && <p className="text-red-600">{error}</p>}
+      </section>
+
+      {error && (
+        <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
+          {error}
+        </p>
+      )}
+
       <button
         type="submit"
         disabled={loading}
-        className="rounded-lg bg-mennyu-primary px-6 py-2 font-medium text-black hover:bg-mennyu-secondary disabled:opacity-50"
+        className="w-full rounded-xl bg-mennyu-primary py-4 text-base font-semibold text-black hover:bg-mennyu-secondary disabled:opacity-50"
       >
-        {loading ? "Processing…" : "Place order"}
+        {loading ? "Preparing payment…" : "Continue to payment"}
       </button>
     </form>
   );

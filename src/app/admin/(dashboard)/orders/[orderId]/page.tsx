@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { parentStatusLabel } from "@/domain/order-state";
+import {
+  fetchAdminOrderDetail,
+  type AdminOrderDetail,
+} from "@/lib/admin-order-detail-query";
+import { adminOperationalParentStatusLabel } from "@/domain/order-state";
 import { getExceptionType, getExceptionReason } from "@/lib/admin-exceptions";
 import { getAdminActionState } from "@/lib/admin-actions";
 import { getVendorOrderHistoryEventLabel } from "@/lib/admin-history-labels";
@@ -18,53 +21,9 @@ export default async function AdminOrderDetailPage({
 }) {
   const { orderId } = await params;
 
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: {
-      id: true,
-      createdAt: true,
-      status: true,
-      customerPhone: true,
-      customerEmail: true,
-      orderNotes: true,
-      subtotalCents: true,
-      totalCents: true,
-      pod: { select: { id: true, name: true } },
-      statusHistory: { orderBy: { createdAt: "asc" }, select: { id: true, status: true, createdAt: true, source: true } },
-      issues: { orderBy: { createdAt: "desc" }, select: { id: true, type: true, severity: true, status: true, notes: true, createdAt: true, resolvedAt: true } },
-      refundAttempts: { orderBy: { createdAt: "asc" }, select: { id: true, vendorOrderId: true, amountCents: true, status: true, stripeRefundId: true, failureCode: true, failureMessage: true, createdAt: true, dismissedAsLegacyAt: true, dismissedAsLegacyBy: true } },
-      vendorOrders: {
-        select: {
-          id: true,
-          orderId: true,
-          vendorId: true,
-          createdAt: true,
-          routingStatus: true,
-          fulfillmentStatus: true,
-          totalCents: true,
-          manuallyRecoveredAt: true,
-          deliverectAttempts: true,
-          deliverectSubmittedAt: true,
-          deliverectLastError: true,
-          vendor: { select: { id: true, name: true } },
-          issues: { orderBy: { createdAt: "desc" }, select: { id: true, type: true, severity: true, status: true, notes: true, createdAt: true, resolvedAt: true } },
-          statusHistory: { orderBy: { createdAt: "asc" }, select: { id: true, createdAt: true, source: true, routingStatus: true, fulfillmentStatus: true } },
-          lineItems: {
-            select: {
-              id: true,
-              name: true,
-              quantity: true,
-              priceCents: true,
-              specialInstructions: true,
-              selections: { select: { nameSnapshot: true, quantity: true, modifierOption: { select: { name: true } } } },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!order) notFound();
+  const loaded = await fetchAdminOrderDetail(orderId);
+  if (!loaded) notFound();
+  const adminOrder: AdminOrderDetail = loaded;
 
   const routingAvailable = isRoutingRetryAvailable();
 
@@ -95,31 +54,31 @@ export default async function AdminOrderDetailPage({
   }
 
   const hasHistory =
-    order.statusHistory.length > 0 ||
-    order.issues.length > 0 ||
-    order.vendorOrders.some((vo) => vo.issues.length > 0) ||
-    order.refundAttempts.length > 0;
+    adminOrder.statusHistory.length > 0 ||
+    adminOrder.issues.length > 0 ||
+    adminOrder.vendorOrders.some((vo) => vo.issues.length > 0) ||
+    adminOrder.refundAttempts.length > 0;
 
   const vendorNameByVoId = (vendorOrderId: string) =>
-    order.vendorOrders.find((vo) => vo.id === vendorOrderId)?.vendor.name ?? null;
+    adminOrder.vendorOrders.find((vo) => vo.id === vendorOrderId)?.vendor.name ?? null;
 
   const timelineEntries = [
-    ...order.statusHistory.map((h) => ({
+    ...adminOrder.statusHistory.map((h) => ({
       date: h.createdAt.getTime(),
       key: `status-${h.id}`,
       label: `${h.status}${h.source ? ` (${h.source})` : ""}`,
     })),
-    ...order.issues.flatMap((i) => [
+    ...adminOrder.issues.flatMap((i) => [
       { date: i.createdAt.getTime(), key: `oi-created-${i.id}`, label: `Order issue: ${i.type.replace(/_/g, " ")} (${i.status})` },
       ...(i.resolvedAt ? [{ date: i.resolvedAt.getTime(), key: `oi-resolved-${i.id}`, label: `Order issue resolved: ${i.type.replace(/_/g, " ")}` }] : []),
     ]),
-    ...order.vendorOrders.flatMap((vo) =>
+    ...adminOrder.vendorOrders.flatMap((vo) =>
       vo.issues.flatMap((i) => [
         { date: i.createdAt.getTime(), key: `voi-created-${i.id}`, label: `Vendor issue (${vo.vendor.name}): ${i.type.replace(/_/g, " ")} (${i.status})` },
         ...(i.resolvedAt ? [{ date: i.resolvedAt.getTime(), key: `voi-resolved-${i.id}`, label: `Vendor issue resolved (${vo.vendor.name}): ${i.type.replace(/_/g, " ")}` }] : []),
       ])
     ),
-    ...order.refundAttempts.map((ra) => ({
+    ...adminOrder.refundAttempts.map((ra) => ({
       date: ra.createdAt.getTime(),
       key: `refund-${ra.id}`,
       label: refundTimelineLabel(ra, vendorNameByVoId),
@@ -133,7 +92,7 @@ export default async function AdminOrderDetailPage({
           ← Orders
         </Link>
         <h1 className="mt-2 text-xl font-semibold text-stone-900">
-          Order #{order.id.slice(-8).toUpperCase()}
+          Order #{adminOrder.id.slice(-8).toUpperCase()}
         </h1>
         <p className="mt-0.5 text-sm text-stone-600">
           Inspect and manage order state across vendors. Use exception actions to resolve failures, or continue fulfillment.
@@ -144,33 +103,36 @@ export default async function AdminOrderDetailPage({
         <h2 className="font-medium text-stone-900">Order</h2>
         <dl className="mt-2 grid gap-1 text-sm">
           <div>
-            <span className="text-stone-500">Created:</span> {formatDate(order.createdAt)}
+            <span className="text-stone-500">Created:</span> {formatDate(adminOrder.createdAt)}
           </div>
           <div>
             <span className="text-stone-500">Status:</span>{" "}
-            {parentStatusLabel(order.status as Parameters<typeof parentStatusLabel>[0])}
+            {adminOperationalParentStatusLabel(
+              adminOrder.status as Parameters<typeof adminOperationalParentStatusLabel>[0],
+              adminOrder.vendorOrders
+            )}
           </div>
           <div>
-            <span className="text-stone-500">Customer phone:</span> {order.customerPhone}
+            <span className="text-stone-500">Customer phone:</span> {adminOrder.customerPhone}
           </div>
-          {order.customerEmail && (
+          {adminOrder.customerEmail && (
             <div>
-              <span className="text-stone-500">Customer email:</span> {order.customerEmail}
+              <span className="text-stone-500">Customer email:</span> {adminOrder.customerEmail}
             </div>
           )}
           <div>
-            <span className="text-stone-500">Pod:</span> {order.pod.name}
+            <span className="text-stone-500">Pod:</span> {adminOrder.pod.name}
           </div>
-          {order.orderNotes && (
+          {adminOrder.orderNotes && (
             <div>
-              <span className="text-stone-500">Order notes:</span> {order.orderNotes}
+              <span className="text-stone-500">Order notes:</span> {adminOrder.orderNotes}
             </div>
           )}
           <div>
-            <span className="text-stone-500">Subtotal:</span> ${(order.subtotalCents / 100).toFixed(2)}
+            <span className="text-stone-500">Subtotal:</span> ${(adminOrder.subtotalCents / 100).toFixed(2)}
           </div>
           <div>
-            <span className="text-stone-500">Total:</span> ${(order.totalCents / 100).toFixed(2)}
+            <span className="text-stone-500">Total:</span> ${(adminOrder.totalCents / 100).toFixed(2)}
           </div>
         </dl>
       </section>
@@ -189,7 +151,7 @@ export default async function AdminOrderDetailPage({
       )}
 
       <AdminOrderIssuesSection
-        orderIssues={order.issues.map((i) => ({
+        orderIssues={adminOrder.issues.map((i) => ({
           id: i.id,
           type: i.type,
           severity: i.severity,
@@ -198,7 +160,7 @@ export default async function AdminOrderDetailPage({
           createdAt: i.createdAt.toISOString(),
           resolvedAt: i.resolvedAt?.toISOString() ?? null,
         }))}
-        vendorOrderIssues={order.vendorOrders.flatMap((vo) =>
+        vendorOrderIssues={adminOrder.vendorOrders.flatMap((vo) =>
           vo.issues.map((i) => ({
             id: i.id,
             vendorOrderId: vo.id,
@@ -215,7 +177,7 @@ export default async function AdminOrderDetailPage({
 
       <section className="space-y-4">
         <h2 className="font-medium text-stone-900">Vendor orders</h2>
-        {order.vendorOrders.map((vo) => {
+        {adminOrder.vendorOrders.map((vo) => {
           const exceptionType = getExceptionType(vo);
           const actionState = getAdminActionState(vo, routingAvailable);
           const reason = exceptionType ? getExceptionReason(vo, exceptionType) : null;
@@ -341,7 +303,7 @@ export default async function AdminOrderDetailPage({
               </section>
 
               {vo.fulfillmentStatus === "cancelled" && (() => {
-                const voRefunds = order.refundAttempts.filter((ra) => ra.vendorOrderId === vo.id);
+                const voRefunds = adminOrder.refundAttempts.filter((ra) => ra.vendorOrderId === vo.id);
                 const latestRefund = voRefunds.length > 0 ? voRefunds[voRefunds.length - 1] : null;
                 const amount = latestRefund ? `$${(latestRefund.amountCents / 100).toFixed(2)}` : "";
                 if (latestRefund?.status === "succeeded") {

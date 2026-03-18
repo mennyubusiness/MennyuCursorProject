@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Prisma, VendorRoutingStatus, VendorFulfillmentStatus } from "@prisma/client";
 import { getOrderIdsNeedingAttention } from "@/lib/admin-attention";
 import { prisma } from "@/lib/db";
-import { parentStatusLabel } from "@/domain/order-state";
+import { adminOperationalParentStatusLabel } from "@/domain/order-state";
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
 
 type OrderFindManyArgs = NonNullable<Parameters<typeof prisma.order.findMany>[0]>;
@@ -310,7 +310,10 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium text-stone-900">
-                      {parentStatusLabel(order.status as Parameters<typeof parentStatusLabel>[0])}
+                      {adminOperationalParentStatusLabel(
+                        order.status as Parameters<typeof adminOperationalParentStatusLabel>[0],
+                        order.vendorOrders
+                      )}
                     </p>
                     <p className="mt-1 text-xs text-stone-600">
                       {order.vendorOrders.map(

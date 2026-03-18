@@ -1,13 +1,10 @@
 /**
- * POST: Retry routing for a vendor order (reuse submitVendorOrderToDeliverect).
- * Returns ok: false with unavailable: true when Deliverect is not configured.
+ * POST: Retry routing for a vendor order via the routing service.
+ * Returns ok: false with unavailable: true when routing is not configured (e.g. ROUTING_MODE=mock).
  */
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { isRoutingRetryAvailable, getRoutingUnavailableReason } from "@/lib/routing-availability";
-import { submitVendorOrderToDeliverect } from "@/services/deliverect.service";
-
-const DEFAULT_PREP_MINUTES = 15;
+import { retryVendorOrderRouting } from "@/services/routing.service";
 
 export async function POST(
   _request: Request,
@@ -29,23 +26,7 @@ export async function POST(
     });
   }
 
-  const vo = await prisma.vendorOrder.findUnique({
-    where: { id: vendorOrderId },
-    include: { order: { select: { customerPhone: true, customerEmail: true } } },
-  });
-  if (!vo) {
-    return NextResponse.json(
-      { ok: false, error: "Vendor order not found" },
-      { status: 404 }
-    );
-  }
-
-  const result = await submitVendorOrderToDeliverect(
-    vendorOrderId,
-    vo.order.customerPhone,
-    vo.order.customerEmail ?? null,
-    DEFAULT_PREP_MINUTES
-  );
+  const result = await retryVendorOrderRouting(vendorOrderId);
 
   if (result.skipped) {
     return NextResponse.json({
@@ -59,7 +40,7 @@ export async function POST(
       ok: true,
       action: "retry-routing",
       message: "Routing submitted",
-      deliverectOrderId: result.deliverectOrderId,
+      deliverectOrderId: result.externalOrderId,
     });
   }
   return NextResponse.json({

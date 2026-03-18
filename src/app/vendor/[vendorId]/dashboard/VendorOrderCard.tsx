@@ -7,6 +7,11 @@ import type {
   ReadyWaitEscalation,
   BehindSiblingEscalation,
 } from "@/lib/vendor-urgency";
+import type { VendorOrderOperatingMode } from "@/lib/vendor-order-operating-mode";
+import {
+  getOperatingModeActionHint,
+  isMennyuControlsPrimary,
+} from "@/lib/vendor-order-operating-mode";
 import { isVendorOrderManuallyRecovered } from "@/lib/vendor-order-effective-state";
 import { canVendorRejectVendorOrder } from "@/lib/cancel-eligibility";
 
@@ -18,9 +23,11 @@ type VendorOrderForCard = {
   manuallyRecoveredAt?: string | null;
   statusHistory?: Array<{ source?: string | null }>;
   totalCents: number;
+  tipCents: number;
   order: {
     id: string;
     orderNotes: string | null;
+    customerPhone: string | null;
     createdAt: string;
   };
   lineItems: Array<{
@@ -37,15 +44,21 @@ type VendorOrderForCard = {
   }>;
 };
 
+/**
+ * Next action: Accept/Deny when POS/Mennyu has routed (sent/confirmed). Confirm only when not live Deliverect (e.g. mock) or as explicit fallback elsewhere.
+ */
 function getNextAction(
   routingStatus: string,
-  fulfillmentStatus: string
+  fulfillmentStatus: string,
+  isDeliverectLive: boolean
 ): { targetState: string; label: string } | null {
-  if (fulfillmentStatus === "pending" && routingStatus === "pending") {
-    return { targetState: "confirmed", label: "Confirm order" };
-  }
-  if (fulfillmentStatus === "pending" && routingStatus === "confirmed") {
-    return { targetState: "accepted", label: "Accept order" };
+  if (fulfillmentStatus === "pending") {
+    if (routingStatus === "sent" || routingStatus === "confirmed") {
+      return { targetState: "accepted", label: "Accept order" };
+    }
+    if (routingStatus === "pending" && !isDeliverectLive) {
+      return { targetState: "confirmed", label: "Confirm order" };
+    }
   }
   if (fulfillmentStatus === "accepted") {
     return { targetState: "preparing", label: "Start preparing" };
@@ -77,27 +90,35 @@ const BEHIND_SIBLING_CLASS: Record<BehindSiblingEscalation, string> = {
   red: "text-red-700 font-semibold",
 };
 
+function formatCustomerPhone(phone: string | null): string | null {
+  if (!phone || !phone.trim()) return null;
+  const d = phone.replace(/\D/g, "");
+  if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  return phone.trim();
+}
+
 export function VendorOrderCard({
   vendorId,
   vendorOrder,
   pickupCode,
-  sourceLabel,
+  operatingMode,
   urgencyLabel,
   urgencyLevel,
   ageText,
   readyWaitMinutes,
   readyWaitEscalation = "neutral",
   vendorOrderCount,
-  isPosManaged,
   isNew = false,
   siblingFirstReadyMinutesAgo = null,
   siblingBehindEscalation = "yellow",
   onStatusSuccess,
+  isDeliverectLive = false,
+  deliverectRoutingDegraded = false,
 }: {
   vendorId: string;
   vendorOrder: VendorOrderForCard;
   pickupCode: string;
-  sourceLabel: string;
+  operatingMode: VendorOrderOperatingMode;
   urgencyLabel: string;
   urgencyLevel: VendorUrgencyLevel;
   ageText: string;
@@ -105,7 +126,6 @@ export function VendorOrderCard({
   /** Escalation for ready-wait display: neutral &lt; 5m, yellow 5–10m, red 10+ */
   readyWaitEscalation?: ReadyWaitEscalation;
   vendorOrderCount: number;
-  isPosManaged: boolean;
   /** When true, shows a subtle visual highlight for newly arrived orders (live updates). */
   isNew?: boolean;
   /** Minutes since first sibling (other vendor) in same order became ready; null if N/A. */
@@ -114,12 +134,27 @@ export function VendorOrderCard({
   siblingBehindEscalation?: BehindSiblingEscalation;
   /** When set, status change success updates this VO in parent state instead of full router.refresh(). */
   onStatusSuccess?: (vendorOrderId: string, update: { routingStatus: string; fulfillmentStatus: string }) => void;
+  /** When true, healthy path expects POS sync first — hide primary Confirm until sent/confirmed. */
+  isDeliverectLive?: boolean;
+  /** Live Deliverect VO stuck in pending/pending past the healthy wait — show manual confirm + degraded copy. */
+  deliverectRoutingDegraded?: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const nextAction = getNextAction(vendorOrder.routingStatus, vendorOrder.fulfillmentStatus);
+  const nextAction = getNextAction(
+    vendorOrder.routingStatus,
+    vendorOrder.fulfillmentStatus,
+    isDeliverectLive
+  );
+  const showManualConfirmFallback = deliverectRoutingDegraded === true;
+  const actionHint = getOperatingModeActionHint(
+    operatingMode,
+    vendorOrder,
+    isDeliverectLive,
+    deliverectRoutingDegraded
+  );
   const isTerminal = ["completed", "cancelled"].includes(vendorOrder.fulfillmentStatus);
   const recovered = isVendorOrderManuallyRecovered(vendorOrder, vendorOrder.statusHistory);
   const canDeny = canVendorRejectVendorOrder(vendorOrder);
@@ -210,8 +245,12 @@ export function VendorOrderCard({
         </div>
       </div>
 
-      {/* Routing / source */}
-      <p className="mt-2 text-xs text-stone-500">{sourceLabel}</p>
+      {formatCustomerPhone(vendorOrder.order.customerPhone) && (
+        <p className="mt-1 text-xs text-stone-600">
+          <span className="font-medium text-stone-700">Customer:</span>{" "}
+          {formatCustomerPhone(vendorOrder.order.customerPhone)}
+        </p>
+      )}
 
       {/* Ready-wait: only when this vendor order is in ready state */}
       {vendorOrder.fulfillmentStatus === "ready" && readyWaitMinutes !== null && (
@@ -261,18 +300,27 @@ export function VendorOrderCard({
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-3">
-        <p className="text-sm font-medium text-stone-700">
-          {totalItems} item{totalItems !== 1 ? "s" : ""} · ${(vendorOrder.totalCents / 100).toFixed(2)}
+      <div className="mt-3 space-y-1 border-t border-stone-100 pt-3 text-sm">
+        <p className="font-medium text-stone-700">
+          {totalItems} item{totalItems !== 1 ? "s" : ""} · Items{" "}
+          <span className="tabular-nums">${(vendorOrder.totalCents / 100).toFixed(2)}</span>
+          {" · Tip "}
+          <span
+            className={
+              vendorOrder.tipCents > 0 ? "tabular-nums text-emerald-800" : "tabular-nums text-stone-500"
+            }
+          >
+            ${(vendorOrder.tipCents / 100).toFixed(2)}
+          </span>
         </p>
       </div>
 
-      {/* Fallback progression: only when not terminal; framed as backup when POS is source */}
-      {(nextAction || canDeny) && !isTerminal && (
+      {/* Status actions: mode-aware (primary vs fallback, with hint) */}
+      {(nextAction || canDeny || showManualConfirmFallback) && !isTerminal && (
         <div className="mt-3 border-t border-stone-100 pt-3">
-          {isPosManaged && (
-            <p className="mb-1.5 text-xs text-stone-500">
-              Status is usually updated by your POS. Use below only if needed (fallback).
+          {actionHint && (
+            <p className="mb-1.5 text-xs text-stone-600">
+              {actionHint}
             </p>
           )}
           <div className="flex flex-wrap items-center gap-2">
@@ -281,7 +329,11 @@ export function VendorOrderCard({
                 type="button"
                 onClick={() => handleStatusChange(nextAction.targetState)}
                 disabled={loading}
-                className="rounded border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                className={
+                  isMennyuControlsPrimary(operatingMode)
+                    ? "rounded border border-stone-700 bg-stone-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-50"
+                    : "rounded border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                }
               >
                 {loading ? "…" : nextAction.label}
               </button>
@@ -294,6 +346,16 @@ export function VendorOrderCard({
                 className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
               >
                 Deny order
+              </button>
+            )}
+            {showManualConfirmFallback && (
+              <button
+                type="button"
+                onClick={() => handleStatusChange("confirmed")}
+                disabled={loading}
+                className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+              >
+                Confirm manually (POS didn&apos;t sync)
               </button>
             )}
           </div>

@@ -14,6 +14,10 @@ const envSchema = z.object({
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_PHONE_NUMBER: z.string().optional(),
   DELIVERECT_API_URL: z.string().url().optional(),
+  /** Channel name for order API path (case-sensitive). e.g. staging path: /{channelName}/order/{channelLinkId} */
+  DELIVERECT_CHANNEL_NAME: z.string().optional(),
+  DELIVERECT_TOKEN_URL: z.string().url().optional(),
+  DELIVERECT_AUDIENCE: z.string().optional(),
   DELIVERECT_CLIENT_ID: z.string().optional(),
   DELIVERECT_CLIENT_SECRET: z.string().optional(),
   DELIVERECT_WEBHOOK_SECRET: z.string().optional(),

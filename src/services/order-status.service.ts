@@ -21,6 +21,23 @@ import { sendOrderStatusUpdate } from "./sms.service";
 /** Source tag for dev simulator; SMS is skipped when source is this value. */
 const DEV_SIMULATOR_SOURCE = "dev_simulator";
 
+/**
+ * Derive parent order status from vendor orders using effective child state (recovery-normalized).
+ * Use this whenever persisting parent status so customer, admin, and vendor see the same state.
+ */
+export function deriveParentStatusFromVendorOrders(
+  vendorOrders: Array<{
+    routingStatus: string;
+    fulfillmentStatus: string;
+    statusHistory?: Array<{ source?: string | null }>;
+  }>
+): ParentOrderStatus {
+  const children: ChildOrderState[] = vendorOrders.map((vo) =>
+    getEffectiveChildStateForParentDerivation(vo, vo.statusHistory ?? null)
+  );
+  return deriveParentStatusFromChildren(children);
+}
+
 export async function updateVendorOrderStatus(
   vendorOrderId: string,
   routingStatus?: string,
@@ -53,6 +70,126 @@ export async function updateVendorOrderStatus(
     select: { orderId: true },
   });
   if (vo) await recomputeAndPersistParentStatus(vo.orderId, source);
+}
+
+const FULFILLMENT_RANK: Record<VendorOrderFulfillmentStatus, number> = {
+  pending: 0,
+  accepted: 1,
+  preparing: 2,
+  ready: 3,
+  completed: 4,
+  cancelled: 100,
+};
+
+/**
+ * Apply Deliverect status webhook: monotonic fulfillment (no accidental downgrades),
+ * optional deliverectOrderId backfill, idempotent when nothing changes.
+ */
+export async function applyDeliverectStatusWebhook(
+  vendorOrderId: string,
+  mapped: {
+    routingStatus?: VendorOrderRoutingStatus;
+    fulfillmentStatus?: VendorOrderFulfillmentStatus;
+  },
+  deliverectExternalId: string | null,
+  rawPayload: unknown
+): Promise<{ updated: boolean; skipped: boolean }> {
+  const vo = await prisma.vendorOrder.findUnique({
+    where: { id: vendorOrderId },
+    select: {
+      orderId: true,
+      routingStatus: true,
+      fulfillmentStatus: true,
+      deliverectOrderId: true,
+    },
+  });
+  if (!vo) throw new Error("Vendor order not found");
+
+  let nextRouting = vo.routingStatus as VendorOrderRoutingStatus;
+  let nextFulfillment = vo.fulfillmentStatus as VendorOrderFulfillmentStatus;
+
+  const posProgress =
+    mapped.fulfillmentStatus &&
+    ["accepted", "preparing", "ready", "completed"].includes(mapped.fulfillmentStatus);
+
+  if (mapped.routingStatus === "failed") {
+    if (vo.fulfillmentStatus !== "completed") {
+      nextRouting = "failed";
+      if (vo.fulfillmentStatus === "pending") nextFulfillment = "pending";
+    }
+  } else if (
+    vo.routingStatus === "failed" &&
+    vo.fulfillmentStatus === "pending" &&
+    posProgress &&
+    mapped.fulfillmentStatus
+  ) {
+    nextRouting = "confirmed";
+    nextFulfillment = mapped.fulfillmentStatus;
+  } else {
+    if (mapped.routingStatus === "confirmed") {
+      if (vo.routingStatus === "pending" || vo.routingStatus === "sent") {
+        nextRouting = "confirmed";
+      }
+    }
+    const inc = mapped.fulfillmentStatus;
+    if (inc === "cancelled") {
+      nextFulfillment = "cancelled";
+      if (vo.routingStatus === "failed" || vo.routingStatus === "sent") {
+        nextRouting = "confirmed";
+      }
+    } else if (inc && vo.fulfillmentStatus !== "cancelled" && vo.fulfillmentStatus !== "completed") {
+      if (FULFILLMENT_RANK[inc] > FULFILLMENT_RANK[nextFulfillment]) {
+        nextFulfillment = inc;
+      }
+    }
+  }
+
+  const backfillId =
+    deliverectExternalId &&
+    !vo.deliverectOrderId &&
+    !String(deliverectExternalId).match(/^c[a-z0-9]{24}$/i)
+      ? deliverectExternalId
+      : null;
+
+  const routingChanged = nextRouting !== vo.routingStatus;
+  const fulfillmentChanged = nextFulfillment !== vo.fulfillmentStatus;
+  const idBackfill = Boolean(backfillId);
+
+  if (!routingChanged && !fulfillmentChanged && !idBackfill) {
+    if (rawPayload) {
+      await prisma.vendorOrder.update({
+        where: { id: vendorOrderId },
+        data: { lastWebhookPayload: rawPayload as Prisma.InputJsonValue },
+      });
+    }
+    await recomputeAndPersistParentStatus(vo.orderId, "deliverect");
+    return { updated: false, skipped: true };
+  }
+
+  await prisma.vendorOrder.update({
+    where: { id: vendorOrderId },
+    data: {
+      ...(routingChanged ? { routingStatus: nextRouting } : {}),
+      ...(fulfillmentChanged ? { fulfillmentStatus: nextFulfillment } : {}),
+      ...(idBackfill ? { deliverectOrderId: backfillId } : {}),
+      lastWebhookPayload: rawPayload as Prisma.InputJsonValue,
+    },
+  });
+
+  if (routingChanged || fulfillmentChanged) {
+    await prisma.vendorOrderStatusHistory.create({
+      data: {
+        vendorOrderId,
+        routingStatus: nextRouting,
+        fulfillmentStatus: nextFulfillment,
+        source: "deliverect",
+        rawPayload: rawPayload as object,
+      },
+    });
+  }
+
+  await recomputeAndPersistParentStatus(vo.orderId, "deliverect");
+  return { updated: true, skipped: false };
 }
 
 export interface ApplyVendorOrderTransitionResult {
@@ -230,3 +367,11 @@ async function getOrderWithUnifiedStatusImpl(orderId: string) {
 }
 
 export const getOrderWithUnifiedStatus = cache(getOrderWithUnifiedStatusImpl);
+
+/**
+ * Same payload as {@link getOrderWithUnifiedStatus}, but not wrapped in React `cache()`.
+ * Use for client polling so every request reads current DB state.
+ */
+export function getOrderWithUnifiedStatusLive(orderId: string) {
+  return getOrderWithUnifiedStatusImpl(orderId);
+}

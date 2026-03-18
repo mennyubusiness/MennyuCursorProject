@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { getSessionIdFromHeaders } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { CheckoutForm } from "./CheckoutForm";
+import { CheckoutProgress } from "./CheckoutProgress";
 import { computeOrderTotals } from "@/domain/fees";
 import { validateCartForOrder } from "@/services/order.service";
 
@@ -62,31 +63,106 @@ export default async function CheckoutPage({
     redirect(`/cart?error=${encodeURIComponent(validation.code)}`);
   }
 
-  const byVendor = new Map<string, number>();
+  const byVendor = new Map<
+    string,
+    { name: string; lines: Array<{ name: string; qty: number; cents: number }> }
+  >();
   for (const item of cart.items) {
-    const sub = item.priceCents * item.quantity;
-    byVendor.set(item.vendorId, (byVendor.get(item.vendorId) ?? 0) + sub);
+    const lineCents = item.priceCents * item.quantity;
+    const g = byVendor.get(item.vendorId);
+    const line = {
+      name: item.menuItem.name,
+      qty: item.quantity,
+      cents: lineCents,
+    };
+    if (g) {
+      g.lines.push(line);
+    } else {
+      byVendor.set(item.vendorId, { name: item.vendor.name, lines: [line] });
+    }
   }
-  const vendorSubtotalsCents = Array.from(byVendor.values());
+  const vendorSubtotalsCents = Array.from(byVendor.values()).map((g) =>
+    g.lines.reduce((a, l) => a + l.cents, 0)
+  );
   const totals = computeOrderTotals({
     vendorSubtotalsCents,
     tipCents: 0,
   });
+  const vendorCount = byVendor.size;
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-stone-900">Checkout</h1>
-      <p className="mt-1 text-stone-600">{cart.pod.name}</p>
-
-      <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-        <p className="text-stone-600">Subtotal: ${(totals.subtotalCents / 100).toFixed(2)}</p>
-        <p className="text-stone-600">
-          Service fee (3.5%): ${(totals.serviceFeeCents / 100).toFixed(2)}
-        </p>
-        <p className="font-medium text-stone-900">
-          Total (before tip): ${((totals.subtotalCents + totals.serviceFeeCents) / 100).toFixed(2)}
-        </p>
+    <div className="mx-auto max-w-2xl">
+      <CheckoutProgress activeStep={2} />
+      <div className="mb-2">
+        <Link
+          href={`/cart`}
+          className="text-sm font-medium text-stone-600 hover:text-stone-900 hover:underline"
+        >
+          ← Back to cart
+        </Link>
       </div>
+      <header className="border-b border-stone-200 pb-4">
+        <h1 className="text-2xl font-semibold text-stone-900">Checkout</h1>
+        <p className="mt-1 text-stone-600">
+          <span className="font-medium text-stone-800">{cart.pod.name}</span>
+          {vendorCount > 1 && (
+            <span className="text-stone-500"> · {vendorCount} vendors</span>
+          )}
+        </p>
+      </header>
+
+      <section className="mt-6 rounded-xl border border-stone-200 bg-white shadow-sm">
+        <div className="border-b border-stone-100 px-4 py-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+            Order summary
+          </h2>
+        </div>
+        <div className="divide-y divide-stone-100 px-4 py-2">
+          {Array.from(byVendor.entries()).map(([vid, g]) => (
+            <div key={vid} className="py-4 first:pt-2 last:pb-2">
+              <p className="font-medium text-stone-900">{g.name}</p>
+              <ul className="mt-2 space-y-1.5 text-sm text-stone-600">
+                {g.lines.map((l, i) => (
+                  <li key={i} className="flex justify-between gap-4">
+                    <span className="min-w-0">
+                      {l.name}
+                      <span className="text-stone-400"> × {l.qty}</span>
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      ${(l.cents / 100).toFixed(2)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <dl className="space-y-2 border-t border-stone-100 bg-stone-50/80 px-4 py-4 text-sm">
+          <div className="flex justify-between gap-4">
+            <dt className="text-stone-600">Food subtotal</dt>
+            <dd className="tabular-nums font-medium text-stone-900">
+              ${(totals.subtotalCents / 100).toFixed(2)}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-stone-600">Service fee (3.5%)</dt>
+            <dd className="tabular-nums text-stone-800">
+              ${(totals.serviceFeeCents / 100).toFixed(2)}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4 border-t border-stone-200 pt-2 text-base">
+            <dt className="font-semibold text-stone-900">Due before tip</dt>
+            <dd className="tabular-nums font-bold text-stone-900">
+              ${((totals.subtotalCents + totals.serviceFeeCents) / 100).toFixed(2)}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <p className="mt-4 text-sm text-stone-500">
+        Add your contact info and tip below, then pay securely. Your order is placed and sent to
+        vendors only after payment succeeds.
+      </p>
 
       <CheckoutForm
         cartId={cart.id}
