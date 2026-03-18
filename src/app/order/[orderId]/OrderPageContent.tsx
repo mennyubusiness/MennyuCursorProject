@@ -27,8 +27,7 @@ function toDate(v: string | Date): Date {
 }
 
 /** Normalize order so all createdAt fields are Date for timeline/display. */
-function normalizeOrderDates(order: OrderFromApi): NonNullable<OrderFromApi> {
-  if (!order) return order;
+function normalizeOrderDates(order: NonNullable<OrderFromApi>): NonNullable<OrderFromApi> {
   return {
     ...order,
     statusHistory: (order.statusHistory ?? []).map((e) => ({
@@ -99,7 +98,7 @@ export function OrderPageContent({
         const fp = orderStatusFingerprint(next);
         if (fp === lastFingerprintRef.current) return;
         lastFingerprintRef.current = fp;
-        setOrder(normalizeOrderDates(next) as NonNullable<OrderFromApi>);
+        setOrder(normalizeOrderDates(next));
         const nextDerived = next.derivedStatus ?? next.status;
         if (isTerminalStatus(nextDerived as Parameters<typeof isTerminalStatus>[0])) {
           clearPoll();
