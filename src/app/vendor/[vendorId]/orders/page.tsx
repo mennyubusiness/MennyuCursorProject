@@ -13,7 +13,12 @@ import { VendorDashboardLiveOrders } from "../dashboard/VendorDashboardLiveOrder
 const getVendorOrdersPageData = cache(async (vendorId: string) => {
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { id: true, name: true, mennyuOrdersPaused: true },
+    select: {
+      id: true,
+      name: true,
+      mennyuOrdersPaused: true,
+      deliverectChannelLinkId: true,
+    },
   });
   if (!vendor) return null;
   const vendorOrders = await prisma.vendorOrder.findMany({
