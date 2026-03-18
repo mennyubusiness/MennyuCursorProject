@@ -114,8 +114,7 @@ export async function submitOrder(
 
   /** Diagnostics for “order not in Deliverect UI” (duplicates, date filter, etc.). No secrets. */
   function submitDiagnostics(httpStatus: number, raw: unknown) {
-    const p = payload as Record<string, unknown>;
-    const pickupTime = p.pickupTime;
+    const pickupTime = payload.pickupTime;
     console.info(
       `${LOG_PREFIX} submitDiagnostics ${JSON.stringify({
         httpStatus,
