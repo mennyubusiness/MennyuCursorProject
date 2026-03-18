@@ -142,7 +142,11 @@ export async function submitVendorOrderToDeliverect(
       : result.raw != null
         ? { body: result.raw }
         : null;
-  if (responsePayload != null && result.acceptedWithoutExternalId) {
+  if (
+    responsePayload != null &&
+    "acceptedWithoutExternalId" in result &&
+    result.acceptedWithoutExternalId
+  ) {
     responsePayload = {
       ...responsePayload,
       _mennyu: { deliverectOrderIdPendingWebhook: true },
