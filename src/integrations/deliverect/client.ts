@@ -77,17 +77,21 @@ export type DeliverectResponseAudit = {
   body: unknown;
 };
 
-export async function submitOrder(
-  payload: DeliverectOrderRequest
-): Promise<{
+/**
+ * Single shape for every submitOrder return path (mock/service use the same fields optionally).
+ * Avoids union narrowing when reading externalOrderId, acceptedWithoutExternalId, responseAudit, etc.
+ */
+export type DeliverectSubmitResult = {
   success: boolean;
   externalOrderId?: string;
   error?: string;
   raw?: unknown;
   responseAudit?: DeliverectResponseAudit;
-  /** Set when HTTP 2xx but body has no order id (e.g. 201 + {}). */
+  /** HTTP 2xx, body has no order id (e.g. 201 + {}). */
   acceptedWithoutExternalId?: boolean;
-}> {
+};
+
+export async function submitOrder(payload: DeliverectOrderRequest): Promise<DeliverectSubmitResult> {
   const channelName = env.DELIVERECT_CHANNEL_NAME?.trim();
   const channelLinkId = payload.channelLinkId;
   const url =

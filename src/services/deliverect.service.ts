@@ -11,7 +11,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
-import { submitOrder, type DeliverectResponseAudit } from "@/integrations/deliverect/client";
+import { submitOrder, type DeliverectSubmitResult } from "@/integrations/deliverect/client";
 import { getVendorOrderForDeliverect } from "@/integrations/deliverect/load";
 import { mennyuVendorOrderToDeliverectPayload } from "@/integrations/deliverect/transform";
 import { validateForSubmission } from "@/integrations/deliverect/validate";
@@ -142,11 +142,7 @@ export async function submitVendorOrderToDeliverect(
       : result.raw != null
         ? { body: result.raw }
         : null;
-  if (
-    responsePayload != null &&
-    "acceptedWithoutExternalId" in result &&
-    result.acceptedWithoutExternalId
-  ) {
+  if (responsePayload != null && result.acceptedWithoutExternalId) {
     responsePayload = {
       ...responsePayload,
       _mennyu: { deliverectOrderIdPendingWebhook: true },
