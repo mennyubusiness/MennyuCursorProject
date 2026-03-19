@@ -50,3 +50,9 @@ If a vendor order is already in routing status `sent` with a `deliverectOrderId`
 3. **Invalid JSON** → **400**. **Missing secret** (no env secret in prod, or no channel link id in staging payload) → **401** with a clear message. **Bad signature** → **401** `Invalid signature`.
 
 Payload field notes and example shapes: **`DELIVERECT_WEBHOOK_PAYLOADS.md`**.
+
+## Admin: simulate POS status (webhook-driven)
+
+`POST /api/admin/vendor-orders/{vendorOrderId}/simulate-deliverect-status` with JSON `{ "status": 20 }` (numeric Deliverect status code). Requires admin cookie or `?admin=SECRET`. Calls Deliverect `POST …/orderStatus/{deliverectOrderId}` only — **no local DB updates**; Mennyu changes should arrive via webhook.
+
+Auth to Deliverect: optional **`DELIVERECT_API_KEY`** (Bearer), else existing OAuth client credentials (`DELIVERECT_CLIENT_ID` / `DELIVERECT_CLIENT_SECRET`).

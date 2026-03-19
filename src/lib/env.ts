@@ -20,6 +20,8 @@ const envSchema = z.object({
   DELIVERECT_AUDIENCE: z.string().optional(),
   DELIVERECT_CLIENT_ID: z.string().optional(),
   DELIVERECT_CLIENT_SECRET: z.string().optional(),
+  /** Optional static Bearer for Deliverect API (e.g. admin simulate). If unset, OAuth client credentials are used. */
+  DELIVERECT_API_KEY: z.string().optional(),
   DELIVERECT_WEBHOOK_SECRET: z.string().optional(),
   /**
    * Optional override for Deliverect webhook HMAC behavior.

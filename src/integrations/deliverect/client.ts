@@ -209,3 +209,41 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
     return { success: false, error: message };
   }
 }
+
+/**
+ * POST `{base}/orderStatus/{deliverectOrderId}` — push status into Deliverect (POS simulation).
+ * Deliverect should emit webhooks; Mennyu does not mutate DB here.
+ *
+ * Auth: `DELIVERECT_API_KEY` as Bearer if set; otherwise OAuth via {@link getDeliverectAuthHeaders}.
+ */
+export async function postDeliverectOrderStatusUpdate(
+  deliverectOrderId: string,
+  status: number
+): Promise<{ httpStatus: number; body: unknown }> {
+  const base = BASE_URL.replace(/\/$/, "");
+  const url = `${base}/orderStatus/${encodeURIComponent(deliverectOrderId)}`;
+
+  const apiKey = env.DELIVERECT_API_KEY?.trim();
+  const authHeaders: Record<string, string> = apiKey
+    ? { Authorization: `Bearer ${apiKey}` }
+    : await getDeliverectAuthHeaders();
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders,
+    },
+    body: JSON.stringify({ status }),
+  });
+
+  const rawText = await res.text();
+  let body: unknown = rawText;
+  try {
+    body = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    body = rawText;
+  }
+
+  return { httpStatus: res.status, body };
+}
