@@ -20,7 +20,8 @@ export function buildAdminCookieHeader(secret: string): string {
   const isProd = process.env.NODE_ENV === "production";
   const parts = [
     `${ADMIN_COOKIE_NAME}=${encodeURIComponent(secret)}`,
-    "Path=/admin",
+    // Must be / so the browser sends this cookie on same-origin fetches to /api/admin/* (Path=/admin does not match /api/...).
+    "Path=/",
     "Max-Age=86400",
     "SameSite=Lax",
     "HttpOnly",
