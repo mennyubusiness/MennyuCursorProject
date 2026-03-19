@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  const { internalVendorOrderId, externalOrderId, update } = resolveWebhookStatusUpdate(payload);
+  const { internalVendorOrderId, externalOrderId } = resolveWebhookStatusUpdate(payload);
 
   let vendorOrderId: string | null = null;
   if (internalVendorOrderId) {
@@ -76,17 +76,26 @@ export async function POST(request: NextRequest) {
         processed: true,
         processedAt: new Date(),
         errorMessage:
-          "Could not resolve vendor order (need channelOrderId / mennyuVendorOrderId or known deliverectOrderId)",
+          "match_failed: could not resolve vendor order (channelOrderId / mennyuVendorOrderId or deliverectOrderId)",
       },
     });
-    return NextResponse.json({ received: true, resolved: false });
+    return NextResponse.json({
+      received: true,
+      resolved: false,
+      outcome: "match_failed" as const,
+    });
   }
 
+  let applyResult: Awaited<ReturnType<typeof applyDeliverectStatusWebhook>>;
   try {
-    await applyDeliverectStatusWebhook(vendorOrderId, update, externalOrderId, payload);
+    applyResult = await applyDeliverectStatusWebhook(vendorOrderId, externalOrderId, payload);
     await prisma.webhookEvent.updateMany({
       where: { idempotencyKey: idemKey },
-      data: { processed: true, processedAt: new Date() },
+      data: {
+        processed: true,
+        processedAt: new Date(),
+        errorMessage: null,
+      },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -97,5 +106,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  return NextResponse.json({ received: true, resolved: true });
+  return NextResponse.json({
+    received: true,
+    resolved: true,
+    outcome: applyResult.outcome,
+    updatedVendorOrderState: applyResult.updatedVendorOrderState,
+  });
 }

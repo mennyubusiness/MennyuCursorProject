@@ -42,22 +42,31 @@ export async function POST(
     });
   }
 
+  const recoveredAt = new Date();
   const result = await applyVendorOrderTransition(
     vendorOrderId,
     "accepted",
-    "admin_manual_recovery"
+    "admin_manual_recovery",
+    {
+      extraVendorOrderUpdate: {
+        manuallyRecoveredAt: recoveredAt,
+        manuallyRecoveredBy: "admin",
+        statusAuthority: "admin_override",
+      },
+      historyRawPayload: {
+        targetState: "accepted",
+        audit: {
+          kind: "admin_manual_recovery",
+          claimedAuthority: "admin_override",
+          summary:
+            "Admin marked order as manually received by vendor; status authority set to admin_override so vendor dashboard may advance fulfillment until an admin hands control back.",
+        },
+      },
+      historyAuthority: "admin_override",
+    }
   );
 
   if (result.success) {
-    // Record manual recovery metadata; routing failure stays in DB for audit.
-    await prisma.vendorOrder.update({
-      where: { id: vendorOrderId },
-      data: {
-        manuallyRecoveredAt: new Date(),
-        manuallyRecoveredBy: "admin",
-      },
-    });
-
     const { createVendorOrderIssue, getVendorOrderIssues, resolveVendorOrderIssue } = await import("@/services/issues.service");
     const openIssues = await getVendorOrderIssues(vendorOrderId, "OPEN");
     for (const issue of openIssues.filter((i) => i.type === "routing_failure")) {

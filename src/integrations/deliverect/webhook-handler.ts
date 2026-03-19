@@ -7,6 +7,11 @@
 import { createHash, createHmac } from "crypto";
 import type { DeliverectWebhookPayload } from "./payloads";
 import type { VendorOrderRoutingStatus, VendorOrderFulfillmentStatus } from "@/domain/types";
+import { readDeliverectStatusCodeFromFlat } from "@/integrations/deliverect/payload-status-read";
+import {
+  interpretDeliverectWebhookFlat,
+  mapDeliverectStatusCodeToMennyuUpdate,
+} from "@/integrations/deliverect/deliverect-status-map";
 
 export function parseDeliverectWebhookBody(body: string): DeliverectWebhookPayload {
   try {
@@ -112,123 +117,25 @@ export function flattenDeliverectWebhookPayload(
   return flat;
 }
 
-const STATUS_NAME_TO_CODE: Record<string, number> = {
-  NEW: 10,
-  ACCEPTED: 20,
-  PRINTED: 40,
-  PREPARING: 50,
-  PREPARED: 60,
-  PICKUP_READY: 70,
-  READY: 70,
-  READY_FOR_PICKUP: 70,
-  FINALIZED: 90,
-  AUTO_FINALIZED: 95,
-  CANCELED: 110,
-  CANCELLED: 110,
-  FAILED: 120,
-  POS_FAILED: 121,
-  PARSED: 1,
-  RECEIVED_BY_POS: 2,
-};
-
-function coerceToStatusNumber(raw: unknown): number | null {
-  if (raw == null) return null;
-  if (typeof raw === "number" && Number.isFinite(raw)) return Math.trunc(raw);
-  if (typeof raw === "string") {
-    const t = raw.trim();
-    if (/^-?\d+$/.test(t)) return parseInt(t, 10);
-    const key = t.toUpperCase().replace(/[\s-]+/g, "_");
-    if (STATUS_NAME_TO_CODE[key] != null) return STATUS_NAME_TO_CODE[key];
-  }
-  if (typeof raw === "object" && !Array.isArray(raw)) {
-    const o = raw as Record<string, unknown>;
-    return coerceToStatusNumber(o.code ?? o.status ?? o.value ?? o.id ?? o.orderStatus);
-  }
-  return null;
-}
-
-function readStatusCode(flat: Record<string, unknown>): number | null {
-  const keys = [
-    "status",
-    "orderStatus",
-    "posStatus",
-    "posOrderStatus",
-    "channelStatus",
-    "statusCode",
-    "newStatus",
-    "orderStatusCode",
-    "deliveryStatus",
-  ];
-  for (const k of keys) {
-    const n = coerceToStatusNumber(flat[k]);
-    if (n != null) return n;
-  }
-  return null;
+/** String form of upstream Deliverect status for audit (VendorOrder.lastExternalStatus / history.externalStatus). */
+export function getDeliverectWebhookAuditStatusString(
+  payload: DeliverectWebhookPayload
+): string | null {
+  const flat = flattenDeliverectWebhookPayload(payload);
+  const code = readDeliverectStatusCodeFromFlat(flat);
+  return code != null ? String(code) : null;
 }
 
 /**
  * Map Deliverect POS / channel status integers to Mennyu vendor-order state.
  * @see https://developers.deliverect.com/page/order-status
+ * @deprecated Prefer interpretDeliverectWebhookFlat / applyDeliverectStatusWebhook pipeline.
  */
 export function mapDeliverectStatusCodeToUpdate(statusCode: number | null): {
   routingStatus?: VendorOrderRoutingStatus;
   fulfillmentStatus?: VendorOrderFulfillmentStatus;
 } {
-  if (statusCode == null) return {};
-
-  if ([110, 100, 115].includes(statusCode)) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "cancelled" };
-  }
-  if ([120, 121, 124, 125, 35, 126].includes(statusCode)) {
-    return { routingStatus: "failed", fulfillmentStatus: "pending" };
-  }
-
-  if ([0, 1, 2, 3, 4, 5, 6, 7, 10, 20, 25].includes(statusCode)) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "accepted" };
-  }
-  if (statusCode === 40) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "preparing" };
-  }
-  if (statusCode === 50) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "preparing" };
-  }
-  if (statusCode === 60 || statusCode === 70) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "ready" };
-  }
-  if (statusCode === 90 || statusCode === 95) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "completed" };
-  }
-  if (statusCode === 89) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "completed" };
-  }
-
-  return {};
-}
-
-function mapDeliverectStringEvent(eventType: string): {
-  routingStatus?: VendorOrderRoutingStatus;
-  fulfillmentStatus?: VendorOrderFulfillmentStatus;
-} {
-  const normalized = eventType.toLowerCase();
-  if (normalized.includes("confirm") || normalized.includes("accepted")) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "accepted" };
-  }
-  if (normalized.includes("preparing") || normalized.includes("in_preparation")) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "preparing" };
-  }
-  if (normalized.includes("ready") || normalized.includes("ready_for_pickup")) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "ready" };
-  }
-  if (normalized.includes("completed") || normalized.includes("done")) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "completed" };
-  }
-  if (normalized.includes("cancel")) {
-    return { routingStatus: "confirmed", fulfillmentStatus: "cancelled" };
-  }
-  if (normalized.includes("reject") || normalized.includes("failed")) {
-    return { routingStatus: "failed", fulfillmentStatus: "pending" };
-  }
-  return {};
+  return mapDeliverectStatusCodeToMennyuUpdate(statusCode);
 }
 
 export interface DeliverectStatusUpdate {
@@ -239,16 +146,12 @@ export interface DeliverectStatusUpdate {
 export function mapDeliverectWebhookToStatusUpdate(
   flat: Record<string, unknown>
 ): DeliverectStatusUpdate {
-  const code = readStatusCode(flat);
-  const fromCode = mapDeliverectStatusCodeToUpdate(code);
-  if (fromCode.routingStatus || fromCode.fulfillmentStatus) return fromCode;
-
-  const eventType = String(
-    flat.eventType ?? flat.type ?? flat.event ?? flat.reason ?? ""
-  );
-  if (eventType) return mapDeliverectStringEvent(eventType);
-
-  return {};
+  const i = interpretDeliverectWebhookFlat(flat);
+  if (i.kind !== "mapped") return {};
+  return {
+    fulfillmentStatus: i.fulfillmentStatus,
+    ...(i.routingStatus != null ? { routingStatus: i.routingStatus } : {}),
+  };
 }
 
 /** Extract Deliverect external order id (Mongo-style); exclude Mennyu cuid. */
@@ -330,7 +233,7 @@ export function getDeliverectEventId(
 
   const ext = extractDeliverectExternalOrderId(flat);
   const ch = resolveMennyuVendorOrderId(flat);
-  const st = readStatusCode(flat);
+  const st = readDeliverectStatusCodeFromFlat(flat);
   const u =
     flat.updatedAt ??
     flat.updated_at ??

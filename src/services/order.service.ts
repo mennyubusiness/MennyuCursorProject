@@ -296,6 +296,12 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
   }
 
   const vendorGroups = groupCartByVendorSubtotals(cart.items);
+  if (vendorGroups.length === 0) {
+    throw new OrderValidationError(
+      "NO_VENDOR_GROUPS",
+      "Order could not be split by vendor; cart items may be missing vendor. Refusing to create order without vendor orders."
+    );
+  }
   const vendorSubtotalsCents = vendorGroups.map((v) => v.subtotalCents);
   const totals = computeOrderTotals({
     vendorSubtotalsCents,
@@ -319,10 +325,12 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
       },
     });
 
-    for (let i = 0; i < totals.vendorAllocations.length; i++) {
+    for (let i = 0; i < vendorGroups.length; i++) {
+      const group = vendorGroups[i]!;
       const alloc = totals.vendorAllocations[i];
-      const group = vendorGroups[i];
-      if (!group) continue;
+      if (!alloc) {
+        throw new Error(`Missing vendor allocation for group index ${i}; cannot create vendor order`);
+      }
       const { vendorId, lines } = group;
       const vo = await tx.vendorOrder.create({
         data: {

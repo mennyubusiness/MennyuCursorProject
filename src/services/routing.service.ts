@@ -9,6 +9,7 @@
 
 import { prisma } from "@/lib/db";
 import { submitVendorOrderToDeliverect } from "@/services/deliverect.service";
+import { applyVendorOrderStatusWithMeta } from "@/services/vendor-order-status-instrumentation";
 
 /** Normalized result for any routing backend. Keeps callers independent of provider. */
 export interface RoutingResult {
@@ -70,18 +71,31 @@ export async function submitVendorOrder(
   }
 
   if (provider === "manual") {
-    // Stable manual path: set VO to confirmed and record history so it does not stay "pending" or trigger Needs Attention.
-    await prisma.vendorOrder.update({
+    const vo = await prisma.vendorOrder.findUnique({
       where: { id: vendorOrderId },
-      data: { routingStatus: "confirmed" },
-    });
-    await prisma.vendorOrderStatusHistory.create({
-      data: {
-        vendorOrderId,
-        routingStatus: "confirmed",
-        source: "manual",
+      select: {
+        orderId: true,
+        fulfillmentStatus: true,
+        statusAuthority: true,
       },
     });
+    if (!vo) {
+      return { success: false, error: "Vendor order not found" };
+    }
+    await applyVendorOrderStatusWithMeta(
+      {
+        vendorOrderId,
+        orderId: vo.orderId,
+        patch: { routingStatus: "confirmed" },
+        statusSource: "system",
+        historySource: "manual",
+        extraVendorOrderUpdate:
+          vo.statusAuthority == null ? { statusAuthority: "vendor_manual" } : {},
+        historyRoutingStatus: "confirmed",
+        historyFulfillmentStatus: vo.fulfillmentStatus,
+      },
+      "manual"
+    );
     return { success: true, skipped: true };
   }
 
@@ -92,6 +106,21 @@ export async function submitVendorOrder(
     context.customerEmail,
     prep
   );
+  if (result.success) {
+    const cur = await prisma.vendorOrder.findUnique({
+      where: { id: vendorOrderId },
+      select: { statusAuthority: true },
+    });
+    // Do not mark POS-managed until a Deliverect webhook proves sync (promoted there).
+    // Until then, vendor may use dashboard; explicit vendor_manual avoids legacy infer edge cases.
+    await prisma.vendorOrder.update({
+      where: { id: vendorOrderId },
+      data: {
+        lastStatusSource: "system",
+        ...(cur?.statusAuthority == null ? { statusAuthority: "vendor_manual" } : {}),
+      },
+    });
+  }
   return {
     success: result.success,
     externalOrderId: result.deliverectOrderId,

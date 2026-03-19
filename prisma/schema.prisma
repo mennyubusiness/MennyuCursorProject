@@ -1,6 +1,3 @@
-// Mennyu MVP – Multi-vendor food cart pod ordering
-// Money stored in cents (integer). Tax MVP = 0% with location-based design for later.
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,7 +8,432 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ---- Enums (status fields) ----
+model Pod {
+  id                 String                 @id @default(cuid())
+  name               String
+  slug               String                 @unique
+  description        String?
+  imageUrl           String?
+  address            String?
+  latitude           Float?
+  longitude          Float?
+  isActive           Boolean                @default(true)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  carts              Cart[]
+  orders             Order[]
+  membershipRequests PodMembershipRequest[]
+  vendors            PodVendor[]
+}
+
+model PodVendor {
+  id        String   @id @default(cuid())
+  podId     String
+  vendorId  String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  pod       Pod      @relation(fields: [podId], references: [id], onDelete: Cascade)
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([podId, vendorId])
+  @@index([podId])
+  @@index([vendorId])
+}
+
+/// Pod membership request: pod owner requests vendor to join; vendor must accept or decline.
+model PodMembershipRequest {
+  id          String    @id @default(cuid())
+  podId       String
+  vendorId    String
+  /// pending | accepted | declined | cancelled
+  status      String
+  requestedBy String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  respondedAt DateTime?
+  pod         Pod       @relation(fields: [podId], references: [id], onDelete: Cascade)
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([podId])
+  @@index([vendorId])
+  @@index([vendorId, status])
+}
+
+model Vendor {
+  id                      String                 @id @default(cuid())
+  name                    String
+  slug                    String                 @unique
+  description             String?
+  imageUrl                String?
+  isActive                Boolean                @default(true)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  deliverectChannelLinkId String?
+  deliverectLocationId    String?
+  deliverectAccountId     String?
+  /// When true, block new Mennyu orders for this vendor (intake only); existing orders still visible.
+  mennyuOrdersPaused      Boolean                @default(false)
+  cartItems               CartItem[]
+  menuItems               MenuItem[]
+  modifierGroups          ModifierGroup[]
+  podMembershipRequests   PodMembershipRequest[]
+  pods                    PodVendor[]
+  vendorOrders            VendorOrder[]
+}
+
+model MenuItem {
+  id                  String                  @id @default(cuid())
+  vendorId            String
+  name                String
+  description         String?
+  priceCents          Int
+  imageUrl            String?
+  sortOrder           Int                     @default(0)
+  isAvailable         Boolean                 @default(true)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  basketMaxQuantity   Int?
+  deliverectProductId String?
+  cartItems           CartItem[]
+  vendor              Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  modifierGroups      MenuItemModifierGroup[]
+  orderLines          OrderLineItem[]
+}
+
+model ModifierGroup {
+  id                     String                  @id @default(cuid())
+  vendorId               String
+  name                   String
+  minSelections          Int                     @default(0)
+  maxSelections          Int                     @default(1)
+  isRequired             Boolean                 @default(false)
+  sortOrder              Int                     @default(0)
+  isAvailable            Boolean                 @default(true)
+  parentModifierOptionId String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  menuItems              MenuItemModifierGroup[]
+  parentModifierOption   ModifierOption?         @relation("NestedModifierGroups", fields: [parentModifierOptionId], references: [id], onDelete: Cascade)
+  vendor                 Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  options                ModifierOption[]        @relation("GroupOptions")
+
+  @@index([vendorId])
+  @@index([parentModifierOptionId])
+}
+
+model ModifierOption {
+  id                      String                   @id @default(cuid())
+  modifierGroupId         String
+  name                    String
+  priceCents              Int                      @default(0)
+  sortOrder               Int                      @default(0)
+  isDefault               Boolean                  @default(false)
+  isAvailable             Boolean                  @default(true)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  deliverectModifierId    String?
+  cartItemSelections      CartItemSelection[]
+  nestedModifierGroups    ModifierGroup[]          @relation("NestedModifierGroups")
+  modifierGroup           ModifierGroup            @relation("GroupOptions", fields: [modifierGroupId], references: [id], onDelete: Cascade)
+  orderLineItemSelections OrderLineItemSelection[]
+
+  @@index([modifierGroupId])
+}
+
+model MenuItemModifierGroup {
+  id              String        @id @default(cuid())
+  menuItemId      String
+  modifierGroupId String
+  required        Boolean       @default(false)
+  minSelections   Int           @default(0)
+  maxSelections   Int           @default(1)
+  sortOrder       Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  menuItem        MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  modifierGroup   ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, modifierGroupId])
+  @@index([menuItemId])
+  @@index([modifierGroupId])
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  podId     String
+  sessionId String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  pod       Pod        @relation(fields: [podId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+
+  @@unique([podId, sessionId])
+}
+
+model CartItem {
+  id                  String              @id @default(cuid())
+  cartId              String
+  menuItemId          String
+  vendorId            String
+  quantity            Int                 @default(1)
+  priceCents          Int
+  specialInstructions String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  cart                Cart                @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  menuItem            MenuItem            @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  vendor              Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  selections          CartItemSelection[]
+
+  @@index([cartId])
+  @@index([vendorId])
+}
+
+model CartItemSelection {
+  id               String         @id @default(cuid())
+  cartItemId       String
+  modifierOptionId String
+  quantity         Int            @default(1)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  cartItem         CartItem       @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  modifierOption   ModifierOption @relation(fields: [modifierOptionId], references: [id], onDelete: Cascade)
+
+  @@unique([cartItemId, modifierOptionId])
+  @@index([cartItemId])
+  @@index([modifierOptionId])
+}
+
+model Order {
+  id                    String               @id @default(cuid())
+  podId                 String
+  customerPhone         String
+  customerEmail         String?
+  subtotalCents         Int
+  serviceFeeCents       Int
+  tipCents              Int                  @default(0)
+  taxCents              Int                  @default(0)
+  totalCents            Int
+  idempotencyKey        String?              @unique
+  status                OrderStatus
+  stripePaymentIntentId String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  orderNotes            String?
+  pod                   Pod                  @relation(fields: [podId], references: [id])
+  issues                OrderIssue[]
+  statusHistory         OrderStatusHistory[]
+  payments              Payment[]
+  refundAttempts        RefundAttempt[]
+  vendorOrders          VendorOrder[]
+
+  @@index([stripePaymentIntentId])
+}
+
+model VendorOrder {
+  id                      String                      @id @default(cuid())
+  orderId                 String
+  vendorId                String
+  subtotalCents           Int
+  tipCents                Int                         @default(0)
+  taxCents                Int                         @default(0)
+  serviceFeeCents         Int                         @default(0)
+  totalCents              Int
+  platformCommissionCents Int                         @default(0)
+  deliverectOrderId       String?
+  deliverectChannelLinkId String?
+  routingStatus           VendorRoutingStatus
+  fulfillmentStatus       VendorFulfillmentStatus
+  lastDeliverectPayload   Json?
+  lastWebhookPayload      Json?
+  deliverectAttempts      Int                         @default(0)
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+  deliverectLastError     String?
+  deliverectSubmittedAt   DateTime?
+  lastDeliverectResponse  Json?
+  manuallyRecoveredAt     DateTime?
+  manuallyRecoveredBy     String?
+  manualRecoveryNotes     String?
+  statusAuthority         VendorOrderStatusAuthority?
+  lastStatusSource        VendorOrderStatusSource?
+  lastExternalStatus      String?
+  lastExternalStatusAt    DateTime?
+  /// Last Deliverect webhook apply outcome + debug fields (JSON)
+  deliverectWebhookLastApply Json?
+  lineItems               OrderLineItem[]
+  paymentAllocations      PaymentAllocation[]
+  order                   Order                       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor                  Vendor                      @relation(fields: [vendorId], references: [id])
+  issues                  VendorOrderIssue[]
+  statusHistory           VendorOrderStatusHistory[]
+
+  @@index([deliverectOrderId])
+  @@index([orderId])
+  @@index([vendorId])
+}
+
+model OrderLineItem {
+  id                  String                   @id @default(cuid())
+  vendorOrderId       String
+  menuItemId          String
+  name                String
+  quantity            Int
+  priceCents          Int
+  specialInstructions String?
+  createdAt           DateTime                 @default(now())
+  menuItem            MenuItem                 @relation(fields: [menuItemId], references: [id])
+  vendorOrder         VendorOrder              @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+  selections          OrderLineItemSelection[]
+}
+
+model OrderLineItemSelection {
+  id                 String         @id @default(cuid())
+  orderLineItemId    String
+  modifierOptionId   String
+  nameSnapshot       String
+  priceCentsSnapshot Int            @default(0)
+  quantity           Int            @default(1)
+  createdAt          DateTime       @default(now())
+  modifierOption     ModifierOption @relation(fields: [modifierOptionId], references: [id])
+  orderLineItem      OrderLineItem  @relation(fields: [orderLineItemId], references: [id], onDelete: Cascade)
+
+  @@unique([orderLineItemId, modifierOptionId])
+  @@index([orderLineItemId])
+  @@index([modifierOptionId])
+}
+
+model Payment {
+  id                    String              @id @default(cuid())
+  orderId               String
+  stripePaymentIntentId String              @unique
+  amountCents           Int
+  status                PaymentStatus
+  idempotencyKey        String?             @unique
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  order                 Order               @relation(fields: [orderId], references: [id])
+  allocations           PaymentAllocation[]
+}
+
+model RefundAttempt {
+  id                  String    @id @default(cuid())
+  idempotencyKey      String    @unique
+  orderId             String
+  vendorOrderId       String?
+  amountCents         Int
+  status              String
+  stripeRefundId      String?
+  failureCode         String?
+  failureMessage      String?
+  reason              String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  /// When set, this failed attempt was dismissed as legacy/test; excluded from Needs Attention.
+  dismissedAsLegacyAt DateTime?
+  dismissedAsLegacyBy String?
+  order               Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([orderId, status])
+}
+
+model PaymentAllocation {
+  id              String      @id @default(cuid())
+  paymentId       String
+  vendorOrderId   String
+  subtotalCents   Int
+  tipCents        Int         @default(0)
+  taxCents        Int         @default(0)
+  serviceFeeCents Int         @default(0)
+  totalCents      Int
+  createdAt       DateTime    @default(now())
+  payment         Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  vendorOrder     VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([paymentId, vendorOrderId])
+  @@index([paymentId])
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(cuid())
+  orderId   String
+  status    String
+  source    String?
+  note      String?
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model VendorOrderStatusHistory {
+  id                String                      @id @default(cuid())
+  vendorOrderId     String
+  routingStatus     String?
+  fulfillmentStatus String?
+  source            String?
+  rawPayload        Json?
+  createdAt         DateTime                    @default(now())
+  authority         VendorOrderStatusAuthority?
+  statusSource      VendorOrderStatusSource?
+  externalStatus    String?
+  vendorOrder       VendorOrder                 @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+
+  @@index([vendorOrderId])
+}
+
+model OrderIssue {
+  id         String    @id @default(cuid())
+  orderId    String
+  type       String
+  severity   String
+  status     String
+  notes      String?
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+  createdBy  String?
+  resolvedBy String?
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([orderId, status])
+}
+
+model VendorOrderIssue {
+  id            String      @id @default(cuid())
+  vendorOrderId String
+  type          String
+  severity      String
+  status        String
+  notes         String?
+  createdAt     DateTime    @default(now())
+  resolvedAt    DateTime?
+  createdBy     String?
+  resolvedBy    String?
+  vendorOrder   VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+
+  @@index([vendorOrderId])
+  @@index([vendorOrderId, status])
+}
+
+model WebhookEvent {
+  id             String    @id @default(cuid())
+  provider       String
+  eventId        String?
+  idempotencyKey String?   @unique
+  payload        Json
+  processed      Boolean   @default(false)
+  processedAt    DateTime?
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+
+  @@index([provider, eventId])
+  @@index([idempotencyKey])
+}
+
 enum OrderStatus {
   pending_payment
   paid
@@ -21,11 +443,11 @@ enum OrderStatus {
   accepted
   preparing
   ready
-  in_progress
-  partially_completed
   completed
   cancelled
   failed
+  in_progress
+  partially_completed
 }
 
 enum VendorRoutingStatus {
@@ -53,465 +475,17 @@ enum PaymentStatus {
   canceled
 }
 
-// ---- Pods & Vendors ----
-model Pod {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  imageUrl    String?
-  address     String?
-  latitude    Float?
-  longitude   Float?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  vendors    PodVendor[]
-  carts      Cart[]
-  orders     Order[]
-  membershipRequests PodMembershipRequest[]
+enum VendorOrderStatusAuthority {
+  pos
+  dma
+  vendor_manual
+  admin_override
 }
 
-// Many-to-many: pod membership. Designed for future pod-owner invites/add-remove.
-model PodVendor {
-  id        String   @id @default(cuid())
-  podId     String
-  vendorId  String
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  pod    Pod    @relation(fields: [podId], references: [id], onDelete: Cascade)
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-
-  @@unique([podId, vendorId])
-  @@index([podId])
-  @@index([vendorId])
-}
-
-/// Pod membership request: pod owner requests vendor to join; vendor must accept or decline.
-model PodMembershipRequest {
-  id          String    @id @default(cuid())
-  podId       String
-  vendorId    String
-  status      String    /// pending | accepted | declined | cancelled
-  requestedBy String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  respondedAt DateTime?
-
-  pod    Pod    @relation(fields: [podId], references: [id], onDelete: Cascade)
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-
-  @@index([podId])
-  @@index([vendorId])
-  @@index([vendorId, status])
-}
-
-model Vendor {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  imageUrl    String?
-  isActive    Boolean  @default(true)
-  /// When true, block new Mennyu orders for this vendor (intake only); existing orders still visible.
-mennyuOrdersPaused Boolean @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Deliverect: store/account identifiers once onboarding complete
-  deliverectChannelLinkId String?  // Deliverect channel link ID for this vendor
-  deliverectLocationId    String?  // Optional location ID
-  deliverectAccountId     String?  // Account identifier for API calls
-
-  pods        PodVendor[]
-  menuItems   MenuItem[]
-  modifierGroups ModifierGroup[]
-  cartItems   CartItem[]
-  vendorOrders VendorOrder[]
-  podMembershipRequests PodMembershipRequest[]
-}
-
-model MenuItem {
-  id          String   @id @default(cuid())
-  vendorId    String
-  name        String
-  description String?
-  priceCents  Int      // Always in cents
-  imageUrl    String?
-  sortOrder   Int      @default(0)
-  isAvailable Boolean  @default(true)
-  basketMaxQuantity Int?  // Optional multimax per product (Deliverect basket limits)
-  deliverectProductId String?  // External product/PLU ID for Deliverect/POS mapping
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  vendor    Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  cartItems CartItem[]
-  orderLines OrderLineItem[]
-  modifierGroups MenuItemModifierGroup[]
-}
-
-// ---- Modifiers (Deliverect-compliant structure) ----
-// ModifierGroup: e.g. "Size", "Toppings". Can be nested under a ModifierOption.
-model ModifierGroup {
-  id                   String   @id @default(cuid())
-  vendorId             String
-  name                 String   // e.g. "Choose size"
-  minSelections        Int      @default(0)
-  maxSelections        Int      @default(1)
-  isRequired           Boolean  @default(false)
-  sortOrder            Int      @default(0)
-  isAvailable          Boolean  @default(true)  // Snooze: hide when false
-  parentModifierOptionId String? // When set, this group is nested under that option
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  vendor           Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  parentModifierOption ModifierOption? @relation("NestedModifierGroups", fields: [parentModifierOptionId], references: [id], onDelete: Cascade)
-  options          ModifierOption[] @relation("GroupOptions")
-  menuItems        MenuItemModifierGroup[]
-
-  @@index([vendorId])
-  @@index([parentModifierOptionId])
-}
-
-model ModifierOption {
-  id             String   @id @default(cuid())
-  modifierGroupId String
-  name          String   // e.g. "Extra cheese"
-  priceCents     Int      @default(0)
-  sortOrder      Int      @default(0)
-  isDefault      Boolean  @default(false)  // Preselected when group is shown
-  isAvailable    Boolean  @default(true)   // Snooze
-  deliverectModifierId String?  // External modifier/PLU ID for Deliverect/POS mapping
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  modifierGroup ModifierGroup @relation("GroupOptions", fields: [modifierGroupId], references: [id], onDelete: Cascade)
-  nestedModifierGroups ModifierGroup[] @relation("NestedModifierGroups")
-  cartItemSelections   CartItemSelection[]
-  orderLineItemSelections OrderLineItemSelection[]
-
-  @@index([modifierGroupId])
-}
-
-// Per-menu-item config: which modifier groups apply and min/max (overrides group defaults)
-model MenuItemModifierGroup {
-  id              String   @id @default(cuid())
-  menuItemId      String
-  modifierGroupId String
-  required        Boolean  @default(false)
-  minSelections   Int      @default(0)
-  maxSelections   Int      @default(1)
-  sortOrder       Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  menuItem     MenuItem     @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
-  modifierGroup ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
-
-  @@unique([menuItemId, modifierGroupId])
-  @@index([menuItemId])
-  @@index([modifierGroupId])
-}
-
-// ---- Cart (session-based; one cart per pod for simplicity) ----
-model Cart {
-  id        String   @id @default(cuid())
-  podId     String
-  sessionId String   // Cookie-based anonymous session
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  pod  Pod       @relation(fields: [podId], references: [id], onDelete: Cascade)
-  items CartItem[]
-
-  @@unique([podId, sessionId])
-}
-
-model CartItem {
-  id         String   @id @default(cuid())
-  cartId     String
-  menuItemId String
-  vendorId   String
-  quantity   Int      @default(1)
-  priceCents Int      // Effective unit price at add-to-cart: base + sum(modifier price × qty); line total = priceCents × quantity
-  specialInstructions String?  // Item-level notes (Deliverect item notes)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  cart     Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
-  vendor   Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  selections CartItemSelection[]
-
-  @@index([cartId])
-  @@index([vendorId])
-}
-
-// Structured modifier selections per cart line (Deliverect-compliant; quantity supports "2x extra cheese")
-model CartItemSelection {
-  id             String   @id @default(cuid())
-  cartItemId     String
-  modifierOptionId String
-  quantity       Int      @default(1)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  cartItem       CartItem      @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
-  modifierOption ModifierOption @relation(fields: [modifierOptionId], references: [id], onDelete: Cascade)
-
-  @@unique([cartItemId, modifierOptionId])
-  @@index([cartItemId])
-  @@index([modifierOptionId])
-}
-
-// ---- Parent order (one per checkout) ----
-model Order {
-  id                String   @id @default(cuid())
-  podId             String
-  customerPhone     String   // Primary notification channel
-  customerEmail     String?
-  orderNotes        String?  // Order-level notes (Deliverect order notes)
-  // Totals in cents (customer-facing)
-  subtotalCents     Int
-  serviceFeeCents   Int     // 3.5% of subtotal
-  tipCents          Int     @default(0)
-  taxCents          Int     @default(0)
-  totalCents        Int
-  // Idempotency
-  idempotencyKey    String?  @unique
-  status            OrderStatus
-  stripePaymentIntentId String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  pod             Pod              @relation(fields: [podId], references: [id], onDelete: Restrict)
-  vendorOrders    VendorOrder[]
-  payments        Payment[]
-  refundAttempts  RefundAttempt[]
-  statusHistory   OrderStatusHistory[]
-  issues          OrderIssue[]
-
-  @@index([stripePaymentIntentId])
-}
-
-// Child order per vendor; sent to Deliverect
-model VendorOrder {
-  id                  String   @id @default(cuid())
-  orderId             String
-  vendorId            String
-  // Allocations in cents
-  subtotalCents       Int
-  tipCents            Int     @default(0)
-  taxCents            Int     @default(0)
-  serviceFeeCents     Int     @default(0)
-  totalCents          Int
-  // Platform commission (2.75% of vendor subtotal)
-  platformCommissionCents Int @default(0)
-  // Deliverect / POS
-  deliverectOrderId   String?  // External ID from Deliverect
-  deliverectChannelLinkId String?
-  routingStatus       VendorRoutingStatus
-  fulfillmentStatus   VendorFulfillmentStatus
-  lastDeliverectPayload Json?   // Last request payload (audit)
-  lastDeliverectResponse Json? // Last response payload (audit)
-  deliverectSubmittedAt DateTime? // Timestamp of last submission attempt
-  deliverectLastError  String?  // Last failure message/code when submission failed
-  lastWebhookPayload   Json?
-  deliverectAttempts   Int    @default(0)
-  // Manual recovery: ops override when routing failed; preserves routing failure in audit.
-  manuallyRecoveredAt  DateTime?
-  manuallyRecoveredBy  String?
-  manualRecoveryNotes  String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  vendor    Vendor          @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  lineItems OrderLineItem[]
-  statusHistory VendorOrderStatusHistory[]
-  paymentAllocations PaymentAllocation[]
-  issues    VendorOrderIssue[]
-
-  @@index([deliverectOrderId])
-  @@index([orderId])
-  @@index([vendorId])
-}
-
-model OrderLineItem {
-  id           String   @id @default(cuid())
-  vendorOrderId String
-  menuItemId   String
-  name         String   // Snapshot
-  quantity     Int
-  priceCents   Int      // Line unit price (base + modifier snapshot at order time)
-  specialInstructions String?  // Item-level notes (Deliverect item notes)
-  createdAt    DateTime @default(now())
-
-  vendorOrder VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
-  menuItem    MenuItem    @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
-  selections  OrderLineItemSelection[]
-}
-
-// Snapshot of chosen modifiers per order line (audit + Deliverect payload)
-model OrderLineItemSelection {
-  id            String   @id @default(cuid())
-  orderLineItemId String
-  modifierOptionId String
-  nameSnapshot  String   // e.g. "Extra cheese"
-  priceCentsSnapshot Int  @default(0)
-  quantity      Int      @default(1)
-  createdAt     DateTime @default(now())
-
-  orderLineItem OrderLineItem @relation(fields: [orderLineItemId], references: [id], onDelete: Cascade)
-  modifierOption ModifierOption @relation(fields: [modifierOptionId], references: [id], onDelete: Restrict)
-
-  @@unique([orderLineItemId, modifierOptionId])
-  @@index([orderLineItemId])
-  @@index([modifierOptionId])
-}
-
-// Payment: one per order (single payer). Allocations stored for reconciliation.
-model Payment {
-  id                    String   @id @default(cuid())
-  orderId               String
-  stripePaymentIntentId String   @unique
-  amountCents           Int
-  status                PaymentStatus
-  idempotencyKey        String?  @unique
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  order        Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  allocations  PaymentAllocation[]
-}
-
-// Refund attempt audit + idempotency (one row per refund context; prevents duplicate refunds).
-model RefundAttempt {
-  id              String   @id @default(cuid())
-  idempotencyKey  String   @unique // e.g. customer_cancel:orderId or customer_cancel:orderId:vendorOrderId
-  orderId         String
-  vendorOrderId   String?
-  amountCents     Int
-  status          String   // attempted | succeeded | failed
-  stripeRefundId  String?
-  failureCode     String?
-  failureMessage  String?
-  reason          String   // RefundReason from decision layer
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  /// When set, this failed attempt was dismissed as legacy/test; excluded from Needs Attention.
-  dismissedAsLegacyAt DateTime?
-  dismissedAsLegacyBy String?  // e.g. "admin"
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-  @@index([orderId, status])
-}
-
-// How the single payment is split (subtotal/tip/tax/fee per vendor for reporting)
-model PaymentAllocation {
-  id             String   @id @default(cuid())
-  paymentId      String
-  vendorOrderId  String
-  subtotalCents  Int
-  tipCents       Int      @default(0)
-  taxCents       Int      @default(0)
-  serviceFeeCents Int     @default(0)
-  totalCents    Int
-  createdAt      DateTime @default(now())
-
-  payment    Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  vendorOrder VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
-
-  @@unique([paymentId, vendorOrderId])
-  @@index([paymentId])
-}
-
-// Audit trail for parent order status (unified customer view)
-model OrderStatusHistory {
-  id        String   @id @default(cuid())
-  orderId   String
-  status    String
-  source    String?  // system | deliverect | admin | fallback
-  note      String?
-  createdAt DateTime @default(now())
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-}
-
-// Per-vendor order status (for routing/fulfillment)
-model VendorOrderStatusHistory {
-  id            String   @id @default(cuid())
-  vendorOrderId String
-  routingStatus String?
-  fulfillmentStatus String?
-  source        String?
-  rawPayload    Json?
-  createdAt     DateTime @default(now())
-
-  vendorOrder VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
-
-  @@index([vendorOrderId])
-}
-
-// Operational issues (tracking only; does not change order lifecycle)
-model OrderIssue {
-  id        String    @id @default(cuid())
-  orderId   String
-  type      String    // routing_failure | partial_order | manual_refund | customer_issue | order_dispute | etc.
-  severity  String    // LOW | MEDIUM | HIGH
-  status    String    // OPEN | RESOLVED
-  notes     String?
-  createdAt DateTime  @default(now())
-  resolvedAt DateTime?
-  createdBy String?   // admin identifier if known
-  resolvedBy String?
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-  @@index([orderId, status])
-}
-
-model VendorOrderIssue {
-  id            String    @id @default(cuid())
-  vendorOrderId String
-  type         String    // routing_failure | vendor_cancelled | delayed_vendor | partial_order | manual_recovery | etc.
-  severity     String    // LOW | MEDIUM | HIGH
-  status       String    // OPEN | RESOLVED
-  notes        String?
-  createdAt    DateTime  @default(now())
-  resolvedAt   DateTime?
-  createdBy    String?
-  resolvedBy   String?
-
-  vendorOrder VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
-
-  @@index([vendorOrderId])
-  @@index([vendorOrderId, status])
-}
-
-// Raw webhook events for idempotency and debugging
-model WebhookEvent {
-  id           String   @id @default(cuid())
-  provider     String   // deliverect | stripe
-  eventId      String?  // External event ID if provided
-  idempotencyKey String? @unique // Hash of provider+eventId or body
-  payload      Json
-  processed    Boolean  @default(false)
-  processedAt  DateTime?
-  errorMessage String?
-  createdAt    DateTime @default(now())
-
-  @@index([provider, eventId])
-  @@index([idempotencyKey])
+enum VendorOrderStatusSource {
+  deliverect_webhook
+  dma_action
+  vendor_dashboard
+  admin_action
+  system
 }

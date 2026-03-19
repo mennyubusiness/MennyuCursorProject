@@ -95,6 +95,18 @@ export async function POST(
       VENDOR_DASHBOARD_SOURCE
     );
 
+    if (!result.success && result.precedenceReason) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: result.error,
+          code: result.code ?? result.precedenceReason,
+          precedenceReason: result.precedenceReason,
+        },
+        { status: 409 }
+      );
+    }
+
     if (result.success) {
       let refundPayload: { refund?: { success: boolean; code?: string; message?: string; amountCents?: number } } = {};
       if (targetState === "cancelled" && result.orderId) {

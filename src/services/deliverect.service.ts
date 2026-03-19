@@ -10,6 +10,7 @@
  */
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getEffectiveAuthority } from "@/domain/status-authority";
 import { env } from "@/lib/env";
 import { submitOrder, type DeliverectSubmitResult } from "@/integrations/deliverect/client";
 import { getVendorOrderForDeliverect } from "@/integrations/deliverect/load";
@@ -181,12 +182,38 @@ export async function submitVendorOrderToDeliverect(
   }
 
   if (result.success) {
+    const snap = await prisma.vendorOrder.findUnique({
+      where: { id: vendorOrderId },
+      select: {
+        fulfillmentStatus: true,
+        statusAuthority: true,
+        lastStatusSource: true,
+        deliverectChannelLinkId: true,
+        routingStatus: true,
+        manuallyRecoveredAt: true,
+        vendor: { select: { deliverectChannelLinkId: true } },
+      },
+    });
+    const authority = snap
+      ? getEffectiveAuthority({
+          statusAuthority: snap.statusAuthority,
+          lastStatusSource: snap.lastStatusSource,
+          deliverectChannelLinkId: snap.deliverectChannelLinkId,
+          routingStatus: snap.routingStatus,
+          manuallyRecoveredAt: snap.manuallyRecoveredAt,
+          vendor: snap.vendor,
+        })
+      : "pos";
     await prisma.vendorOrderStatusHistory.create({
       data: {
         vendorOrderId,
         routingStatus: "sent",
+        fulfillmentStatus: snap?.fulfillmentStatus ?? null,
         source: "deliverect",
         rawPayload: (responsePayload ?? {}) as unknown as Prisma.InputJsonValue,
+        authority,
+        statusSource: "system",
+        externalStatus: null,
       },
     });
   }
