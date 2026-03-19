@@ -44,19 +44,37 @@ function logDeliverectWebhookHeaderDiagnostics(request: NextRequest): void {
   });
 }
 
+function nonEmptyStringField(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s !== "" ? s : null;
+}
+
+/**
+ * Staging HMAC secret: channel link id from a record or nested `channelLink` object.
+ * Tries root fields first, then channelLink.{id,_id,channelLinkId}.
+ */
 function channelLinkIdFromRecord(obj: Record<string, unknown> | undefined): string | null {
   if (!obj) return null;
-  const top = obj.channelLinkId;
-  if (top != null && String(top).trim() !== "") {
-    return String(top).trim();
+
+  for (const key of ["channelLinkId", "id", "_id"] as const) {
+    const s = nonEmptyStringField(obj[key]);
+    if (s) return s;
   }
+
   const cl = obj.channelLink;
+  if (typeof cl === "string") {
+    const s = cl.trim();
+    if (s) return s;
+  }
   if (cl && typeof cl === "object" && !Array.isArray(cl)) {
-    const id = (cl as Record<string, unknown>).id;
-    if (id != null && String(id).trim() !== "") {
-      return String(id).trim();
+    const nested = cl as Record<string, unknown>;
+    for (const key of ["id", "_id", "channelLinkId"] as const) {
+      const s = nonEmptyStringField(nested[key]);
+      if (s) return s;
     }
   }
+
   return null;
 }
 
@@ -72,13 +90,13 @@ function extractChannelLinkIdSecret(parsed: Record<string, unknown>): string | n
     const found = channelLinkIdFromRecord(obj);
     if (found) return found;
   }
+
   const loc = parsed.location;
   if (loc && typeof loc === "object" && !Array.isArray(loc)) {
-    const lid = (loc as Record<string, unknown>).channelLinkId;
-    if (lid != null && String(lid).trim() !== "") {
-      return String(lid).trim();
-    }
+    const fromLoc = channelLinkIdFromRecord(loc as Record<string, unknown>);
+    if (fromLoc) return fromLoc;
   }
+
   return null;
 }
 
@@ -99,6 +117,32 @@ function logDeliverectWebhookPayloadShape(parsed: Record<string, unknown>): void
     topLevelKeys,
     dataKeys,
     orderKeys,
+  });
+}
+
+/** TEMP: channelLink / location structure only (no values). */
+function logDeliverectWebhookChannelLinkShape(parsed: Record<string, unknown>): void {
+  const cl = parsed.channelLink;
+  const channelLinkType =
+    cl === null ? "null" : Array.isArray(cl) ? "array" : typeof cl;
+  const channelLinkKeys =
+    cl !== null && typeof cl === "object" && !Array.isArray(cl)
+      ? Object.keys(cl as Record<string, unknown>).sort()
+      : [];
+
+  const loc = parsed.location;
+  const locationType =
+    loc === null ? "null" : Array.isArray(loc) ? "array" : typeof loc;
+  const locationKeys =
+    loc !== null && typeof loc === "object" && !Array.isArray(loc)
+      ? Object.keys(loc as Record<string, unknown>).sort()
+      : [];
+
+  console.log("[DELIVERECT WEBHOOK CHANNELLINK SHAPE]", {
+    channelLinkType,
+    channelLinkKeys,
+    locationType,
+    locationKeys,
   });
 }
 
@@ -127,6 +171,7 @@ export async function POST(request: NextRequest) {
   }
 
   logDeliverectWebhookPayloadShape(parsed);
+  logDeliverectWebhookChannelLinkShape(parsed);
 
   const production = isDeliverectWebhookProduction();
   let verificationSecret: string | undefined;
