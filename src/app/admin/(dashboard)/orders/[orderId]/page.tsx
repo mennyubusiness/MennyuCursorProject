@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { env } from "@/lib/env";
 import {
   fetchAdminOrderDetail,
   type AdminOrderDetail,
@@ -12,7 +13,17 @@ import { isManuallyRecovered } from "@/lib/admin-manual-recovery";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import { AdminVendorOrderExceptionActions } from "./AdminVendorOrderExceptionActions";
 import { AdminVendorOrderTransition } from "./AdminVendorOrderTransition";
+import { AdminDeliverectSimulateStatus } from "./AdminDeliverectSimulateStatus";
 import { AdminOrderIssuesSection } from "./AdminOrderIssuesSection";
+
+/** TEMP: show Deliverect POS sim UI in dev, staging/sandbox, or when explicitly enabled. */
+function showDeliverectStatusSimUI(): boolean {
+  if (env.SHOW_DELIVERECT_STATUS_SIM_UI === "true") return true;
+  if (env.NODE_ENV === "development") return true;
+  const d = env.DELIVERECT_ENV?.trim().toLowerCase();
+  if (d === "staging" || d === "sandbox") return true;
+  return false;
+}
 
 export default async function AdminOrderDetailPage({
   params,
@@ -278,6 +289,15 @@ export default async function AdminOrderDetailPage({
                   <p className="mt-1 text-xs text-stone-500">No valid progression actions (terminal state or use exception actions above)</p>
                 )}
               </section>
+
+              {showDeliverectStatusSimUI() && vo.deliverectOrderId != null && vo.deliverectOrderId !== "" && (
+                <section className="mt-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                    Deliverect sandbox
+                  </p>
+                  <AdminDeliverectSimulateStatus vendorOrderId={vo.id} />
+                </section>
+              )}
 
               <section className="mt-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-stone-400">

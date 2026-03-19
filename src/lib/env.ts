@@ -36,6 +36,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   /** Optional. When set, admin routes require this value (query param or cookie). TODO: Replace with proper auth. */
   ADMIN_SECRET: z.string().optional(),
+  /** Set to "true" to show Deliverect POS status simulation UI on admin order detail (production). */
+  SHOW_DELIVERECT_STATUS_SIM_UI: z.enum(["true", "false"]).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -56,3 +56,5 @@ Payload field notes and example shapes: **`DELIVERECT_WEBHOOK_PAYLOADS.md`**.
 `POST /api/admin/vendor-orders/{vendorOrderId}/simulate-deliverect-status` with JSON `{ "status": 20 }` (numeric Deliverect status code). Requires admin cookie or `?admin=SECRET`. Calls Deliverect `POST …/orderStatus/{deliverectOrderId}` only — **no local DB updates**; Mennyu changes should arrive via webhook.
 
 Auth to Deliverect: optional **`DELIVERECT_API_KEY`** (Bearer), else existing OAuth client credentials (`DELIVERECT_CLIENT_ID` / `DELIVERECT_CLIENT_SECRET`).
+
+**Admin UI:** On **Admin → Order detail**, when `deliverectOrderId` is set and the environment is dev, staging, or sandbox (or `SHOW_DELIVERECT_STATUS_SIM_UI=true`), a **“Sandbox: send test status to Deliverect”** control appears per vendor order.
