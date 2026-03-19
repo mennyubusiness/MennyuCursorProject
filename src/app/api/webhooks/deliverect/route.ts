@@ -11,12 +11,37 @@ import {
 import type { DeliverectWebhookPayload } from "@/integrations/deliverect/payloads";
 import { applyDeliverectStatusWebhook } from "@/services/order-status.service";
 
+/**
+ * Webhook HMAC mode (not the same as NODE_ENV on Vercel).
+ * - Set `DELIVERECT_ENV=staging` on Vercel when testing Deliverect sandbox while NODE_ENV=production.
+ * - Only `DELIVERECT_ENV=production` (case-insensitive) forces partner-secret verification.
+ */
 function isDeliverectWebhookProduction(): boolean {
   const d = env.DELIVERECT_ENV?.trim();
   if (d !== undefined && d !== "") {
     return d.toLowerCase() === "production";
   }
   return env.NODE_ENV === "production";
+}
+
+/** TEMP: identify real HMAC header names Deliverect sends (no secret/signature values). */
+function logDeliverectWebhookHeaderDiagnostics(request: NextRequest): void {
+  const allHeaderNames = Array.from(request.headers.keys()).sort();
+  const signatureRelatedHeaders: Record<string, { length: number } | { empty: true }> = {};
+  for (const name of allHeaderNames) {
+    if (/hmac|signature|deliverect/i.test(name)) {
+      const v = request.headers.get(name);
+      if (v == null || v.trim() === "") {
+        signatureRelatedHeaders[name] = { empty: true };
+      } else {
+        signatureRelatedHeaders[name] = { length: v.length };
+      }
+    }
+  }
+  console.log("[DELIVERECT WEBHOOK DEBUG]", {
+    allHeaderNames,
+    signatureRelatedHeaders,
+  });
 }
 
 /** Staging/sandbox: HMAC secret is the channel link id from the webhook JSON. */
@@ -41,6 +66,7 @@ function extractChannelLinkIdSecret(parsed: Record<string, unknown>): string | n
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
+  logDeliverectWebhookHeaderDiagnostics(request);
 
   const signature =
     request.headers.get("x-deliverect-hmacsha256") ??
@@ -74,8 +100,14 @@ export async function POST(request: NextRequest) {
   }
 
   console.log("[DELIVERECT WEBHOOK VERIFY]", {
-    env: env.DELIVERECT_ENV ?? env.NODE_ENV,
-    hasSignature: Boolean(signature?.trim()),
+    deliverectEnv: env.DELIVERECT_ENV ?? "(unset)",
+    nodeEnv: env.NODE_ENV,
+    verificationPath: production ? "production_partner_secret" : "staging_channelLinkId",
+    note:
+      env.DELIVERECT_ENV == null || env.DELIVERECT_ENV.trim() === ""
+        ? "DELIVERECT_ENV unset → NODE_ENV decides; set DELIVERECT_ENV=staging on Vercel for sandbox"
+        : undefined,
+    hasSignatureFromKnownHeaders: Boolean(signature?.trim()),
     secretSource: production ? "env" : "channelLinkId",
     hasEnvSecret: Boolean(env.DELIVERECT_WEBHOOK_SECRET?.trim()),
     hasChannelLinkId: channelLinkIdForLog,
