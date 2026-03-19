@@ -3,30 +3,108 @@ import { env } from "@/lib/env";
 import { prisma } from "@/lib/db";
 import { webhookIdempotencyKey } from "@/lib/idempotency";
 import {
-  parseDeliverectWebhookBody,
   verifyDeliverectSignature,
   getDeliverectEventId,
   resolveWebhookStatusUpdate,
   flattenDeliverectWebhookPayload,
 } from "@/integrations/deliverect/webhook-handler";
+import type { DeliverectWebhookPayload } from "@/integrations/deliverect/payloads";
 import { applyDeliverectStatusWebhook } from "@/services/order-status.service";
 
+function isDeliverectWebhookProduction(): boolean {
+  const d = env.DELIVERECT_ENV?.trim();
+  if (d !== undefined && d !== "") {
+    return d.toLowerCase() === "production";
+  }
+  return env.NODE_ENV === "production";
+}
+
+/** Staging/sandbox: HMAC secret is the channel link id from the webhook JSON. */
+function extractChannelLinkIdSecret(parsed: Record<string, unknown>): string | null {
+  const top = parsed.channelLinkId;
+  if (top != null && String(top).trim() !== "") {
+    return String(top).trim();
+  }
+  const cl = parsed.channelLink;
+  if (cl && typeof cl === "object" && !Array.isArray(cl)) {
+    const id = (cl as Record<string, unknown>).id;
+    if (id != null && String(id).trim() !== "") {
+      return String(id).trim();
+    }
+  }
+  const data = parsed.data;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    return extractChannelLinkIdSecret(data as Record<string, unknown>);
+  }
+  return null;
+}
+
 export async function POST(request: NextRequest) {
-  const body = await request.text();
-  const payload = parseDeliverectWebhookBody(body);
-  const flat = flattenDeliverectWebhookPayload(payload);
+  const rawBody = await request.text();
+
   const signature =
+    request.headers.get("x-deliverect-hmacsha256") ??
+    request.headers.get("X-Deliverect-Hmac-Sha256") ??
     request.headers.get("x-deliverect-signature") ??
     request.headers.get("x-signature") ??
     request.headers.get("X-Deliverect-Hmac-Signature") ??
     null;
 
-  if (!verifyDeliverectSignature(body, signature, env.DELIVERECT_WEBHOOK_SECRET)) {
+  let parsed: Record<string, unknown>;
+  try {
+    const v = JSON.parse(rawBody) as unknown;
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    parsed = v as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const production = isDeliverectWebhookProduction();
+  let verificationSecret: string | undefined;
+  let channelLinkIdForLog = false;
+
+  if (production) {
+    verificationSecret = env.DELIVERECT_WEBHOOK_SECRET?.trim() || undefined;
+  } else {
+    const ch = extractChannelLinkIdSecret(parsed);
+    verificationSecret = ch ?? undefined;
+    channelLinkIdForLog = !!ch;
+  }
+
+  console.log("[DELIVERECT WEBHOOK VERIFY]", {
+    env: env.DELIVERECT_ENV ?? env.NODE_ENV,
+    hasSignature: Boolean(signature?.trim()),
+    secretSource: production ? "env" : "channelLinkId",
+    hasEnvSecret: Boolean(env.DELIVERECT_WEBHOOK_SECRET?.trim()),
+    hasChannelLinkId: channelLinkIdForLog,
+  });
+
+  if (!verificationSecret) {
+    return NextResponse.json(
+      {
+        error: production
+          ? "Webhook verification misconfigured: DELIVERECT_WEBHOOK_SECRET is missing"
+          : "Webhook verification failed: channelLinkId not found in payload (required for staging/sandbox HMAC)",
+      },
+      { status: 401 }
+    );
+  }
+
+  if (
+    !verifyDeliverectSignature(rawBody, signature, verificationSecret, {
+      nodeEnv: production ? "production" : "development",
+      allowUnsignedDev: false,
+    })
+  ) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  const eventId = getDeliverectEventId(payload, flat, body);
-  const idemKey = webhookIdempotencyKey("deliverect", eventId, body);
+  const payload = parsed as DeliverectWebhookPayload;
+  const flat = flattenDeliverectWebhookPayload(payload);
+  const eventId = getDeliverectEventId(payload, flat, rawBody);
+  const idemKey = webhookIdempotencyKey("deliverect", eventId, rawBody);
 
   const existing = await prisma.webhookEvent.findUnique({
     where: { idempotencyKey: idemKey },
@@ -35,12 +113,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, duplicate: true, processed: existing.processed });
   }
 
-  let parsedPayload: object;
-  try {
-    parsedPayload = JSON.parse(body) as object;
-  } catch {
-    parsedPayload = {};
-  }
+  const parsedPayload = parsed as object;
 
   await prisma.webhookEvent.create({
     data: {

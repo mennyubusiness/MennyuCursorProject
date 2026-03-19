@@ -44,9 +44,9 @@ If a vendor order is already in routing status `sent` with a `deliverectOrderId`
 
 1. In Deliverect **channel link** settings, set the **Order status webhook URL** to:
    `{YOUR_APP_ORIGIN}/api/webhooks/deliverect`
-2. **HMAC:** Deliverect signs the **raw POST body** with **SHA256 HMAC**.  
-   - **Production:** set `DELIVERECT_WEBHOOK_SECRET` to the secret Deliverect gives you.  
-   - **Staging:** Deliverect often signs with the **channel link ID** as the secret — set `DELIVERECT_WEBHOOK_SECRET` to that ID (comma-separate if you use multiple links).  
-3. **Production** without a configured secret returns **401** (requests rejected). **Development** without a secret still accepts webhooks (with a console warning); configure the secret to test verification locally.
+2. **HMAC:** Deliverect signs the **raw POST body** with **SHA256 HMAC** (header names may include `x-deliverect-hmacsha256`, `X-Deliverect-Hmac-Signature`, etc.).  
+   - **Production** (`DELIVERECT_ENV=production`, or unset with `NODE_ENV=production`): verify with `DELIVERECT_WEBHOOK_SECRET` (partner webhook secret).  
+   - **Staging / sandbox:** Mennyu reads `channelLinkId` or `channelLink.id` from the **JSON body** and uses that string as the HMAC key (no need to duplicate it in env). Set `DELIVERECT_ENV=staging` (or any non-`production` value) on Vercel when `NODE_ENV` is `production` so preview builds use channel-link verification.  
+3. **Invalid JSON** → **400**. **Missing secret** (no env secret in prod, or no channel link id in staging payload) → **401** with a clear message. **Bad signature** → **401** `Invalid signature`.
 
 Payload field notes and example shapes: **`DELIVERECT_WEBHOOK_PAYLOADS.md`**.

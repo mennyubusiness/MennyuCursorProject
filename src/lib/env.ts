@@ -21,6 +21,13 @@ const envSchema = z.object({
   DELIVERECT_CLIENT_ID: z.string().optional(),
   DELIVERECT_CLIENT_SECRET: z.string().optional(),
   DELIVERECT_WEBHOOK_SECRET: z.string().optional(),
+  /**
+   * Optional override for Deliverect webhook HMAC behavior.
+   * `production` → verify with DELIVERECT_WEBHOOK_SECRET (partner secret).
+   * Anything else (e.g. staging, sandbox) when set → verify with channelLinkId from webhook JSON.
+   * If unset, NODE_ENV === "production" is treated as production.
+   */
+  DELIVERECT_ENV: z.string().optional(),
   /** When "mock", Deliverect submission is skipped (payload still built and audited). Use "deliverect" for live submission. */
   ROUTING_MODE: z.enum(["mock", "deliverect"]).default("mock"),
   NEXTAUTH_URL: z.string().url().optional(),
