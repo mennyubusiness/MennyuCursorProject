@@ -44,24 +44,62 @@ function logDeliverectWebhookHeaderDiagnostics(request: NextRequest): void {
   });
 }
 
-/** Staging/sandbox: HMAC secret is the channel link id from the webhook JSON. */
-function extractChannelLinkIdSecret(parsed: Record<string, unknown>): string | null {
-  const top = parsed.channelLinkId;
+function channelLinkIdFromRecord(obj: Record<string, unknown> | undefined): string | null {
+  if (!obj) return null;
+  const top = obj.channelLinkId;
   if (top != null && String(top).trim() !== "") {
     return String(top).trim();
   }
-  const cl = parsed.channelLink;
+  const cl = obj.channelLink;
   if (cl && typeof cl === "object" && !Array.isArray(cl)) {
     const id = (cl as Record<string, unknown>).id;
     if (id != null && String(id).trim() !== "") {
       return String(id).trim();
     }
   }
-  const data = parsed.data;
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return extractChannelLinkIdSecret(data as Record<string, unknown>);
+  return null;
+}
+
+/** Staging/sandbox: HMAC secret is the channel link id from the webhook JSON. */
+function extractChannelLinkIdSecret(parsed: Record<string, unknown>): string | null {
+  const candidates: Array<Record<string, unknown> | undefined> = [
+    parsed,
+    parsed.data as Record<string, unknown> | undefined,
+    parsed.order as Record<string, unknown> | undefined,
+    parsed.payload as Record<string, unknown> | undefined,
+  ];
+  for (const obj of candidates) {
+    const found = channelLinkIdFromRecord(obj);
+    if (found) return found;
+  }
+  const loc = parsed.location;
+  if (loc && typeof loc === "object" && !Array.isArray(loc)) {
+    const lid = (loc as Record<string, unknown>).channelLinkId;
+    if (lid != null && String(lid).trim() !== "") {
+      return String(lid).trim();
+    }
   }
   return null;
+}
+
+/** TEMP: payload shape only (no values). */
+function logDeliverectWebhookPayloadShape(parsed: Record<string, unknown>): void {
+  const topLevelKeys = Object.keys(parsed).sort();
+  const data = parsed.data;
+  const dataKeys =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? Object.keys(data as Record<string, unknown>).sort()
+      : [];
+  const order = parsed.order;
+  const orderKeys =
+    order && typeof order === "object" && !Array.isArray(order)
+      ? Object.keys(order as Record<string, unknown>).sort()
+      : [];
+  console.log("[DELIVERECT WEBHOOK DEBUG]", {
+    topLevelKeys,
+    dataKeys,
+    orderKeys,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -69,11 +107,12 @@ export async function POST(request: NextRequest) {
   logDeliverectWebhookHeaderDiagnostics(request);
 
   const signature =
+    request.headers.get("x-server-authorization-hmac-sha256") ??
+    request.headers.get("X-Server-Authorization-Hmac-Sha256") ??
     request.headers.get("x-deliverect-hmacsha256") ??
     request.headers.get("X-Deliverect-Hmac-Sha256") ??
     request.headers.get("x-deliverect-signature") ??
     request.headers.get("x-signature") ??
-    request.headers.get("X-Deliverect-Hmac-Signature") ??
     null;
 
   let parsed: Record<string, unknown>;
@@ -86,6 +125,8 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+
+  logDeliverectWebhookPayloadShape(parsed);
 
   const production = isDeliverectWebhookProduction();
   let verificationSecret: string | undefined;
