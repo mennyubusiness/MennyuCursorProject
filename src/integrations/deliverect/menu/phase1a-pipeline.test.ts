@@ -76,6 +76,81 @@ describe("runPhase1aDeliverectMenuImport", () => {
     expect(result.normalizationIssues.some((i) => i.code === "NO_VALID_PRODUCTS")).toBe(false);
   });
 
+  it("normalizes modifier groups from subProducts as string-keyed object map (Deliverect Menu Push)", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        categories: [{ _id: "cat-1", name: "Food", productIds: ["p1"] }],
+        products: {
+          p1: {
+            _id: "p1",
+            name: "Combo",
+            price: 1000,
+            subProducts: {
+              "mg-size": {
+                name: "Size",
+                min: 1,
+                max: 1,
+                subProducts: {
+                  "opt-s": { name: "Small", price: 0 },
+                  "opt-l": { name: "Large", price: 100 },
+                },
+              },
+            },
+          },
+        },
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    const p = result.menu!.products.find((x) => x.deliverectId === "p1");
+    expect(p?.modifierGroupDeliverectIds).toEqual(["mg-size"]);
+    const g = result.menu!.modifierGroupDefinitions.find((x) => x.deliverectId === "mg-size");
+    expect(g).toBeDefined();
+    expect(g!.options.map((o) => o.deliverectId).sort()).toEqual(["opt-l", "opt-s"]);
+  });
+
+  it("reads subproducts (lowercase) alias for modifier tree", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        products: [
+          {
+            _id: "p2",
+            name: "Item",
+            price: 500,
+            subproducts: [
+              {
+                _id: "g1",
+                name: "Add-on",
+                min: 0,
+                max: 2,
+                subproducts: [{ _id: "o1", name: "Extra", price: 50 }],
+              },
+            ],
+          },
+        ],
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    expect(result.menu!.products[0]!.modifierGroupDeliverectIds).toEqual(["g1"]);
+    expect(result.menu!.modifierGroupDefinitions.find((x) => x.deliverectId === "g1")?.options[0]!.deliverectId).toBe(
+      "o1"
+    );
+  });
+
+  it("emits SUB_PRODUCTS_WRONG_TYPE when subProducts is a string", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        products: [{ _id: "px", name: "Bad", price: 100, subProducts: "not-a-tree" }],
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.normalizationIssues.some((i) => i.code === "SUB_PRODUCTS_WRONG_TYPE")).toBe(true);
+  });
+
   it("normalizes products from a string-keyed object map (Deliverect Menu Push style)", () => {
     const result = runPhase1aDeliverectMenuImport({
       raw: {

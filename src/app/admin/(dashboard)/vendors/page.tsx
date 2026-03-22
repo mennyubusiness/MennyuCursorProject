@@ -52,6 +52,12 @@ export default async function AdminVendorsPage() {
                 <td className="px-4 py-2">
                   <AdminVendorToggle vendorId={v.id} isActive={v.isActive} />
                   <Link
+                    href={`/admin/vendors/${v.id}/menu-history`}
+                    className="ml-2 text-sm text-sky-800 hover:underline"
+                  >
+                    Menu history
+                  </Link>
+                  <Link
                     href={`/admin/vendors/${v.id}/deliverect-mapping`}
                     className="ml-2 text-sm text-amber-800 hover:underline"
                   >

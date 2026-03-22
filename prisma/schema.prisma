@@ -190,6 +190,10 @@ model MenuVersion {
   previousPublishedVersionId String?
   previousPublishedVersion   MenuVersion?      @relation("MenuVersionHistory", fields: [previousPublishedVersionId], references: [id], onDelete: SetNull)
   nextVersions               MenuVersion[]     @relation("MenuVersionHistory")
+  /// When set, this row was published by restoring the snapshot from the referenced (typically archived) MenuVersion.
+  restoredFromMenuVersionId  String?
+  restoredFromMenuVersion    MenuVersion?      @relation("MenuVersionRollbackSource", fields: [restoredFromMenuVersionId], references: [id], onDelete: SetNull)
+  rollbacksDerivedFromThis   MenuVersion[]     @relation("MenuVersionRollbackSource")
   publishedAt                DateTime?
   publishedBy                String?
   createdAt                  DateTime          @default(now())
@@ -200,6 +204,7 @@ model MenuVersion {
 
   @@index([vendorId, state])
   @@index([vendorId, createdAt(sort: Desc)])
+  @@index([vendorId, publishedAt(sort: Desc)])
 }
 
 model MenuItem {

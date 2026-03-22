@@ -6,9 +6,9 @@
 - **`MenuImportJob`:** vendor, source, status, optional Deliverect correlation + `idempotencyKey`, optional `draftVersionId` → `MenuVersion`, error fields, timestamps.
 - **`MenuImportRawPayload`:** one per job (`jobId` unique), `payload` JSON, `payloadSha256`, optional `deliverectApiVersion`.
 - **`MenuImportIssue`:** per-job rows mirroring `MenuImportIssueRecord` (+ waiver fields for later).
-- **`MenuVersion`:** `canonicalSnapshot` + `canonicalSnapshotSha256`, `state` (Phase 1B uses `draft` only), optional publish/rollback chain fields.
+- **`MenuVersion`:** `canonicalSnapshot` + `canonicalSnapshotSha256`, `state`, `previousPublishedVersionId`, optional **`restoredFromMenuVersionId`** (rollback audit: new published row points at the archived source snapshot row).
 
-Migration: `prisma/migrations/20250319120000_menu_import_phase1b/migration.sql`.
+Migrations: `prisma/migrations/20250319120000_menu_import_phase1b/migration.sql`, `prisma/migrations/20250323100000_menu_version_rollback_audit/migration.sql`.
 
 Run: `npx prisma migrate deploy` (or `db:migrate` in dev).
 
@@ -29,6 +29,11 @@ Run: `npx prisma migrate deploy` (or `db:migrate` in dev).
 | `POST /api/admin/menu-imports/[jobId]/publish` | Admin-only publish. |
 | `src/services/discard-draft-menu-version.service.ts` | **Discard draft:** deletes `MenuVersion` only when `state: draft`; unlinks `MenuImportJob.draftVersionId`, sets job `cancelled` + `errorCode: DRAFT_DISCARDED`; keeps job, issues, raw payload. |
 | `POST /api/admin/menu-imports/[jobId]/discard-draft` | Admin-only discard linked draft (confirmation in UI). |
+| `src/domain/menu-import/canonical-menu-summary.ts` | `getCanonicalMenuSummaryCounts` — parse snapshot for admin counts (history UI). |
+| `src/lib/admin-vendor-menu-history-queries.ts` | `fetchVendorMenuVersionHistoryForAdmin` — published + archived rows + summaries. |
+| `src/services/menu-rollback-published.service.ts` | `rollbackVendorPublishedMenu` — archive current published, **create** new published row (copy of archived snapshot), `restoredFromMenuVersionId`, `applyCanonicalMenuToLiveTables`. |
+| `POST /api/admin/vendors/{vendorId}/menu-versions/rollback` | Admin-only rollback (`sourceMenuVersionId` = archived `MenuVersion` id). |
+| `/admin/vendors/{vendorId}/menu-history` | Published history + rollback confirmation (read-only menus). |
 
 Optional **`deps.prisma`** for tests / alternate clients.
 

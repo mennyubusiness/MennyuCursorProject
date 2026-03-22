@@ -12,7 +12,8 @@
  * - id: `_id` | `id` | `plu` (string)
  * - `name`, `price` | `unitPrice` (minor units / cents)
  * - `snoozed` | `isSnoozed` → isAvailable inverse
- * - `subProducts` → modifier groups; each group has `subProducts` for options
+ * - `subProducts` → modifier groups; each group has `subProducts` for options (array **or** string-keyed object map, like `products`)
+ * - `subproducts` / `SubProducts` aliases on product and group nodes
  * - Options may have nested `subProducts` for per-option modifier groups (nestedGroupDeliverectIds)
  *
  * No database or network I/O.
@@ -387,6 +388,90 @@ function extractCategoriesArray(root: Record<string, unknown>, issues: MenuImpor
   return [];
 }
 
+type SubProductChild = { node: Record<string, unknown>; mapKey?: string };
+
+/**
+ * Deliverect often nests modifiers under `subProducts` as either an array or a string-keyed map (same pattern as `products`).
+ */
+function getSubProductsRaw(obj: Record<string, unknown>): unknown {
+  return obj.subProducts ?? obj.subproducts ?? obj.SubProducts;
+}
+
+/**
+ * Resolve Deliverect id for a subProduct node: standard id fields, then modifier-specific keys, then map key when the payload omits inline ids.
+ */
+function resolveSubProductNodeId(node: Record<string, unknown>, mapKey?: string): string | undefined {
+  return (
+    firstDeliverectId(node) ??
+    asString(node.modifierId) ??
+    asString(node.groupId) ??
+    asString(node.optionId) ??
+    asString(node.subModifierId) ??
+    asString(node.channelModifierId) ??
+    (mapKey != null && String(mapKey).trim() !== "" ? String(mapKey).trim() : undefined)
+  );
+}
+
+/**
+ * Coerce `subProducts` value into an ordered list of child objects. Emits explicit issues for wrong container types and non-object entries.
+ */
+function coerceSubProductChildren(
+  raw: unknown,
+  issues: MenuImportIssueRecord[],
+  context: { entityPath: string; deliverectId?: string }
+): SubProductChild[] {
+  if (raw === undefined || raw === null) return [];
+
+  if (Array.isArray(raw)) {
+    const out: SubProductChild[] = [];
+    for (let i = 0; i < raw.length; i++) {
+      const x = raw[i];
+      if (!isRecord(x) || Array.isArray(x)) {
+        issues.push({
+          kind: "normalization",
+          severity: "warning",
+          code: "SKIP_NON_OBJECT_SUB_PRODUCT",
+          message: `subProducts[${i}] is not an object; skipped.`,
+          entityPath: `${context.entityPath}/subProducts/${i}`,
+          deliverectId: context.deliverectId,
+        });
+        continue;
+      }
+      out.push({ node: x });
+    }
+    return out;
+  }
+
+  if (isRecord(raw) && !Array.isArray(raw)) {
+    const out: SubProductChild[] = [];
+    for (const [mapKey, x] of Object.entries(raw)) {
+      if (!isRecord(x) || Array.isArray(x)) {
+        issues.push({
+          kind: "normalization",
+          severity: "warning",
+          code: "SKIP_NON_OBJECT_SUB_PRODUCT_MAP_ENTRY",
+          message: `subProducts map entry "${mapKey}" is not an object; skipped.`,
+          entityPath: `${context.entityPath}/subProducts/${mapKey}`,
+          deliverectId: context.deliverectId,
+        });
+        continue;
+      }
+      out.push({ node: x, mapKey });
+    }
+    return out;
+  }
+
+  issues.push({
+    kind: "normalization",
+    severity: "warning",
+    code: "SUB_PRODUCTS_WRONG_TYPE",
+    message: `subProducts must be an array or object map; got ${typeof raw}. Modifier tree under this path ignored.`,
+    entityPath: `${context.entityPath}/subProducts`,
+    deliverectId: context.deliverectId,
+  });
+  return [];
+}
+
 function buildProduct(
   pr: Record<string, unknown>,
   index: number,
@@ -447,6 +532,7 @@ function buildProduct(
   const modifierGroupDeliverectIds = walkTopLevelModifierGroups(
     pr,
     deliverectId,
+    index,
     registry,
     issues,
     index * 1000
@@ -471,26 +557,31 @@ function buildProduct(
 function walkTopLevelModifierGroups(
   productRaw: Record<string, unknown>,
   productDeliverectId: string,
+  productIndex: number,
   registry: Map<string, MennyuCanonicalModifierGroup>,
   issues: MenuImportIssueRecord[],
   sortBase: number
 ): string[] {
-  const subs = productRaw.subProducts;
-  if (!Array.isArray(subs) || subs.length === 0) return [];
+  const subsRaw = getSubProductsRaw(productRaw);
+  const children = coerceSubProductChildren(subsRaw, issues, {
+    entityPath: `/products/${productIndex}`,
+    deliverectId: productDeliverectId,
+  });
+  if (children.length === 0) return [];
 
   const groupIds: string[] = [];
   let order = sortBase;
-  for (let gi = 0; gi < subs.length; gi++) {
-    const g = subs[gi];
-    if (!isRecord(g)) continue;
-    const gid = firstDeliverectId(g);
+  for (let gi = 0; gi < children.length; gi++) {
+    const { node: g, mapKey } = children[gi]!;
+    const gid = resolveSubProductNodeId(g, mapKey);
     if (!gid) {
       issues.push({
         kind: "normalization",
         severity: "blocking",
         code: "MISSING_MODIFIER_GROUP_ID",
-        message: `Product ${productDeliverectId} has a modifier group without _id/id/plu at subProducts[${gi}].`,
+        message: `Product ${productDeliverectId} has a modifier group without a Deliverect id (_id/id/plu or subProducts map key) at subProducts[${gi}].`,
         deliverectId: productDeliverectId,
+        entityPath: `/products/${productIndex}/subProducts/${gi}`,
       });
       continue;
     }
@@ -542,21 +633,24 @@ function buildModifierGroupTree(
   let max = coerceInt(g.max ?? g.maxQty, 1);
   if (max < min) max = min;
 
-  const optSource = g.subProducts;
-  const optsRaw = Array.isArray(optSource) ? optSource : [];
+  const optChildren = coerceSubProductChildren(getSubProductsRaw(g), issues, {
+    entityPath: `/modifierGroupDefinitions/${gid}`,
+    deliverectId: gid,
+  });
 
   const options: MennyuCanonicalModifierOption[] = [];
   let oi = 0;
-  for (const o of optsRaw) {
-    if (!isRecord(o)) continue;
-    const oid = firstDeliverectId(o);
+  for (let oiLoop = 0; oiLoop < optChildren.length; oiLoop++) {
+    const { node: o, mapKey } = optChildren[oiLoop]!;
+    const oid = resolveSubProductNodeId(o, mapKey);
     if (!oid) {
       issues.push({
         kind: "normalization",
         severity: "blocking",
         code: "MISSING_MODIFIER_OPTION_ID",
-        message: `Modifier group ${gid} has an option without id under product ${productDeliverectId}.`,
+        message: `Modifier group ${gid} has an option without a Deliverect id (_id/id/plu or subProducts map key) under product ${productDeliverectId} at subProducts[${oiLoop}].`,
         deliverectId: gid,
+        entityPath: `/modifierGroupDefinitions/${gid}/subProducts/${oiLoop}`,
       });
       continue;
     }
@@ -614,16 +708,28 @@ function walkNestedModifierGroupsFromOption(
   issues: MenuImportIssueRecord[],
   sortBase: number
 ): string[] {
-  const subs = optionRaw.subProducts;
-  if (!Array.isArray(subs) || subs.length === 0) return [];
+  const children = coerceSubProductChildren(getSubProductsRaw(optionRaw), issues, {
+    entityPath: `/products/${productDeliverectId}/options/${parentOptionId}`,
+    deliverectId: parentOptionId,
+  });
+  if (children.length === 0) return [];
 
   const nestedIds: string[] = [];
   let order = sortBase;
-  for (let i = 0; i < subs.length; i++) {
-    const g = subs[i];
-    if (!isRecord(g)) continue;
-    const gid = firstDeliverectId(g);
-    if (!gid) continue;
+  for (let i = 0; i < children.length; i++) {
+    const { node: g, mapKey } = children[i]!;
+    const gid = resolveSubProductNodeId(g, mapKey);
+    if (!gid) {
+      issues.push({
+        kind: "normalization",
+        severity: "blocking",
+        code: "MISSING_MODIFIER_GROUP_ID",
+        message: `Option ${parentOptionId} on product ${productDeliverectId} has a nested modifier group without a Deliverect id at subProducts[${i}].`,
+        deliverectId: parentOptionId,
+        entityPath: `/products/${productDeliverectId}/options/${parentOptionId}/subProducts/${i}`,
+      });
+      continue;
+    }
 
     const group = buildModifierGroupTree(
       g,

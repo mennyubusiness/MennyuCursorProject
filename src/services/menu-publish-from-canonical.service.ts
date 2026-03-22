@@ -71,7 +71,8 @@ export function evaluateMenuImportPublishEligibility(input: {
   return { canPublish: reasons.length === 0, reasons };
 }
 
-async function applyCanonicalMenuToLiveTables(
+/** Exported for rollback: same upsert + soft-disable rules as publish. */
+export async function applyCanonicalMenuToLiveTables(
   tx: Prisma.TransactionClient,
   vendorId: string,
   menu: MennyuCanonicalMenu
