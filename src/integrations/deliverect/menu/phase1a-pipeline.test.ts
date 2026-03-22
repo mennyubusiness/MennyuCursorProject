@@ -110,6 +110,47 @@ describe("runPhase1aDeliverectMenuImport", () => {
     expect(g!.options.map((o) => o.deliverectId).sort()).toEqual(["opt-l", "opt-s"]);
   });
 
+  it("resolves subProducts string references via top-level modifierGroups and modifiers", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        categories: [{ _id: "cat-1", name: "Food", productIds: ["p1"] }],
+        modifierGroups: {
+          mg1: {
+            _id: "mg1",
+            name: "Choose",
+            min: 1,
+            max: 1,
+            subProducts: ["mod-a", "mod-b"],
+          },
+        },
+        modifiers: {
+          "mod-a": { _id: "mod-a", name: "Option A", price: 0 },
+          "mod-b": { _id: "mod-b", name: "Option B", price: 100 },
+        },
+        products: {
+          p1: { _id: "p1", name: "Item", price: 500, subProducts: ["mg1"] },
+        },
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    expect(result.menu!.products.find((p) => p.deliverectId === "p1")?.modifierGroupDeliverectIds).toEqual(["mg1"]);
+    const g = result.menu!.modifierGroupDefinitions.find((x) => x.deliverectId === "mg1");
+    expect(g?.options.map((o) => o.deliverectId).sort()).toEqual(["mod-a", "mod-b"]);
+  });
+
+  it("warns when subProducts group reference cannot be resolved", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        products: [{ _id: "p1", name: "Item", price: 100, subProducts: ["missing-group-id"] }],
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.normalizationIssues.some((i) => i.code === "UNRESOLVED_SUB_PRODUCT_GROUP_REF")).toBe(true);
+  });
+
   it("reads subproducts (lowercase) alias for modifier tree", () => {
     const result = runPhase1aDeliverectMenuImport({
       raw: {
