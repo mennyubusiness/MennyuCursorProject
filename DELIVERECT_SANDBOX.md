@@ -40,6 +40,26 @@ If a vendor order is already in routing status `sent` with a `deliverectOrderId`
 
 **Action:** Confirm with your **Deliverect account admin** or **Deliverect support** which roles and UI paths allow status changes for *channel-pushed* orders in your environment. Mennyu cannot grant DMA controls; only Deliverect access configuration can.
 
+## Menu import (Phase 1B — draft only, no live menu writes)
+
+### Manual pull (Commerce API)
+
+1. **Vendor (DB):** Set `deliverectAccountId` (Deliverect **account** id) and `deliverectChannelLinkId` (used as **storeId** in Deliverect’s Commerce “store menus” API — same as channel link for orders). Optional `deliverectLocationId` for metadata on the import job.
+2. **HTTP:** `POST /api/admin/vendors/{vendorId}/menu-import/deliverect-pull` with admin cookie or `?admin=SECRET`. Optional JSON body:
+   - `fulfillmentType`: `delivery` | `pickup` | `curbside` | `eatIn`
+   - `idempotencyKey`: string (dedupes `MenuImportJob`)
+   - `accountId` / `channelLinkId`: overrides vendor fields for testing
+3. **Deliverect call:** `GET {DELIVERECT_API_URL}/commerce/{accountId}/stores/{channelLinkId}/menus` with `DELIVERECT_API_KEY` or OAuth (`DELIVERECT_CLIENT_ID` / `DELIVERECT_CLIENT_SECRET`). See [Get Store Menu(s)](https://developers.deliverect.com/reference/commerce-channel-api-stores-get-store-menus).
+
+Response JSON includes `jobId`, `draftVersionId`, `jobStatus`, `issueCount`, `ok`, `deduped`, `deliverectFetch`.
+
+### Menu Update webhook
+
+1. Configure Deliverect **Menu Update** (or equivalent) webhook URL to: `{YOUR_APP_ORIGIN}/api/webhooks/deliverect/menu`
+2. **HMAC** matches the order-status webhook: production → `DELIVERECT_WEBHOOK_SECRET`; staging/sandbox → channel link id from JSON body (`DELIVERECT_ENV=staging` on Vercel when needed).
+3. **Vendor match:** `Vendor.deliverectChannelLinkId` must match the channel link id extracted from the payload (same as staging HMAC key source). Unknown link → **200** `outcome: "vendor_not_found"` (no `MenuImportJob`).
+4. **Idempotency:** `webhookIdempotencyKey("deliverect_menu", …)` on `MenuImportJob.idempotencyKey`.
+
 ## Order status webhook (Mennyu ingestion)
 
 1. In Deliverect **channel link** settings, set the **Order status webhook URL** to:

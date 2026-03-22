@@ -10,19 +10,12 @@ import {
 } from "@/integrations/deliverect/webhook-handler";
 import type { DeliverectWebhookPayload } from "@/integrations/deliverect/payloads";
 import { applyDeliverectStatusWebhook } from "@/services/order-status.service";
-
-/**
- * Webhook HMAC mode (not the same as NODE_ENV on Vercel).
- * - Set `DELIVERECT_ENV=staging` on Vercel when testing Deliverect sandbox while NODE_ENV=production.
- * - Only `DELIVERECT_ENV=production` (case-insensitive) forces partner-secret verification.
- */
-function isDeliverectWebhookProduction(): boolean {
-  const d = env.DELIVERECT_ENV?.trim();
-  if (d !== undefined && d !== "") {
-    return d.toLowerCase() === "production";
-  }
-  return env.NODE_ENV === "production";
-}
+import {
+  getDeliverectSignatureFromRequest,
+  isDeliverectWebhookProduction,
+  parseDeliverectWebhookJsonObject,
+  resolveDeliverectWebhookVerificationSecret,
+} from "@/integrations/deliverect/webhook-inbound-shared";
 
 /** TEMP: identify real HMAC header names Deliverect sends (no secret/signature values). */
 function logDeliverectWebhookHeaderDiagnostics(request: NextRequest): void {
@@ -42,62 +35,6 @@ function logDeliverectWebhookHeaderDiagnostics(request: NextRequest): void {
     allHeaderNames,
     signatureRelatedHeaders,
   });
-}
-
-function nonEmptyStringField(v: unknown): string | null {
-  if (v == null) return null;
-  const s = String(v).trim();
-  return s !== "" ? s : null;
-}
-
-/**
- * Staging HMAC secret: channel link id from a record or nested `channelLink` object.
- * Tries root fields first, then channelLink.{id,_id,channelLinkId}.
- */
-function channelLinkIdFromRecord(obj: Record<string, unknown> | undefined): string | null {
-  if (!obj) return null;
-
-  for (const key of ["channelLinkId", "id", "_id"] as const) {
-    const s = nonEmptyStringField(obj[key]);
-    if (s) return s;
-  }
-
-  const cl = obj.channelLink;
-  if (typeof cl === "string") {
-    const s = cl.trim();
-    if (s) return s;
-  }
-  if (cl && typeof cl === "object" && !Array.isArray(cl)) {
-    const nested = cl as Record<string, unknown>;
-    for (const key of ["id", "_id", "channelLinkId"] as const) {
-      const s = nonEmptyStringField(nested[key]);
-      if (s) return s;
-    }
-  }
-
-  return null;
-}
-
-/** Staging/sandbox: HMAC secret is the channel link id from the webhook JSON. */
-function extractChannelLinkIdSecret(parsed: Record<string, unknown>): string | null {
-  const candidates: Array<Record<string, unknown> | undefined> = [
-    parsed,
-    parsed.data as Record<string, unknown> | undefined,
-    parsed.order as Record<string, unknown> | undefined,
-    parsed.payload as Record<string, unknown> | undefined,
-  ];
-  for (const obj of candidates) {
-    const found = channelLinkIdFromRecord(obj);
-    if (found) return found;
-  }
-
-  const loc = parsed.location;
-  if (loc && typeof loc === "object" && !Array.isArray(loc)) {
-    const fromLoc = channelLinkIdFromRecord(loc as Record<string, unknown>);
-    if (fromLoc) return fromLoc;
-  }
-
-  return null;
 }
 
 /** TEMP: payload shape only (no values). */
@@ -150,40 +87,20 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   logDeliverectWebhookHeaderDiagnostics(request);
 
-  const signature =
-    request.headers.get("x-server-authorization-hmac-sha256") ??
-    request.headers.get("X-Server-Authorization-Hmac-Sha256") ??
-    request.headers.get("x-deliverect-hmacsha256") ??
-    request.headers.get("X-Deliverect-Hmac-Sha256") ??
-    request.headers.get("x-deliverect-signature") ??
-    request.headers.get("x-signature") ??
-    null;
+  const signature = getDeliverectSignatureFromRequest(request);
 
-  let parsed: Record<string, unknown>;
-  try {
-    const v = JSON.parse(rawBody) as unknown;
-    if (v === null || typeof v !== "object" || Array.isArray(v)) {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-    parsed = v as Record<string, unknown>;
-  } catch {
+  const parsedResult = parseDeliverectWebhookJsonObject(rawBody);
+  if (!parsedResult.ok) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+  const parsed = parsedResult.parsed;
 
   logDeliverectWebhookPayloadShape(parsed);
   logDeliverectWebhookChannelLinkShape(parsed);
 
   const production = isDeliverectWebhookProduction();
-  let verificationSecret: string | undefined;
-  let channelLinkIdForLog = false;
-
-  if (production) {
-    verificationSecret = env.DELIVERECT_WEBHOOK_SECRET?.trim() || undefined;
-  } else {
-    const ch = extractChannelLinkIdSecret(parsed);
-    verificationSecret = ch ?? undefined;
-    channelLinkIdForLog = !!ch;
-  }
+  const { secret: verificationSecret, hasChannelLinkId: channelLinkIdForLog } =
+    resolveDeliverectWebhookVerificationSecret(parsed, production);
 
   console.log("[DELIVERECT WEBHOOK VERIFY]", {
     deliverectEnv: env.DELIVERECT_ENV ?? "(unset)",

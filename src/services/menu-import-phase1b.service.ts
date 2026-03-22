@@ -28,7 +28,14 @@ export class MenuImportVendorNotFoundError extends Error {
 export interface IngestDeliverectMenuPhase1bParams {
   vendorId: string;
   source: MenuImportSource;
+  /** Stored verbatim on `MenuImportRawPayload` (audit). */
   rawPayload: unknown;
+  /**
+   * When set, Phase 1A normalization uses this value instead of `rawPayload`.
+   * Use when the HTTP/API envelope differs from the menu object shape expected by the normalizer
+   * (e.g. Commerce `GET .../menus` returns an array or `{ menus: [...] }`).
+   */
+  normalizationRaw?: unknown;
   deliverectMeta: DeliverectMenuImportMeta;
   deliverectApiVersion?: string | null;
   idempotencyKey?: string | null;
@@ -172,8 +179,11 @@ export async function ingestDeliverectMenuImportPhase1b(
     return { job: j, rawPayload: raw };
   });
 
+  const rawForPhase1 =
+    params.normalizationRaw !== undefined ? params.normalizationRaw : params.rawPayload;
+
   const phase1 = runPhase1aDeliverectMenuImport({
-    raw: params.rawPayload,
+    raw: rawForPhase1,
     vendorId: params.vendorId,
     deliverect: params.deliverectMeta,
   });

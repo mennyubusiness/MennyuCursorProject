@@ -18,7 +18,11 @@ Run: `npx prisma migrate deploy` (or `db:migrate` in dev).
 |-------------------|----------------|
 | `src/lib/menu-import-payload-hash.ts` | `stableStringify` + `payloadFingerprint` (raw + canonical SHA-256). |
 | `src/integrations/deliverect/menu/phase1a-pipeline.ts` | In-memory normalize + validate (unchanged). |
-| `src/services/menu-import-phase1b.service.ts` | `ingestDeliverectMenuImportPhase1b`: vendor check → tx(raw+job) → Phase 1A → tx(issues + optional `MenuVersion` draft + job status). |
+| `src/services/menu-import-phase1b.service.ts` | `ingestDeliverectMenuImportPhase1b`: vendor check → tx(raw+job) → Phase 1A → tx(issues + optional `MenuVersion` draft + job status). Optional **`normalizationRaw`** when the stored verbatim body differs from the JSON shape Phase 1A expects (e.g. Commerce menus array envelope). |
+| `src/integrations/deliverect/menu-api.ts` | `fetchDeliverectCommerceStoreMenus` — `GET /commerce/{accountId}/stores/{storeId}/menus`; `pickNormalizerInputFromCommerceMenusResponse` for unwrap. |
+| `src/services/deliverect-menu-pull-ingest.service.ts` | `pullDeliverectMenuAndIngestPhase1b` — load vendor Deliverect ids → GET menu → Phase 1B ingest. |
+| `POST /api/admin/vendors/{vendorId}/menu-import/deliverect-pull` | Admin-only manual pull (see `DELIVERECT_SANDBOX.md`). |
+| `POST /api/webhooks/deliverect/menu` | Menu Update webhook → same HMAC as order webhook → Phase 1B (`DELIVERECT_MENU_WEBHOOK`). |
 
 Optional **`deps.prisma`** for tests / alternate clients.
 
