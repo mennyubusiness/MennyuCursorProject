@@ -3,6 +3,17 @@
 import { useState, useCallback, useMemo } from "react";
 import type { ModifierConfigForUI, ModifierGroupLinkForUI, ModifierOptionForUI } from "./modifier-config";
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
+import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
+
+function modifierGroupSelectionHint(minSelections: number, maxSelections: number): string {
+  if (modifierMaxSelectionsIsUnbounded(maxSelections) && minSelections === 0) {
+    return "optional — choose any";
+  }
+  if (minSelections === maxSelections) {
+    return `choose ${minSelections}`;
+  }
+  return `${minSelections}–${maxSelections} choices`;
+}
 
 type SelectionState = Record<string, number>;
 
@@ -208,9 +219,7 @@ export function ModifierModal({
                   <legend className="text-sm font-medium text-stone-900">
                     {link.modifierGroup.name}
                     <span className="ml-1 text-stone-500">
-                      ({link.minSelections === link.maxSelections
-                        ? `choose ${link.minSelections}`
-                        : `${link.minSelections}–${link.maxSelections} choices`}
+                      ({modifierGroupSelectionHint(link.minSelections, link.maxSelections)}
                       {link.required ? ", required" : ""})
                     </span>
                   </legend>
@@ -348,7 +357,7 @@ function OptionRow({
             return (
               <fieldset key={nested.id} className="rounded border border-stone-100 p-2">
                 <legend className="text-xs font-medium text-stone-700">
-                  {nested.name} ({nested.minSelections}–{nested.maxSelections})
+                  {nested.name} ({modifierGroupSelectionHint(nested.minSelections, nested.maxSelections)})
                 </legend>
                 {nRequiredMissing && (
                   <p className="mb-1 text-xs text-red-600">Select at least {nested.minSelections}.</p>

@@ -7,6 +7,7 @@ import {
 } from "@/lib/admin-menu-import-queries";
 import { diffCanonicalMenus } from "@/domain/menu-import/canonical-diff";
 import { mennyuCanonicalMenuSchema, type MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import { formatModifierMaxSelectionsLabel } from "@/domain/modifier-selection-unbounded";
 import { env } from "@/lib/env";
 import { evaluateDraftMenuVersionDiscardEligibility } from "@/services/discard-draft-menu-version.service";
 import { evaluateMenuImportPublishEligibility } from "@/services/menu-publish-from-canonical.service";
@@ -398,7 +399,8 @@ export default async function AdminMenuImportJobPage({
                                   <div className="text-xs font-medium text-stone-700">
                                     {g.name}{" "}
                                     <span className="font-mono font-normal text-stone-500">
-                                      ({g.deliverectId}) · min {g.minSelections} / max {g.maxSelections}
+                                      ({g.deliverectId}) · min {g.minSelections} / max{" "}
+                                      {formatModifierMaxSelectionsLabel(g.maxSelections)}
                                     </span>
                                   </div>
                                   <ul className="ml-2 mt-1 list-inside list-disc text-xs text-stone-600">

@@ -3,6 +3,7 @@ import deliverectFragment from "@/domain/menu-import/__examples__/deliverect-men
 import { runPhase1aDeliverectMenuImport } from "./phase1a-pipeline";
 import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { hasBlockingIssues } from "@/domain/menu-import/issues";
+import { MODIFIER_MAX_SELECTIONS_UNBOUNDED } from "@/domain/modifier-selection-unbounded";
 
 describe("runPhase1aDeliverectMenuImport", () => {
   it("normalizes and validates the sample Deliverect fragment", () => {
@@ -221,6 +222,36 @@ describe("runPhase1aDeliverectMenuImport", () => {
     expect(result.menu!.modifierGroupDefinitions.find((x) => x.deliverectId === "g1")?.options[0]!.deliverectId).toBe(
       "o1"
     );
+  });
+
+  it("maps Deliverect min=0 max=0 optional add-ons to unbounded maxSelections", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        products: [
+          {
+            _id: "p-toppings",
+            name: "Pizza",
+            price: 1200,
+            subProducts: [
+              {
+                _id: "g-toppings",
+                name: "Extra toppings",
+                min: 0,
+                max: 0,
+                subProducts: [{ _id: "t1", name: "Pepperoni", price: 100 }],
+              },
+            ],
+          },
+        ],
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    const g = result.menu!.modifierGroupDefinitions.find((x) => x.deliverectId === "g-toppings");
+    expect(g?.minSelections).toBe(0);
+    expect(g?.maxSelections).toBe(MODIFIER_MAX_SELECTIONS_UNBOUNDED);
+    expect(g?.isRequired).toBe(false);
   });
 
   it("emits SUB_PRODUCTS_WRONG_TYPE when subProducts is a string", () => {

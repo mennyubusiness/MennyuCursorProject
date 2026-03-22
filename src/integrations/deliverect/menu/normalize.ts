@@ -30,6 +30,7 @@ import type {
   MennyuCanonicalProduct,
 } from "@/domain/menu-import/canonical.schema";
 import type { MenuImportIssueRecord } from "@/domain/menu-import/issues";
+import { MODIFIER_MAX_SELECTIONS_UNBOUNDED } from "@/domain/modifier-selection-unbounded";
 import {
   asNumber,
   asString,
@@ -1000,6 +1001,10 @@ function buildModifierGroupTree(
   const min = coerceInt(g.min ?? g.minQty ?? (g.multiSelect === false ? 1 : 0), 0);
   let max = coerceInt(g.max ?? g.maxQty, 1);
   if (max < min) max = min;
+  // Deliverect: min=0 max=0 on optional add-on groups means "pick any amount", not "pick zero".
+  if (min === 0 && max === 0) {
+    max = MODIFIER_MAX_SELECTIONS_UNBOUNDED;
+  }
 
   const leafOptionSpecs = collectLeafOptionsFromGroupNode(g, lookups, issues, {
     entityPath: `/modifierGroupDefinitions/${gid}`,
