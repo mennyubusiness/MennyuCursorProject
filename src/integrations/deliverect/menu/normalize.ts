@@ -92,12 +92,15 @@ export function normalizeDeliverectMenuToCanonical(
   const categories = buildCategories(categoriesRaw, products, issues);
 
   if (products.length === 0) {
-    issues.push({
-      kind: "normalization",
-      severity: "blocking",
-      code: "NO_VALID_PRODUCTS",
-      message: "No valid products were normalized from the payload.",
-    });
+    const emptyCollectionExplained = issues.some((i) => i.code === "EMPTY_PRODUCTS_COLLECTION");
+    if (!emptyCollectionExplained) {
+      issues.push({
+        kind: "normalization",
+        severity: "blocking",
+        code: "NO_VALID_PRODUCTS",
+        message: "No valid products were normalized from the payload.",
+      });
+    }
     return { menu: null, issues };
   }
 
@@ -154,6 +157,48 @@ function takeProductListFromValue(keyPath: string, v: unknown): ProductListHit |
     const values = Object.values(v).filter((x) => isRecord(x) && !Array.isArray(x));
     if (values.length === 0) return null;
     return { list: values, source: `${keyPath}.object_map` };
+  }
+  return null;
+}
+
+/**
+ * True when a product-collection key is present with value `[]`, `{}`, or a map with no product-shaped object values
+ * (same structural emptiness as `takeProductListFromValue` returning null — but the key exists).
+ */
+function isDeclaredEmptyProductCollection(v: unknown): boolean {
+  if (v === undefined || v === null) return false;
+  if (Array.isArray(v)) return v.length === 0;
+  if (isRecord(v) && !Array.isArray(v)) {
+    const values = Object.values(v).filter((x) => isRecord(x) && !Array.isArray(x));
+    return values.length === 0;
+  }
+  return false;
+}
+
+/**
+ * First declared-but-empty product collection on root, `data`, or `payload` (same surfaces as extraction).
+ */
+function findDeclaredEmptyProductCollectionOnLayers(root: Record<string, unknown>): {
+  key: string;
+  entityPath: string;
+} | null {
+  const layers: { rec: Record<string, unknown>; pathPrefix: string }[] = [
+    { rec: root, pathPrefix: "" },
+  ];
+  const data = root.data;
+  if (isRecord(data)) layers.push({ rec: data, pathPrefix: "data" });
+  const payload = root.payload;
+  if (isRecord(payload)) layers.push({ rec: payload, pathPrefix: "payload" });
+
+  for (const { rec, pathPrefix } of layers) {
+    for (const key of PRODUCT_COLLECTION_KEYS) {
+      if (!Object.prototype.hasOwnProperty.call(rec, key)) continue;
+      const v = rec[key];
+      if (isDeclaredEmptyProductCollection(v)) {
+        const entityPath = pathPrefix ? `/${pathPrefix}/${key}` : `/${key}`;
+        return { key, entityPath };
+      }
+    }
   }
   return null;
 }
@@ -286,6 +331,24 @@ function extractProductsArray(
   if (fromCats.length > 0) {
     logDeliverectProductExtraction("categories.embedded_product_objects", fromCats.length);
     return fromCats;
+  }
+
+  const emptyDecl = findDeclaredEmptyProductCollectionOnLayers(root);
+  if (emptyDecl) {
+    const { key, entityPath } = emptyDecl;
+    const message =
+      key === "products"
+        ? "Products collection exists but contains no products."
+        : `The "${key}" collection exists but contains no products.`;
+    issues.push({
+      kind: "normalization",
+      severity: "blocking",
+      code: "EMPTY_PRODUCTS_COLLECTION",
+      message,
+      entityPath,
+      details: { collectionKey: key },
+    });
+    return [];
   }
 
   issues.push({

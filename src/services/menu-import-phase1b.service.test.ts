@@ -147,7 +147,7 @@ describe("ingestDeliverectMenuImportPhase1b", () => {
     expect(tx.menuVersion.create).not.toHaveBeenCalled();
     expect(tx.menuImportIssue.createMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
-        expect.objectContaining({ code: "NO_VALID_PRODUCTS", kind: "normalization" }),
+        expect.objectContaining({ code: "EMPTY_PRODUCTS_COLLECTION", kind: "normalization" }),
       ]),
     });
   });

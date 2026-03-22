@@ -34,7 +34,7 @@ describe("runPhase1aDeliverectMenuImport", () => {
     expect(result.normalizationIssues.some((i) => i.code === "ROOT_NOT_OBJECT")).toBe(true);
   });
 
-  it("fails when products array is empty", () => {
+  it("fails when products array is empty with EMPTY_PRODUCTS_COLLECTION (not MISSING / NO_VALID)", () => {
     const result = runPhase1aDeliverectMenuImport({
       raw: { products: [] },
       vendorId: "v1",
@@ -42,7 +42,38 @@ describe("runPhase1aDeliverectMenuImport", () => {
     });
     expect(result.menu).toBeNull();
     expect(result.ok).toBe(false);
+    expect(result.normalizationIssues.some((i) => i.code === "EMPTY_PRODUCTS_COLLECTION")).toBe(true);
+    expect(result.normalizationIssues.some((i) => i.code === "MISSING_PRODUCTS_ARRAY")).toBe(false);
+    expect(result.normalizationIssues.some((i) => i.code === "NO_VALID_PRODUCTS")).toBe(false);
+  });
+
+  it("emits NO_VALID_PRODUCTS when products is non-empty but no row normalizes to a valid product", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: { products: [{}, { foo: 1 }] },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_api_v1" },
+    });
+    expect(result.menu).toBeNull();
+    expect(result.ok).toBe(false);
     expect(result.normalizationIssues.some((i) => i.code === "NO_VALID_PRODUCTS")).toBe(true);
+    expect(result.normalizationIssues.some((i) => i.code === "EMPTY_PRODUCTS_COLLECTION")).toBe(false);
+    expect(result.normalizationIssues.some((i) => i.code === "MISSING_PRODUCTS_ARRAY")).toBe(false);
+  });
+
+  it("fails when products is an empty object map (Menu Push style) with categories empty", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: { products: {}, categories: [] },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).toBeNull();
+    expect(result.ok).toBe(false);
+    expect(result.normalizationIssues.some((i) => i.code === "EMPTY_PRODUCTS_COLLECTION")).toBe(true);
+    expect(
+      result.normalizationIssues.find((i) => i.code === "EMPTY_PRODUCTS_COLLECTION")?.message
+    ).toContain("Products collection exists but contains no products");
+    expect(result.normalizationIssues.some((i) => i.code === "MISSING_PRODUCTS_ARRAY")).toBe(false);
+    expect(result.normalizationIssues.some((i) => i.code === "NO_VALID_PRODUCTS")).toBe(false);
   });
 
   it("normalizes products from a string-keyed object map (Deliverect Menu Push style)", () => {
