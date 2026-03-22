@@ -81,6 +81,125 @@ model Vendor {
   podMembershipRequests   PodMembershipRequest[]
   pods                    PodVendor[]
   vendorOrders            VendorOrder[]
+  menuImportJobs          MenuImportJob[]
+  menuVersions            MenuVersion[]
+}
+
+// ---- Deliverect-first menu import (Phase 1B: draft only; no live MenuItem writes) ----
+
+enum MenuImportSource {
+  DELIVERECT_API_PULL
+  DELIVERECT_MENU_WEBHOOK
+}
+
+enum MenuImportJobStatus {
+  queued
+  fetching
+  ingested
+  normalizing
+  validating
+  awaiting_review
+  publishing
+  succeeded
+  failed
+  cancelled
+}
+
+enum MenuImportIssueSeverity {
+  blocking
+  warning
+  info
+}
+
+enum MenuImportIssueKind {
+  normalization
+  validation
+}
+
+enum MenuVersionState {
+  draft
+  published
+  archived
+  superseded
+}
+
+model MenuImportJob {
+  id                      String              @id @default(cuid())
+  vendorId                String
+  source                  MenuImportSource
+  status                  MenuImportJobStatus @default(queued)
+  deliverectChannelLinkId String?
+  deliverectLocationId    String?
+  deliverectMenuId        String?
+  idempotencyKey          String?             @unique
+  draftVersionId          String?             @unique
+  draftVersion            MenuVersion?        @relation("MenuImportDraftVersion", fields: [draftVersionId], references: [id], onDelete: SetNull)
+  errorCode               String?
+  errorMessage            String?
+  startedAt               DateTime            @default(now())
+  completedAt             DateTime?
+  createdBy               String?
+
+  vendor              Vendor                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  menuImportRawPayload MenuImportRawPayload?
+  issues              MenuImportIssue[]
+
+  @@index([vendorId, status])
+  @@index([vendorId, startedAt(sort: Desc)])
+}
+
+model MenuImportRawPayload {
+  id                   String        @id @default(cuid())
+  jobId                String        @unique
+  job                  MenuImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  deliverectApiVersion String?
+  payload              Json
+  payloadSha256        String
+  createdAt            DateTime      @default(now())
+
+  @@index([payloadSha256])
+}
+
+model MenuImportIssue {
+  id               String                   @id @default(cuid())
+  jobId            String
+  job              MenuImportJob            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  kind             MenuImportIssueKind
+  severity         MenuImportIssueSeverity
+  code             String
+  message          String
+  entityPath       String?
+  deliverectId     String?
+  mennyuEntityType String?
+  mennyuEntityId   String?
+  details          Json?
+  waived           Boolean                  @default(false)
+  waivedBy         String?
+  waivedAt         DateTime?
+
+  @@index([jobId])
+  @@index([jobId, severity])
+}
+
+model MenuVersion {
+  id                         String            @id @default(cuid())
+  vendorId                   String
+  state                      MenuVersionState  @default(draft)
+  canonicalSnapshot          Json
+  canonicalSnapshotSha256    String
+  previousPublishedVersionId String?
+  previousPublishedVersion   MenuVersion?      @relation("MenuVersionHistory", fields: [previousPublishedVersionId], references: [id], onDelete: SetNull)
+  nextVersions               MenuVersion[]     @relation("MenuVersionHistory")
+  publishedAt                DateTime?
+  publishedBy                String?
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
+
+  vendor              Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  jobPointingToDraft  MenuImportJob?  @relation("MenuImportDraftVersion")
+
+  @@index([vendorId, state])
+  @@index([vendorId, createdAt(sort: Desc)])
 }
 
 model MenuItem {

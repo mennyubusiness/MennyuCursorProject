@@ -1,0 +1,43 @@
+{
+  "menuId": "sample-menu-001",
+  "categories": [
+    {
+      "_id": "cat-mains",
+      "name": "Mains",
+      "sortOrder": 0,
+      "productIds": ["prod-burger-1"]
+    }
+  ],
+  "products": [
+    {
+      "_id": "prod-burger-1",
+      "plu": "BRG-001",
+      "name": "House Burger",
+      "description": "Beef patty with lettuce",
+      "price": 899,
+      "sortOrder": 0,
+      "snoozed": false,
+      "subProducts": [
+        {
+          "_id": "mg-size",
+          "name": "Size",
+          "min": 1,
+          "max": 1,
+          "subProducts": [
+            {
+              "_id": "opt-regular",
+              "name": "Regular",
+              "price": 0,
+              "default": true
+            },
+            {
+              "_id": "opt-large",
+              "name": "Large",
+              "price": 150
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

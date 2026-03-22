@@ -1,2 +1,3 @@
 -- Deliverect webhook apply audit (outcome, timestamps, debug)
-ALTER TABLE "VendorOrder" ADD COLUMN "deliverectWebhookLastApply" JSONB;
+-- IF NOT EXISTS: safe when the column was already added (e.g. db push) before this migration ran.
+ALTER TABLE "VendorOrder" ADD COLUMN IF NOT EXISTS "deliverectWebhookLastApply" JSONB;

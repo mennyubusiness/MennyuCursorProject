@@ -56,6 +56,7 @@ mennyu/
 │   │
 │   ├── lib/
 │   │   ├── db.ts                        # Prisma client singleton
+│   │   ├── menu-import-payload-hash.ts  # Stable stringify + SHA-256 fingerprint for import payloads
 │   │   ├── env.ts                       # Validated env (Zod)
 │   │   ├── stripe.ts                    # Stripe client
 │   │   ├── twilio.ts                    # Twilio client
@@ -65,13 +66,19 @@ mennyu/
 │   │   ├── types.ts                     # Shared domain types
 │   │   ├── order-state.ts               # Order state machine
 │   │   ├── money.ts                     # Money arithmetic (cents)
-│   │   └── fees.ts                     # Service fee, commission, tip split
+│   │   ├── fees.ts                     # Service fee, commission, tip split
+│   │   └── menu-import/                 # Deliverect-first menu canonical + validation (Phase 1A+)
+│   │       ├── canonical.schema.ts      # Zod + inferred TS types
+│   │       ├── issues.ts
+│   │       ├── validate.ts
+│   │       └── __examples__/            # Sample raw + canonical snippets
 │   │
 │   ├── services/
 │   │   ├── cart.service.ts              # Cart business logic
 │   │   ├── order.service.ts             # Order creation, splitting, allocation
 │   │   ├── payment.service.ts           # Stripe payment intent, capture
 │   │   ├── deliverect.service.ts       # Deliverect API + payload transform
+│   │   ├── menu-import-phase1b.service.ts # Persist raw menu import + draft MenuVersion (no live menu writes)
 │   │   ├── sms.service.ts              # Twilio SMS notifications
 │   │   └── order-status.service.ts     # Unified status derivation, updates
 │   │
@@ -80,7 +87,11 @@ mennyu/
 │   │       ├── client.ts                # HTTP client for Deliverect API
 │   │       ├── payloads.ts              # Request/response types
 │   │       ├── transform.ts             # Mennyu order → Deliverect payload
-│   │       └── webhook-handler.ts       # Parse, verify, dispatch events
+│   │       ├── webhook-handler.ts       # Parse, verify, dispatch events
+│   │       └── menu/                    # Menu JSON → canonical (no live DB writes)
+│   │           ├── normalize.ts
+│   │           ├── raw-helpers.ts
+│   │           └── phase1a-pipeline.ts
 │   │
 │   ├── actions/
 │   │   ├── cart.actions.ts              # Server actions: add/update cart

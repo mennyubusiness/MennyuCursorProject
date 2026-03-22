@@ -1,3 +1,3 @@
 -- AlterTable
-ALTER TABLE "RefundAttempt" ADD COLUMN     "dismissedAsLegacyAt" TIMESTAMP(3),
-ADD COLUMN     "dismissedAsLegacyBy" TEXT;
+ALTER TABLE "RefundAttempt" ADD COLUMN IF NOT EXISTS "dismissedAsLegacyAt" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "dismissedAsLegacyBy" TEXT;
