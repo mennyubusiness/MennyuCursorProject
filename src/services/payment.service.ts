@@ -59,6 +59,29 @@ export async function createPaymentIntent(
   return { clientSecret, paymentIntentId: paymentIntent.id };
 }
 
+/**
+ * Resume Stripe PaymentElement for an unpaid order. Verifies phone matches; stable idempotency per order.
+ */
+export async function getResumePaymentPayloadForCustomer(params: {
+  orderId: string;
+  customerPhone: string;
+}): Promise<{ clientSecret: string; paymentIntentId: string; totalCents: number } | null> {
+  const normalized = params.customerPhone.trim();
+  const order = await prisma.order.findUnique({
+    where: { id: params.orderId },
+    select: { customerPhone: true, status: true, totalCents: true },
+  });
+  if (!order || order.customerPhone.trim() !== normalized || order.status !== "pending_payment") {
+    return null;
+  }
+  const { clientSecret, paymentIntentId } = await createPaymentIntent(
+    params.orderId,
+    order.totalCents,
+    `resume_${params.orderId}`
+  );
+  return { clientSecret, paymentIntentId, totalCents: order.totalCents };
+}
+
 export async function recordPaymentAndAllocations(
   orderId: string,
   stripePaymentIntentId: string,

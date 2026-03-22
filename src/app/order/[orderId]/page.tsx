@@ -5,6 +5,7 @@ import {
   clearCartAfterOrderSuccessAction,
 } from "@/actions/order.actions";
 import { OrderPageContent } from "./OrderPageContent";
+import { OrderResumePayment } from "./OrderResumePayment";
 
 export default async function OrderStatusPage({
   params,
@@ -26,6 +27,10 @@ export default async function OrderStatusPage({
 
   if (payment === "success" && order.status !== "pending_payment") {
     await clearCartAfterOrderSuccessAction(orderId);
+  }
+
+  if (order.status === "pending_payment") {
+    return <OrderResumePayment orderId={orderId} />;
   }
 
   return (

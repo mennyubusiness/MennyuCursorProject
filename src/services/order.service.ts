@@ -549,8 +549,14 @@ export interface OrderHistoryEntry {
 const TERMINAL_ORDER_STATUSES = ["completed", "partially_completed", "cancelled", "failed"] as const;
 
 /**
- * Returns the customer's most recent active order (non-terminal status), if any.
- * Used for header "Active order" shortcut and cart redirect.
+ * Parent orders still in checkout (unpaid). Must not block /cart or show as a "live" placed order.
+ */
+const CHECKOUT_IN_PROGRESS_STATUSES = ["pending_payment"] as const;
+
+/**
+ * Returns the customer's most recent active order (placed + paid or in fulfillment), if any.
+ * Excludes terminal outcomes and unpaid `pending_payment` (abandoned Stripe / incomplete checkout).
+ * Used for header "Cart" shortcut and cart redirect.
  */
 export async function getActiveOrderByCustomerPhone(
   customerPhone: string
@@ -561,7 +567,7 @@ export async function getActiveOrderByCustomerPhone(
   const order = await prisma.order.findFirst({
     where: {
       customerPhone: normalized,
-      status: { notIn: [...TERMINAL_ORDER_STATUSES] },
+      status: { notIn: [...TERMINAL_ORDER_STATUSES, ...CHECKOUT_IN_PROGRESS_STATUSES] },
     },
     orderBy: { createdAt: "desc" },
     select: { id: true },
