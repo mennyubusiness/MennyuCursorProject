@@ -60,6 +60,26 @@ export async function fetchLatestPublishedMenuVersionForVendor(vendorId: string)
   });
 }
 
+/** One query: latest published MenuVersion id per vendor (for batch discard eligibility on list). */
+export async function fetchLatestPublishedMenuVersionIdByVendorMap(
+  vendorIds: string[]
+): Promise<Map<string, string>> {
+  const unique = [...new Set(vendorIds.map((v) => v.trim()).filter(Boolean))];
+  if (unique.length === 0) return new Map();
+
+  const rows = await prisma.menuVersion.findMany({
+    where: { vendorId: { in: unique }, state: MenuVersionState.published },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    select: { id: true, vendorId: true },
+  });
+
+  const map = new Map<string, string>();
+  for (const r of rows) {
+    if (!map.has(r.vendorId)) map.set(r.vendorId, r.id);
+  }
+  return map;
+}
+
 export async function fetchAdminMenuImportJobsList(limit = 50) {
   return prisma.menuImportJob.findMany({
     take: limit,
@@ -73,6 +93,7 @@ export async function fetchAdminMenuImportJobsList(limit = 50) {
       draftVersionId: true,
       errorCode: true,
       vendor: { select: { id: true, name: true } },
+      draftVersion: { select: { id: true, state: true } },
       _count: { select: { issues: true } },
     },
   });

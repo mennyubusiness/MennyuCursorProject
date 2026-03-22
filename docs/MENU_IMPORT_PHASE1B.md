@@ -25,6 +25,10 @@ Run: `npx prisma migrate deploy` (or `db:migrate` in dev).
 | `POST /api/webhooks/deliverect/menu` | Menu Update webhook → same HMAC as order webhook → Phase 1B (`DELIVERECT_MENU_WEBHOOK`). |
 | `src/domain/menu-import/canonical-diff.ts` | `diffCanonicalMenus(draft, published, publishedVersionId)` — Deliverect id–based diff of two canonical snapshots (admin only). |
 | `/admin/menu-imports/[jobId]` | Includes **Draft vs published**: draft job snapshot vs latest `MenuVersion` with `state: published` for the same vendor. |
+| `src/services/menu-publish-from-canonical.service.ts` | Guarded publish: draft canonical → live `MenuItem` / modifier tables; archives prior published snapshot row. |
+| `POST /api/admin/menu-imports/[jobId]/publish` | Admin-only publish. |
+| `src/services/discard-draft-menu-version.service.ts` | **Discard draft:** deletes `MenuVersion` only when `state: draft`; unlinks `MenuImportJob.draftVersionId`, sets job `cancelled` + `errorCode: DRAFT_DISCARDED`; keeps job, issues, raw payload. |
+| `POST /api/admin/menu-imports/[jobId]/discard-draft` | Admin-only discard linked draft (confirmation in UI). |
 
 Optional **`deps.prisma`** for tests / alternate clients.
 

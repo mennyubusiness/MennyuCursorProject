@@ -8,8 +8,10 @@ import {
 import { diffCanonicalMenus } from "@/domain/menu-import/canonical-diff";
 import { mennyuCanonicalMenuSchema, type MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import { env } from "@/lib/env";
+import { evaluateDraftMenuVersionDiscardEligibility } from "@/services/discard-draft-menu-version.service";
 import { evaluateMenuImportPublishEligibility } from "@/services/menu-publish-from-canonical.service";
 import { AdminMenuImportDiffView } from "./AdminMenuImportDiffView";
+import { MenuImportDiscardDraftButton } from "../MenuImportDiscardDraftButton";
 import { MenuImportPublishPanel } from "./MenuImportPublishPanel";
 import { MenuImportIssueSeverity } from "@prisma/client";
 
@@ -96,6 +98,12 @@ export default async function AdminMenuImportJobPage({
     draftVersionId: job.draftVersionId,
     draftVersion: job.draftVersion,
     issues: job.issues.map((i) => ({ severity: i.severity, waived: i.waived })),
+  });
+
+  const discardDraftEligibility = evaluateDraftMenuVersionDiscardEligibility({
+    draftVersionId: job.draftVersionId,
+    draftVersion: job.draftVersion,
+    activePublishedMenuVersionId: publishedRow?.id ?? null,
   });
 
   const draftCountsSummary =
@@ -243,6 +251,15 @@ export default async function AdminMenuImportJobPage({
         summaryMode={publishSummaryMode}
         diffUnavailableNote={publishDiffUnavailableNote}
         adminSecretForPublish={env.ADMIN_SECRET?.trim() ?? null}
+      />
+
+      <MenuImportDiscardDraftButton
+        jobId={job.id}
+        draftVersionId={job.draftVersionId}
+        canDiscard={discardDraftEligibility.canDiscard}
+        discardReasons={discardDraftEligibility.reasons}
+        adminSecretForDiscard={env.ADMIN_SECRET?.trim() ?? null}
+        variant="panel"
       />
 
       {/* B. Summary cards */}

@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { fetchAdminMenuImportJobsList } from "@/lib/admin-menu-import-queries";
+import {
+  fetchAdminMenuImportJobsList,
+  fetchLatestPublishedMenuVersionIdByVendorMap,
+} from "@/lib/admin-menu-import-queries";
+import { env } from "@/lib/env";
+import { evaluateDraftMenuVersionDiscardEligibility } from "@/services/discard-draft-menu-version.service";
+import { MenuImportDiscardDraftButton } from "./MenuImportDiscardDraftButton";
 
 function formatDate(d: Date): string {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "short", timeStyle: "short" }).format(d);
@@ -7,6 +13,9 @@ function formatDate(d: Date): string {
 
 export default async function AdminMenuImportsListPage() {
   const jobs = await fetchAdminMenuImportJobsList(50);
+  const publishedByVendor = await fetchLatestPublishedMenuVersionIdByVendorMap(
+    jobs.map((j) => j.vendor.id)
+  );
 
   return (
     <div className="space-y-6">
@@ -27,7 +36,7 @@ export default async function AdminMenuImportsListPage() {
               <th className="px-4 py-2 font-medium">Status</th>
               <th className="px-4 py-2 font-medium">Draft</th>
               <th className="px-4 py-2 font-medium">Issues</th>
-              <th className="px-4 py-2 font-medium" />
+              <th className="px-4 py-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
@@ -38,7 +47,13 @@ export default async function AdminMenuImportsListPage() {
                 </td>
               </tr>
             ) : (
-              jobs.map((j) => (
+              jobs.map((j) => {
+                const discardEligibility = evaluateDraftMenuVersionDiscardEligibility({
+                  draftVersionId: j.draftVersionId,
+                  draftVersion: j.draftVersion,
+                  activePublishedMenuVersionId: publishedByVendor.get(j.vendor.id) ?? null,
+                });
+                return (
                 <tr key={j.id} className="hover:bg-stone-50">
                   <td className="whitespace-nowrap px-4 py-2 text-stone-700">{formatDate(j.startedAt)}</td>
                   <td className="px-4 py-2 text-stone-900">{j.vendor.name}</td>
@@ -49,15 +64,26 @@ export default async function AdminMenuImportsListPage() {
                   </td>
                   <td className="px-4 py-2 text-stone-700">{j._count.issues}</td>
                   <td className="px-4 py-2 text-right">
-                    <Link
-                      href={`/admin/menu-imports/${j.id}`}
-                      className="text-sky-700 hover:underline"
-                    >
-                      Review
-                    </Link>
+                    <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-3">
+                      <Link
+                        href={`/admin/menu-imports/${j.id}`}
+                        className="text-sky-700 hover:underline"
+                      >
+                        Review
+                      </Link>
+                      <MenuImportDiscardDraftButton
+                        jobId={j.id}
+                        draftVersionId={j.draftVersionId}
+                        canDiscard={discardEligibility.canDiscard}
+                        discardReasons={discardEligibility.reasons}
+                        adminSecretForDiscard={env.ADMIN_SECRET?.trim() ?? null}
+                        variant="compact"
+                      />
+                    </div>
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>
