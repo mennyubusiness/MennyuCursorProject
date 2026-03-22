@@ -58,3 +58,5 @@ Payload field notes and example shapes: **`DELIVERECT_WEBHOOK_PAYLOADS.md`**.
 Auth to Deliverect: optional **`DELIVERECT_API_KEY`** (Bearer), else existing OAuth client credentials (`DELIVERECT_CLIENT_ID` / `DELIVERECT_CLIENT_SECRET`).
 
 **Admin UI:** On **Admin → Order detail**, when `deliverectOrderId` is set and the environment is dev, staging, or sandbox (or `SHOW_DELIVERECT_STATUS_SIM_UI=true`), a **“Sandbox: send test status to Deliverect”** control appears per vendor order.
+
+**TEMP (unblocks testing without admin cookie):** set server **`ADMIN_SECRET`** — the admin order page passes it into the simulate UI so the POST URL includes `?admin=…` at **runtime** (avoids build-time inlining / dead-code removal when `NEXT_PUBLIC_ADMIN_SECRET` was unset). Optional: **`NEXT_PUBLIC_ADMIN_SECRET`** (same value) if you rely on public env at build only. **Do not use for production** you care to harden; replace with real admin auth later.

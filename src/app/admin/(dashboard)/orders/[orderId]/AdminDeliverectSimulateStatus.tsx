@@ -12,20 +12,52 @@ const OPTIONS: { label: string; code: number }[] = [
 ];
 
 /**
- * TEMP: Push test status to Deliverect (triggers webhooks). Admin order page only.
+ * TEMP / SANDBOX: Push test status to Deliverect (triggers webhooks). Admin order page only.
  * Does not mutate Mennyu DB from the client — updates arrive via webhook.
+ *
+ * Auth query param:
+ * - Prefer **`adminSecretForSimulate`** from the server (same value as `ADMIN_SECRET`). This is
+ *   supplied at request time so the `?admin=` branch is not dead-code-eliminated when
+ *   `NEXT_PUBLIC_ADMIN_SECRET` was empty at **build** time.
+ * - Else fall back to **`NEXT_PUBLIC_ADMIN_SECRET`** (must match server `ADMIN_SECRET`); only works
+ *   if set when the app was built.
  */
-export function AdminDeliverectSimulateStatus({ vendorOrderId }: { vendorOrderId: string }) {
+export function simulateDeliverectStatusUrl(
+  vendorOrderId: string,
+  adminSecretForSimulate?: string | null
+): string {
+  const path = `/api/admin/vendor-orders/${vendorOrderId}/simulate-deliverect-status`;
+  const fromServer = adminSecretForSimulate?.trim() ?? "";
+  const fromPublicBuild = process.env.NEXT_PUBLIC_ADMIN_SECRET?.trim() ?? "";
+  const admin = fromServer || fromPublicBuild;
+  if (!admin) return path;
+  return `${path}?${new URLSearchParams({ admin }).toString()}`;
+}
+
+export function AdminDeliverectSimulateStatus({
+  vendorOrderId,
+  adminSecretForSimulate = null,
+}: {
+  vendorOrderId: string;
+  /** TEMP: pass server `ADMIN_SECRET` so `?admin=` works without NEXT_PUBLIC at build. */
+  adminSecretForSimulate?: string | null;
+}) {
   const router = useRouter();
   const [code, setCode] = useState<number>(OPTIONS[0].code);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
+  const simulateUrl = simulateDeliverectStatusUrl(vendorOrderId, adminSecretForSimulate);
+  const simulateUrlMissingAdminQuery = !simulateUrl.includes("?");
+
   async function handleApply() {
     setMessage(null);
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/vendor-orders/${vendorOrderId}/simulate-deliverect-status`, {
+      const url = simulateDeliverectStatusUrl(vendorOrderId, adminSecretForSimulate);
+      // TEMP debug: verify Network tab request URL includes ?admin= when secret is configured.
+      console.log("[SIM DELIVERECT URL]", url);
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -67,6 +99,13 @@ export function AdminDeliverectSimulateStatus({ vendorOrderId }: { vendorOrderId
         Calls Deliverect&apos;s order status API only. This app does not change the order here — expect updates
         through the Deliverect webhook after a short delay.
       </p>
+      {simulateUrlMissingAdminQuery && (
+        <p className="mt-1 text-xs font-medium text-red-700">
+          TEMP: No admin secret for this UI — request URL has no <code className="rounded bg-red-100 px-0.5">?admin=</code>{" "}
+          (set server <code className="rounded bg-red-100 px-0.5">ADMIN_SECRET</code> or rebuild with{" "}
+          <code className="rounded bg-red-100 px-0.5">NEXT_PUBLIC_ADMIN_SECRET</code>). Expect 403.
+        </p>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <select
           value={code}

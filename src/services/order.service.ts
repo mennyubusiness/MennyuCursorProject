@@ -322,6 +322,7 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
         totalCents: totals.totalCents,
         idempotencyKey: idemKey,
         status: "pending_payment",
+        sourceCartId: cart.id,
       },
     });
 

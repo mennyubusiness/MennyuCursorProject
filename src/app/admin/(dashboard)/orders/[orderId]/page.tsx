@@ -295,7 +295,10 @@ export default async function AdminOrderDetailPage({
                   <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
                     Deliverect sandbox
                   </p>
-                  <AdminDeliverectSimulateStatus vendorOrderId={vo.id} />
+                  <AdminDeliverectSimulateStatus
+                    vendorOrderId={vo.id}
+                    adminSecretForSimulate={env.ADMIN_SECRET?.trim() ?? null}
+                  />
                 </section>
               )}
 

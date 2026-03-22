@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
 import { recordPaymentAndAllocations } from "@/services/payment.service";
 import { setOrderStatus } from "@/services/order.service";
 import { submitVendorOrder } from "@/services/routing.service";
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
       where: { id: orderId, status: { not: "pending_payment" } },
     });
     if (existing) {
+      await clearCheckoutSourceCartForOrder(orderId);
       return NextResponse.json({ orderId: existing.id, status: existing.status });
     }
 
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
       where: { id: orderId },
       select: { id: true, status: true },
     });
+    await clearCheckoutSourceCartForOrder(orderId);
     return NextResponse.json({ orderId: final!.id, status: final!.status });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Order confirmation failed";

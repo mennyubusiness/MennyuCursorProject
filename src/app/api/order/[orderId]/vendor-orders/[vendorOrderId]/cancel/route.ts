@@ -12,6 +12,7 @@ import { canCustomerCancelVendorOrder } from "@/lib/cancel-eligibility";
 import { getRefundDecision } from "@/lib/refund-decision";
 import { applyVendorOrderTransition } from "@/services/order-status.service";
 import { executeRefund } from "@/services/refund.service";
+import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
 
 export async function POST(
   _request: Request,
@@ -120,6 +121,8 @@ export async function POST(
         : { success: false, code: exec.code, message: exec.message, amountCents: exec.amountCents };
     }
   }
+
+  await clearCheckoutSourceCartForOrder(orderId);
 
   return NextResponse.json({
     ok: true,

@@ -4,6 +4,7 @@
  * (only when pending), updates parent routing status, sends confirmation SMS when this call recorded the payment.
  */
 import { prisma } from "@/lib/db";
+import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
 import { recordPaymentAndAllocations } from "@/services/payment.service";
 import { setOrderStatus } from "@/services/order.service";
 import { submitVendorOrder } from "@/services/routing.service";
@@ -77,4 +78,6 @@ export async function processSuccessfulPayment(params: {
       await sendOrderConfirmation(order.customerPhone, orderId, order.totalCents);
     }
   }
+
+  await clearCheckoutSourceCartForOrder(orderId);
 }

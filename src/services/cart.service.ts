@@ -272,6 +272,48 @@ export async function clearCartForSession(cartId: string, sessionId: string): Pr
   return getCartById(cartId);
 }
 
+/**
+ * Clear the checkout cart snapshot for a placed order (by Order.sourceCartId).
+ * Idempotent. Server-only; safe to call after payment success or customer cancel.
+ */
+export async function clearCheckoutSourceCartForOrder(orderId: string): Promise<void> {
+  const row = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { sourceCartId: true },
+  });
+  if (!row?.sourceCartId) return;
+  const cartId = row.sourceCartId;
+  await prisma.cartItem.deleteMany({ where: { cartId } });
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { sourceCartId: null },
+  });
+}
+
+/**
+ * Defensive: drop persisted line items when the cart id is still linked to a checkout that has
+ * moved past an unpaid snapshot (anything except abandoned `pending_payment` or retryable `failed`).
+ * Keeps in-progress shopping and failed-payment / routing-failure carts intact.
+ */
+export async function discardStaleCheckoutCartsForSession(sessionId: string): Promise<void> {
+  const carts = await prisma.cart.findMany({
+    where: { sessionId, items: { some: {} } },
+    select: { id: true },
+  });
+  for (const { id: cartId } of carts) {
+    const blocking = await prisma.order.findFirst({
+      where: {
+        sourceCartId: cartId,
+        status: { notIn: ["pending_payment", "failed"] },
+      },
+      select: { id: true },
+    });
+    if (blocking) {
+      await prisma.cartItem.deleteMany({ where: { cartId } });
+    }
+  }
+}
+
 export async function getCartById(cartId: string): Promise<Cart | null> {
   const cart = await prisma.cart.findUnique({
     where: { id: cartId },

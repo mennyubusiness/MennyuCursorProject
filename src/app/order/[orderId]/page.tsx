@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import {
   getOrderStatusAction,
   reconcilePaymentIfSucceededAction,
@@ -26,20 +25,7 @@ export default async function OrderStatusPage({
   }
 
   if (payment === "success" && order.status !== "pending_payment") {
-    const cookieStore = await cookies();
-    const checkoutCookie = cookieStore.get("mennyu_checkout")?.value;
-    if (checkoutCookie) {
-      try {
-        const { orderId: cookieOrderId, cartId } = JSON.parse(
-          decodeURIComponent(checkoutCookie)
-        ) as { orderId?: string; cartId?: string };
-        if (cookieOrderId === orderId && cartId) {
-          await clearCartAfterOrderSuccessAction(cartId);
-        }
-      } catch {
-        // ignore
-      }
-    }
+    await clearCartAfterOrderSuccessAction(orderId);
   }
 
   return (

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getSessionIdFromHeaders, getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
+import { discardStaleCheckoutCartsForSession } from "@/services/cart.service";
 import { getActiveOrderByCustomerPhone, validateCartItemsForDisplay, getCartValidationMessage } from "@/services/order.service";
 import type { CartForValidation } from "@/services/order.service";
 import { prisma } from "@/lib/db";
@@ -22,6 +23,9 @@ export default async function CartPage({
   }
 
   const sessionId = getSessionIdFromHeaders(headersList) ?? "__no_session__";
+  if (sessionId !== "__no_session__") {
+    await discardStaleCheckoutCartsForSession(sessionId);
+  }
   const currentPodId = getCurrentPodIdFromHeaders(headersList);
   const params = await searchParams;
   const reorderSkipped = params.reorder_skipped ? parseInt(params.reorder_skipped, 10) : 0;
