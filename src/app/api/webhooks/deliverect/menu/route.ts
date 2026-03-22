@@ -61,6 +61,14 @@ export async function POST(request: NextRequest) {
   const signature = getDeliverectSignatureFromRequest(request);
   const parsedResult = parseDeliverectWebhookJsonObject(rawBody);
   if (!parsedResult.ok) {
+    // TEMP: remove after confirming Deliverect Menu Update payload shape (non-JSON / array root / etc.)
+    console.log("[DELIVERECT MENU WEBHOOK RAW]", {
+      contentType: request.headers.get("content-type"),
+      contentLength: request.headers.get("content-length"),
+      rawLength: rawBody.length,
+      rawPreview: rawBody.slice(0, 200),
+      isBlank: rawBody.trim().length === 0,
+    });
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   const parsed = parsedResult.parsed;
