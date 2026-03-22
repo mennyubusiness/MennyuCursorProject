@@ -20,6 +20,9 @@ export default function AdminLayout({
             <Link href="/admin/orders" className="text-stone-600 hover:text-stone-900">
               Orders
             </Link>
+            <Link href="/admin/menu-imports" className="text-stone-600 hover:text-stone-900">
+              Menu imports
+            </Link>
             <Link href="/admin/analytics" className="text-stone-600 hover:text-stone-900">
               Analytics
             </Link>
