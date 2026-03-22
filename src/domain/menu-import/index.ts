@@ -30,3 +30,5 @@ export {
 } from "./issues";
 
 export { validateCanonicalMenu, type ValidateCanonicalMenuResult } from "./validate";
+
+export { diffCanonicalMenus, type CanonicalMenuDiff } from "./canonical-diff";

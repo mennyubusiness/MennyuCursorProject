@@ -23,6 +23,8 @@ Run: `npx prisma migrate deploy` (or `db:migrate` in dev).
 | `src/services/deliverect-menu-pull-ingest.service.ts` | `pullDeliverectMenuAndIngestPhase1b` — load vendor Deliverect ids → GET menu → Phase 1B ingest. |
 | `POST /api/admin/vendors/{vendorId}/menu-import/deliverect-pull` | Admin-only manual pull (see `DELIVERECT_SANDBOX.md`). |
 | `POST /api/webhooks/deliverect/menu` | Menu Update webhook → same HMAC as order webhook → Phase 1B (`DELIVERECT_MENU_WEBHOOK`). |
+| `src/domain/menu-import/canonical-diff.ts` | `diffCanonicalMenus(draft, published, publishedVersionId)` — Deliverect id–based diff of two canonical snapshots (admin only). |
+| `/admin/menu-imports/[jobId]` | Includes **Draft vs published**: draft job snapshot vs latest `MenuVersion` with `state: published` for the same vendor. |
 
 Optional **`deps.prisma`** for tests / alternate clients.
 

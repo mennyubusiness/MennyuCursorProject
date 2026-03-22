@@ -2,9 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   fetchAdminMenuImportJobDetail,
+  fetchLatestPublishedMenuVersionForVendor,
   sortMenuImportIssuesForDisplay,
 } from "@/lib/admin-menu-import-queries";
+import { diffCanonicalMenus } from "@/domain/menu-import/canonical-diff";
 import { mennyuCanonicalMenuSchema, type MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import { AdminMenuImportDiffView } from "./AdminMenuImportDiffView";
 import { MenuImportIssueSeverity } from "@prisma/client";
 
 function formatDate(d: Date | null | undefined): string {
@@ -50,6 +53,8 @@ export default async function AdminMenuImportJobPage({
   const job = await fetchAdminMenuImportJobDetail(jobId);
   if (!job) notFound();
 
+  const publishedRow = await fetchLatestPublishedMenuVersionForVendor(job.vendorId);
+
   const issues = sortMenuImportIssuesForDisplay(job.issues);
   const blockingCount = issues.filter((i) => i.severity === MenuImportIssueSeverity.blocking).length;
   const warningCount = issues.filter((i) => i.severity === MenuImportIssueSeverity.warning).length;
@@ -57,6 +62,22 @@ export default async function AdminMenuImportJobPage({
 
   const snapshotJson = job.draftVersion?.canonicalSnapshot ?? null;
   const { menu, parseError } = snapshotJson != null ? parseCanonicalSnapshot(snapshotJson) : { menu: null, parseError: null };
+
+  let publishedBaselineError: string | null = null;
+  let menuDiff = null;
+  if (menu) {
+    if (publishedRow) {
+      const pr = mennyuCanonicalMenuSchema.safeParse(publishedRow.canonicalSnapshot);
+      if (pr.success) {
+        menuDiff = diffCanonicalMenus(menu, pr.data, publishedRow.id);
+      } else {
+        publishedBaselineError =
+          "Could not parse published MenuVersion canonicalSnapshot — diff skipped. Fix or republish baseline.";
+      }
+    } else {
+      menuDiff = diffCanonicalMenus(menu, null, null);
+    }
+  }
 
   const categoryCount = menu?.categories.length ?? 0;
   const productCount = menu?.products.length ?? 0;
@@ -208,6 +229,17 @@ export default async function AdminMenuImportJobPage({
           </div>
         </div>
       </section>
+
+      <AdminMenuImportDiffView
+        hasDraftMenu={!!menu}
+        publishedRow={
+          publishedRow
+            ? { id: publishedRow.id, publishedAt: publishedRow.publishedAt }
+            : null
+        }
+        diff={menuDiff}
+        baselineError={publishedBaselineError}
+      />
 
       {/* C. Issues */}
       <section className="rounded-lg border border-stone-200 bg-white p-4">

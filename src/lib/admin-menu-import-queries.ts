@@ -2,7 +2,7 @@
  * Read-only admin queries for menu import jobs (draft MenuVersion / issues). No live menu writes.
  */
 import "server-only";
-import { Prisma } from "@prisma/client";
+import { MenuVersionState, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 const menuImportJobAdminInclude = {
@@ -40,6 +40,23 @@ export async function fetchAdminMenuImportJobDetail(
   return prisma.menuImportJob.findUnique({
     where: { id: jobId.trim() },
     include: menuImportJobAdminInclude,
+  });
+}
+
+/** Latest published canonical menu for vendor (baseline for draft-vs-published diff). Read-only. */
+export async function fetchLatestPublishedMenuVersionForVendor(vendorId: string) {
+  if (!vendorId?.trim()) return null;
+  return prisma.menuVersion.findFirst({
+    where: { vendorId: vendorId.trim(), state: MenuVersionState.published },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      publishedAt: true,
+      publishedBy: true,
+      createdAt: true,
+      canonicalSnapshot: true,
+      canonicalSnapshotSha256: true,
+    },
   });
 }
 
