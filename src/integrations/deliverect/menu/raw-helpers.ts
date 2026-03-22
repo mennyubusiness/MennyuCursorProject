@@ -28,7 +28,18 @@ export function coerceInt(v: unknown, fallback: number): number {
   return Math.trunc(n);
 }
 
-/** Prefer Deliverect-style _id, then id, then plu. */
+/**
+ * Prefer Deliverect-style _id, then id, plu, and common API/webhook aliases.
+ * No name-based matching — ids come from payload fields only.
+ */
 export function firstDeliverectId(obj: Record<string, unknown>): string | undefined {
-  return asString(obj._id) ?? asString(obj.id) ?? asString(obj.plu);
+  return (
+    asString(obj._id) ??
+    asString(obj.id) ??
+    asString(obj.plu) ??
+    asString(obj.productId) ??
+    asString(obj.externalProductId) ??
+    asString(obj.externalId) ??
+    asString(obj.channelProductId)
+  );
 }

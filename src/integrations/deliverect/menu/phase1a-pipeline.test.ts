@@ -45,6 +45,82 @@ describe("runPhase1aDeliverectMenuImport", () => {
     expect(result.normalizationIssues.some((i) => i.code === "NO_VALID_PRODUCTS")).toBe(true);
   });
 
+  it("normalizes products from a string-keyed object map (Deliverect Menu Push style)", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        categories: [
+          {
+            _id: "cat-1",
+            name: "Food",
+            productIds: ["p1"],
+          },
+        ],
+        products: {
+          p1: { _id: "p1", name: "Bagel", price: 350, plu: "PLU-1" },
+        },
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    expect(result.menu!.products).toHaveLength(1);
+    expect(result.menu!.products[0]!.deliverectId).toBe("p1");
+    expect(result.menu!.categories[0]!.productDeliverectIds).toEqual(["p1"]);
+    expect(result.normalizationIssues.some((i) => i.code === "MISSING_PRODUCTS_ARRAY")).toBe(false);
+  });
+
+  it("reads products nested under data when root has no products", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        data: {
+          products: [{ _id: "x1", name: "Item", price: 100 }],
+        },
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    expect(result.menu!.products[0]!.deliverectId).toBe("x1");
+  });
+
+  it("collects products from availabilities rows when they embed product objects", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        availabilities: [
+          { dayOfWeek: 1, product: { _id: "avp1", name: "Coffee", price: 250 } },
+          { product: { _id: "avp2", name: "Tea", price: 200 } },
+        ],
+        categories: [
+          { _id: "c1", name: "Drinks", productIds: ["avp1", "avp2"] },
+        ],
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    expect(result.menu!.products.map((p) => p.deliverectId).sort()).toEqual(["avp1", "avp2"]);
+    expect(result.menu!.categories[0]!.productDeliverectIds).toEqual(["avp1", "avp2"]);
+  });
+
+  it("collects products embedded as objects under categories when no top-level collection", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        categories: [
+          {
+            _id: "c1",
+            name: "Mains",
+            products: [{ _id: "ep1", name: "Soup", price: 500 }],
+          },
+        ],
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    expect(result.menu!.products).toHaveLength(1);
+    expect(result.menu!.products[0]!.deliverectId).toBe("ep1");
+  });
+
   it("fails validation when two products share the same deliverect id", () => {
     const result = runPhase1aDeliverectMenuImport({
       raw: {

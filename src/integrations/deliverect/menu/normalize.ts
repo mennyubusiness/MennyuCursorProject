@@ -2,9 +2,11 @@
  * Phase 1A: pure Deliverect (unknown JSON) → MennyuCanonicalMenu.
  *
  * Supported raw shapes (extend explicitly when API contract is fixed):
- * - `{ products: [...], categories?: [...] }`
- * - `{ items: [...] }` (alias for products)
+ * - `{ products: [...], categories?: [...] }` or `{ products: { id: {...}, ... } }` (string-keyed map)
+ * - `{ items: [...] | { ... } }`, `menuItems`, `availableProducts`, `catalog` (array or map)
  * - `{ menu: { products, categories? } }` (one level of nesting)
+ * - `{ data: { products | items | ... } }` (common webhook envelope)
+ * - Products embedded as objects under `categories[].products` / `categories[].items` when no top-level list/map exists
  *
  * Product entries:
  * - id: `_id` | `id` | `plu` (string)
@@ -65,8 +67,8 @@ export function normalizeDeliverectMenuToCanonical(
   }
 
   const root = unwrapMenuRoot(input.raw);
-  const productsRaw = extractProductsArray(root, issues);
   const categoriesRaw = extractCategoriesArray(root, issues);
+  const productsRaw = extractProductsArray(root, categoriesRaw, issues);
 
   const groupRegistry = new Map<string, MennyuCanonicalModifierGroup>();
   const products: MennyuCanonicalProduct[] = [];
@@ -119,15 +121,190 @@ function unwrapMenuRoot(raw: Record<string, unknown>): Record<string, unknown> {
   return raw;
 }
 
-function extractProductsArray(root: Record<string, unknown>, issues: MenuImportIssueRecord[]): unknown[] {
-  const p = root.products ?? root.items;
-  if (Array.isArray(p)) return p;
+/** Set `DELIVERECT_MENU_NORMALIZE_DEBUG=1` to log chosen product source and count (server logs). */
+function logDeliverectProductExtraction(source: string, count: number): void {
+  if (typeof process !== "undefined" && process.env.DELIVERECT_MENU_NORMALIZE_DEBUG === "1") {
+    console.log("[Deliverect menu normalize] products extracted", { source, count });
+  }
+}
+
+const PRODUCT_COLLECTION_KEYS = [
+  "products",
+  "items",
+  "menuItems",
+  "availableProducts",
+  "allProducts",
+  "productList",
+  "catalog",
+  "catalogItems",
+] as const;
+
+type ProductListHit = { list: unknown[]; source: string };
+
+/**
+ * Deliverect Menu Push often sends `products` as a **string-keyed object** (id → product), not an array.
+ * Accept non-empty arrays or object maps whose values are plain product records.
+ */
+function takeProductListFromValue(keyPath: string, v: unknown): ProductListHit | null {
+  if (Array.isArray(v)) {
+    if (v.length === 0) return null;
+    return { list: v, source: `${keyPath}.array` };
+  }
+  if (isRecord(v) && !Array.isArray(v)) {
+    const values = Object.values(v).filter((x) => isRecord(x) && !Array.isArray(x));
+    if (values.length === 0) return null;
+    return { list: values, source: `${keyPath}.object_map` };
+  }
+  return null;
+}
+
+function tryExtractProductsFromRecord(
+  obj: Record<string, unknown>,
+  keyPrefix: string
+): ProductListHit | null {
+  for (const key of PRODUCT_COLLECTION_KEYS) {
+    const hit = takeProductListFromValue(keyPrefix ? `${keyPrefix}.${key}` : key, obj[key]);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * Some Menu Push payloads lead with `availabilities` where each row may embed the product document
+ * (e.g. `{ product: { _id, name, price } }`) instead of a top-level `products` map.
+ */
+function extractProductsFromAvailabilityRows(root: Record<string, unknown>): unknown[] {
+  const av = root.availabilities;
+  if (!Array.isArray(av) || av.length === 0) return [];
+
+  const byId = new Map<string, Record<string, unknown>>();
+  for (let i = 0; i < av.length; i++) {
+    const row = av[i];
+    if (!isRecord(row)) continue;
+
+    const product =
+      (isRecord(row.product) ? row.product : null) ??
+      (isRecord(row.menuItem) ? row.menuItem : null) ??
+      (isRecord(row.item) ? row.item : null) ??
+      (isRecord(row.menuItemRef) ? row.menuItemRef : null);
+
+    if (!product) continue;
+
+    const id = firstDeliverectId(product);
+    if (!id) continue;
+    if (!byId.has(id)) byId.set(id, product);
+  }
+
+  return byId.size > 0 ? [...byId.values()] : [];
+}
+
+/**
+ * Collect product **objects** nested under categories (e.g. `products: [{ _id, name, ... }]`)
+ * when top-level product collections are absent.
+ */
+function extractEmbeddedProductsFromCategories(
+  categoriesRaw: unknown[],
+  issues: MenuImportIssueRecord[]
+): unknown[] {
+  const byId = new Map<string, Record<string, unknown>>();
+  let ci = 0;
+  for (const c of categoriesRaw) {
+    if (!isRecord(c)) {
+      ci++;
+      continue;
+    }
+    for (const embedKey of ["products", "items", "menuItems"] as const) {
+      const prods = c[embedKey];
+      if (!Array.isArray(prods)) continue;
+      for (let pi = 0; pi < prods.length; pi++) {
+        const p = prods[pi];
+        if (typeof p === "string" || typeof p === "number") continue;
+        if (!isRecord(p) || Array.isArray(p)) {
+          issues.push({
+            kind: "normalization",
+            severity: "warning",
+            code: "SKIP_NON_OBJECT_CATEGORY_EMBEDDED_PRODUCT",
+            message: `categories[${ci}].${embedKey}[${pi}] is not an object; skipped for product extraction.`,
+            entityPath: `/categories/${ci}/${embedKey}/${pi}`,
+          });
+          continue;
+        }
+        const id = firstDeliverectId(p);
+        if (!id) continue;
+        if (!byId.has(id)) byId.set(id, p);
+      }
+    }
+    ci++;
+  }
+  return [...byId.values()];
+}
+
+function extractProductsArray(
+  root: Record<string, unknown>,
+  categoriesRaw: unknown[],
+  issues: MenuImportIssueRecord[]
+): unknown[] {
+  const fromRoot = tryExtractProductsFromRecord(root, "");
+  if (fromRoot) {
+    logDeliverectProductExtraction(fromRoot.source, fromRoot.list.length);
+    return fromRoot.list;
+  }
+
+  const data = root.data;
+  if (isRecord(data)) {
+    const fromData = tryExtractProductsFromRecord(data, "data");
+    if (fromData) {
+      logDeliverectProductExtraction(fromData.source, fromData.list.length);
+      return fromData.list;
+    }
+  }
+
+  const payload = root.payload;
+  if (isRecord(payload)) {
+    const fromPayload = tryExtractProductsFromRecord(payload, "payload");
+    if (fromPayload) {
+      logDeliverectProductExtraction(fromPayload.source, fromPayload.list.length);
+      return fromPayload.list;
+    }
+  }
+
+  const fromAvail = extractProductsFromAvailabilityRows(root);
+  if (fromAvail.length > 0) {
+    logDeliverectProductExtraction("availabilities[].product|menuItem|item", fromAvail.length);
+    return fromAvail;
+  }
+
+  if (isRecord(data)) {
+    const fromDataAvail = extractProductsFromAvailabilityRows(data);
+    if (fromDataAvail.length > 0) {
+      logDeliverectProductExtraction("data.availabilities[].product|menuItem|item", fromDataAvail.length);
+      return fromDataAvail;
+    }
+  }
+
+  const fromCats = extractEmbeddedProductsFromCategories(categoriesRaw, issues);
+  if (fromCats.length > 0) {
+    logDeliverectProductExtraction("categories.embedded_product_objects", fromCats.length);
+    return fromCats;
+  }
+
   issues.push({
     kind: "normalization",
     severity: "blocking",
     code: "MISSING_PRODUCTS_ARRAY",
-    message: "Expected `products` or `items` array on menu payload.",
+    message:
+      "Could not find a non-empty products collection: expected one of products/items/menuItems/availableProducts/catalog (array or string-keyed object map) on root, data, or payload; or product objects embedded under categories[].products|items|menuItems.",
     entityPath: "/products",
+    details: {
+      checkedKeys: [...PRODUCT_COLLECTION_KEYS],
+      checkedPaths: [
+        "root",
+        "data",
+        "payload",
+        "availabilities[].product|menuItem|item",
+        "categories.*.products|items|menuItems",
+      ],
+    },
   });
   return [];
 }
@@ -177,7 +354,14 @@ function buildProduct(
     });
   }
 
-  const priceRaw = asNumber(pr.price) ?? asNumber(pr.unitPrice) ?? asNumber(pr.basePrice);
+  const priceRaw =
+    asNumber(pr.price) ??
+    asNumber(pr.unitPrice) ??
+    asNumber(pr.basePrice) ??
+    asNumber(pr.salesPrice) ??
+    asNumber(pr.retailPrice) ??
+    asNumber(pr.priceInclTax) ??
+    asNumber(pr.priceExclTax);
   if (priceRaw === undefined) {
     issues.push({
       kind: "normalization",
@@ -483,23 +667,38 @@ function buildCategories(
   return out;
 }
 
+function collectStringishIdsFromArray(arr: unknown[]): string[] {
+  const ids: string[] = [];
+  for (const x of arr) {
+    const s = asString(x) ?? (isRecord(x) ? firstDeliverectId(x) : undefined);
+    if (s) ids.push(s);
+  }
+  return dedupePreserveOrder(ids);
+}
+
 function extractProductIdsFromCategory(
   c: Record<string, unknown>,
   issues: MenuImportIssueRecord[],
   categoryId: string
 ): string[] {
-  const ids: string[] = [];
   const pids = c.productIds;
   if (Array.isArray(pids)) {
-    for (const x of pids) {
-      const s = asString(x) ?? (isRecord(x) ? firstDeliverectId(x) : undefined);
-      if (s) ids.push(s);
-    }
-    return dedupePreserveOrder(ids);
+    return collectStringishIdsFromArray(pids);
+  }
+
+  const itemIds = c.itemIds;
+  if (Array.isArray(itemIds)) {
+    return collectStringishIdsFromArray(itemIds);
+  }
+
+  const menuItemIds = c.menuItemIds;
+  if (Array.isArray(menuItemIds)) {
+    return collectStringishIdsFromArray(menuItemIds);
   }
 
   const prods = c.products;
   if (Array.isArray(prods)) {
+    const ids: string[] = [];
     for (const x of prods) {
       if (typeof x === "string" || typeof x === "number") {
         const s = asString(x);
@@ -514,11 +713,28 @@ function extractProductIdsFromCategory(
     return dedupePreserveOrder(ids);
   }
 
+  const items = c.items;
+  if (Array.isArray(items)) {
+    const ids: string[] = [];
+    for (const x of items) {
+      if (typeof x === "string" || typeof x === "number") {
+        const s = asString(x);
+        if (s) ids.push(s);
+        continue;
+      }
+      if (isRecord(x)) {
+        const s = firstDeliverectId(x);
+        if (s) ids.push(s);
+      }
+    }
+    if (ids.length > 0) return dedupePreserveOrder(ids);
+  }
+
   issues.push({
     kind: "normalization",
     severity: "info",
     code: "CATEGORY_NO_PRODUCTS",
-    message: `Category ${categoryId} has no productIds or products array; category will be empty.`,
+    message: `Category ${categoryId} has no productIds/itemIds/menuItemIds or products/items reference array; category will be empty.`,
     deliverectId: categoryId,
   });
   return [];
