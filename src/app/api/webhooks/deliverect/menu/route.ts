@@ -10,6 +10,10 @@
  * **Vendor resolution:** `Vendor.deliverectChannelLinkId` must equal the channel link id used as HMAC secret
  * in staging (and typically present in payload). If no vendor matches, returns **200** with
  * `outcome: "vendor_not_found"` to avoid pointless retries when misconfigured.
+ *
+ * **Payload shape:** In our tenant, Deliverect Menu Push may send a **top-level JSON array** (e.g. `[{...}]`).
+ * A single-element array is unwrapped for HMAC secret resolution and Phase 1A; the full parsed value is still
+ * stored on `MenuImportRawPayload`. Multiple menus in one request are rejected with a structured 400.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { MenuImportSource } from "@prisma/client";
@@ -35,6 +39,87 @@ import {
 import { env } from "@/lib/env";
 import { ingestDeliverectMenuImportPhase1b } from "@/services/menu-import-phase1b.service";
 
+type MenuWebhookUnwrapOk = {
+  ok: true;
+  /** Full JSON.parse result — stored verbatim on `MenuImportRawPayload`. */
+  verbatim: unknown;
+  /** Object used for channel link / event id / Deliverect meta (unwrap when array length 1). */
+  objectForProcessing: Record<string, unknown>;
+  /** When set, Phase 1A uses this instead of `verbatim` (top-level array wrapper). */
+  normalizationRaw: unknown | undefined;
+};
+
+type MenuWebhookUnwrapErr = {
+  ok: false;
+  status: 400;
+  body: Record<string, unknown>;
+};
+
+/**
+ * Deliverect Menu Push (our tenant): body may be `{...}` or `[{...}]`.
+ * Multiple menus in one payload are not supported (no silent pick).
+ */
+function unwrapSingleMenuWebhookPayload(parsed: unknown): MenuWebhookUnwrapOk | MenuWebhookUnwrapErr {
+  if (parsed === null || typeof parsed !== "object") {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: "Menu webhook body must be a JSON object or array",
+        code: "INVALID_JSON_SHAPE",
+      },
+    };
+  }
+
+  if (Array.isArray(parsed)) {
+    if (parsed.length === 0) {
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          error: "Menu webhook body is an empty array",
+          code: "EMPTY_MENU_ARRAY",
+        },
+      };
+    }
+    if (parsed.length > 1) {
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          error: "Multiple menus in one webhook payload is not supported yet",
+          code: "MULTIPLE_MENUS_NOT_SUPPORTED",
+          menuCount: parsed.length,
+        },
+      };
+    }
+    const only = parsed[0];
+    if (only === null || typeof only !== "object" || Array.isArray(only)) {
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          error: "Menu webhook array must contain one JSON object",
+          code: "INVALID_MENU_ELEMENT",
+        },
+      };
+    }
+    return {
+      ok: true,
+      verbatim: parsed,
+      objectForProcessing: only as Record<string, unknown>,
+      normalizationRaw: only,
+    };
+  }
+
+  return {
+    ok: true,
+    verbatim: parsed,
+    objectForProcessing: parsed as Record<string, unknown>,
+    normalizationRaw: undefined,
+  };
+}
+
 function logDeliverectMenuWebhookHeaderDiagnostics(request: NextRequest): void {
   const allHeaderNames = Array.from(request.headers.keys()).sort();
   const signatureRelatedHeaders: Record<string, { length: number } | { empty: true }> = {};
@@ -59,9 +144,12 @@ export async function POST(request: NextRequest) {
   logDeliverectMenuWebhookHeaderDiagnostics(request);
 
   const signature = getDeliverectSignatureFromRequest(request);
-  const parsedResult = parseDeliverectWebhookJsonObject(rawBody);
-  if (!parsedResult.ok) {
-    // TEMP: remove after confirming Deliverect Menu Update payload shape (non-JSON / array root / etc.)
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(rawBody) as unknown;
+  } catch {
+    // Syntax errors only — tenant uses top-level JSON array for menu push; log raw preview for debugging.
     console.log("[DELIVERECT MENU WEBHOOK RAW]", {
       contentType: request.headers.get("content-type"),
       contentLength: request.headers.get("content-length"),
@@ -71,11 +159,16 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const parsed = parsedResult.parsed;
+
+  const unwrap = unwrapSingleMenuWebhookPayload(parsedJson);
+  if (!unwrap.ok) {
+    return NextResponse.json(unwrap.body, { status: unwrap.status });
+  }
+  const { verbatim, objectForProcessing, normalizationRaw } = unwrap;
 
   const production = isDeliverectWebhookProduction();
   const { secret: verificationSecret, hasChannelLinkId } = resolveDeliverectWebhookVerificationSecret(
-    parsed,
+    objectForProcessing,
     production
   );
 
@@ -107,12 +200,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  const payload = parsed as DeliverectWebhookPayload;
+  const payload = objectForProcessing as DeliverectWebhookPayload;
   const flat = flattenDeliverectWebhookPayload(payload);
   const eventId = getDeliverectEventId(payload, flat, rawBody);
   const idemKey = webhookIdempotencyKey("deliverect_menu", eventId, rawBody);
 
-  const channelLinkId = extractChannelLinkIdSecret(parsed);
+  const channelLinkId = extractChannelLinkIdSecret(objectForProcessing);
   if (!channelLinkId) {
     return NextResponse.json(
       { received: true, outcome: "missing_channel_link_id" as const },
@@ -141,13 +234,15 @@ export async function POST(request: NextRequest) {
     const ingestResult = await ingestDeliverectMenuImportPhase1b({
       vendorId: vendor.id,
       source: MenuImportSource.DELIVERECT_MENU_WEBHOOK,
-      rawPayload: parsed,
+      rawPayload: verbatim,
+      normalizationRaw,
       deliverectMeta: {
         sourcePayloadKind: "deliverect_menu_webhook_v1",
         channelLinkId,
         locationId:
-          extractMenuWebhookLocationId(parsed) ?? (vendor.deliverectLocationId?.trim() || undefined),
-        menuId: extractMenuWebhookMenuId(parsed),
+          extractMenuWebhookLocationId(objectForProcessing) ??
+          (vendor.deliverectLocationId?.trim() || undefined),
+        menuId: extractMenuWebhookMenuId(objectForProcessing),
       },
       idempotencyKey: idemKey,
     });

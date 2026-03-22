@@ -59,6 +59,7 @@ Response JSON includes `jobId`, `draftVersionId`, `jobStatus`, `issueCount`, `ok
 2. **HMAC** matches the order-status webhook: production → `DELIVERECT_WEBHOOK_SECRET`; staging/sandbox → channel link id from JSON body (`DELIVERECT_ENV=staging` on Vercel when needed).
 3. **Vendor match:** `Vendor.deliverectChannelLinkId` must match the channel link id extracted from the payload (same as staging HMAC key source). Unknown link → **200** `outcome: "vendor_not_found"` (no `MenuImportJob`).
 4. **Idempotency:** `webhookIdempotencyKey("deliverect_menu", …)` on `MenuImportJob.idempotencyKey`.
+5. **Body shape:** Menu Push may arrive as a **top-level JSON array** with one menu object (`[{...}]`). Multiple elements in one request return **400** `MULTIPLE_MENUS_NOT_SUPPORTED` (not silently ingested).
 
 ## Order status webhook (Mennyu ingestion)
 
