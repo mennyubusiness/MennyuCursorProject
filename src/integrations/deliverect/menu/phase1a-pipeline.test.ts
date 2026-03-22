@@ -254,6 +254,39 @@ describe("runPhase1aDeliverectMenuImport", () => {
     expect(g?.isRequired).toBe(false);
   });
 
+  it("maps minimum/maximum 0/0 on modifierGroups + subProducts id ref to unbounded (Deliverect menu map style)", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        categories: [{ _id: "c1", name: "Food", productIds: ["pizza1"] }],
+        products: {
+          pizza1: {
+            _id: "pizza1",
+            name: "Pizza",
+            price: 999,
+            subProducts: ["mg-extra-toppings"],
+          },
+        },
+        modifierGroups: {
+          "mg-extra-toppings": {
+            _id: "mg-extra-toppings",
+            name: "Add extra toppings",
+            minimum: 0,
+            maximum: 0,
+            subProducts: [{ _id: "top-cheese", name: "Extra cheese", price: 100 }],
+          },
+        },
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    const g = result.menu!.modifierGroupDefinitions.find((x) => x.deliverectId === "mg-extra-toppings");
+    expect(g?.name).toBe("Add extra toppings");
+    expect(g?.minSelections).toBe(0);
+    expect(g?.maxSelections).toBe(MODIFIER_MAX_SELECTIONS_UNBOUNDED);
+    expect(g?.options.map((o) => o.deliverectId)).toEqual(["top-cheese"]);
+  });
+
   it("emits SUB_PRODUCTS_WRONG_TYPE when subProducts is a string", () => {
     const result = runPhase1aDeliverectMenuImport({
       raw: {

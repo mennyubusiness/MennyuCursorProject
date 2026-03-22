@@ -17,6 +17,7 @@
  * - Options may have nested `subProducts` for per-option modifier groups (nestedGroupDeliverectIds)
  * - `subProducts` entries may be **string/number references** to rows in top-level `modifierGroups` / `modifiers` (or maps under `data` / `payload`)
  * - **Nested modifier groups** under another group's `subProducts` (no option price on the inner node) are **flattened**: leaf options bubble up to the parent group's option list
+ * - Modifier bounds: `min`/`max`, `minQty`/`maxQty`, `minimum`/`maximum`, `minSelection`/`maxSelection`, `minSelections`/`maxSelections` (Deliverect variants). `min=0` + `max=0` means optional unbounded selections.
  *
  * No database or network I/O.
  */
@@ -30,7 +31,10 @@ import type {
   MennyuCanonicalProduct,
 } from "@/domain/menu-import/canonical.schema";
 import type { MenuImportIssueRecord } from "@/domain/menu-import/issues";
-import { MODIFIER_MAX_SELECTIONS_UNBOUNDED } from "@/domain/modifier-selection-unbounded";
+import {
+  MODIFIER_MAX_SELECTIONS_UNBOUNDED,
+  applyDeliverectZeroZeroUnboundedToModifierGroup,
+} from "@/domain/modifier-selection-unbounded";
 import {
   asNumber,
   asString,
@@ -114,7 +118,9 @@ export function normalizeDeliverectMenuToCanonical(
     vendorId: input.vendorId,
     deliverect: input.deliverect,
     categories,
-    modifierGroupDefinitions: [...groupRegistry.values()].sort((a, b) => a.sortOrder - b.sortOrder),
+    modifierGroupDefinitions: [...groupRegistry.values()]
+      .map(applyDeliverectZeroZeroUnboundedToModifierGroup)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
     products: products.sort((a, b) => a.sortOrder - b.sortOrder),
   };
 
@@ -987,6 +993,35 @@ function walkTopLevelModifierGroups(
   return groupIds;
 }
 
+/**
+ * Read modifier selection bounds from Deliverect-style payloads (several naming variants).
+ * When all max-* fields are absent, defaults max to 1 (single-select style cap).
+ */
+function readDeliverectModifierGroupBounds(g: Record<string, unknown>): { min: number; max: number } {
+  const minPrimary =
+    g.min ??
+    g.minQty ??
+    g.minSelection ??
+    g.minimum ??
+    g.minSelections;
+  const maxPrimary =
+    g.max ??
+    g.maxQty ??
+    g.maxSelection ??
+    g.maximum ??
+    g.maxSelections;
+
+  const minWhenUnset = g.multiSelect === false ? 1 : 0;
+  const min = coerceInt(minPrimary ?? minWhenUnset, 0);
+  let max = coerceInt(maxPrimary, 1);
+  if (max < min) max = min;
+  // Deliverect: min=0 max=0 on optional add-on groups means "pick any amount", not "pick zero".
+  if (min === 0 && max === 0) {
+    max = MODIFIER_MAX_SELECTIONS_UNBOUNDED;
+  }
+  return { min, max };
+}
+
 function buildModifierGroupTree(
   g: Record<string, unknown>,
   gid: string,
@@ -998,13 +1033,7 @@ function buildModifierGroupTree(
   sortOrder: number
 ): MennyuCanonicalModifierGroup | null {
   const name = asString(g.name) ?? asString(g.title) ?? "(modifier group)";
-  const min = coerceInt(g.min ?? g.minQty ?? (g.multiSelect === false ? 1 : 0), 0);
-  let max = coerceInt(g.max ?? g.maxQty, 1);
-  if (max < min) max = min;
-  // Deliverect: min=0 max=0 on optional add-on groups means "pick any amount", not "pick zero".
-  if (min === 0 && max === 0) {
-    max = MODIFIER_MAX_SELECTIONS_UNBOUNDED;
-  }
+  const { min, max } = readDeliverectModifierGroupBounds(g);
 
   const leafOptionSpecs = collectLeafOptionsFromGroupNode(g, lookups, issues, {
     entityPath: `/modifierGroupDefinitions/${gid}`,

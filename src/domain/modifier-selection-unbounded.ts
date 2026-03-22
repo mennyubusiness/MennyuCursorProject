@@ -15,3 +15,15 @@ export function modifierMaxSelectionsIsUnbounded(maxSelections: number): boolean
 export function formatModifierMaxSelectionsLabel(maxSelections: number): string {
   return modifierMaxSelectionsIsUnbounded(maxSelections) ? "unlimited" : String(maxSelections);
 }
+
+/**
+ * Final safety net: if canonical still has Deliverect's "optional unlimited" sentinel (0/0),
+ * coerce max to {@link MODIFIER_MAX_SELECTIONS_UNBOUNDED}. Call once on each canonical group
+ * when assembling the menu snapshot so every construction path is covered.
+ */
+export function applyDeliverectZeroZeroUnboundedToModifierGroup<
+  T extends { minSelections: number; maxSelections: number },
+>(g: T): T {
+  if (g.minSelections !== 0 || g.maxSelections !== 0) return g;
+  return { ...g, maxSelections: MODIFIER_MAX_SELECTIONS_UNBOUNDED };
+}
