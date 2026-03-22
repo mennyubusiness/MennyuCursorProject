@@ -131,7 +131,7 @@ export function AdminMenuImportDiffView({
       )}
 
       {(diff.addedCategories.length > 0 || diff.removedCategories.length > 0 || diff.changedCategories.length > 0) && (
-        <DiffList title="Categories" emptyHint="">
+        <DiffList title="Categories">
           <ul className="space-y-2">
             {diff.addedCategories.map((c) => (
               <li key={`add-c-${c.deliverectId}`} className="text-emerald-800">
@@ -175,7 +175,7 @@ export function AdminMenuImportDiffView({
       )}
 
       {diff.changedPrices.length > 0 && (
-        <DiffList title="Changed prices" emptyHint="">
+        <DiffList title="Changed prices">
           <ul className="space-y-2">
             {diff.changedPrices.map((p) => (
               <li key={`price-${p.deliverectId}`}>
