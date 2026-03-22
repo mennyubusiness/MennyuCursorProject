@@ -140,6 +140,48 @@ describe("runPhase1aDeliverectMenuImport", () => {
     expect(g?.options.map((o) => o.deliverectId).sort()).toEqual(["mod-a", "mod-b"]);
   });
 
+  it("flattens nested modifier groups under a parent group's subProducts into leaf options", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        categories: [{ _id: "c1", name: "M", productIds: ["p1"] }],
+        products: {
+          p1: {
+            _id: "p1",
+            name: "Item",
+            price: 300,
+            subProducts: [
+              {
+                _id: "ga",
+                name: "Outer",
+                min: 1,
+                max: 1,
+                subProducts: [
+                  {
+                    _id: "gb",
+                    name: "Inner group",
+                    min: 1,
+                    max: 1,
+                    subProducts: [
+                      { _id: "o1", name: "Leaf one", price: 0 },
+                      { _id: "o2", name: "Leaf two", price: 50 },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_webhook_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    const ga = result.menu!.modifierGroupDefinitions.find((x) => x.deliverectId === "ga");
+    expect(ga).toBeDefined();
+    expect(ga!.options.map((o) => o.deliverectId)).toEqual(["o1", "o2"]);
+    expect(result.normalizationIssues.some((i) => i.code === "OPTION_REF_POINTS_TO_GROUP")).toBe(false);
+  });
+
   it("warns when subProducts group reference cannot be resolved", () => {
     const result = runPhase1aDeliverectMenuImport({
       raw: {

@@ -16,6 +16,7 @@
  * - `subproducts` / `SubProducts` aliases on product and group nodes
  * - Options may have nested `subProducts` for per-option modifier groups (nestedGroupDeliverectIds)
  * - `subProducts` entries may be **string/number references** to rows in top-level `modifierGroups` / `modifiers` (or maps under `data` / `payload`)
+ * - **Nested modifier groups** under another group's `subProducts` (no option price on the inner node) are **flattened**: leaf options bubble up to the parent group's option list
  *
  * No database or network I/O.
  */
@@ -524,6 +525,24 @@ function looksLikeModifierGroupRecord(r: Record<string, unknown>): boolean {
   return false;
 }
 
+/** True when the node has any common option price field (including 0). */
+function optionLikePricePresent(node: Record<string, unknown>): boolean {
+  return (
+    asNumber(node.price) !== undefined ||
+    asNumber(node.unitPrice) !== undefined ||
+    asNumber(node.basePrice) !== undefined
+  );
+}
+
+/**
+ * Deliverect may nest modifier Group B under Group A's subProducts. If the node has no option price,
+ * treat it as a nested group container and flatten its leaf options into the parent group's option list.
+ */
+function subProductActsAsNestedGroupContainer(node: Record<string, unknown>): boolean {
+  if (optionLikePricePresent(node)) return false;
+  return looksLikeModifierGroupRecord(node);
+}
+
 function cloneRecordShallow(r: Record<string, unknown>): Record<string, unknown> {
   return { ...r };
 }
@@ -555,57 +574,6 @@ function resolveSubProductGroupRef(
     severity: "warning",
     code: "UNRESOLVED_SUB_PRODUCT_GROUP_REF",
     message: `subProducts group reference "${trimmed}" was not found in modifierGroups, modifiers (as group), or products with subProducts.`,
-    entityPath: context.entityPath,
-    deliverectId: context.deliverectId,
-    details: { refId: trimmed },
-  });
-  return null;
-}
-
-function resolveSubProductOptionRef(
-  refId: string,
-  lookups: ModifierPayloadLookups,
-  issues: MenuImportIssueRecord[],
-  context: { entityPath: string; deliverectId?: string }
-): Record<string, unknown> | null {
-  const trimmed = refId.trim();
-  if (!trimmed) return null;
-
-  const asModifier = lookups.modifierById.get(trimmed);
-  if (asModifier) {
-    if (looksLikeModifierGroupRecord(asModifier)) {
-      issues.push({
-        kind: "normalization",
-        severity: "warning",
-        code: "OPTION_REF_POINTS_TO_GROUP",
-        message: `subProducts option reference "${trimmed}" resolved to a group-shaped modifier entry; expected a leaf option.`,
-        entityPath: context.entityPath,
-        deliverectId: context.deliverectId,
-        details: { refId: trimmed },
-      });
-      return null;
-    }
-    return cloneRecordShallow(asModifier);
-  }
-
-  if (lookups.groupById.has(trimmed)) {
-    issues.push({
-      kind: "normalization",
-      severity: "warning",
-      code: "OPTION_REF_POINTS_TO_GROUP_TABLE",
-      message: `subProducts option reference "${trimmed}" exists only in modifierGroups; expected a leaf entry in modifiers.`,
-      entityPath: context.entityPath,
-      deliverectId: context.deliverectId,
-      details: { refId: trimmed },
-    });
-    return null;
-  }
-
-  issues.push({
-    kind: "normalization",
-    severity: "warning",
-    code: "UNRESOLVED_SUB_PRODUCT_OPTION_REF",
-    message: `subProducts option reference "${trimmed}" was not found in modifiers.`,
     entityPath: context.entityPath,
     deliverectId: context.deliverectId,
     details: { refId: trimmed },
@@ -729,44 +697,148 @@ function resolveSubProductEntryToGroupNode(
   return { node: resolved, gid };
 }
 
-function resolveSubProductEntryToOptionNode(
+/**
+ * Resolve one subProducts entry under a modifier group as either a nested group (flattened later) or a leaf option.
+ * Does not emit issues (caller reports unresolved / missing ids).
+ */
+function tryResolveSubProductEntryForGroupSubProduct(
   entry: SubProductEntry,
-  lookups: ModifierPayloadLookups,
-  issues: MenuImportIssueRecord[],
-  context: { entityPath: string; deliverectId?: string }
-): { node: Record<string, unknown>; oid: string } | null {
+  lookups: ModifierPayloadLookups
+):
+  | { kind: "group"; node: Record<string, unknown>; gid: string }
+  | { kind: "leaf"; node: Record<string, unknown>; oid: string }
+  | null {
   if (entry.kind === "inline") {
-    const oid = resolveSubProductNodeId(entry.node, entry.mapKey);
-    if (!oid) {
-      issues.push({
-        kind: "normalization",
-        severity: "blocking",
-        code: "MISSING_MODIFIER_OPTION_ID",
-        message: `Modifier option has no Deliverect id (_id/id/plu or subProducts map key).`,
-        entityPath: context.entityPath,
-        deliverectId: context.deliverectId,
-      });
-      return null;
+    const node = entry.node;
+    if (subProductActsAsNestedGroupContainer(node)) {
+      const gid = resolveSubProductNodeId(node, entry.mapKey);
+      if (!gid) return null;
+      return { kind: "group", node, gid };
     }
-    return { node: entry.node, oid };
+    const oid = resolveSubProductNodeId(node, entry.mapKey);
+    if (!oid) return null;
+    return { kind: "leaf", node, oid };
   }
 
-  const resolved = resolveSubProductOptionRef(entry.refId, lookups, issues, context);
-  if (!resolved) return null;
-  const oid =
-    resolveSubProductNodeId(resolved, entry.mapKey) ?? entry.mapKey?.trim() ?? entry.refId.trim();
-  if (!oid) {
+  const trimmed = entry.refId.trim();
+  if (!trimmed) return null;
+
+  const gRow = lookups.groupById.get(trimmed);
+  if (gRow) {
+    const node = cloneRecordShallow(gRow);
+    const gid = resolveSubProductNodeId(node, entry.mapKey) ?? entry.mapKey?.trim() ?? trimmed;
+    return { kind: "group", node, gid };
+  }
+
+  const mRow = lookups.modifierById.get(trimmed);
+  if (mRow) {
+    const node = cloneRecordShallow(mRow);
+    if (subProductActsAsNestedGroupContainer(node)) {
+      const gid = resolveSubProductNodeId(node, entry.mapKey) ?? entry.mapKey?.trim() ?? trimmed;
+      return { kind: "group", node, gid };
+    }
+    const oid = resolveSubProductNodeId(node, entry.mapKey) ?? entry.mapKey?.trim() ?? trimmed;
+    return { kind: "leaf", node, oid };
+  }
+
+  const pRow = lookups.productById.get(trimmed);
+  if (pRow && getSubProductsRaw(pRow) != null) {
+    const node = cloneRecordShallow(pRow);
+    const gid = resolveSubProductNodeId(node, entry.mapKey) ?? trimmed;
+    return { kind: "group", node, gid };
+  }
+
+  return null;
+}
+
+const MAX_SUB_PRODUCT_GROUP_NEST = 24;
+
+/**
+ * Walk subProducts under a modifier group recursively: nested group containers are flattened into leaf option records.
+ */
+function expandSubProductEntriesToLeafOptionSpecs(
+  entries: SubProductEntry[],
+  lookups: ModifierPayloadLookups,
+  issues: MenuImportIssueRecord[],
+  context: { entityPath: string; deliverectId?: string },
+  depth: number
+): Array<{ node: Record<string, unknown>; oid: string }> {
+  if (depth > MAX_SUB_PRODUCT_GROUP_NEST) {
     issues.push({
       kind: "normalization",
-      severity: "blocking",
-      code: "MISSING_MODIFIER_OPTION_ID",
-      message: `Resolved option for reference "${entry.refId}" has no usable Deliverect id.`,
+      severity: "warning",
+      code: "SUB_PRODUCTS_NESTING_DEPTH_EXCEEDED",
+      message: `subProducts nesting exceeded ${MAX_SUB_PRODUCT_GROUP_NEST} levels under modifier group; deeper entries ignored.`,
       entityPath: context.entityPath,
       deliverectId: context.deliverectId,
     });
-    return null;
+    return [];
   }
-  return { node: resolved, oid };
+
+  const out: Array<{ node: Record<string, unknown>; oid: string }> = [];
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]!;
+    const path = `${context.entityPath}/subProducts/${i}`;
+    const resolved = tryResolveSubProductEntryForGroupSubProduct(entry, lookups);
+    if (!resolved) {
+      if (entry.kind === "ref") {
+        issues.push({
+          kind: "normalization",
+          severity: "warning",
+          code: "UNRESOLVED_SUB_PRODUCT_REF",
+          message: `subProducts reference "${entry.refId.trim()}" could not be resolved (modifierGroups, modifiers, or products with subProducts).`,
+          entityPath: path,
+          deliverectId: context.deliverectId,
+          details: { refId: entry.refId.trim() },
+        });
+      } else if (subProductActsAsNestedGroupContainer(entry.node)) {
+        issues.push({
+          kind: "normalization",
+          severity: "blocking",
+          code: "MISSING_MODIFIER_GROUP_ID",
+          message: `Nested modifier group under subProducts has no Deliverect id (_id/id/plu or map key).`,
+          entityPath: path,
+          deliverectId: context.deliverectId,
+        });
+      } else {
+        issues.push({
+          kind: "normalization",
+          severity: "blocking",
+          code: "MISSING_MODIFIER_OPTION_ID",
+          message: `Modifier option under subProducts has no Deliverect id (_id/id/plu or map key).`,
+          entityPath: path,
+          deliverectId: context.deliverectId,
+        });
+      }
+      continue;
+    }
+    if (resolved.kind === "leaf") {
+      out.push({ node: resolved.node, oid: resolved.oid });
+      continue;
+    }
+    const innerEntries = coerceSubProductEntries(getSubProductsRaw(resolved.node), issues, {
+      entityPath: `${path}/nestedGroup/${resolved.gid}`,
+      deliverectId: resolved.gid,
+    });
+    out.push(
+      ...expandSubProductEntriesToLeafOptionSpecs(innerEntries, lookups, issues, {
+        entityPath: `${path}/nestedGroup/${resolved.gid}`,
+        deliverectId: resolved.gid,
+      }, depth + 1)
+    );
+  }
+  return out;
+}
+
+/** Collect all leaf options for a modifier group node (flattens nested Deliverect groups). */
+function collectLeafOptionsFromGroupNode(
+  groupNode: Record<string, unknown>,
+  lookups: ModifierPayloadLookups,
+  issues: MenuImportIssueRecord[],
+  context: { entityPath: string; deliverectId?: string }
+): Array<{ node: Record<string, unknown>; oid: string }> {
+  const entries = coerceSubProductEntries(getSubProductsRaw(groupNode), issues, context);
+  return expandSubProductEntriesToLeafOptionSpecs(entries, lookups, issues, context, 0);
 }
 
 function buildProduct(
@@ -929,20 +1001,15 @@ function buildModifierGroupTree(
   let max = coerceInt(g.max ?? g.maxQty, 1);
   if (max < min) max = min;
 
-  const optEntries = coerceSubProductEntries(getSubProductsRaw(g), issues, {
+  const leafOptionSpecs = collectLeafOptionsFromGroupNode(g, lookups, issues, {
     entityPath: `/modifierGroupDefinitions/${gid}`,
     deliverectId: gid,
   });
 
   const options: MennyuCanonicalModifierOption[] = [];
   let oi = 0;
-  for (let oiLoop = 0; oiLoop < optEntries.length; oiLoop++) {
-    const optResolved = resolveSubProductEntryToOptionNode(optEntries[oiLoop]!, lookups, issues, {
-      entityPath: `/modifierGroupDefinitions/${gid}/subProducts/${oiLoop}`,
-      deliverectId: gid,
-    });
-    if (!optResolved) continue;
-    const { node: o, oid } = optResolved;
+  for (let oiLoop = 0; oiLoop < leafOptionSpecs.length; oiLoop++) {
+    const { node: o, oid } = leafOptionSpecs[oiLoop]!;
 
     const nestedGroupIds = walkNestedModifierGroupsFromOption(
       o,
