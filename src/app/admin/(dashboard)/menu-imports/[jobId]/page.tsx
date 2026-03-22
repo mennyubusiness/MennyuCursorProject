@@ -7,7 +7,10 @@ import {
 } from "@/lib/admin-menu-import-queries";
 import { diffCanonicalMenus } from "@/domain/menu-import/canonical-diff";
 import { mennyuCanonicalMenuSchema, type MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import { env } from "@/lib/env";
+import { evaluateMenuImportPublishEligibility } from "@/services/menu-publish-from-canonical.service";
 import { AdminMenuImportDiffView } from "./AdminMenuImportDiffView";
+import { MenuImportPublishPanel } from "./MenuImportPublishPanel";
 import { MenuImportIssueSeverity } from "@prisma/client";
 
 function formatDate(d: Date | null | undefined): string {
@@ -88,11 +91,45 @@ export default async function AdminMenuImportJobPage({
   const productById = new Map(menu?.products.map((p) => [p.deliverectId, p]) ?? []);
   const groupById = new Map(menu?.modifierGroupDefinitions.map((g) => [g.deliverectId, g]) ?? []);
 
-  const notReadyForPublish =
-    blockingCount > 0 ||
-    job.status === "failed" ||
-    !job.draftVersionId ||
-    !menu;
+  const publishEligibility = evaluateMenuImportPublishEligibility({
+    status: job.status,
+    draftVersionId: job.draftVersionId,
+    draftVersion: job.draftVersion,
+    issues: job.issues.map((i) => ({ severity: i.severity, waived: i.waived })),
+  });
+
+  const draftCountsSummary =
+    menu && publishedBaselineError
+      ? {
+          addedCategories: menu.categories.length,
+          removedCategories: 0,
+          changedCategories: 0,
+          addedProducts: menu.products.length,
+          removedProducts: 0,
+          changedPrices: 0,
+          changedProductsOther: 0,
+          addedModifierGroups: menu.modifierGroupDefinitions.length,
+          removedModifierGroups: 0,
+          changedModifierGroups: 0,
+          addedModifierOptions: optionCount,
+          removedModifierOptions: 0,
+          changedModifierOptions: 0,
+        }
+      : null;
+
+  const publishSummary = menuDiff?.summary ?? draftCountsSummary;
+  const publishSummaryMode: "diff" | "firstPublish" | "draftCounts" = menuDiff
+    ? menuDiff.isFirstPublish
+      ? "firstPublish"
+      : "diff"
+    : draftCountsSummary
+      ? "draftCounts"
+      : "diff";
+
+  const publishDiffUnavailableNote =
+    menu && publishedBaselineError && publishedRow
+      ? `${publishedBaselineError} Showing draft entity counts only (not a full diff).`
+      : null;
 
   const sortedCategories = menu ? [...menu.categories].sort((a, b) => a.sortOrder - b.sortOrder) : [];
 
@@ -117,18 +154,20 @@ export default async function AdminMenuImportJobPage({
         <p className="mt-0.5 font-mono text-sm text-stone-600">{job.id}</p>
       </div>
 
-      {notReadyForPublish && (
+      {!publishEligibility.canPublish && (
         <div
           className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
           role="status"
         >
           <p className="font-medium">Not ready for publish</p>
-          <p className="mt-1 text-amber-900/90">
-            {blockingCount > 0 && `${blockingCount} blocking issue(s). `}
-            {job.status === "failed" && `Job status is failed${job.errorCode ? ` (${job.errorCode})` : ""}. `}
-            {!job.draftVersionId && "No draft MenuVersion linked. "}
-            {job.draftVersionId && !menu && (parseError ? "Draft snapshot failed schema parse. " : "No canonical menu data. ")}
-          </p>
+          <ul className="mt-2 list-inside list-disc text-amber-900/90">
+            {publishEligibility.reasons.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+          {job.status === "failed" && job.errorCode && (
+            <p className="mt-2 font-mono text-xs text-amber-800">errorCode: {job.errorCode}</p>
+          )}
         </div>
       )}
 
@@ -196,6 +235,15 @@ export default async function AdminMenuImportJobPage({
           )}
         </dl>
       </section>
+
+      <MenuImportPublishPanel
+        jobId={job.id}
+        canPublish={publishEligibility.canPublish}
+        diffSummary={publishSummary}
+        summaryMode={publishSummaryMode}
+        diffUnavailableNote={publishDiffUnavailableNote}
+        adminSecretForPublish={env.ADMIN_SECRET?.trim() ?? null}
+      />
 
       {/* B. Summary cards */}
       <section>

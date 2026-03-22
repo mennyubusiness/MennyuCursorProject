@@ -203,43 +203,50 @@ model MenuVersion {
 }
 
 model MenuItem {
-  id                  String                  @id @default(cuid())
-  vendorId            String
-  name                String
-  description         String?
-  priceCents          Int
-  imageUrl            String?
-  sortOrder           Int                     @default(0)
-  isAvailable         Boolean                 @default(true)
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  basketMaxQuantity   Int?
-  deliverectProductId String?
-  cartItems           CartItem[]
-  vendor              Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  modifierGroups      MenuItemModifierGroup[]
-  orderLines          OrderLineItem[]
+  id                   String                  @id @default(cuid())
+  vendorId             String
+  name                 String
+  description          String?
+  priceCents           Int
+  imageUrl             String?
+  sortOrder            Int                     @default(0)
+  isAvailable          Boolean                 @default(true)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  basketMaxQuantity    Int?
+  deliverectProductId  String?
+  /// Deliverect category id from canonical menu (ordering / future grouping).
+  deliverectCategoryId String?
+  cartItems            CartItem[]
+  vendor               Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  modifierGroups       MenuItemModifierGroup[]
+  orderLines           OrderLineItem[]
+
+  @@index([vendorId, deliverectCategoryId])
 }
 
 model ModifierGroup {
-  id                     String                  @id @default(cuid())
-  vendorId               String
-  name                   String
-  minSelections          Int                     @default(0)
-  maxSelections          Int                     @default(1)
-  isRequired             Boolean                 @default(false)
-  sortOrder              Int                     @default(0)
-  isAvailable            Boolean                 @default(true)
-  parentModifierOptionId String?
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  menuItems              MenuItemModifierGroup[]
-  parentModifierOption   ModifierOption?         @relation("NestedModifierGroups", fields: [parentModifierOptionId], references: [id], onDelete: Cascade)
-  vendor                 Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  options                ModifierOption[]        @relation("GroupOptions")
+  id                        String                  @id @default(cuid())
+  vendorId                  String
+  name                      String
+  minSelections             Int                     @default(0)
+  maxSelections             Int                     @default(1)
+  isRequired                Boolean                 @default(false)
+  sortOrder                 Int                     @default(0)
+  isAvailable               Boolean                 @default(true)
+  parentModifierOptionId    String?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+  /// Stable identity for Deliverect-first menu publish (upsert / soft-remove).
+  deliverectModifierGroupId String?
+  menuItems                 MenuItemModifierGroup[]
+  parentModifierOption      ModifierOption?         @relation("NestedModifierGroups", fields: [parentModifierOptionId], references: [id], onDelete: Cascade)
+  vendor                    Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  options                   ModifierOption[]        @relation("GroupOptions")
 
   @@index([vendorId])
   @@index([parentModifierOptionId])
+  @@index([vendorId, deliverectModifierGroupId])
 }
 
 model ModifierOption {

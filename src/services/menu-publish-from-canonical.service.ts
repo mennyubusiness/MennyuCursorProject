@@ -1,0 +1,406 @@
+/**
+ * Guarded publish: draft MenuVersion canonical snapshot → live MenuItem / ModifierGroup / ModifierOption.
+ * Transactional; no auto-publish. Uses Deliverect ids on rows (deliverectProductId, deliverectModifierGroupId, deliverectModifierId).
+ */
+import "server-only";
+import {
+  MenuImportJobStatus,
+  MenuImportIssueSeverity,
+  MenuVersionState,
+  type Prisma,
+} from "@prisma/client";
+import { prisma } from "@/lib/db";
+import {
+  mennyuCanonicalMenuSchema,
+  type MennyuCanonicalMenu,
+  type MennyuCanonicalProduct,
+} from "@/domain/menu-import/canonical.schema";
+import { orderModifierGroupsForPublish } from "@/domain/menu-import/modifier-group-publish-order";
+
+export class MenuPublishValidationError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = "MenuPublishValidationError";
+  }
+}
+
+export type PublishEligibility = {
+  canPublish: boolean;
+  reasons: string[];
+};
+
+/** Read-only checks for admin UI (mirrors service gates). */
+export function evaluateMenuImportPublishEligibility(input: {
+  status: MenuImportJobStatus;
+  draftVersionId: string | null;
+  draftVersion: { state: MenuVersionState; canonicalSnapshot: unknown } | null;
+  issues: Array<{ severity: MenuImportIssueSeverity; waived: boolean }>;
+}): PublishEligibility {
+  const reasons: string[] = [];
+
+  if (!input.draftVersionId || !input.draftVersion) {
+    reasons.push("No draft MenuVersion linked to this job.");
+  } else if (input.draftVersion.state !== MenuVersionState.draft) {
+    reasons.push(`Draft version is not in draft state (current: ${input.draftVersion.state}).`);
+  }
+
+  const parsed = input.draftVersion
+    ? mennyuCanonicalMenuSchema.safeParse(input.draftVersion.canonicalSnapshot)
+    : null;
+  if (input.draftVersion && !parsed?.success) {
+    reasons.push("Canonical snapshot does not parse (fix import or draft data).");
+  }
+  if (parsed?.success && parsed.data.products.length === 0) {
+    reasons.push("Canonical menu has no products to publish.");
+  }
+
+  if (input.status !== MenuImportJobStatus.awaiting_review) {
+    reasons.push(`Job status must be awaiting_review (current: ${input.status}).`);
+  }
+
+  const blocking = input.issues.filter(
+    (i) => i.severity === MenuImportIssueSeverity.blocking && !i.waived
+  ).length;
+  if (blocking > 0) {
+    reasons.push(`${blocking} blocking issue(s) must be resolved or waived before publish.`);
+  }
+
+  return { canPublish: reasons.length === 0, reasons };
+}
+
+async function applyCanonicalMenuToLiveTables(
+  tx: Prisma.TransactionClient,
+  vendorId: string,
+  menu: MennyuCanonicalMenu
+): Promise<void> {
+  const orderedGroups = orderModifierGroupsForPublish(menu.modifierGroupDefinitions);
+  const groupDeliverectToDbId = new Map<string, string>();
+  const optionDeliverectToDbId = new Map<string, string>();
+
+  for (const g of orderedGroups) {
+    let parentDbId: string | null = null;
+    if (g.parentDeliverectOptionId != null) {
+      parentDbId = optionDeliverectToDbId.get(g.parentDeliverectOptionId) ?? null;
+      if (!parentDbId) {
+        throw new MenuPublishValidationError(
+          "MODIFIER_PARENT_MISSING",
+          `Modifier group ${g.deliverectId} references unknown parent option ${g.parentDeliverectOptionId}`
+        );
+      }
+    }
+
+    const existingG = await tx.modifierGroup.findFirst({
+      where: { vendorId, deliverectModifierGroupId: g.deliverectId },
+    });
+
+    const groupData = {
+      name: g.name,
+      minSelections: g.minSelections,
+      maxSelections: g.maxSelections,
+      isRequired: g.isRequired,
+      sortOrder: g.sortOrder,
+      isAvailable: true,
+      parentModifierOptionId: parentDbId,
+      deliverectModifierGroupId: g.deliverectId,
+    };
+
+    const dbGroup = existingG
+      ? await tx.modifierGroup.update({
+          where: { id: existingG.id },
+          data: groupData,
+        })
+      : await tx.modifierGroup.create({
+          data: { vendorId, ...groupData },
+        });
+
+    groupDeliverectToDbId.set(g.deliverectId, dbGroup.id);
+
+    const sortedOpts = [...g.options].sort((a, b) => a.sortOrder - b.sortOrder);
+    for (const o of sortedOpts) {
+      const existingO = await tx.modifierOption.findFirst({
+        where: { modifierGroupId: dbGroup.id, deliverectModifierId: o.deliverectId },
+      });
+      const optData = {
+        name: o.name,
+        priceCents: o.priceCents,
+        sortOrder: o.sortOrder,
+        isDefault: o.isDefault,
+        isAvailable: o.isAvailable,
+        deliverectModifierId: o.deliverectId,
+      };
+      const dbOpt = existingO
+        ? await tx.modifierOption.update({
+            where: { id: existingO.id },
+            data: optData,
+          })
+        : await tx.modifierOption.create({
+            data: { modifierGroupId: dbGroup.id, ...optData },
+          });
+      optionDeliverectToDbId.set(o.deliverectId, dbOpt.id);
+    }
+  }
+
+  const draftProductIds = new Set(menu.products.map((p) => p.deliverectId));
+  const draftGroupIds = new Set(menu.modifierGroupDefinitions.map((gr) => gr.deliverectId));
+  const productById = new Map(menu.products.map((p) => [p.deliverectId, p]));
+
+  const inCategory = new Set<string>();
+  let sort = 0;
+  const sortedCats = [...menu.categories].sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const cat of sortedCats) {
+    for (const pid of cat.productDeliverectIds) {
+      const p = productById.get(pid);
+      if (!p) continue;
+      inCategory.add(pid);
+      await upsertMenuItemAndLinks(tx, vendorId, menu, p, sort++, cat.deliverectId, groupDeliverectToDbId);
+    }
+  }
+  const sortedProducts = [...menu.products].sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const p of sortedProducts) {
+    if (!inCategory.has(p.deliverectId)) {
+      await upsertMenuItemAndLinks(tx, vendorId, menu, p, sort++, null, groupDeliverectToDbId);
+    }
+  }
+
+  for (const g of menu.modifierGroupDefinitions) {
+    const dbGid = groupDeliverectToDbId.get(g.deliverectId);
+    if (!dbGid) continue;
+    const expected = new Set(g.options.map((o) => o.deliverectId));
+    const dbOpts = await tx.modifierOption.findMany({
+      where: { modifierGroupId: dbGid },
+      select: { id: true, deliverectModifierId: true },
+    });
+    for (const row of dbOpts) {
+      const mid = row.deliverectModifierId;
+      if (mid && !expected.has(mid)) {
+        await tx.modifierOption.update({
+          where: { id: row.id },
+          data: { isAvailable: false },
+        });
+      }
+    }
+  }
+
+  if (draftProductIds.size > 0) {
+    await tx.menuItem.updateMany({
+      where: {
+        vendorId,
+        deliverectProductId: { not: null, notIn: [...draftProductIds] },
+      },
+      data: { isAvailable: false },
+    });
+  }
+
+  if (draftGroupIds.size > 0) {
+    await tx.modifierGroup.updateMany({
+      where: {
+        vendorId,
+        deliverectModifierGroupId: { not: null, notIn: [...draftGroupIds] },
+      },
+      data: { isAvailable: false },
+    });
+  }
+}
+
+async function upsertMenuItemAndLinks(
+  tx: Prisma.TransactionClient,
+  vendorId: string,
+  menu: MennyuCanonicalMenu,
+  p: MennyuCanonicalProduct,
+  sortOrder: number,
+  deliverectCategoryId: string | null,
+  groupDeliverectToDbId: Map<string, string>
+): Promise<void> {
+  const existing = await tx.menuItem.findFirst({
+    where: { vendorId, deliverectProductId: p.deliverectId },
+  });
+
+  const itemData = {
+    name: p.name,
+    description: p.description ?? null,
+    priceCents: p.priceCents,
+    imageUrl: p.imageUrl ?? null,
+    sortOrder,
+    isAvailable: p.isAvailable,
+    basketMaxQuantity: p.basketMaxQuantity ?? null,
+    deliverectProductId: p.deliverectId,
+    deliverectCategoryId,
+  };
+
+  const row = existing
+    ? await tx.menuItem.update({
+        where: { id: existing.id },
+        data: itemData,
+      })
+    : await tx.menuItem.create({
+        data: { vendorId, ...itemData },
+      });
+
+  await tx.menuItemModifierGroup.deleteMany({ where: { menuItemId: row.id } });
+
+  let linkOrder = 0;
+  for (const gid of p.modifierGroupDeliverectIds) {
+    const dbGid = groupDeliverectToDbId.get(gid);
+    if (!dbGid) {
+      throw new MenuPublishValidationError(
+        "UNKNOWN_MODIFIER_GROUP_ON_PRODUCT",
+        `Product ${p.deliverectId} references unknown modifier group ${gid}`
+      );
+    }
+    const gdef = menu.modifierGroupDefinitions.find((x) => x.deliverectId === gid);
+    await tx.menuItemModifierGroup.create({
+      data: {
+        menuItemId: row.id,
+        modifierGroupId: dbGid,
+        required: gdef?.isRequired ?? false,
+        minSelections: gdef?.minSelections ?? 0,
+        maxSelections: gdef?.maxSelections ?? 1,
+        sortOrder: linkOrder++,
+      },
+    });
+  }
+}
+
+export type PublishMenuImportDraftResult =
+  | {
+      status: "published";
+      menuVersionId: string;
+      previousPublishedMenuVersionId: string | null;
+    }
+  | { status: "already_published"; menuVersionId: string };
+
+/**
+ * Publish this job's draft MenuVersion to live tables. Admin-only caller.
+ */
+export async function publishMenuImportDraftToLive(params: {
+  jobId: string;
+  publishedBy?: string | null;
+}): Promise<PublishMenuImportDraftResult> {
+  const jobId = params.jobId?.trim();
+  if (!jobId) {
+    throw new MenuPublishValidationError("INVALID_JOB", "jobId is required");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const job = await tx.menuImportJob.findUnique({
+      where: { id: jobId },
+      include: {
+        issues: true,
+        draftVersion: true,
+      },
+    });
+
+    if (!job) {
+      throw new MenuPublishValidationError("NOT_FOUND", "Menu import job not found");
+    }
+
+    if (!job.draftVersionId || !job.draftVersion) {
+      throw new MenuPublishValidationError("NO_DRAFT", "No draft MenuVersion on this job");
+    }
+
+    if (job.draftVersion.state === MenuVersionState.published) {
+      return { status: "already_published" as const, menuVersionId: job.draftVersionId };
+    }
+
+    if (job.draftVersion.state !== MenuVersionState.draft) {
+      throw new MenuPublishValidationError(
+        "INVALID_VERSION_STATE",
+        `MenuVersion must be draft to publish (is ${job.draftVersion.state})`
+      );
+    }
+
+    if (job.status !== MenuImportJobStatus.awaiting_review) {
+      throw new MenuPublishValidationError(
+        "JOB_NOT_REVIEWABLE",
+        `Job must be awaiting_review to publish (is ${job.status})`
+      );
+    }
+
+    const blocking = job.issues.filter(
+      (i) => i.severity === MenuImportIssueSeverity.blocking && !i.waived
+    ).length;
+    if (blocking > 0) {
+      throw new MenuPublishValidationError(
+        "BLOCKING_ISSUES",
+        `Resolve ${blocking} blocking issue(s) before publish`
+      );
+    }
+
+    const parsed = mennyuCanonicalMenuSchema.safeParse(job.draftVersion.canonicalSnapshot);
+    if (!parsed.success) {
+      throw new MenuPublishValidationError("INVALID_CANONICAL", "Canonical snapshot failed schema validation");
+    }
+
+    const menu = parsed.data;
+    if (menu.vendorId !== job.vendorId) {
+      throw new MenuPublishValidationError(
+        "VENDOR_MISMATCH",
+        "Canonical menu vendorId does not match import job vendor"
+      );
+    }
+
+    if (menu.products.length === 0) {
+      throw new MenuPublishValidationError("EMPTY_MENU", "Cannot publish a canonical menu with zero products");
+    }
+
+    const draftId = job.draftVersionId;
+
+    const prevPublished = await tx.menuVersion.findFirst({
+      where: {
+        vendorId: job.vendorId,
+        state: MenuVersionState.published,
+        NOT: { id: draftId },
+      },
+      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    });
+
+    if (prevPublished) {
+      await tx.menuVersion.update({
+        where: { id: prevPublished.id },
+        data: { state: MenuVersionState.archived },
+      });
+    }
+
+    const versionUpdate = await tx.menuVersion.updateMany({
+      where: {
+        id: draftId,
+        vendorId: job.vendorId,
+        state: MenuVersionState.draft,
+      },
+      data: {
+        state: MenuVersionState.published,
+        publishedAt: new Date(),
+        publishedBy: params.publishedBy?.trim() || null,
+        previousPublishedVersionId: prevPublished?.id ?? null,
+      },
+    });
+
+    if (versionUpdate.count !== 1) {
+      throw new MenuPublishValidationError(
+        "VERSION_CONFLICT",
+        "Draft MenuVersion could not be locked (already published or missing)"
+      );
+    }
+
+    await applyCanonicalMenuToLiveTables(tx, job.vendorId, menu);
+
+    await tx.menuImportJob.update({
+      where: { id: job.id },
+      data: {
+        status: MenuImportJobStatus.succeeded,
+        completedAt: new Date(),
+        errorCode: null,
+        errorMessage: null,
+      },
+    });
+
+    return {
+      status: "published" as const,
+      menuVersionId: draftId,
+      previousPublishedMenuVersionId: prevPublished?.id ?? null,
+    };
+  });
+}
