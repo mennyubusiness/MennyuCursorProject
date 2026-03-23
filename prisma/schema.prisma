@@ -75,6 +75,10 @@ model Vendor {
   deliverectAccountId     String?
   /// When true, block new Mennyu orders for this vendor (intake only); existing orders still visible.
   mennyuOrdersPaused      Boolean                @default(false)
+  /// When true, Deliverect menu webhook imports may auto-publish when eligibility rules pass (see menu-auto-publish.service).
+  autoPublishMenus        Boolean                @default(false)
+  /// Optional shared secret for vendor dashboard actions (publish menu, etc.). Set via admin; vendor pastes in Settings to bind session cookie.
+  vendorDashboardToken    String?
   cartItems               CartItem[]
   menuItems               MenuItem[]
   modifierGroups          ModifierGroup[]

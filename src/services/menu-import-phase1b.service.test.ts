@@ -9,6 +9,10 @@ import {
   MenuImportVendorNotFoundError,
 } from "./menu-import-phase1b.service";
 
+vi.mock("@/services/menu-auto-publish.service", () => ({
+  tryAutoPublishMenuImportJob: vi.fn().mockResolvedValue({ didPublish: false, reason: "skipped_in_unit_test" }),
+}));
+
 function makeTxMock() {
   return {
     menuImportJob: {
@@ -66,8 +70,8 @@ describe("ingestDeliverectMenuImportPhase1b", () => {
       menuImportIssue: {
         count: vi.fn().mockResolvedValue(0),
       },
-      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<void>) => {
-        await fn(tx);
+      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => {
+        return await fn(tx);
       }),
     } as unknown as PrismaClient;
 
@@ -125,8 +129,8 @@ describe("ingestDeliverectMenuImportPhase1b", () => {
       menuImportIssue: {
         count: vi.fn().mockResolvedValue(1),
       },
-      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<void>) => {
-        await fn(tx);
+      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => {
+        return await fn(tx);
       }),
     } as unknown as PrismaClient;
 
@@ -166,8 +170,8 @@ describe("ingestDeliverectMenuImportPhase1b", () => {
       menuImportIssue: {
         count: vi.fn().mockResolvedValue(1),
       },
-      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<void>) => {
-        await fn(tx);
+      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => {
+        return await fn(tx);
       }),
     } as unknown as PrismaClient;
 
@@ -203,8 +207,8 @@ describe("ingestDeliverectMenuImportPhase1b", () => {
       menuImportIssue: {
         count: vi.fn().mockResolvedValue(2),
       },
-      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<void>) => {
-        await fn(tx);
+      $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => {
+        return await fn(tx);
       }),
     } as unknown as PrismaClient;
 

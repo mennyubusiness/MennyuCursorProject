@@ -4,6 +4,8 @@ import Link from "next/link";
 import { VendorPauseToggle } from "../dashboard/VendorPauseToggle";
 import { VendorPodRequests } from "../dashboard/VendorPodRequests";
 import { VendorRecentPodRequests } from "../dashboard/VendorRecentPodRequests";
+import { VendorAutoPublishToggle } from "./VendorAutoPublishToggle";
+import { VendorDashboardTokenForm } from "./VendorDashboardTokenForm";
 
 export default async function VendorSettingsPage({
   params,
@@ -22,6 +24,8 @@ export default async function VendorSettingsPage({
         description: true,
         imageUrl: true,
         mennyuOrdersPaused: true,
+        autoPublishMenus: true,
+        vendorDashboardToken: true,
       },
     }),
     prisma.podMembershipRequest.findMany({
@@ -122,6 +126,23 @@ export default async function VendorSettingsPage({
           page.
         </p>
       </section>
+
+      <VendorAutoPublishToggle vendorId={vendor.id} initialAutoPublishMenus={vendor.autoPublishMenus ?? false} />
+
+      {vendor.vendorDashboardToken ? (
+        <VendorDashboardTokenForm vendorId={vendor.id} />
+      ) : (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-medium">Dashboard token not configured</p>
+          <p className="mt-1">
+            Ask your Mennyu admin to run{" "}
+            <code className="rounded bg-amber-100 px-1 font-mono text-xs">
+              POST /api/admin/vendors/&#123;vendorId&#125;/dashboard-token
+            </code>{" "}
+            (admin auth) to generate a token, then reload this page.
+          </p>
+        </div>
+      )}
 
       {/* Integrations placeholder */}
       <section className="rounded-lg border border-stone-200 bg-stone-50/80 p-4">

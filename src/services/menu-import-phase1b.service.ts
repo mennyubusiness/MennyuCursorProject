@@ -17,6 +17,7 @@ import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema"
 import { prisma } from "@/lib/db";
 import { payloadFingerprint } from "@/lib/menu-import-payload-hash";
 import { runPhase1aDeliverectMenuImport } from "@/integrations/deliverect/menu/phase1a-pipeline";
+import { tryAutoPublishMenuImportJob } from "@/services/menu-auto-publish.service";
 
 export class MenuImportVendorNotFoundError extends Error {
   constructor(public readonly vendorId: string) {
@@ -52,6 +53,8 @@ export interface Phase1bIngestResult {
   issueCount: number;
   /** True when this response came from an existing idempotency key (no new run). */
   deduped: boolean;
+  /** Set on fresh ingests when auto-publish was evaluated (vendor.autoPublishMenus + webhook + rules). */
+  autoPublish?: { didPublish: boolean; reason?: string };
 }
 
 export type MenuImportPhase1bDeps = {
@@ -111,7 +114,7 @@ async function mapExistingJobToResult(
   }
 
   const blockingIssues = await client.menuImportIssue.count({
-    where: { jobId, severity: MenuImportIssueSeverity.blocking },
+    where: { jobId, severity: MenuImportIssueSeverity.blocking, waived: false },
   });
 
   const ok =
@@ -126,6 +129,7 @@ async function mapExistingJobToResult(
     jobStatus: job.status,
     issueCount: job.issues.length,
     deduped: true,
+    autoPublish: undefined,
   };
 }
 
@@ -258,13 +262,29 @@ export async function ingestDeliverectMenuImportPhase1b(
   });
 
   const blockingIssues = await client.menuImportIssue.count({
-    where: { jobId: job.id, severity: MenuImportIssueSeverity.blocking },
+    where: { jobId: job.id, severity: MenuImportIssueSeverity.blocking, waived: false },
+  });
+
+  let autoPublish: { didPublish: boolean; reason?: string } | undefined;
+  if (finalJob.status === MenuImportJobStatus.awaiting_review && finalJob.draftVersionId) {
+    const ap = await tryAutoPublishMenuImportJob({ jobId: job.id }, { prisma: client });
+    if (ap.didPublish) {
+      autoPublish = { didPublish: true };
+    } else {
+      autoPublish = { didPublish: false, reason: ap.reason };
+    }
+  }
+
+  const jobAfter = await client.menuImportJob.findUniqueOrThrow({
+    where: { id: job.id },
+    select: { status: true },
   });
 
   const ok =
-    finalJob.status === MenuImportJobStatus.awaiting_review &&
     phase1.ok &&
-    blockingIssues === 0;
+    blockingIssues === 0 &&
+    (jobAfter.status === MenuImportJobStatus.awaiting_review ||
+      jobAfter.status === MenuImportJobStatus.succeeded);
 
   return {
     jobId: job.id,
@@ -272,8 +292,9 @@ export async function ingestDeliverectMenuImportPhase1b(
     draftVersionId: finalJob.draftVersionId,
     menu: phase1.menu,
     ok,
-    jobStatus: finalJob.status,
+    jobStatus: jobAfter.status,
     issueCount: phase1.allIssues.length,
     deduped: false,
+    autoPublish,
   };
 }

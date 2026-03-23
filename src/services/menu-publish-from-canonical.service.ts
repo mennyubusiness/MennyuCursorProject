@@ -16,6 +16,7 @@ import {
   type MennyuCanonicalProduct,
 } from "@/domain/menu-import/canonical.schema";
 import { orderModifierGroupsForPublish } from "@/domain/menu-import/modifier-group-publish-order";
+import { onMenuImportPublishedToLive } from "@/services/menu-deliverect-post-publish.service";
 
 export class MenuPublishValidationError extends Error {
   constructor(
@@ -274,7 +275,8 @@ export type PublishMenuImportDraftResult =
   | { status: "already_published"; menuVersionId: string };
 
 /**
- * Publish this job's draft MenuVersion to live tables. Admin-only caller.
+ * Publish this job's draft MenuVersion to live tables.
+ * Callers: admin API, vendor API (scoped), auto-publish (webhook + vendor flag).
  */
 export async function publishMenuImportDraftToLive(params: {
   jobId: string;
@@ -285,7 +287,9 @@ export async function publishMenuImportDraftToLive(params: {
     throw new MenuPublishValidationError("INVALID_JOB", "jobId is required");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const publishedByTrim = params.publishedBy?.trim() ?? null;
+
+  const result = await prisma.$transaction(async (tx) => {
     const job = await tx.menuImportJob.findUnique({
       where: { id: jobId },
       include: {
@@ -374,7 +378,7 @@ export async function publishMenuImportDraftToLive(params: {
       data: {
         state: MenuVersionState.published,
         publishedAt: new Date(),
-        publishedBy: params.publishedBy?.trim() || null,
+        publishedBy: publishedByTrim,
         previousPublishedVersionId: prevPublished?.id ?? null,
       },
     });
@@ -404,4 +408,24 @@ export async function publishMenuImportDraftToLive(params: {
       previousPublishedMenuVersionId: prevPublished?.id ?? null,
     };
   });
+
+  if (result.status === "published") {
+    const jobMeta = await prisma.menuImportJob.findUnique({
+      where: { id: jobId },
+      select: { vendorId: true, source: true },
+    });
+    if (jobMeta) {
+      void onMenuImportPublishedToLive({
+        jobId,
+        vendorId: jobMeta.vendorId,
+        menuVersionId: result.menuVersionId,
+        source: jobMeta.source,
+        publishedBy: publishedByTrim,
+      }).catch((err) => {
+        console.error("[menu-import] post-publish hook failed", err);
+      });
+    }
+  }
+
+  return result;
 }

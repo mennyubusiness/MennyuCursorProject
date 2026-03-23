@@ -52,6 +52,8 @@ export function MenuImportPublishPanel({
   summaryMode,
   diffUnavailableNote,
   adminSecretForPublish = null,
+  /** When set (e.g. vendor dashboard), POST here instead of admin API (cookie/Bearer auth). */
+  publishUrlOverride = null,
 }: {
   jobId: string;
   canPublish: boolean;
@@ -61,15 +63,21 @@ export function MenuImportPublishPanel({
   /** Shown when baseline diff is missing but draft parses (e.g. published snapshot invalid). */
   diffUnavailableNote: string | null;
   adminSecretForPublish?: string | null;
+  publishUrlOverride?: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
-  const publishUrl = menuImportPublishUrl(jobId, adminSecretForPublish);
+  const publishUrl =
+    publishUrlOverride && publishUrlOverride.trim() !== ""
+      ? publishUrlOverride.trim()
+      : menuImportPublishUrl(jobId, adminSecretForPublish);
   const publishUrlMissingAdminQuery =
-    process.env.NODE_ENV === "production" && !publishUrl.includes("?");
+    process.env.NODE_ENV === "production" &&
+    !publishUrl.includes("?") &&
+    publishUrl.includes("/api/admin/");
 
   const summaryRows = diffSummary != null ? buildSummaryRows(diffSummary, summaryMode) : [];
 
@@ -119,9 +127,16 @@ export function MenuImportPublishPanel({
       <p className="mt-1 text-sm text-stone-600">
         Writes the draft canonical snapshot to live <code className="rounded bg-stone-100 px-0.5">MenuItem</code> /{" "}
         <code className="rounded bg-stone-100 px-0.5">ModifierGroup</code> /{" "}
-        <code className="rounded bg-stone-100 px-0.5">ModifierOption</code> rows. No auto-publish — confirm
-        manually. Removed Deliverect entities are marked unavailable, not deleted.
+        <code className="rounded bg-stone-100 px-0.5">ModifierOption</code> rows. Confirm manually unless your vendor
+        has auto-publish enabled for webhook imports only. Removed Deliverect entities are marked unavailable, not
+        deleted.
       </p>
+      {publishUrlOverride && (
+        <p className="mt-2 text-xs text-stone-600">
+          Vendor publish uses your dashboard session (cookie from Settings) or{" "}
+          <code className="rounded bg-stone-100 px-0.5">Authorization: Bearer</code> in production.
+        </p>
+      )}
 
       {publishUrlMissingAdminQuery && (
         <p className="mt-2 text-xs font-medium text-amber-800">
