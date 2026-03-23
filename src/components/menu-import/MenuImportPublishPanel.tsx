@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CanonicalMenuDiff } from "@/domain/menu-import/canonical-diff";
+import { buildPublishSummaryRows, type PublishSummaryMode } from "@/domain/menu-import/publish-summary-rows";
 
 export function menuImportPublishUrl(jobId: string, adminSecretForPublish?: string | null): string {
   const path = `/api/admin/menu-imports/${encodeURIComponent(jobId)}/publish`;
@@ -11,38 +12,6 @@ export function menuImportPublishUrl(jobId: string, adminSecretForPublish?: stri
   const admin = fromServer || fromPublicBuild;
   if (!admin) return path;
   return `${path}?${new URLSearchParams({ admin }).toString()}`;
-}
-
-type SummaryRow = { label: string; value: number };
-
-function buildSummaryRows(summary: CanonicalMenuDiff["summary"], mode: "diff" | "firstPublish" | "draftCounts") {
-  const rows: SummaryRow[] =
-    mode === "draftCounts"
-      ? [
-          { label: "Categories (in draft)", value: summary.addedCategories },
-          { label: "Products (in draft)", value: summary.addedProducts },
-          { label: "Modifier groups (in draft)", value: summary.addedModifierGroups },
-          { label: "Modifier options (in draft)", value: summary.addedModifierOptions },
-        ]
-      : [
-          { label: "Categories added", value: summary.addedCategories },
-          { label: "Categories removed (live: hidden via items)", value: summary.removedCategories },
-          { label: "Categories changed", value: summary.changedCategories },
-          { label: "Products added", value: summary.addedProducts },
-          { label: "Products removed (live: unavailable)", value: summary.removedProducts },
-          { label: "Product price changes", value: summary.changedPrices },
-          { label: "Other product field changes", value: summary.changedProductsOther },
-          { label: "Modifier groups added", value: summary.addedModifierGroups },
-          { label: "Modifier groups removed (live: unavailable)", value: summary.removedModifierGroups },
-          { label: "Modifier groups changed", value: summary.changedModifierGroups },
-          { label: "Modifier options added", value: summary.addedModifierOptions },
-          { label: "Modifier options removed (live: unavailable)", value: summary.removedModifierOptions },
-          { label: "Modifier options changed", value: summary.changedModifierOptions },
-        ];
-  if (mode === "firstPublish") {
-    return rows.filter((r) => !r.label.includes("removed") && !r.label.includes("changed"));
-  }
-  return rows;
 }
 
 export function MenuImportPublishPanel({
@@ -54,16 +23,17 @@ export function MenuImportPublishPanel({
   adminSecretForPublish = null,
   /** When set (e.g. vendor dashboard), POST here instead of admin API (cookie/Bearer auth). */
   publishUrlOverride = null,
+  /** Shorter copy; hide vendor auth notes (dashboard session is enough). */
+  variant = "full",
 }: {
   jobId: string;
   canPublish: boolean;
   diffSummary: CanonicalMenuDiff["summary"] | null;
-  /** How to label summary rows in the confirm step. */
-  summaryMode: "diff" | "firstPublish" | "draftCounts";
-  /** Shown when baseline diff is missing but draft parses (e.g. published snapshot invalid). */
+  summaryMode: PublishSummaryMode;
   diffUnavailableNote: string | null;
   adminSecretForPublish?: string | null;
   publishUrlOverride?: string | null;
+  variant?: "full" | "minimal";
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -79,7 +49,7 @@ export function MenuImportPublishPanel({
     !publishUrl.includes("?") &&
     publishUrl.includes("/api/admin/");
 
-  const summaryRows = diffSummary != null ? buildSummaryRows(diffSummary, summaryMode) : [];
+  const summaryRows = diffSummary != null ? buildPublishSummaryRows(diffSummary, summaryMode) : [];
 
   async function handlePublish() {
     setMessage(null);
@@ -103,7 +73,7 @@ export function MenuImportPublishPanel({
           text:
             data.status === "already_published"
               ? "This draft was already published."
-              : "Published successfully. Live menu tables were updated from the canonical snapshot.",
+              : "Published successfully. Your live menu is updated from this draft.",
           error: false,
         });
         router.refresh();
@@ -118,6 +88,8 @@ export function MenuImportPublishPanel({
     }
   }
 
+  const isMinimal = variant === "minimal";
+
   return (
     <section
       id="admin-menu-import-publish"
@@ -125,18 +97,20 @@ export function MenuImportPublishPanel({
     >
       <h2 className="font-medium text-stone-900">Publish to live menu</h2>
       <p className="mt-1 text-sm text-stone-600">
-        Writes the draft canonical snapshot to live <code className="rounded bg-stone-100 px-0.5">MenuItem</code> /{" "}
-        <code className="rounded bg-stone-100 px-0.5">ModifierGroup</code> /{" "}
-        <code className="rounded bg-stone-100 px-0.5">ModifierOption</code> rows.{" "}
-        {publishUrlOverride
-          ? "Confirm when you are ready. (Auto-publish from Deliverect webhooks is optional in Settings.) "
-          : "Confirm manually unless the vendor has auto-publish enabled for webhook imports only. "}
-        Removed Deliverect entities are marked unavailable, not deleted.
+        {isMinimal
+          ? "Applies this draft to your live Mennyu menu (items, modifiers, availability). "
+          : "Writes the draft snapshot to your live menu tables. "}
+        {!isMinimal && publishUrlOverride
+          ? "Confirm when you are ready. "
+          : !isMinimal
+            ? "Confirm manually unless the vendor has auto-publish enabled for webhook imports. "
+            : null}
+        {!isMinimal && "Removed items in Deliverect are marked unavailable, not deleted."}
       </p>
-      {publishUrlOverride && (
-        <p className="mt-2 text-xs text-stone-600">
-          Vendor publish uses your dashboard session (cookie from Settings) or{" "}
-          <code className="rounded bg-stone-100 px-0.5">Authorization: Bearer</code> in production.
+
+      {!isMinimal && publishUrlOverride && (
+        <p className="mt-2 text-xs text-stone-500">
+          Uses your signed-in session when you confirm.
         </p>
       )}
 

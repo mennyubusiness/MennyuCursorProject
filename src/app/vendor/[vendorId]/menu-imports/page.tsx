@@ -3,9 +3,11 @@ import { notFound } from "next/navigation";
 import { MenuImportIssueSeverity } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
+  menuImportFriendlySource,
+  menuImportListSummaryLine,
   vendorMenuImportListBadge,
   vendorMenuImportListBadgeClass,
-} from "@/lib/vendor-menu-import-labels";
+} from "@/lib/menu-import-ui-labels";
 
 function formatDate(d: Date): string {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "short", timeStyle: "short" }).format(d);
@@ -45,38 +47,40 @@ export default async function VendorMenuImportsListPage({
     },
   });
 
+  const latestActionableId = jobs.find(
+    (j) => j.status === "awaiting_review" && j.draftVersionId != null
+  )?.id;
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-stone-900">Menu updates from Deliverect</h2>
+        <h2 className="text-xl font-semibold text-stone-900">Menu updates</h2>
         <p className="mt-1 text-sm text-stone-600">
-          When you publish or push your menu in Deliverect, Mennyu receives a draft here. You own review and publish — no
-          admin step is required for normal updates. Your live Mennyu menu (including availability) updates only after
-          you publish (or after auto-publish, if you turned that on in Settings).
+          When Deliverect sends a menu change, it appears here. Publish when you&apos;re ready for it to go live on
+          Mennyu.
         </p>
         {vendor.autoPublishMenus && (
           <p className="mt-2 rounded border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-950">
-            <strong>Auto-publish</strong> is on: eligible Deliverect <strong>webhook</strong> imports go live
-            automatically when there are no blocking issues — same safety checks as manual publish.
+            <strong>Auto-publish</strong> is on for eligible webhook imports (no blocking issues).
           </p>
         )}
       </div>
 
       <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
         <table className="min-w-full text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+          <thead className="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium uppercase tracking-wide text-stone-500">
             <tr>
-              <th className="px-4 py-2 font-medium">When</th>
-              <th className="px-4 py-2 font-medium">Source</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Actions</th>
+              <th className="px-4 py-2">Updated</th>
+              <th className="px-4 py-2">Status</th>
+              <th className="px-4 py-2">Summary</th>
+              <th className="px-4 py-2 text-right"> </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
             {jobs.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-stone-500">
-                  No imports yet.
+                  No updates yet.
                 </td>
               </tr>
             ) : (
@@ -87,33 +91,49 @@ export default async function VendorMenuImportsListPage({
                   issues: j.issues,
                   draftVersion: j.draftVersion,
                 });
+                const summary = menuImportListSummaryLine({
+                  status: j.status,
+                  errorCode: j.errorCode,
+                  issues: j.issues,
+                  draftVersion: j.draftVersion,
+                  draftVersionId: j.draftVersionId,
+                });
+                const isActionableHighlight = j.id === latestActionableId;
+
                 return (
-                <tr key={j.id} className="hover:bg-stone-50">
-                  <td className="whitespace-nowrap px-4 py-2 text-stone-700">{formatDate(j.startedAt)}</td>
-                  <td className="px-4 py-2 font-mono text-xs text-stone-600">{j.source}</td>
-                  <td className="px-4 py-2">
-                    <span className={vendorMenuImportListBadgeClass(badge.tone)}>{badge.label}</span>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <Link
-                      href={`/vendor/${vendorId}/menu-imports/${j.id}`}
-                      className="font-medium text-sky-800 hover:underline"
-                    >
-                      Open
-                    </Link>
-                  </td>
-                </tr>
+                  <tr
+                    key={j.id}
+                    className={`hover:bg-stone-50 ${isActionableHighlight ? "bg-emerald-50/60" : ""}`}
+                  >
+                    <td className="whitespace-nowrap px-4 py-3 text-stone-700">
+                      {formatDate(j.completedAt ?? j.startedAt)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={vendorMenuImportListBadgeClass(badge.tone)}>{badge.label}</span>
+                    </td>
+                    <td className="max-w-md px-4 py-3 text-stone-600">
+                      <span className="line-clamp-2">{summary}</span>
+                      <span className="mt-0.5 block text-xs text-stone-500">
+                        {menuImportFriendlySource(j.source)}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <Link
+                        href={`/vendor/${vendorId}/menu-imports/${j.id}`}
+                        className={`font-medium hover:underline ${
+                          isActionableHighlight ? "text-emerald-800" : "text-sky-800"
+                        }`}
+                      >
+                        {isActionableHighlight ? "Review & publish" : "Open"}
+                      </Link>
+                    </td>
+                  </tr>
                 );
               })
             )}
           </tbody>
         </table>
       </div>
-
-      <p className="text-xs text-stone-500">
-        Mennyu admins can still publish, discard, or roll back from the admin area if you need help — that path is
-        optional for day-to-day menu updates.
-      </p>
     </div>
   );
 }

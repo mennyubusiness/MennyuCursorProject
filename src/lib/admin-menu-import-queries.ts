@@ -94,7 +94,7 @@ export type AdminMenuImportJobListRow = Prisma.MenuImportJobGetPayload<{
     errorCode: true;
     vendorId: true;
     vendor: { select: { id: true; name: true; slug: true } };
-    draftVersion: { select: { id: true; state: true } };
+    draftVersion: { select: { id: true; state: true; publishedBy: true } };
     menuImportRawPayload: { select: { payloadSha256: true } };
     issues: { select: { id: true } };
     _count: { select: { issues: true } };
@@ -115,7 +115,7 @@ export async function fetchAdminMenuImportJobsList(limit = 100): Promise<AdminMe
       errorCode: true,
       vendorId: true,
       vendor: { select: { id: true, name: true, slug: true } },
-      draftVersion: { select: { id: true, state: true } },
+      draftVersion: { select: { id: true, state: true, publishedBy: true } },
       menuImportRawPayload: { select: { payloadSha256: true } },
       issues: {
         where: { severity: MenuImportIssueSeverity.blocking, waived: false },
