@@ -73,9 +73,10 @@ model User {
   updatedAt     DateTime @updatedAt
 
   vendorMemberships VendorMembership[]
+  /// Platform (Mennyu internal) admin; same User + session as vendors. Complements temporary ADMIN_SECRET cookie bridge.
+  isPlatformAdmin Boolean @default(false)
   // Future: podMemberships PodMembership[]
   // Future: customerProfile Customer?
-  // Future: isPlatformAdmin Boolean @default(false)
 }
 
 enum VendorMembershipRole {

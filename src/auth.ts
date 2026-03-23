@@ -1,6 +1,7 @@
 /**
  * Unified Auth.js (NextAuth v5) — credentials + JWT session cookie.
- * Phase 1: vendor access via VendorMembership; legacy vendorDashboardToken remains for migration.
+ * Phase 1: vendor access via VendorMembership; platform admin via User.isPlatformAdmin (JWT);
+ * legacy vendorDashboardToken + ADMIN_SECRET cookie bridge remain for migration.
  */
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
@@ -35,12 +36,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = emailRaw.toLowerCase().trim();
         const user = await prisma.user.findUnique({
           where: { email },
-          select: { id: true, email: true, name: true, passwordHash: true },
+          select: { id: true, email: true, name: true, passwordHash: true, isPlatformAdmin: true },
         });
         if (!user?.passwordHash) return null;
         const ok = await verifyPassword(passwordRaw, user.passwordHash);
         if (!ok) return null;
-        return { id: user.id, email: user.email, name: user.name };
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          isPlatformAdmin: user.isPlatformAdmin,
+        };
       },
     }),
   ],
@@ -55,12 +61,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
+        token.isPlatformAdmin = Boolean(user.isPlatformAdmin);
       }
       return token;
     },
     session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
+        session.user.isPlatformAdmin = Boolean(token.isPlatformAdmin);
       }
       return session;
     },

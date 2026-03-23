@@ -3,26 +3,11 @@
  * TODO: Replace with pod-owner–scoped auth when available (e.g. pod owner role / invite).
  * For now reuses same gate as admin (cookie/secret) so pod dashboard is not wide open in production.
  */
-import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { isAdminAllowed } from "@/lib/admin-auth";
+import { isAdminDashboardLayoutAuthorized } from "@/lib/admin-auth";
 import { env } from "@/lib/env";
 import { PodAreaNav } from "../PodAreaNav";
-
-function getAdminCookie(headersList: Headers): string | null {
-  const cookie = headersList.get("cookie");
-  if (!cookie) return null;
-  const match = cookie.match(/mennyu_admin=([^;]+)/);
-  const value = match?.[1]?.trim();
-  if (!value) return null;
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return null;
-  }
-}
 
 export default async function PodDashboardLayout({
   params,
@@ -31,9 +16,7 @@ export default async function PodDashboardLayout({
   params: Promise<{ podId: string }>;
   children: React.ReactNode;
 }) {
-  const headersList = await headers();
-  const cookieValue = getAdminCookie(headersList);
-  const allowed = isAdminAllowed(cookieValue, null);
+  const allowed = await isAdminDashboardLayoutAuthorized();
   if (!allowed) {
     if (env.NODE_ENV === "production" && env.ADMIN_SECRET) {
       redirect("/admin/access-denied");

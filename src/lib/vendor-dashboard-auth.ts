@@ -1,6 +1,6 @@
 /**
  * Vendor dashboard access (Phase 1 unified auth):
- * 1) Mennyu admin: same `mennyu_admin` cookie / `?admin=` as admin APIs (`isAdminAllowed`)
+ * 1) Mennyu platform admin: `mennyu_admin` cookie / `?admin=` **or** `User.isPlatformAdmin` session
  * 2) Preferred: Auth.js session + VendorMembership for vendorId
  * 3) Legacy: Vendor.vendorDashboardToken via Bearer or mennyu_vdash_{vendorId} cookie (migration / automation)
  * Development: open unless overridden.
@@ -49,6 +49,9 @@ export async function canAccessVendorDashboard(vendorId: string): Promise<boolea
   }
 
   const session = await auth();
+  if (session?.user?.isPlatformAdmin) {
+    return true;
+  }
   if (session?.user?.id) {
     const m = await prisma.vendorMembership.findUnique({
       where: { userId_vendorId: { userId: session.user.id, vendorId } },
@@ -83,6 +86,9 @@ export async function verifyVendorAccessForApi(
   }
 
   const session = await auth();
+  if (session?.user?.isPlatformAdmin) {
+    return { ok: true, mode: "admin", userId: session.user.id };
+  }
   if (session?.user?.id) {
     const m = await prisma.vendorMembership.findUnique({
       where: {

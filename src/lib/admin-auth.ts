@@ -1,13 +1,19 @@
 /**
- * Minimal admin gate for dashboard access.
- * TODO: Replace with proper auth (e.g. NextAuth, role-based access) when available.
- * - In development: access allowed without secret.
- * - In production: require ADMIN_SECRET env and match via query ?admin=SECRET or cookie.
+ * Admin access for dashboard + /api/admin/*:
+ * - Development: allowed without checks (existing behavior).
+ * - Production: temporary ADMIN_SECRET via `mennyu_admin` cookie or `?admin=` **or**
+ *   authenticated User with `isPlatformAdmin` (unified NextAuth session).
  */
+import { cookies } from "next/headers";
+import { auth } from "@/auth";
 import { env } from "@/lib/env";
 
 export const ADMIN_COOKIE_NAME = "mennyu_admin";
 
+/**
+ * ADMIN_SECRET bridge only (cookie / query). Does **not** include session.
+ * In development, always true.
+ */
 export function isAdminAllowed(cookieValue: string | null, querySecret: string | null): boolean {
   if (env.NODE_ENV === "development") return true;
   const secret = env.ADMIN_SECRET;
@@ -16,11 +22,10 @@ export function isAdminAllowed(cookieValue: string | null, querySecret: string |
   return match(cookieValue) || match(querySecret);
 }
 
-/**
- * Same admin gate as admin APIs, for vendor routes that must allow Mennyu staff to help any vendor.
- * Reads `mennyu_admin` cookie and optional `?admin=` from the request URL (Fetch from browser sends cookies).
- */
-export function isAdminAccessFromRequest(request: Request): boolean {
+export function getAdminBridgeCredentialsFromRequest(request: Request): {
+  cookie: string | null;
+  querySecret: string | null;
+} {
   const cookieHeader = request.headers.get("cookie") ?? "";
   let adminCookie: string | null = null;
   const prefix = `${ADMIN_COOKIE_NAME}=`;
@@ -37,14 +42,51 @@ export function isAdminAccessFromRequest(request: Request): boolean {
   } catch {
     querySecret = null;
   }
-  return isAdminAllowed(adminCookie, querySecret);
+  return { cookie: adminCookie, querySecret };
+}
+
+/**
+ * Same admin gate as admin APIs: cookie + optional `?admin=` from the request URL.
+ * Does **not** check platform-admin session (sync). Prefer `isAdminApiRequestAuthorized` in route handlers.
+ */
+export function isAdminAccessFromRequest(request: Request): boolean {
+  const { cookie, querySecret } = getAdminBridgeCredentialsFromRequest(request);
+  return isAdminAllowed(cookie, querySecret);
+}
+
+/** Route handlers: dev open, secret bridge, or `User.isPlatformAdmin` session. */
+export async function isAdminApiRequestAuthorized(request: Request): Promise<boolean> {
+  if (env.NODE_ENV === "development") return true;
+  const { cookie, querySecret } = getAdminBridgeCredentialsFromRequest(request);
+  if (isAdminAllowed(cookie, querySecret)) return true;
+  const session = await auth();
+  return Boolean(session?.user?.isPlatformAdmin);
+}
+
+/** RSC layouts: dev open, secret cookie, or platform-admin session. */
+export async function isAdminDashboardLayoutAuthorized(): Promise<boolean> {
+  if (env.NODE_ENV === "development") return true;
+  const cookieStore = await cookies();
+  const cookieValue = cookieStore.get(ADMIN_COOKIE_NAME)?.value ?? null;
+  if (isAdminAllowed(cookieValue, null)) return true;
+  const session = await auth();
+  return Boolean(session?.user?.isPlatformAdmin);
+}
+
+/**
+ * Promote/create platform admin: **only** ADMIN_SECRET bridge (or dev).
+ * Intentionally does not accept session — avoids account takeover → self-grant admin.
+ */
+export function isAdminBootstrapSecretAuthorized(request: Request): boolean {
+  if (env.NODE_ENV === "development") return true;
+  const { cookie, querySecret } = getAdminBridgeCredentialsFromRequest(request);
+  return isAdminAllowed(cookie, querySecret);
 }
 
 export function buildAdminCookieHeader(secret: string): string {
   const isProd = process.env.NODE_ENV === "production";
   const parts = [
     `${ADMIN_COOKIE_NAME}=${encodeURIComponent(secret)}`,
-    // Must be / so the browser sends this cookie on same-origin fetches to /api/admin/* (Path=/admin does not match /api/...).
     "Path=/",
     "Max-Age=86400",
     "SameSite=Lax",

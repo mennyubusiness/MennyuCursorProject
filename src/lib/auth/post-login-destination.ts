@@ -23,16 +23,29 @@ export async function resolvePostLoginDestination(
   intent: LoginIntent,
   callbackUrl: string | null
 ): Promise<PostLoginDestinationResult> {
+  if (intent === "admin") {
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isPlatformAdmin: true },
+    });
+    if (u?.isPlatformAdmin) {
+      return { kind: "redirect", path: "/admin" };
+    }
+    return {
+      kind: "coming_soon",
+      headline: "No Mennyu team access on this account",
+      body: "You’re signed in, but this account isn’t marked as a platform admin. Ask your team to grant access, or use the admin secret link you were given. Vendor dashboard still works if you have a restaurant membership.",
+    };
+  }
+
   if (intent !== "vendor") {
     return {
       kind: "coming_soon",
       headline: "This area isn’t connected yet",
       body:
-        intent === "admin"
-          ? "You’re signed in. Mennyu team access still uses a separate secure step from your administrator. Restaurant sign-in doesn’t grant internal tools."
-          : intent === "pod"
-            ? "You’re signed in. Pod dashboard access for your account is coming in a future update. Choose Vendor dashboard if you manage a restaurant."
-            : "You’re signed in. Customer account features for this email are coming in a future update. You can still browse and order on Mennyu as usual.",
+        intent === "pod"
+          ? "You’re signed in. Pod dashboard access for your account is coming in a future update. Choose Vendor dashboard if you manage a restaurant."
+          : "You’re signed in. Customer account features for this email are coming in a future update. You can still browse and order on Mennyu as usual.",
     };
   }
 

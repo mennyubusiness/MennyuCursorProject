@@ -5,16 +5,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
-import { ADMIN_COOKIE_NAME, isAdminAllowed } from "@/lib/admin-auth";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { postDeliverectOrderStatusUpdate } from "@/integrations/deliverect/client";
 
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ vendorOrderId: string }> }
 ) {
-  const cookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value ?? null;
-  const querySecret = request.nextUrl.searchParams.get("admin");
-  if (!isAdminAllowed(cookie, querySecret)) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

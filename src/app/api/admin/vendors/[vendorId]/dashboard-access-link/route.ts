@@ -4,7 +4,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { ADMIN_COOKIE_NAME, isAdminAllowed } from "@/lib/admin-auth";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { signVendorAccessLinkToken } from "@/lib/vendor-access-link";
 
@@ -18,9 +18,7 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ vendorId: string }> }
 ) {
-  const cookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value ?? null;
-  const querySecret = request.nextUrl.searchParams.get("admin");
-  if (!isAdminAllowed(cookie, querySecret)) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

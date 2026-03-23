@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 export default function AdminAccessDeniedPage() {
@@ -36,6 +37,13 @@ export default function AdminAccessDeniedPage() {
       <h1 className="text-lg font-semibold text-stone-900">Admin access</h1>
       <p className="text-sm text-stone-600">
         Enter the admin secret to continue. (In development, access is automatic.)
+      </p>
+      <p className="text-sm text-stone-600">
+        If you have a platform admin account, you can also{" "}
+        <Link href="/login?intent=admin" className="font-medium text-sky-800 underline">
+          sign in with email
+        </Link>{" "}
+        (Mennyu team access).
       </p>
       <form onSubmit={handleSubmit} className="space-y-3">
         <input

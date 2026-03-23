@@ -3,7 +3,7 @@
  * Admin-only. Retains MenuImportJob, issues, and raw payload; clears draft link and sets job to cancelled.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_COOKIE_NAME, isAdminAllowed } from "@/lib/admin-auth";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import {
   DraftMenuVersionDiscardError,
   discardDraftMenuVersionForImportJob,
@@ -13,9 +13,7 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ jobId: string }> }
 ) {
-  const cookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value ?? null;
-  const querySecret = request.nextUrl.searchParams.get("admin");
-  if (!isAdminAllowed(cookie, querySecret)) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

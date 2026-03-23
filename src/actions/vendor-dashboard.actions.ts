@@ -57,6 +57,14 @@ export async function updateVendorAutoPublishMenus(
     }
 
     const session = await auth();
+    if (session?.user?.isPlatformAdmin) {
+      await prisma.vendor.update({
+        where: { id: vendorId.trim() },
+        data: { autoPublishMenus },
+      });
+      revalidatePath(`/vendor/${vendorId}/settings`);
+      return { ok: true };
+    }
     if (session?.user?.id) {
       const m = await prisma.vendorMembership.findUnique({
         where: { userId_vendorId: { userId: session.user.id, vendorId } },

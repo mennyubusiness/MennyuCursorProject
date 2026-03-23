@@ -4,7 +4,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { ADMIN_COOKIE_NAME, isAdminAllowed } from "@/lib/admin-auth";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db";
 import { VendorMembershipRole } from "@prisma/client";
@@ -17,9 +17,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const cookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value ?? null;
-  const querySecret = request.nextUrl.searchParams.get("admin");
-  if (!isAdminAllowed(cookie, querySecret)) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
