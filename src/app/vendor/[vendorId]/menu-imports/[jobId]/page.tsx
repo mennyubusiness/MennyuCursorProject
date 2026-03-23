@@ -14,9 +14,6 @@ import { MenuImportPublishPanel } from "@/app/admin/(dashboard)/menu-imports/[jo
 import { MenuImportDiscardDraftButton } from "@/app/admin/(dashboard)/menu-imports/MenuImportDiscardDraftButton";
 import { vendorMenuImportDetailPrimaryStatus } from "@/lib/vendor-menu-import-labels";
 import { MenuImportIssueSeverity } from "@prisma/client";
-import { prisma } from "@/lib/db";
-import { isVendorDashboardDevOpen, vendorDashboardCookieName } from "@/lib/vendor-dashboard-auth";
-import { cookies } from "next/headers";
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return "—";
@@ -57,20 +54,6 @@ export default async function VendorMenuImportJobPage({
   const job = await fetchAdminMenuImportJobDetail(jobId);
   if (!job) notFound();
   if (job.vendorId !== vendorId) notFound();
-
-  const vendorAuth = await prisma.vendor.findUnique({
-    where: { id: vendorId },
-    select: { vendorDashboardToken: true },
-  });
-  const needsDashboardToken =
-    !isVendorDashboardDevOpen() && (!vendorAuth?.vendorDashboardToken || vendorAuth.vendorDashboardToken.trim() === "");
-
-  const cookieStore = await cookies();
-  const hasSessionCookie = Boolean(cookieStore.get(vendorDashboardCookieName(vendorId))?.value);
-  const needsSessionCookie =
-    !isVendorDashboardDevOpen() &&
-    Boolean(vendorAuth?.vendorDashboardToken?.trim()) &&
-    !hasSessionCookie;
 
   const publishedRow = await fetchLatestPublishedMenuVersionForVendor(job.vendorId);
 
@@ -162,7 +145,8 @@ export default async function VendorMenuImportJobPage({
   const vendorPublishUrl = `/api/vendor/${encodeURIComponent(vendorId)}/menu-imports/${encodeURIComponent(job.id)}/publish`;
   const vendorDiscardUrl = `/api/vendor/${encodeURIComponent(vendorId)}/menu-imports/${encodeURIComponent(job.id)}/discard-draft`;
 
-  const vendorActionsUnlocked = !needsDashboardToken && !needsSessionCookie;
+  /** Vendor layout enforces session/membership or legacy cookie before this page renders. */
+  const vendorActionsUnlocked = true;
 
   return (
     <div className="space-y-8">
@@ -173,32 +157,6 @@ export default async function VendorMenuImportJobPage({
         <h1 className="mt-2 text-xl font-semibold text-stone-900">Menu update</h1>
         <p className="mt-0.5 font-mono text-sm text-stone-600">{job.id}</p>
       </div>
-
-      {needsDashboardToken && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="alert">
-          <p className="font-medium">Dashboard token required</p>
-          <p className="mt-1">
-            Ask your Mennyu admin to generate a token, then paste it under{" "}
-            <Link href={`/vendor/${vendorId}/settings`} className="font-medium underline">
-              Settings
-            </Link>{" "}
-            to publish from this dashboard in production.
-          </p>
-        </div>
-      )}
-
-      {needsSessionCookie && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="alert">
-          <p className="font-medium">Sign in with your dashboard token</p>
-          <p className="mt-1">
-            Paste your token on{" "}
-            <Link href={`/vendor/${vendorId}/settings`} className="font-medium underline">
-              Settings
-            </Link>{" "}
-            to set a browser session before publishing.
-          </p>
-        </div>
-      )}
 
       {!publishEligibility.canPublish && (
         <div

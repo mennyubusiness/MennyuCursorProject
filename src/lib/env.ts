@@ -34,8 +34,15 @@ const envSchema = z.object({
   ROUTING_MODE: z.enum(["mock", "deliverect"]).default("mock"),
   NEXTAUTH_URL: z.string().url().optional(),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  /** Required in production for Auth.js (JWT session). Generate: openssl rand -base64 32 */
+  AUTH_SECRET: z.string().min(32).optional(),
   /** Optional. When set, admin routes require this value (query param or cookie). TODO: Replace with proper auth. */
   ADMIN_SECRET: z.string().optional(),
+  /**
+   * Required in production for signed vendor dashboard magic links (`/api/vendor/.../session/grant`).
+   * Min 32 characters; use a random secret (e.g. openssl rand -hex 32).
+   */
+  VENDOR_ACCESS_SIGNING_SECRET: z.string().min(32).optional(),
   /** Set to "true" to show Deliverect POS status simulation UI on admin order detail (production). */
   SHOW_DELIVERECT_STATUS_SIM_UI: z.enum(["true", "false"]).optional(),
 });

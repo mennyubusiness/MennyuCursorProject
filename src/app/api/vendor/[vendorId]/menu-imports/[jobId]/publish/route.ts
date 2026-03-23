@@ -3,7 +3,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyVendorDashboardRequest } from "@/lib/vendor-dashboard-auth";
+import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
 import {
   MenuPublishValidationError,
   publishMenuImportDraftToLive,
@@ -26,12 +26,12 @@ export async function POST(
     return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
   }
 
-  const allowed = await verifyVendorDashboardRequest(vendor.id, request, vendor.vendorDashboardToken);
-  if (!allowed) {
+  const access = await verifyVendorAccessForApi(vendor.id, request, vendor.vendorDashboardToken);
+  if (!access.ok) {
     return NextResponse.json(
       {
         error:
-          "Forbidden: set a dashboard token on the vendor (admin) and sign in from vendor Settings, or use Authorization: Bearer.",
+          "Forbidden: sign in with a user linked to this vendor, or use a legacy dashboard token (Bearer / cookie).",
         code: "VENDOR_DASHBOARD_AUTH",
       },
       { status: 403 }
@@ -50,9 +50,13 @@ export async function POST(
   }
 
   try {
+    const publishedBy =
+      access.mode === "session" && access.userId
+        ? `user:${access.userId}`
+        : `vendor:${vendor.id}`;
     const result = await publishMenuImportDraftToLive({
       jobId: job.id,
-      publishedBy: `vendor:${vendor.id}`,
+      publishedBy,
     });
     return NextResponse.json(result);
   } catch (e) {

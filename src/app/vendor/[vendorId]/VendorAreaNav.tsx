@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 
 const NAV_LINKS = [
   { href: "orders", label: "Orders" },
@@ -13,10 +14,12 @@ const NAV_LINKS = [
 export function VendorAreaNav({ vendorId }: { vendorId: string }) {
   const pathname = usePathname();
   const base = `/vendor/${vendorId}`;
+  const { status } = useSession();
 
   return (
     <nav className="border-b border-stone-200 bg-white" aria-label="Vendor area">
-      <div className="mx-auto flex max-w-2xl gap-1 px-4 py-2">
+      <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-2 px-4 py-2">
+        <div className="flex flex-wrap gap-1">
         {NAV_LINKS.map(({ href, label }) => {
           const path = `${base}/${href}`;
           const isActive = pathname === path || (href === "orders" && pathname === base);
@@ -34,6 +37,16 @@ export function VendorAreaNav({ vendorId }: { vendorId: string }) {
             </Link>
           );
         })}
+        </div>
+        {status === "authenticated" && (
+          <button
+            type="button"
+            onClick={() => void signOut({ callbackUrl: "/" })}
+            className="text-sm text-stone-600 hover:text-stone-900 hover:underline"
+          >
+            Sign out
+          </button>
+        )}
       </div>
     </nav>
   );

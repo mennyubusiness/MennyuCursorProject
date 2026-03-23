@@ -15,7 +15,10 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
     try {
       const res = await bindVendorDashboardSession(vendorId, token);
       if (res.ok) {
-        setMessage({ text: "Session saved. You can publish menu imports from this browser.", ok: true });
+        setMessage({
+          text: "Session saved in this browser. You can publish menu imports and change auto-publish here.",
+          ok: true,
+        });
         setToken("");
       } else {
         setMessage({ text: res.error ?? "Failed", ok: false });
@@ -26,11 +29,13 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Dashboard access token</h3>
+    <details className="rounded-lg border border-stone-200 bg-white p-4">
+      <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-stone-500">
+        Manual dashboard token (advanced)
+      </summary>
       <p className="mt-2 text-sm text-stone-600">
-        Paste the token your Mennyu admin generated (one-time via admin API). This stores an http-only cookie so you
-        can publish menu drafts from the vendor dashboard in production.
+        Prefer the <strong>secure access link</strong> from your admin — no copy/paste. Use this only if you are
+        integrating via API or automation that needs the raw secret; it sets the same browser session as the link.
       </p>
       <form onSubmit={onSubmit} className="mt-3 space-y-2">
         <label htmlFor="vdash-token" className="sr-only">
@@ -58,6 +63,6 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
           {message.text}
         </p>
       )}
-    </div>
+    </details>
   );
 }

@@ -1,13 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import {
   isVendorDashboardDevOpen,
   timingSafeStringEqual,
   vendorDashboardCookieName,
 } from "@/lib/vendor-dashboard-auth";
-import { cookies } from "next/headers";
+import { setVendorDashboardSessionCookie } from "@/lib/vendor-dashboard-session";
 
 export async function bindVendorDashboardSession(
   vendorId: string,
@@ -24,14 +26,7 @@ export async function bindVendorDashboardSession(
     return { ok: false, error: "Token does not match." };
   }
 
-  const cookieStore = await cookies();
-  cookieStore.set(vendorDashboardCookieName(vendorId), tokenPlain.trim(), {
-    httpOnly: true,
-    path: "/",
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 90,
-  });
+  await setVendorDashboardSessionCookie(vendorId, tokenPlain.trim());
 
   revalidatePath(`/vendor/${vendorId}`);
   revalidatePath(`/vendor/${vendorId}/settings`);
@@ -50,11 +45,40 @@ export async function updateVendorAutoPublishMenus(
   if (!v) return { ok: false, error: "Vendor not found" };
 
   if (!isVendorDashboardDevOpen()) {
+    const session = await auth();
+    if (session?.user?.id) {
+      const m = await prisma.vendorMembership.findUnique({
+        where: { userId_vendorId: { userId: session.user.id, vendorId } },
+      });
+      if (m) {
+        await prisma.vendor.update({
+          where: { id: vendorId.trim() },
+          data: { autoPublishMenus },
+        });
+        revalidatePath(`/vendor/${vendorId}/settings`);
+        return { ok: true };
+      }
+    }
+
     const cookieStore = await cookies();
     const c = cookieStore.get(vendorDashboardCookieName(vendorId))?.value;
-    if (!c || !v.vendorDashboardToken || !timingSafeStringEqual(c.trim(), v.vendorDashboardToken.trim())) {
-      return { ok: false, error: "Unauthorized: paste dashboard token on this page first." };
+    if (
+      c &&
+      v.vendorDashboardToken &&
+      timingSafeStringEqual(c.trim(), v.vendorDashboardToken.trim())
+    ) {
+      await prisma.vendor.update({
+        where: { id: vendorId.trim() },
+        data: { autoPublishMenus },
+      });
+      revalidatePath(`/vendor/${vendorId}/settings`);
+      return { ok: true };
     }
+
+    return {
+      ok: false,
+      error: "Unauthorized: sign in with a vendor-linked account, or use a legacy dashboard session.",
+    };
   }
 
   await prisma.vendor.update({

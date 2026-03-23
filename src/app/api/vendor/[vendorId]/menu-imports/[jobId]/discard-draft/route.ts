@@ -4,7 +4,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyVendorDashboardRequest } from "@/lib/vendor-dashboard-auth";
+import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
 import {
   DraftMenuVersionDiscardError,
   discardDraftMenuVersionForImportJob,
@@ -27,8 +27,8 @@ export async function POST(
     return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
   }
 
-  const allowed = await verifyVendorDashboardRequest(vendor.id, request, vendor.vendorDashboardToken);
-  if (!allowed) {
+  const access = await verifyVendorAccessForApi(vendor.id, request, vendor.vendorDashboardToken);
+  if (!access.ok) {
     return NextResponse.json(
       {
         error:

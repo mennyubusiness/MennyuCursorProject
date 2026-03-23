@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
@@ -6,6 +7,8 @@ import { VendorPodRequests } from "../dashboard/VendorPodRequests";
 import { VendorRecentPodRequests } from "../dashboard/VendorRecentPodRequests";
 import { VendorAutoPublishToggle } from "./VendorAutoPublishToggle";
 import { VendorDashboardTokenForm } from "./VendorDashboardTokenForm";
+import { VendorDashboardAccessCard } from "./VendorDashboardAccessCard";
+import { VendorAccessQueryMessages } from "./VendorAccessMessages";
 
 export default async function VendorSettingsPage({
   params,
@@ -129,17 +132,30 @@ export default async function VendorSettingsPage({
 
       <VendorAutoPublishToggle vendorId={vendor.id} initialAutoPublishMenus={vendor.autoPublishMenus ?? false} />
 
+      <Suspense fallback={null}>
+        <VendorAccessQueryMessages />
+      </Suspense>
+
+      <VendorDashboardAccessCard
+        vendorId={vendor.id}
+        hasDashboardSecret={Boolean(vendor.vendorDashboardToken?.trim())}
+      />
+
       {vendor.vendorDashboardToken ? (
         <VendorDashboardTokenForm vendorId={vendor.id} />
       ) : (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-          <p className="font-medium">Dashboard token not configured</p>
+          <p className="font-medium">Dashboard access not provisioned</p>
           <p className="mt-1">
-            Ask your Mennyu admin to run{" "}
+            Admin: use{" "}
             <code className="rounded bg-amber-100 px-1 font-mono text-xs">
-              POST /api/admin/vendors/&#123;vendorId&#125;/dashboard-token
+              POST /api/admin/vendors/&#123;vendorId&#125;/dashboard-access-link
             </code>{" "}
-            (admin auth) to generate a token, then reload this page.
+            (recommended — sends a magic URL) or{" "}
+            <code className="rounded bg-amber-100 px-1 font-mono text-xs">
+              POST .../dashboard-token
+            </code>{" "}
+            for a raw secret only.
           </p>
         </div>
       )}

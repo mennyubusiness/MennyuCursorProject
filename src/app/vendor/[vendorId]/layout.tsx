@@ -1,5 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { canAccessVendorDashboard, isVendorDashboardDevOpen } from "@/lib/vendor-dashboard-auth";
 import { VendorAreaNav } from "./VendorAreaNav";
 
 export default async function VendorAreaLayout({
@@ -13,9 +15,25 @@ export default async function VendorAreaLayout({
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, vendorDashboardToken: true },
   });
   if (!vendor) notFound();
+
+  if (!isVendorDashboardDevOpen()) {
+    const allowed = await canAccessVendorDashboard(vendorId);
+    if (!allowed) {
+      const session = await auth();
+      if (session?.user?.id) {
+        notFound();
+      }
+      if (vendor.vendorDashboardToken?.trim()) {
+        redirect(`/vendor/${vendorId}/settings?access=needs_session`);
+      }
+      redirect(
+        `/login?callbackUrl=${encodeURIComponent(`/vendor/${vendorId}`)}`
+      );
+    }
+  }
 
   return (
     <div className="min-h-screen bg-stone-50">

@@ -31,6 +31,7 @@ export async function POST(
   return NextResponse.json({
     vendorId: vendorId.trim(),
     vendorDashboardToken: token,
-    message: "Save this token for the vendor; it will not be shown again. Vendor pastes it in Settings to enable dashboard publish.",
+    message:
+      "Save this secret for API/automation only; prefer POST .../dashboard-access-link to email vendors a magic URL (no paste). If you share this token, the vendor can paste it under Settings → Manual token.",
   });
 }

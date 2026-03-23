@@ -89,6 +89,9 @@ export function vendorMenuImportDetailPrimaryStatus(job: {
     if (by.startsWith("auto:")) {
       return "Published automatically";
     }
+    if (by.startsWith("user:")) {
+      return "Published from your account";
+    }
     if (by.startsWith("vendor:")) {
       return "Published from your dashboard";
     }

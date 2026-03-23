@@ -4,6 +4,7 @@
  * Run: npm run db:seed (or npx prisma db seed)
  */
 import "dotenv/config";
+import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
@@ -342,6 +343,34 @@ async function main() {
   ];
   for (const item of noodleItems) {
     await upsertMenuItem(vendorNoodle.id, item);
+  }
+
+  // Dev vendor login (Auth.js): email/password — Taco Fiesta owner
+  const devEmail = "vendor@mennyu.local";
+  const devPasswordHash = await bcrypt.hash("mennyu-dev-password", 12);
+  let devUser = await prisma.user.findUnique({ where: { email: devEmail } });
+  if (!devUser) {
+    devUser = await prisma.user.create({
+      data: {
+        email: devEmail,
+        passwordHash: devPasswordHash,
+        name: "Seed vendor user",
+        vendorMemberships: {
+          create: { vendorId: vendorTaco.id, role: "owner" },
+        },
+      },
+    });
+    console.log("Auth: created dev user", devEmail, "(password: mennyu-dev-password) for vendor", vendorTaco.slug);
+  } else {
+    const m = await prisma.vendorMembership.findUnique({
+      where: { userId_vendorId: { userId: devUser.id, vendorId: vendorTaco.id } },
+    });
+    if (!m) {
+      await prisma.vendorMembership.create({
+        data: { userId: devUser.id, vendorId: vendorTaco.id, role: "owner" },
+      });
+      console.log("Auth: linked existing user to Taco Fiesta vendor");
+    }
   }
 
   console.log("Seed complete: 2 pods, 6 vendors, menu items + Deliverect-style modifiers (Whole Pizza) created.");

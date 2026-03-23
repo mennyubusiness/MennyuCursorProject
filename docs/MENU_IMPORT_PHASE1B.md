@@ -58,7 +58,9 @@ Errors: **`MenuImportVendorNotFoundError`** when `vendorId` is missing.
 
 ## E. Vendor-owned menu publishing (primary path)
 
-- **Auth:** `src/lib/vendor-dashboard-auth.ts` — production: `Vendor.vendorDashboardToken` + httpOnly cookie (`mennyu_vdash_{vendorId}`) or `Authorization: Bearer`; development: open (same pattern as other vendor APIs).
+- **Auth (Phase 1 unified):** Prefer **Auth.js session** + `VendorMembership` — see `docs/AUTH_PHASE1.md`. Legacy `Vendor.vendorDashboardToken` (Bearer / `mennyu_vdash_*` cookie / magic-link grant) remains for migration. Development: open (`src/lib/vendor-dashboard-auth.ts`).
+- **Magic link (preferred):** `VENDOR_ACCESS_SIGNING_SECRET` (min 32 chars, production) signs short-lived tokens in `src/lib/vendor-access-link.ts`. Admin `POST /api/admin/vendors/{vendorId}/dashboard-access-link` returns a URL to `GET /api/vendor/{vendorId}/session/grant?token=...` which sets the **same** httpOnly cookie as the legacy paste flow (no token in the URL except the signed ticket).
+- **Legacy token:** `POST /api/admin/vendors/{vendorId}/dashboard-token` still returns the raw secret for API/automation; vendor may paste under Settings → **Manual token (advanced)**.
 - **Routes:** `/vendor/{vendorId}/menu-imports` (list), `/vendor/{vendorId}/menu-imports/{jobId}` (review diff, publish, discard).
 - **APIs:** `POST /api/vendor/{vendorId}/menu-imports/{jobId}/publish`, `POST .../discard-draft` — both enforce `job.vendorId === vendorId` and same auth as above.
 - **Settings:** `Vendor.autoPublishMenus` (default `false`) — vendor toggle in `/vendor/{vendorId}/settings` (`VendorAutoPublishToggle`). When `true`, `src/services/menu-auto-publish.service.ts` may auto-publish **only** `DELIVERECT_MENU_WEBHOOK` imports after Phase 1B if eligibility matches manual publish.

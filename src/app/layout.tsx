@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import "./globals.css";
 import Link from "next/link";
+import { AuthSessionProvider } from "@/components/AuthSessionProvider";
 import { getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getActiveOrderByCustomerPhone } from "@/services/order.service";
 
@@ -28,6 +29,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-stone-50 text-stone-900 antialiased">
+        <AuthSessionProvider>
         <header className="border-b border-stone-200 bg-white">
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
             <Link href="/" className="text-xl font-semibold text-black hover:text-mennyu-primary">
@@ -56,6 +58,7 @@ export default async function RootLayout({
         <footer className="border-t border-stone-200 py-6 text-center text-sm text-stone-500">
           © Mennyu · mennyu.com
         </footer>
+        </AuthSessionProvider>
       </body>
     </html>
   );
