@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { ADMIN_COOKIE_NAME, isAdminAllowed } from "@/lib/admin-auth";
 import {
   isVendorDashboardDevOpen,
   timingSafeStringEqual,
@@ -45,6 +46,16 @@ export async function updateVendorAutoPublishMenus(
   if (!v) return { ok: false, error: "Vendor not found" };
 
   if (!isVendorDashboardDevOpen()) {
+    const cookieStore = await cookies();
+    if (isAdminAllowed(cookieStore.get(ADMIN_COOKIE_NAME)?.value ?? null, null)) {
+      await prisma.vendor.update({
+        where: { id: vendorId.trim() },
+        data: { autoPublishMenus },
+      });
+      revalidatePath(`/vendor/${vendorId}/settings`);
+      return { ok: true };
+    }
+
     const session = await auth();
     if (session?.user?.id) {
       const m = await prisma.vendorMembership.findUnique({
@@ -60,7 +71,6 @@ export async function updateVendorAutoPublishMenus(
       }
     }
 
-    const cookieStore = await cookies();
     const c = cookieStore.get(vendorDashboardCookieName(vendorId))?.value;
     if (
       c &&

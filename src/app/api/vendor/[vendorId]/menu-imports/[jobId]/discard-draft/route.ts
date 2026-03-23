@@ -32,7 +32,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "Forbidden: set a dashboard token on the vendor (admin) and sign in from vendor Settings, or use Authorization: Bearer.",
+          "Forbidden: vendor membership, legacy token, or Mennyu admin authentication required.",
         code: "VENDOR_DASHBOARD_AUTH",
       },
       { status: 403 }
@@ -51,9 +51,10 @@ export async function POST(
   }
 
   try {
+    const discardedBy = access.mode === "admin" ? "admin" : "vendor";
     const result = await discardDraftMenuVersionForImportJob({
       jobId: job.id,
-      discardedBy: "vendor",
+      discardedBy,
     });
     return NextResponse.json(result);
   } catch (e) {

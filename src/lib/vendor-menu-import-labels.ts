@@ -40,6 +40,9 @@ export function vendorMenuImportListBadge(job: VendorMenuImportListRow): {
     if (by.startsWith("auto:")) {
       return { label: "Published automatically", tone: "auto" };
     }
+    if (by.startsWith("admin:")) {
+      return { label: "Published by Mennyu admin", tone: "success" };
+    }
     return { label: "Published", tone: "success" };
   }
   if (job.status === "awaiting_review") {
@@ -88,6 +91,9 @@ export function vendorMenuImportDetailPrimaryStatus(job: {
     const by = job.draftVersion?.publishedBy ?? "";
     if (by.startsWith("auto:")) {
       return "Published automatically";
+    }
+    if (by.startsWith("admin:")) {
+      return "Published by Mennyu admin (support)";
     }
     if (by.startsWith("user:")) {
       return "Published from your account";

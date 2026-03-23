@@ -31,7 +31,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "Forbidden: sign in with a user linked to this vendor, or use a legacy dashboard token (Bearer / cookie).",
+          "Forbidden: sign in with a user linked to this vendor, use a legacy dashboard token, or authenticate as Mennyu admin.",
         code: "VENDOR_DASHBOARD_AUTH",
       },
       { status: 403 }
@@ -51,9 +51,11 @@ export async function POST(
 
   try {
     const publishedBy =
-      access.mode === "session" && access.userId
-        ? `user:${access.userId}`
-        : `vendor:${vendor.id}`;
+      access.mode === "admin"
+        ? "admin:help"
+        : access.mode === "session" && access.userId
+          ? `user:${access.userId}`
+          : `vendor:${vendor.id}`;
     const result = await publishMenuImportDraftToLive({
       jobId: job.id,
       publishedBy,

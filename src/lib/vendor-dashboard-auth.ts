@@ -1,14 +1,16 @@
 /**
  * Vendor dashboard access (Phase 1 unified auth):
- * 1) Preferred: Auth.js session + VendorMembership for vendorId
- * 2) Legacy: Vendor.vendorDashboardToken via Bearer or mennyu_vdash_{vendorId} cookie (migration / automation)
- * Development: open (same as admin) unless overridden.
+ * 1) Mennyu admin: same `mennyu_admin` cookie / `?admin=` as admin APIs (`isAdminAllowed`)
+ * 2) Preferred: Auth.js session + VendorMembership for vendorId
+ * 3) Legacy: Vendor.vendorDashboardToken via Bearer or mennyu_vdash_{vendorId} cookie (migration / automation)
+ * Development: open unless overridden.
  */
 import "server-only";
 import { timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { ADMIN_COOKIE_NAME, isAdminAccessFromRequest, isAdminAllowed } from "@/lib/admin-auth";
 import { env } from "@/lib/env";
 
 export const vendorDashboardCookieName = (vendorId: string) => `mennyu_vdash_${vendorId}`;
@@ -29,17 +31,22 @@ export function isVendorDashboardDevOpen(): boolean {
   return env.NODE_ENV === "development";
 }
 
-export type VendorAccessMode = "session" | "legacy" | "dev";
+export type VendorAccessMode = "session" | "legacy" | "dev" | "admin";
 
 export type VendorAccessResult =
   | { ok: true; mode: VendorAccessMode; userId?: string }
   | { ok: false };
 
 /**
- * True if the caller may view/act in this vendor area: dev, or session+membership, or legacy cookie/Bearer.
+ * True if the caller may view/act in this vendor area: dev, admin cookie, session+membership, or legacy cookie/Bearer.
  */
 export async function canAccessVendorDashboard(vendorId: string): Promise<boolean> {
   if (isVendorDashboardDevOpen()) return true;
+
+  const cookieStore = await cookies();
+  if (isAdminAllowed(cookieStore.get(ADMIN_COOKIE_NAME)?.value ?? null, null)) {
+    return true;
+  }
 
   const session = await auth();
   if (session?.user?.id) {
@@ -55,13 +62,12 @@ export async function canAccessVendorDashboard(vendorId: string): Promise<boolea
     select: { vendorDashboardToken: true },
   });
   if (!v?.vendorDashboardToken?.trim()) return false;
-  const cookieStore = await cookies();
   const c = cookieStore.get(vendorDashboardCookieName(vendorId))?.value;
   return Boolean(c && timingSafeStringEqual(c.trim(), v.vendorDashboardToken.trim()));
 }
 
 /**
- * API routes (publish, discard, etc.): session + membership, else legacy token.
+ * API routes (publish, discard, etc.): admin secret, session + membership, else legacy token.
  */
 export async function verifyVendorAccessForApi(
   vendorId: string,
@@ -70,6 +76,10 @@ export async function verifyVendorAccessForApi(
 ): Promise<VendorAccessResult> {
   if (isVendorDashboardDevOpen()) {
     return { ok: true, mode: "dev" };
+  }
+
+  if (isAdminAccessFromRequest(request)) {
+    return { ok: true, mode: "admin" };
   }
 
   const session = await auth();

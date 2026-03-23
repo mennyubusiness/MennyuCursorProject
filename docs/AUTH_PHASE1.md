@@ -22,6 +22,7 @@ Migration: `prisma/migrations/20250315130000_unified_auth_user_vendor_membership
 | Check | Behavior |
 |--------|----------|
 | **Preferred** | `auth()` session + `VendorMembership` for URL `vendorId` |
+| **Admin** | `mennyu_admin` cookie or `?admin=` matching `ADMIN_SECRET` (same as `/admin` dashboard) |
 | **Legacy** | `Authorization: Bearer` or `mennyu_vdash_{vendorId}` cookie matches `vendorDashboardToken` |
 | **Dev** | `NODE_ENV === "development"` — open (existing behavior) |
 
