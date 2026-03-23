@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import {
   fetchAdminMenuImportJobDetail,
   fetchLatestPublishedMenuVersionForVendor,
+  getLatestActionableMenuImportJobForVendor,
   sortMenuImportIssuesForDisplay,
 } from "@/lib/admin-menu-import-queries";
 import { diffCanonicalMenus } from "@/domain/menu-import/canonical-diff";
@@ -60,6 +61,12 @@ export default async function AdminMenuImportJobPage({
   if (!job) notFound();
 
   const publishedRow = await fetchLatestPublishedMenuVersionForVendor(job.vendorId);
+  const latestActionableForVendor = await getLatestActionableMenuImportJobForVendor(job.vendorId);
+  const isLatestActionableJob =
+    latestActionableForVendor != null &&
+    latestActionableForVendor.id === job.id &&
+    job.status === "awaiting_review" &&
+    job.draftVersionId != null;
 
   const issues = sortMenuImportIssuesForDisplay(job.issues);
   const blockingCount = issues.filter((i) => i.severity === MenuImportIssueSeverity.blocking).length;
@@ -162,6 +169,45 @@ export default async function AdminMenuImportJobPage({
         <h1 className="mt-2 text-xl font-semibold text-stone-900">Menu import job</h1>
         <p className="mt-0.5 font-mono text-sm text-stone-600">{job.id}</p>
       </div>
+
+      {isLatestActionableJob && (
+        <div
+          className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"
+          role="status"
+        >
+          <p className="font-medium">Latest menu update for {job.vendor.name}</p>
+          <p className="mt-1 text-emerald-900/90">
+            This is the newest import awaiting review for this vendor. Review the diff below, then use{" "}
+            <strong>Publish to live menu</strong> — publishing is idempotent and only applies this job&apos;s draft
+            snapshot.
+          </p>
+          <p className="mt-2">
+            <a
+              href="#admin-menu-import-publish"
+              className="inline-flex rounded-md bg-emerald-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-900"
+            >
+              Publish latest menu update
+            </a>
+          </p>
+        </div>
+      )}
+
+      {latestActionableForVendor && latestActionableForVendor.id !== job.id && job.status === "awaiting_review" && (
+        <div
+          className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          role="status"
+        >
+          <p className="font-medium">A newer menu import is awaiting review</p>
+          <p className="mt-1 text-amber-900/90">
+            The latest actionable job for this vendor is{" "}
+            <Link href={`/admin/menu-imports/${latestActionableForVendor.id}`} className="font-mono underline">
+              {latestActionableForVendor.id.slice(0, 8)}…
+            </Link>{" "}
+            ({formatDate(latestActionableForVendor.startedAt)}). Prefer publishing that draft so live menu matches the
+            newest Deliverect payload.
+          </p>
+        </div>
+      )}
 
       {!publishEligibility.canPublish && (
         <div

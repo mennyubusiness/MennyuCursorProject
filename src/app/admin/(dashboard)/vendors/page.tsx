@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { getLatestActionableMenuImportJobIdByVendorMap } from "@/lib/admin-menu-import-queries";
 import { AdminVendorToggle } from "./AdminVendorToggle";
 
 export default async function AdminVendorsPage() {
@@ -10,6 +11,8 @@ export default async function AdminVendorsPage() {
     },
     orderBy: { name: "asc" },
   });
+
+  const pendingJobByVendor = await getLatestActionableMenuImportJobIdByVendorMap(vendors.map((v) => v.id));
 
   return (
     <div>
@@ -35,6 +38,16 @@ export default async function AdminVendorsPage() {
                 <td className="px-4 py-2">
                   <span className="font-medium text-stone-900">{v.name}</span>
                   <p className="text-xs text-stone-500">{v.slug}</p>
+                  {pendingJobByVendor.has(v.id) && (
+                    <p className="mt-1">
+                      <Link
+                        href={`/admin/menu-imports/${pendingJobByVendor.get(v.id)}#admin-menu-import-publish`}
+                        className="inline-block rounded bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 hover:bg-sky-200"
+                      >
+                        Menu update available — review
+                      </Link>
+                    </p>
+                  )}
                 </td>
                 <td className="px-4 py-2">
                   <span className={v.isActive ? "text-green-700" : "text-stone-500"}>

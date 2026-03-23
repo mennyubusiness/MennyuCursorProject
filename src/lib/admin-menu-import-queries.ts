@@ -2,7 +2,7 @@
  * Read-only admin queries for menu import jobs (draft MenuVersion / issues). No live menu writes.
  */
 import "server-only";
-import { MenuVersionState, Prisma } from "@prisma/client";
+import { MenuImportJobStatus, MenuImportIssueSeverity, MenuVersionState, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 const menuImportJobAdminInclude = {
@@ -80,7 +80,26 @@ export async function fetchLatestPublishedMenuVersionIdByVendorMap(
   return map;
 }
 
-export async function fetchAdminMenuImportJobsList(limit = 50) {
+/** List row for admin menu-imports table (includes payload hash + blocking issue ids for badges). */
+export type AdminMenuImportJobListRow = Prisma.MenuImportJobGetPayload<{
+  select: {
+    id: true;
+    source: true;
+    status: true;
+    startedAt: true;
+    completedAt: true;
+    draftVersionId: true;
+    errorCode: true;
+    vendorId: true;
+    vendor: { select: { id: true; name: true; slug: true } };
+    draftVersion: { select: { id: true; state: true } };
+    menuImportRawPayload: { select: { payloadSha256: true } };
+    issues: { select: { id: true } };
+    _count: { select: { issues: true } };
+  };
+}>;
+
+export async function fetchAdminMenuImportJobsList(limit = 100): Promise<AdminMenuImportJobListRow[]> {
   return prisma.menuImportJob.findMany({
     take: limit,
     orderBy: { startedAt: "desc" },
@@ -92,12 +111,133 @@ export async function fetchAdminMenuImportJobsList(limit = 50) {
       completedAt: true,
       draftVersionId: true,
       errorCode: true,
-      vendor: { select: { id: true, name: true } },
+      vendorId: true,
+      vendor: { select: { id: true, name: true, slug: true } },
       draftVersion: { select: { id: true, state: true } },
+      menuImportRawPayload: { select: { payloadSha256: true } },
+      issues: {
+        where: { severity: MenuImportIssueSeverity.blocking, waived: false },
+        select: { id: true },
+      },
       _count: { select: { issues: true } },
     },
   });
 }
+
+/**
+ * Newest import job per vendor that can still be published: awaiting_review with a draft snapshot.
+ * After publish, status becomes `succeeded` — those jobs are excluded.
+ */
+export async function getLatestActionableMenuImportJobForVendor(vendorId: string) {
+  if (!vendorId?.trim()) return null;
+  return prisma.menuImportJob.findFirst({
+    where: {
+      vendorId: vendorId.trim(),
+      status: MenuImportJobStatus.awaiting_review,
+      draftVersionId: { not: null },
+    },
+    orderBy: { startedAt: "desc" },
+    select: {
+      id: true,
+      vendorId: true,
+      source: true,
+      status: true,
+      startedAt: true,
+      completedAt: true,
+      draftVersionId: true,
+      vendor: { select: { id: true, name: true, slug: true } },
+    },
+  });
+}
+
+/** Map vendorId → jobId for the latest actionable job (one query). */
+export async function getLatestActionableMenuImportJobIdByVendorMap(
+  vendorIds: string[]
+): Promise<Map<string, string>> {
+  const unique = [...new Set(vendorIds.map((v) => v.trim()).filter(Boolean))];
+  if (unique.length === 0) return new Map();
+
+  const jobs = await prisma.menuImportJob.findMany({
+    where: {
+      vendorId: { in: unique },
+      status: MenuImportJobStatus.awaiting_review,
+      draftVersionId: { not: null },
+    },
+    orderBy: { startedAt: "desc" },
+    select: { id: true, vendorId: true, startedAt: true },
+  });
+
+  const map = new Map<string, string>();
+  for (const j of jobs) {
+    if (!map.has(j.vendorId)) map.set(j.vendorId, j.id);
+  }
+  return map;
+}
+
+export type PendingMenuImportJobsSummary = {
+  /** Jobs with draft awaiting admin publish (same filter as publish eligibility gate). */
+  awaitingReviewCount: number;
+  /** Distinct vendors that have at least one such job. */
+  vendorsWithPendingCount: number;
+};
+
+export async function fetchPendingMenuImportJobsSummary(): Promise<PendingMenuImportJobsSummary> {
+  const base = {
+    status: MenuImportJobStatus.awaiting_review,
+    draftVersionId: { not: null },
+  } as const;
+
+  const [awaitingReviewCount, vendorRows] = await prisma.$transaction([
+    prisma.menuImportJob.count({ where: base }),
+    prisma.menuImportJob.findMany({
+      where: base,
+      select: { vendorId: true },
+      distinct: ["vendorId"],
+    }),
+  ]);
+
+  return {
+    awaitingReviewCount,
+    vendorsWithPendingCount: vendorRows.length,
+  };
+}
+
+/**
+ * Jobs that share the same raw payload hash (e.g. duplicate webhook deliveries with different idempotency keys).
+ * Used for UI badges only — does not change which job is "latest".
+ */
+export function getDuplicatePayloadShaJobIdSets(
+  jobs: Array<{ id: string; menuImportRawPayload: { payloadSha256: string } | null }>
+): Map<string, Set<string>> {
+  const bySha = new Map<string, Set<string>>();
+  for (const j of jobs) {
+    const sha = j.menuImportRawPayload?.payloadSha256;
+    if (!sha) continue;
+    let set = bySha.get(sha);
+    if (!set) {
+      set = new Set<string>();
+      bySha.set(sha, set);
+    }
+    set.add(j.id);
+  }
+  const duplicates = new Map<string, Set<string>>();
+  for (const [sha, ids] of bySha) {
+    if (ids.size > 1) duplicates.set(sha, ids);
+  }
+  return duplicates;
+}
+
+/** True if this job id appears in a duplicate raw-payload group (same SHA as another job). */
+export function isDuplicatePayloadJob(jobId: string, duplicateSetsBySha: Map<string, Set<string>>): boolean {
+  for (const set of duplicateSetsBySha.values()) {
+    if (set.has(jobId)) return true;
+  }
+  return false;
+}
+
+/** Aliases for certification/docs naming. */
+export { getLatestActionableMenuImportJobForVendor as getLatestMenuImportJobByVendor };
+export { fetchPendingMenuImportJobsSummary as getPendingMenuImportJobsSummary };
 
 /** Stable sort: blocking → warning → info, then code (Prisma DB order is not guaranteed). */
 export function sortMenuImportIssuesForDisplay<T extends { severity: string; code: string }>(

@@ -111,7 +111,10 @@ export function MenuImportPublishPanel({
   }
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white p-4">
+    <section
+      id="admin-menu-import-publish"
+      className="scroll-mt-4 rounded-lg border border-stone-200 bg-white p-4"
+    >
       <h2 className="font-medium text-stone-900">Publish to live menu</h2>
       <p className="mt-1 text-sm text-stone-600">
         Writes the draft canonical snapshot to live <code className="rounded bg-stone-100 px-0.5">MenuItem</code> /{" "}

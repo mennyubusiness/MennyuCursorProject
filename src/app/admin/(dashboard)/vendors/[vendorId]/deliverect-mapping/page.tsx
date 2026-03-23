@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { getLatestActionableMenuImportJobForVendor } from "@/lib/admin-menu-import-queries";
 import { DeliverectMappingClient } from "./DeliverectMappingClient";
 
 export default async function AdminVendorDeliverectMappingPage({
@@ -20,6 +21,8 @@ export default async function AdminVendorDeliverectMappingPage({
     },
   });
   if (!vendor) notFound();
+
+  const latestMenuImport = await getLatestActionableMenuImportJobForVendor(vendorId);
 
   const [menuItems, groups] = await Promise.all([
     prisma.menuItem.findMany({
@@ -74,6 +77,26 @@ export default async function AdminVendorDeliverectMappingPage({
         Attach Deliverect product and modifier IDs to existing Mennyu menu data for{" "}
         <strong>{vendor.name}</strong>. Clear a field and save to unset.
       </p>
+
+      {latestMenuImport && (
+        <div
+          className="mt-4 rounded-lg border border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-950"
+          role="status"
+        >
+          <p className="font-medium">New menu update from Deliverect</p>
+          <p className="mt-1 text-sky-900/90">
+            A draft menu is awaiting review. Publish after diff review to update live items (including snooze).
+          </p>
+          <p className="mt-2">
+            <Link
+              href={`/admin/menu-imports/${latestMenuImport.id}#admin-menu-import-publish`}
+              className="font-medium text-sky-900 underline hover:text-sky-950"
+            >
+              Open import job → Review & publish
+            </Link>
+          </p>
+        </div>
+      )}
 
       <div className="mt-6">
         <DeliverectMappingClient
