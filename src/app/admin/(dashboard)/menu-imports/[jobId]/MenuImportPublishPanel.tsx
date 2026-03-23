@@ -127,9 +127,11 @@ export function MenuImportPublishPanel({
       <p className="mt-1 text-sm text-stone-600">
         Writes the draft canonical snapshot to live <code className="rounded bg-stone-100 px-0.5">MenuItem</code> /{" "}
         <code className="rounded bg-stone-100 px-0.5">ModifierGroup</code> /{" "}
-        <code className="rounded bg-stone-100 px-0.5">ModifierOption</code> rows. Confirm manually unless your vendor
-        has auto-publish enabled for webhook imports only. Removed Deliverect entities are marked unavailable, not
-        deleted.
+        <code className="rounded bg-stone-100 px-0.5">ModifierOption</code> rows.{" "}
+        {publishUrlOverride
+          ? "Confirm when you are ready. (Auto-publish from Deliverect webhooks is optional in Settings.) "
+          : "Confirm manually unless the vendor has auto-publish enabled for webhook imports only. "}
+        Removed Deliverect entities are marked unavailable, not deleted.
       </p>
       {publishUrlOverride && (
         <p className="mt-2 text-xs text-stone-600">

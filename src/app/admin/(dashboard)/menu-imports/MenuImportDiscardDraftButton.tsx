@@ -18,6 +18,7 @@ export function MenuImportDiscardDraftButton({
   canDiscard,
   discardReasons,
   adminSecretForDiscard = null,
+  discardUrlOverride = null,
   variant = "compact",
 }: {
   jobId: string;
@@ -25,6 +26,8 @@ export function MenuImportDiscardDraftButton({
   canDiscard: boolean;
   discardReasons: string[];
   adminSecretForDiscard?: string | null;
+  /** When set (e.g. vendor dashboard), POST goes here with session/Bearer auth instead of admin. */
+  discardUrlOverride?: string | null;
   variant?: "compact" | "panel";
 }) {
   const router = useRouter();
@@ -32,9 +35,13 @@ export function MenuImportDiscardDraftButton({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
-  const url = menuImportDiscardDraftUrl(jobId, adminSecretForDiscard);
+  const url = discardUrlOverride?.trim()
+    ? discardUrlOverride.trim()
+    : menuImportDiscardDraftUrl(jobId, adminSecretForDiscard);
   const prodMissingSecret =
-    process.env.NODE_ENV === "production" && !url.includes("?");
+    !discardUrlOverride?.trim() &&
+    process.env.NODE_ENV === "production" &&
+    !url.includes("?");
 
   const title = !canDiscard ? discardReasons.join(" ") : undefined;
 

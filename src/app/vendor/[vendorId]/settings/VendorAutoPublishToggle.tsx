@@ -35,11 +35,13 @@ export function VendorAutoPublishToggle({
 
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Auto-publish menu (webhook)</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Menu publishing</h3>
       <p className="mt-2 text-sm text-stone-600">
-        When enabled, Deliverect <strong>menu webhook</strong> imports publish automatically only if there are no
-        blocking issues and the draft is valid — same checks as manual publish. API pulls and manual imports stay in
-        &quot;awaiting review&quot; unless you publish them.
+        <strong>Review before publish (default):</strong> Deliverect sends drafts to Mennyu; you open{" "}
+        <strong>Menu imports</strong>, review the diff, then publish.{" "}
+        <strong>Auto-publish:</strong> when on, <em>only</em> Deliverect <strong>menu webhook</strong> imports can go
+        live automatically if they pass the same safety checks as manual publish (no blocking issues, valid draft).
+        Other sources (e.g. API pull) stay in &quot;needs review&quot; until you publish.
       </p>
       <div className="mt-3 flex items-center gap-3">
         <button
@@ -50,7 +52,7 @@ export function VendorAutoPublishToggle({
             on ? "bg-emerald-600 text-white hover:bg-emerald-700" : "border border-stone-300 bg-white text-stone-800"
           } disabled:opacity-50`}
         >
-          {loading ? "Saving…" : on ? "Auto-publish: ON" : "Auto-publish: OFF"}
+          {loading ? "Saving…" : on ? "Auto-publish: ON" : "Auto-publish: OFF (review first)"}
         </button>
       </div>
       {error && (

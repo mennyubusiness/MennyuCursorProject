@@ -8,8 +8,11 @@ import {
 import { diffCanonicalMenus } from "@/domain/menu-import/canonical-diff";
 import { mennyuCanonicalMenuSchema, type MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import { evaluateMenuImportPublishEligibility } from "@/services/menu-publish-from-canonical.service";
+import { evaluateDraftMenuVersionDiscardEligibility } from "@/services/discard-draft-menu-version.service";
 import { AdminMenuImportDiffView } from "@/app/admin/(dashboard)/menu-imports/[jobId]/AdminMenuImportDiffView";
 import { MenuImportPublishPanel } from "@/app/admin/(dashboard)/menu-imports/[jobId]/MenuImportPublishPanel";
+import { MenuImportDiscardDraftButton } from "@/app/admin/(dashboard)/menu-imports/MenuImportDiscardDraftButton";
+import { vendorMenuImportDetailPrimaryStatus } from "@/lib/vendor-menu-import-labels";
 import { MenuImportIssueSeverity } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isVendorDashboardDevOpen, vendorDashboardCookieName } from "@/lib/vendor-dashboard-auth";
@@ -72,7 +75,9 @@ export default async function VendorMenuImportJobPage({
   const publishedRow = await fetchLatestPublishedMenuVersionForVendor(job.vendorId);
 
   const issues = sortMenuImportIssuesForDisplay(job.issues);
-  const blockingCount = issues.filter((i) => i.severity === MenuImportIssueSeverity.blocking).length;
+  const blockingCount = issues.filter(
+    (i) => i.severity === MenuImportIssueSeverity.blocking && !i.waived
+  ).length;
   const warningCount = issues.filter((i) => i.severity === MenuImportIssueSeverity.warning).length;
   const infoCount = issues.filter((i) => i.severity === MenuImportIssueSeverity.info).length;
 
@@ -106,6 +111,19 @@ export default async function VendorMenuImportJobPage({
     draftVersionId: job.draftVersionId,
     draftVersion: job.draftVersion,
     issues: job.issues.map((i) => ({ severity: i.severity, waived: i.waived })),
+  });
+
+  const discardDraftEligibility = evaluateDraftMenuVersionDiscardEligibility({
+    draftVersionId: job.draftVersionId,
+    draftVersion: job.draftVersion,
+    activePublishedMenuVersionId: publishedRow?.id ?? null,
+  });
+
+  const vendorFriendlyStatus = vendorMenuImportDetailPrimaryStatus({
+    status: job.status,
+    errorCode: job.errorCode,
+    draftVersion: job.draftVersion,
+    blockingIssueCount: blockingCount,
   });
 
   const draftCountsSummary =
@@ -142,6 +160,9 @@ export default async function VendorMenuImportJobPage({
       : null;
 
   const vendorPublishUrl = `/api/vendor/${encodeURIComponent(vendorId)}/menu-imports/${encodeURIComponent(job.id)}/publish`;
+  const vendorDiscardUrl = `/api/vendor/${encodeURIComponent(vendorId)}/menu-imports/${encodeURIComponent(job.id)}/discard-draft`;
+
+  const vendorActionsUnlocked = !needsDashboardToken && !needsSessionCookie;
 
   return (
     <div className="space-y-8">
@@ -149,7 +170,7 @@ export default async function VendorMenuImportJobPage({
         <Link href={`/vendor/${vendorId}/menu-imports`} className="text-sm text-stone-600 hover:underline">
           ← Menu imports
         </Link>
-        <h1 className="mt-2 text-xl font-semibold text-stone-900">Review menu update</h1>
+        <h1 className="mt-2 text-xl font-semibold text-stone-900">Menu update</h1>
         <p className="mt-0.5 font-mono text-sm text-stone-600">{job.id}</p>
       </div>
 
@@ -198,7 +219,8 @@ export default async function VendorMenuImportJobPage({
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-stone-500">Status</dt>
-            <dd className="font-mono text-stone-900">{job.status}</dd>
+            <dd className="text-stone-900">{vendorFriendlyStatus}</dd>
+            <dd className="mt-0.5 font-mono text-xs text-stone-500">{job.status}</dd>
           </div>
           <div>
             <dt className="text-stone-500">Source</dt>
@@ -217,12 +239,21 @@ export default async function VendorMenuImportJobPage({
 
       <MenuImportPublishPanel
         jobId={job.id}
-        canPublish={publishEligibility.canPublish && !needsDashboardToken && !needsSessionCookie}
+        canPublish={publishEligibility.canPublish && vendorActionsUnlocked}
         diffSummary={publishSummary}
         summaryMode={publishSummaryMode}
         diffUnavailableNote={publishDiffUnavailableNote}
         adminSecretForPublish={null}
         publishUrlOverride={vendorPublishUrl}
+      />
+
+      <MenuImportDiscardDraftButton
+        jobId={job.id}
+        draftVersionId={job.draftVersionId}
+        canDiscard={discardDraftEligibility.canDiscard && vendorActionsUnlocked}
+        discardReasons={discardDraftEligibility.reasons}
+        discardUrlOverride={vendorDiscardUrl}
+        variant="panel"
       />
 
       <section>

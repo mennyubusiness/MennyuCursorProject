@@ -12,6 +12,8 @@ const menuImportJobAdminInclude = {
     select: {
       id: true,
       state: true,
+      publishedAt: true,
+      publishedBy: true,
       canonicalSnapshot: true,
       canonicalSnapshotSha256: true,
       createdAt: true,

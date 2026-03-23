@@ -64,11 +64,18 @@ export function evaluateDraftMenuVersionDiscardEligibility(input: {
  */
 export async function discardDraftMenuVersion(params: {
   menuVersionId: string;
+  /** Audit note on the retained MenuImportJob row. */
+  discardedBy?: "vendor" | "admin";
 }): Promise<{ discardedMenuVersionId: string }> {
   const menuVersionId = params.menuVersionId?.trim();
   if (!menuVersionId) {
     throw new DraftMenuVersionDiscardError("INVALID_ID", "menuVersionId is required");
   }
+
+  const discardMessage =
+    params.discardedBy === "vendor"
+      ? "Draft MenuVersion was discarded by the vendor; job retained for audit."
+      : "Draft MenuVersion was discarded by an admin; job retained for audit.";
 
   return prisma.$transaction(async (tx) => {
     const version = await tx.menuVersion.findUnique({
@@ -112,7 +119,7 @@ export async function discardDraftMenuVersion(params: {
           draftVersionId: null,
           status: MenuImportJobStatus.cancelled,
           errorCode: "DRAFT_DISCARDED",
-          errorMessage: "Draft MenuVersion was discarded by an admin; job retained for audit.",
+          errorMessage: discardMessage,
         },
       });
     }
@@ -128,6 +135,7 @@ export async function discardDraftMenuVersion(params: {
 /** Discard the draft linked to a menu import job (review page entry point). */
 export async function discardDraftMenuVersionForImportJob(params: {
   jobId: string;
+  discardedBy?: "vendor" | "admin";
 }): Promise<{ discardedMenuVersionId: string }> {
   const jobId = params.jobId?.trim();
   if (!jobId) {
@@ -170,5 +178,8 @@ export async function discardDraftMenuVersionForImportJob(params: {
     );
   }
 
-  return discardDraftMenuVersion({ menuVersionId: job.draftVersionId });
+  return discardDraftMenuVersion({
+    menuVersionId: job.draftVersionId,
+    discardedBy: params.discardedBy ?? "admin",
+  });
 }

@@ -25,7 +25,10 @@ export async function POST(
   }
 
   try {
-    const result = await discardDraftMenuVersionForImportJob({ jobId: jobId.trim() });
+    const result = await discardDraftMenuVersionForImportJob({
+      jobId: jobId.trim(),
+      discardedBy: "admin",
+    });
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof DraftMenuVersionDiscardError) {

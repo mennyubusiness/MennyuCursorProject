@@ -55,3 +55,13 @@ Errors: **`MenuImportVendorNotFoundError`** when `vendorId` is missing.
 - **Phase 1A:** `src/integrations/deliverect/menu/phase1a-pipeline.test.ts` (sample JSON, bad root, empty products, duplicate product id).
 - **Hash:** `src/lib/menu-import-payload-hash.test.ts`.
 - **Phase 1B:** `src/services/menu-import-phase1b.service.test.ts` (mocked `PrismaClient`: happy path, empty products, idempotency, missing vendor).
+
+## E. Vendor-owned menu publishing (primary path)
+
+- **Auth:** `src/lib/vendor-dashboard-auth.ts` — production: `Vendor.vendorDashboardToken` + httpOnly cookie (`mennyu_vdash_{vendorId}`) or `Authorization: Bearer`; development: open (same pattern as other vendor APIs).
+- **Routes:** `/vendor/{vendorId}/menu-imports` (list), `/vendor/{vendorId}/menu-imports/{jobId}` (review diff, publish, discard).
+- **APIs:** `POST /api/vendor/{vendorId}/menu-imports/{jobId}/publish`, `POST .../discard-draft` — both enforce `job.vendorId === vendorId` and same auth as above.
+- **Settings:** `Vendor.autoPublishMenus` (default `false`) — vendor toggle in `/vendor/{vendorId}/settings` (`VendorAutoPublishToggle`). When `true`, `src/services/menu-auto-publish.service.ts` may auto-publish **only** `DELIVERECT_MENU_WEBHOOK` imports after Phase 1B if eligibility matches manual publish.
+- **Webhook → auto-publish:** `src/services/menu-import-phase1b.service.ts` calls `tryAutoPublishMenuImportJob` after ingest; `MenuVersion.publishedBy` is `auto:deliverect_menu_webhook` for audit.
+- **Labels:** `src/lib/vendor-menu-import-labels.ts` — vendor-friendly list/detail copy (e.g. “Published automatically”, “New menu update available”, “Blocked by issues”).
+- **Admin:** unchanged; `/admin/menu-imports` remains for support (publish, discard, rollback). Discard audit text distinguishes `discardedBy: "vendor"` vs `"admin"` on `MenuImportJob.errorMessage`.
