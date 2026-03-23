@@ -12,14 +12,15 @@ export function AddToCartButton({
   menuItemName,
   priceCents,
   modifierConfig,
-  vendorUnavailable = false,
+  /** True when vendor is closed/paused or this menu item is snoozed / unavailable. */
+  orderingDisabled = false,
 }: {
   cartId: string;
   menuItemId: string;
   menuItemName: string;
   priceCents: number;
   modifierConfig?: ModifierConfigForUI;
-  vendorUnavailable?: boolean;
+  orderingDisabled?: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -48,7 +49,7 @@ export function AddToCartButton({
   }
 
   function handleClick() {
-    if (vendorUnavailable) return;
+    if (orderingDisabled) return;
     if (hasModifiers) {
       setModalOpen(true);
       setError(null);
@@ -72,11 +73,11 @@ export function AddToCartButton({
       <button
         type="button"
         onClick={handleClick}
-        disabled={loading || !cartId || vendorUnavailable}
+        disabled={loading || !cartId || orderingDisabled}
         className="rounded-lg border border-mennyu-primary bg-white px-4 py-2 text-sm font-medium text-black hover:bg-mennyu-muted disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {vendorUnavailable
-          ? "Not available"
+        {orderingDisabled
+          ? "Unavailable"
           : loading
             ? "Adding…"
             : done

@@ -21,7 +21,6 @@ export default async function VendorMenuPage({
           vendor: {
             include: {
               menuItems: {
-                where: { isAvailable: true },
                 orderBy: { sortOrder: "asc" },
                 include: {
                   modifierGroups: {
@@ -58,6 +57,11 @@ export default async function VendorMenuPage({
   const cart = await getOrCreateCartAction(podId);
   const availabilityStatus = getVendorAvailabilityStatus(vendor);
   const unavailable = availabilityStatus !== "open";
+
+  const menuItemsSorted = [...vendor.menuItems].sort((a, b) => {
+    if (a.isAvailable === b.isAvailable) return a.sortOrder - b.sortOrder;
+    return a.isAvailable ? -1 : 1;
+  });
 
   return (
     <div>
@@ -97,7 +101,7 @@ export default async function VendorMenuPage({
       {vendor.description && (
         <p className="mt-2 text-stone-600">{vendor.description}</p>
       )}
-      {vendor.menuItems.length === 0 ? (
+      {menuItemsSorted.length === 0 ? (
         <div className="mt-8 rounded-xl border border-stone-200 bg-stone-50 p-8 text-center">
           <p className="text-stone-600">This vendor has no menu items available right now.</p>
           <p className="mt-1 text-sm text-stone-500">Check back later.</p>
@@ -107,13 +111,22 @@ export default async function VendorMenuPage({
         </div>
       ) : (
       <div className="mt-8 space-y-6">
-        {vendor.menuItems.map((item) => (
+        {menuItemsSorted.map((item) => {
+          const itemUnavailable = unavailable || !item.isAvailable;
+          return (
           <div
             key={item.id}
-            className="flex flex-col gap-2 rounded-lg border border-stone-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+            className={`flex flex-col gap-2 rounded-lg border border-stone-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between ${!item.isAvailable ? "opacity-75" : ""}`}
           >
             <div>
-              <h3 className="font-medium text-stone-900">{item.name}</h3>
+              <h3 className="font-medium text-stone-900">
+                {item.name}
+                {!item.isAvailable && (
+                  <span className="ml-2 rounded bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-700">
+                    Unavailable
+                  </span>
+                )}
+              </h3>
               {item.description && (
                 <p className="text-sm text-stone-600">{item.description}</p>
               )}
@@ -127,10 +140,11 @@ export default async function VendorMenuPage({
               menuItemName={item.name}
               priceCents={item.priceCents}
               modifierConfig={item.modifierGroups?.length ? serializeModifierConfig(item) : undefined}
-              vendorUnavailable={unavailable}
+              orderingDisabled={itemUnavailable}
             />
           </div>
-        ))}
+          );
+        })}
       </div>
       )}
       {cart.items.length > 0 && (

@@ -68,8 +68,14 @@ export async function addCartItem(
     where: { id: menuItemId },
     include: { vendor: true, modifierGroups: true },
   });
-  if (!menuItem || !menuItem.isAvailable) {
-    throw new Error("MenuItem not found or unavailable");
+  if (!menuItem) {
+    throw new Error("MenuItem not found");
+  }
+  if (!menuItem.isAvailable) {
+    throw new CartValidationError(`${menuItem.name} is no longer available.`, "ITEM_UNAVAILABLE", {
+      menuItemId: menuItem.id,
+      menuItemName: menuItem.name,
+    });
   }
   const vendorAvailability = getVendorAvailability(menuItem.vendor);
   if (!vendorAvailability.orderable) {
@@ -195,7 +201,10 @@ export async function updateCartItem(
   }
   const existingItem = await prisma.cartItem.findFirst({
     where: { id: cartItemId, cartId },
-    include: { menuItem: true },
+    include: {
+      menuItem: true,
+      selections: { include: { modifierOption: true } },
+    },
   });
   if (!existingItem) return getCartByIdOrThrow(cartId);
 
@@ -240,6 +249,37 @@ export async function updateCartItem(
       data: { quantity, priceCents: priceCentsToStore, ...(specialInstructions !== undefined ? { specialInstructions: specialInstructions === "" ? null : specialInstructions } : {}) },
     });
     return getCartByIdOrThrow(cartId);
+  }
+
+  // Quantity / notes-only updates must still enforce current menu + modifier availability (re-publish / snooze).
+  if (!existingItem.menuItem.isAvailable) {
+    throw new CartValidationError(`${existingItem.menuItem.name} is no longer available.`, "ITEM_UNAVAILABLE", {
+      cartItemId,
+      menuItemId: existingItem.menuItemId,
+      menuItemName: existingItem.menuItem.name,
+    });
+  }
+  const persistedSelections = existingItem.selections.map((s) => ({
+    modifierOptionId: s.modifierOptionId,
+    quantity: s.quantity,
+  }));
+  const modResult = await validateCartItemModifiers({
+    id: cartItemId,
+    menuItemId: existingItem.menuItemId,
+    quantity,
+    menuItem: {
+      name: existingItem.menuItem.name,
+      isAvailable: existingItem.menuItem.isAvailable,
+      basketMaxQuantity: existingItem.menuItem.basketMaxQuantity ?? undefined,
+    },
+    selections: persistedSelections,
+  });
+  if (!modResult.valid) {
+    throw new CartValidationError(modResult.message, modResult.code, {
+      cartItemId: modResult.cartItemId ?? cartItemId,
+      menuItemId: modResult.menuItemId,
+      menuItemName: modResult.menuItemName,
+    });
   }
 
   const data: { quantity: number; specialInstructions?: string | null } = { quantity };
