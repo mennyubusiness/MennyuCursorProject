@@ -5,34 +5,32 @@ import { useState } from "react";
 import { isHttpsImageUrl } from "@/lib/remote-image-url";
 import { vendorInitials } from "@/lib/vendor-initials";
 
-const DEFAULT_BOX = "h-14 w-14";
+const DEFAULT_BOX = "h-28 w-28 sm:h-36 sm:w-36";
 
-type VendorLogoProps = {
+type PodLogoProps = {
   imageUrl: string | null | undefined;
-  vendorName: string;
-  /** Outer box (fixed size); image uses object-cover inside. */
+  podName: string;
   className?: string;
-  /** Passed to next/image `sizes` for responsive loading (match approximate render width). */
   sizes?: string;
 };
 
-export function VendorLogo({
+export function PodLogo({
   imageUrl,
-  vendorName,
+  podName,
   className = DEFAULT_BOX,
-  sizes = "56px",
-}: VendorLogoProps) {
+  sizes = "(max-width: 640px) 112px, 144px",
+}: PodLogoProps) {
   const [loadFailed, setLoadFailed] = useState(false);
   const canTryImage = isHttpsImageUrl(imageUrl) && !loadFailed;
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-xl border border-stone-200 bg-stone-100 ${className}`}
+      className={`relative shrink-0 overflow-hidden rounded-2xl border border-stone-200 bg-stone-100 ${className}`}
     >
       {canTryImage ? (
         <Image
           src={imageUrl}
-          alt={`${vendorName} logo`}
+          alt={`${podName}`}
           fill
           className="object-cover"
           sizes={sizes}
@@ -40,10 +38,10 @@ export function VendorLogo({
         />
       ) : (
         <div
-          className="flex h-full min-h-[3.5rem] w-full items-center justify-center text-sm font-semibold text-stone-500"
+          className="flex h-full min-h-[7rem] w-full items-center justify-center text-2xl font-semibold text-stone-500 sm:min-h-[9rem]"
           aria-hidden
         >
-          {vendorInitials(vendorName)}
+          {vendorInitials(podName)}
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 /**
- * Post-login routing for /login — vendor flow fully implemented; other intents stubbed.
+ * Post-login routing for /login — vendor flow fully implemented; customer intent redirects to
+ * the order hub (/orders or a safe callback); pod/admin have separate handling.
  */
 import "server-only";
 import { prisma } from "@/lib/db";
@@ -16,6 +17,16 @@ function safeInternalPath(raw: string | null): string | null {
   const t = raw.trim();
   if (!t.startsWith("/") || t.startsWith("//")) return null;
   return t;
+}
+
+/** Safe redirects after customer-intent email sign-in (order hub + browse; never vendor/admin). */
+function isCustomerHubRedirectPath(path: string): boolean {
+  const clean = path.split("?")[0]?.trim() ?? "";
+  if (!clean.startsWith("/")) return false;
+  if (clean === "/orders" || clean === "/explore" || clean === "/cart" || clean === "/") return true;
+  if (clean.startsWith("/pod/")) return true;
+  if (clean.startsWith("/order/")) return true;
+  return false;
 }
 
 export async function resolvePostLoginDestination(
@@ -38,14 +49,19 @@ export async function resolvePostLoginDestination(
     };
   }
 
-  if (intent !== "vendor") {
+  if (intent === "customer") {
+    const cb = safeInternalPath(callbackUrl);
+    if (cb && isCustomerHubRedirectPath(cb)) {
+      return { kind: "redirect", path: cb };
+    }
+    return { kind: "redirect", path: "/orders" };
+  }
+
+  if (intent === "pod") {
     return {
       kind: "coming_soon",
       headline: "This area isn’t connected yet",
-      body:
-        intent === "pod"
-          ? "You’re signed in. Pod dashboard access for your account is coming in a future update. Choose Vendor dashboard if you manage a restaurant."
-          : "You’re signed in. Customer account features for this email are coming in a future update. You can still browse and order on Mennyu as usual.",
+      body: "You’re signed in. Pod dashboard access for your account is coming in a future update. Choose Vendor dashboard if you manage a restaurant.",
     };
   }
 

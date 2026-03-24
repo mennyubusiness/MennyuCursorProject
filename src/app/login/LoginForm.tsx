@@ -30,8 +30,9 @@ function formCopy(intent: LoginIntent): { title: string; blurb: string; button: 
     case "customer":
       return {
         title: "Sign in",
-        blurb: "Customer account sign-in is coming soon. You can still sign in with your email.",
-        button: "Sign in",
+        blurb:
+          "If you have a Mennyu email login, you can sign in here. Afterward we take you to Your orders—where you link your checkout phone number to see past orders. (Restaurant staff usually choose Vendor dashboard instead.)",
+        button: "Continue to your orders",
       };
     case "admin":
       return {

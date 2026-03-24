@@ -63,7 +63,11 @@ export function SiteHeaderNav({
       <Link href="/explore" className="text-stone-600 hover:text-mennyu-primary">
         Explore pods
       </Link>
-      <Link href="/orders" className="text-stone-600 hover:text-mennyu-primary">
+      <Link
+        href="/orders"
+        className="text-stone-600 hover:text-mennyu-primary"
+        title="Your orders — link your phone from checkout to see history"
+      >
         Orders
       </Link>
       <Link
@@ -76,6 +80,7 @@ export function SiteHeaderNav({
         <Link
           href={loginHref}
           className="font-medium text-mennyu-primary hover:underline"
+          title="Email sign-in (staff accounts). For order history, use Orders and your phone number."
         >
           Sign in
         </Link>
@@ -86,6 +91,7 @@ export function SiteHeaderNav({
           disabled={signingOut}
           onClick={() => void handleSignOut()}
           className="text-stone-600 hover:text-mennyu-primary disabled:opacity-50"
+          title="Clears saved phone for orders and signs out email if you used one"
         >
           {signingOut ? "Signing out…" : "Sign out"}
         </button>

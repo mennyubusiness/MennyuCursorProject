@@ -17,8 +17,8 @@ const OPTIONS: { id: LoginIntent; label: string; description: string }[] = [
   },
   {
     id: "customer",
-    label: "Customer account",
-    description: "Orders and account for diners (coming soon).",
+    label: "Your orders (diner)",
+    description: "View order history with your checkout phone number. Email sign-in goes to the same place.",
   },
   {
     id: "admin",

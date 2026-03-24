@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PodLogo } from "@/components/images/PodLogo";
 import { VendorLogo } from "@/components/images/VendorLogo";
 import { prisma } from "@/lib/db";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
@@ -33,22 +34,9 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
 
   return (
     <div className="space-y-10">
-      <nav className="text-sm text-stone-500" aria-label="Breadcrumb">
-        <ol className="flex flex-wrap items-center gap-1.5">
-          <li>
-            <Link href="/explore" className="hover:text-mennyu-primary">
-              Explore pods
-            </Link>
-          </li>
-          <li aria-hidden className="text-stone-300">
-            /
-          </li>
-          <li className="font-medium text-stone-700">{pod.name}</li>
-        </ol>
-      </nav>
-
       <header className="border-b border-stone-200 pb-8">
-        <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+        <PodLogo imageUrl={pod.imageUrl} podName={pod.name} />
+        <p className="mt-6 text-xs font-semibold uppercase tracking-wide text-stone-500">
           Food pod
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">

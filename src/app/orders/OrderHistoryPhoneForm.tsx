@@ -39,7 +39,8 @@ export function OrderHistoryPhoneForm() {
   return (
     <form onSubmit={handleSubmit} className="rounded-lg border border-stone-200 bg-white p-6">
       <p className="text-stone-600">
-        Enter the phone number used for this order to view your order history.
+        Enter the phone number you used at checkout. We&apos;ll show orders that match this number
+        on this device.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <input
