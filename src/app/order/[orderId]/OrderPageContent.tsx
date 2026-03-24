@@ -256,12 +256,34 @@ export function OrderPageContent({
                     This vendor&apos;s portion is ready for pickup.
                   </p>
                 )}
-                <ul className="mt-3 space-y-1.5 text-sm text-stone-600">
-                  {vo.lineItems.map((line) => (
-                    <li key={line.id}>
-                      {line.name} × {line.quantity} — ${((line.priceCents * line.quantity) / 100).toFixed(2)}
-                    </li>
-                  ))}
+                <ul className="mt-3 space-y-2 text-sm text-stone-600">
+                  {vo.lineItems.map((line) => {
+                    const selections = line.selections ?? [];
+                    return (
+                      <li key={line.id}>
+                        <div>
+                          {line.name} × {line.quantity} — $
+                          {((line.priceCents * line.quantity) / 100).toFixed(2)}
+                        </div>
+                        {selections.length > 0 && (
+                          <ul className="mt-1.5 space-y-0.5 pl-3 text-stone-500">
+                            {selections.map((s) => (
+                              <li key={s.id} className="flex gap-2">
+                                <span className="text-stone-400" aria-hidden>
+                                  ·
+                                </span>
+                                <span>
+                                  {s.quantity > 1
+                                    ? `${s.nameSnapshot} ×${s.quantity}`
+                                    : s.nameSnapshot}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
                 {showVendorSubtotal && (
                   <div className="mt-3 border-t border-stone-200 pt-3">

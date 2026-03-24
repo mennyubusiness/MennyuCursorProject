@@ -65,6 +65,37 @@ export async function validateCartItemModifiers(cartItem: CartItemForValidation)
     }
   }
 
+  /** Nested option id → parent top-level option id (one UI level; matches serializeModifierConfig). */
+  const nestedToParent = new Map<string, string>();
+  for (const link of menuItem.modifierGroups) {
+    const group = link.modifierGroup;
+    if (group.parentModifierOptionId != null) continue;
+    for (const opt of group.options) {
+      for (const ng of opt.nestedModifierGroups) {
+        for (const no of ng.options) {
+          nestedToParent.set(no.id, opt.id);
+        }
+      }
+    }
+  }
+
+  for (const [optionId, qty] of selectionByOptionId) {
+    if (qty < 1) continue;
+    const parentId = nestedToParent.get(optionId);
+    if (parentId === undefined) continue;
+    const parentQty = selectionByOptionId.get(parentId) ?? 0;
+    if (parentQty < 1) {
+      return {
+        valid: false,
+        code: "INVALID_NESTED_MODIFIER",
+        message: `A nested modifier for ${menuItem.name} requires the parent option to be selected.`,
+        cartItemId: cartItem.id,
+        menuItemId: cartItem.menuItemId,
+        menuItemName: menuItem.name,
+      };
+    }
+  }
+
   const optionIdsSelected = new Set(selectionByOptionId.keys());
 
   for (const link of menuItem.modifierGroups) {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchDeliverectCommerceStoreMenus } from "./menu-api";
+import { pickNormalizerInputFromCommerceMenusResponse } from "@/integrations/deliverect/menu-api";
 
 describe("pickNormalizerInputFromCommerceMenusResponse", () => {
   it("unwraps single-element menu array", () => {

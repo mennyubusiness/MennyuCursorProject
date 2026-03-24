@@ -591,7 +591,11 @@ async function getOrderWithUnifiedStatusImpl(orderId: string) {
       vendorOrders: {
         include: {
           vendor: true,
-          lineItems: true,
+          lineItems: {
+            include: {
+              selections: { orderBy: { id: "asc" } },
+            },
+          },
           statusHistory: { orderBy: { createdAt: "asc" } },
         },
       },

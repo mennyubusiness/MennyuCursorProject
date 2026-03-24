@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import type { ModifierConfigForUI, ModifierGroupLinkForUI, ModifierOptionForUI } from "./modifier-config";
+import type {
+  ModifierConfigForUI,
+  ModifierGroupLinkForUI,
+  ModifierOptionForUI,
+} from "./modifier-config";
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
 import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
 
@@ -34,6 +38,15 @@ function totalSelectedInNested(
     n += state[opt.id] ?? 0;
   }
   return n;
+}
+
+/** Nested option ids under a single top-level option (matches one level in serializeModifierConfig). */
+function nestedOptionIdsUnderTopLevelOption(option: ModifierOptionForUI): string[] {
+  const ids: string[] = [];
+  for (const ng of option.nestedModifierGroups ?? []) {
+    for (const no of ng.options) ids.push(no.id);
+  }
+  return ids;
 }
 
 export function ModifierModal({
@@ -85,17 +98,29 @@ export function ModifierModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
 
-  const setOptionQty = useCallback((optionId: string, delta: number) => {
-    setSelections((prev) => {
-      const next = { ...prev };
-      const cur = next[optionId] ?? 0;
-      const v = Math.max(0, cur + delta);
-      if (v === 0) delete next[optionId];
-      else next[optionId] = v;
-      return next;
-    });
-    setError(null);
-  }, []);
+  const setOptionQty = useCallback(
+    (optionId: string, delta: number) => {
+      setSelections((prev) => {
+        const next = { ...prev };
+        const cur = next[optionId] ?? 0;
+        const v = Math.max(0, cur + delta);
+        if (v === 0) {
+          delete next[optionId];
+          for (const link of config.groups) {
+            for (const opt of link.modifierGroup.options) {
+              if (opt.id !== optionId) continue;
+              for (const nid of nestedOptionIdsUnderTopLevelOption(opt)) delete next[nid];
+            }
+          }
+        } else {
+          next[optionId] = v;
+        }
+        return next;
+      });
+      setError(null);
+    },
+    [config.groups]
+  );
 
   const selectionsList = useMemo(() => {
     const list: { modifierOptionId: string; quantity: number }[] = [];
