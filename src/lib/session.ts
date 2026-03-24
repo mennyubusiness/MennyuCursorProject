@@ -9,7 +9,9 @@ export const COOKIE_NAME = "mennyu_session";
 export const CURRENT_POD_COOKIE = "mennyu_current_pod";
 /** Cookie storing customer phone for order history (session-based access without full account). */
 export const CUSTOMER_PHONE_COOKIE = "mennyu_customer_phone";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
+/** Max-Age (seconds) for mennyu_session — keep in sync with Set-Cookie and cookies().set. */
+export const MENNYU_SESSION_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
+const COOKIE_MAX_AGE = MENNYU_SESSION_MAX_AGE;
 
 function generateSessionId(): string {
   return crypto.randomUUID();

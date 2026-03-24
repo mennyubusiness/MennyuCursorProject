@@ -9,17 +9,11 @@ import {
   CartValidationError,
 } from "@/services/cart.service";
 import type { AddToCartResult, UpdateCartItemResult, CartItemSelectionInput } from "./cart.actions.types";
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { getSessionIdFromHeaders } from "@/lib/session";
-
-async function getSessionId(): Promise<string> {
-  const h = await headers();
-  return getSessionIdFromHeaders(h) ?? crypto.randomUUID();
-}
+import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 
 export async function getOrCreateCartAction(podId: string) {
-  const sessionId = await getSessionId();
+  const sessionId = await getOrCreateMennyuSessionIdForCart();
   return getOrCreateCart(podId, sessionId);
 }
 
