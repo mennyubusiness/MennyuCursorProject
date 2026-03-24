@@ -19,6 +19,7 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
               description: true,
               isActive: true,
               mennyuOrdersPaused: true,
+              imageUrl: true,
             },
           },
         },
