@@ -42,16 +42,12 @@ export function AdminVendorOrderTransition({
   }
 
   if (allowedTargets.length === 0) {
-    return (
-      <div className="mt-2 text-xs text-stone-500">
-        Order progression: no valid transitions (terminal state or use exception actions above).
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="mt-2 rounded border border-stone-200 bg-stone-50/50 p-2">
-      <p className="text-xs font-medium text-stone-600">Order progression</p>
+    <div className="rounded-md border border-stone-200 bg-stone-50/80 p-2">
+      <p className="text-xs font-medium text-stone-600">Fulfillment transition</p>
       <div className="mt-1 flex flex-wrap items-center gap-2">
         <select
           value={target}

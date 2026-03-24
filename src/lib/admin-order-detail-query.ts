@@ -9,6 +9,7 @@ export const adminOrderDetailSelect = Prisma.validator<Prisma.OrderSelect>()({
   customerPhone: true,
   customerEmail: true,
   orderNotes: true,
+  adminResolutionNotes: true,
   subtotalCents: true,
   totalCents: true,
   pod: { select: { id: true, name: true } },

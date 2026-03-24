@@ -396,6 +396,8 @@ model Order {
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   orderNotes            String?
+  /// Shared admin notes for resolving exceptions on this order (not per-issue).
+  adminResolutionNotes  String?
   /// Cart row used at checkout (line items cleared after payment / cancel). Optional for legacy orders.
   sourceCartId          String?
   pod                   Pod                  @relation(fields: [podId], references: [id])

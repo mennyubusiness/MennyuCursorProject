@@ -96,9 +96,8 @@ export function AdminVendorOrderExceptionActions({
   const busy = loading !== null;
 
   return (
-    <div className="mt-2 rounded border border-amber-200 bg-amber-50/50 p-2">
-      <p className="text-xs font-medium text-amber-800">Needs attention actions</p>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {showRetry && (
           <button
             type="button"
@@ -140,7 +139,7 @@ export function AdminVendorOrderExceptionActions({
         )}
       </div>
       {message && (
-        <p className={`mt-1 text-xs ${message.error ? "text-red-600" : "text-stone-600"}`}>
+        <p className={`text-xs ${message.error ? "text-red-600" : "text-stone-600"}`}>
           {message.text}
         </p>
       )}
