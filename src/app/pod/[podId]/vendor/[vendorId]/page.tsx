@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 import { MenuItemImage } from "@/components/images/MenuItemImage";
 import { VendorLogo } from "@/components/images/VendorLogo";
 import { prisma } from "@/lib/db";
+import {
+  customerMenuCategoryDomId,
+  loadCustomerVendorMenuSections,
+  type CustomerVendorMenuItem,
+} from "@/services/vendor-customer-menu.service";
 import { AddToCartButton } from "./AddToCartButton";
 import { getOrCreateCartAction } from "@/actions/cart.actions";
 import { serializeModifierConfig } from "@/lib/modifier-config";
@@ -39,6 +44,57 @@ function availabilityBannerCopy(status: VendorAvailabilityStatus): string | null
   return "This vendor is not currently available.";
 }
 
+function MenuItemRow({
+  item,
+  cartId,
+  orderingDisabled,
+}: {
+  item: CustomerVendorMenuItem;
+  cartId: string;
+  orderingDisabled: boolean;
+}) {
+  const itemUnavailable = orderingDisabled || !item.isAvailable;
+  return (
+    <div
+      className={`flex flex-col gap-4 rounded-lg border border-stone-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 ${!item.isAvailable ? "opacity-75" : ""}`}
+    >
+      <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
+        <MenuItemImage
+          imageUrl={item.imageUrl}
+          itemName={item.name}
+          className="h-16 w-16 shrink-0 sm:h-20 sm:w-20"
+        />
+        <div className="min-w-0 flex-1">
+          <h3 className="font-medium text-stone-900">
+            {item.name}
+            {!item.isAvailable && (
+              <span className="ml-2 rounded bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-700">
+                Unavailable
+              </span>
+            )}
+          </h3>
+          {item.description && (
+            <p className="mt-1 text-sm text-stone-600">{item.description}</p>
+          )}
+          <p className="mt-2 text-sm font-medium text-mennyu-primary">
+            ${(item.priceCents / 100).toFixed(2)}
+          </p>
+        </div>
+      </div>
+      <div className="flex shrink-0 justify-end sm:justify-center">
+        <AddToCartButton
+          cartId={cartId}
+          menuItemId={item.id}
+          menuItemName={item.name}
+          priceCents={item.priceCents}
+          modifierConfig={item.modifierGroups?.length ? serializeModifierConfig(item) : undefined}
+          orderingDisabled={itemUnavailable}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default async function VendorMenuPage({
   params,
 }: {
@@ -51,34 +107,7 @@ export default async function VendorMenuPage({
       vendors: {
         where: { vendorId },
         include: {
-          vendor: {
-            include: {
-              menuItems: {
-                orderBy: { sortOrder: "asc" },
-                include: {
-                  modifierGroups: {
-                    orderBy: { sortOrder: "asc" },
-                    include: {
-                      modifierGroup: {
-                        include: {
-                          options: {
-                            orderBy: { sortOrder: "asc" },
-                            include: {
-                              nestedModifierGroups: {
-                                include: {
-                                  options: { orderBy: { sortOrder: "asc" } },
-                                },
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
+          vendor: true,
         },
       },
     },
@@ -87,15 +116,16 @@ export default async function VendorMenuPage({
   const vendor = pv?.vendor;
   if (!pod || !vendor) notFound();
 
-  const cart = await getOrCreateCartAction(podId);
+  const [{ sections }, cart] = await Promise.all([
+    loadCustomerVendorMenuSections(vendorId),
+    getOrCreateCartAction(podId),
+  ]);
+
   const availabilityStatus = getVendorAvailabilityStatus(vendor);
   const unavailable = availabilityStatus !== "open";
   const bannerLine = availabilityBannerCopy(availabilityStatus);
 
-  const menuItemsSorted = [...vendor.menuItems].sort((a, b) => {
-    if (a.isAvailable === b.isAvailable) return a.sortOrder - b.sortOrder;
-    return a.isAvailable ? -1 : 1;
-  });
+  const showCategoryJump = sections.length > 1;
 
   return (
     <div>
@@ -145,7 +175,7 @@ export default async function VendorMenuPage({
         </div>
       )}
 
-      {menuItemsSorted.length === 0 ? (
+      {sections.length === 0 ? (
         <div className="mt-10 rounded-xl border border-stone-200 bg-stone-50 p-8 text-center">
           <p className="text-stone-600">This vendor has no menu items available right now.</p>
           <p className="mt-1 text-sm text-stone-500">Check back later.</p>
@@ -154,52 +184,52 @@ export default async function VendorMenuPage({
           </Link>
         </div>
       ) : (
-        <div className="mt-10 space-y-6">
-          <h2 className="text-lg font-semibold text-stone-900">Menu</h2>
-          {menuItemsSorted.map((item) => {
-            const itemUnavailable = unavailable || !item.isAvailable;
-            return (
-              <div
-                key={item.id}
-                className={`flex flex-col gap-4 rounded-lg border border-stone-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 ${!item.isAvailable ? "opacity-75" : ""}`}
+        <>
+          {showCategoryJump && (
+            <nav
+              className="mt-8 flex flex-wrap gap-2 border-b border-stone-200 pb-4"
+              aria-label="Jump to menu category"
+            >
+              {sections.map((s) => (
+                <a
+                  key={s.id}
+                  href={`#${customerMenuCategoryDomId(s.id)}`}
+                  className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-sm hover:border-mennyu-primary/40 hover:text-mennyu-primary"
+                >
+                  {s.name}
+                </a>
+              ))}
+            </nav>
+          )}
+
+          <div className="mt-8 space-y-10">
+            {sections.map((section) => (
+              <section
+                key={section.id}
+                id={customerMenuCategoryDomId(section.id)}
+                aria-labelledby={`heading-${customerMenuCategoryDomId(section.id)}`}
+                className="scroll-mt-24"
               >
-                <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
-                  <MenuItemImage
-                    imageUrl={item.imageUrl}
-                    itemName={item.name}
-                    className="h-16 w-16 shrink-0 sm:h-20 sm:w-20"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-medium text-stone-900">
-                      {item.name}
-                      {!item.isAvailable && (
-                        <span className="ml-2 rounded bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-700">
-                          Unavailable
-                        </span>
-                      )}
-                    </h3>
-                    {item.description && (
-                      <p className="mt-1 text-sm text-stone-600">{item.description}</p>
-                    )}
-                    <p className="mt-2 text-sm font-medium text-mennyu-primary">
-                      ${(item.priceCents / 100).toFixed(2)}
-                    </p>
-                  </div>
+                <h2
+                  id={`heading-${customerMenuCategoryDomId(section.id)}`}
+                  className="text-lg font-semibold text-stone-900"
+                >
+                  {section.name}
+                </h2>
+                <div className="mt-4 space-y-4">
+                  {section.items.map((item) => (
+                    <MenuItemRow
+                      key={item.id}
+                      item={item}
+                      cartId={cart.id}
+                      orderingDisabled={unavailable}
+                    />
+                  ))}
                 </div>
-                <div className="flex shrink-0 justify-end sm:justify-center">
-                  <AddToCartButton
-                    cartId={cart.id}
-                    menuItemId={item.id}
-                    menuItemName={item.name}
-                    priceCents={item.priceCents}
-                    modifierConfig={item.modifierGroups?.length ? serializeModifierConfig(item) : undefined}
-                    orderingDisabled={itemUnavailable}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              </section>
+            ))}
+          </div>
+        </>
       )}
       {cart.items.length > 0 && (
         <div className="mt-10">
