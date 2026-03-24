@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-/** Server-rendered guidance for the primary (magic link) access path. */
+/** Primary path: email/password session. Magic link & token live under Advanced access. */
 export function VendorDashboardAccessCard({
   vendorId,
   hasDashboardSecret,
@@ -10,27 +10,30 @@ export function VendorDashboardAccessCard({
 }) {
   return (
     <section className="rounded-lg border border-stone-200 bg-white p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Secure dashboard access</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Dashboard access</h3>
       <p className="mt-2 text-sm text-stone-600">
-        Sign in with your <strong>email and password</strong> at{" "}
-        <Link href="/login" className="font-medium text-sky-800 underline">
-          /login
+        <strong>Sign in</strong> with the email and password your team uses for Mennyu:{" "}
+        <Link href={`/login?intent=vendor&callbackUrl=${encodeURIComponent(`/vendor/${vendorId}`)}`} className="font-medium text-sky-800 underline">
+          Sign in to this dashboard
         </Link>
-        , then open this vendor dashboard. Your admin creates the account and links it to your vendor. Alternatively,
-        a <strong>secure access link</strong> or legacy token can still bootstrap the old cookie for automation.
+        . After you&apos;re signed in, you can use orders, menu imports, and settings here.
+      </p>
+      <p className="mt-3 text-sm text-stone-600">
+        Your administrator can also send a <strong>one-time secure link</strong> that opens this dashboard on your
+        device—handy if you haven&apos;t set a password yet.
       </p>
       {!hasDashboardSecret ? (
         <p className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          Access isn&apos;t provisioned yet. Ask your admin to create a secure link (recommended) or run the
-          dashboard token API — then reload this page.
+          Extra access options (token, automation) aren&apos;t set up for this location yet. You can still use email
+          sign-in if your account is linked. Open <strong>Advanced access</strong> below for details.
         </p>
       ) : (
         <p className="mt-3 text-sm text-stone-600">
-          Already have a link? Open it on this device. You can also use{" "}
+          After you&apos;re signed in, open{" "}
           <Link href={`/vendor/${vendorId}/menu-imports`} className="font-medium text-sky-800 underline">
             Menu imports
           </Link>{" "}
-          after signing in.
+          or other tools from the nav.
         </p>
       )}
     </section>

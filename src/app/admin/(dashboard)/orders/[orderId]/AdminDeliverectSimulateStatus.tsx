@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminApiAuthHint } from "@/components/admin/AdminApiAuthHint";
 
 const OPTIONS: { label: string; code: number }[] = [
   { label: "Accepted (20)", code: 20 },
@@ -12,15 +13,8 @@ const OPTIONS: { label: string; code: number }[] = [
 ];
 
 /**
- * TEMP / SANDBOX: Push test status to Deliverect (triggers webhooks). Admin order page only.
- * Does not mutate Mennyu DB from the client — updates arrive via webhook.
- *
- * Auth query param:
- * - Prefer **`adminSecretForSimulate`** from the server (same value as `ADMIN_SECRET`). This is
- *   supplied at request time so the `?admin=` branch is not dead-code-eliminated when
- *   `NEXT_PUBLIC_ADMIN_SECRET` was empty at **build** time.
- * - Else fall back to **`NEXT_PUBLIC_ADMIN_SECRET`** (must match server `ADMIN_SECRET`); only works
- *   if set when the app was built.
+ * Sandbox: push test status to Deliverect (triggers webhooks). Admin order page only.
+ * Auth: platform admin session and/or `?admin=` when server passes `ADMIN_SECRET` / build-time public secret.
  */
 export function simulateDeliverectStatusUrl(
   vendorOrderId: string,
@@ -39,7 +33,6 @@ export function AdminDeliverectSimulateStatus({
   adminSecretForSimulate = null,
 }: {
   vendorOrderId: string;
-  /** TEMP: pass server `ADMIN_SECRET` so `?admin=` works without NEXT_PUBLIC at build. */
   adminSecretForSimulate?: string | null;
 }) {
   const router = useRouter();
@@ -55,8 +48,6 @@ export function AdminDeliverectSimulateStatus({
     setLoading(true);
     try {
       const url = simulateDeliverectStatusUrl(vendorOrderId, adminSecretForSimulate);
-      // TEMP debug: verify Network tab request URL includes ?admin= when secret is configured.
-      console.log("[SIM DELIVERECT URL]", url);
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,13 +90,7 @@ export function AdminDeliverectSimulateStatus({
         Calls Deliverect&apos;s order status API only. This app does not change the order here — expect updates
         through the Deliverect webhook after a short delay.
       </p>
-      {simulateUrlMissingAdminQuery && (
-        <p className="mt-1 text-xs font-medium text-red-700">
-          TEMP: No admin secret for this UI — request URL has no <code className="rounded bg-red-100 px-0.5">?admin=</code>{" "}
-          (set server <code className="rounded bg-red-100 px-0.5">ADMIN_SECRET</code> or rebuild with{" "}
-          <code className="rounded bg-red-100 px-0.5">NEXT_PUBLIC_ADMIN_SECRET</code>). Expect 403.
-        </p>
-      )}
+      <AdminApiAuthHint show={simulateUrlMissingAdminQuery} compact className="mt-1" />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <select
           value={code}

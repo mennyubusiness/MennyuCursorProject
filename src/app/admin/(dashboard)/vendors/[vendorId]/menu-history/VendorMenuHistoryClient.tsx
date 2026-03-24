@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminApiAuthHint } from "@/components/admin/AdminApiAuthHint";
 import type { MenuVersionState } from "@prisma/client";
 
 export type MenuHistoryRowClient = {
@@ -54,6 +55,8 @@ export function VendorMenuHistoryClient({
 
   const confirmRow = confirmId ? rows.find((r) => r.id === confirmId) : null;
   const rollbackUrl = vendorMenuRollbackUrl(vendorId, adminSecret);
+  const rollbackMissingAdminQuery =
+    process.env.NODE_ENV === "production" && !rollbackUrl.includes("?");
 
   async function handleRollback() {
     if (!confirmId) return;
@@ -97,6 +100,8 @@ export function VendorMenuHistoryClient({
         archived snapshot), archives the current published row, and reapplies the canonical menu to live tables — same
         rules as publish. Prior rows are not edited.
       </p>
+
+      <AdminApiAuthHint show={rollbackMissingAdminQuery} className="mt-2" />
 
       {message && (
         <p

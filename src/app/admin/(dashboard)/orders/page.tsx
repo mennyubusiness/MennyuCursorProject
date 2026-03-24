@@ -16,6 +16,18 @@ type SearchParams = Promise<{
   q?: string;
 }>;
 
+/** Filter dropdown: value is DB `OrderStatus`; label is operator-facing. */
+const ORDER_STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: "pending_payment", label: "Awaiting payment" },
+  { value: "paid", label: "Paid" },
+  { value: "routing", label: "Routing" },
+  { value: "routed", label: "Routed" },
+  { value: "routed_partial", label: "Partially routed" },
+  { value: "completed", label: "Completed" },
+  { value: "failed", label: "Failed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
 function buildQueryString(overrides: Record<string, string | undefined>) {
   const entries = Object.entries(overrides).filter(([, v]) => v != null && v !== "") as [string, string][];
   return entries.length ? `?${new URLSearchParams(entries).toString()}` : "";
@@ -190,14 +202,11 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
               aria-label="Filter by status"
             >
               <option value="">All statuses</option>
-              <option value="pending_payment">pending_payment</option>
-              <option value="paid">paid</option>
-              <option value="routing">routing</option>
-              <option value="routed">routed</option>
-              <option value="routed_partial">routed_partial</option>
-              <option value="completed">completed</option>
-              <option value="failed">failed</option>
-              <option value="cancelled">cancelled</option>
+              {ORDER_STATUS_FILTER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
             <select
               name="vendor"

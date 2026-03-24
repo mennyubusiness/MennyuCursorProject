@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminApiAuthHint } from "@/components/admin/AdminApiAuthHint";
 
 export function menuImportDiscardDraftUrl(jobId: string, adminSecret?: string | null): string {
   const path = `/api/admin/menu-imports/${encodeURIComponent(jobId)}/discard-draft`;
@@ -124,11 +125,7 @@ export function MenuImportDiscardDraftButton({
                   Draft id: {draftVersionId}
                 </p>
               )}
-              {prodMissingSecret && (
-                <p className="mt-2 text-xs text-amber-800">
-                  Set ADMIN_SECRET / NEXT_PUBLIC_ADMIN_SECRET or this request may 403 in production.
-                </p>
-              )}
+              <AdminApiAuthHint show={prodMissingSecret} compact className="mt-2" />
               {message && (
                 <p
                   className={`mt-3 rounded border px-2 py-1.5 text-xs ${
@@ -179,11 +176,7 @@ export function MenuImportDiscardDraftButton({
           ))}
         </ul>
       )}
-      {prodMissingSecret && (
-        <p className="mt-2 text-xs text-amber-800">
-          Production: ensure admin auth is configured for API routes (cookie or <code className="rounded bg-amber-50 px-0.5">?admin=</code>).
-        </p>
-      )}
+      <AdminApiAuthHint show={prodMissingSecret} className="mt-2" />
       {message && (
         <p
           className={`mt-3 rounded border px-3 py-2 text-sm ${

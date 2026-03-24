@@ -61,15 +61,8 @@ export function MenuImportJobNextStepsAdmin({
         >
           <p className="font-medium">This is the latest menu update for {vendorName}</p>
           <p className="mt-1 text-emerald-900/90">
-            Review the changes below, then publish when you&apos;re happy — or discard if you&apos;re not.
-          </p>
-          <p className="mt-2">
-            <a
-              href="#admin-menu-import-publish"
-              className="inline-flex rounded-md bg-emerald-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-900"
-            >
-              Publish
-            </a>
+            Review the sections below, then use <strong>Publish to live menu</strong> in Actions when you&apos;re ready —
+            or discard the draft if you need to start over.
           </p>
         </div>
       )}

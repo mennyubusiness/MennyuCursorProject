@@ -41,6 +41,10 @@ UPDATE "User" SET "isPlatformAdmin" = true WHERE email = 'admin@example.com';
 
 Password must still be set via app or `vendor-users` API; hashes are bcrypt (see `src/lib/auth/password.ts`).
 
+## Deliverect verbose logs (optional)
+
+Set `DEBUG_DELIVERECT=true` to enable detailed Deliverect HTTP and menu-normalize logs on the server. Default logs stay minimal (warnings on errors; short info when no sync order id).
+
 ## Migrating off ADMIN_SECRET-only
 
 1. Run migration; bootstrap at least one `isPlatformAdmin` user.

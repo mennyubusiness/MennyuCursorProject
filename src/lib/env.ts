@@ -45,6 +45,8 @@ const envSchema = z.object({
   VENDOR_ACCESS_SIGNING_SECRET: z.string().min(32).optional(),
   /** Set to "true" to show Deliverect POS status simulation UI on admin order detail (production). */
   SHOW_DELIVERECT_STATUS_SIM_UI: z.enum(["true", "false"]).optional(),
+  /** Verbose Deliverect HTTP / normalize logging (server). Keeps warnings for failures. */
+  DEBUG_DELIVERECT: z.enum(["true", "false"]).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

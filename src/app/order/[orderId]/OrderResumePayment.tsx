@@ -34,10 +34,11 @@ export async function OrderResumePayment({ orderId }: { orderId: string }) {
         <PhoneCookieSyncRefresh />
         <h1 className="text-2xl font-semibold text-stone-900">Resume payment</h1>
         <p className="mt-3 text-stone-600">
-          We&apos;re linking this browser to your checkout. This page should refresh in a moment.
+          Hang on — we&apos;re confirming this device matches your order so you can pay safely.
         </p>
         <p className="mt-2 text-sm text-stone-500">
-          If nothing changes, use the same device where you entered your phone, or go back to your cart.
+          This page usually refreshes on its own. If it doesn&apos;t, open the link again from the same phone you used to
+          start checkout, or return to your cart.
         </p>
         <Link
           href="/cart"

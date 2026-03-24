@@ -6,9 +6,9 @@ import { VendorPauseToggle } from "../dashboard/VendorPauseToggle";
 import { VendorPodRequests } from "../dashboard/VendorPodRequests";
 import { VendorRecentPodRequests } from "../dashboard/VendorRecentPodRequests";
 import { VendorAutoPublishToggle } from "./VendorAutoPublishToggle";
-import { VendorDashboardTokenForm } from "./VendorDashboardTokenForm";
 import { VendorDashboardAccessCard } from "./VendorDashboardAccessCard";
 import { VendorAccessQueryMessages } from "./VendorAccessMessages";
+import { VendorAdvancedAccessSection } from "./VendorAdvancedAccessSection";
 
 export default async function VendorSettingsPage({
   params,
@@ -66,14 +66,22 @@ export default async function VendorSettingsPage({
     respondedAt: r.respondedAt?.toISOString() ?? null,
   }));
 
+  const hasToken = Boolean(vendor.vendorDashboardToken?.trim());
+
   return (
     <div className="space-y-8">
       <div>
         <h2 className="text-xl font-semibold text-stone-900">Settings</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Vendor info and Mennyu controls. More options coming as we add integrations.
+          Vendor profile, Mennyu controls, and how you sign in to this dashboard.
         </p>
       </div>
+
+      <VendorDashboardAccessCard vendorId={vendor.id} hasDashboardSecret={hasToken} />
+
+      <Suspense fallback={null}>
+        <VendorAccessQueryMessages />
+      </Suspense>
 
       {/* Vendor info (read-only) */}
       <section className="rounded-lg border border-stone-200 bg-white p-4">
@@ -132,33 +140,17 @@ export default async function VendorSettingsPage({
 
       <VendorAutoPublishToggle vendorId={vendor.id} initialAutoPublishMenus={vendor.autoPublishMenus ?? false} />
 
-      <Suspense fallback={null}>
-        <VendorAccessQueryMessages />
-      </Suspense>
-
-      <VendorDashboardAccessCard
+      {/* Pending pod requests */}
+      <VendorPodRequests
         vendorId={vendor.id}
-        hasDashboardSecret={Boolean(vendor.vendorDashboardToken?.trim())}
+        requests={pendingRequestsForComponent}
+        currentPod={currentPod ? { id: currentPod.pod.id, name: currentPod.pod.name } : null}
       />
 
-      {vendor.vendorDashboardToken ? (
-        <VendorDashboardTokenForm vendorId={vendor.id} />
-      ) : (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-          <p className="font-medium">Dashboard access not provisioned</p>
-          <p className="mt-1">
-            Admin: use{" "}
-            <code className="rounded bg-amber-100 px-1 font-mono text-xs">
-              POST /api/admin/vendors/&#123;vendorId&#125;/dashboard-access-link
-            </code>{" "}
-            (recommended — sends a magic URL) or{" "}
-            <code className="rounded bg-amber-100 px-1 font-mono text-xs">
-              POST .../dashboard-token
-            </code>{" "}
-            for a raw secret only.
-          </p>
-        </div>
-      )}
+      {/* Recent pod requests */}
+      <VendorRecentPodRequests recentRequests={recentRequestsForComponent} />
+
+      <VendorAdvancedAccessSection vendorId={vendor.id} hasDashboardToken={hasToken} />
 
       {/* Integrations placeholder */}
       <section className="rounded-lg border border-stone-200 bg-stone-50/80 p-4">
@@ -169,16 +161,6 @@ export default async function VendorSettingsPage({
           POS / Deliverect connection coming soon. Your orders are managed in Mennyu until then.
         </p>
       </section>
-
-      {/* Pending pod requests */}
-      <VendorPodRequests
-        vendorId={vendor.id}
-        requests={pendingRequestsForComponent}
-        currentPod={currentPod ? { id: currentPod.pod.id, name: currentPod.pod.name } : null}
-      />
-
-      {/* Recent pod requests */}
-      <VendorRecentPodRequests recentRequests={recentRequestsForComponent} />
     </div>
   );
 }

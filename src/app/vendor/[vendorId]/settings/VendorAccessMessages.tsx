@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 /** Client: show feedback after magic-link grant redirect. */
@@ -8,30 +10,39 @@ export function VendorAccessQueryMessages() {
   const code = sp.get("access");
   if (!code) return null;
 
-  const copy: Record<string, { title: string; body: string; tone: "error" | "warn" }> = {
+  const copy: Record<string, { title: string; body: ReactNode; tone: "error" | "warn" }> = {
     invalid: {
       title: "Link invalid or expired",
-      body: "Ask your Mennyu admin for a new secure access link.",
+      body: "Ask your Mennyu administrator for a new secure link, or sign in with email if you have an account.",
       tone: "error",
     },
     missing_token: {
       title: "Link incomplete",
-      body: "Use the full URL from your admin (including the token parameter).",
+      body: "Use the full URL you were sent (including everything after ?).",
       tone: "warn",
     },
     vendor_mismatch: {
-      title: "Link does not match this vendor",
-      body: "Open the link for your location, or ask Mennyu support.",
+      title: "Link doesn’t match this restaurant",
+      body: "Open the link for this location, or contact support.",
       tone: "error",
     },
     no_secret: {
-      title: "Dashboard not ready yet",
-      body: "Ask your Mennyu admin to provision access (secure link or token API).",
+      title: "Dashboard isn’t ready yet",
+      body: "Your administrator still needs to finish setup. You can try again after they’ve sent a link or enabled sign-in.",
       tone: "warn",
     },
     needs_session: {
-      title: "Finish signing in",
-      body: "Open your secure access link, paste a legacy token under Manual token, or sign in at /login if you have a vendor account.",
+      title: "Please sign in to access this dashboard",
+      body: (
+        <>
+          Use{" "}
+          <Link href="/login?intent=vendor" className="font-medium text-sky-800 underline">
+            Sign in
+          </Link>{" "}
+          with your restaurant email, or open the secure link from your administrator. Token-based access (automation) is
+          under <strong>Advanced access</strong> on Settings if you need it.
+        </>
+      ),
       tone: "warn",
     },
   };

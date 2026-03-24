@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminApiAuthHint } from "@/components/admin/AdminApiAuthHint";
 import type { CanonicalMenuDiff } from "@/domain/menu-import/canonical-diff";
 import { buildPublishSummaryRows, type PublishSummaryMode } from "@/domain/menu-import/publish-summary-rows";
 
@@ -114,13 +115,7 @@ export function MenuImportPublishPanel({
         </p>
       )}
 
-      {publishUrlMissingAdminQuery && (
-        <p className="mt-2 text-xs font-medium text-amber-800">
-          Production: ensure <code className="rounded bg-amber-100 px-0.5">ADMIN_SECRET</code> is passed from the
-          server or set <code className="rounded bg-amber-100 px-0.5">NEXT_PUBLIC_ADMIN_SECRET</code> at build time,
-          or API calls may return 403.
-        </p>
-      )}
+      <AdminApiAuthHint show={publishUrlMissingAdminQuery} className="mt-2" />
 
       {message && (
         <p

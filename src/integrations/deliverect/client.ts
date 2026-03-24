@@ -10,6 +10,10 @@ import type { DeliverectOrderRequest, DeliverectOrderResponse } from "./payloads
 const BASE_URL = env.DELIVERECT_API_URL ?? "https://api.deliverect.com";
 const LOG_PREFIX = "[Deliverect client]";
 
+function deliverectVerboseDebug(): boolean {
+  return env.DEBUG_DELIVERECT === "true";
+}
+
 /**
  * Deliverect often returns Mongo-style `_id` instead of `id`. Handles nested `order` / `data` and `$oid` wrappers.
  */
@@ -106,7 +110,9 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
   }
 
   const method = "POST";
-  console.info(`${LOG_PREFIX} Outbound request method=${method} url=${url}`);
+  if (deliverectVerboseDebug()) {
+    console.info(`${LOG_PREFIX} Outbound request method=${method} url=${url}`);
+  }
 
   const body = JSON.stringify(payload);
   const authHeaders = await getDeliverectAuthHeaders();
@@ -118,6 +124,7 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
 
   /** Diagnostics for “order not in Deliverect UI” (duplicates, date filter, etc.). No secrets. */
   function submitDiagnostics(httpStatus: number, raw: unknown) {
+    if (!deliverectVerboseDebug()) return;
     const pickupTime = payload.pickupTime;
     console.info(
       `${LOG_PREFIX} submitDiagnostics ${JSON.stringify({
@@ -157,9 +164,11 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
     if (!res.ok) {
       console.warn(`${LOG_PREFIX} Non-2xx response status=${res.status}`);
       submitDiagnostics(res.status, raw);
-      console.warn(`${LOG_PREFIX} Response headers (sanitized keys):`, safeJsonForLog(responseHeaders));
-      console.warn(`${LOG_PREFIX} Response body:`, JSON.stringify(raw, null, 2));
-      console.warn(`${LOG_PREFIX} Outbound payload (for debugging):`, JSON.stringify(payload, null, 2));
+      if (deliverectVerboseDebug()) {
+        console.warn(`${LOG_PREFIX} Response headers (sanitized keys):`, safeJsonForLog(responseHeaders));
+        console.warn(`${LOG_PREFIX} Response body:`, JSON.stringify(raw, null, 2));
+        console.warn(`${LOG_PREFIX} Outbound payload (for debugging):`, JSON.stringify(payload, null, 2));
+      }
       return {
         success: false,
         error: raw.error ?? (raw as { message?: string }).message ?? res.statusText,
@@ -169,10 +178,12 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
     }
 
     submitDiagnostics(res.status, raw);
-    console.info(`${LOG_PREFIX} Success HTTP ${res.status} parsed body:`, safeJsonForLog(raw));
-    console.info(
-      `${LOG_PREFIX} Success response headers (diagnostic): ${safeJsonForLog(headerDiag)} fullHeaderKeys=${Object.keys(responseHeaders).join(",")}`
-    );
+    if (deliverectVerboseDebug()) {
+      console.info(`${LOG_PREFIX} Success HTTP ${res.status} parsed body:`, safeJsonForLog(raw));
+      console.info(
+        `${LOG_PREFIX} Success response headers (diagnostic): ${safeJsonForLog(headerDiag)} fullHeaderKeys=${Object.keys(responseHeaders).join(",")}`
+      );
+    }
 
     const externalOrderId = extractDeliverectOrderId(raw);
     if (externalOrderId) {
@@ -187,16 +198,24 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
     if (deliverectBodyIndicatesError(raw)) {
       const err = `Deliverect ${res.status}: error/validation in body: ${safeJsonForLog(raw)}`;
       console.warn(`${LOG_PREFIX} ${err}`);
-      console.warn(`${LOG_PREFIX} Full response headers:`, safeJsonForLog(responseHeaders));
+      if (deliverectVerboseDebug()) {
+        console.warn(`${LOG_PREFIX} Full response headers:`, safeJsonForLog(responseHeaders));
+      }
       return { success: false, error: err, raw, responseAudit };
     }
 
     const bodyKeys =
       raw && typeof raw === "object" ? Object.keys(raw as object).join(",") || "(empty)" : "(non-object)";
-    console.warn(`${LOG_PREFIX} Full response headers (no id in body):`, safeJsonForLog(responseHeaders));
-    console.info(
-      `${LOG_PREFIX} HTTP ${res.status} body keys=${bodyKeys}: accepted as routed to Deliverect without synchronous order id (e.g. 201 {}). Reconcile deliverectOrderId via webhook when available.`
-    );
+    if (deliverectVerboseDebug()) {
+      console.warn(`${LOG_PREFIX} Full response headers (no id in body):`, safeJsonForLog(responseHeaders));
+      console.info(
+        `${LOG_PREFIX} HTTP ${res.status} body keys=${bodyKeys}: accepted without synchronous order id; reconcile via webhook if needed.`
+      );
+    } else {
+      console.info(
+        `${LOG_PREFIX} HTTP ${res.status}: Deliverect accepted; no synchronous order id in body (webhook may supply id).`
+      );
+    }
 
     return {
       success: true,

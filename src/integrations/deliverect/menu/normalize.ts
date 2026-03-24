@@ -23,6 +23,7 @@
  */
 
 import type { DeliverectMenuImportMeta } from "@/domain/menu-import/canonical.schema";
+import { env } from "@/lib/env";
 import type {
   MennyuCanonicalCategory,
   MennyuCanonicalMenu,
@@ -135,9 +136,12 @@ function unwrapMenuRoot(raw: Record<string, unknown>): Record<string, unknown> {
   return raw;
 }
 
-/** Set `DELIVERECT_MENU_NORMALIZE_DEBUG=1` to log chosen product source and count (server logs). */
+/** Set `DEBUG_DELIVERECT=true` or `DELIVERECT_MENU_NORMALIZE_DEBUG=1` for this log (server). */
 function logDeliverectProductExtraction(source: string, count: number): void {
-  if (typeof process !== "undefined" && process.env.DELIVERECT_MENU_NORMALIZE_DEBUG === "1") {
+  const debug =
+    env.DEBUG_DELIVERECT === "true" ||
+    (typeof process !== "undefined" && process.env.DELIVERECT_MENU_NORMALIZE_DEBUG === "1");
+  if (debug) {
     console.log("[Deliverect menu normalize] products extracted", { source, count });
   }
 }

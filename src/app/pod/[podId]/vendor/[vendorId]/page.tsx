@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MenuItemImage } from "@/components/images/MenuItemImage";
 import { prisma } from "@/lib/db";
 import { AddToCartButton } from "./AddToCartButton";
 import { getOrCreateCartAction } from "@/actions/cart.actions";
@@ -116,32 +117,41 @@ export default async function VendorMenuPage({
           return (
           <div
             key={item.id}
-            className={`flex flex-col gap-2 rounded-lg border border-stone-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between ${!item.isAvailable ? "opacity-75" : ""}`}
+            className={`flex flex-col gap-4 rounded-lg border border-stone-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 ${!item.isAvailable ? "opacity-75" : ""}`}
           >
-            <div>
-              <h3 className="font-medium text-stone-900">
-                {item.name}
-                {!item.isAvailable && (
-                  <span className="ml-2 rounded bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-700">
-                    Unavailable
-                  </span>
+            <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
+              <MenuItemImage
+                imageUrl={item.imageUrl}
+                itemName={item.name}
+                className="h-16 w-16 shrink-0 sm:h-20 sm:w-20"
+              />
+              <div className="min-w-0 flex-1">
+                <h3 className="font-medium text-stone-900">
+                  {item.name}
+                  {!item.isAvailable && (
+                    <span className="ml-2 rounded bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-700">
+                      Unavailable
+                    </span>
+                  )}
+                </h3>
+                {item.description && (
+                  <p className="mt-1 text-sm text-stone-600">{item.description}</p>
                 )}
-              </h3>
-              {item.description && (
-                <p className="text-sm text-stone-600">{item.description}</p>
-              )}
-              <p className="mt-1 text-sm font-medium text-mennyu-primary">
-                ${(item.priceCents / 100).toFixed(2)}
-              </p>
+                <p className="mt-2 text-sm font-medium text-mennyu-primary">
+                  ${(item.priceCents / 100).toFixed(2)}
+                </p>
+              </div>
             </div>
-            <AddToCartButton
-              cartId={cart.id}
-              menuItemId={item.id}
-              menuItemName={item.name}
-              priceCents={item.priceCents}
-              modifierConfig={item.modifierGroups?.length ? serializeModifierConfig(item) : undefined}
-              orderingDisabled={itemUnavailable}
-            />
+            <div className="flex shrink-0 justify-end sm:justify-center">
+              <AddToCartButton
+                cartId={cart.id}
+                menuItemId={item.id}
+                menuItemName={item.name}
+                priceCents={item.priceCents}
+                modifierConfig={item.modifierGroups?.length ? serializeModifierConfig(item) : undefined}
+                orderingDisabled={itemUnavailable}
+              />
+            </div>
           </div>
           );
         })}

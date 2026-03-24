@@ -95,6 +95,14 @@ export function buildCustomerPhoneCookieHeader(phone: string): string {
   return parts.join("; ");
 }
 
+/** Clear the customer-phone cookie (sign out of order history / phone session). */
+export function buildClearCustomerPhoneCookieHeader(): string {
+  const isProd = process.env.NODE_ENV === "production";
+  const parts = [`${CUSTOMER_PHONE_COOKIE}=`, "Path=/", "Max-Age=0", "SameSite=Lax"];
+  if (isProd) parts.push("Secure");
+  return parts.join("; ");
+}
+
 /** Build Set-Cookie header for the current-pod cookie (used by middleware). */
 export function buildCurrentPodCookieHeader(podId: string): string {
   const isProd = process.env.NODE_ENV === "production";
