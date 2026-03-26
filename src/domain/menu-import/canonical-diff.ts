@@ -30,6 +30,9 @@ function describeProductChanges(
   const basketD = d.basketMaxQuantity ?? null;
   const basketP = p.basketMaxQuantity ?? null;
   if (basketD !== basketP) otherLabels.push("basket max");
+  const pluD = d.plu ?? null;
+  const pluP = p.plu ?? null;
+  if (pluD !== pluP) otherLabels.push("Deliverect PLU (snooze key)");
   if (stableJson(d.modifierGroupDeliverectIds) !== stableJson(p.modifierGroupDeliverectIds)) {
     otherLabels.push("modifier group links");
   }

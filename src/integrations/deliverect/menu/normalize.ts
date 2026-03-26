@@ -920,8 +920,11 @@ function buildProduct(
     index * 1000
   );
 
+  const pluRaw = asString(pr.plu);
+
   return {
     deliverectId,
+    plu: pluRaw ?? null,
     name: nameRaw ?? "Unnamed item",
     description: desc,
     priceCents,

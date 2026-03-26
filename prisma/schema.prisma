@@ -263,6 +263,8 @@ model MenuItem {
   updatedAt            DateTime                @updatedAt
   basketMaxQuantity    Int?
   deliverectProductId  String?
+  /// Raw Deliverect `plu` from menu payload; snooze webhooks key on PLU while `deliverectProductId` is often `_id`-first.
+  deliverectPlu        String?
   /// Deliverect category id from canonical menu (ordering / future grouping).
   deliverectCategoryId String?
   cartItems            CartItem[]
@@ -271,6 +273,7 @@ model MenuItem {
   orderLines           OrderLineItem[]
 
   @@index([vendorId, deliverectCategoryId])
+  @@index([vendorId, deliverectPlu])
 }
 
 model ModifierGroup {

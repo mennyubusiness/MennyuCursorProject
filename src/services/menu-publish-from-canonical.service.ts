@@ -229,6 +229,7 @@ async function upsertMenuItemAndLinks(
     isAvailable: p.isAvailable,
     basketMaxQuantity: p.basketMaxQuantity ?? null,
     deliverectProductId: p.deliverectId,
+    deliverectPlu: p.plu ?? null,
     deliverectCategoryId,
   };
 

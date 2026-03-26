@@ -16,6 +16,10 @@ import {
   nonEmptyStringField,
   resolveDeliverectWebhookVerificationSecret,
 } from "@/integrations/deliverect/webhook-inbound-shared";
+import {
+  loadDeliverectSnoozePublishedScope,
+  type DeliverectSnoozePublishedScope,
+} from "@/services/deliverect-snooze-scope.service";
 
 export const dynamic = "force-dynamic";
 
@@ -89,88 +93,89 @@ function isAvailableForAction(action: "snooze" | "unsnooze"): boolean {
   return action === "unsnooze";
 }
 
-type MatchedKind = "menuItem_deliverectProductId" | "menuItem_id" | "modifierOption_deliverectModifierId" | "modifierOption_id";
+type MatchedKind =
+  | "menuItem_deliverectPlu"
+  | "menuItem_deliverectProductId"
+  | "modifierOption_deliverectModifierId";
 
+/**
+ * Apply snooze/unsnooze only to rows in the **published** catalog for each vendor.
+ * Products: prefer `deliverectPlu`, then `deliverectProductId === plu` when that id is in the snapshot.
+ * Modifiers: `deliverectModifierId === plu` only when that id appears in the published snapshot.
+ */
 async function applyPluAvailability(
   plu: string,
   isAvailable: boolean,
-  vendorIds: string[]
+  vendorIds: string[],
+  scope: DeliverectSnoozePublishedScope
 ): Promise<{ matched: boolean; kind: MatchedKind | null; updated: number }> {
   if (vendorIds.length === 0) {
     return { matched: false, kind: null, updated: 0 };
   }
 
-  const miByProduct = await prisma.menuItem.updateMany({
-    where: { vendorId: { in: vendorIds }, deliverectProductId: plu },
-    data: { isAvailable },
-  });
-  if (miByProduct.count > 0) {
-    return { matched: true, kind: "menuItem_deliverectProductId", updated: miByProduct.count };
-  }
+  let totalUpdated = 0;
+  let kind: MatchedKind | null = null;
 
-  const miById = await prisma.menuItem.updateMany({
-    where: { vendorId: { in: vendorIds }, id: plu },
-    data: { isAvailable },
-  });
-  if (miById.count > 0) {
-    const anchor = await prisma.menuItem.findFirst({
-      where: { vendorId: { in: vendorIds }, id: plu },
-      select: { deliverectProductId: true, vendorId: true },
-    });
-    let total = miById.count;
-    if (anchor?.deliverectProductId) {
-      const syncDupes = await prisma.menuItem.updateMany({
+  for (const vendorId of vendorIds) {
+    const pubProductIds = scope.productDeliverectIdsByVendor.get(vendorId);
+    if (pubProductIds && pubProductIds.size > 0) {
+      const idList = [...pubProductIds];
+
+      const byDeliverectPlu = await prisma.menuItem.updateMany({
         where: {
-          vendorId: anchor.vendorId,
-          deliverectProductId: anchor.deliverectProductId,
+          vendorId,
+          deliverectPlu: plu,
+          deliverectProductId: { in: idList },
         },
         data: { isAvailable },
       });
-      total = syncDupes.count;
+      if (byDeliverectPlu.count > 0) {
+        totalUpdated += byDeliverectPlu.count;
+        kind = "menuItem_deliverectPlu";
+      }
     }
-    return { matched: true, kind: "menuItem_id", updated: total };
   }
 
-  const moByDeliverect = await prisma.modifierOption.updateMany({
-    where: {
-      deliverectModifierId: plu,
-      modifierGroup: { vendorId: { in: vendorIds } },
-    },
-    data: { isAvailable },
-  });
-  if (moByDeliverect.count > 0) {
-    return { matched: true, kind: "modifierOption_deliverectModifierId", updated: moByDeliverect.count };
+  if (totalUpdated === 0) {
+    for (const vendorId of vendorIds) {
+      const pubProductIds = scope.productDeliverectIdsByVendor.get(vendorId);
+      if (!pubProductIds?.has(plu)) continue;
+
+      const byProductId = await prisma.menuItem.updateMany({
+        where: { vendorId, deliverectProductId: plu },
+        data: { isAvailable },
+      });
+      if (byProductId.count > 0) {
+        totalUpdated += byProductId.count;
+        kind = "menuItem_deliverectProductId";
+      }
+    }
   }
 
-  const moById = await prisma.modifierOption.updateMany({
-    where: {
-      id: plu,
-      modifierGroup: { vendorId: { in: vendorIds } },
-    },
-    data: { isAvailable },
-  });
-  if (moById.count > 0) {
-    const anchor = await prisma.modifierOption.findFirst({
-      where: { id: plu, modifierGroup: { vendorId: { in: vendorIds } } },
-      select: { deliverectModifierId: true, modifierGroup: { select: { vendorId: true } } },
-    });
-    let total = moById.count;
-    const extId = anchor?.deliverectModifierId;
-    const vId = anchor?.modifierGroup.vendorId;
-    if (extId && vId) {
-      const syncDupes = await prisma.modifierOption.updateMany({
+  if (totalUpdated === 0) {
+    for (const vendorId of vendorIds) {
+      const pubModIds = scope.modifierOptionDeliverectIdsByVendor.get(vendorId);
+      if (!pubModIds?.has(plu)) continue;
+
+      const mo = await prisma.modifierOption.updateMany({
         where: {
-          deliverectModifierId: extId,
-          modifierGroup: { vendorId: vId },
+          deliverectModifierId: plu,
+          modifierGroup: { vendorId },
         },
         data: { isAvailable },
       });
-      total = syncDupes.count;
+      if (mo.count > 0) {
+        totalUpdated += mo.count;
+        kind = "modifierOption_deliverectModifierId";
+      }
     }
-    return { matched: true, kind: "modifierOption_id", updated: total };
   }
 
-  return { matched: false, kind: null, updated: 0 };
+  return {
+    matched: totalUpdated > 0,
+    kind,
+    updated: totalUpdated,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -250,6 +255,8 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  const publishedScope = await loadDeliverectSnoozePublishedScope(vendorIds);
+
   const operations = parsed.operations;
   if (!Array.isArray(operations)) {
     console.warn(LOG, "operations missing or not an array; nothing to apply");
@@ -299,7 +306,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const result = await applyPluAvailability(plu, isAvailable, vendorIds);
+        const result = await applyPluAvailability(plu, isAvailable, vendorIds, publishedScope);
         if (result.matched) {
           processedPlu += 1;
           console.log(LOG, "update applied", {
