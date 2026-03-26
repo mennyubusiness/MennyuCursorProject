@@ -113,7 +113,22 @@ async function applyPluAvailability(
     data: { isAvailable },
   });
   if (miById.count > 0) {
-    return { matched: true, kind: "menuItem_id", updated: miById.count };
+    const anchor = await prisma.menuItem.findFirst({
+      where: { vendorId: { in: vendorIds }, id: plu },
+      select: { deliverectProductId: true, vendorId: true },
+    });
+    let total = miById.count;
+    if (anchor?.deliverectProductId) {
+      const syncDupes = await prisma.menuItem.updateMany({
+        where: {
+          vendorId: anchor.vendorId,
+          deliverectProductId: anchor.deliverectProductId,
+        },
+        data: { isAvailable },
+      });
+      total = syncDupes.count;
+    }
+    return { matched: true, kind: "menuItem_id", updated: total };
   }
 
   const moByDeliverect = await prisma.modifierOption.updateMany({
@@ -135,7 +150,24 @@ async function applyPluAvailability(
     data: { isAvailable },
   });
   if (moById.count > 0) {
-    return { matched: true, kind: "modifierOption_id", updated: moById.count };
+    const anchor = await prisma.modifierOption.findFirst({
+      where: { id: plu, modifierGroup: { vendorId: { in: vendorIds } } },
+      select: { deliverectModifierId: true, modifierGroup: { select: { vendorId: true } } },
+    });
+    let total = moById.count;
+    const extId = anchor?.deliverectModifierId;
+    const vId = anchor?.modifierGroup.vendorId;
+    if (extId && vId) {
+      const syncDupes = await prisma.modifierOption.updateMany({
+        where: {
+          deliverectModifierId: extId,
+          modifierGroup: { vendorId: vId },
+        },
+        data: { isAvailable },
+      });
+      total = syncDupes.count;
+    }
+    return { matched: true, kind: "modifierOption_id", updated: total };
   }
 
   return { matched: false, kind: null, updated: 0 };

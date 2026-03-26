@@ -138,12 +138,26 @@ export async function loadCustomerVendorMenuSections(
         include: CUSTOMER_VENDOR_MENU_ITEM_INCLUDE,
       });
 
-      const byProductId = new Map<string, CustomerVendorMenuItem>();
+      /**
+       * Multiple DB rows can share the same deliverectProductId (legacy publishes, id-based
+       * snooze updating only one row, etc.). First-wins hid a still-available duplicate.
+       * - Representative row: latest `updatedAt` (matches most recent publish/snooze).
+       * - `isAvailable`: false if ANY duplicate is unavailable (snooze / soft-off on any row).
+       */
+      const groupedByProduct = new Map<string, CustomerVendorMenuItem[]>();
       for (const r of rows) {
         if (!r.deliverectProductId) continue;
-        if (!byProductId.has(r.deliverectProductId)) {
-          byProductId.set(r.deliverectProductId, r);
-        }
+        const list = groupedByProduct.get(r.deliverectProductId) ?? [];
+        list.push(r);
+        groupedByProduct.set(r.deliverectProductId, list);
+      }
+
+      const byProductId = new Map<string, CustomerVendorMenuItem>();
+      for (const [pid, list] of groupedByProduct) {
+        const sorted = [...list].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+        const rep = sorted[0]!;
+        const mergedAvailable = list.every((r) => r.isAvailable);
+        byProductId.set(pid, { ...rep, isAvailable: mergedAvailable });
       }
 
       const sections = buildSectionsFromCanonical(menu, byProductId);
