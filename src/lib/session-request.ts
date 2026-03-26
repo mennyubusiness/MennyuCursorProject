@@ -1,13 +1,19 @@
 /**
- * App Router request context: read/write mennyu_session using next/headers.
- * Centralizes session resolution for Server Components / Server Actions so we never mint a
- * throwaway UUID without also persisting Set-Cookie (see cart.actions).
+ * Cart session contract (App Router — Server Components / Server Actions):
+ *
+ * - Read-only: `getMennyuSessionIdForRequest()` — never mints; same identity as Route Handlers
+ *   when middleware echoes `x-mennyu-session` or the cookie is present.
+ * - Ensure + persist cookie: `getOrCreateMennyuSessionIdForCart()` — only here (besides middleware
+ *   edge path and `getOrSetSessionId` + Set-Cookie for Route Handlers).
+ *
+ * Do not call `crypto.randomUUID()` for cart identity outside `@/lib/session` + this module.
  */
 import "server-only";
 import { cookies, headers } from "next/headers";
 import {
   COOKIE_NAME,
   MENNYU_SESSION_MAX_AGE,
+  createMennyuSessionId,
   getSessionIdFromHeaders,
 } from "@/lib/session";
 
@@ -30,7 +36,7 @@ export async function getOrCreateMennyuSessionIdForCart(): Promise<string> {
   const existing = await getMennyuSessionIdForRequest();
   if (existing) return existing;
 
-  const sessionId = crypto.randomUUID();
+  const sessionId = createMennyuSessionId();
   const store = await cookies();
   store.set(COOKIE_NAME, sessionId, {
     httpOnly: true,

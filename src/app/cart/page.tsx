@@ -3,10 +3,9 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
-import { discardStaleCheckoutCartsForSession } from "@/services/cart.service";
+import { discardStaleCheckoutCartsForSession, loadActiveDisplayCartForSession } from "@/services/cart.service";
 import { getActiveOrderByCustomerPhone, validateCartItemsForDisplay, getCartValidationMessage } from "@/services/order.service";
 import type { CartForValidation } from "@/services/order.service";
-import { prisma } from "@/lib/db";
 import { MenuItemImage } from "@/components/images/MenuItemImage";
 import { serializeModifierConfig } from "@/lib/modifier-config";
 import { CartItemActions } from "./CartItemActions";
@@ -34,46 +33,7 @@ export default async function CartPage({
   const reorderSkipped = params.reorder_skipped ? parseInt(params.reorder_skipped, 10) : 0;
   const reorderAdded = params.reorder_added ? parseInt(params.reorder_added, 10) : 0;
   const checkoutErrorCode = params.error ? decodeURIComponent(params.error) : null;
-  const carts = await prisma.cart.findMany({
-    where: { sessionId },
-    include: {
-      items: {
-        include: {
-          menuItem: {
-            include: {
-              modifierGroups: {
-                orderBy: { sortOrder: "asc" },
-                include: {
-                  modifierGroup: {
-                    include: {
-                      options: {
-                        orderBy: { sortOrder: "asc" },
-                        include: {
-                          nestedModifierGroups: {
-                            include: {
-                              options: { orderBy: { sortOrder: "asc" } },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          vendor: true,
-          selections: { include: { modifierOption: true } },
-        },
-      },
-      pod: true,
-    },
-    orderBy: { updatedAt: "desc" },
-  });
-  const cart =
-    currentPodId && carts.some((c) => c.podId === currentPodId)
-      ? carts.find((c) => c.podId === currentPodId)!
-      : carts[0];
+  const cart = await loadActiveDisplayCartForSession(sessionId, currentPodId);
   if (!cart || cart.items.length === 0) {
     return (
       <div className="mx-auto max-w-lg px-2 py-12">

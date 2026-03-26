@@ -1,6 +1,11 @@
 /**
- * Stateless cookie-based anonymous session for cart identity.
- * No auth libraries; just a UUID in a cookie.
+ * Stateless cookie-based anonymous session for cart identity (no auth library).
+ *
+ * **Mint** `createMennyuSessionId()` only from: middleware (edge), `getOrSetSessionId` for Route
+ * Handlers (with `Set-Cookie`), and `getOrCreateMennyuSessionIdForCart` in `@/lib/session-request`.
+ *
+ * **Read** incoming HTTP: `getSessionIdFromRequest` (cookie, then `x-mennyu-session`). For
+ * `next/headers` in RSC/actions, use `@/lib/session-request` / `getSessionIdFromHeaders`.
  */
 import { NextRequest } from "next/server";
 
@@ -13,22 +18,28 @@ export const CUSTOMER_PHONE_COOKIE = "mennyu_customer_phone";
 export const MENNYU_SESSION_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 const COOKIE_MAX_AGE = MENNYU_SESSION_MAX_AGE;
 
-function generateSessionId(): string {
-  return crypto.randomUUID();
-}
-
 /**
- * Read session ID from request cookie. Returns null if not set.
+ * Single factory for new anonymous Mennyu cart session ids.
+ * Use from middleware, Route Handlers (`getOrSetSessionId`), and `ensureCartSessionId` only.
  */
-export function getSessionIdFromRequest(request: NextRequest): string | null {
-  const cookie = request.cookies.get(COOKIE_NAME);
-  const value = cookie?.value?.trim();
-  if (!value) return null;
-  return value;
+export function createMennyuSessionId(): string {
+  return crypto.randomUUID();
 }
 
 /** Header set by middleware when it creates a new session (same request, cookie not yet on client). */
 export const SESSION_HEADER = "x-mennyu-session";
+
+/**
+ * Read session from the incoming Request: cookie first, then `x-mennyu-session` (middleware echo).
+ * Route Handlers must use this so the first hop matches Server Components / Actions.
+ */
+export function getSessionIdFromRequest(request: NextRequest): string | null {
+  const cookie = request.cookies.get(COOKIE_NAME);
+  const fromCookie = cookie?.value?.trim();
+  if (fromCookie) return fromCookie;
+  const header = request.headers.get(SESSION_HEADER)?.trim();
+  return header && header.length > 0 ? header : null;
+}
 
 /**
  * Read session ID from a Headers instance (e.g. from next/headers in server actions).
@@ -119,13 +130,13 @@ export function buildCurrentPodCookieHeader(podId: string): string {
 }
 
 /**
- * Get existing session ID or generate a new one.
- * Returns { sessionId, isNew } so callers can set the cookie when isNew is true.
+ * Route Handler helper: resolve or mint session and let caller attach `Set-Cookie` when `isNew`.
+ * Prefer {@link getSessionIdFromRequest} when minting is not allowed.
  */
 export function getOrSetSessionId(request: NextRequest): { sessionId: string; isNew: boolean } {
   const existing = getSessionIdFromRequest(request);
   if (existing) return { sessionId: existing, isNew: false };
-  return { sessionId: generateSessionId(), isNew: true };
+  return { sessionId: createMennyuSessionId(), isNew: true };
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   SESSION_HEADER,
   buildSessionCookieHeader,
   buildCurrentPodCookieHeader,
+  createMennyuSessionId,
 } from "@/lib/session";
 
 export function middleware(request: NextRequest) {
@@ -20,7 +21,7 @@ export function middleware(request: NextRequest) {
     requestHeaders.set(SESSION_HEADER, existingSession);
     response = NextResponse.next({ request: { headers: requestHeaders } });
   } else {
-    const sessionId = crypto.randomUUID();
+    const sessionId = createMennyuSessionId();
     requestHeaders.set(SESSION_HEADER, sessionId);
     response = NextResponse.next({ request: { headers: requestHeaders } });
     response.headers.set("Set-Cookie", buildSessionCookieHeader(sessionId));

@@ -8,6 +8,7 @@ import type { Cart, CartGroup, CartItem } from "@/domain/types";
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
 import { validateCartItemModifiers } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
+import { selectCartForSessionAndPod } from "@/lib/cart-selection";
 
 /** Thrown when add/update cart item fails validation (modifiers, availability, etc.). Callers can return structured JSON. */
 export class CartValidationError extends Error {
@@ -352,6 +353,53 @@ export async function discardStaleCheckoutCartsForSession(sessionId: string): Pr
       await prisma.cartItem.deleteMany({ where: { cartId } });
     }
   }
+}
+
+/**
+ * All session carts for /cart SSR, ordered by recency, then the same pod selection rule as checkout
+ * validation (prefer `mennyu_current_pod` when that cart exists).
+ */
+export async function loadActiveDisplayCartForSession(
+  sessionId: string,
+  preferredPodId: string | null
+) {
+  const rows = await prisma.cart.findMany({
+    where: { sessionId },
+    include: {
+      items: {
+        include: {
+          menuItem: {
+            include: {
+              modifierGroups: {
+                orderBy: { sortOrder: "asc" },
+                include: {
+                  modifierGroup: {
+                    include: {
+                      options: {
+                        orderBy: { sortOrder: "asc" },
+                        include: {
+                          nestedModifierGroups: {
+                            include: {
+                              options: { orderBy: { sortOrder: "asc" } },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          vendor: true,
+          selections: { include: { modifierOption: true } },
+        },
+      },
+      pod: true,
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+  return selectCartForSessionAndPod(rows, preferredPodId);
 }
 
 export async function getCartById(cartId: string): Promise<Cart | null> {

@@ -1,5 +1,7 @@
 "use server";
 
+// Cart session: use `@/lib/session-request` only — do not mint UUIDs here.
+
 import {
   getOrCreateCart,
   getCartById,
