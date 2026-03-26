@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { getSessionIdFromHeaders } from "@/lib/session";
+import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 import { prisma } from "@/lib/db";
 import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutProgress } from "./CheckoutProgress";
@@ -16,8 +15,7 @@ export default async function CheckoutPage({
   const { cartId } = await searchParams;
   if (!cartId) redirect("/cart");
 
-  const headersList = await headers();
-  const sessionId = getSessionIdFromHeaders(headersList) ?? "";
+  const sessionId = (await getMennyuSessionIdForRequest()) ?? "";
   const cart = await prisma.cart.findFirst({
     where: { id: cartId, sessionId },
     include: {

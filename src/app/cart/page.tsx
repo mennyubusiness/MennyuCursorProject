@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { getSessionIdFromHeaders, getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
+import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
+import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 import { discardStaleCheckoutCartsForSession } from "@/services/cart.service";
 import { getActiveOrderByCustomerPhone, validateCartItemsForDisplay, getCartValidationMessage } from "@/services/order.service";
 import type { CartForValidation } from "@/services/order.service";
@@ -23,7 +24,8 @@ export default async function CartPage({
     redirect(`/order/${activeOrder.id}?from=cart`);
   }
 
-  const sessionId = getSessionIdFromHeaders(headersList) ?? "__no_session__";
+  /** Align with getOrCreateCartAction: prefer cookies() then header fallback (same as cart writes). */
+  const sessionId = (await getMennyuSessionIdForRequest()) ?? "__no_session__";
   if (sessionId !== "__no_session__") {
     await discardStaleCheckoutCartsForSession(sessionId);
   }
