@@ -23,11 +23,17 @@ export async function sendSms(to: string, body: string): Promise<{ success: bool
   }
 }
 
-export async function sendOrderConfirmation(phone: string, orderId: string, totalCents: number): Promise<void> {
+export async function sendOrderConfirmation(
+  phone: string,
+  orderId: string,
+  totalCents: number,
+  pickupFragment?: string
+): Promise<void> {
   const total = (totalCents / 100).toFixed(2);
+  const pickup = pickupFragment ? ` ${pickupFragment}.` : "";
   await sendSms(
     phone,
-    `Your Mennyu order is confirmed. Order #${orderId.slice(-8).toUpperCase()}. Total $${total}. Track status: https://mennyu.com/order/${orderId}`
+    `Your Mennyu order is confirmed. Order #${orderId.slice(-8).toUpperCase()}.${pickup} Total $${total}. Track status: https://mennyu.com/order/${orderId}`
   );
 }
 

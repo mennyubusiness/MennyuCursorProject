@@ -139,10 +139,10 @@ export async function loadCustomerVendorMenuSections(
       });
 
       /**
-       * Multiple DB rows can share the same deliverectProductId (legacy publishes, id-based
-       * snooze updating only one row, etc.). First-wins hid a still-available duplicate.
+       * Multiple DB rows can share the same deliverectProductId (legacy publishes, etc.).
        * - Representative row: latest `updatedAt` (matches most recent publish/snooze).
-       * - `isAvailable`: false if ANY duplicate is unavailable (snooze / soft-off on any row).
+       * - `isAvailable`: false if ANY duplicate is unavailable — must match cart/checkout
+       *   {@link effectiveAvailabilityByMenuItemId} in `menu-item-availability.service`.
        */
       const groupedByProduct = new Map<string, CustomerVendorMenuItem[]>();
       for (const r of rows) {

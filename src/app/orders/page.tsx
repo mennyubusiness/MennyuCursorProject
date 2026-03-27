@@ -96,6 +96,7 @@ export default async function OrdersPage() {
                 </p>
                 <p className="mt-1 text-sm text-stone-600">{formatDate(order.createdAt)}</p>
                 <p className="mt-0.5 text-sm text-stone-700">{order.podName}</p>
+                <p className="text-xs text-stone-600">{order.pickupDisplayLine}</p>
                 <p className="text-xs text-stone-500">{order.vendorNames.join(", ")}</p>
                 <p className="mt-1 font-medium text-stone-900">
                   ${(order.totalCents / 100).toFixed(2)}

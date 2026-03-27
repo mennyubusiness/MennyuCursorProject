@@ -9,6 +9,14 @@ import type { Order, VendorOrder as VendorOrderType, CheckoutInput } from "@/dom
 import { buildIdempotencyKey } from "@/lib/idempotency";
 import { validateCartItemModifiers, validateCartBasketLimits } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
+import { effectiveAvailabilityByMenuItemId } from "@/services/menu-item-availability.service";
+import { formatPickupDetailLine } from "@/lib/pickup-display";
+import {
+  getDefaultScheduledSuggestion,
+  resolvePickupTimezone,
+  validateScheduledPickup,
+  wallTimeInZoneToUtc,
+} from "@/lib/pickup-scheduling";
 
 export interface CreateOrderResult {
   order: Order;
@@ -43,13 +51,29 @@ export async function validateCartForOrder(cart: {
     vendorId: string;
     quantity: number;
     priceCents: number;
-    menuItem: { priceCents: number; isAvailable: boolean; name: string; basketMaxQuantity?: number | null };
+    menuItem: {
+      priceCents: number;
+      isAvailable: boolean;
+      name: string;
+      basketMaxQuantity?: number | null;
+      /** Used with vendorId for effective availability (duplicate Deliverect product rows). */
+      deliverectProductId?: string | null;
+    };
     vendor: { isActive?: boolean; mennyuOrdersPaused?: boolean; posOpen?: boolean };
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
   }>;
 }): Promise<CartValidationResult> {
+  const effectiveByMenuItemId = await effectiveAvailabilityByMenuItemId(
+    cart.items.map((i) => ({
+      id: i.menuItemId,
+      vendorId: i.vendorId,
+      deliverectProductId: i.menuItem.deliverectProductId ?? null,
+      isAvailable: i.menuItem.isAvailable,
+    }))
+  );
+
   for (const item of cart.items) {
-    if (!item.menuItem.isAvailable) {
+    if (!effectiveByMenuItemId.get(item.menuItemId)) {
       return { valid: false, code: "ITEM_UNAVAILABLE", message: `${item.menuItem.name} is no longer available.`, cartItemId: item.id, menuItemId: item.menuItemId, menuItemName: item.menuItem.name };
     }
     const vendorAvailability = getVendorAvailability(item.vendor);
@@ -124,7 +148,14 @@ export type CartForValidation = {
     vendorId: string;
     quantity: number;
     priceCents: number;
-    menuItem: { priceCents: number; isAvailable: boolean; name: string; basketMaxQuantity?: number | null };
+    menuItem: {
+      priceCents: number;
+      isAvailable: boolean;
+      name: string;
+      basketMaxQuantity?: number | null;
+      /** Used with vendorId for effective availability (duplicate Deliverect product rows). */
+      deliverectProductId?: string | null;
+    };
     vendor: { isActive?: boolean; mennyuOrdersPaused?: boolean; posOpen?: boolean };
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
   }>;
@@ -140,8 +171,17 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
 }> {
   const errors: CartItemValidationError[] = [];
 
+  const effectiveByMenuItemId = await effectiveAvailabilityByMenuItemId(
+    cart.items.map((i) => ({
+      id: i.menuItemId,
+      vendorId: i.vendorId,
+      deliverectProductId: i.menuItem.deliverectProductId ?? null,
+      isAvailable: i.menuItem.isAvailable,
+    }))
+  );
+
   for (const item of cart.items) {
-    if (!item.menuItem.isAvailable) {
+    if (!effectiveByMenuItemId.get(item.menuItemId)) {
       errors.push({
         code: "ITEM_UNAVAILABLE",
         message: `${item.menuItem.name} is no longer available.`,
@@ -309,6 +349,45 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
     tipCents: input.tipCents,
   });
 
+  const pickupMode = input.pickupMode ?? "asap";
+  let requestedPickupAt: Date | null = null;
+  if (pickupMode === "scheduled") {
+    if (!input.scheduledPickupDate?.trim() || !input.scheduledPickupTime?.trim()) {
+      throw new OrderValidationError(
+        "PICKUP_SCHEDULE_INCOMPLETE",
+        "Choose a date and time for scheduled pickup."
+      );
+    }
+    const dateMatch = input.scheduledPickupDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const timeMatch = input.scheduledPickupTime.match(/^(\d{2}):(\d{2})$/);
+    if (!dateMatch || !timeMatch) {
+      throw new OrderValidationError("PICKUP_TIME_INVALID", "Enter a valid pickup date and time.");
+    }
+    const year = Number(dateMatch[1]);
+    const month = Number(dateMatch[2]);
+    const day = Number(dateMatch[3]);
+    const hour = Number(timeMatch[1]);
+    const minute = Number(timeMatch[2]);
+    if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) {
+      throw new OrderValidationError("PICKUP_TIME_INVALID", "Enter a valid pickup date and time.");
+    }
+    const tz = resolvePickupTimezone(cart.pod);
+    let atUtc: Date;
+    try {
+      atUtc = wallTimeInZoneToUtc(year, month, day, hour, minute, tz);
+    } catch {
+      throw new OrderValidationError(
+        "PICKUP_TIMEZONE_INVALID",
+        "Pickup timezone is not configured correctly."
+      );
+    }
+    const v = validateScheduledPickup(atUtc);
+    if (!v.ok) {
+      throw new OrderValidationError(v.code, v.message);
+    }
+    requestedPickupAt = atUtc;
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     const order = await tx.order.create({
       data: {
@@ -324,6 +403,7 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
         idempotencyKey: idemKey,
         status: "pending_payment",
         sourceCartId: cart.id,
+        requestedPickupAt,
       },
     });
 
@@ -468,6 +548,7 @@ function toOrder(row: {
   totalCents: number;
   status: string;
   stripePaymentIntentId: string | null;
+  requestedPickupAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }): Order {
@@ -484,6 +565,7 @@ function toOrder(row: {
     totalCents: row.totalCents,
     status: row.status as Order["status"],
     stripePaymentIntentId: row.stripePaymentIntentId,
+    requestedPickupAt: row.requestedPickupAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -544,6 +626,7 @@ export interface OrderHistoryEntry {
   status: string;
   podName: string;
   vendorNames: string[];
+  pickupDisplayLine: string;
 }
 
 /** Terminal Order.status values: no further updates expected; order is not "active". */
@@ -587,21 +670,31 @@ export async function getOrdersByCustomerPhone(customerPhone: string): Promise<O
   const orders = await prisma.order.findMany({
     where: { customerPhone: normalized },
     include: {
-      pod: { select: { name: true } },
+      pod: { select: { name: true, pickupTimezone: true } },
       vendorOrders: { include: { vendor: { select: { name: true } } } },
     },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
 
-  return orders.map((o) => ({
-    id: o.id,
-    createdAt: o.createdAt,
-    totalCents: o.totalCents,
-    status: o.status,
-    podName: o.pod.name,
-    vendorNames: [...new Set(o.vendorOrders.map((vo) => vo.vendor.name))],
-  }));
+  return orders.map((o) => {
+    const tz = resolvePickupTimezone(o.pod);
+    return {
+      id: o.id,
+      createdAt: o.createdAt,
+      totalCents: o.totalCents,
+      status: o.status,
+      podName: o.pod.name,
+      vendorNames: [...new Set(o.vendorOrders.map((vo) => vo.vendor.name))],
+      pickupDisplayLine: formatPickupDetailLine(o.requestedPickupAt, tz),
+    };
+  });
+}
+
+/** Server-only helper for checkout page default scheduled fields. */
+export function getCheckoutDefaultScheduledPickup(pod: { pickupTimezone: string | null }) {
+  const tz = resolvePickupTimezone(pod);
+  return { timezone: tz, ...getDefaultScheduledSuggestion(tz) };
 }
 
 export async function setOrderStripePaymentIntent(

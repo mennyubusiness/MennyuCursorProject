@@ -10,6 +10,8 @@ import { setOrderStatus } from "@/services/order.service";
 import { submitVendorOrder } from "@/services/routing.service";
 import { sendOrderConfirmation } from "@/services/sms.service";
 import { deriveParentStatusFromVendorOrders } from "@/services/order-status.service";
+import { formatPickupSmsFragment } from "@/lib/pickup-display";
+import { resolvePickupTimezone } from "@/lib/pickup-scheduling";
 
 /**
  * Run full post-payment flow: record payment (or skip if already recorded), set status,
@@ -45,7 +47,7 @@ export async function processSuccessfulPayment(params: {
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { vendorOrders: true },
+    include: { vendorOrders: true, pod: true },
   });
   if (order) {
     for (const vo of order.vendorOrders) {
@@ -75,7 +77,13 @@ export async function processSuccessfulPayment(params: {
     await setOrderStatus(orderId, parentStatus, "system");
 
     if (paymentCreated) {
-      await sendOrderConfirmation(order.customerPhone, orderId, order.totalCents);
+      const tz = resolvePickupTimezone(order.pod);
+      await sendOrderConfirmation(
+        order.customerPhone,
+        orderId,
+        order.totalCents,
+        formatPickupSmsFragment(order.requestedPickupAt, tz)
+      );
     }
   }
 

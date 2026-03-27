@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutProgress } from "./CheckoutProgress";
 import { computeOrderTotals } from "@/domain/fees";
-import { validateCartForOrder } from "@/services/order.service";
+import { getCheckoutDefaultScheduledPickup, validateCartForOrder } from "@/services/order.service";
 
 export default async function CheckoutPage({
   searchParams,
@@ -44,6 +44,7 @@ export default async function CheckoutPage({
         isAvailable: i.menuItem.isAvailable,
         name: i.menuItem.name,
         basketMaxQuantity: i.menuItem.basketMaxQuantity ?? null,
+        deliverectProductId: i.menuItem.deliverectProductId ?? null,
       },
       vendor: {
         isActive: i.vendor.isActive,
@@ -87,6 +88,7 @@ export default async function CheckoutPage({
     tipCents: 0,
   });
   const vendorCount = byVendor.size;
+  const scheduledDefaults = getCheckoutDefaultScheduledPickup(cart.pod);
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -164,10 +166,12 @@ export default async function CheckoutPage({
 
       <CheckoutForm
         cartId={cart.id}
-        podId={cart.podId}
         totalCents={totals.totalCents}
         subtotalCents={totals.subtotalCents}
         serviceFeeCents={totals.serviceFeeCents}
+        pickupTimezoneLabel={scheduledDefaults.timezone}
+        defaultScheduledDate={scheduledDefaults.date}
+        defaultScheduledTime={scheduledDefaults.time}
       />
     </div>
   );

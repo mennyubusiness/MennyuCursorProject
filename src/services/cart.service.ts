@@ -9,6 +9,7 @@ import { computeEffectiveUnitPriceCents } from "@/domain/money";
 import { validateCartItemModifiers } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
 import { selectCartForSessionAndPod } from "@/lib/cart-selection";
+import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
 
 /** Thrown when add/update cart item fails validation (modifiers, availability, etc.). Callers can return structured JSON. */
 export class CartValidationError extends Error {
@@ -253,7 +254,13 @@ export async function updateCartItem(
   }
 
   // Quantity / notes-only updates must still enforce current menu + modifier availability (re-publish / snooze).
-  if (!existingItem.menuItem.isAvailable) {
+  const stillOrderable = await isMenuItemEffectivelyAvailable({
+    id: existingItem.menuItem.id,
+    vendorId: existingItem.menuItem.vendorId,
+    deliverectProductId: existingItem.menuItem.deliverectProductId,
+    isAvailable: existingItem.menuItem.isAvailable,
+  });
+  if (!stillOrderable) {
     throw new CartValidationError(`${existingItem.menuItem.name} is no longer available.`, "ITEM_UNAVAILABLE", {
       cartItemId,
       menuItemId: existingItem.menuItemId,

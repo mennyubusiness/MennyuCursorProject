@@ -8,6 +8,8 @@ import { submitVendorOrder } from "@/services/routing.service";
 import { sendOrderConfirmation } from "@/services/sms.service";
 import { buildIdempotencyKey } from "@/lib/idempotency";
 import { deriveParentStatusFromVendorOrders } from "@/services/order-status.service";
+import { formatPickupSmsFragment } from "@/lib/pickup-display";
+import { resolvePickupTimezone } from "@/lib/pickup-scheduling";
 
 const bodySchema = z.object({
   orderId: z.string(),
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { vendorOrders: true },
+      include: { vendorOrders: true, pod: true },
     });
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -74,7 +76,13 @@ export async function POST(request: NextRequest) {
       updatedOrder?.vendorOrders ?? []
     );
     await setOrderStatus(orderId, parentStatus, "system");
-    await sendOrderConfirmation(order.customerPhone, orderId, order.totalCents);
+    const tz = resolvePickupTimezone(order.pod);
+    await sendOrderConfirmation(
+      order.customerPhone,
+      orderId,
+      order.totalCents,
+      formatPickupSmsFragment(order.requestedPickupAt, tz)
+    );
 
     const final = await prisma.order.findUnique({
       where: { id: orderId },

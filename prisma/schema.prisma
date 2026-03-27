@@ -17,6 +17,8 @@ model Pod {
   address            String?
   latitude           Float?
   longitude          Float?
+  /// IANA timezone for scheduled pickup (e.g. America/Chicago). Falls back to DEFAULT_PICKUP_TIMEZONE env when null.
+  pickupTimezone     String?
   isActive           Boolean                @default(true)
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
@@ -403,6 +405,8 @@ model Order {
   adminResolutionNotes  String?
   /// Cart row used at checkout (line items cleared after payment / cancel). Optional for legacy orders.
   sourceCartId          String?
+  /// Customer-requested pickup instant (UTC). Null = ASAP pickup.
+  requestedPickupAt     DateTime?
   pod                   Pod                  @relation(fields: [podId], references: [id])
   issues                OrderIssue[]
   statusHistory         OrderStatusHistory[]

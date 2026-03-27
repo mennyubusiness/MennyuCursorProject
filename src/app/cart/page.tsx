@@ -100,6 +100,7 @@ export default async function CartPage({
         isAvailable: i.menuItem.isAvailable,
         name: i.menuItem.name,
         basketMaxQuantity: i.menuItem.basketMaxQuantity ?? null,
+        deliverectProductId: i.menuItem.deliverectProductId ?? null,
       },
       vendor: {
         isActive: i.vendor.isActive,

@@ -136,6 +136,8 @@ export interface Order {
   totalCents: number;
   status: ParentOrderStatus;
   stripePaymentIntentId: string | null;
+  /** Null = ASAP pickup. */
+  requestedPickupAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -205,6 +207,8 @@ export interface VendorOrderStatusHistoryEntry {
 }
 
 // ---- Checkout input ----
+export type CheckoutPickupMode = "asap" | "scheduled";
+
 export interface CheckoutInput {
   cartId: string;
   customerPhone: string;
@@ -212,6 +216,11 @@ export interface CheckoutInput {
   orderNotes?: string | null;
   tipCents: number;
   idempotencyKey: string;
+  pickupMode?: CheckoutPickupMode;
+  /** Required when pickupMode is `scheduled` (YYYY-MM-DD in pod timezone). */
+  scheduledPickupDate?: string;
+  /** Required when pickupMode is `scheduled` (HH:mm, 24h, in pod timezone). */
+  scheduledPickupTime?: string;
 }
 
 // ---- Deliverect (integration) ----

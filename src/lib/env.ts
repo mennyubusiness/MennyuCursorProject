@@ -47,6 +47,8 @@ const envSchema = z.object({
   SHOW_DELIVERECT_STATUS_SIM_UI: z.enum(["true", "false"]).optional(),
   /** Verbose Deliverect HTTP / normalize logging (server). Keeps warnings for failures. */
   DEBUG_DELIVERECT: z.enum(["true", "false"]).optional(),
+  /** IANA timezone when Pod.pickupTimezone is unset (scheduled pickup checkout & display). */
+  DEFAULT_PICKUP_TIMEZONE: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

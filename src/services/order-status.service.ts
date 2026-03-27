@@ -37,6 +37,7 @@ import {
   legacySourceToStatusSource,
 } from "@/services/vendor-order-status-instrumentation";
 import { sendOrderStatusUpdate } from "./sms.service";
+import { resolvePickupTimezone } from "@/lib/pickup-scheduling";
 
 /** Source tag for dev simulator; SMS is skipped when source is this value. */
 const DEV_SIMULATOR_SOURCE = "dev_simulator";
@@ -624,6 +625,7 @@ async function getOrderWithUnifiedStatusImpl(orderId: string) {
     ...order,
     derivedStatus: derived,
     statusLabel: parentStatusLabel(derived),
+    resolvedPickupTimezone: resolvePickupTimezone(order.pod),
   };
 }
 

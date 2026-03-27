@@ -8,10 +8,13 @@ import { CheckoutProgress } from "./CheckoutProgress";
 
 interface CheckoutFormProps {
   cartId: string;
-  podId: string;
   totalCents: number;
   subtotalCents: number;
   serviceFeeCents: number;
+  /** IANA timezone used for scheduled pickup (pod or default). */
+  pickupTimezoneLabel: string;
+  defaultScheduledDate: string;
+  defaultScheduledTime: string;
 }
 
 type Step = "form" | "payment";
@@ -35,6 +38,7 @@ function PaymentStep({
   subtotalCents,
   serviceFeeCents,
   tipCents,
+  pickupSummaryLine,
   onSuccess,
 }: {
   orderId: string;
@@ -44,6 +48,7 @@ function PaymentStep({
   subtotalCents: number;
   serviceFeeCents: number;
   tipCents: number;
+  pickupSummaryLine: string;
   onSuccess: () => void;
 }) {
   const stripe = useStripe();
@@ -100,6 +105,10 @@ function PaymentStep({
           Your card is processed by Stripe. Vendors receive this order only after payment succeeds.
         </p>
         <dl className="mt-4 space-y-2 border-t border-stone-200 pt-4 text-sm">
+          <div className="flex justify-between gap-4 text-stone-800">
+            <dt className="text-stone-600">Pickup</dt>
+            <dd className="max-w-[65%] text-right text-sm font-medium">{pickupSummaryLine}</dd>
+          </div>
           <div className="flex justify-between gap-4">
             <dt className="text-stone-600">Subtotal</dt>
             <dd className="tabular-nums">${(subtotalCents / 100).toFixed(2)}</dd>
@@ -146,10 +155,12 @@ function PaymentStep({
 
 export function CheckoutForm({
   cartId,
-  podId,
   totalCents,
   subtotalCents,
   serviceFeeCents,
+  pickupTimezoneLabel,
+  defaultScheduledDate,
+  defaultScheduledTime,
 }: CheckoutFormProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("form");
@@ -168,9 +179,20 @@ export function CheckoutForm({
   const [customTipError, setCustomTipError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickupMode, setPickupMode] = useState<"asap" | "scheduled">("asap");
+  const [scheduledDate, setScheduledDate] = useState(defaultScheduledDate);
+  const [scheduledTime, setScheduledTime] = useState(defaultScheduledTime);
+  const [pickupFieldError, setPickupFieldError] = useState<string | null>(null);
 
   const idempotencyKeyRef = useRef(crypto.randomUUID());
   const totalWithTip = totalCents + tipCents;
+
+  const pickupSummaryLine =
+    pickupMode === "asap"
+      ? "ASAP"
+      : scheduledDate && scheduledTime
+        ? `${scheduledDate} ${scheduledTime} (${pickupTimezoneLabel})`
+        : "Scheduled";
 
   const isCustomTipSelected = tipPresetPercent === null;
 
@@ -230,6 +252,13 @@ export function CheckoutForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setPickupFieldError(null);
+    if (pickupMode === "scheduled") {
+      if (!scheduledDate.trim() || !scheduledTime.trim()) {
+        setPickupFieldError("Choose a date and time for pickup.");
+        return;
+      }
+    }
     if (customTipError) return;
     if (isCustomTipSelected && customTipInput.trim() !== "") {
       const cents = parseCustomTip(customTipInput);
@@ -250,6 +279,10 @@ export function CheckoutForm({
           customerEmail: email || undefined,
           tipCents,
           idempotencyKey,
+          pickupMode,
+          ...(pickupMode === "scheduled"
+            ? { scheduledPickupDate: scheduledDate, scheduledPickupTime: scheduledTime }
+            : {}),
         }),
       });
       const text = await res.text();
@@ -333,6 +366,7 @@ export function CheckoutForm({
           subtotalCents={subtotalCents}
           serviceFeeCents={serviceFeeCents}
           tipCents={tipCents}
+          pickupSummaryLine={pickupSummaryLine}
           onSuccess={() => router.push(`/order/${paymentData!.orderId}`)}
         />
       </Elements>
@@ -379,6 +413,80 @@ export function CheckoutForm({
             />
           </div>
         </div>
+      </section>
+
+      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Pickup</h2>
+        <p className="mt-1 text-sm text-stone-500">Pickup orders only. Times use {pickupTimezoneLabel}.</p>
+        <fieldset className="mt-4 space-y-3">
+          <legend className="sr-only">When to pick up</legend>
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-200 p-3 has-[:checked]:border-mennyu-primary has-[:checked]:bg-mennyu-muted">
+            <input
+              type="radio"
+              name="pickupMode"
+              checked={pickupMode === "asap"}
+              onChange={() => {
+                setPickupMode("asap");
+                setPickupFieldError(null);
+              }}
+              className="mt-1"
+            />
+            <span>
+              <span className="font-medium text-stone-900">ASAP</span>
+              <span className="mt-0.5 block text-sm text-stone-600">
+                As soon as the kitchen can prepare your order (default).
+              </span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-200 p-3 has-[:checked]:border-mennyu-primary has-[:checked]:bg-mennyu-muted">
+            <input
+              type="radio"
+              name="pickupMode"
+              checked={pickupMode === "scheduled"}
+              onChange={() => setPickupMode("scheduled")}
+              className="mt-1"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="font-medium text-stone-900">Schedule for later</span>
+              <span className="mt-0.5 block text-sm text-stone-600">
+                Choose when you plan to pick up (at least ~30 minutes from now).
+              </span>
+              {pickupMode === "scheduled" && (
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <div>
+                    <label htmlFor="pickup-date" className="block text-xs font-medium text-stone-600">
+                      Date
+                    </label>
+                    <input
+                      id="pickup-date"
+                      type="date"
+                      value={scheduledDate}
+                      onChange={(e) => setScheduledDate(e.target.value)}
+                      className="mt-1 rounded-lg border border-stone-300 px-3 py-2 text-stone-900"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="pickup-time" className="block text-xs font-medium text-stone-600">
+                      Time
+                    </label>
+                    <input
+                      id="pickup-time"
+                      type="time"
+                      value={scheduledTime}
+                      onChange={(e) => setScheduledTime(e.target.value)}
+                      className="mt-1 rounded-lg border border-stone-300 px-3 py-2 text-stone-900"
+                    />
+                  </div>
+                </div>
+              )}
+            </span>
+          </label>
+        </fieldset>
+        {pickupFieldError && (
+          <p className="mt-2 text-sm text-red-600" role="alert">
+            {pickupFieldError}
+          </p>
+        )}
       </section>
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">

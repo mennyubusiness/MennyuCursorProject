@@ -10,6 +10,7 @@ import { canCustomerCancelOrder, canCustomerCancelVendorOrder } from "@/lib/canc
 import { SetCustomerPhoneFromOrder } from "./SetCustomerPhoneFromOrder";
 import { OrderCancelButton } from "./OrderCancelButton";
 import { VendorOrderCancelButton } from "./VendorOrderCancelButton";
+import { formatPickupDetailLine } from "@/lib/pickup-display";
 import {
   vendorStatusLabel,
   orderSummaryExplanation,
@@ -28,8 +29,13 @@ function toDate(v: string | Date): Date {
 
 /** Normalize order so all createdAt fields are Date for timeline/display. */
 function normalizeOrderDates(order: NonNullable<OrderFromApi>): NonNullable<OrderFromApi> {
+  const requested =
+    order.requestedPickupAt != null
+      ? toDate(order.requestedPickupAt as string | Date)
+      : null;
   return {
     ...order,
+    requestedPickupAt: requested,
     statusHistory: (order.statusHistory ?? []).map((e) => ({
       ...e,
       createdAt: toDate(e.createdAt as string | Date),
@@ -141,6 +147,10 @@ export function OrderPageContent({
   const explanation = orderSummaryExplanation(derivedStatus, order.vendorOrders);
   const timelineEvents = buildTimelineEvents(order);
   const pickupCode = getPickupCode(order.id);
+  const pickupLine = formatPickupDetailLine(
+    order.requestedPickupAt,
+    order.resolvedPickupTimezone
+  );
   const isMultiVendor = order.vendorOrders.length > 1;
   const customerCanCancel = canCustomerCancelOrder(order);
   const isOrderCancelled = derivedStatus === "cancelled";
@@ -159,6 +169,10 @@ export function OrderPageContent({
       )}
       <h1 className="text-2xl font-semibold text-stone-900">Your order</h1>
       <p className="mt-1 text-stone-600">Order #{order.id.slice(-8).toUpperCase()}</p>
+
+      <p className="mt-4 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-800">
+        {pickupLine}
+      </p>
 
       <section className="mt-6 rounded-xl border-2 border-stone-300 bg-stone-50 p-6" aria-label="Pickup code">
         <p className="text-sm font-medium uppercase tracking-wide text-stone-500">Pickup code</p>

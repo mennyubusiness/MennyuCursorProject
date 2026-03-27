@@ -3,6 +3,7 @@
  * Enforces min/max selections, required groups, snooze/availability, and basket limits.
  */
 import { prisma } from "@/lib/db";
+import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
 
 export type ModifierValidationResult =
   | { valid: true }
@@ -46,7 +47,13 @@ export async function validateCartItemModifiers(cartItem: CartItemForValidation)
     return { valid: false, code: "ITEM_NOT_FOUND", message: "Menu item not found.", menuItemId: cartItem.menuItemId, menuItemName: cartItem.menuItem?.name };
   }
 
-  if (!menuItem.isAvailable) {
+  const productOk = await isMenuItemEffectivelyAvailable({
+    id: menuItem.id,
+    vendorId: menuItem.vendorId,
+    deliverectProductId: menuItem.deliverectProductId,
+    isAvailable: menuItem.isAvailable,
+  });
+  if (!productOk) {
     return { valid: false, code: "ITEM_UNAVAILABLE", message: `${menuItem.name} is no longer available.`, cartItemId: cartItem.id, menuItemId: cartItem.menuItemId, menuItemName: menuItem.name };
   }
 

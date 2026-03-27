@@ -25,6 +25,7 @@ function minimalVendorOrder(overrides?: Partial<NonNullable<HydratedVendorOrder>
       customerEmail: null,
       orderNotes: null,
       stripePaymentIntentId: "pi_cert_fixture",
+      requestedPickupAt: null,
     },
     ...overrides,
   } as NonNullable<HydratedVendorOrder>;
@@ -54,7 +55,7 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     expect(payload.pickupTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   });
 
-  it("sets isASAP false when preparation time exceeds 30 minutes", () => {
+  it("ASAP orders keep isASAP true even when preparation time exceeds 30 minutes", () => {
     const payload = mennyuVendorOrderToDeliverectPayload({
       vendorOrder: minimalVendorOrder(),
       channelLinkId: "ch-link-cert",
@@ -62,7 +63,7 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     });
 
     expect(payload.preparationTime).toBe(45);
-    expect(payload.isASAP).toBe(false);
+    expect(payload.isASAP).toBe(true);
     expect(payload.pickupTime).toBe("2025-06-01T14:45:00Z");
   });
 
@@ -74,5 +75,24 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
 
     expect(payload.preparationTime).toBe(15);
     expect(payload.isASAP).toBe(true);
+  });
+
+  it("scheduled pickup: isASAP false and pickupTime from order.requestedPickupAt", () => {
+    const base = minimalVendorOrder();
+    const payload = mennyuVendorOrderToDeliverectPayload({
+      vendorOrder: minimalVendorOrder({
+        order: {
+          ...base.order,
+          requestedPickupAt: new Date("2025-06-03T16:45:00.000Z"),
+        },
+      }),
+      channelLinkId: "ch-link-cert",
+      preparationTimeMinutes: 15,
+    });
+
+    expect(payload.isASAP).toBe(false);
+    expect(payload.pickupTime).toBe("2025-06-03T16:45:00Z");
+    expect(payload.orderType).toBe(1);
+    expect(payload.preparationTime).toBe(15);
   });
 });

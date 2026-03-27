@@ -368,6 +368,11 @@ function OptionRow({
         </div>
         <span className={disabled ? "text-stone-400" : "text-stone-900"}>
           {option.name}
+          {!option.isAvailable && (
+            <span className="ml-2 rounded bg-stone-200 px-1.5 py-0.5 text-xs font-medium text-stone-700">
+              Unavailable
+            </span>
+          )}
           {option.priceCents > 0 && (
             <span className="ml-1 text-stone-500">+${(option.priceCents / 100).toFixed(2)}</span>
           )}
@@ -411,6 +416,11 @@ function OptionRow({
                       </div>
                       <span className={!nopt.isAvailable ? "text-stone-400" : "text-stone-800"}>
                         {nopt.name}
+                        {!nopt.isAvailable && (
+                          <span className="ml-1 rounded bg-stone-200 px-1 py-0.5 text-[10px] font-medium text-stone-700">
+                            Unavailable
+                          </span>
+                        )}
                         {nopt.priceCents > 0 && (
                           <span className="text-stone-500"> +${(nopt.priceCents / 100).toFixed(2)}</span>
                         )}

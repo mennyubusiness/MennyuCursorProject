@@ -107,14 +107,27 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
  * Prices: sent as integer cents (Deliverect expects integer).
  * Top-level field names match Deliverect API: channelOrderId, channelOrderDisplayId, items, orderType.
  */
+function toDeliverectPickupTimeIso(d: Date): string {
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
 export function mennyuVendorOrderToDeliverectPayload(input: TransformInput): DeliverectOrderRequest {
   const { vendorOrder } = input;
   const items: DeliverectOrderItem[] = vendorOrder.lineItems.map(lineItemToDeliverectItem);
 
   const prepMin = input.preparationTimeMinutes ?? 15;
-  const pickupAt = new Date(Date.now() + prepMin * 60 * 1000);
-  /** Deliverect sample format without ms: yyyy-MM-ddTHH:mm:ssZ */
-  const pickupTime = pickupAt.toISOString().replace(/\.\d{3}Z$/, "Z");
+  const scheduledAt = vendorOrder.order.requestedPickupAt;
+  const now = Date.now();
+  let pickupTime: string;
+  let isASAP: boolean;
+  if (scheduledAt != null) {
+    pickupTime = toDeliverectPickupTimeIso(scheduledAt);
+    isASAP = false;
+  } else {
+    const pickupAt = new Date(now + prepMin * 60 * 1000);
+    pickupTime = toDeliverectPickupTimeIso(pickupAt);
+    isASAP = true;
+  }
 
   const payload: DeliverectOrderRequest = {
     channelLinkId: input.channelLinkId,
@@ -124,7 +137,7 @@ export function mennyuVendorOrderToDeliverectPayload(input: TransformInput): Del
     orderType: 1, // pickup
     preparationTime: prepMin,
     pickupTime,
-    isASAP: prepMin <= 30,
+    isASAP,
   };
 
   const orderNote = vendorOrder.order.orderNotes?.trim();
