@@ -12,12 +12,12 @@ import { OrderCancelButton } from "./OrderCancelButton";
 import { VendorOrderCancelButton } from "./VendorOrderCancelButton";
 import { formatPickupDetailLine } from "@/lib/pickup-display";
 import {
-  vendorStatusLabel,
+  vendorStatusLabelForScheduledPickup,
   orderSummaryExplanation,
   buildTimelineEvents,
   formatTimestamp,
   refundDisplayMessage,
-  customerStatusLabel,
+  customerStatusLabelForScheduledPickup,
 } from "./order-status-helpers";
 
 /** Order as returned by status API / server (dates may be ISO strings after JSON). */
@@ -143,8 +143,17 @@ export function OrderPageContent({
         v.fulfillmentStatus === "cancelled" ||
         (v.routingStatus === "failed" && v.fulfillmentStatus === "pending")
     );
-  const statusLabel = customerStatusLabel(derivedStatus, order.vendorOrders, failedButRecoverable);
-  const explanation = orderSummaryExplanation(derivedStatus, order.vendorOrders);
+  const statusLabel = customerStatusLabelForScheduledPickup(
+    derivedStatus,
+    order.vendorOrders,
+    failedButRecoverable,
+    order.requestedPickupAt
+  );
+  const explanation = orderSummaryExplanation(
+    derivedStatus,
+    order.vendorOrders,
+    order.requestedPickupAt
+  );
   const timelineEvents = buildTimelineEvents(order);
   const pickupCode = getPickupCode(order.id);
   const pickupLine = formatPickupDetailLine(
@@ -237,7 +246,12 @@ export function OrderPageContent({
             const isReady = vo.fulfillmentStatus === "ready";
             const isCancelled = vo.fulfillmentStatus === "cancelled";
             const recovered = isVendorOrderManuallyRecovered(vo, vo.statusHistory);
-            const statusLabelVo = vendorStatusLabel(vo.routingStatus, vo.fulfillmentStatus, recovered);
+            const statusLabelVo = vendorStatusLabelForScheduledPickup(
+              order.requestedPickupAt,
+              vo.routingStatus,
+              vo.fulfillmentStatus,
+              recovered
+            );
             const canCancelThisVo = canCustomerCancelVendorOrder(vo);
             const showVendorSubtotal = order.vendorOrders.length > 1;
             return (

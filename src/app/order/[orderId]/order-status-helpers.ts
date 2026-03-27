@@ -27,10 +27,76 @@ export function vendorStatusLabel(
   return "In progress";
 }
 
+/**
+ * True when a future scheduled pickup is still before active kitchen work (no preparing/ready yet).
+ * Used for customer-facing "Scheduled" labels only; does not change stored status.
+ */
+export function shouldShowScheduledPickupCustomerLabels(
+  requestedPickupAt: unknown,
+  vendorOrders: Array<{ fulfillmentStatus: string }>
+): boolean {
+  if (requestedPickupAt == null) return false;
+  return !vendorOrders.some((v) => ["preparing", "ready"].includes(v.fulfillmentStatus));
+}
+
+/**
+ * Customer vendor row: show "Scheduled" for future pickup until POS moves into preparing or later.
+ */
+export function vendorStatusLabelForScheduledPickup(
+  requestedPickupAt: unknown,
+  routingStatus: string,
+  fulfillmentStatus: string,
+  isManuallyRecovered?: boolean
+): string {
+  if (routingStatus === "failed" && !isManuallyRecovered) return "Unavailable";
+  if (fulfillmentStatus === "cancelled") return "Cancelled";
+  if (fulfillmentStatus === "completed") return "Picked up";
+  if (
+    requestedPickupAt != null &&
+    (fulfillmentStatus === "pending" || fulfillmentStatus === "accepted")
+  ) {
+    return "Scheduled";
+  }
+  return vendorStatusLabel(routingStatus, fulfillmentStatus, isManuallyRecovered);
+}
+
+/**
+ * Parent header: show "Scheduled" when the order is future-scheduled but derived parent status
+ * already reflects accepted vendor rows (→ "In progress") before any kitchen prep has started.
+ */
+export function customerStatusLabelForScheduledPickup(
+  derivedStatus: string,
+  vendorOrders: Array<{ routingStatus: string; fulfillmentStatus: string }>,
+  failedButRecoverable: boolean,
+  requestedPickupAt: unknown
+): string {
+  if (failedButRecoverable) return "Confirming your order";
+  if (
+    requestedPickupAt != null &&
+    shouldShowScheduledPickupCustomerLabels(requestedPickupAt, vendorOrders) &&
+    (derivedStatus === "in_progress" ||
+      derivedStatus === "accepted" ||
+      derivedStatus === "preparing")
+  ) {
+    return "Scheduled";
+  }
+  return customerStatusLabel(derivedStatus, vendorOrders, failedButRecoverable);
+}
+
 export function orderSummaryExplanation(
   derivedStatus: string,
-  vendorOrders: Array<{ fulfillmentStatus: string; routingStatus: string }>
+  vendorOrders: Array<{ fulfillmentStatus: string; routingStatus: string }>,
+  requestedPickupAt?: unknown
 ): string {
+  if (
+    requestedPickupAt != null &&
+    shouldShowScheduledPickupCustomerLabels(requestedPickupAt, vendorOrders) &&
+    (derivedStatus === "in_progress" ||
+      derivedStatus === "accepted" ||
+      derivedStatus === "preparing")
+  ) {
+    return "Your pickup is scheduled. We'll update you when the kitchen starts preparing your order.";
+  }
   const ready = vendorOrders.filter((v) => v.fulfillmentStatus === "ready").length;
   const preparing = vendorOrders.filter((v) =>
     ["accepted", "preparing"].includes(v.fulfillmentStatus)
