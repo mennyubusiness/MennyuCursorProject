@@ -94,5 +94,20 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     expect(payload.pickupTime).toBe("2025-06-03T16:45:00Z");
     expect(payload.orderType).toBe(1);
     expect(payload.preparationTime).toBe(15);
+    expect(payload.pickupTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  });
+
+  it("scheduled pickupTime is the stored instant, not shifted by fake timers", () => {
+    const base = minimalVendorOrder();
+    const stored = new Date("2026-12-24T20:00:00.000Z");
+    const payload = mennyuVendorOrderToDeliverectPayload({
+      vendorOrder: minimalVendorOrder({
+        order: { ...base.order, requestedPickupAt: stored },
+      }),
+      channelLinkId: "ch-link-cert",
+      preparationTimeMinutes: 20,
+    });
+    expect(payload.pickupTime).toBe("2026-12-24T20:00:00Z");
+    expect(payload.isASAP).toBe(false);
   });
 });

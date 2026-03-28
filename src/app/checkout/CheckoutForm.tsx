@@ -554,6 +554,10 @@ export function CheckoutForm({
           Total before payment
         </h2>
         <dl className="mt-3 space-y-2 text-sm">
+          <div className="flex justify-between gap-4 text-stone-800">
+            <dt className="text-stone-600">Pickup</dt>
+            <dd className="max-w-[65%] text-right text-sm font-medium">{pickupSummaryLine}</dd>
+          </div>
           <div className="flex justify-between">
             <dt className="text-stone-600">Food + service fee</dt>
             <dd className="tabular-nums">${(totalCents / 100).toFixed(2)}</dd>

@@ -1,5 +1,7 @@
 /**
  * Customer-facing pickup labels (ASAP vs scheduled). Safe for client or server.
+ * Uses `Intl` with the pod (or default) IANA timezone — distinct from Deliverect `pickupTime`, which is always UTC.
+ * Order history uses {@link formatPickupDetailLine} via `getOrdersByCustomerPhone`; keep wording aligned with the order status page.
  */
 
 export function formatPickupDetailLine(

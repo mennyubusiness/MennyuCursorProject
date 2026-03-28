@@ -55,4 +55,22 @@ describe("scheduled pickup display overrides", () => {
       ])
     ).toBe(false);
   });
+
+  it("vendor row: terminal and active states override Scheduled", () => {
+    expect(vendorStatusLabelForScheduledPickup(future, "confirmed", "cancelled", false)).toBe(
+      "Cancelled"
+    );
+    expect(vendorStatusLabelForScheduledPickup(future, "confirmed", "ready", false)).toBe(
+      "Ready for pickup"
+    );
+    expect(vendorStatusLabelForScheduledPickup(future, "failed", "pending", false)).toBe(
+      "Unavailable"
+    );
+  });
+
+  it("ASAP order: vendor accepted shows Accepted, not Scheduled", () => {
+    expect(vendorStatusLabelForScheduledPickup(null, "confirmed", "accepted", false)).toBe(
+      "Accepted"
+    );
+  });
 });

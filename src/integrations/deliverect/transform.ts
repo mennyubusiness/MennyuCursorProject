@@ -107,10 +107,20 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
  * Prices: sent as integer cents (Deliverect expects integer).
  * Top-level field names match Deliverect API: channelOrderId, channelOrderDisplayId, items, orderType.
  */
+/**
+ * Deliverect pickup time: UTC instant as `yyyy-MM-ddTHH:mm:ssZ` (no fractional seconds).
+ * Customer-scheduled wall time is converted to this instant at order creation (DB stores UTC).
+ */
 function toDeliverectPickupTimeIso(d: Date): string {
   return d.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
+/**
+ * Certification-relevant pickup fields:
+ * - `orderType: 1` = pickup.
+ * - ASAP: `isASAP: true`, `pickupTime` = now + `preparationTime` minutes (UTC), `preparationTime` = minutes.
+ * - Scheduled: `isASAP: false`, `pickupTime` = `order.requestedPickupAt` (UTC), `preparationTime` unchanged from routing.
+ */
 export function mennyuVendorOrderToDeliverectPayload(input: TransformInput): DeliverectOrderRequest {
   const { vendorOrder } = input;
   const items: DeliverectOrderItem[] = vendorOrder.lineItems.map(lineItemToDeliverectItem);
