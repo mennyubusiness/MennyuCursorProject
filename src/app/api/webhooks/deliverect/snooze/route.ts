@@ -20,6 +20,10 @@ import {
   loadDeliverectSnoozePublishedScope,
   type DeliverectSnoozePublishedScope,
 } from "@/services/deliverect-snooze-scope.service";
+import {
+  getOperationalMenuItemIdsForVendor,
+  getOperationalModifierOptionIdsForVendor,
+} from "@/services/menu-active-scope.service";
 
 export const dynamic = "force-dynamic";
 
@@ -113,16 +117,25 @@ async function applyPluAvailability(
     return { matched: false, kind: null, updated: 0 };
   }
 
+  const operationalMenuByVendor = new Map<string, Set<string>>();
+  const operationalModByVendor = new Map<string, Set<string>>();
+  for (const vendorId of vendorIds) {
+    operationalMenuByVendor.set(vendorId, await getOperationalMenuItemIdsForVendor(vendorId));
+    operationalModByVendor.set(vendorId, await getOperationalModifierOptionIdsForVendor(vendorId));
+  }
+
   let totalUpdated = 0;
   let kind: MatchedKind | null = null;
 
   for (const vendorId of vendorIds) {
     const pubProductIds = scope.productDeliverectIdsByVendor.get(vendorId);
-    if (pubProductIds && pubProductIds.size > 0) {
+    const activeMenuIds = [...(operationalMenuByVendor.get(vendorId) ?? new Set<string>())];
+    if (pubProductIds && pubProductIds.size > 0 && activeMenuIds.length > 0) {
       const idList = [...pubProductIds];
 
       const byDeliverectPlu = await prisma.menuItem.updateMany({
         where: {
+          id: { in: activeMenuIds },
           vendorId,
           deliverectPlu: plu,
           deliverectProductId: { in: idList },
@@ -140,9 +153,11 @@ async function applyPluAvailability(
     for (const vendorId of vendorIds) {
       const pubProductIds = scope.productDeliverectIdsByVendor.get(vendorId);
       if (!pubProductIds?.has(plu)) continue;
+      const activeMenuIds = [...(operationalMenuByVendor.get(vendorId) ?? new Set<string>())];
+      if (activeMenuIds.length === 0) continue;
 
       const byProductId = await prisma.menuItem.updateMany({
-        where: { vendorId, deliverectProductId: plu },
+        where: { id: { in: activeMenuIds }, vendorId, deliverectProductId: plu },
         data: { isAvailable },
       });
       if (byProductId.count > 0) {
@@ -156,9 +171,12 @@ async function applyPluAvailability(
     for (const vendorId of vendorIds) {
       const pubModIds = scope.modifierOptionDeliverectIdsByVendor.get(vendorId);
       if (!pubModIds?.has(plu)) continue;
+      const activeModIds = [...(operationalModByVendor.get(vendorId) ?? new Set<string>())];
+      if (activeModIds.length === 0) continue;
 
       const mo = await prisma.modifierOption.updateMany({
         where: {
+          id: { in: activeModIds },
           deliverectModifierId: plu,
           modifierGroup: { vendorId },
         },

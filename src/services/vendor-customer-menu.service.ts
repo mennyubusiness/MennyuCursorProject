@@ -10,6 +10,7 @@ import {
   mennyuCanonicalMenuSchema,
   type MennyuCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
+import { computeOperationalProductPools } from "@/services/menu-active-scope.service";
 
 export const CUSTOMER_VENDOR_MENU_ITEM_INCLUDE = {
   modifierGroups: {
@@ -139,24 +140,15 @@ export async function loadCustomerVendorMenuSections(
       });
 
       /**
-       * Multiple DB rows can share the same deliverectProductId (legacy publishes, etc.).
-       * - Representative row: latest `updatedAt` (matches most recent publish/snooze).
-       * - `isAvailable`: false if ANY duplicate is unavailable — must match cart/checkout
-       *   {@link effectiveAvailabilityByMenuItemId} in `menu-item-availability.service`.
+       * One operational row per canonical product key: same PLU filter + winner as
+       * {@link pickOperationalMenuItemWinners}. `isAvailable` is false if any row in that pool is unavailable
+       * (aligned with {@link effectiveAvailabilityByMenuItemId} when the winner is operational).
        */
-      const groupedByProduct = new Map<string, CustomerVendorMenuItem[]>();
-      for (const r of rows) {
-        if (!r.deliverectProductId) continue;
-        const list = groupedByProduct.get(r.deliverectProductId) ?? [];
-        list.push(r);
-        groupedByProduct.set(r.deliverectProductId, list);
-      }
-
+      const pools = computeOperationalProductPools(menu, rows, { vendorId });
       const byProductId = new Map<string, CustomerVendorMenuItem>();
-      for (const [pid, list] of groupedByProduct) {
-        const sorted = [...list].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-        const rep = sorted[0]!;
-        const mergedAvailable = list.every((r) => r.isAvailable);
+      for (const [pid, pool] of pools) {
+        const rep = pool[0]!;
+        const mergedAvailable = pool.every((r) => r.isAvailable);
         byProductId.set(pid, { ...rep, isAvailable: mergedAvailable });
       }
 

@@ -10,6 +10,7 @@ import { validateCartItemModifiers } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
 import { selectCartForSessionAndPod } from "@/lib/cart-selection";
 import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
+import { isMenuItemIdOperational } from "@/services/menu-active-scope.service";
 
 /** Thrown when add/update cart item fails validation (modifiers, availability, etc.). Callers can return structured JSON. */
 export class CartValidationError extends Error {
@@ -72,6 +73,12 @@ export async function addCartItem(
   });
   if (!menuItem) {
     throw new Error("MenuItem not found");
+  }
+  if (!(await isMenuItemIdOperational(menuItem.vendorId, menuItem.id))) {
+    throw new CartValidationError(`${menuItem.name} is not on the current menu.`, "ITEM_NOT_IN_CURRENT_MENU", {
+      menuItemId: menuItem.id,
+      menuItemName: menuItem.name,
+    });
   }
   if (!menuItem.isAvailable) {
     throw new CartValidationError(`${menuItem.name} is no longer available.`, "ITEM_UNAVAILABLE", {
@@ -209,6 +216,18 @@ export async function updateCartItem(
     },
   });
   if (!existingItem) return getCartByIdOrThrow(cartId);
+
+  if (!(await isMenuItemIdOperational(existingItem.menuItem.vendorId, existingItem.menuItemId))) {
+    throw new CartValidationError(
+      `${existingItem.menuItem.name} is not on the current menu.`,
+      "ITEM_NOT_IN_CURRENT_MENU",
+      {
+        cartItemId,
+        menuItemId: existingItem.menuItemId,
+        menuItemName: existingItem.menuItem.name,
+      }
+    );
+  }
 
   if (selections != null) {
     const modResult = await validateCartItemModifiers({

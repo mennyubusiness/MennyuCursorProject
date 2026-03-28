@@ -9,7 +9,7 @@ import type { Order, VendorOrder as VendorOrderType, CheckoutInput } from "@/dom
 import { buildIdempotencyKey } from "@/lib/idempotency";
 import { validateCartItemModifiers, validateCartBasketLimits } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
-import { effectiveAvailabilityByMenuItemId } from "@/services/menu-item-availability.service";
+import { getOperationalMenuItemIdsForVendor } from "@/services/menu-active-scope.service";
 import { formatPickupDetailLine } from "@/lib/pickup-display";
 import {
   getDefaultScheduledSuggestion,
@@ -63,17 +63,25 @@ export async function validateCartForOrder(cart: {
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
   }>;
 }): Promise<CartValidationResult> {
-  const effectiveByMenuItemId = await effectiveAvailabilityByMenuItemId(
-    cart.items.map((i) => ({
-      id: i.menuItemId,
-      vendorId: i.vendorId,
-      deliverectProductId: i.menuItem.deliverectProductId ?? null,
-      isAvailable: i.menuItem.isAvailable,
-    }))
-  );
+  const vendorIds = [...new Set(cart.items.map((i) => i.vendorId))];
+  const operationalByVendor = new Map<string, Set<string>>();
+  for (const vid of vendorIds) {
+    operationalByVendor.set(vid, await getOperationalMenuItemIdsForVendor(vid));
+  }
 
   for (const item of cart.items) {
-    if (!effectiveByMenuItemId.get(item.menuItemId)) {
+    const operational = operationalByVendor.get(item.vendorId)?.has(item.menuItemId) ?? false;
+    if (!operational) {
+      return {
+        valid: false,
+        code: "ITEM_NOT_IN_CURRENT_MENU",
+        message: `${item.menuItem.name} is not on the current menu.`,
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      };
+    }
+    if (!item.menuItem.isAvailable) {
       return { valid: false, code: "ITEM_UNAVAILABLE", message: `${item.menuItem.name} is no longer available.`, cartItemId: item.id, menuItemId: item.menuItemId, menuItemName: item.menuItem.name };
     }
     const vendorAvailability = getVendorAvailability(item.vendor);
@@ -171,17 +179,25 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
 }> {
   const errors: CartItemValidationError[] = [];
 
-  const effectiveByMenuItemId = await effectiveAvailabilityByMenuItemId(
-    cart.items.map((i) => ({
-      id: i.menuItemId,
-      vendorId: i.vendorId,
-      deliverectProductId: i.menuItem.deliverectProductId ?? null,
-      isAvailable: i.menuItem.isAvailable,
-    }))
-  );
+  const vendorIdsDisplay = [...new Set(cart.items.map((i) => i.vendorId))];
+  const operationalByVendorDisplay = new Map<string, Set<string>>();
+  for (const vid of vendorIdsDisplay) {
+    operationalByVendorDisplay.set(vid, await getOperationalMenuItemIdsForVendor(vid));
+  }
 
   for (const item of cart.items) {
-    if (!effectiveByMenuItemId.get(item.menuItemId)) {
+    const operational = operationalByVendorDisplay.get(item.vendorId)?.has(item.menuItemId) ?? false;
+    if (!operational) {
+      errors.push({
+        code: "ITEM_NOT_IN_CURRENT_MENU",
+        message: `${item.menuItem.name} is not on the current menu.`,
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      });
+      continue;
+    }
+    if (!item.menuItem.isAvailable) {
       errors.push({
         code: "ITEM_UNAVAILABLE",
         message: `${item.menuItem.name} is no longer available.`,
@@ -279,6 +295,7 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
 /** Map validation code to short customer-facing message for cart/checkout. */
 export function getCartValidationMessage(code: string): string {
   const map: Record<string, string> = {
+    ITEM_NOT_IN_CURRENT_MENU: "One or more items are not on the vendor's current menu.",
     ITEM_UNAVAILABLE: "One or more items in your cart are no longer available.",
     VENDOR_INACTIVE: "A vendor in your cart is no longer active.",
     VENDOR_CLOSED: "A vendor in your cart is currently closed.",
@@ -293,6 +310,7 @@ export function getCartValidationMessage(code: string): string {
     INVALID_MODIFIER_QUANTITY: "A modifier selection needs to be updated.",
     INVALID_NESTED_MODIFIER: "A nested modifier selection needs to be updated.",
     BASKET_LIMIT_EXCEEDED: "Quantity exceeds the maximum allowed for an item.",
+    MODIFIER_OPTION_NOT_IN_CURRENT_MENU: "A modifier selection is not on the vendor's current menu.",
   };
   return map[code] ?? "Your cart needs attention. Please review or remove items.";
 }

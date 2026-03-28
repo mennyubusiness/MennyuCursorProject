@@ -3,7 +3,10 @@
  * Enforces min/max selections, required groups, snooze/availability, and basket limits.
  */
 import { prisma } from "@/lib/db";
-import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
+import {
+  getOperationalModifierOptionIdsForVendor,
+  isMenuItemIdOperational,
+} from "@/services/menu-active-scope.service";
 
 export type ModifierValidationResult =
   | { valid: true }
@@ -47,18 +50,29 @@ export async function validateCartItemModifiers(cartItem: CartItemForValidation)
     return { valid: false, code: "ITEM_NOT_FOUND", message: "Menu item not found.", menuItemId: cartItem.menuItemId, menuItemName: cartItem.menuItem?.name };
   }
 
-  const productOk = await isMenuItemEffectivelyAvailable({
-    id: menuItem.id,
-    vendorId: menuItem.vendorId,
-    deliverectProductId: menuItem.deliverectProductId,
-    isAvailable: menuItem.isAvailable,
-  });
-  if (!productOk) {
+  if (!menuItem.isAvailable) {
     return { valid: false, code: "ITEM_UNAVAILABLE", message: `${menuItem.name} is no longer available.`, cartItemId: cartItem.id, menuItemId: cartItem.menuItemId, menuItemName: menuItem.name };
   }
 
   const selections = cartItem.selections ?? [];
   const selectionByOptionId = new Map(selections.map((s) => [s.modifierOptionId, s.quantity]));
+
+  if (selections.length > 0) {
+    const operationalOpts = await getOperationalModifierOptionIdsForVendor(menuItem.vendorId);
+    for (const s of selections) {
+      if (s.quantity < 1) continue;
+      if (!operationalOpts.has(s.modifierOptionId)) {
+        return {
+          valid: false,
+          code: "MODIFIER_OPTION_NOT_IN_CURRENT_MENU",
+          message: `A modifier for ${menuItem.name} is not on the current menu.`,
+          cartItemId: cartItem.id,
+          menuItemId: cartItem.menuItemId,
+          menuItemName: menuItem.name,
+        };
+      }
+    }
+  }
 
   const hasAnyModifierGroups = menuItem.modifierGroups.length > 0;
   if (!hasAnyModifierGroups && selections.length > 0) {
