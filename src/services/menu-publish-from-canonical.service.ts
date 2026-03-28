@@ -17,6 +17,7 @@ import {
 } from "@/domain/menu-import/canonical.schema";
 import { orderModifierGroupsForPublish } from "@/domain/menu-import/modifier-group-publish-order";
 import { onMenuImportPublishedToLive } from "@/services/menu-deliverect-post-publish.service";
+import { runMenuParityAudit, type MenuParityAuditResult } from "@/services/menu-parity.service";
 
 export class MenuPublishValidationError extends Error {
   constructor(
@@ -272,6 +273,7 @@ export type PublishMenuImportDraftResult =
       status: "published";
       menuVersionId: string;
       previousPublishedMenuVersionId: string | null;
+      menuParity: MenuParityAuditResult;
     }
   | { status: "already_published"; menuVersionId: string };
 
@@ -407,26 +409,43 @@ export async function publishMenuImportDraftToLive(params: {
       status: "published" as const,
       menuVersionId: draftId,
       previousPublishedMenuVersionId: prevPublished?.id ?? null,
+      vendorId: job.vendorId,
     };
   });
 
-  if (result.status === "published") {
-    const jobMeta = await prisma.menuImportJob.findUnique({
-      where: { id: jobId },
-      select: { vendorId: true, source: true },
-    });
-    if (jobMeta) {
-      void onMenuImportPublishedToLive({
-        jobId,
-        vendorId: jobMeta.vendorId,
-        menuVersionId: result.menuVersionId,
-        source: jobMeta.source,
-        publishedBy: publishedByTrim,
-      }).catch((err) => {
-        console.error("[menu-import] post-publish hook failed", err);
-      });
-    }
+  if (result.status === "already_published") {
+    return { status: "already_published", menuVersionId: result.menuVersionId };
   }
 
-  return result;
+  const jobMeta = await prisma.menuImportJob.findUnique({
+    where: { id: jobId },
+    select: { vendorId: true, source: true },
+  });
+  if (jobMeta) {
+    void onMenuImportPublishedToLive({
+      jobId,
+      vendorId: jobMeta.vendorId,
+      menuVersionId: result.menuVersionId,
+      source: jobMeta.source,
+      publishedBy: publishedByTrim,
+    }).catch((err) => {
+      console.error("[menu-import] post-publish hook failed", err);
+    });
+  }
+
+  const menuParity = await runMenuParityAudit(result.vendorId);
+  if (!menuParity.ok) {
+    console.warn("[menu-parity] Post-publish audit found issues", {
+      vendorId: result.vendorId,
+      issueCount: menuParity.issues.length,
+      codes: menuParity.issues.map((i) => i.code),
+    });
+  }
+
+  return {
+    status: "published",
+    menuVersionId: result.menuVersionId,
+    previousPublishedMenuVersionId: result.previousPublishedMenuVersionId,
+    menuParity,
+  };
 }

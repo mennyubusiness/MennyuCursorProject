@@ -23,6 +23,8 @@ import { MenuImportJobNextStepsAdmin } from "@/components/menu-import/MenuImport
 import { menuImportFriendlySource } from "@/lib/menu-import-ui-labels";
 import { vendorMenuImportDetailPrimaryStatus } from "@/lib/vendor-menu-import-labels";
 import { MenuImportIssueSeverity } from "@prisma/client";
+import { runMenuParityAudit } from "@/services/menu-parity.service";
+import { MenuParityAuditBanner } from "@/components/menu-import/MenuParityAuditBanner";
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return "—";
@@ -136,6 +138,8 @@ export default async function AdminMenuImportJobPage({
       ? { id: latestActionableForVendor.id, startedAt: latestActionableForVendor.startedAt }
       : null;
 
+  const menuParity = await runMenuParityAudit(job.vendorId);
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -159,6 +163,8 @@ export default async function AdminMenuImportJobPage({
         publishReasons={publishEligibility.reasons}
         failedErrorCode={job.status === "failed" ? job.errorCode : null}
       />
+
+      <MenuParityAuditBanner audit={menuParity} />
 
       <section className="rounded-lg border border-stone-200 bg-white p-4">
         <h2 className="font-medium text-stone-900">What changed</h2>

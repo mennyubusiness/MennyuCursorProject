@@ -10,12 +10,14 @@ import {
   applyCanonicalMenuToLiveTables,
   MenuPublishValidationError,
 } from "@/services/menu-publish-from-canonical.service";
+import { runMenuParityAudit, type MenuParityAuditResult } from "@/services/menu-parity.service";
 
 export type RollbackPublishedMenuResult = {
   status: "rolled_back";
   newMenuVersionId: string;
   archivedMenuVersionId: string | null;
   sourceMenuVersionId: string;
+  menuParity: MenuParityAuditResult;
 };
 
 /**
@@ -35,7 +37,7 @@ export async function rollbackVendorPublishedMenu(params: {
     throw new MenuPublishValidationError("INVALID_SOURCE", "sourceMenuVersionId is required");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const rolled = await prisma.$transaction(async (tx) => {
     const source = await tx.menuVersion.findFirst({
       where: { id: sourceMenuVersionId, vendorId },
       select: {
@@ -125,4 +127,15 @@ export async function rollbackVendorPublishedMenu(params: {
       sourceMenuVersionId: source.id,
     };
   });
+
+  const menuParity = await runMenuParityAudit(vendorId);
+  if (!menuParity.ok) {
+    console.warn("[menu-parity] Post-rollback audit found issues", {
+      vendorId,
+      issueCount: menuParity.issues.length,
+      codes: menuParity.issues.map((i) => i.code),
+    });
+  }
+
+  return { ...rolled, menuParity };
 }
