@@ -10,7 +10,10 @@ import {
   mennyuCanonicalMenuSchema,
   type MennyuCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
-import { computeOperationalProductPools } from "@/services/menu-active-scope.service";
+import {
+  computeOperationalProductPools,
+  getOperationalMenuItemIdsForVendor,
+} from "@/services/menu-active-scope.service";
 
 export const CUSTOMER_VENDOR_MENU_ITEM_INCLUDE = {
   modifierGroups: {
@@ -157,27 +160,35 @@ export async function loadCustomerVendorMenuSections(
     }
   }
 
-  /** No valid published snapshot: exclude legacy rows without Deliverect id and soft-disabled items. */
-  const rows = await prisma.menuItem.findMany({
-    where: {
-      vendorId,
-      deliverectProductId: { not: null },
-      isAvailable: true,
-    },
-    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-    include: CUSTOMER_VENDOR_MENU_ITEM_INCLUDE,
-  });
+  /**
+   * No valid published canonical: still list only **operational** rows (same set as
+   * {@link getOperationalMenuItemIdsForVendor} / add-to-cart). Otherwise we would show every
+   * `isAvailable` duplicate per deliverectProductId while cart accepts only the fallback winner.
+   */
+  const [rows, operationalIds] = await Promise.all([
+    prisma.menuItem.findMany({
+      where: {
+        vendorId,
+        deliverectProductId: { not: null },
+        isAvailable: true,
+      },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+      include: CUSTOMER_VENDOR_MENU_ITEM_INCLUDE,
+    }),
+    getOperationalMenuItemIdsForVendor(vendorId),
+  ]);
+  const activeRows = rows.filter((r) => operationalIds.has(r.id));
 
   return {
     sections:
-      rows.length === 0
+      activeRows.length === 0
         ? []
         : [
             {
               id: "all",
               name: "Menu",
               sortOrder: 0,
-              items: rows,
+              items: activeRows,
             },
           ],
     source: "fallback_active_with_deliverect_id",
