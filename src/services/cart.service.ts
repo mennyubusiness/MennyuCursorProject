@@ -167,60 +167,104 @@ export async function addCartItem(
 
   const priceCentsToStore = await effectiveUnitPriceCents;
 
-  const existing = await prisma.cartItem.findFirst({
-    where: { cartId, menuItemId },
+  if (DEBUG_ADD_TO_CART_TRACE) {
+    const existingPreview = await prisma.cartItem.findFirst({
+      where: { cartId, menuItemId },
+      select: { id: true },
+    });
+    console.log("[addCartItem] pre-write", {
+      cartId,
+      existingLineId: existingPreview?.id ?? null,
+      willCreate: !existingPreview,
+    });
+  }
+
+  /** All CartItem / CartItemSelection writes in one transaction (no implicit rollback otherwise — each await used to commit separately). */
+  let writePath: "update" | "create";
+  let primaryCartItemId: string;
+
+  await prisma.$transaction(async (tx) => {
+    const row = await tx.cartItem.findFirst({
+      where: { cartId, menuItemId },
+    });
+
+    if (row) {
+      writePath = "update";
+      primaryCartItemId = row.id;
+      if (DEBUG_ADD_TO_CART_TRACE) {
+        console.log("[addCartItem] tx path=update", { cartItemId: row.id });
+      }
+      await tx.cartItem.update({
+        where: { id: row.id },
+        data: {
+          quantity: row.quantity + quantity,
+          specialInstructions: specialInstructions ?? row.specialInstructions,
+          ...(selections != null ? { priceCents: priceCentsToStore } : {}),
+        },
+      });
+      if (selections != null) {
+        await tx.cartItemSelection.deleteMany({ where: { cartItemId: row.id } });
+        for (const s of selections) {
+          if (s.quantity < 1) continue;
+          await tx.cartItemSelection.create({
+            data: { cartItemId: row.id, modifierOptionId: s.modifierOptionId, quantity: s.quantity },
+          });
+        }
+      }
+    } else {
+      writePath = "create";
+      const created = await tx.cartItem.create({
+        data: {
+          cartId,
+          menuItemId,
+          vendorId: menuItem.vendorId,
+          quantity,
+          priceCents: priceCentsToStore,
+          specialInstructions: specialInstructions ?? null,
+        },
+      });
+      primaryCartItemId = created.id;
+      if (DEBUG_ADD_TO_CART_TRACE) {
+        console.log("[addCartItem] tx path=create", { cartItemId: created.id });
+      }
+      if (selections != null && selections.length > 0) {
+        for (const s of selections) {
+          if (s.quantity < 1) continue;
+          await tx.cartItemSelection.create({
+            data: { cartItemId: created.id, modifierOptionId: s.modifierOptionId, quantity: s.quantity },
+          });
+        }
+      }
+    }
+
+    const verifyInTx = await tx.cartItem.findMany({
+      where: { cartId },
+      select: { id: true },
+    });
+    if (DEBUG_ADD_TO_CART_TRACE) {
+      console.log("[addCartItem] verify inside transaction (before commit)", {
+        cartId,
+        count: verifyInTx.length,
+        ids: verifyInTx.map((r) => r.id),
+        primaryCartItemId,
+        writePath,
+      });
+    }
   });
 
   if (DEBUG_ADD_TO_CART_TRACE) {
-    console.log("[addCartItem] pre-write", {
+    const verifyAfterCommit = await prisma.cartItem.findMany({
+      where: { cartId },
+      select: { id: true },
+    });
+    console.log("[addCartItem] verify after transaction (committed)", {
       cartId,
-      existingLineId: existing?.id ?? null,
-      willCreate: !existing,
+      count: verifyAfterCommit.length,
+      ids: verifyAfterCommit.map((r) => r.id),
     });
+    console.log("[addCartItem] write complete, loading cart via getCartById (itemCount will be from this query)");
   }
 
-  if (existing) {
-    await prisma.cartItem.update({
-      where: { id: existing.id },
-      data: {
-        quantity: existing.quantity + quantity,
-        specialInstructions: specialInstructions ?? existing.specialInstructions,
-        ...(selections != null ? { priceCents: priceCentsToStore } : {}),
-      },
-    });
-    if (selections != null) {
-      await prisma.cartItemSelection.deleteMany({ where: { cartItemId: existing.id } });
-      for (const s of selections) {
-        if (s.quantity < 1) continue;
-        await prisma.cartItemSelection.create({
-          data: { cartItemId: existing.id, modifierOptionId: s.modifierOptionId, quantity: s.quantity },
-        });
-      }
-    }
-  } else {
-    const created = await prisma.cartItem.create({
-      data: {
-        cartId,
-        menuItemId,
-        vendorId: menuItem.vendorId,
-        quantity,
-        priceCents: priceCentsToStore,
-        specialInstructions: specialInstructions ?? null,
-      },
-    });
-    if (selections != null && selections.length > 0) {
-      for (const s of selections) {
-        if (s.quantity < 1) continue;
-        await prisma.cartItemSelection.create({
-          data: { cartItemId: created.id, modifierOptionId: s.modifierOptionId, quantity: s.quantity },
-        });
-      }
-    }
-  }
-
-  if (DEBUG_ADD_TO_CART_TRACE) {
-    console.log("[addCartItem] write complete, returning cart");
-  }
   return getCartByIdOrThrow(cartId);
 }
 
