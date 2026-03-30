@@ -76,25 +76,16 @@ export default async function PodDashboardPage({
       <div>
         <h1 className="text-xl font-semibold text-stone-900">Overview</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Pending invitations and your vendor roster — order and featured flags update the public pod page.
+          Invite vendors, track responses, and curate your roster — order and featured flags update the
+          public pod page.
         </p>
       </div>
-
-      <PodDashboardPendingRequests podId={pod.id} requests={pendingForUi} />
-
-      <section>
-        <h2 className="mb-3 text-base font-semibold text-stone-900">Vendor roster</h2>
-        <p className="mb-3 text-sm text-stone-600">
-          Drag to reorder. Featured shows a badge only — it does not change sort order.
-        </p>
-        <PodVendorRosterPanel podId={pod.id} initialRows={rosterRows} />
-      </section>
 
       <section>
         <h2 className="mb-3 font-medium text-stone-800">Request vendor to join</h2>
         <p className="mb-2 text-sm text-stone-600">
-          The vendor must approve, or you can accept a pending request above. If they are in another pod,
-          accepting moves them here.
+          We&apos;ll notify the vendor. They choose whether to accept or decline. If they&apos;re already
+          in another pod, accepting your invitation moves them here.
         </p>
         {vendorsNotInPod.length === 0 ? (
           <p className="text-sm text-stone-500">All vendors are already in this pod or have pending requests.</p>
@@ -110,6 +101,16 @@ export default async function PodDashboardPage({
             }))}
           />
         )}
+      </section>
+
+      <PodDashboardPendingRequests podId={pod.id} requests={pendingForUi} />
+
+      <section>
+        <h2 className="mb-3 text-base font-semibold text-stone-900">Vendor roster</h2>
+        <p className="mb-3 text-sm text-stone-600">
+          Drag to reorder. Featured shows a badge only — it does not change sort order.
+        </p>
+        <PodVendorRosterPanel podId={pod.id} initialRows={rosterRows} />
       </section>
     </div>
   );

@@ -25,25 +25,7 @@ export function PodDashboardPendingRequests({
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  async function postAccept(requestId: string) {
-    setError(null);
-    setActingId(requestId);
-    try {
-      const res = await fetch(`/api/pod/${podId}/membership-requests/${requestId}/accept`, {
-        method: "POST",
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "Could not accept");
-        return;
-      }
-      router.refresh();
-    } finally {
-      setActingId(null);
-    }
-  }
-
-  async function postDecline(requestId: string) {
+  async function postCancelInvitation(requestId: string) {
     setError(null);
     setActingId(requestId);
     try {
@@ -52,7 +34,7 @@ export function PodDashboardPendingRequests({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? "Could not decline");
+        setError(data.error ?? "Could not cancel invitation");
         return;
       }
       router.refresh();
@@ -66,10 +48,12 @@ export function PodDashboardPendingRequests({
   }
 
   return (
-    <section className="rounded-xl border-2 border-amber-200/80 bg-amber-50/40 p-4">
-      <h2 className="text-base font-semibold text-stone-900">Pending vendor requests</h2>
+    <section className="rounded-xl border border-stone-200 bg-stone-50/80 p-4">
+      <h2 className="text-base font-semibold text-stone-900">Awaiting vendor response</h2>
       <p className="mt-1 text-sm text-stone-600">
-        Accept to add the vendor to this pod, or decline to withdraw the invitation.
+        These invitations are waiting for the vendor to accept or decline. Only they can complete or
+        reject the request. You can cancel a pending invitation if you sent it by mistake or no longer
+        want them to join.
       </p>
       {error && <p className="mt-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <ul className="mt-4 space-y-3">
@@ -88,7 +72,7 @@ export function PodDashboardPendingRequests({
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-stone-900">{r.vendorName}</p>
                 <p className="mt-0.5 text-xs text-stone-500">
-                  Requested{" "}
+                  Invitation sent{" "}
                   {new Date(r.createdAt).toLocaleString(undefined, {
                     dateStyle: "short",
                     timeStyle: "short",
@@ -109,18 +93,10 @@ export function PodDashboardPendingRequests({
                   <button
                     type="button"
                     disabled={actingId !== null}
-                    onClick={() => void postAccept(r.id)}
-                    className="rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
-                  >
-                    {actingId === r.id ? "…" : "Accept"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={actingId !== null}
-                    onClick={() => void postDecline(r.id)}
+                    onClick={() => void postCancelInvitation(r.id)}
                     className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
                   >
-                    Decline
+                    {actingId === r.id ? "…" : "Cancel invitation"}
                   </button>
                   {r.vendorDescription && r.vendorDescription.length > 160 && (
                     <button
@@ -131,11 +107,11 @@ export function PodDashboardPendingRequests({
                       {expandedId === r.id ? "Show less" : "Read full description"}
                     </button>
                   )}
-                  <p className="w-full text-xs text-stone-400">
-                    Customer menu preview is available after they join — use{" "}
-                    <span className="text-stone-600">More → View vendor page</span> on the roster.
-                  </p>
                 </div>
+                <p className="mt-3 text-xs text-stone-400">
+                  After they join, customers can open their menu from your pod; use{" "}
+                  <span className="text-stone-600">More → View vendor page</span> on the roster.
+                </p>
               </div>
             </div>
           </li>
