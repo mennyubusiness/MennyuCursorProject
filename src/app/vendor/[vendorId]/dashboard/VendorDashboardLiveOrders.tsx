@@ -190,20 +190,15 @@ export function VendorDashboardLiveOrders({
     <>
       <NewOrderSoundAlert newOrderIds={newOrderIdsForSound} />
       {vendorOrders.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-4 rounded-lg border border-stone-200 bg-stone-50/50 px-3 py-2 text-sm">
-          <span className="font-medium text-stone-700">
-            Needs action: <strong>{needsActionCount}</strong>
-          </span>
-          <span className="text-stone-600">
-            In progress: <strong>{inProgressCount}</strong>
-          </span>
-          <span className="text-stone-600">
-            Ready: <strong>{readyCount}</strong>
-          </span>
-          <span className="text-stone-500">
-            Completed today: <strong>{completedCount}</strong>
-          </span>
-        </div>
+        <p className="mb-4 text-sm text-stone-600">
+          <span className="font-medium text-stone-800">{needsActionCount}</span> need action
+          <span className="text-stone-400"> · </span>
+          <span className="font-medium text-stone-800">{inProgressCount}</span> in progress
+          <span className="text-stone-400"> · </span>
+          <span className="font-medium text-stone-800">{readyCount}</span> ready
+          <span className="text-stone-400"> · </span>
+          <span className="text-stone-500">{completedCount} completed (shown)</span>
+        </p>
       )}
       {vendorOrders.length === 0 ? (
         <p className="text-sm text-stone-500">No orders yet.</p>

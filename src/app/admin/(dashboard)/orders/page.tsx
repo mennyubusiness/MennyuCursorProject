@@ -324,11 +324,6 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                         order.vendorOrders
                       )}
                     </p>
-                    <p className="mt-1 text-xs text-stone-600">
-                      {order.vendorOrders.map(
-                        (vo) => `${vo.vendor.name}: ${vo.routingStatus}/${vo.fulfillmentStatus}`
-                      ).join(" · ")}
-                    </p>
                     <p className="mt-1 font-medium text-stone-900">
                       ${(order.totalCents / 100).toFixed(2)}
                     </p>

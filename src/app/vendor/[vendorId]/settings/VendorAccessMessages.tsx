@@ -27,12 +27,12 @@ export function VendorAccessQueryMessages() {
       tone: "error",
     },
     no_secret: {
-      title: "Dashboard isn’t ready yet",
+      title: "This location isn’t fully set up yet",
       body: "Your administrator still needs to finish setup. You can try again after they’ve sent a link or enabled sign-in.",
       tone: "warn",
     },
     needs_session: {
-      title: "Please sign in to access this dashboard",
+      title: "Please sign in to continue",
       body: (
         <>
           Use{" "}

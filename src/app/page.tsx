@@ -44,7 +44,7 @@ export default function HomePage() {
         <h2 className="text-lg font-semibold text-black">For everyone</h2>
         <p className="mt-2 text-sm text-stone-600">
           <strong>Customers</strong> get one place to order from their favorite pod.{" "}
-          <strong>Vendors</strong> reach more customers and manage orders in one dashboard.{" "}
+          <strong>Vendors</strong> reach more customers and manage orders in one place.{" "}
           <strong>Pod owners</strong> bring together vendors and streamline pickup.
         </p>
       </section>

@@ -73,7 +73,7 @@ export default async function VendorSettingsPage({
       <div>
         <h2 className="text-xl font-semibold text-stone-900">Settings</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Vendor profile, Mennyu controls, and how you sign in to this dashboard.
+          Vendor profile, Mennyu controls, and how you sign in.
         </p>
       </div>
 

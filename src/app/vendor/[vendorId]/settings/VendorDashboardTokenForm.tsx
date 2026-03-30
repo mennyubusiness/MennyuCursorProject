@@ -31,7 +31,7 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
   return (
     <details className="rounded-lg border border-stone-200 bg-white p-4">
       <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-stone-500">
-        Manual dashboard token (advanced)
+        Manual access token (advanced)
       </summary>
       <p className="mt-2 text-sm text-stone-600">
         Prefer the <strong>secure access link</strong> from your admin — no copy/paste. Use this only if you are
@@ -39,7 +39,7 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
       </p>
       <form onSubmit={onSubmit} className="mt-3 space-y-2">
         <label htmlFor="vdash-token" className="sr-only">
-          Dashboard token
+          Access token
         </label>
         <input
           id="vdash-token"

@@ -6,8 +6,7 @@ import {
   isDeliverectVendorOrderRoutingDegraded,
   shouldOmitVendorOrderFromDeliverectDashboard,
 } from "@/lib/vendor-deliverect-dashboard-visibility";
-import { VendorAvailabilityStatusSection } from "../dashboard/VendorAvailabilityStatusSection";
-import { VendorPauseToggle } from "../dashboard/VendorPauseToggle";
+import { VendorOrdersOperationsBar } from "../dashboard/VendorOrdersOperationsBar";
 import { VendorDashboardLiveOrders } from "../dashboard/VendorDashboardLiveOrders";
 
 const getVendorOrdersPageData = cache(async (vendorId: string) => {
@@ -111,18 +110,14 @@ export default async function VendorOrdersPage({
       <div>
         <h2 className="text-xl font-semibold text-stone-900">Orders</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Manage incoming orders, status, and pickup.
+          Your live queue — one status and one action area per order below.
         </p>
       </div>
 
-      <VendorAvailabilityStatusSection
-        posOpen={undefined}
-        mennyuOrdersPaused={vendor.mennyuOrdersPaused ?? false}
-      />
-
-      <VendorPauseToggle
+      <VendorOrdersOperationsBar
         vendorId={vendor.id}
         initialPaused={vendor.mennyuOrdersPaused ?? false}
+        posOpen={undefined}
       />
 
       <VendorDashboardLiveOrders

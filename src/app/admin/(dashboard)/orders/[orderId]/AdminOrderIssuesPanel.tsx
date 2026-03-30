@@ -87,11 +87,9 @@ export function AdminOrderIssuesPanel({
 
   return (
     <section className="rounded-lg border border-amber-200/80 bg-amber-50/40 p-4">
-      <h2 className="text-lg font-semibold text-stone-900">⚠ Issues</h2>
+      <h2 className="text-lg font-semibold text-stone-900">Issues &amp; notes</h2>
       <p className="mt-1 text-sm text-stone-600">
-        Open problems on this order. Use{" "}
-        <span className="font-medium text-stone-800">Resolution notes</span> below for a single shared
-        log (not per-issue).
+        Open issues and your shared resolution log for this order.
       </p>
 
       {all.length === 0 ? (

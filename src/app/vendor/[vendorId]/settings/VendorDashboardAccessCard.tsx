@@ -10,16 +10,16 @@ export function VendorDashboardAccessCard({
 }) {
   return (
     <section className="rounded-lg border border-stone-200 bg-white p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Dashboard access</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Sign-in &amp; access</h3>
       <p className="mt-2 text-sm text-stone-600">
         <strong>Sign in</strong> with the email and password your team uses for Mennyu:{" "}
         <Link href={`/login?intent=vendor&callbackUrl=${encodeURIComponent(`/vendor/${vendorId}`)}`} className="font-medium text-sky-800 underline">
-          Sign in to this dashboard
+          Sign in to this restaurant
         </Link>
         . After you&apos;re signed in, you can use orders, your current menu, and settings here.
       </p>
       <p className="mt-3 text-sm text-stone-600">
-        Your administrator can also send a <strong>one-time secure link</strong> that opens this dashboard on your
+        Your administrator can also send a <strong>one-time secure link</strong> that opens this vendor area on your
         device—handy if you haven&apos;t set a password yet.
       </p>
       {!hasDashboardSecret ? (

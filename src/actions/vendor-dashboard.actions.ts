@@ -21,7 +21,7 @@ export async function bindVendorDashboardSession(
     select: { vendorDashboardToken: true },
   });
   if (!v?.vendorDashboardToken?.trim()) {
-    return { ok: false, error: "No dashboard token is configured for this vendor yet. Ask your Mennyu admin to generate one." };
+    return { ok: false, error: "No access token is configured for this vendor yet. Ask your Mennyu admin to generate one." };
   }
   if (!timingSafeStringEqual(tokenPlain.trim(), v.vendorDashboardToken.trim())) {
     return { ok: false, error: "Token does not match." };
@@ -96,7 +96,7 @@ export async function updateVendorAutoPublishMenus(
 
     return {
       ok: false,
-      error: "Unauthorized: sign in with a vendor-linked account, or use a legacy dashboard session.",
+      error: "Unauthorized: sign in with a vendor-linked account, or use a legacy vendor session token.",
     };
   }
 

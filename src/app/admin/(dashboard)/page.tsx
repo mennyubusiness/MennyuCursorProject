@@ -20,7 +20,6 @@ export default async function AdminOverviewPage() {
     cancelledTodayCount,
     activeVendors,
     activePods,
-    vendorOrdersNeedingAttention,
   ] = await Promise.all([
     prisma.order.count({ where: { createdAt: { gte: since } } }),
     prisma.vendorOrder.count({
@@ -41,31 +40,9 @@ export default async function AdminOverviewPage() {
     }),
     prisma.vendor.count({ where: { isActive: true } }),
     prisma.pod.count({ where: { isActive: true } }),
-    prisma.vendorOrder.findMany({
-      where: {
-        fulfillmentStatus: VendorFulfillmentStatus.pending,
-        OR: [
-          { routingStatus: VendorRoutingStatus.failed },
-          {
-            routingStatus: VendorRoutingStatus.pending,
-            createdAt: { lt: routingStuckBefore },
-          },
-        ],
-      },
-      select: { vendorId: true, vendor: { select: { name: true } } },
-      take: 500,
-    }),
   ]);
 
   const needsAttentionCount = failedRoutingCount + stuckRoutingCount;
-  const vendorIssueCounts = vendorOrdersNeedingAttention.reduce(
-    (acc, vo) => {
-      acc[vo.vendorId] = { name: vo.vendor.name, count: (acc[vo.vendorId]?.count ?? 0) + 1 };
-      return acc;
-    },
-    {} as Record<string, { name: string; count: number }>
-  );
-  const vendorsWithIssues = Object.entries(vendorIssueCounts).map(([id, v]) => ({ vendorId: id, ...v }));
 
   const cards = [
     { label: "Orders today", value: ordersToday, href: "/admin/orders", desc: "Inspect and manage" },
@@ -91,9 +68,9 @@ export default async function AdminOverviewPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-stone-900">What needs attention now?</h1>
+      <h1 className="text-xl font-semibold text-stone-900">Overview</h1>
       <p className="mt-1 text-sm text-stone-600">
-        Triage board — use the links below to jump to the right workspace.
+        Counts and shortcuts — open an order only from Orders or Exceptions for full controls.
       </p>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (
@@ -109,26 +86,6 @@ export default async function AdminOverviewPage() {
           </Link>
         ))}
       </div>
-
-      {vendorsWithIssues.length > 0 && (
-        <section className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-          <h2 className="text-sm font-medium text-stone-700">Vendors with active issues</h2>
-          <p className="mt-0.5 text-xs text-stone-500">
-            {vendorsWithIssues.length} vendor{vendorsWithIssues.length !== 1 ? "s" : ""} with orders in Needs Attention
-          </p>
-          <ul className="mt-2 space-y-1 text-sm">
-            {vendorsWithIssues.map((v) => (
-              <li key={v.vendorId} className="flex justify-between">
-                <span className="text-stone-800">{v.name}</span>
-                <span className="font-medium text-amber-700">{v.count}</span>
-              </li>
-            ))}
-          </ul>
-          <Link href="/admin/exceptions" className="mt-2 inline-block text-xs text-stone-600 hover:underline">
-            View Needs Attention →
-          </Link>
-        </section>
-      )}
     </div>
   );
 }

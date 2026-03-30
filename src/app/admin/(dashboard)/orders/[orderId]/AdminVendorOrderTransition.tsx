@@ -5,13 +5,9 @@ import { useRouter } from "next/navigation";
 
 export function AdminVendorOrderTransition({
   vendorOrderId,
-  currentRouting,
-  currentFulfillment,
   allowedTargets,
 }: {
   vendorOrderId: string;
-  currentRouting: string;
-  currentFulfillment: string;
   /** Only these targets are valid next steps; derived from getAllowedProgressionTargets. */
   allowedTargets: string[];
 }) {
@@ -68,9 +64,6 @@ export function AdminVendorOrderTransition({
         >
           {loading ? "…" : "Apply"}
         </button>
-        <span className="text-xs text-stone-400">
-          current: {currentRouting} / {currentFulfillment}
-        </span>
       </div>
       {message && (
         <span className={`mt-1 block text-xs ${message.error ? "text-red-600" : "text-stone-600"}`}>

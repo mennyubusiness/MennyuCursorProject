@@ -7,13 +7,13 @@ import { resolveLoginIntent, type LoginIntent } from "@/lib/auth/login-intent";
 const OPTIONS: { id: LoginIntent; label: string; description: string }[] = [
   {
     id: "vendor",
-    label: "Vendor dashboard",
+    label: "Vendor",
     description: "Orders, menu, and settings for your restaurant.",
   },
   {
     id: "pod",
-    label: "Pod dashboard",
-    description: "Manage a pod and its vendors (coming soon).",
+    label: "Pod",
+    description: "Pod overview and settings (vendors and join requests).",
   },
   {
     id: "customer",

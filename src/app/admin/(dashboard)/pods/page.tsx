@@ -49,13 +49,7 @@ export default async function AdminPodsPage() {
                     href={`/pod/${p.id}/dashboard`}
                     className="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-stone-100"
                   >
-                    Dashboard
-                  </Link>
-                  <Link
-                    href={`/pod/${p.id}/analytics`}
-                    className="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-stone-100"
-                  >
-                    Analytics
+                    Pod overview
                   </Link>
                   <AdminPodToggle podId={p.id} isActive={p.isActive} />
                 </td>

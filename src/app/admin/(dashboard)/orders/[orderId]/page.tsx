@@ -14,6 +14,25 @@ import { AdminVendorOrderExceptionActions } from "./AdminVendorOrderExceptionAct
 import { AdminVendorOrderTransition } from "./AdminVendorOrderTransition";
 import { AdminOrderIssuesPanel } from "./AdminOrderIssuesPanel";
 
+function fulfillmentLabel(fulfillmentStatus: string): string {
+  switch (fulfillmentStatus) {
+    case "pending":
+      return "Awaiting acceptance";
+    case "accepted":
+      return "Accepted";
+    case "preparing":
+      return "Preparing";
+    case "ready":
+      return "Ready for pickup";
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return fulfillmentStatus;
+  }
+}
+
 export default async function AdminOrderDetailPage({
   params,
 }: {
@@ -40,7 +59,22 @@ export default async function AdminOrderDetailPage({
     const showRecoveredBadge = isManuallyRecovered(vo, vo.statusHistory);
     const showActionsPanel =
       actionState.hasAnyExceptionAction || actionState.hasAnyProgressionAction;
-    return { vo, exceptionType, actionState, reason, showRecoveredBadge, showActionsPanel };
+    const progressionTargetsFiltered =
+      actionState.showCancel && actionState.allowedProgressionTargets.includes("cancelled")
+        ? actionState.allowedProgressionTargets.filter((t) => t !== "cancelled")
+        : actionState.allowedProgressionTargets;
+    const showProgressionUi =
+      actionState.hasAnyProgressionAction && progressionTargetsFiltered.length > 0;
+    return {
+      vo,
+      exceptionType,
+      actionState,
+      reason,
+      showRecoveredBadge,
+      showActionsPanel,
+      progressionTargetsFiltered,
+      showProgressionUi,
+    };
   });
 
   return (
@@ -53,12 +87,13 @@ export default async function AdminOrderDetailPage({
           Order #{adminOrder.id.slice(-8).toUpperCase()}
         </h1>
         <p className="mt-0.5 text-sm text-stone-600">
-          Action-first view: what&apos;s wrong, what to do, and a single timeline.
+          Summary first, then actions — full routing codes are under Technical details.
         </p>
       </div>
 
+      {/* 1. Summary */}
       <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="font-medium text-stone-900">Order</h2>
+        <h2 className="font-medium text-stone-900">Summary</h2>
         <dl className="mt-2 grid gap-1 text-sm">
           <div>
             <span className="text-stone-500">Created:</span> {formatDate(adminOrder.createdAt)}
@@ -93,36 +128,88 @@ export default async function AdminOrderDetailPage({
             <span className="text-stone-500">Total:</span> ${(adminOrder.totalCents / 100).toFixed(2)}
           </div>
         </dl>
-      </section>
 
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Current state</h2>
-        <ul className="mt-3 divide-y divide-stone-100">
-          {vendorContexts.map(
-            ({ vo, exceptionType, showRecoveredBadge }) =>
-              (
-                <li key={vo.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 first:pt-0">
-                  <span className="font-medium text-stone-900">{vo.vendor.name}</span>
-                  <span className="text-sm text-stone-600">
-                    Routing {vo.routingStatus} · {vo.fulfillmentStatus}
-                  </span>
-                  {exceptionType && (
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
-                      {exceptionType.replace(/_/g, " ")}
-                    </span>
-                  )}
-                  {showRecoveredBadge && (
-                    <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-800">
-                      Recovered manually
-                    </span>
-                  )}
-                  <span className="text-xs text-stone-500">${(vo.totalCents / 100).toFixed(2)}</span>
-                </li>
-              )
-          )}
+        <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-stone-500">Vendors</h3>
+        <ul className="mt-2 divide-y divide-stone-100">
+          {vendorContexts.map(({ vo, exceptionType, showRecoveredBadge }) => (
+            <li key={vo.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 first:pt-0">
+              <span className="font-medium text-stone-900">{vo.vendor.name}</span>
+              <span className="text-sm text-stone-600">{fulfillmentLabel(vo.fulfillmentStatus)}</span>
+              {exceptionType && (
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                  {exceptionType.replace(/_/g, " ")}
+                </span>
+              )}
+              {showRecoveredBadge && (
+                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-800">
+                  Recovered manually
+                </span>
+              )}
+              <span className="text-xs text-stone-500">${(vo.totalCents / 100).toFixed(2)}</span>
+            </li>
+          ))}
         </ul>
+
+        <p className="mt-4 text-sm text-stone-600">
+          <Link href={`/order/${orderId}`} className="hover:underline">
+            Customer tracking page →
+          </Link>
+        </p>
       </section>
 
+      {/* 2. Primary actions */}
+      {vendorContexts.some((c) => c.showActionsPanel) && (
+        <section className="rounded-lg border border-stone-200 bg-white p-4">
+          <h2 className="text-lg font-semibold text-stone-900">Primary actions</h2>
+          <p className="mt-1 text-sm text-stone-600">
+            Per-vendor controls. Cancel appears once here (not again in the transition list).
+          </p>
+          <div className="mt-4 space-y-4">
+            {vendorContexts
+              .filter((c) => c.showActionsPanel)
+              .map(({ vo, exceptionType, actionState, reason, showProgressionUi, progressionTargetsFiltered }) => (
+                <div key={vo.id} className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 className="font-semibold text-stone-900">{vo.vendor.name}</h3>
+                    <Link
+                      href={`/vendor/${vo.vendorId}/orders`}
+                      className="text-xs text-stone-600 hover:underline"
+                    >
+                      Vendor queue →
+                    </Link>
+                  </div>
+                  {exceptionType && reason && <p className="mt-2 text-sm text-amber-900">{reason}</p>}
+                  {actionState.hasAnyExceptionAction && (
+                    <div className="mt-3">
+                      <AdminVendorOrderExceptionActions
+                        vendorOrderId={vo.id}
+                        exceptionType={
+                          exceptionType ??
+                          (actionState.context === "manually_recovered"
+                            ? "routing_failed"
+                            : "unknown_attention_needed")
+                        }
+                        fulfillmentStatus={vo.fulfillmentStatus}
+                        routingAvailable={routingAvailable}
+                        canCancel={actionState.showCancel}
+                      />
+                    </div>
+                  )}
+                  {showProgressionUi && (
+                    <div className="mt-3">
+                      <AdminVendorOrderTransition
+                        vendorOrderId={vo.id}
+                        allowedTargets={progressionTargetsFiltered}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
+        </section>
+      )}
+
+      {/* 3. Issues & notes */}
       <AdminOrderIssuesPanel
         orderId={adminOrder.id}
         initialResolutionNotes={adminOrder.adminResolutionNotes ?? null}
@@ -150,87 +237,10 @@ export default async function AdminOrderDetailPage({
         )}
       />
 
-      {vendorContexts.some((c) => c.showActionsPanel) && (
-        <section className="rounded-lg border border-stone-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-stone-900">Actions</h2>
-          <p className="mt-1 text-sm text-stone-600">
-            Per-vendor operations. Only options valid for the current state are shown.
-          </p>
-          <div className="mt-4 space-y-4">
-            {vendorContexts
-              .filter((c) => c.showActionsPanel)
-              .map(({ vo, exceptionType, actionState, reason }) => (
-                <div
-                  key={vo.id}
-                  className="rounded-lg border border-stone-200 bg-stone-50/50 p-4"
-                >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 className="font-semibold text-stone-900">{vo.vendor.name}</h3>
-                    <Link
-                      href={`/vendor/${vo.vendorId}/orders`}
-                      className="text-xs text-stone-600 hover:underline"
-                    >
-                      Vendor orders →
-                    </Link>
-                  </div>
-                  {exceptionType && reason && (
-                    <p className="mt-2 text-sm text-amber-900">{reason}</p>
-                  )}
-                  {actionState.hasAnyExceptionAction && (
-                    <div className="mt-3">
-                      <AdminVendorOrderExceptionActions
-                        vendorOrderId={vo.id}
-                        exceptionType={
-                          exceptionType ??
-                          (actionState.context === "manually_recovered"
-                            ? "routing_failed"
-                            : "unknown_attention_needed")
-                        }
-                        fulfillmentStatus={vo.fulfillmentStatus}
-                        routingAvailable={routingAvailable}
-                        canCancel={actionState.showCancel}
-                      />
-                    </div>
-                  )}
-                  {actionState.hasAnyProgressionAction && actionState.allowedProgressionTargets.length > 0 && (
-                    <div className="mt-3">
-                      <AdminVendorOrderTransition
-                        vendorOrderId={vo.id}
-                        currentRouting={vo.routingStatus}
-                        currentFulfillment={vo.fulfillmentStatus}
-                        allowedTargets={actionState.allowedProgressionTargets}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-          </div>
-        </section>
-      )}
-
-      {timeline.length > 0 && (
-        <section className="rounded-lg border border-stone-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-stone-900">Order timeline</h2>
-          <p className="mt-1 text-sm text-stone-500">
-            Chronological history — parent order, vendors, issues, and refunds.
-          </p>
-          <ul className="mt-4 space-y-3">
-            {timeline.map((e) => (
-              <li
-                key={e.id}
-                className="flex flex-col gap-0.5 border-b border-stone-100 pb-3 text-sm last:border-0 last:pb-0 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3"
-              >
-                <span className="shrink-0 text-xs text-stone-500">{formatDate(e.at)}</span>
-                <span className="font-medium text-stone-900">{e.title}</span>
-                <span className="text-xs text-stone-500">{e.sourceLabel}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
+      {/* 4. Vendor order slices */}
       <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="text-lg font-semibold text-stone-900">Line items</h2>
+        <h2 className="text-lg font-semibold text-stone-900">Vendor orders</h2>
+        <p className="mt-1 text-sm text-stone-500">Line items and refund status per vendor slice.</p>
         <div className="mt-4 space-y-6">
           {vendorContexts.map(({ vo }) => {
             const voRefunds = adminOrder.refundAttempts.filter((ra) => ra.vendorOrderId === vo.id);
@@ -272,8 +282,7 @@ export default async function AdminOrderDetailPage({
                     <div className="mt-2 rounded border border-amber-200 bg-amber-50/50 p-2">
                       <p className="text-xs font-medium text-amber-800">Financial follow-up may be required</p>
                       <p className="mt-0.5 text-xs text-stone-600">
-                        This vendor order was cancelled. Refund or reconciliation may be needed outside this
-                        dashboard.
+                        This vendor order was cancelled. Refund or reconciliation may be needed outside Mennyu.
                       </p>
                     </div>
                   );
@@ -304,11 +313,45 @@ export default async function AdminOrderDetailPage({
         </div>
       </section>
 
-      <p className="text-sm text-stone-600">
-        <Link href={`/order/${orderId}`} className="hover:underline">
-          Customer tracking page →
-        </Link>
-      </p>
+      {/* 5. Timeline (collapsed) */}
+      {timeline.length > 0 && (
+        <details className="rounded-lg border border-stone-200 bg-white p-4">
+          <summary className="cursor-pointer text-lg font-semibold text-stone-900">
+            Order timeline
+          </summary>
+          <p className="mt-1 text-sm text-stone-500">
+            Chronological history — parent order, vendors, issues, and refunds.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {timeline.map((e) => (
+              <li
+                key={e.id}
+                className="flex flex-col gap-0.5 border-b border-stone-100 pb-3 text-sm last:border-0 last:pb-0 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3"
+              >
+                <span className="shrink-0 text-xs text-stone-500">{formatDate(e.at)}</span>
+                <span className="font-medium text-stone-900">{e.title}</span>
+                <span className="text-xs text-stone-500">{e.sourceLabel}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {/* 6. Debug (collapsed) */}
+      <details className="rounded-lg border border-stone-200 bg-stone-50/80 p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-stone-700">Technical details</summary>
+        <div className="mt-3 space-y-3 font-mono text-xs text-stone-700">
+          <p>
+            <span className="text-stone-500">Order ID:</span> {adminOrder.id}
+          </p>
+          {vendorContexts.map(({ vo }) => (
+            <p key={vo.id}>
+              <span className="text-stone-500">Vendor order {vo.vendor.name}:</span> {vo.id} · routing{" "}
+              {vo.routingStatus} · {vo.fulfillmentStatus}
+            </p>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }

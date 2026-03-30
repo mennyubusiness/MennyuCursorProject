@@ -63,14 +63,16 @@ export default async function VendorCurrentMenuPage({
           <h2 className="text-lg font-semibold text-stone-900">Current menu</h2>
           <p className="mt-0.5 text-sm text-stone-500">{vendor.name}</p>
           <p className="mt-1 text-sm text-stone-600">
-            What customers see right now — published categories and items only (active operational rows).
+            What customers see right now — published categories, items, and availability.
           </p>
-          <p className="mt-1 text-xs text-stone-500">
-            Source:{" "}
-            {source === "published_canonical"
-              ? "Latest published menu snapshot"
-              : "Active items (no published snapshot yet)"}
-          </p>
+          <details className="mt-2 text-xs text-stone-500">
+            <summary className="cursor-pointer select-none hover:text-stone-700">Menu source</summary>
+            <p className="mt-1 pl-1">
+              {source === "published_canonical"
+                ? "Latest published menu snapshot"
+                : "Active items (no published snapshot yet)"}
+            </p>
+          </details>
         </div>
         <Link
           href={`/vendor/${vendorId}/menu-imports`}

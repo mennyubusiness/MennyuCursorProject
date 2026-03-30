@@ -45,7 +45,7 @@ export async function resolvePostLoginDestination(
     return {
       kind: "coming_soon",
       headline: "No Mennyu team access on this account",
-      body: "You’re signed in, but this account isn’t marked as a platform admin. Ask your team to grant access, or use the admin secret link you were given. Vendor dashboard still works if you have a restaurant membership.",
+      body: "You’re signed in, but this account isn’t marked as a platform admin. Ask your team to grant access, or use the admin secret link you were given. The vendor area still works if you have a restaurant membership.",
     };
   }
 
@@ -61,7 +61,7 @@ export async function resolvePostLoginDestination(
     return {
       kind: "coming_soon",
       headline: "This area isn’t connected yet",
-      body: "You’re signed in. Pod dashboard access for your account is coming in a future update. Choose Vendor dashboard if you manage a restaurant.",
+      body: "You’re signed in. Pod access for your account is not enabled yet. Choose Vendor if you manage a restaurant.",
     };
   }
 

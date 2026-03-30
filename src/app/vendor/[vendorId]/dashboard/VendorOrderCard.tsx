@@ -72,10 +72,10 @@ function getNextAction(
   return null;
 }
 
-const URGENCY_CLASS: Record<VendorUrgencyLevel, string> = {
-  new: "bg-emerald-100 text-emerald-800",
-  aging: "bg-amber-100 text-amber-800",
-  urgent: "bg-red-100 text-red-800",
+const URGENCY_INLINE_CLASS: Record<VendorUrgencyLevel, string> = {
+  new: "text-emerald-800",
+  aging: "text-amber-800",
+  urgent: "text-red-800",
 };
 
 const READY_WAIT_CLASS: Record<ReadyWaitEscalation, string> = {
@@ -178,12 +178,6 @@ export function VendorOrderCard({
         : ["accepted", "preparing"].includes(vendorOrder.fulfillmentStatus)
           ? "Preparing"
           : "New";
-  const statusBadgeClass = isCancelledOrFailed
-    ? "bg-stone-200 text-stone-600"
-    : vendorOrder.fulfillmentStatus === "completed"
-      ? "bg-stone-100 text-stone-600"
-      : "bg-stone-100 text-stone-700";
-
   async function handleStatusChange(targetState: string) {
     setError(null);
     setLoading(true);
@@ -215,33 +209,58 @@ export function VendorOrderCard({
 
   const totalItems = vendorOrder.lineItems.reduce((sum, l) => sum + l.quantity, 0);
 
+  const statusLineClass =
+    urgencyLevel === "urgent"
+      ? "text-red-800"
+      : urgencyLevel === "aging"
+        ? "text-amber-900"
+        : "text-stone-800";
+
   return (
     <div
       className={`rounded-lg border p-4 shadow-sm ${
         isCancelledOrFailed ? "border-stone-200 bg-stone-50" : "border-stone-200 bg-white"
       } ${isNew ? "ring-2 ring-emerald-400 ring-offset-2" : ""}`}
     >
-      {/* Header: order id, status, time, age */}
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-mono text-sm font-medium text-stone-700">
-            Order #{vendorOrder.order.id.slice(-8).toUpperCase()}
-          </p>
-          <span className="rounded bg-stone-200 px-2 py-0.5 font-mono text-sm font-semibold text-stone-800" title="Pickup code">
-            {pickupCode}
-          </span>
-          <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${statusBadgeClass}`}>
-            {statusBadgeLabel}
-          </span>
-          {showUrgency && (
-            <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${URGENCY_CLASS[urgencyLevel]}`}>
-              {urgencyLabel}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className="rounded bg-stone-800 px-2.5 py-1 font-mono text-sm font-semibold text-white"
+              title="Pickup code for the customer"
+            >
+              {pickupCode}
             </span>
+            <details className="text-xs text-stone-500">
+              <summary className="cursor-pointer select-none hover:text-stone-700">Reference</summary>
+              <p className="mt-1 font-mono text-stone-600">Order #{vendorOrder.order.id.slice(-8).toUpperCase()}</p>
+            </details>
+          </div>
+          <p className={`mt-2 text-sm font-medium ${statusLineClass}`}>
+            {statusBadgeLabel}
+            {showUrgency && (
+              <>
+                <span className="font-normal text-stone-400"> · </span>
+                <span className={URGENCY_INLINE_CLASS[urgencyLevel]}>{urgencyLabel}</span>
+              </>
+            )}
+            <span className="font-normal text-stone-500"> · {ageText}</span>
+          </p>
+          {vendorOrder.fulfillmentStatus === "ready" && readyWaitMinutes !== null && (
+            <p className={`mt-0.5 text-xs ${READY_WAIT_CLASS[readyWaitEscalation]}`}>
+              Waiting for pickup · {readyWaitMinutes}m
+            </p>
           )}
+          {siblingFirstReadyMinutesAgo != null &&
+            siblingFirstReadyMinutesAgo >= 0 &&
+            !["ready", "completed", "cancelled"].includes(vendorOrder.fulfillmentStatus) && (
+              <p className={`mt-0.5 text-xs ${BEHIND_SIBLING_CLASS[siblingBehindEscalation]}`}>
+                Another vendor in this order is already ready ({siblingFirstReadyMinutesAgo}m ago)
+              </p>
+            )}
         </div>
-        <div className="text-right text-xs text-stone-500">
+        <div className="shrink-0 text-right text-xs text-stone-500">
           <p>{orderTime}</p>
-          <p>{ageText}</p>
         </div>
       </div>
 
@@ -251,22 +270,6 @@ export function VendorOrderCard({
           {formatCustomerPhone(vendorOrder.order.customerPhone)}
         </p>
       )}
-
-      {/* Ready-wait: only when this vendor order is in ready state */}
-      {vendorOrder.fulfillmentStatus === "ready" && readyWaitMinutes !== null && (
-        <p className={`mt-1 text-xs ${READY_WAIT_CLASS[readyWaitEscalation]}`}>
-          Ready for {readyWaitMinutes}m
-        </p>
-      )}
-
-      {/* Behind other vendors: only when not ready/completed/cancelled and a sibling is already ready */}
-      {siblingFirstReadyMinutesAgo != null &&
-        siblingFirstReadyMinutesAgo >= 0 &&
-        !["ready", "completed", "cancelled"].includes(vendorOrder.fulfillmentStatus) && (
-          <p className={`mt-1 text-xs ${BEHIND_SIBLING_CLASS[siblingBehindEscalation]}`}>
-            Behind other vendors · First vendor ready {siblingFirstReadyMinutesAgo}m ago
-          </p>
-        )}
 
       {/* Multi-vendor context: generic only; do not show other vendor names */}
       {vendorOrderCount > 1 && (

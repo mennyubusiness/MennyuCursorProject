@@ -4,8 +4,7 @@ import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 
 const NAV_LINKS = [
-  { href: "dashboard", label: "Vendors" },
-  { href: "analytics", label: "Analytics" },
+  { href: "dashboard", label: "Overview" },
   { href: "settings", label: "Settings" },
 ] as const;
 

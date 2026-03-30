@@ -2,30 +2,12 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import type { ExceptionType } from "@/lib/admin-exceptions";
 import type { AdminAttentionItem } from "@/lib/admin-attention";
-import { ExceptionRowActions } from "./ExceptionRowActions";
 
 /** Extract RefundAttempt id from attention item id for refund_failed items (format: refund_attempt:${ra.id}). */
 function getRefundAttemptIdFromItemId(itemId: string): string | null {
   if (!itemId.startsWith("refund_attempt:")) return null;
   return itemId.slice("refund_attempt:".length) || null;
-}
-
-function attentionReasonToExceptionType(reason: AdminAttentionItem["reason"]): ExceptionType {
-  switch (reason) {
-    case "routing_failed":
-    case "manual_recovery_required":
-      return "routing_failed";
-    case "routing_stuck":
-      return "routing_stuck";
-    case "fulfillment_stuck":
-      return "fulfillment_stuck";
-    case "refund_failed":
-      return "unknown_attention_needed";
-    default:
-      return "unknown_attention_needed";
-  }
 }
 
 function severityToUrgencyLabel(severity: AdminAttentionItem["severity"]): string {
@@ -60,10 +42,8 @@ function formatAgeCompact(ageMinutes: number): string {
 
 export function ExceptionList({
   initialItems,
-  routingAvailable,
 }: {
   initialItems: AdminAttentionItem[];
-  routingAvailable: boolean;
 }) {
   const [items, setItems] = useState<AdminAttentionItem[]>(initialItems);
 
@@ -190,19 +170,14 @@ export function ExceptionList({
               </p>
             ) : null}
 
-            {/* Actions: one block, no duplicate links */}
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
               {isVendorOrder ? (
-                <ExceptionRowActions
-                  itemId={item.id}
-                  vendorOrderId={item.vendorOrderId!}
-                  orderId={item.orderId}
-                  exceptionType={attentionReasonToExceptionType(item.reason)}
-                  routingAvailable={routingAvailable}
-                  canCancel={true}
-                  onActionSuccess={onActionSuccess}
-                  hideViewOrderLink
-                />
+                <Link
+                  href={`/admin/orders/${item.orderId}`}
+                  className="rounded-lg bg-stone-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-900"
+                >
+                  Open order
+                </Link>
               ) : item.reason === "refund_failed" && getRefundAttemptIdFromItemId(item.id) ? (
                 <>
                   <button

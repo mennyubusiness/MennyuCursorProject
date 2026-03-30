@@ -19,19 +19,19 @@ function formCopy(intent: LoginIntent): { title: string; blurb: string; button: 
       return {
         title: "Sign in",
         blurb: "Use the email and password for your restaurant team account.",
-        button: "Sign in to vendor dashboard",
+        button: "Sign in to vendor",
       };
     case "pod":
       return {
         title: "Sign in",
-        blurb: "Pod manager access is coming soon. You can still sign in to verify your account.",
+        blurb: "Use the account your team uses for Mennyu. Pod overview and settings open after sign-in when your access is enabled.",
         button: "Sign in",
       };
     case "customer":
       return {
         title: "Sign in",
         blurb:
-          "If you have a Mennyu email login, you can sign in here. Afterward we take you to Your orders—where you link your checkout phone number to see past orders. (Restaurant staff usually choose Vendor dashboard instead.)",
+          "If you have a Mennyu email login, you can sign in here. Afterward we take you to Your orders—where you link your checkout phone number to see past orders. (Restaurant staff usually choose Vendor instead.)",
         button: "Continue to your orders",
       };
     case "admin":

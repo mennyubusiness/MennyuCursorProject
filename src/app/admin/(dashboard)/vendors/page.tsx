@@ -80,7 +80,7 @@ export default async function AdminVendorsPage() {
                     href={`/vendor/${v.id}/orders`}
                     className="ml-2 text-sm text-stone-600 hover:underline"
                   >
-                    Dashboard
+                    Vendor area
                   </Link>
                 </td>
               </tr>
