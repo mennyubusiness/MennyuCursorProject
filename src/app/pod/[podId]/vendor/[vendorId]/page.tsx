@@ -47,10 +47,14 @@ function availabilityBannerCopy(status: VendorAvailabilityStatus): string | null
 function MenuItemRow({
   item,
   cartId,
+  podId,
+  vendorId,
   orderingDisabled,
 }: {
   item: CustomerVendorMenuItem;
   cartId: string;
+  podId: string;
+  vendorId: string;
   orderingDisabled: boolean;
 }) {
   const itemUnavailable = orderingDisabled || !item.isAvailable;
@@ -87,6 +91,8 @@ function MenuItemRow({
           menuItemId={item.id}
           menuItemName={item.name}
           priceCents={item.priceCents}
+          podId={podId}
+          vendorId={vendorId}
           modifierConfig={item.modifierGroups?.length ? serializeModifierConfig(item) : undefined}
           orderingDisabled={itemUnavailable}
         />
@@ -222,6 +228,8 @@ export default async function VendorMenuPage({
                       key={item.id}
                       item={item}
                       cartId={cart.id}
+                      podId={podId}
+                      vendorId={vendorId}
                       orderingDisabled={unavailable}
                     />
                   ))}

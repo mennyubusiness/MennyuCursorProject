@@ -12,6 +12,9 @@ import { selectCartForSessionAndPod } from "@/lib/cart-selection";
 import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
 import { isMenuItemIdOperational } from "@/services/menu-active-scope.service";
 
+/** TEMP: set false to silence add-to-cart trace logs */
+const DEBUG_ADD_TO_CART_TRACE = true;
+
 /** Thrown when add/update cart item fails validation (modifiers, availability, etc.). Callers can return structured JSON. */
 export class CartValidationError extends Error {
   constructor(
@@ -67,12 +70,25 @@ export async function addCartItem(
   specialInstructions?: string | null,
   selections?: CartItemSelectionInput[] | null
 ): Promise<Cart> {
+  if (DEBUG_ADD_TO_CART_TRACE) {
+    console.log("[addCartItem] enter", { cartId, menuItemId, quantity });
+  }
   const menuItem = await prisma.menuItem.findUnique({
     where: { id: menuItemId },
     include: { vendor: true, modifierGroups: true },
   });
   if (!menuItem) {
+    if (DEBUG_ADD_TO_CART_TRACE) {
+      console.error("[addCartItem] MenuItem not found", { menuItemId });
+    }
     throw new Error("MenuItem not found");
+  }
+  if (DEBUG_ADD_TO_CART_TRACE) {
+    console.log("[addCartItem] menuItem loaded", {
+      menuItemId: menuItem.id,
+      vendorId: menuItem.vendorId,
+      name: menuItem.name,
+    });
   }
   if (!(await isMenuItemIdOperational(menuItem.vendorId, menuItem.id))) {
     throw new CartValidationError(`${menuItem.name} is not on the current menu.`, "ITEM_NOT_IN_CURRENT_MENU", {
@@ -155,6 +171,14 @@ export async function addCartItem(
     where: { cartId, menuItemId },
   });
 
+  if (DEBUG_ADD_TO_CART_TRACE) {
+    console.log("[addCartItem] pre-write", {
+      cartId,
+      existingLineId: existing?.id ?? null,
+      willCreate: !existing,
+    });
+  }
+
   if (existing) {
     await prisma.cartItem.update({
       where: { id: existing.id },
@@ -194,6 +218,9 @@ export async function addCartItem(
     }
   }
 
+  if (DEBUG_ADD_TO_CART_TRACE) {
+    console.log("[addCartItem] write complete, returning cart");
+  }
   return getCartByIdOrThrow(cartId);
 }
 

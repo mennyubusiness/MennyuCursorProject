@@ -9,6 +9,9 @@ import type {
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
 import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
 
+/** TEMP: set false to silence add-to-cart trace logs */
+const DEBUG_ADD_TO_CART_TRACE = true;
+
 function modifierGroupSelectionHint(minSelections: number, maxSelections: number): string {
   if (modifierMaxSelectionsIsUnbounded(maxSelections) && minSelections === 0) {
     return "optional — choose any";
@@ -52,6 +55,8 @@ function nestedOptionIdsUnderTopLevelOption(option: ModifierOptionForUI): string
 export function ModifierModal({
   config,
   cartId,
+  podId,
+  vendorId,
   onClose,
   onSuccess,
   /** Edit mode: update existing cart item instead of adding. */
@@ -62,6 +67,8 @@ export function ModifierModal({
 }: {
   config: ModifierConfigForUI;
   cartId: string;
+  podId?: string;
+  vendorId?: string;
   onClose: () => void;
   onSuccess: () => void;
   cartItemId?: string;
@@ -174,10 +181,23 @@ export function ModifierModal({
   const canSubmit = requiredSatisfied;
 
   async function submit() {
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      if (DEBUG_ADD_TO_CART_TRACE) {
+        console.log("[ModifierModal] submit skipped (canSubmit=false)");
+      }
+      return;
+    }
     setLoading(true);
     setError(null);
     if (isEditMode && cartItemId) {
+      if (DEBUG_ADD_TO_CART_TRACE) {
+        console.log("[ModifierModal] submit → updateCartItemAction", {
+          cartId,
+          cartItemId,
+          podId,
+          vendorId,
+        });
+      }
       const result = await updateCartItemAction(
         cartId,
         cartItemId,
@@ -186,6 +206,9 @@ export function ModifierModal({
         selectionsList
       );
       setLoading(false);
+      if (DEBUG_ADD_TO_CART_TRACE) {
+        console.log("[ModifierModal] updateCartItemAction returned", { success: result?.success, error: result && !result.success ? result.error : undefined });
+      }
       if (result?.success) {
         onSuccess();
         onClose();
@@ -193,6 +216,14 @@ export function ModifierModal({
         setError({ message: result.error, code: result.code });
       }
     } else {
+      if (DEBUG_ADD_TO_CART_TRACE) {
+        console.log("[ModifierModal] submit → addToCartAction", {
+          cartId,
+          menuItemId: config.menuItemId,
+          podId,
+          vendorId,
+        });
+      }
       const result = await addToCartAction(
         cartId,
         config.menuItemId,
@@ -201,6 +232,13 @@ export function ModifierModal({
         selectionsList
       );
       setLoading(false);
+      if (DEBUG_ADD_TO_CART_TRACE) {
+        console.log("[ModifierModal] addToCartAction returned", {
+          success: result.success,
+          error: "error" in result ? result.error : undefined,
+          code: "code" in result ? result.code : undefined,
+        });
+      }
       if (result.success) {
         onSuccess();
         onClose();
