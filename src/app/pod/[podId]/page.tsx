@@ -21,6 +21,7 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
               isActive: true,
               mennyuOrdersPaused: true,
               imageUrl: true,
+              accentColor: true,
             },
           },
         },
@@ -104,6 +105,15 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
                         ? "border-stone-200 bg-stone-50/90"
                         : "border-stone-200 bg-white"
                     }`}
+                    style={
+                      pv.vendor.accentColor
+                        ? {
+                            borderLeftWidth: 4,
+                            borderLeftStyle: "solid",
+                            borderLeftColor: pv.vendor.accentColor,
+                          }
+                        : undefined
+                    }
                     aria-label={`${pv.vendor.name} — ${statusLabel}. View menu.`}
                   >
                     <VendorLogo imageUrl={pv.vendor.imageUrl} vendorName={pv.vendor.name} />
@@ -128,7 +138,10 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
                       {(isMennyuNotAccepting || isPosClosed) && (
                         <p className="mt-2 text-xs text-stone-500">You can still browse the menu.</p>
                       )}
-                      <span className="mt-3 inline-flex items-center text-sm font-medium text-mennyu-primary">
+                      <span
+                        className="mt-3 inline-flex items-center text-sm font-medium text-mennyu-primary"
+                        style={pv.vendor.accentColor ? { color: pv.vendor.accentColor } : undefined}
+                      >
                         View menu
                         <span aria-hidden className="ml-1">
                           →

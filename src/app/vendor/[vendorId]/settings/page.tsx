@@ -9,6 +9,7 @@ import { VendorAutoPublishToggle } from "./VendorAutoPublishToggle";
 import { VendorDashboardAccessCard } from "./VendorDashboardAccessCard";
 import { VendorAccessQueryMessages } from "./VendorAccessMessages";
 import { VendorAdvancedAccessSection } from "./VendorAdvancedAccessSection";
+import { VendorBrandProfileForm } from "./VendorBrandProfileForm";
 
 export default async function VendorSettingsPage({
   params,
@@ -26,6 +27,7 @@ export default async function VendorSettingsPage({
         slug: true,
         description: true,
         imageUrl: true,
+        accentColor: true,
         mennyuOrdersPaused: true,
         autoPublishMenus: true,
         vendorDashboardToken: true,
@@ -83,42 +85,24 @@ export default async function VendorSettingsPage({
         <VendorAccessQueryMessages />
       </Suspense>
 
-      {/* Vendor info (read-only) */}
+      {/* Brand / profile (customer-facing) */}
       <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
-          Vendor info
-        </h3>
-        <dl className="mt-3 space-y-2 text-sm">
-          <div>
-            <dt className="text-stone-500">Name</dt>
-            <dd className="font-medium text-stone-900">{vendor.name}</dd>
-          </div>
-          <div>
-            <dt className="text-stone-500">Slug</dt>
-            <dd className="font-mono text-stone-700">{vendor.slug}</dd>
-          </div>
-          {vendor.description && (
-            <div>
-              <dt className="text-stone-500">Description</dt>
-              <dd className="text-stone-700">{vendor.description}</dd>
-            </div>
-          )}
-          {vendor.imageUrl && (
-            <div>
-              <dt className="text-stone-500">Image</dt>
-              <dd>
-                <img
-                  src={vendor.imageUrl}
-                  alt=""
-                  className="mt-1 h-20 w-20 rounded-lg object-cover"
-                />
-              </dd>
-            </div>
-          )}
-        </dl>
-        <p className="mt-3 text-xs text-stone-400">
-          Editing vendor profile is not available yet. You can manage orders and pause state below.
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Brand / profile</h3>
+        <p className="mt-1 text-sm text-stone-600">
+          How your restaurant appears on the pod page and when customers open your menu.
         </p>
+        <p className="mt-2 text-xs text-stone-500">
+          Internal slug: <span className="font-mono text-stone-700">{vendor.slug}</span> (not editable here)
+        </p>
+        <div className="mt-4">
+          <VendorBrandProfileForm
+            vendorId={vendor.id}
+            initialName={vendor.name}
+            initialDescription={vendor.description}
+            initialImageUrl={vendor.imageUrl}
+            initialAccentColor={vendor.accentColor}
+          />
+        </div>
       </section>
 
       {/* Mennyu settings */}

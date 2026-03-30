@@ -152,7 +152,14 @@ export default async function VendorMenuPage({
         </ol>
       </nav>
 
-      <header className="border-b border-stone-200 pb-8">
+      <header
+        className="border-b border-stone-200 pb-8"
+        style={
+          vendor.accentColor
+            ? { borderBottomWidth: 2, borderBottomColor: vendor.accentColor }
+            : undefined
+        }
+      >
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
           <VendorLogo
             imageUrl={vendor.imageUrl}
@@ -204,6 +211,11 @@ export default async function VendorMenuPage({
                   key={s.id}
                   href={`#${customerMenuCategoryDomId(s.id)}`}
                   className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-sm hover:border-mennyu-primary/40 hover:text-mennyu-primary"
+                  style={
+                    vendor.accentColor
+                      ? { borderColor: vendor.accentColor }
+                      : undefined
+                  }
                 >
                   {s.name}
                 </a>
@@ -221,7 +233,10 @@ export default async function VendorMenuPage({
               >
                 <h2
                   id={`heading-${customerMenuCategoryDomId(section.id)}`}
-                  className="text-lg font-semibold text-stone-900"
+                  className="border-l-4 border-stone-200 pl-3 text-lg font-semibold text-stone-900"
+                  style={
+                    vendor.accentColor ? { borderLeftColor: vendor.accentColor } : undefined
+                  }
                 >
                   {section.name}
                 </h2>
