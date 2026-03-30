@@ -11,6 +11,7 @@ import { getVendorAvailability } from "@/lib/vendor-availability";
 import { selectCartForSessionAndPod } from "@/lib/cart-selection";
 import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
 import { isMenuItemIdOperational } from "@/services/menu-active-scope.service";
+import { normalizedConfigurationKey } from "@/lib/cart-line-identity";
 
 /** TEMP: set false to silence add-to-cart trace logs */
 const DEBUG_ADD_TO_CART_TRACE = true;
@@ -191,15 +192,30 @@ export async function addCartItem(
 
   const priceCentsToStore = await effectiveUnitPriceCents;
 
+  const incomingKey = normalizedConfigurationKey(
+    specialInstructions,
+    selections?.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity })) ?? null
+  );
+
   if (DEBUG_ADD_TO_CART_TRACE) {
-    const existingPreview = await prisma.cartItem.findFirst({
+    const previewCandidates = await prisma.cartItem.findMany({
       where: { cartId, menuItemId },
-      select: { id: true },
+      include: { selections: true },
     });
+    const previewMatch =
+      previewCandidates.find((c) => {
+        const key = normalizedConfigurationKey(
+          c.specialInstructions,
+          c.selections.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity }))
+        );
+        return key === incomingKey;
+      }) ?? null;
     console.log("[addCartItem] pre-write", {
       cartId,
-      existingLineId: existingPreview?.id ?? null,
-      willCreate: !existingPreview,
+      incomingKey,
+      candidateLineIds: previewCandidates.map((c) => c.id),
+      matchingLineId: previewMatch?.id ?? null,
+      willCreate: !previewMatch,
     });
   }
 
@@ -208,9 +224,19 @@ export async function addCartItem(
   let primaryCartItemId: string;
 
   await prisma.$transaction(async (tx) => {
-    const row = await tx.cartItem.findFirst({
+    const candidates = await tx.cartItem.findMany({
       where: { cartId, menuItemId },
+      include: { selections: true },
     });
+
+    const row =
+      candidates.find((c) => {
+        const key = normalizedConfigurationKey(
+          c.specialInstructions,
+          c.selections.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity }))
+        );
+        return key === incomingKey;
+      }) ?? null;
 
     if (row) {
       writePath = "update";

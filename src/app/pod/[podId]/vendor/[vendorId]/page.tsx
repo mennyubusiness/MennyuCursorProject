@@ -15,6 +15,7 @@ import {
   getVendorAvailabilityStatus,
   type VendorAvailabilityStatus,
 } from "@/lib/vendor-availability";
+import type { CartItem } from "@/domain/types";
 
 function VendorStatusBadge({ status }: { status: VendorAvailabilityStatus }) {
   if (status === "open") {
@@ -49,12 +50,14 @@ function MenuItemRow({
   cartId,
   podId,
   vendorId,
+  vendorCartItems,
   orderingDisabled,
 }: {
   item: CustomerVendorMenuItem;
   cartId: string;
   podId: string;
   vendorId: string;
+  vendorCartItems: CartItem[];
   orderingDisabled: boolean;
 }) {
   const itemUnavailable = orderingDisabled || !item.isAvailable;
@@ -89,10 +92,9 @@ function MenuItemRow({
         <AddToCartButton
           cartId={cartId}
           menuItemId={item.id}
-          menuItemName={item.name}
-          priceCents={item.priceCents}
           podId={podId}
           vendorId={vendorId}
+          vendorCartItems={vendorCartItems}
           modifierConfig={item.modifierGroups?.length ? serializeModifierConfig(item) : undefined}
           orderingDisabled={itemUnavailable}
         />
@@ -130,6 +132,7 @@ export default async function VendorMenuPage({
   const availabilityStatus = getVendorAvailabilityStatus(vendor);
   const unavailable = availabilityStatus !== "open";
   const bannerLine = availabilityBannerCopy(availabilityStatus);
+  const vendorCartItems = cart.items.filter((i) => i.vendorId === vendorId);
 
   const showCategoryJump = sections.length > 1;
 
@@ -230,6 +233,7 @@ export default async function VendorMenuPage({
                       cartId={cart.id}
                       podId={podId}
                       vendorId={vendorId}
+                      vendorCartItems={vendorCartItems}
                       orderingDisabled={unavailable}
                     />
                   ))}
