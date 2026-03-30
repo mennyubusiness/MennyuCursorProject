@@ -9,7 +9,7 @@
 import {
   serviceFeeFromSubtotalCents,
   platformCommissionFromSubtotalCents,
-  taxFromSubtotalCents,
+  pickupSalesTaxFromSubtotalCents,
   splitTipProRata,
   splitProRata,
   addCents,
@@ -34,6 +34,8 @@ export interface VendorAllocation {
 export interface OrderTotalsInput {
   vendorSubtotalsCents: number[];
   tipCents: number;
+  /** Pod `pickupSalesTaxBps` — Mennyu-computed pickup tax on food subtotal; null = none. */
+  pickupSalesTaxBps?: number | null;
 }
 
 export interface OrderTotals {
@@ -47,12 +49,13 @@ export interface OrderTotals {
 
 /**
  * Compute order-level totals and per-vendor allocations.
- * Service fee = 3.5% of subtotal. Tip split pro-rata. Tax MVP = 0.
+ * Service fee = 3.5% of subtotal (Mennyu only — not sent to Deliverect). Tip split pro-rata.
+ * Tax = pod pickup rate × food subtotal when `pickupSalesTaxBps` is set.
  */
 export function computeOrderTotals(input: OrderTotalsInput): OrderTotals {
   const subtotalCents = input.vendorSubtotalsCents.reduce((a, b) => a + b, 0);
   const serviceFeeCents = serviceFeeFromSubtotalCents(subtotalCents);
-  const taxCents = taxFromSubtotalCents(subtotalCents);
+  const taxCents = pickupSalesTaxFromSubtotalCents(subtotalCents, input.pickupSalesTaxBps);
   const tipCents = input.tipCents;
   const totalCents = addCents(subtotalCents, serviceFeeCents, taxCents, tipCents);
 

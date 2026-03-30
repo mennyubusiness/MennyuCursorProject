@@ -14,7 +14,8 @@
  * The kitchen and POS must not see the Mennyu platform fee as part of “what was paid for this order”
  * or as tax/serviceCharge/delivery — it is not restaurant revenue. Use:
  * - Line items: menu + modifier prices (already the case in `transform.ts`)
- * - `taxTotal` / `taxes[]`: `vendorOrder.taxCents` only (restaurant-relevant tax allocation)
+ * - `taxTotal` / `taxes[]`: `vendorOrder.taxCents` only (restaurant-relevant tax allocation from Mennyu’s
+ *   pickup tax model — e.g. pod `pickupSalesTaxBps` on food subtotal — never the platform fee)
  * - `payment.amount`: **subtotal + tax + tip** for this vendor order — **excluding** `serviceFeeCents`
  *
  * Stripe still captures the full customer charge including the platform fee; only the Deliverect payload is scoped down.

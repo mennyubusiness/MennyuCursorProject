@@ -11,6 +11,8 @@ interface CheckoutFormProps {
   totalCents: number;
   subtotalCents: number;
   serviceFeeCents: number;
+  /** Mennyu-computed pickup sales tax from pod rate (0 if none). */
+  taxCents: number;
   /** IANA timezone used for scheduled pickup (pod or default). */
   pickupTimezoneLabel: string;
   defaultScheduledDate: string;
@@ -37,6 +39,7 @@ function PaymentStep({
   totalWithTip,
   subtotalCents,
   serviceFeeCents,
+  taxCents,
   tipCents,
   pickupSummaryLine,
   onSuccess,
@@ -47,6 +50,7 @@ function PaymentStep({
   totalWithTip: number;
   subtotalCents: number;
   serviceFeeCents: number;
+  taxCents: number;
   tipCents: number;
   pickupSummaryLine: string;
   onSuccess: () => void;
@@ -117,6 +121,12 @@ function PaymentStep({
             <dt className="text-stone-600">Service fee</dt>
             <dd className="tabular-nums">${(serviceFeeCents / 100).toFixed(2)}</dd>
           </div>
+          {taxCents > 0 && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-stone-600">Sales tax</dt>
+              <dd className="tabular-nums">${(taxCents / 100).toFixed(2)}</dd>
+            </div>
+          )}
           <div className="flex justify-between gap-4">
             <dt className="text-stone-600">Tip</dt>
             <dd className="tabular-nums">${(tipCents / 100).toFixed(2)}</dd>
@@ -158,6 +168,7 @@ export function CheckoutForm({
   totalCents,
   subtotalCents,
   serviceFeeCents,
+  taxCents,
   pickupTimezoneLabel,
   defaultScheduledDate,
   defaultScheduledTime,
@@ -365,6 +376,7 @@ export function CheckoutForm({
           totalWithTip={totalWithTip}
           subtotalCents={subtotalCents}
           serviceFeeCents={serviceFeeCents}
+          taxCents={taxCents}
           tipCents={tipCents}
           pickupSummaryLine={pickupSummaryLine}
           onSuccess={() => router.push(`/order/${paymentData!.orderId}`)}
@@ -559,7 +571,7 @@ export function CheckoutForm({
             <dd className="max-w-[65%] text-right text-sm font-medium">{pickupSummaryLine}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-stone-600">Food + service fee</dt>
+            <dt className="text-stone-600">Food, service fee{taxCents > 0 ? " & tax" : ""}</dt>
             <dd className="tabular-nums">${(totalCents / 100).toFixed(2)}</dd>
           </div>
           <div className="flex justify-between">

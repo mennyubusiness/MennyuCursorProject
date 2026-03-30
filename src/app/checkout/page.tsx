@@ -86,6 +86,7 @@ export default async function CheckoutPage({
   const totals = computeOrderTotals({
     vendorSubtotalsCents,
     tipCents: 0,
+    pickupSalesTaxBps: cart.pod.pickupSalesTaxBps,
   });
   const vendorCount = byVendor.size;
   const scheduledDefaults = getCheckoutDefaultScheduledPickup(cart.pod);
@@ -150,10 +151,18 @@ export default async function CheckoutPage({
               ${(totals.serviceFeeCents / 100).toFixed(2)}
             </dd>
           </div>
+          {totals.taxCents > 0 && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-stone-600">Sales tax (pickup)</dt>
+              <dd className="tabular-nums text-stone-800">
+                ${(totals.taxCents / 100).toFixed(2)}
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between gap-4 border-t border-stone-200 pt-2 text-base">
             <dt className="font-semibold text-stone-900">Due before tip</dt>
             <dd className="tabular-nums font-bold text-stone-900">
-              ${((totals.subtotalCents + totals.serviceFeeCents) / 100).toFixed(2)}
+              ${((totals.subtotalCents + totals.serviceFeeCents + totals.taxCents) / 100).toFixed(2)}
             </dd>
           </div>
         </dl>
@@ -169,6 +178,7 @@ export default async function CheckoutPage({
         totalCents={totals.totalCents}
         subtotalCents={totals.subtotalCents}
         serviceFeeCents={totals.serviceFeeCents}
+        taxCents={totals.taxCents}
         pickupTimezoneLabel={scheduledDefaults.timezone}
         defaultScheduledDate={scheduledDefaults.date}
         defaultScheduledTime={scheduledDefaults.time}

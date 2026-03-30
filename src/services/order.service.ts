@@ -365,6 +365,7 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
   const totals = computeOrderTotals({
     vendorSubtotalsCents,
     tipCents: input.tipCents,
+    pickupSalesTaxBps: cart.pod.pickupSalesTaxBps,
   });
 
   const pickupMode = input.pickupMode ?? "asap";

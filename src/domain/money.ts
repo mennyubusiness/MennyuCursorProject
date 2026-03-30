@@ -37,12 +37,16 @@ export function platformCommissionFromSubtotalCents(subtotalCents: number): numb
 }
 
 /**
- * MVP: returns 0 — no automatic tax. Pickup-only; real product/jurisdiction tax belongs in a
- * dedicated tax engine later. Allocated `taxCents` on orders is still passed through to Deliverect
- * as restaurant-facing tax only (never mixed with the Mennyu platform fee).
+ * Pickup sales tax computed by Mennyu from the pod’s configured rate — not vendor-entered per order.
+ * @param taxRateBps — basis points (825 = 8.25%). Null, undefined, or ≤0 → no tax.
+ * For Stripe/Deliverect, allocated `taxCents` remains restaurant-facing only (never the Mennyu platform fee).
  */
-export function taxFromSubtotalCents(_subtotalCents: number, _location?: unknown): number {
-  return 0;
+export function pickupSalesTaxFromSubtotalCents(
+  subtotalCents: number,
+  taxRateBps: number | null | undefined
+): number {
+  if (taxRateBps == null || taxRateBps <= 0) return 0;
+  return roundCents((subtotalCents * taxRateBps) / 10_000);
 }
 
 /**
