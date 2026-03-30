@@ -15,6 +15,9 @@ import { isMenuItemIdOperational } from "@/services/menu-active-scope.service";
 /** TEMP: set false to silence add-to-cart trace logs */
 const DEBUG_ADD_TO_CART_TRACE = true;
 
+/** TEMP: set false to silence stale-checkout unlink trace logs */
+const DEBUG_DISCARD_STALE_CHECKOUT = true;
+
 /** Thrown when add/update cart item fails validation (modifiers, availability, etc.). Callers can return structured JSON. */
 export class CartValidationError extends Error {
   constructor(
@@ -25,6 +28,25 @@ export class CartValidationError extends Error {
     super(message);
     this.name = "CartValidationError";
   }
+}
+
+/**
+ * Completed / in-flight orders (anything except unpaid `pending_payment` or retryable `failed`) may
+ * still reference this cart via `Order.sourceCartId` if cleanup did not run. That poisons reuse:
+ * `discardStaleCheckoutCartsForSession` would see a "blocking" order and wipe line items on every
+ * /cart load. Unlink those orders from the cart id without deleting CartItem rows — payment success
+ * should already have cleared lines via `clearCheckoutSourceCartForOrder`; if not, we prefer leaving
+ * stale lines over deleting the customer's new basket.
+ */
+export async function unlinkCompletedCheckoutOrdersFromCart(cartId: string): Promise<number> {
+  const result = await prisma.order.updateMany({
+    where: {
+      sourceCartId: cartId,
+      status: { notIn: ["pending_payment", "failed"] },
+    },
+    data: { sourceCartId: null },
+  });
+  return result.count;
 }
 
 export async function getOrCreateCart(podId: string, sessionId: string): Promise<Cart> {
@@ -57,6 +79,8 @@ export async function getOrCreateCart(podId: string, sessionId: string): Promise
       },
     });
   }
+
+  await unlinkCompletedCheckoutOrdersFromCart(cart.id);
 
   return toCartWithGroups(cart);
 }
@@ -429,26 +453,62 @@ export async function clearCheckoutSourceCartForOrder(orderId: string): Promise<
 }
 
 /**
- * Defensive: drop persisted line items when the cart id is still linked to a checkout that has
- * moved past an unpaid snapshot (anything except abandoned `pending_payment` or retryable `failed`).
- * Keeps in-progress shopping and failed-payment / routing-failure carts intact.
+ * Defensive: unlink `Order.sourceCartId` for carts where checkout has moved past an unpaid snapshot
+ * (anything except abandoned `pending_payment` or retryable `failed`). We intentionally do **not**
+ * delete CartItem rows here: that used to wipe new baskets when the same cart id was reused after a
+ * completed order still pointed at it, and it did not clear `sourceCartId` — so every /cart load
+ * cleared items again. Line cleanup after successful payment remains `clearCheckoutSourceCartForOrder`.
  */
 export async function discardStaleCheckoutCartsForSession(sessionId: string): Promise<void> {
   const carts = await prisma.cart.findMany({
     where: { sessionId, items: { some: {} } },
     select: { id: true },
   });
+
+  if (DEBUG_DISCARD_STALE_CHECKOUT) {
+    console.log("[discardStaleCheckoutCartsForSession] enter", {
+      sessionId,
+      cartIdsConsidered: carts.map((c) => c.id),
+    });
+  }
+
   for (const { id: cartId } of carts) {
-    const blocking = await prisma.order.findFirst({
+    const blockingOrders = await prisma.order.findMany({
       where: {
         sourceCartId: cartId,
         status: { notIn: ["pending_payment", "failed"] },
       },
-      select: { id: true },
+      select: { id: true, status: true, sourceCartId: true },
     });
-    if (blocking) {
-      await prisma.cartItem.deleteMany({ where: { cartId } });
+
+    if (DEBUG_DISCARD_STALE_CHECKOUT && blockingOrders.length > 0) {
+      console.log("[discardStaleCheckoutCartsForSession] blocking orders for cart", {
+        cartId,
+        orders: blockingOrders.map((o) => ({ id: o.id, status: o.status })),
+      });
     }
+
+    if (blockingOrders.length === 0) continue;
+
+    const itemCountBefore = await prisma.cartItem.count({ where: { cartId } });
+
+    const unlinked = await unlinkCompletedCheckoutOrdersFromCart(cartId);
+
+    const itemCountAfter = await prisma.cartItem.count({ where: { cartId } });
+
+    if (DEBUG_DISCARD_STALE_CHECKOUT) {
+      console.log("[discardStaleCheckoutCartsForSession] unlinked orders from cart (no CartItem delete)", {
+        cartId,
+        orderIdsUnlinked: blockingOrders.map((o) => o.id),
+        unlinkedCount: unlinked,
+        itemCountBefore,
+        itemCountAfter,
+      });
+    }
+  }
+
+  if (DEBUG_DISCARD_STALE_CHECKOUT) {
+    console.log("[discardStaleCheckoutCartsForSession] done", { sessionId });
   }
 }
 
