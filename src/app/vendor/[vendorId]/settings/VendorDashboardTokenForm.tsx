@@ -16,7 +16,7 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
       const res = await bindVendorDashboardSession(vendorId, token);
       if (res.ok) {
         setMessage({
-          text: "Session saved in this browser. You can publish menu imports and change auto-publish here.",
+          text: "Session saved in this browser.",
           ok: true,
         });
         setToken("");
@@ -29,13 +29,10 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
   }
 
   return (
-    <details className="rounded-lg border border-stone-200 bg-white p-4">
-      <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-stone-500">
-        Manual access token (advanced)
-      </summary>
-      <p className="mt-2 text-sm text-stone-600">
-        Prefer the <strong>secure access link</strong> from your admin — no copy/paste. Use this only if you are
-        integrating via API or automation that needs the raw secret; it sets the same browser session as the link.
+    <div className="rounded-lg border border-stone-200 bg-white p-4">
+      <h4 className="text-sm font-semibold text-stone-800">Manual access token</h4>
+      <p className="mt-1 text-xs text-stone-500">
+        Same session as an admin secure link — use only when you must paste a token (e.g. API/automation).
       </p>
       <form onSubmit={onSubmit} className="mt-3 space-y-2">
         <label htmlFor="vdash-token" className="sr-only">
@@ -63,6 +60,6 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
           {message.text}
         </p>
       )}
-    </details>
+    </div>
   );
 }

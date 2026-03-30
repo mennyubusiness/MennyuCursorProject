@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import Link from "next/link";
+import { prisma } from "@/lib/db";
 import { VendorPauseToggle } from "../dashboard/VendorPauseToggle";
 import { VendorPodRequests } from "../dashboard/VendorPodRequests";
 import { VendorRecentPodRequests } from "../dashboard/VendorRecentPodRequests";
@@ -71,30 +71,26 @@ export default async function VendorSettingsPage({
   const hasToken = Boolean(vendor.vendorDashboardToken?.trim());
 
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-10">
+      <header>
         <h2 className="text-xl font-semibold text-stone-900">Settings</h2>
-        <p className="mt-1 text-sm text-stone-600">
-          Vendor profile, Mennyu controls, and how you sign in.
-        </p>
-      </div>
-
-      <VendorDashboardAccessCard vendorId={vendor.id} hasDashboardSecret={hasToken} />
+        <p className="mt-1 text-sm text-stone-500">Profile, orders, menu, and sign-in.</p>
+      </header>
 
       <Suspense fallback={null}>
         <VendorAccessQueryMessages />
       </Suspense>
 
-      {/* Brand / profile (customer-facing) */}
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Brand / profile</h3>
-        <p className="mt-1 text-sm text-stone-600">
-          How your restaurant appears on the pod page and when customers open your menu.
-        </p>
-        <p className="mt-2 text-xs text-stone-500">
-          Internal slug: <span className="font-mono text-stone-700">{vendor.slug}</span> (not editable here)
-        </p>
-        <div className="mt-4">
+      {/* Brand / profile */}
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-stone-900">Brand &amp; profile</h3>
+          <p className="mt-1 text-sm text-stone-500">Name, logo, and colors on the pod and customer menu.</p>
+          <p className="mt-1 text-xs text-stone-400">
+            URL slug: <span className="font-mono text-stone-600">{vendor.slug}</span> (fixed)
+          </p>
+        </div>
+        <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
           <VendorBrandProfileForm
             vendorId={vendor.id}
             initialName={vendor.name}
@@ -105,46 +101,62 @@ export default async function VendorSettingsPage({
         </div>
       </section>
 
-      {/* Mennyu settings */}
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
-          Mennyu settings
-        </h3>
-        <div className="mt-3">
-          <VendorPauseToggle vendorId={vendor.id} initialPaused={vendor.mennyuOrdersPaused ?? false} />
+      {/* Ordering & availability */}
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-stone-900">Ordering &amp; availability</h3>
+          <p className="mt-1 text-sm text-stone-500">Stop or resume new Mennyu orders.</p>
         </div>
-        <p className="mt-3 text-xs text-stone-400">
-          You can also pause or resume Mennyu orders from the{" "}
-          <Link href={`/vendor/${vendorId}/orders`} className="underline hover:text-stone-600">
+        <VendorPauseToggle vendorId={vendor.id} initialPaused={vendor.mennyuOrdersPaused ?? false} embedded />
+        <p className="text-xs text-stone-400">
+          You can also pause from{" "}
+          <Link href={`/vendor/${vendorId}/orders`} className="text-stone-600 underline hover:text-stone-800">
             Orders
-          </Link>{" "}
-          page.
+          </Link>
+          .
         </p>
       </section>
 
-      <VendorAutoPublishToggle vendorId={vendor.id} initialAutoPublishMenus={vendor.autoPublishMenus ?? false} />
-
-      {/* Pending pod requests */}
-      <VendorPodRequests
-        vendorId={vendor.id}
-        requests={pendingRequestsForComponent}
-        currentPod={currentPod ? { id: currentPod.pod.id, name: currentPod.pod.name } : null}
-      />
-
-      {/* Recent pod requests */}
-      <VendorRecentPodRequests recentRequests={recentRequestsForComponent} />
-
-      <VendorAdvancedAccessSection vendorId={vendor.id} hasDashboardToken={hasToken} />
-
-      {/* Integrations placeholder */}
-      <section className="rounded-lg border border-stone-200 bg-stone-50/80 p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
-          Integrations
-        </h3>
-        <p className="mt-3 text-sm text-stone-600">
-          POS / Deliverect connection coming soon. Your orders are managed in Mennyu until then.
-        </p>
+      {/* Menu publishing */}
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-stone-900">Menu publishing</h3>
+          <p className="mt-1 text-sm text-stone-500">How Deliverect menu updates go live.</p>
+        </div>
+        <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+          <VendorAutoPublishToggle vendorId={vendor.id} initialAutoPublishMenus={vendor.autoPublishMenus ?? false} />
+        </div>
       </section>
+
+      {/* Pod membership */}
+      <section className="space-y-4">
+        <VendorPodRequests
+          vendorId={vendor.id}
+          requests={pendingRequestsForComponent}
+          currentPod={currentPod ? { id: currentPod.pod.id, name: currentPod.pod.name } : null}
+        />
+        <VendorRecentPodRequests recentRequests={recentRequestsForComponent} />
+      </section>
+
+      {/* Access / sign-in */}
+      <section className="space-y-3">
+        <h3 className="text-lg font-semibold text-stone-900">Access &amp; sign-in</h3>
+        <VendorDashboardAccessCard vendorId={vendor.id} hasDashboardSecret={hasToken} />
+      </section>
+
+      {/* Advanced */}
+      <details className="rounded-xl border border-stone-200 bg-white shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 text-lg font-semibold text-stone-900 marker:hidden [&::-webkit-details-marker]:hidden">
+          Advanced
+        </summary>
+        <div className="space-y-5 border-t border-stone-100 px-5 pb-5 pt-4">
+          <p className="text-sm text-stone-600">
+            <span className="font-medium text-stone-800">Integrations:</span> POS / Deliverect connection coming soon.
+            Orders stay in Mennyu until then.
+          </p>
+          <VendorAdvancedAccessSection vendorId={vendor.id} hasDashboardToken={hasToken} />
+        </div>
+      </details>
     </div>
   );
 }

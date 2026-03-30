@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 export function VendorPauseToggle({
   vendorId,
   initialPaused,
+  embedded,
 }: {
   vendorId: string;
   initialPaused: boolean;
+  /** When true, no outer card border — use inside a parent section. */
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [paused, setPaused] = useState(initialPaused);
@@ -39,7 +42,13 @@ export function VendorPauseToggle({
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+    <div
+      className={
+        embedded
+          ? "rounded-lg bg-stone-50/80 p-4"
+          : "rounded-lg border border-stone-200 bg-stone-50 p-4"
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-medium text-stone-800">Mennyu orders</p>

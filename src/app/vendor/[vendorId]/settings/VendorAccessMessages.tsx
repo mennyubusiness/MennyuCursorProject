@@ -39,8 +39,7 @@ export function VendorAccessQueryMessages() {
           <Link href="/login?intent=vendor" className="font-medium text-sky-800 underline">
             Sign in
           </Link>{" "}
-          with your restaurant email, or open the secure link from your administrator. Token-based access (automation) is
-          under <strong>Advanced access</strong> on Settings if you need it.
+          or your admin secure link. Token access is under <strong>Advanced</strong> on Settings.
         </>
       ),
       tone: "warn",

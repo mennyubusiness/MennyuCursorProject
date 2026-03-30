@@ -19,38 +19,42 @@ export function VendorRecentPodRequests({
 }: {
   recentRequests: RecentRequestItem[];
 }) {
+  if (recentRequests.length === 0) {
+    return null;
+  }
+
   return (
-    <section className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">
-        Recent pod requests
-      </h2>
-      {recentRequests.length === 0 ? (
-        <p className="mt-3 text-sm text-stone-500">No recent pod requests.</p>
-      ) : (
-        <ul className="mt-3 space-y-2">
-          {recentRequests.map((r) => (
-            <li
-              key={r.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded border border-stone-200 bg-white px-3 py-2 text-sm"
-            >
-              <div>
-                <span className="font-medium text-stone-800">{r.podName}</span>
-                <span className="ml-2 text-stone-500">
-                  {statusLabel(r.status)}
-                  {r.respondedAt && (
-                    <span className="ml-1">
-                      · {new Date(r.respondedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
-                    </span>
-                  )}
-                </span>
-              </div>
-              <span className="text-xs text-stone-400">
-                Requested {new Date(r.createdAt).toLocaleDateString(undefined, { dateStyle: "short" })}
+    <details className="rounded-lg border border-stone-100 bg-stone-50/40">
+      <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-stone-700 hover:bg-stone-50/80">
+        Recent pod activity ({recentRequests.length})
+      </summary>
+      <ul className="space-y-2 border-t border-stone-100 px-4 py-3">
+        {recentRequests.map((r) => (
+          <li
+            key={r.id}
+            className="flex flex-wrap items-center justify-between gap-2 text-sm text-stone-700"
+          >
+            <span>
+              <span className="font-medium">{r.podName}</span>
+              <span className="ml-2 text-stone-500">
+                {statusLabel(r.status)}
+                {r.respondedAt && (
+                  <span className="ml-1">
+                    ·{" "}
+                    {new Date(r.respondedAt).toLocaleString(undefined, {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}
+                  </span>
+                )}
               </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+            </span>
+            <span className="text-xs text-stone-400">
+              {new Date(r.createdAt).toLocaleDateString(undefined, { dateStyle: "short" })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

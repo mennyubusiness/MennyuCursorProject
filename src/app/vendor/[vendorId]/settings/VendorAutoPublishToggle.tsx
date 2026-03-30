@@ -34,16 +34,21 @@ export function VendorAutoPublishToggle({
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Menu publishing</h3>
-      <p className="mt-2 text-sm text-stone-600">
-        <strong>Review before publish (default):</strong> Deliverect sends drafts to Mennyu; you open{" "}
-        <strong>Menu imports</strong>, review the diff, then publish.{" "}
-        <strong>Auto-publish:</strong> when on, <em>only</em> Deliverect <strong>menu webhook</strong> imports can go
-        live automatically if they pass the same safety checks as manual publish (no blocking issues, valid draft).
-        Other sources (e.g. API pull) stay in &quot;needs review&quot; until you publish.
+    <div className="space-y-3">
+      <p className="text-sm text-stone-600">
+        <strong>Off (recommended):</strong> review menu imports before they go live.{" "}
+        <strong>On:</strong> Deliverect webhook imports can publish automatically when checks pass.
       </p>
-      <div className="mt-3 flex items-center gap-3">
+      <details className="text-sm text-stone-500">
+        <summary className="cursor-pointer select-none text-stone-600 hover:text-stone-800">
+          More detail
+        </summary>
+        <p className="mt-2 pl-0 text-xs leading-relaxed">
+          Other import sources (e.g. API pull) still need a manual publish. Same safety rules apply as when you
+          publish from Menu imports.
+        </p>
+      </details>
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={() => void toggle()}
@@ -52,11 +57,11 @@ export function VendorAutoPublishToggle({
             on ? "bg-emerald-600 text-white hover:bg-emerald-700" : "border border-stone-300 bg-white text-stone-800"
           } disabled:opacity-50`}
         >
-          {loading ? "Saving…" : on ? "Auto-publish: ON" : "Auto-publish: OFF (review first)"}
+          {loading ? "Saving…" : on ? "Auto-publish on" : "Auto-publish off"}
         </button>
       </div>
       {error && (
-        <p className="mt-2 text-sm text-red-700" role="alert">
+        <p className="text-sm text-red-700" role="alert">
           {error}
         </p>
       )}

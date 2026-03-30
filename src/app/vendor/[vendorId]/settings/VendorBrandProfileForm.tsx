@@ -72,7 +72,7 @@ export function VendorBrandProfileForm({
         <label htmlFor="brand-description" className="block text-sm font-medium text-stone-800">
           Description
         </label>
-        <p className="mt-0.5 text-xs text-stone-500">Shown on your pod listing and customer menu. Optional.</p>
+        <p className="mt-0.5 text-xs text-stone-500">Optional. Shown on the pod and your menu.</p>
         <textarea
           id="brand-description"
           value={description}
@@ -117,9 +117,7 @@ export function VendorBrandProfileForm({
           />
           Use custom accent color
         </label>
-        <p className="mt-1 text-xs text-stone-500">
-          Subtle borders and highlights on your pod card and customer menu — not a full theme.
-        </p>
+        <p className="mt-1 text-xs text-stone-500">Highlights on your pod card and menu.</p>
         {useAccent && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <input

@@ -64,21 +64,22 @@ export function VendorPodRequests({
   }
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">
-        Pending pod requests
-      </h2>
-      <p className="mt-1 text-sm text-stone-600">
-        A pod has requested your location to join. Accept to join that pod; your menu will appear there. Declining does not change your current pod.
-      </p>
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-lg font-semibold text-stone-900">Pod invitations</h3>
+        <p className="mt-1 text-sm text-stone-500">
+          Accept or decline join requests. Your menu appears on the pod when you accept.
+        </p>
+      </div>
+      <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
       {requests.length === 0 ? (
-        <p className="mt-3 text-sm text-stone-500">No pending pod requests.</p>
+        <p className="text-sm text-stone-500">None pending.</p>
       ) : (
         <>
       {error && (
-        <p className="mt-2 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       )}
-      <ul className="mt-3 space-y-3">
+      <ul className="space-y-3">
         {requests.map((r) => {
           const isCurrentPod = currentPod && currentPod.id === r.podId;
           const isOtherPod = currentPod && currentPod.id !== r.podId;
@@ -137,6 +138,7 @@ export function VendorPodRequests({
       </ul>
         </>
       )}
+      </div>
     </section>
   );
 }
