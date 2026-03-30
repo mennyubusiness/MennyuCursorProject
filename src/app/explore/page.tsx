@@ -21,6 +21,8 @@ export default async function ExplorePage() {
           id: p.id,
           name: p.name,
           description: p.description,
+          imageUrl: p.imageUrl,
+          accentColor: p.accentColor,
           vendors: p.vendors,
         }))}
       />

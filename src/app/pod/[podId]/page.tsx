@@ -25,7 +25,7 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
             },
           },
         },
-        orderBy: { sortOrder: "asc" },
+        orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
       },
     },
   });
@@ -35,9 +35,19 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
 
   return (
     <div className="space-y-10">
-      <header className="border-b border-stone-200 pb-8">
+      <header
+        className="border-b border-stone-200 pb-8"
+        style={
+          pod.accentColor
+            ? { borderBottomWidth: 2, borderBottomColor: pod.accentColor }
+            : undefined
+        }
+      >
         <PodLogo imageUrl={pod.imageUrl} podName={pod.name} />
-        <p className="mt-6 text-xs font-semibold uppercase tracking-wide text-stone-500">
+        <p
+          className="mt-6 text-xs font-semibold uppercase tracking-wide text-stone-500"
+          style={pod.accentColor ? { color: pod.accentColor } : undefined}
+        >
           Food pod
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
@@ -120,6 +130,22 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-lg font-semibold text-stone-900">{pv.vendor.name}</h3>
+                        {pv.isFeatured && (
+                          <span
+                            className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-xs font-medium text-stone-800"
+                            style={
+                              pod.accentColor
+                                ? {
+                                    borderColor: pod.accentColor,
+                                    color: pod.accentColor,
+                                    backgroundColor: "transparent",
+                                  }
+                                : undefined
+                            }
+                          >
+                            Featured
+                          </span>
+                        )}
                         {!unavailable ? (
                           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900">
                             Open

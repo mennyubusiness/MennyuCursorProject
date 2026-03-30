@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useState, useMemo } from "react";
+import { PodLogo } from "@/components/images/PodLogo";
 
 type PodForList = {
   id: string;
   name: string;
   description: string | null;
+  imageUrl: string | null;
+  accentColor: string | null;
   vendors: { vendor: unknown }[];
 };
 
@@ -47,15 +50,35 @@ export function ExplorePodList({ pods }: { pods: PodForList[] }) {
             <Link
               key={pod.id}
               href={`/pod/${pod.id}`}
-              className="block rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-mennyu-primary/30 hover:shadow-md"
+              className="flex gap-4 rounded-xl border border-stone-200 bg-white p-4 shadow-sm transition hover:border-mennyu-primary/30 hover:shadow-md sm:p-5"
+              style={
+                pod.accentColor
+                  ? {
+                      borderLeftWidth: 4,
+                      borderLeftStyle: "solid",
+                      borderLeftColor: pod.accentColor,
+                    }
+                  : undefined
+              }
             >
-              <h2 className="font-semibold text-stone-900">{pod.name}</h2>
-              {pod.description && (
-                <p className="mt-1 text-sm text-stone-600">{pod.description}</p>
-              )}
-              <p className="mt-2 text-sm text-mennyu-primary">
-                {pod.vendors.length} vendor{pod.vendors.length !== 1 ? "s" : ""}
-              </p>
+              <PodLogo
+                imageUrl={pod.imageUrl}
+                podName={pod.name}
+                className="h-14 w-14 shrink-0 sm:h-16 sm:w-16"
+                sizes="64px"
+              />
+              <div className="min-w-0 flex-1">
+                <h2 className="font-semibold text-stone-900">{pod.name}</h2>
+                {pod.description && (
+                  <p className="mt-1 line-clamp-2 text-sm text-stone-600">{pod.description}</p>
+                )}
+                <p
+                  className="mt-2 text-sm font-medium text-mennyu-primary"
+                  style={pod.accentColor ? { color: pod.accentColor } : undefined}
+                >
+                  {pod.vendors.length} vendor{pod.vendors.length !== 1 ? "s" : ""}
+                </p>
+              </div>
             </Link>
           ))}
         </div>

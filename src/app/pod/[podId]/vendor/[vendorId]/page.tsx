@@ -111,7 +111,10 @@ export default async function VendorMenuPage({
   const { podId, vendorId } = await params;
   const pod = await prisma.pod.findUnique({
     where: { id: podId },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      accentColor: true,
       vendors: {
         where: { vendorId },
         include: {
@@ -138,10 +141,22 @@ export default async function VendorMenuPage({
 
   return (
     <div>
-      <nav className="mb-8 text-xs text-stone-500" aria-label="Breadcrumb">
+      <nav
+        className="mb-8 border-b border-stone-100 pb-3 text-xs text-stone-500"
+        aria-label="Breadcrumb"
+        style={
+          pod.accentColor
+            ? { borderBottomColor: pod.accentColor, borderBottomWidth: 1 }
+            : undefined
+        }
+      >
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
-            <Link href={`/pod/${podId}`} className="hover:text-mennyu-primary">
+            <Link
+              href={`/pod/${podId}`}
+              className="font-medium hover:underline"
+              style={pod.accentColor ? { color: pod.accentColor } : undefined}
+            >
               {pod.name}
             </Link>
           </li>

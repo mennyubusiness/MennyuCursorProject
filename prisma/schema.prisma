@@ -14,6 +14,8 @@ model Pod {
   slug               String                 @unique
   description        String?
   imageUrl           String?
+  /// Customer-facing accent, e.g. #1d4ed8 — validated app-side; null = default Mennyu styling.
+  accentColor        String?
   address            String?
   latitude           Float?
   longitude          Float?
@@ -31,11 +33,13 @@ model Pod {
 }
 
 model PodVendor {
-  id        String   @id @default(cuid())
-  podId     String
-  vendorId  String
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
+  id         String   @id @default(cuid())
+  podId      String
+  vendorId   String
+  sortOrder  Int      @default(0)
+  /// Presentation: featured vendors sort before others (then by sortOrder).
+  isFeatured Boolean  @default(false)
+  isActive   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   pod       Pod      @relation(fields: [podId], references: [id], onDelete: Cascade)

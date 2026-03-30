@@ -26,7 +26,7 @@ export default async function PodDashboardPage({
             },
           },
         },
-        orderBy: { sortOrder: "asc" },
+        orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
       },
     },
   });
