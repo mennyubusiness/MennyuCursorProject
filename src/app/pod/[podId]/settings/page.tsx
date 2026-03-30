@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import Link from "next/link";
 import { PodBrandProfileForm } from "./PodBrandProfileForm";
-import { PodVendorPresentationForm } from "./PodVendorPresentationForm";
 
 export default async function PodSettingsPage({
   params,
@@ -19,28 +19,20 @@ export default async function PodSettingsPage({
       description: true,
       imageUrl: true,
       accentColor: true,
-      vendors: {
-        include: {
-          vendor: { select: { id: true, name: true } },
-        },
-        orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
-      },
     },
   });
   if (!pod) notFound();
-
-  const presentationRows = pod.vendors.map((pv) => ({
-    vendorId: pv.vendorId,
-    vendorName: pv.vendor.name,
-    isFeatured: pv.isFeatured,
-  }));
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
       <div>
         <h1 className="text-xl font-semibold text-stone-900">Settings</h1>
         <p className="mt-1 text-sm text-stone-600">
-          How this pod looks to customers and how vendors are ordered on the pod page.
+          How this pod looks to customers. Manage vendor order and featured flags on{" "}
+          <Link href={`/pod/${pod.id}/dashboard`} className="font-medium text-stone-900 underline">
+            Overview
+          </Link>
+          .
         </p>
       </div>
 
@@ -63,17 +55,6 @@ export default async function PodSettingsPage({
         </div>
       </section>
 
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Presentation</h2>
-        <p className="mt-1 text-sm text-stone-600">Vendor order and featured flags — display only, not permissions.</p>
-        <div className="mt-4">
-          <PodVendorPresentationForm
-            key={presentationRows.map((r) => `${r.vendorId}:${r.isFeatured ? 1 : 0}`).join(">")}
-            podId={pod.id}
-            initialRows={presentationRows}
-          />
-        </div>
-      </section>
     </div>
   );
 }

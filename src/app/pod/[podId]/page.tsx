@@ -25,7 +25,7 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
             },
           },
         },
-        orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
+        orderBy: [{ sortOrder: "asc" }, { vendorId: "asc" }],
       },
     },
   });

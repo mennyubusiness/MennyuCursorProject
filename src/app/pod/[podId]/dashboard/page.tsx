@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { PodDashboardVendors } from "./PodDashboardVendors";
 import { PodDashboardAddVendor } from "./PodDashboardAddVendor";
 import { PodDashboardPendingRequests } from "./PodDashboardPendingRequests";
+import { PodVendorRosterPanel } from "./PodVendorRosterPanel";
 
 export default async function PodDashboardPage({
   params,
@@ -21,21 +21,20 @@ export default async function PodDashboardPage({
               id: true,
               name: true,
               slug: true,
+              description: true,
+              imageUrl: true,
               isActive: true,
               mennyuOrdersPaused: true,
             },
           },
         },
-        orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
+        orderBy: [{ sortOrder: "asc" }, { vendorId: "asc" }],
       },
     },
   });
   if (!pod) notFound();
 
   const vendorIdsInPod = pod.vendors.map((pv) => pv.vendor.id);
-  const activeOnMennyuCount = pod.vendors.filter(
-    (pv) => !(pv.vendor.mennyuOrdersPaused ?? false)
-  ).length;
   const [vendorsNotInPod, pendingRequests] = await Promise.all([
     prisma.vendor.findMany({
       where: { id: { notIn: vendorIdsInPod } },
@@ -44,71 +43,61 @@ export default async function PodDashboardPage({
     }),
     prisma.podMembershipRequest.findMany({
       where: { podId, status: "pending" },
-      include: { vendor: { select: { id: true, name: true } } },
+      include: {
+        vendor: {
+          select: { id: true, name: true, description: true, imageUrl: true },
+        },
+      },
       orderBy: { createdAt: "desc" },
     }),
   ]);
 
+  const rosterRows = pod.vendors.map((pv) => ({
+    vendorId: pv.vendor.id,
+    name: pv.vendor.name,
+    description: pv.vendor.description,
+    imageUrl: pv.vendor.imageUrl,
+    isFeatured: pv.isFeatured,
+    isActive: pv.vendor.isActive,
+    mennyuOrdersPaused: pv.vendor.mennyuOrdersPaused ?? false,
+  }));
+
+  const pendingForUi = pendingRequests.map((r) => ({
+    id: r.id,
+    vendorId: r.vendor.id,
+    vendorName: r.vendor.name,
+    vendorDescription: r.vendor.description,
+    vendorImageUrl: r.vendor.imageUrl,
+    createdAt: r.createdAt.toISOString(),
+  }));
+
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
-      {/* Vendor summary overview */}
-      <section className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">
-          Vendor Summary
-        </h2>
+      <div>
+        <h1 className="text-xl font-semibold text-stone-900">Overview</h1>
+        <p className="mt-1 text-sm text-stone-600">
+          Pending invitations and your vendor roster — order and featured flags update the public pod page.
+        </p>
+      </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-stone-200 bg-white p-3">
-            <p className="text-xs font-medium text-stone-500">Vendors in pod</p>
-            <p className="mt-1 text-xl font-semibold text-stone-900">{pod.vendors.length}</p>
-          </div>
-          <div className="rounded-lg border border-stone-200 bg-white p-3">
-            <p className="text-xs font-medium text-stone-500">Pending requests</p>
-            <p className="mt-1 text-xl font-semibold text-stone-900">{pendingRequests.length}</p>
-          </div>
-          <div className="rounded-lg border border-stone-200 bg-white p-3">
-            <p className="text-xs font-medium text-stone-500">Active on Mennyu</p>
-            <p className="mt-1 text-xl font-semibold text-stone-900">{activeOnMennyuCount}</p>
-          </div>
-        </div>
+      <PodDashboardPendingRequests podId={pod.id} requests={pendingForUi} />
 
-        <h3 className="mt-5 mb-3 text-sm font-medium text-stone-800">Vendors in this pod</h3>
-        {pod.vendors.length === 0 ? (
-          <p className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-500">
-            No vendors in this pod yet. Request a vendor to join below.
-          </p>
-        ) : (
-          <PodDashboardVendors
-            podId={pod.id}
-            vendors={pod.vendors.map((pv) => ({
-              id: pv.vendor.id,
-              name: pv.vendor.name,
-              slug: pv.vendor.slug,
-              isActive: pv.vendor.isActive,
-              mennyuOrdersPaused: pv.vendor.mennyuOrdersPaused ?? false,
-            }))}
-          />
-        )}
+      <section>
+        <h2 className="mb-3 text-base font-semibold text-stone-900">Vendor roster</h2>
+        <p className="mb-3 text-sm text-stone-600">
+          Drag to reorder. Featured shows a badge only — it does not change sort order.
+        </p>
+        <PodVendorRosterPanel podId={pod.id} initialRows={rosterRows} />
       </section>
 
-      {/* Pending vendor requests */}
-      <PodDashboardPendingRequests
-        podId={pod.id}
-        requests={pendingRequests.map((r) => ({
-          id: r.id,
-          vendorName: r.vendor.name,
-          createdAt: r.createdAt.toISOString(),
-        }))}
-      />
-
-      {/* Request vendor to join */}
       <section>
         <h2 className="mb-3 font-medium text-stone-800">Request vendor to join</h2>
         <p className="mb-2 text-sm text-stone-600">
-          The vendor must approve. If they are in another pod, accepting will move them to this pod.
+          The vendor must approve, or you can accept a pending request above. If they are in another pod,
+          accepting moves them here.
         </p>
         {vendorsNotInPod.length === 0 ? (
-          <p className="text-sm text-stone-500">All vendors are already in this pod.</p>
+          <p className="text-sm text-stone-500">All vendors are already in this pod or have pending requests.</p>
         ) : (
           <PodDashboardAddVendor
             podId={pod.id}

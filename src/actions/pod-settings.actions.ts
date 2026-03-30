@@ -86,8 +86,8 @@ export type PodVendorPresentationRow = {
 };
 
 /**
- * Rows are top-to-bottom display order. Featured vendors are shown first on the customer pod page,
- * in this order among featured, then non-featured in this order among non-featured.
+ * Rows are top-to-bottom customer display order. sortOrder is set to 0..n-1 in that order.
+ * isFeatured is independent (badge only; does not change ordering).
  */
 export async function updatePodVendorPresentation(
   podId: string,
@@ -116,26 +116,18 @@ export async function updatePodVendorPresentation(
     seen.add(r.vendorId);
   }
 
-  const featured = rows.filter((r) => r.isFeatured);
-  const other = rows.filter((r) => !r.isFeatured);
-
-  await prisma.$transaction([
-    ...featured.map((r, i) =>
+  await prisma.$transaction(
+    rows.map((r, index) =>
       prisma.podVendor.update({
         where: { podId_vendorId: { podId: id, vendorId: r.vendorId } },
-        data: { isFeatured: true, sortOrder: i },
+        data: { isFeatured: r.isFeatured, sortOrder: index },
       })
-    ),
-    ...other.map((r, i) =>
-      prisma.podVendor.update({
-        where: { podId_vendorId: { podId: id, vendorId: r.vendorId } },
-        data: { isFeatured: false, sortOrder: i },
-      })
-    ),
-  ]);
+    )
+  );
 
   revalidatePath(`/pod/${id}`);
   revalidatePath(`/pod/${id}/settings`);
+  revalidatePath(`/pod/${id}/dashboard`);
   for (const r of rows) {
     revalidatePath(`/pod/${id}/vendor/${r.vendorId}`);
   }
