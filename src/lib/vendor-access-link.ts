@@ -87,7 +87,7 @@ export function verifyVendorAccessLinkToken(token: string): VendorAccessLinkPayl
 /** Only allow redirects under this vendor's dashboard path. */
 export function safeVendorDashboardRedirectPath(vendorId: string, path: string | null | undefined): string {
   const base = `/vendor/${vendorId}`;
-  const fallback = `${base}/menu-imports`;
+  const fallback = `${base}/menu`;
   if (!path || typeof path !== "string") return fallback;
   const trimmed = path.trim();
   if (!trimmed.startsWith("/")) return fallback;

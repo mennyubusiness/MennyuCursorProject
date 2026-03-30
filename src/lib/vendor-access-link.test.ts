@@ -5,11 +5,11 @@ describe("vendor-access-link", () => {
   it("round-trips and expires", () => {
     const t = signVendorAccessLinkToken("vendor_1", {
       expiresInSec: 3600,
-      redirectPath: "/vendor/vendor_1/menu-imports",
+      redirectPath: "/vendor/vendor_1/menu",
     });
     const p = verifyVendorAccessLinkToken(t);
     expect(p.vendorId).toBe("vendor_1");
-    expect(p.redirectPath).toBe("/vendor/vendor_1/menu-imports");
+    expect(p.redirectPath).toBe("/vendor/vendor_1/menu");
   });
 
   it("rejects tampered token", () => {
@@ -19,8 +19,8 @@ describe("vendor-access-link", () => {
   });
 
   it("safeVendorDashboardRedirectPath blocks open redirects", () => {
-    expect(safeVendorDashboardRedirectPath("v1", "/vendor/v2/menu-imports")).toMatch(/\/vendor\/v1\/menu-imports/);
-    expect(safeVendorDashboardRedirectPath("v1", "https://evil.com")).toMatch(/\/vendor\/v1\/menu-imports/);
+    expect(safeVendorDashboardRedirectPath("v1", "/vendor/v2/menu")).toMatch(/\/vendor\/v1\/menu$/);
+    expect(safeVendorDashboardRedirectPath("v1", "https://evil.com")).toMatch(/\/vendor\/v1\/menu$/);
     expect(safeVendorDashboardRedirectPath("v1", "/vendor/v1/orders")).toBe("/vendor/v1/orders");
   });
 });

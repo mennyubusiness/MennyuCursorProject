@@ -1,6 +1,7 @@
 /**
  * POST: Publish draft menu for this vendor only. Requires vendor dashboard token (cookie or Bearer) in production.
  */
+import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
@@ -60,6 +61,8 @@ export async function POST(
       jobId: job.id,
       publishedBy,
     });
+    revalidatePath(`/vendor/${vendor.id}/menu`);
+    revalidatePath(`/vendor/${vendor.id}/menu-imports`);
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof MenuPublishValidationError) {

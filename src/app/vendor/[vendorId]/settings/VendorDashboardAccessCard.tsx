@@ -16,7 +16,7 @@ export function VendorDashboardAccessCard({
         <Link href={`/login?intent=vendor&callbackUrl=${encodeURIComponent(`/vendor/${vendorId}`)}`} className="font-medium text-sky-800 underline">
           Sign in to this dashboard
         </Link>
-        . After you&apos;re signed in, you can use orders, menu imports, and settings here.
+        . After you&apos;re signed in, you can use orders, your current menu, and settings here.
       </p>
       <p className="mt-3 text-sm text-stone-600">
         Your administrator can also send a <strong>one-time secure link</strong> that opens this dashboard on your
@@ -30,10 +30,10 @@ export function VendorDashboardAccessCard({
       ) : (
         <p className="mt-3 text-sm text-stone-600">
           After you&apos;re signed in, open{" "}
-          <Link href={`/vendor/${vendorId}/menu-imports`} className="font-medium text-sky-800 underline">
-            Menu imports
+          <Link href={`/vendor/${vendorId}/menu`} className="font-medium text-sky-800 underline">
+            Menu
           </Link>{" "}
-          or other tools from the nav.
+          for your live items, or use <strong>View import history</strong> on that page when you need imports.
         </p>
       )}
     </section>

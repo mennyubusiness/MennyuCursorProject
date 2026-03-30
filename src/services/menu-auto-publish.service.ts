@@ -3,6 +3,7 @@
  * and the same eligibility rules as manual publish are satisfied.
  */
 import "server-only";
+import { revalidatePath } from "next/cache";
 import type { PrismaClient } from "@prisma/client";
 import {
   MenuImportJobStatus,
@@ -94,6 +95,8 @@ export async function tryAutoPublishMenuImportJob(
       jobId: job.id,
       publishedBy: "auto:deliverect_menu_webhook",
     });
+    revalidatePath(`/vendor/${job.vendorId}/menu`);
+    revalidatePath(`/vendor/${job.vendorId}/menu-imports`);
     return { didPublish: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -58,7 +58,7 @@ export async function POST(
   try {
     signed = signVendorAccessLinkToken(id, {
       expiresInSec: body.expiresInSec ?? undefined,
-      redirectPath: body.redirectPath ?? `/vendor/${id}/menu-imports`,
+      redirectPath: body.redirectPath ?? `/vendor/${id}/menu`,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

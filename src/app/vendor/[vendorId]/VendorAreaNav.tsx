@@ -6,10 +6,21 @@ import { signOut, useSession } from "next-auth/react";
 
 const NAV_LINKS = [
   { href: "orders", label: "Orders" },
-  { href: "menu-imports", label: "Menu imports" },
+  { href: "menu", label: "Menu" },
   { href: "analytics", label: "Analytics" },
   { href: "settings", label: "Settings" },
 ] as const;
+
+function navLinkIsActive(pathname: string, base: string, href: string): boolean {
+  const path = `${base}/${href}`;
+  if (href === "orders") {
+    return pathname === path || pathname === base;
+  }
+  if (href === "menu") {
+    return pathname === path;
+  }
+  return pathname === path;
+}
 
 export function VendorAreaNav({ vendorId }: { vendorId: string }) {
   const pathname = usePathname();
@@ -22,7 +33,7 @@ export function VendorAreaNav({ vendorId }: { vendorId: string }) {
         <div className="flex flex-wrap gap-1">
         {NAV_LINKS.map(({ href, label }) => {
           const path = `${base}/${href}`;
-          const isActive = pathname === path || (href === "orders" && pathname === base);
+          const isActive = navLinkIsActive(pathname, base, href);
           return (
             <Link
               key={href}

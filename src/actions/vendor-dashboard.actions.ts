@@ -31,6 +31,7 @@ export async function bindVendorDashboardSession(
 
   revalidatePath(`/vendor/${vendorId}`);
   revalidatePath(`/vendor/${vendorId}/settings`);
+  revalidatePath(`/vendor/${vendorId}/menu`);
   revalidatePath(`/vendor/${vendorId}/menu-imports`);
   return { ok: true };
 }
