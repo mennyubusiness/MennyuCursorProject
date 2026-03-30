@@ -2,6 +2,10 @@
  * Transform Mennyu VendorOrder (hydrated) into Deliverect request payload.
  * Maps line items, modifier selections (including nested), item/order notes, and prices.
  * No live API calls; output is ready for future submission.
+ *
+ * **Money scope:** Line item `price` fields are menu/modifier unit prices only. Order-level
+ * `payment.amount` and tax fields must follow {@link deliverectRestaurantFacingPaymentCents} —
+ * never include Mennyu’s 3.5% platform service fee (see `deliverect-financial-scope.ts`).
  */
 import type {
   DeliverectOrderRequest,
@@ -9,6 +13,7 @@ import type {
   DeliverectModifier,
 } from "./payloads";
 import type { HydratedVendorOrder } from "./load";
+import { deliverectRestaurantFacingPaymentCents } from "./deliverect-financial-scope";
 
 export interface TransformInput {
   /** Fully loaded VendorOrder from getVendorOrderForDeliverect. */
@@ -170,16 +175,25 @@ export function mennyuVendorOrderToDeliverectPayload(input: TransformInput): Del
   }
 
   const taxCents = Math.max(0, Math.round(vendorOrder.taxCents));
-  const totalCents = Math.max(0, Math.round(vendorOrder.totalCents));
   payload.taxTotal = taxCents;
   payload.taxes = [{ taxClassId: 0, name: "Tax", total: taxCents }];
+
+  /**
+   * Prepaid amount for Deliverect: food + restaurant tax + tip for this vendor.
+   * Do NOT use `vendorOrder.totalCents` — it includes `serviceFeeCents` (Mennyu 3.5% platform fee).
+   */
+  const restaurantFacingPaymentCents = deliverectRestaurantFacingPaymentCents({
+    subtotalCents: Math.max(0, Math.round(vendorOrder.subtotalCents)),
+    taxCents,
+    tipCents: Math.max(0, Math.round(vendorOrder.tipCents)),
+  });
 
   /** Stripe checkout completed → treat as pre-paid online in Deliverect. */
   const isStripePaid = Boolean(vendorOrder.order.stripePaymentIntentId);
   payload.decimalDigits = 2;
   payload.orderIsAlreadyPaid = isStripePaid;
   payload.payment = {
-    amount: totalCents,
+    amount: restaurantFacingPaymentCents,
     type: isStripePaid ? 0 : 1,
   };
 

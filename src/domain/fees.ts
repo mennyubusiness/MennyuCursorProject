@@ -1,6 +1,9 @@
 /**
  * Fee and allocation logic: service fee 3.5%, commission 2.75%, tip pro-rata.
  * All amounts in cents.
+ *
+ * The 3.5% service fee is stored on `VendorOrder.serviceFeeCents` and in parent totals for Stripe.
+ * It is **not** sent to Deliverect — see `integrations/deliverect/deliverect-financial-scope.ts`.
  */
 
 import {

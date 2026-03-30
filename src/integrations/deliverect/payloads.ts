@@ -42,15 +42,18 @@ export interface DeliverectOrderRequest {
     email?: string;
     name?: string;
   };
-  /** Total tax in minor units (vendor-order tax allocation). */
+  /** Total tax in minor units — restaurant-facing tax allocation only (no Mennyu platform fee). */
   taxTotal?: number;
-  /** Tax-exclusive: required line items; one entry minimum (total may be 0). */
+  /** Tax lines; totals should match restaurant tax only. */
   taxes?: Array<{ taxClassId: number; name: string; total: number }>;
   /** Minor units per major currency unit (e.g. 2 for cents). */
   decimalDigits?: number;
   /** When true, order is pre-paid online (Deliverect shows paid). */
   orderIsAlreadyPaid?: boolean;
-  /** Total in minor units; type 0 = card/online paid, 1 = cash / pay at pickup. */
+  /**
+   * Prepaid amount in minor units — **restaurant-facing** total (subtotal + tax + tip for this vendor).
+   * Must NOT include Mennyu’s platform service fee. Type 0 = card/online paid, 1 = cash / pay at pickup.
+   */
   payment?: { amount: number; type: number };
 }
 

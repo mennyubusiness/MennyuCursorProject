@@ -6,6 +6,9 @@ import type { HydratedVendorOrder } from "./load";
 function minimalVendorOrder(overrides?: Partial<NonNullable<HydratedVendorOrder>>): NonNullable<HydratedVendorOrder> {
   return {
     id: "vo_cert_test",
+    subtotalCents: 1000,
+    tipCents: 0,
+    serviceFeeCents: 0,
     taxCents: 50,
     totalCents: 1050,
     lineItems: [
@@ -109,5 +112,22 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     });
     expect(payload.pickupTime).toBe("2026-12-24T20:00:00Z");
     expect(payload.isASAP).toBe(false);
+  });
+
+  it("payment.amount excludes Mennyu platform service fee — restaurant-facing total only", () => {
+    const payload = mennyuVendorOrderToDeliverectPayload({
+      vendorOrder: minimalVendorOrder({
+        subtotalCents: 10_000,
+        taxCents: 80,
+        tipCents: 500,
+        serviceFeeCents: 350,
+        totalCents: 10_000 + 80 + 500 + 350,
+      }),
+      channelLinkId: "ch-link-cert",
+    });
+
+    expect(payload.payment?.amount).toBe(10_000 + 80 + 500);
+    expect(payload.payment?.amount).not.toBe(10_000 + 80 + 500 + 350);
+    expect(payload.taxTotal).toBe(80);
   });
 });

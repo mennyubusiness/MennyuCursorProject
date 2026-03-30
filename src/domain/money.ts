@@ -36,7 +36,11 @@ export function platformCommissionFromSubtotalCents(subtotalCents: number): numb
   return roundCents(subtotalCents * 0.0275);
 }
 
-/** MVP: 0% tax. Design for location-based tax later. */
+/**
+ * MVP: returns 0 — no automatic tax. Pickup-only; real product/jurisdiction tax belongs in a
+ * dedicated tax engine later. Allocated `taxCents` on orders is still passed through to Deliverect
+ * as restaurant-facing tax only (never mixed with the Mennyu platform fee).
+ */
 export function taxFromSubtotalCents(_subtotalCents: number, _location?: unknown): number {
   return 0;
 }
