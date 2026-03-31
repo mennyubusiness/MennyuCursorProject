@@ -184,6 +184,10 @@ export interface PaymentAllocation {
   taxCents: number;
   serviceFeeCents: number;
   totalCents: number;
+  /** Snapshot at payment: subtotal + tax + tip (excludes Mennyu service fee). */
+  grossVendorPayableCents?: number;
+  allocatedProcessingFeeCents?: number;
+  netVendorTransferCents?: number;
 }
 
 // ---- Status history ----

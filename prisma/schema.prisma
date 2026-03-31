@@ -500,16 +500,18 @@ model OrderLineItemSelection {
 }
 
 model Payment {
-  id                    String              @id @default(cuid())
-  orderId               String
-  stripePaymentIntentId String              @unique
-  amountCents           Int
-  status                PaymentStatus
-  idempotencyKey        String?             @unique
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  order                 Order               @relation(fields: [orderId], references: [id])
-  allocations           PaymentAllocation[]
+  id                        String              @id @default(cuid())
+  orderId                   String
+  stripePaymentIntentId     String              @unique
+  amountCents               Int
+  status                    PaymentStatus
+  idempotencyKey            String?             @unique
+  /// Stripe balance_transaction.fee for this charge (cents). Null = legacy / dev bypass / unavailable.
+  stripeProcessingFeeCents  Int?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  order                    Order               @relation(fields: [orderId], references: [id])
+  allocations              PaymentAllocation[]
 }
 
 model RefundAttempt {
@@ -535,17 +537,23 @@ model RefundAttempt {
 }
 
 model PaymentAllocation {
-  id              String      @id @default(cuid())
-  paymentId       String
-  vendorOrderId   String
-  subtotalCents   Int
-  tipCents        Int         @default(0)
-  taxCents        Int         @default(0)
-  serviceFeeCents Int         @default(0)
-  totalCents      Int
-  createdAt       DateTime    @default(now())
-  payment         Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  vendorOrder     VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+  id                          String      @id @default(cuid())
+  paymentId                   String
+  vendorOrderId               String
+  subtotalCents               Int
+  tipCents                    Int         @default(0)
+  taxCents                    Int         @default(0)
+  serviceFeeCents             Int         @default(0)
+  totalCents                  Int
+  /// Immutable snapshot: subtotal + tax + tip (restaurant-facing; excludes Mennyu service fee).
+  grossVendorPayableCents     Int
+  /// This vendor's share of Payment.stripeProcessingFeeCents (largest-remainder split).
+  allocatedProcessingFeeCents Int         @default(0)
+  /// max(0, grossVendorPayableCents - allocatedProcessingFeeCents). Basis for future Connect transfers.
+  netVendorTransferCents      Int
+  createdAt                   DateTime    @default(now())
+  payment                     Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  vendorOrder                 VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
 
   @@unique([paymentId, vendorOrderId])
   @@index([paymentId])

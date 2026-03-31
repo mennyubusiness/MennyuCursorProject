@@ -1,10 +1,19 @@
 /**
  * Stripe payment: create PaymentIntent, confirm; create Payment + PaymentAllocation records.
- * Idempotency by idempotencyKey.
+ * Idempotency by idempotencyKey; payout snapshots (gross / allocated processing fee / net) at payment time.
+ *
+ * TODO(refund-payout): Do not recompute these snapshots on refund — later pass for reconciliation.
  */
+import { addCents } from "@/domain/money";
+import { computeVendorOrderPayoutSnapshots } from "@/domain/stripe-fee-allocation";
 import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 import { buildIdempotencyKey } from "@/lib/idempotency";
+import { assertPaymentPayoutSnapshotMatchesLiveFee } from "@/domain/payment-payout-snapshot";
+import {
+  fetchStripeProcessingFeeCents,
+  isDevBypassStripePaymentIntentId,
+} from "@/services/stripe-processing-fee.service";
 
 /** Development-only: bypass real Stripe when key is missing or placeholder. Not used in production. */
 function isDevPaymentBypass(): boolean {
@@ -42,12 +51,15 @@ export async function createPaymentIntent(
     return { clientSecret: secret, paymentIntentId: pi.id };
   }
 
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: totalCents,
-    currency: "usd",
-    automatic_payment_methods: { enabled: true },
-    metadata: { orderId },
-  }, { idempotencyKey: key });
+  const paymentIntent = await stripe.paymentIntents.create(
+    {
+      amount: totalCents,
+      currency: "usd",
+      automatic_payment_methods: { enabled: true },
+      metadata: { orderId },
+    },
+    { idempotencyKey: key }
+  );
 
   await prisma.order.update({
     where: { id: orderId },
@@ -82,16 +94,42 @@ export async function getResumePaymentPayloadForCustomer(params: {
   return { clientSecret, paymentIntentId, totalCents: order.totalCents };
 }
 
+async function verifyExistingPaymentSnapshots(
+  payment: {
+    id: string;
+    stripeProcessingFeeCents: number | null;
+    allocations: { allocatedProcessingFeeCents: number }[];
+  },
+  stripePaymentIntentId: string
+): Promise<void> {
+  const liveFee = await fetchStripeProcessingFeeCents(stripePaymentIntentId);
+  assertPaymentPayoutSnapshotMatchesLiveFee(payment, liveFee);
+}
+
 export async function recordPaymentAndAllocations(
   orderId: string,
   stripePaymentIntentId: string,
   idempotencyKey: string
 ): Promise<{ created: boolean }> {
   const key = buildIdempotencyKey("payment", idempotencyKey);
-  const existing = await prisma.payment.findUnique({
+
+  const existingByKey = await prisma.payment.findUnique({
     where: { idempotencyKey: key },
+    include: { allocations: true },
   });
-  if (existing) return { created: false };
+  if (existingByKey) {
+    await verifyExistingPaymentSnapshots(existingByKey, stripePaymentIntentId);
+    return { created: false };
+  }
+
+  const existingByPi = await prisma.payment.findUnique({
+    where: { stripePaymentIntentId },
+    include: { allocations: true },
+  });
+  if (existingByPi) {
+    await verifyExistingPaymentSnapshots(existingByPi, stripePaymentIntentId);
+    return { created: false };
+  }
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -99,6 +137,42 @@ export async function recordPaymentAndAllocations(
   });
   if (!order) throw new Error("Order not found");
   if (order.status !== "pending_payment") return { created: false }; // already processed
+
+  const feeCents = await fetchStripeProcessingFeeCents(stripePaymentIntentId);
+  const production = process.env.NODE_ENV === "production";
+  if (
+    production &&
+    stripe &&
+    !isDevBypassStripePaymentIntentId(stripePaymentIntentId) &&
+    feeCents === null
+  ) {
+    throw new Error(
+      "STRIPE_PROCESSING_FEE_UNAVAILABLE: missing balance_transaction.fee for PaymentIntent in production"
+    );
+  }
+
+  const grosses = order.vendorOrders.map((vo) =>
+    addCents(vo.subtotalCents, vo.taxCents, vo.tipCents)
+  );
+  const feeToAllocate = feeCents ?? 0;
+  const {
+    allocatedProcessingFeeCents: allocatedCents,
+    netVendorTransferCents: nets,
+    zeroWeightWithPositiveFee,
+  } = computeVendorOrderPayoutSnapshots(grosses, feeCents);
+  if (zeroWeightWithPositiveFee) {
+    const msg =
+      "VENDOR_PAYABLE_WEIGHTS_ZERO: all grossVendorPayableCents are 0 but Stripe fee > 0; fix order line data";
+    console.error(`[payment] ${msg}`, { orderId, stripePaymentIntentId, feeToAllocate });
+    throw new Error(msg);
+  }
+
+  const sumAllocated = allocatedCents.reduce((a, b) => a + b, 0);
+  if (sumAllocated !== feeToAllocate) {
+    throw new Error(
+      `INTERNAL_ALLOCATION_SUM_MISMATCH: sum=${sumAllocated} feeToAllocate=${feeToAllocate}`
+    );
+  }
 
   const amountCents = order.totalCents;
   await prisma.$transaction(async (tx) => {
@@ -109,9 +183,11 @@ export async function recordPaymentAndAllocations(
         amountCents,
         status: "succeeded",
         idempotencyKey: key,
+        stripeProcessingFeeCents: feeCents,
       },
     });
-    for (const vo of order.vendorOrders) {
+    for (let i = 0; i < order.vendorOrders.length; i++) {
+      const vo = order.vendorOrders[i]!;
       await tx.paymentAllocation.create({
         data: {
           paymentId: payment.id,
@@ -121,6 +197,9 @@ export async function recordPaymentAndAllocations(
           taxCents: vo.taxCents,
           serviceFeeCents: vo.serviceFeeCents,
           totalCents: vo.totalCents,
+          grossVendorPayableCents: grosses[i]!,
+          allocatedProcessingFeeCents: allocatedCents[i]!,
+          netVendorTransferCents: nets[i] ?? 0,
         },
       });
     }
