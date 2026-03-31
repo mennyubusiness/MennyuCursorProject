@@ -11,6 +11,7 @@ import { getCustomerPhoneFromHeaders } from "@/lib/session";
 import { canCustomerCancelVendorOrder } from "@/lib/cancel-eligibility";
 import { getRefundDecision } from "@/lib/refund-decision";
 import { applyVendorOrderTransition } from "@/services/order-status.service";
+import { notifyDeliverectOfCustomerCancellation } from "@/services/deliverect-customer-cancel.service";
 import { executeRefund } from "@/services/refund.service";
 import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
 
@@ -94,6 +95,8 @@ export async function POST(
       { status: 400 }
     );
   }
+
+  await notifyDeliverectOfCustomerCancellation(vo.id);
 
   let refundResult: { success: boolean; code?: string; message?: string; amountCents?: number } | undefined;
   const orderForRefund = await prisma.order.findUnique({

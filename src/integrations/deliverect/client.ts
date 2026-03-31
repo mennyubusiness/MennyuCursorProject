@@ -229,9 +229,16 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
   }
 }
 
+/** URL for POST `{base}/orderStatus/{deliverectOrderId}` (status push / cancel uses code 110). */
+export function getDeliverectOrderStatusPushUrl(deliverectOrderId: string): string {
+  const base = BASE_URL.replace(/\/$/, "");
+  return `${base}/orderStatus/${encodeURIComponent(deliverectOrderId)}`;
+}
+
 /**
  * POST `{base}/orderStatus/{deliverectOrderId}` — push status into Deliverect (POS simulation).
  * Deliverect should emit webhooks; Mennyu does not mutate DB here.
+ * Customer cancel uses status **110** (CANCELLED) — see `payload-status-read.ts` (`CANCELLED: 110`).
  *
  * Auth: `DELIVERECT_API_KEY` as Bearer if set; otherwise OAuth via {@link getDeliverectAuthHeaders}.
  */
@@ -239,8 +246,7 @@ export async function postDeliverectOrderStatusUpdate(
   deliverectOrderId: string,
   status: number
 ): Promise<{ httpStatus: number; body: unknown }> {
-  const base = BASE_URL.replace(/\/$/, "");
-  const url = `${base}/orderStatus/${encodeURIComponent(deliverectOrderId)}`;
+  const url = getDeliverectOrderStatusPushUrl(deliverectOrderId);
 
   const apiKey = env.DELIVERECT_API_KEY?.trim();
   const authHeaders: Record<string, string> = apiKey
