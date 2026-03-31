@@ -1,2 +1,3 @@
 -- AlterTable
-ALTER TABLE "Vendor" ADD COLUMN "accentColor" TEXT;
+ALTER TABLE "Vendor" 
+ADD COLUMN IF NOT EXISTS "accentColor" TEXT;
