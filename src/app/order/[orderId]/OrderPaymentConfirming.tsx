@@ -2,11 +2,13 @@
 
 /**
  * Shown after Stripe redirect (?payment=success) when the order is still `pending_payment`
- * (reconcile lag, webhook race, or transient server error). Polls until backend catches up —
- * never mounts a second Stripe payment form.
+ * (reconcile lag, webhook race, or transient server error). Each tick retries redirect reconcile
+ * (same as a full page refresh) then reads order state — read-only GET polling can stay stale
+ * or miss the reconcile pass that fixes the order.
  */
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { pollOrderAfterPaymentAction } from "@/actions/order.actions";
 
 const POLL_MS = 2000;
 const MAX_MS = 180_000;
@@ -27,24 +29,34 @@ export function OrderPaymentConfirming({ orderId }: { orderId: string }) {
     async function pollOnce() {
       if (doneRef.current) return;
       try {
-        const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/status`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as { status?: string };
-        const s = data.status;
-        // TEMP DEBUG
-        console.info("[mennyu:post-payment-debug] poll /api/orders/.../status", { orderId, status: s });
+        const { reconcileResult, order } = await pollOrderAfterPaymentAction(orderId);
+        const s = order?.status;
+        const keepWaiting = !order || s === "pending_payment";
 
-        if (s && s !== "pending_payment") {
+        // TEMP DEBUG: remove after post-payment flow verification
+        console.info("[mennyu:post-payment-debug] poll tick decision", {
+          orderId,
+          reconciled: reconcileResult.reconciled,
+          reconcileError: reconcileResult.error,
+          rawStatus: s,
+          derivedStatus: order?.derivedStatus,
+          keepWaiting,
+          redirect: !keepWaiting,
+        });
+
+        if (!keepWaiting) {
           doneRef.current = true;
           if (intervalId) clearInterval(intervalId);
           router.replace(`/order/${orderId}`);
           router.refresh();
           return;
         }
-      } catch {
-        // ignore transient network errors
+      } catch (err) {
+        // TEMP DEBUG
+        console.info("[mennyu:post-payment-debug] pollOrderAfterPaymentAction failed", {
+          orderId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       if (Date.now() - startedAtRef.current > MAX_MS) {

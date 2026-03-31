@@ -17,6 +17,25 @@ export async function reconcilePaymentIfSucceededAction(orderId: string) {
 }
 
 /**
+ * Post-payment wait screen: retry redirect reconcile (idempotent) then read unified order state.
+ * Matches what a full page refresh does (server runs reconcile again); read-only polling alone
+ * does not, so it could stay stuck on pending_payment while refresh fixes the order.
+ */
+export async function pollOrderAfterPaymentAction(orderId: string) {
+  const reconcileResult = await reconcilePaymentFromRedirect(orderId);
+  const order = await getOrderWithUnifiedStatus(orderId);
+  // TEMP DEBUG: remove after post-payment flow verification
+  console.info("[mennyu:post-payment-debug] pollOrderAfterPaymentAction", {
+    orderId,
+    reconciled: reconcileResult.reconciled,
+    reconcileError: reconcileResult.error,
+    orderStatus: order?.status,
+    derivedStatus: order?.derivedStatus,
+  });
+  return { reconcileResult, order };
+}
+
+/**
  * Clear checkout cart snapshot and drop mennyu_checkout cookie after successful payment redirect.
  * Uses Order.sourceCartId (no fragile cookie cart id required).
  */
