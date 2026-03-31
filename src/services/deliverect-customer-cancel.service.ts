@@ -2,7 +2,8 @@
  * After Mennyu records a customer-initiated cancellation, notify Deliverect so POS can reflect it.
  * Local cancel + refund stay authoritative; this is best-effort outbound (logs on failure).
  *
- * Uses POST /orderStatus/{deliverectOrderId} with status 110 (CANCELLED), same as admin simulate.
+ * Outbound: POST /orderStatus/{deliverectOrderId} with **status 100** (channel-side cancel request per Deliverect).
+ * Inbound webhooks may still report finalized cancel as 110 — not changed in this module.
  */
 import { prisma } from "@/lib/db";
 import {
@@ -10,8 +11,8 @@ import {
   postDeliverectOrderStatusUpdate,
 } from "@/integrations/deliverect/client";
 
-/** Matches DELIVERECT_STATUS_NAME_TO_CODE CANCELLED / CANCELED in payload-status-read.ts */
-const DELIVERECT_CANCEL_STATUS_CODE = 110;
+/** Outbound customer-cancel status (channel cancel request). Distinct from inbound CANCELLED 110 in payload-status-read. */
+const DELIVERECT_CUSTOMER_CANCEL_OUTBOUND_STATUS = 100;
 
 function safeBodyForLog(body: unknown): string {
   try {
@@ -23,7 +24,7 @@ function safeBodyForLog(body: unknown): string {
 }
 
 /**
- * If this vendor order was sent to Deliverect (`deliverectOrderId` set), push cancel status 110.
+ * If this vendor order was sent to Deliverect (`deliverectOrderId` set), push outbound cancel status 100.
  * Call after `applyVendorOrderTransition(..., "cancelled", "customer")` succeeds.
  */
 export async function notifyDeliverectOfCustomerCancellation(vendorOrderId: string): Promise<void> {
@@ -76,21 +77,30 @@ export async function notifyDeliverectOfCustomerCancellation(vendorOrderId: stri
     channelLinkId,
     method: "POST",
     url,
-    body: { status: DELIVERECT_CANCEL_STATUS_CODE },
+    outboundStatusSent: DELIVERECT_CUSTOMER_CANCEL_OUTBOUND_STATUS,
+    body: { status: DELIVERECT_CUSTOMER_CANCEL_OUTBOUND_STATUS },
   });
 
   try {
     const { httpStatus, body } = await postDeliverectOrderStatusUpdate(
       deliverectOrderId,
-      DELIVERECT_CANCEL_STATUS_CODE
+      DELIVERECT_CUSTOMER_CANCEL_OUTBOUND_STATUS
     );
     console.info("[Deliverect customer cancel] response", {
       vendorOrderId: vo.id,
       deliverectOrderId,
       channelLinkId,
       httpStatus,
+      outboundStatusSent: DELIVERECT_CUSTOMER_CANCEL_OUTBOUND_STATUS,
       responseBody: safeBodyForLog(body),
     });
+    if (httpStatus === 403 || httpStatus === 401) {
+      console.warn("[Deliverect customer cancel] auth or scope rejection (check OAuth scopes / channel vs genericPOS)", {
+        vendorOrderId: vo.id,
+        httpStatus,
+        responseBody: safeBodyForLog(body),
+      });
+    }
   } catch (e) {
     console.error("[Deliverect customer cancel] request error (Mennyu cancel already applied)", {
       vendorOrderId: vo.id,

@@ -229,7 +229,7 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
   }
 }
 
-/** URL for POST `{base}/orderStatus/{deliverectOrderId}` (status push / cancel uses code 110). */
+/** URL for POST `{base}/orderStatus/{deliverectOrderId}` (caller chooses status code, e.g. customer cancel uses 100). */
 export function getDeliverectOrderStatusPushUrl(deliverectOrderId: string): string {
   const base = BASE_URL.replace(/\/$/, "");
   return `${base}/orderStatus/${encodeURIComponent(deliverectOrderId)}`;
@@ -238,7 +238,7 @@ export function getDeliverectOrderStatusPushUrl(deliverectOrderId: string): stri
 /**
  * POST `{base}/orderStatus/{deliverectOrderId}` — push status into Deliverect (POS simulation).
  * Deliverect should emit webhooks; Mennyu does not mutate DB here.
- * Customer cancel uses status **110** (CANCELLED) — see `payload-status-read.ts` (`CANCELLED: 110`).
+ * Customer-initiated cancel propagation uses **100** — see `deliverect-customer-cancel.service.ts`.
  *
  * Auth: `DELIVERECT_API_KEY` as Bearer if set; otherwise OAuth via {@link getDeliverectAuthHeaders}.
  */
