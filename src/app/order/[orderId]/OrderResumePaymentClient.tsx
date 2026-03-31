@@ -1,13 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
-const stripePublishableKey =
-  typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "") : "";
+/**
+ * Must match server render — do NOT gate on `typeof window` (empty string on server caused
+ * hydration mismatch: server showed "Stripe not configured", client mounted Elements → React #418).
+ * NEXT_PUBLIC_* is inlined at build time for both bundles.
+ */
+const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
 
 function ResumePaymentForm({ orderId, totalCents }: { orderId: string; totalCents: number }) {
   const stripe = useStripe();
@@ -28,6 +32,8 @@ function ResumePaymentForm({ orderId, totalCents }: { orderId: string; totalCent
         setLoading(false);
         return;
       }
+      // TEMP DEBUG: remove after production checkout investigation
+      console.info("[mennyu:checkout-debug] ResumePaymentForm confirmPayment start", { orderId });
       const { error: confirmError } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -36,6 +42,11 @@ function ResumePaymentForm({ orderId, totalCents }: { orderId: string; totalCent
             billing_details: { address: { country: "US" } },
           },
         },
+      });
+      console.info("[mennyu:checkout-debug] ResumePaymentForm confirmPayment done", {
+        orderId,
+        hasError: Boolean(confirmError),
+        code: confirmError?.code,
       });
       if (confirmError) {
         setError(confirmError.message ?? "Payment failed");
@@ -148,6 +159,16 @@ export function OrderResumePaymentClient({
   paymentIntentId: string;
   totalCents: number;
 }) {
+  useEffect(() => {
+    // TEMP DEBUG: remove after production checkout investigation
+    console.info("[mennyu:checkout-debug] OrderResumePaymentClient mounted", {
+      orderId,
+      hasPublishableKey: Boolean(stripePublishableKey),
+      clientSecretPrefix:
+        clientSecret.length > 12 ? `${clientSecret.slice(0, 12)}…` : "(short)",
+    });
+  }, [orderId, clientSecret]);
+
   const stripePromise = useMemo(
     () => (stripePublishableKey ? loadStripe(stripePublishableKey) : null),
     []

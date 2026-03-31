@@ -72,6 +72,8 @@ function PaymentStep({
         setLoading(false);
         return;
       }
+      // TEMP DEBUG: remove after production checkout investigation
+      console.info("[mennyu:checkout-debug] CheckoutForm PaymentStep confirmPayment start", { orderId });
       const { error: confirmError } = await stripe.confirmPayment({
         elements,
         clientSecret,
@@ -81,6 +83,11 @@ function PaymentStep({
             billing_details: { address: { country: "US" } },
           },
         },
+      });
+      console.info("[mennyu:checkout-debug] CheckoutForm PaymentStep confirmPayment done", {
+        orderId,
+        hasError: Boolean(confirmError),
+        code: confirmError?.code,
       });
       if (confirmError) {
         setError(confirmError.message ?? "Payment failed");
