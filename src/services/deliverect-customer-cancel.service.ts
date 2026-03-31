@@ -10,7 +10,7 @@ import {
   postDeliverectOrderStatusUpdate,
 } from "@/integrations/deliverect/client";
 
-/** Matches {@link DELIVERECT_STATUS_NAME_TO_CODE} CANCELLED / CANCELED in payload-status-read.ts */
+/** Matches DELIVERECT_STATUS_NAME_TO_CODE CANCELLED / CANCELED in payload-status-read.ts */
 const DELIVERECT_CANCEL_STATUS_CODE = 110;
 
 function safeBodyForLog(body: unknown): string {
@@ -27,6 +27,10 @@ function safeBodyForLog(body: unknown): string {
  * Call after `applyVendorOrderTransition(..., "cancelled", "customer")` succeeds.
  */
 export async function notifyDeliverectOfCustomerCancellation(vendorOrderId: string): Promise<void> {
+  console.info("[TRACE customer cancel] notifyDeliverectOfCustomerCancellation: helper entered", {
+    vendorOrderId,
+  });
+
   const vo = await prisma.vendorOrder.findUnique({
     where: { id: vendorOrderId },
     select: {
@@ -37,7 +41,10 @@ export async function notifyDeliverectOfCustomerCancellation(vendorOrderId: stri
   });
 
   if (!vo) {
-    console.warn("[Deliverect customer cancel] vendor order not found", { vendorOrderId });
+    console.info("[TRACE customer cancel] notify helper skip — exact reason", {
+      vendorOrderId,
+      reason: "vendor_order_row_not_found_after_transition",
+    });
     return;
   }
 
@@ -45,9 +52,19 @@ export async function notifyDeliverectOfCustomerCancellation(vendorOrderId: stri
   const channelLinkId = vo.deliverectChannelLinkId?.trim() ?? null;
 
   if (!deliverectOrderId) {
-    console.info("[Deliverect customer cancel] skip — no Deliverect order id (not routed or id pending)", {
+    const raw = vo.deliverectOrderId;
+    const reason =
+      raw == null
+        ? "deliverectOrderId_is_null"
+        : String(raw).trim() === ""
+          ? "deliverectOrderId_is_empty_string"
+          : "deliverectOrderId_is_whitespace_only";
+    console.info("[TRACE customer cancel] notify helper skip — exact reason", {
       vendorOrderId: vo.id,
       channelLinkId,
+      deliverectOrderIdRaw: raw,
+      reason,
+      note: "no_outbound_http_without_deliverect_order_id",
     });
     return;
   }

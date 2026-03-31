@@ -20,13 +20,24 @@ export async function POST(
   context: { params: Promise<{ orderId: string }> }
 ) {
   const { orderId } = await context.params;
+  console.info("[TRACE customer cancel] route hit (top)", {
+    route: "POST /api/order/[orderId]/cancel",
+    orderId: orderId ?? null,
+    vendorOrderId: null,
+  });
   if (!orderId) {
+    console.info("[TRACE customer cancel] early return", { reason: "missing orderId", status: 400 });
     return NextResponse.json({ error: "Missing orderId" }, { status: 400 });
   }
 
   const headersList = await headers();
   const customerPhone = getCustomerPhoneFromHeaders(headersList);
   if (!customerPhone?.trim()) {
+    console.info("[TRACE customer cancel] early return", {
+      reason: "no customer phone in headers / session",
+      orderId,
+      status: 401,
+    });
     return NextResponse.json(
       { error: "Customer identity required. Please use the same device you used to place the order." },
       { status: 401 }
@@ -52,11 +63,17 @@ export async function POST(
   });
 
   if (!order) {
+    console.info("[TRACE customer cancel] early return", { reason: "order not found", orderId, status: 404 });
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
   const normalizedPhone = customerPhone.trim();
   if (order.customerPhone !== normalizedPhone) {
+    console.info("[TRACE customer cancel] early return", {
+      reason: "customer phone mismatch",
+      orderId,
+      status: 403,
+    });
     return NextResponse.json(
       { error: "This order does not belong to you." },
       { status: 403 }
@@ -64,6 +81,11 @@ export async function POST(
   }
 
   if (!canCustomerCancelOrder(order)) {
+    console.info("[TRACE customer cancel] early return", {
+      reason: "canCustomerCancelOrder false (NOT_ELIGIBLE)",
+      orderId,
+      status: 400,
+    });
     return NextResponse.json(
       {
         error: "This order can no longer be cancelled because preparation has started.",
@@ -73,22 +95,58 @@ export async function POST(
     );
   }
 
+  console.info("[TRACE customer cancel] past guards — entering cancel loop", {
+    orderId,
+    vendorOrderCount: order.vendorOrders.length,
+    vendorOrderIds: order.vendorOrders.map((v) => v.id),
+  });
+
   const CUSTOMER_SOURCE = "customer";
   for (const vo of order.vendorOrders) {
-    if (vo.fulfillmentStatus === "cancelled") continue;
+    if (vo.fulfillmentStatus === "cancelled") {
+      console.info("[TRACE customer cancel] skip vendor order (already cancelled)", {
+        route: "POST /api/order/[orderId]/cancel",
+        orderId,
+        vendorOrderId: vo.id,
+      });
+      continue;
+    }
     const result = await applyVendorOrderTransition(
       vo.id,
       "cancelled",
       CUSTOMER_SOURCE
     );
     if (!result.success) {
+      console.info("[TRACE customer cancel] transition failed — return before notifyDeliverect", {
+        route: "POST /api/order/[orderId]/cancel",
+        orderId,
+        vendorOrderId: vo.id,
+        error: result.error,
+        code: result.code,
+      });
       return NextResponse.json(
         { error: result.error, code: result.code },
         { status: 400 }
       );
     }
+
+    const voForNotify = await prisma.vendorOrder.findUnique({
+      where: { id: vo.id },
+      select: { deliverectOrderId: true },
+    });
+    const deliverectOrderIdPreview = voForNotify?.deliverectOrderId?.trim() ?? null;
+    console.info("[TRACE customer cancel] pre-notifyDeliverect", {
+      route: "POST /api/order/[orderId]/cancel",
+      orderId,
+      vendorOrderId: vo.id,
+      deliverectOrderId: deliverectOrderIdPreview,
+      aboutToCallNotifyDeliverect: true,
+      expectsOutboundDeliverectHttp: Boolean(deliverectOrderIdPreview),
+    });
     await notifyDeliverectOfCustomerCancellation(vo.id);
   }
+
+  console.info("[TRACE customer cancel] cancel loop finished — refund/clear cart next", { orderId });
 
   let refundResult: { success: boolean; code?: string; message?: string; amountCents?: number } | undefined;
   const orderForRefund = await prisma.order.findUnique({
