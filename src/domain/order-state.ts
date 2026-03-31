@@ -179,49 +179,36 @@ export function parentStatusLabel(status: ParentOrderStatus): string {
 }
 
 /**
- * Customer-facing header status: approval/progress wording, not internal routing transport.
+ * Customer-facing parent order header (short line). Uses explicit single- vs multi-vendor
+ * phrasing only for `routed_partial` (partially accepted).
  */
 export function customerOrderHeaderStatus(
   status: ParentOrderStatus,
   vendorOrders: Array<{ routingStatus: string; fulfillmentStatus: string }>
 ): string {
-  const n = vendorOrders.length;
+  const isMultiVendor = vendorOrders.length > 1;
   switch (status) {
-    case "routing":
-      return n > 1
-        ? "Connecting with each vendor"
-        : "Sending your order to the vendor";
-    case "routed":
-      return "Waiting on vendor approval";
-    case "routed_partial": {
-      if (n <= 1) return "Waiting on vendor approval";
-      const confirmed = vendorOrders.filter((v) => v.routingStatus === "confirmed").length;
-      const sent = vendorOrders.filter((v) => v.routingStatus === "sent").length;
-      const failed = vendorOrders.filter((v) => v.routingStatus === "failed").length;
-      if (confirmed > 0 && (sent > 0 || failed > 0))
-        return "Some vendors have confirmed your order";
-      if (failed > 0 && confirmed + sent > 0) return "We're still confirming with each vendor";
-      return "Waiting on remaining vendor approval";
-    }
     case "pending_payment":
       return "Awaiting payment";
     case "paid":
-      return "Payment received";
+    case "routing":
+    case "routed":
+      return "Confirming your order";
+    case "routed_partial":
+      return isMultiVendor ? "Partially accepted" : "Confirming your order";
     case "accepted":
     case "preparing":
+    case "in_progress":
+    case "partially_completed":
       return "In progress";
     case "ready":
       return "Ready for pickup";
-    case "in_progress":
-      return n > 1 ? "Your order is in progress" : "In progress";
-    case "partially_completed":
-      return "Partially complete";
     case "completed":
       return "Completed";
     case "cancelled":
       return "Cancelled";
     case "failed":
-      return "Order issue";
+      return "Failed";
     default:
       return parentStatusLabel(status);
   }
@@ -241,24 +228,37 @@ export function customerStatusLabelForRouted(
 
 /**
  * Customer-facing labels for parent order rows in "Recent updates" timeline (not admin parentStatusLabel).
+ * Multi-vendor only changes copy for `routed_partial` → "Partially accepted".
  */
-export function customerOrderTimelineParentLabel(status: ParentOrderStatus): string {
-  const labels: Record<ParentOrderStatus, string> = {
-    pending_payment: "Order placed",
-    paid: "Payment received",
-    routing: "Shared with each vendor",
-    routed_partial: "Vendor confirmations in progress",
-    routed: "Each vendor has your order",
-    accepted: "In progress",
-    preparing: "In progress",
-    ready: "Ready for pickup",
-    in_progress: "In progress",
-    partially_completed: "Partially complete",
-    completed: "Completed",
-    cancelled: "Cancelled",
-    failed: "Order could not be completed",
-  };
-  return labels[status] ?? parentStatusLabel(status);
+export function customerOrderTimelineParentLabel(
+  status: ParentOrderStatus,
+  isMultiVendor: boolean
+): string {
+  switch (status) {
+    case "pending_payment":
+      return "Order placed";
+    case "paid":
+    case "routing":
+    case "routed":
+      return "Confirming your order";
+    case "routed_partial":
+      return isMultiVendor ? "Partially accepted" : "Confirming your order";
+    case "accepted":
+    case "preparing":
+    case "in_progress":
+    case "partially_completed":
+      return "In progress";
+    case "ready":
+      return "Ready for pickup";
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Cancelled";
+    case "failed":
+      return "Failed";
+    default:
+      return parentStatusLabel(status);
+  }
 }
 
 /**

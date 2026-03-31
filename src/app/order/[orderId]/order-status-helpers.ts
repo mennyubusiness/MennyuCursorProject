@@ -7,24 +7,27 @@ import {
 } from "@/domain/order-state";
 import type { ParentOrderStatus } from "@/domain/types";
 
+/**
+ * Customer-facing vendor order chip: Deliverect / fulfillment progression.
+ * DB has no separate "prepared" state; `ready` maps to "Ready for pickup".
+ */
 export function vendorStatusLabel(
   routingStatus: string,
   fulfillmentStatus: string,
   isManuallyRecovered?: boolean
 ): string {
-  if (routingStatus === "failed" && !isManuallyRecovered) return "Unavailable";
-  const fulfillmentLabels: Record<string, string> = {
-    pending: "Order received",
-    accepted: "Accepted",
-    preparing: "Preparing",
-    ready: "Ready for pickup",
-    completed: "Picked up",
-    cancelled: "Cancelled",
-  };
-  const label = fulfillmentLabels[fulfillmentStatus];
-  if (label) return label;
-  if (routingStatus === "sent" || routingStatus === "confirmed") return "Order received";
-  return "In progress";
+  if (routingStatus === "failed" && !isManuallyRecovered) return "Failed";
+  if (fulfillmentStatus === "cancelled") return "Cancelled";
+  if (fulfillmentStatus === "completed") return "Completed";
+  if (fulfillmentStatus === "ready") return "Ready for pickup";
+  if (fulfillmentStatus === "preparing") return "Preparing";
+  if (fulfillmentStatus === "accepted") return "Accepted";
+  if (fulfillmentStatus === "pending") {
+    if (routingStatus === "sent" || routingStatus === "confirmed" || routingStatus === "pending") {
+      return "Confirming";
+    }
+  }
+  return "Confirming";
 }
 
 /**
@@ -48,9 +51,9 @@ export function vendorStatusLabelForScheduledPickup(
   fulfillmentStatus: string,
   isManuallyRecovered?: boolean
 ): string {
-  if (routingStatus === "failed" && !isManuallyRecovered) return "Unavailable";
+  if (routingStatus === "failed" && !isManuallyRecovered) return "Failed";
   if (fulfillmentStatus === "cancelled") return "Cancelled";
-  if (fulfillmentStatus === "completed") return "Picked up";
+  if (fulfillmentStatus === "completed") return "Completed";
   if (
     requestedPickupAt != null &&
     (fulfillmentStatus === "pending" || fulfillmentStatus === "accepted")
@@ -88,6 +91,7 @@ export function orderSummaryExplanation(
   vendorOrders: Array<{ fulfillmentStatus: string; routingStatus: string }>,
   requestedPickupAt?: unknown
 ): string {
+  const multi = vendorOrders.length > 1;
   if (
     requestedPickupAt != null &&
     shouldShowScheduledPickupCustomerLabels(requestedPickupAt, vendorOrders) &&
@@ -101,42 +105,44 @@ export function orderSummaryExplanation(
   const preparing = vendorOrders.filter((v) =>
     ["accepted", "preparing"].includes(v.fulfillmentStatus)
   ).length;
-  const completed = vendorOrders.filter((v) => v.fulfillmentStatus === "completed").length;
   const total = vendorOrders.length;
 
   if (derivedStatus === "completed") {
     return "Your order is complete. Thank you!";
   }
   if (derivedStatus === "ready") {
-    if (total === 1) return "Your order is ready for pickup.";
     return "Your order is ready for pickup.";
   }
   if (derivedStatus === "in_progress") {
-    if (ready > 0 && preparing > 0) {
+    if (multi && ready > 0 && preparing > 0) {
       return `${ready} ${ready === 1 ? "vendor has" : "vendors have"} your items ready; ${preparing} ${preparing === 1 ? "is" : "are"} still preparing.`;
     }
     if (ready > 0) return "Your items are ready for pickup.";
-    return "We're preparing your order with our vendors.";
+    return multi
+      ? "We're preparing your order with each vendor."
+      : "The restaurant is preparing your order.";
   }
   if (derivedStatus === "partially_completed") {
     return "Part of your order is complete; we'll update you on the rest.";
   }
   if (derivedStatus === "routing") {
-    return total > 1
+    return multi
       ? "Each vendor is getting your order. You'll see updates as they accept."
-      : "Your vendor is receiving your order.";
+      : "The restaurant is receiving your order.";
   }
-  if (derivedStatus === "routed_partial" && total > 1) {
+  if (derivedStatus === "routed_partial" && multi) {
     const confirmed = vendorOrders.filter((v) => v.routingStatus === "confirmed").length;
     if (confirmed > 0 && confirmed < total)
       return "Some vendors have already accepted; we're waiting on the others.";
     return "We're waiting on each vendor to confirm your order.";
   }
   if (derivedStatus === "routed" || derivedStatus === "routed_partial") {
-    return "You'll get updates as soon as your vendor accepts.";
+    return multi
+      ? "You'll get updates as each vendor accepts."
+      : "You'll get updates as soon as the restaurant accepts.";
   }
   if (derivedStatus === "paid" || derivedStatus === "pending_payment") {
-    return "We're getting your order to the vendors.";
+    return multi ? "We're getting your order to each vendor." : "We're getting your order to the restaurant.";
   }
   if (derivedStatus === "failed") {
     const allRecoverable =
@@ -158,27 +164,15 @@ export function timelineEntryLabel(
   vendorName: string | null,
   routingStatus: string | null,
   fulfillmentStatus: string | null,
-  orderStatus?: string
+  orderStatus?: string,
+  isMultiVendor: boolean = false
 ): string {
   if (orderStatus !== undefined) {
-    return customerOrderTimelineParentLabel(orderStatus as ParentOrderStatus);
+    return customerOrderTimelineParentLabel(orderStatus as ParentOrderStatus, isMultiVendor);
   }
-  const fulfillmentLabels: Record<string, string> = {
-    accepted: "Accepted",
-    preparing: "Preparing",
-    ready: "Ready for pickup",
-    completed: "Completed",
-    cancelled: "Cancelled",
-  };
-  const routingLabels: Record<string, string> = {
-    sent: "Received your order",
-    confirmed: "Confirmed",
-    failed: "Unavailable",
-  };
-  const part =
-    (fulfillmentStatus && fulfillmentLabels[fulfillmentStatus]) ??
-    (routingStatus && routingLabels[routingStatus]) ??
-    "Updated";
+  const r = routingStatus ?? "";
+  const f = fulfillmentStatus ?? "";
+  const part = vendorStatusLabel(r, f, false);
   return vendorName ? `${vendorName} — ${part}` : part;
 }
 
@@ -201,12 +195,13 @@ export function buildTimelineEvents(order: {
   }>;
   refundAttempts?: Array<{ status: string; amountCents: number; createdAt: Date }>;
 }): TimelineEvent[] {
+  const isMultiVendor = order.vendorOrders.length > 1;
   const raw: InternalTimelineEvent[] = [];
 
   for (const e of order.statusHistory) {
     raw.push({
       createdAt: e.createdAt,
-      label: timelineEntryLabel(null, null, null, e.status),
+      label: timelineEntryLabel(null, null, null, e.status, isMultiVendor),
       type: "order",
     });
   }
@@ -223,7 +218,9 @@ export function buildTimelineEvents(order: {
       const label = timelineEntryLabel(
         vo.vendor.name,
         e.routingStatus,
-        e.fulfillmentStatus
+        e.fulfillmentStatus,
+        undefined,
+        isMultiVendor
       );
       if (label.endsWith(" — Confirmed")) continue;
       raw.push({ createdAt: e.createdAt, label, type: "vendor" });

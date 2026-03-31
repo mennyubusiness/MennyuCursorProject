@@ -3,7 +3,8 @@ import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getOrdersByCustomerPhoneAction } from "@/actions/order.actions";
-import { parentStatusLabel } from "@/domain/order-state";
+import { customerOrderHeaderStatus } from "@/domain/order-state";
+import type { ParentOrderStatus } from "@/domain/types";
 import { ClearPhoneSessionButton } from "./ClearPhoneSessionButton";
 import { OrderHistoryPhoneForm } from "./OrderHistoryPhoneForm";
 import { ReorderButton } from "./ReorderButton";
@@ -19,6 +20,14 @@ function formatUsPhone(phone: string): string {
   const m = phone.replace(/\D/g, "").match(/^(\d{3})(\d{3})(\d{4})$/);
   if (m) return `(${m[1]}) ${m[2]}-${m[3]}`;
   return phone;
+}
+
+/** Stub rows so {@link customerOrderHeaderStatus} can branch on multi-vendor (e.g. routed_partial). */
+function stubVendorOrders(count: number): Array<{ routingStatus: string; fulfillmentStatus: string }> {
+  return Array.from({ length: Math.max(1, count) }, () => ({
+    routingStatus: "sent",
+    fulfillmentStatus: "pending",
+  }));
 }
 
 export default async function OrdersPage() {
@@ -102,7 +111,7 @@ export default async function OrdersPage() {
                   ${(order.totalCents / 100).toFixed(2)}
                 </p>
                 <p className="text-xs text-stone-600">
-                  {parentStatusLabel(order.status as Parameters<typeof parentStatusLabel>[0])}
+                  {customerOrderHeaderStatus(order.status as ParentOrderStatus, stubVendorOrders(order.vendorNames.length))}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
