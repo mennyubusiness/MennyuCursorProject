@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
@@ -32,8 +32,6 @@ function ResumePaymentForm({ orderId, totalCents }: { orderId: string; totalCent
         setLoading(false);
         return;
       }
-      // TEMP DEBUG: remove after production checkout investigation
-      console.info("[mennyu:checkout-debug] ResumePaymentForm confirmPayment start", { orderId });
       const { error: confirmError } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -42,11 +40,6 @@ function ResumePaymentForm({ orderId, totalCents }: { orderId: string; totalCent
             billing_details: { address: { country: "US" } },
           },
         },
-      });
-      console.info("[mennyu:checkout-debug] ResumePaymentForm confirmPayment done", {
-        orderId,
-        hasError: Boolean(confirmError),
-        code: confirmError?.code,
       });
       if (confirmError) {
         setError(confirmError.message ?? "Payment failed");
@@ -159,16 +152,6 @@ export function OrderResumePaymentClient({
   paymentIntentId: string;
   totalCents: number;
 }) {
-  useEffect(() => {
-    // TEMP DEBUG: remove after production checkout investigation
-    console.info("[mennyu:checkout-debug] OrderResumePaymentClient mounted", {
-      orderId,
-      hasPublishableKey: Boolean(stripePublishableKey),
-      clientSecretPrefix:
-        clientSecret.length > 12 ? `${clientSecret.slice(0, 12)}…` : "(short)",
-    });
-  }, [orderId, clientSecret]);
-
   const stripePromise = useMemo(
     () => (stripePublishableKey ? loadStripe(stripePublishableKey) : null),
     []
