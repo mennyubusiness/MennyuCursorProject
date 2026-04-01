@@ -30,6 +30,7 @@ model Pod {
   orders             Order[]
   membershipRequests PodMembershipRequest[]
   vendors            PodVendor[]
+  memberships        PodMembership[]
 }
 
 model PodVendor {
@@ -81,10 +82,30 @@ model User {
   updatedAt     DateTime @updatedAt
 
   vendorMemberships VendorMembership[]
+  podMemberships    PodMembership[]
   /// Platform (Mennyu internal) admin; same User + session as vendors. Complements temporary ADMIN_SECRET cookie bridge.
   isPlatformAdmin Boolean @default(false)
-  // Future: podMemberships PodMembership[]
-  // Future: customerProfile Customer?
+}
+
+enum PodMembershipRole {
+  owner
+  manager
+}
+
+/// User ↔ pod: contextual access for pod dashboard (curation, membership requests). Not a global role.
+model PodMembership {
+  id        String            @id @default(cuid())
+  userId    String
+  podId     String
+  role      PodMembershipRole @default(manager)
+  createdAt DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pod  Pod  @relation(fields: [podId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, podId])
+  @@index([podId])
+  @@index([userId])
 }
 
 enum VendorMembershipRole {

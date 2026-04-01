@@ -1,6 +1,6 @@
 /**
  * POST: request to add a vendor to the pod.
- * Requires same access as pod dashboard (caller is trusted by layout guard).
+ * Access: platform admin or PodMembership for podId.
  *
  * Interim product rule: one pod per vendor; no direct add/move without vendor approval.
  * - Already in this pod → 200 ok (idempotent).
@@ -10,9 +10,10 @@
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { assertPodApiAccess } from "@/lib/permissions";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ podId: string }> }
 ) {
   const { podId } = await context.params;
@@ -20,9 +21,14 @@ export async function POST(
     return NextResponse.json({ error: "Missing podId" }, { status: 400 });
   }
 
+  const gate = await assertPodApiAccess(request, podId);
+  if (!gate.ok) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: gate.status });
+  }
+
   let body: unknown;
   try {
-    body = await _request.json();
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }

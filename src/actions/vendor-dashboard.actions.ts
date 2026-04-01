@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { ADMIN_COOKIE_NAME, isAdminAllowed } from "@/lib/admin-auth";
+import { canViewVendor } from "@/lib/permissions";
 import {
   isVendorDashboardDevOpen,
   timingSafeStringEqual,
@@ -37,13 +38,9 @@ async function authorizeVendorSettingsWrite(vendorId: string): Promise<
   }
 
   const session = await auth();
-  if (session?.user?.isPlatformAdmin) return { ok: true };
-
   if (session?.user?.id) {
-    const m = await prisma.vendorMembership.findUnique({
-      where: { userId_vendorId: { userId: session.user.id, vendorId: id } },
-    });
-    if (m) return { ok: true };
+    const allowed = await canViewVendor(session.user.id, id);
+    if (allowed) return { ok: true };
   }
 
   const c = cookieStore.get(vendorDashboardCookieName(id))?.value;

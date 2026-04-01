@@ -1,12 +1,11 @@
 /**
- * Pod Dashboard v1: layout with minimal access guard.
- * TODO: Replace with pod-owner–scoped auth when available (e.g. pod owner role / invite).
- * For now reuses same gate as admin (cookie/secret) so pod dashboard is not wide open in production.
+ * Pod dashboard: platform admin (cookie/session), or PodMembership for this podId.
  */
 import { redirect, notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { isAdminDashboardLayoutAuthorized } from "@/lib/admin-auth";
 import { env } from "@/lib/env";
+import { canAccessPodDashboardLayout } from "@/lib/permissions";
 import { PodAreaNav } from "../PodAreaNav";
 
 export default async function PodDashboardLayout({
@@ -16,14 +15,19 @@ export default async function PodDashboardLayout({
   params: Promise<{ podId: string }>;
   children: React.ReactNode;
 }) {
-  const allowed = await isAdminDashboardLayoutAuthorized();
+  const { podId } = await params;
+
+  const allowed = await canAccessPodDashboardLayout(podId);
   if (!allowed) {
-    if (env.NODE_ENV === "production" && env.ADMIN_SECRET) {
+    if (env.NODE_ENV === "production") {
+      const session = await auth();
+      if (!session?.user?.id) {
+        redirect(`/login?intent=pod&callbackUrl=${encodeURIComponent(`/pod/${podId}/dashboard`)}`);
+      }
       redirect("/admin/access-denied");
     }
   }
 
-  const { podId } = await params;
   const pod = await prisma.pod.findUnique({
     where: { id: podId },
     select: { id: true, name: true },

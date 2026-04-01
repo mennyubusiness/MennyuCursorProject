@@ -12,6 +12,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { ADMIN_COOKIE_NAME, isAdminAccessFromRequest, isAdminAllowed } from "@/lib/admin-auth";
 import { env } from "@/lib/env";
+import { canViewVendor } from "@/lib/permissions";
 
 export const vendorDashboardCookieName = (vendorId: string) => `mennyu_vdash_${vendorId}`;
 
@@ -49,15 +50,8 @@ export async function canAccessVendorDashboard(vendorId: string): Promise<boolea
   }
 
   const session = await auth();
-  if (session?.user?.isPlatformAdmin) {
-    return true;
-  }
   if (session?.user?.id) {
-    const m = await prisma.vendorMembership.findUnique({
-      where: { userId_vendorId: { userId: session.user.id, vendorId } },
-    });
-    if (m) return true;
-    return false;
+    return canViewVendor(session.user.id, vendorId);
   }
 
   const v = await prisma.vendor.findUnique({
@@ -86,17 +80,14 @@ export async function verifyVendorAccessForApi(
   }
 
   const session = await auth();
-  if (session?.user?.isPlatformAdmin) {
-    return { ok: true, mode: "admin", userId: session.user.id };
-  }
   if (session?.user?.id) {
-    const m = await prisma.vendorMembership.findUnique({
-      where: {
-        userId_vendorId: { userId: session.user.id, vendorId },
-      },
-    });
-    if (m) {
-      return { ok: true, mode: "session", userId: session.user.id };
+    const allowed = await canViewVendor(session.user.id, vendorId);
+    if (allowed) {
+      return {
+        ok: true,
+        mode: session.user.isPlatformAdmin ? "admin" : "session",
+        userId: session.user.id,
+      };
     }
   }
 

@@ -1,22 +1,27 @@
 /**
  * Pod owner cancels a pending membership request.
  * Only pending requests can be cancelled. Request must belong to this pod.
- * Access: same as pod dashboard (layout guard).
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { assertPodApiAccess } from "@/lib/permissions";
 
 const PENDING = "pending";
 const CANCELLED = "cancelled";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ podId: string; requestId: string }> }
 ) {
   const { podId, requestId } = await context.params;
   if (!podId || !requestId) {
     return NextResponse.json({ error: "Missing podId or requestId" }, { status: 400 });
+  }
+
+  const gate = await assertPodApiAccess(request, podId);
+  if (!gate.ok) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: gate.status });
   }
 
   const pod = await prisma.pod.findUnique({

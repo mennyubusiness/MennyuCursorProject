@@ -58,11 +58,27 @@ export async function resolvePostLoginDestination(
   }
 
   if (intent === "pod") {
-    return {
-      kind: "coming_soon",
-      headline: "This area isn’t connected yet",
-      body: "You’re signed in. Pod access for your account is not enabled yet. Choose Vendor if you manage a restaurant.",
-    };
+    const podRows = await prisma.podMembership.findMany({
+      where: { userId },
+      select: { podId: true },
+      orderBy: { createdAt: "asc" },
+    });
+    const cb = safeInternalPath(callbackUrl);
+    if (cb?.startsWith("/pod/")) {
+      const m = cb.match(/^\/pod\/([^/]+)/);
+      const podFromUrl = m?.[1];
+      if (podFromUrl && podRows.some((r) => r.podId === podFromUrl)) {
+        return { kind: "redirect", path: cb };
+      }
+    }
+    if (podRows.length === 0) {
+      return {
+        kind: "no_access",
+        headline: "No pod access yet",
+        body: "You’re signed in, but this account isn’t linked to a pod. Ask your team to add you as a pod member.",
+      };
+    }
+    return { kind: "redirect", path: `/pod/${podRows[0].podId}/dashboard` };
   }
 
   const memberships = await prisma.vendorMembership.findMany({
