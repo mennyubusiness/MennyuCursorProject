@@ -12,6 +12,8 @@ export const deliverectMenuImportMetaSchema = z.object({
 
 export const mennyuCanonicalModifierOptionSchema = z.object({
   deliverectId: z.string().min(1),
+  /** Deliverect `plu` when present; outbound orders must send this as modifier `plu`, not Mongo `_id`. */
+  plu: z.string().min(1).nullable().optional(),
   name: z.string().min(1),
   priceCents: canonicalMoneyCentsSchema,
   sortOrder: z.number().int(),

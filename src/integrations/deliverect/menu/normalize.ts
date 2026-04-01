@@ -1066,6 +1066,7 @@ function buildModifierGroupTree(
 
     options.push({
       deliverectId: oid,
+      plu: asString(o.plu) ?? null,
       name: asString(o.name) ?? "Option",
       priceCents: Math.max(0, Math.round(optPrice)),
       sortOrder: oi,

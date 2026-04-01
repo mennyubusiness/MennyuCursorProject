@@ -58,6 +58,9 @@ function describeGroupMetaChanges(
 
 function describeOptionChanges(d: MennyuCanonicalModifierOption, p: MennyuCanonicalModifierOption): string[] {
   const out: string[] = [];
+  const pluD = d.plu ?? null;
+  const pluP = p.plu ?? null;
+  if (pluD !== pluP) out.push("Deliverect modifier PLU");
   if (d.name !== p.name) out.push(`name (${p.name} → ${d.name})`);
   if (d.priceCents !== p.priceCents) out.push(`price (${p.priceCents}¢ → ${d.priceCents}¢)`);
   if (d.isDefault !== p.isDefault) out.push("default");

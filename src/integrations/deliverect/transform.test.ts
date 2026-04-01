@@ -19,7 +19,12 @@ function minimalVendorOrder(overrides?: Partial<NonNullable<HydratedVendorOrder>
         quantity: 1,
         priceCents: 1000,
         specialInstructions: null,
-        menuItem: { id: "menu-item-1", deliverectProductId: "dc-prod-1" },
+        menuItem: {
+          id: "menu-item-1",
+          name: "Test item",
+          deliverectProductId: "69cce376adf3afeb41ffe8e4",
+          deliverectPlu: "BRG-001",
+        },
         selections: [],
       },
     ],
@@ -112,6 +117,16 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     });
     expect(payload.pickupTime).toBe("2026-12-24T20:00:00Z");
     expect(payload.isASAP).toBe(false);
+  });
+
+  it("sends POS PLU on items.plu, not Deliverect Mongo product id", () => {
+    const payload = mennyuVendorOrderToDeliverectPayload({
+      vendorOrder: minimalVendorOrder(),
+      channelLinkId: "ch-link-cert",
+    });
+    expect(payload.items[0]?.plu).toBe("BRG-001");
+    expect(payload.items[0]?.plu).not.toBe("69cce376adf3afeb41ffe8e4");
+    expect(payload.items[0]?.externalProductId).toBe("69cce376adf3afeb41ffe8e4");
   });
 
   it("payment.amount excludes Mennyu platform service fee — restaurant-facing total only", () => {

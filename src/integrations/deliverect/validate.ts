@@ -23,9 +23,9 @@ export type ValidationResult =
 /**
  * Validate that a hydrated VendorOrder has all identifiers required for Deliverect submission.
  * - Vendor must have channel link ID (or VendorOrder override).
- * - Every line item's menu item must have deliverectProductId.
- * - Every modifier selection's option must have deliverectModifierId.
- * Use before building payload when ROUTING_MODE=deliverect to fail fast with clear errors.
+ * - Every line item's menu item must have `deliverectPlu` (POS PLU for channel `plu` field).
+ * - Every modifier selection's option must have `deliverectModifierPlu`.
+ * `deliverectProductId` / `deliverectModifierId` (Mongo-style ids) are optional `external*` refs only.
  */
 export function validateForSubmission(
   vendorOrder: NonNullable<HydratedVendorOrder>,
@@ -44,14 +44,20 @@ export function validateForSubmission(
   const missingModifierIds: string[] = [];
 
   for (const line of vendorOrder.lineItems) {
-    const productId = line.menuItem?.deliverectProductId;
-    if (!productId || String(productId).trim() === "") {
-      missingProductIds.push(line.menuItemId);
+    const productPlu = line.menuItem?.deliverectPlu?.trim();
+    if (!productPlu) {
+      const label = line.menuItem?.name
+        ? `${line.menuItem.name} (${line.menuItemId})`
+        : line.menuItemId;
+      missingProductIds.push(label);
     }
     for (const sel of line.selections) {
-      const modifierId = sel.modifierOption.deliverectModifierId;
-      if (!modifierId || String(modifierId).trim() === "") {
-        missingModifierIds.push(sel.modifierOptionId);
+      const modPlu = sel.modifierOption.deliverectModifierPlu?.trim();
+      if (!modPlu) {
+        const label = sel.modifierOption.name
+          ? `${sel.modifierOption.name} (${sel.modifierOptionId})`
+          : sel.modifierOptionId;
+        missingModifierIds.push(label);
       }
     }
   }
@@ -59,14 +65,18 @@ export function validateForSubmission(
   if (missingProductIds.length > 0 || missingModifierIds.length > 0) {
     const parts: string[] = [];
     if (missingProductIds.length > 0) {
-      parts.push(`missing deliverectProductId for menu items: ${missingProductIds.join(", ")}`);
+      parts.push(
+        `Missing Deliverect PLU for menu item: ${[...new Set(missingProductIds)].join(", ")}`
+      );
     }
     if (missingModifierIds.length > 0) {
-      parts.push(`missing deliverectModifierId for modifier options: ${missingModifierIds.join(", ")}`);
+      parts.push(
+        `Missing Deliverect PLU for modifier option: ${[...new Set(missingModifierIds)].join(", ")}`
+      );
     }
     return {
       valid: false,
-      error: `Incomplete Deliverect mapping: ${parts.join("; ")}`,
+      error: parts.join(" "),
       code: "MISSING_EXTERNAL_IDS",
       missingProductIds: [...new Set(missingProductIds)],
       missingModifierIds: [...new Set(missingModifierIds)],

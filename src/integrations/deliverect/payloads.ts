@@ -59,9 +59,9 @@ export interface DeliverectOrderRequest {
 
 /** Single line item (product) in the order. */
 export interface DeliverectOrderItem {
-  /** POS product ID. Placeholder: use Mennyu menuItemId until external product sync. */
+  /** POS PLU — must be `MenuItem.deliverectPlu`, not Deliverect Mongo `_id`. */
   plu: string;
-  /** External product ID when Deliverect/POS mapping is available. */
+  /** Deliverect product `_id` when known; optional companion to `plu`. */
   externalProductId?: string;
   name: string;
   quantity: number;
@@ -75,9 +75,9 @@ export interface DeliverectOrderItem {
 
 /** Single modifier selection. Supports nested modifiers for options that have sub-choices. */
 export interface DeliverectModifier {
-  /** POS modifier ID. Placeholder: use Mennyu modifierOptionId until external mapping. */
+  /** POS modifier PLU — must be `ModifierOption.deliverectModifierPlu`, not Mongo `_id`. */
   plu: string;
-  /** External modifier ID when Deliverect/POS mapping is available. */
+  /** Deliverect modifier `_id` when known. */
   externalModifierId?: string;
   name: string;
   quantity: number;

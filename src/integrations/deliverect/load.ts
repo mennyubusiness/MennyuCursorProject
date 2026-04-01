@@ -19,7 +19,14 @@ export async function getVendorOrderForDeliverect(vendorOrderId: string) {
       vendor: true,
       lineItems: {
         include: {
-          menuItem: { select: { id: true, deliverectProductId: true } },
+          menuItem: {
+            select: {
+              id: true,
+              name: true,
+              deliverectProductId: true,
+              deliverectPlu: true,
+            },
+          },
           selections: {
             include: {
               modifierOption: {
@@ -45,7 +52,14 @@ export async function getOrderVendorOrdersForDeliverect(orderId: string) {
       vendor: true,
       lineItems: {
         include: {
-          menuItem: { select: { id: true, deliverectProductId: true } },
+          menuItem: {
+            select: {
+              id: true,
+              name: true,
+              deliverectProductId: true,
+              deliverectPlu: true,
+            },
+          },
           selections: {
             include: {
               modifierOption: {

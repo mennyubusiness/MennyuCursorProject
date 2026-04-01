@@ -342,6 +342,8 @@ model ModifierOption {
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   deliverectModifierId    String?
+  /// Raw Deliverect `plu` for modifiers; channel order `plu` must match POS (not Mongo `_id`).
+  deliverectModifierPlu   String?
   cartItemSelections      CartItemSelection[]
   nestedModifierGroups    ModifierGroup[]          @relation("NestedModifierGroups")
   modifierGroup           ModifierGroup            @relation("GroupOptions", fields: [modifierGroupId], references: [id], onDelete: Cascade)

@@ -133,6 +133,7 @@ export async function applyCanonicalMenuToLiveTables(
         isDefault: o.isDefault,
         isAvailable: o.isAvailable,
         deliverectModifierId: o.deliverectId,
+        deliverectModifierPlu: o.plu ?? null,
       };
       const dbOpt = existingO
         ? await tx.modifierOption.update({

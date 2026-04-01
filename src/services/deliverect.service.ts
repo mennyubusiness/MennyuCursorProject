@@ -5,7 +5,8 @@
  * Idempotent: if VO is already "sent" with deliverectOrderId, skips API call and returns success.
  *
  * First sandbox vendor: set Vendor.deliverectChannelLinkId (and optionally deliverectLocationId).
- * Ensure every MenuItem used in orders has deliverectProductId; every ModifierOption has deliverectModifierId.
+ * Ensure every MenuItem has deliverectPlu (POS PLU for outbound `plu`) and every ModifierOption has
+ * deliverectModifierPlu. deliverectProductId / deliverectModifierId are optional external refs only.
  * Set DELIVERECT_API_URL to sandbox base if needed; ROUTING_MODE=deliverect to enable submission.
  */
 import { Prisma } from "@prisma/client";

@@ -35,10 +35,15 @@ type Selection = LineItem["selections"][number];
  * Price: integer cents (Deliverect expects integer).
  */
 function selectionToModifier(sel: Selection): Omit<DeliverectModifier, "nestedModifiers"> & { _mennyuOptionId: string } {
-  const externalId = sel.modifierOption.deliverectModifierId ?? null;
+  const plu = sel.modifierOption.deliverectModifierPlu?.trim();
+  if (!plu) {
+    const label = sel.modifierOption.name ?? sel.modifierOptionId;
+    throw new Error(`Missing Deliverect PLU for modifier option "${label}" (${sel.modifierOptionId})`);
+  }
+  const externalModifierId = sel.modifierOption.deliverectModifierId?.trim() ?? null;
   return {
-    plu: externalId ?? sel.modifierOptionId,
-    ...(externalId ? { externalModifierId: externalId } : {}),
+    plu,
+    ...(externalModifierId ? { externalModifierId } : {}),
     name: sel.nameSnapshot,
     quantity: sel.quantity,
     price: Math.round(sel.priceCentsSnapshot),
@@ -89,15 +94,21 @@ function buildModifiersForLine(selections: Selection[]): DeliverectModifier[] | 
 }
 
 /**
- * Map one Mennyu line item to Deliverect order item. Prefer external product ID when mapped.
- * Price: integer cents (Deliverect expects integer).
+ * Map one Mennyu line item to Deliverect order item.
+ * `plu` must be the POS PLU (`MenuItem.deliverectPlu`), never Mongo `deliverectProductId` or Mennyu ids.
+ * `externalProductId` may carry Deliverect product `_id` when present.
  */
 function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
+  const plu = line.menuItem?.deliverectPlu?.trim();
+  if (!plu) {
+    const label = line.menuItem?.name ?? line.name;
+    throw new Error(`Missing Deliverect PLU for menu item "${label}" (${line.menuItemId})`);
+  }
   const modifiers = buildModifiersForLine(line.selections);
-  const externalProductId = line.menuItem?.deliverectProductId ?? null;
+  const externalProductId = line.menuItem?.deliverectProductId?.trim() ?? null;
   const itemNote = line.specialInstructions?.trim();
   return {
-    plu: externalProductId ?? line.menuItemId,
+    plu,
     ...(externalProductId ? { externalProductId } : {}),
     name: line.name,
     quantity: line.quantity,

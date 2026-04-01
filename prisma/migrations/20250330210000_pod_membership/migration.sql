@@ -1,8 +1,12 @@
--- CreateEnum
-CREATE TYPE "PodMembershipRole" AS ENUM ('owner', 'manager');
+-- CreateEnum (idempotent: recover from partial runs that created the type only)
+DO $$ BEGIN
+    CREATE TYPE "PodMembershipRole" AS ENUM ('owner', 'manager');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- CreateTable
-CREATE TABLE "PodMembership" (
+CREATE TABLE IF NOT EXISTS "PodMembership" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "podId" TEXT NOT NULL,
@@ -13,16 +17,21 @@ CREATE TABLE "PodMembership" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PodMembership_userId_podId_key" ON "PodMembership"("userId", "podId");
+CREATE UNIQUE INDEX IF NOT EXISTS "PodMembership_userId_podId_key" ON "PodMembership"("userId", "podId");
 
--- CreateIndex
-CREATE INDEX "PodMembership_podId_idx" ON "PodMembership"("podId");
+CREATE INDEX IF NOT EXISTS "PodMembership_podId_idx" ON "PodMembership"("podId");
 
--- CreateIndex
-CREATE INDEX "PodMembership_userId_idx" ON "PodMembership"("userId");
+CREATE INDEX IF NOT EXISTS "PodMembership_userId_idx" ON "PodMembership"("userId");
 
--- AddForeignKey
-ALTER TABLE "PodMembership" ADD CONSTRAINT "PodMembership_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (idempotent if constraints already applied)
+DO $$ BEGIN
+    ALTER TABLE "PodMembership" ADD CONSTRAINT "PodMembership_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
--- AddForeignKey
-ALTER TABLE "PodMembership" ADD CONSTRAINT "PodMembership_podId_fkey" FOREIGN KEY ("podId") REFERENCES "Pod"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "PodMembership" ADD CONSTRAINT "PodMembership_podId_fkey" FOREIGN KEY ("podId") REFERENCES "Pod"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
