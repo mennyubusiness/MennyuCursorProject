@@ -57,6 +57,20 @@ export interface DeliverectOrderRequest {
   payment?: { amount: number; type: number };
 }
 
+/**
+ * Variation or modifier line nested under a parent order item.
+ * Deliverect variant products require the chosen variation here, not as the top-level `plu`.
+ */
+export interface DeliverectOrderSubLine {
+  plu: string;
+  name: string;
+  quantity: number;
+  price: number;
+  remarks?: string;
+  /** Nested modifier selections on this variation line. */
+  modifiers?: DeliverectModifier[];
+}
+
 /** Single line item (product) in the order. */
 export interface DeliverectOrderItem {
   /** POS PLU — must be `MenuItem.deliverectPlu`, not Deliverect Mongo `_id`. */
@@ -71,6 +85,11 @@ export interface DeliverectOrderItem {
   remarks?: string;
   /** Modifier selections for this line (top-level and nested). */
   modifiers?: DeliverectModifier[];
+  /**
+   * Deliverect variant products: parent line uses variant product PLU (often price 0); chosen variation goes here.
+   * See https://developers.deliverect.com/docs/variants
+   */
+  subItems?: DeliverectOrderSubLine[];
 }
 
 /** Single modifier selection. Supports nested modifiers for options that have sub-choices. */

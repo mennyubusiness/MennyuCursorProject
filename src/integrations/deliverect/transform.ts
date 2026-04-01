@@ -10,6 +10,7 @@
 import type {
   DeliverectOrderRequest,
   DeliverectOrderItem,
+  DeliverectOrderSubLine,
   DeliverectModifier,
 } from "./payloads";
 import type { HydratedVendorOrder } from "./load";
@@ -99,16 +100,38 @@ function buildModifiersForLine(selections: Selection[]): DeliverectModifier[] | 
  * `externalProductId` may carry Deliverect product `_id` when present.
  */
 function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
-  const plu = line.menuItem?.deliverectPlu?.trim();
-  if (!plu) {
+  const variationPlu = line.menuItem?.deliverectPlu?.trim();
+  if (!variationPlu) {
     const label = line.menuItem?.name ?? line.name;
     throw new Error(`Missing Deliverect PLU for menu item "${label}" (${line.menuItemId})`);
   }
   const modifiers = buildModifiersForLine(line.selections);
-  const externalProductId = line.menuItem?.deliverectProductId?.trim() ?? null;
   const itemNote = line.specialInstructions?.trim();
+
+  const parentPlu = line.menuItem?.deliverectVariantParentPlu?.trim();
+  const parentName = line.menuItem?.deliverectVariantParentName?.trim();
+
+  if (parentPlu) {
+    const subLine: DeliverectOrderSubLine = {
+      plu: variationPlu,
+      name: line.name,
+      quantity: line.quantity,
+      price: Math.round(line.priceCents),
+      ...(itemNote ? { remarks: itemNote } : {}),
+      ...(modifiers && modifiers.length > 0 ? { modifiers } : {}),
+    };
+    return {
+      plu: parentPlu,
+      name: parentName ?? parentPlu,
+      quantity: line.quantity,
+      price: 0,
+      subItems: [subLine],
+    };
+  }
+
+  const externalProductId = line.menuItem?.deliverectProductId?.trim() ?? null;
   return {
-    plu,
+    plu: variationPlu,
     ...(externalProductId ? { externalProductId } : {}),
     name: line.name,
     quantity: line.quantity,

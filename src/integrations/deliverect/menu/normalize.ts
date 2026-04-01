@@ -79,6 +79,7 @@ export function normalizeDeliverectMenuToCanonical(
   const categoriesRaw = extractCategoriesArray(root, issues);
   const productsRaw = extractProductsArray(root, categoriesRaw, issues);
   const modifierLookups = buildModifierPayloadLookups(root, productsRaw, issues);
+  const variantParentByDeliverectId = buildDeliverectVariantParentIndex(productsRaw, modifierLookups, issues);
 
   const groupRegistry = new Map<string, MennyuCanonicalModifierGroup>();
   const products: MennyuCanonicalProduct[] = [];
@@ -95,7 +96,7 @@ export function normalizeDeliverectMenuToCanonical(
       });
       continue;
     }
-    const built = buildProduct(pr, i, groupRegistry, modifierLookups, issues);
+    const built = buildProduct(pr, i, groupRegistry, modifierLookups, issues, variantParentByDeliverectId);
     if (built) products.push(built);
   }
 
@@ -522,6 +523,9 @@ function buildModifierPayloadLookups(
     if (!isRecord(p) || Array.isArray(p)) continue;
     const id = firstDeliverectId(p);
     if (id && !productById.has(id)) productById.set(id, p);
+    /** Deliverect often references variation/modifier rows by `plu` while `firstDeliverectId` prefers `_id`. */
+    const plu = asString(p.plu)?.trim();
+    if (plu && !productById.has(plu)) productById.set(plu, p);
   }
 
   return { groupById, modifierById, productById };
@@ -852,12 +856,107 @@ function collectLeafOptionsFromGroupNode(
   return expandSubProductEntriesToLeafOptionSpecs(entries, lookups, issues, context, 0);
 }
 
+/** True when `subProducts` has at least one entry (array or string-keyed map). */
+function subProductsNonEmpty(raw: unknown): boolean {
+  if (raw === undefined || raw === null) return false;
+  if (Array.isArray(raw)) return raw.length > 0;
+  if (isRecord(raw) && !Array.isArray(raw)) return Object.keys(raw).length > 0;
+  return false;
+}
+
+/**
+ * Deliverect variant group row (`isVariantGroup` / productType 3) between a variant parent and leaf PLUs.
+ * See https://developers.deliverect.com/docs/variants
+ */
+function isDeliverectVariantGroupNode(node: Record<string, unknown>): boolean {
+  if (node.isVariantGroup === true) return true;
+  const pt = node.productType;
+  if (pt === 3 || pt === "3") return true;
+  return false;
+}
+
+/**
+ * Map variation product `deliverectId` → parent variant product PLU + name for outbound channel orders.
+ * Walks `isVariant` parents → optional variant group → leaf variation products.
+ */
+function buildDeliverectVariantParentIndex(
+  productsRaw: unknown[],
+  lookups: ModifierPayloadLookups,
+  issues: MenuImportIssueRecord[]
+): Map<string, { parentPlu: string; parentName: string }> {
+  const out = new Map<string, { parentPlu: string; parentName: string }>();
+
+  function resolveRawProductNode(refId: string): Record<string, unknown> | null {
+    const t = refId.trim();
+    if (!t) return null;
+    return (
+      lookups.productById.get(t) ?? lookups.groupById.get(t) ?? lookups.modifierById.get(t) ?? null
+    );
+  }
+
+  function resolveEntry(entry: SubProductEntry): Record<string, unknown> | null {
+    if (entry.kind === "inline") return entry.node;
+    return resolveRawProductNode(entry.refId);
+  }
+
+  function registerVariationLeaf(
+    leaf: Record<string, unknown>,
+    parentPlu: string,
+    parentName: string
+  ): void {
+    const id = firstDeliverectId(leaf);
+    if (!id) return;
+    if (leaf.isVariant === true) return;
+    out.set(id, { parentPlu, parentName });
+  }
+
+  for (const pr of productsRaw) {
+    if (!isRecord(pr) || Array.isArray(pr)) continue;
+    if (pr.isVariant !== true) continue;
+
+    const parentPlu = asString(pr.plu)?.trim();
+    if (!parentPlu) continue;
+
+    const parentNameRaw = asString(pr.name) ?? asString(pr.productName);
+    const parentName = (parentNameRaw?.trim() || parentPlu).trim();
+
+    const topEntries = coerceSubProductEntries(getSubProductsRaw(pr), issues, {
+      entityPath: "/deliverectVariantParent/subProducts",
+      deliverectId: firstDeliverectId(pr),
+    });
+
+    for (const entry of topEntries) {
+      const node = resolveEntry(entry);
+      if (!node) continue;
+
+      if (isDeliverectVariantGroupNode(node)) {
+        const leafEntries = coerceSubProductEntries(getSubProductsRaw(node), issues, {
+          entityPath: "/deliverectVariantGroup/subProducts",
+          deliverectId: firstDeliverectId(node),
+        });
+        for (const le of leafEntries) {
+          const leaf = resolveEntry(le);
+          if (!leaf) continue;
+          if (isDeliverectVariantGroupNode(leaf)) continue;
+          if (leaf.isVariant === true) continue;
+          registerVariationLeaf(leaf, parentPlu, parentName);
+        }
+      } else if (!subProductsNonEmpty(getSubProductsRaw(node))) {
+        registerVariationLeaf(node, parentPlu, parentName);
+      }
+    }
+  }
+
+  return out;
+}
+
 function buildProduct(
   pr: Record<string, unknown>,
   index: number,
   registry: Map<string, MennyuCanonicalModifierGroup>,
   lookups: ModifierPayloadLookups,
-  issues: MenuImportIssueRecord[]
+  issues: MenuImportIssueRecord[],
+  variantParentByDeliverectId: Map<string, { parentPlu: string; parentName: string }>
 ): MennyuCanonicalProduct | null {
   const deliverectId = firstDeliverectId(pr);
   if (!deliverectId) {
@@ -921,10 +1020,17 @@ function buildProduct(
   );
 
   const pluRaw = asString(pr.plu);
+  const variantParent = variantParentByDeliverectId.get(deliverectId);
 
   return {
     deliverectId,
     plu: pluRaw ?? null,
+    ...(variantParent
+      ? {
+          deliverectVariantParentPlu: variantParent.parentPlu,
+          deliverectVariantParentName: variantParent.parentName,
+        }
+      : {}),
     name: nameRaw ?? "Unnamed item",
     description: desc,
     priceCents,

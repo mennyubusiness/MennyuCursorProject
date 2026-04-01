@@ -389,4 +389,53 @@ describe("runPhase1aDeliverectMenuImport", () => {
     expect(result.ok).toBe(false);
     expect(result.validationIssues.length + result.normalizationIssues.length).toBeGreaterThan(0);
   });
+
+  it("sets deliverectVariantParentPlu on Deliverect variation leaf products", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        products: [
+          {
+            _id: "parent-mongo",
+            plu: "VAR-PROD-1",
+            name: "Chicken tenders",
+            price: 0,
+            isVariant: true,
+            subProducts: ["MG-VAR-1"],
+          },
+          {
+            _id: "mg-1",
+            plu: "MG-VAR-1",
+            name: "How many pieces?",
+            price: 0,
+            productType: 3,
+            isVariantGroup: true,
+            min: 1,
+            max: 1,
+            subProducts: ["VAR-1", "VAR-2"],
+          },
+          {
+            _id: "var-1",
+            plu: "VAR-1",
+            name: "3 Pieces",
+            price: 800,
+          },
+          {
+            _id: "var-2",
+            plu: "VAR-2",
+            name: "6 Pieces",
+            price: 1100,
+          },
+        ],
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_api_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    expect(result.ok).toBe(true);
+    const byId = new Map(result.menu!.products.map((p) => [p.deliverectId, p]));
+    expect(byId.get("var-1")?.deliverectVariantParentPlu).toBe("VAR-PROD-1");
+    expect(byId.get("var-1")?.deliverectVariantParentName).toBe("Chicken tenders");
+    expect(byId.get("var-2")?.deliverectVariantParentPlu).toBe("VAR-PROD-1");
+    expect(byId.get("parent-mongo")?.deliverectVariantParentPlu).toBeUndefined();
+  });
 });

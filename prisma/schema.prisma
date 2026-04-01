@@ -296,6 +296,10 @@ model MenuItem {
   deliverectProductId  String?
   /// Raw Deliverect `plu` from menu payload; snooze webhooks key on PLU while `deliverectProductId` is often `_id`-first.
   deliverectPlu        String?
+  /// When this row is a Deliverect variation PLU, parent variant product PLU for outbound orders (`items[].subItems`).
+  deliverectVariantParentPlu   String?
+  /// Display name of the parent variant product (top-level order line `name`).
+  deliverectVariantParentName  String?
   /// Deliverect category id from canonical menu (ordering / future grouping).
   deliverectCategoryId String?
   cartItems            CartItem[]

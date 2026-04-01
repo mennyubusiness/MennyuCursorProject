@@ -44,6 +44,12 @@ export const mennyuCanonicalProductSchema = z.object({
   deliverectId: z.string().min(1),
   /** Deliverect `plu` when present; used for snooze webhooks (distinct from `_id`-first `deliverectId`). */
   plu: z.string().min(1).nullable().optional(),
+  /**
+   * When this product is a variation leaf under a Deliverect `isVariant` parent, parent product PLU/name
+   * for channel orders (parent line + variation in `subItems`).
+   */
+  deliverectVariantParentPlu: z.string().min(1).nullable().optional(),
+  deliverectVariantParentName: z.string().min(1).nullable().optional(),
   name: z.string().min(1),
   description: z.string().nullable().optional(),
   priceCents: canonicalMoneyCentsSchema,

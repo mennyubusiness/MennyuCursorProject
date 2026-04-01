@@ -129,6 +129,39 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     expect(payload.items[0]?.externalProductId).toBe("69cce376adf3afeb41ffe8e4");
   });
 
+  it("sends Deliverect variant products as parent PLU with variation in subItems", () => {
+    const base = minimalVendorOrder();
+    const payload = mennyuVendorOrderToDeliverectPayload({
+      vendorOrder: {
+        ...base,
+        lineItems: [
+          {
+            ...base.lineItems[0]!,
+            name: "Spicy Ranch",
+            menuItem: {
+              id: "mi-var",
+              name: "Spicy Ranch",
+              deliverectProductId: "leaf-mongo",
+              deliverectPlu: "P-SPICY-RANCH",
+              deliverectVariantParentPlu: "PARENT-SALAD",
+              deliverectVariantParentName: "Salad base",
+            },
+          },
+        ],
+      } as NonNullable<typeof base>,
+      channelLinkId: "ch-link-cert",
+    });
+
+    expect(payload.items[0]?.plu).toBe("PARENT-SALAD");
+    expect(payload.items[0]?.name).toBe("Salad base");
+    expect(payload.items[0]?.price).toBe(0);
+    expect(payload.items[0]?.subItems).toHaveLength(1);
+    expect(payload.items[0]?.subItems?.[0]?.plu).toBe("P-SPICY-RANCH");
+    expect(payload.items[0]?.subItems?.[0]?.name).toBe("Spicy Ranch");
+    expect(payload.items[0]?.subItems?.[0]?.price).toBe(1000);
+    expect(payload.items[0]?.externalProductId).toBeUndefined();
+  });
+
   it("payment.amount excludes Mennyu platform service fee — restaurant-facing total only", () => {
     const payload = mennyuVendorOrderToDeliverectPayload({
       vendorOrder: minimalVendorOrder({

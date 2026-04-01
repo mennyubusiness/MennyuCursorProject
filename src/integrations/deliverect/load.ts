@@ -25,6 +25,8 @@ export async function getVendorOrderForDeliverect(vendorOrderId: string) {
               name: true,
               deliverectProductId: true,
               deliverectPlu: true,
+              deliverectVariantParentPlu: true,
+              deliverectVariantParentName: true,
             },
           },
           selections: {
@@ -58,6 +60,8 @@ export async function getOrderVendorOrdersForDeliverect(orderId: string) {
               name: true,
               deliverectProductId: true,
               deliverectPlu: true,
+              deliverectVariantParentPlu: true,
+              deliverectVariantParentName: true,
             },
           },
           selections: {
