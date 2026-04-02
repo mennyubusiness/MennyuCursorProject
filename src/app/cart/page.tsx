@@ -8,6 +8,7 @@ import { getActiveOrderByCustomerPhone, validateCartItemsForDisplay, getCartVali
 import type { CartForValidation } from "@/services/order.service";
 import { MenuItemImage } from "@/components/images/MenuItemImage";
 import { serializeModifierConfig } from "@/lib/modifier-config";
+import { getCartEditModifierModalPayload } from "@/actions/variant-modifier-config.actions";
 import {
   getShellBasePriceCentsByVendorParentPlu,
   shellBasePriceKey,
@@ -90,6 +91,27 @@ export default async function CartPage({
   }
   const totalCents = Array.from(byVendor.values()).reduce((a, v) => a + v.subtotalCents, 0);
   const vendorCount = byVendor.size;
+
+  /** Parent+leaf merge + implicit size selection — matches vendor ModifierModal; edit mode skips client merge. */
+  const cartEditModifierByItemId = new Map<
+    string,
+    Awaited<ReturnType<typeof getCartEditModifierModalPayload>>
+  >();
+  await Promise.all(
+    cart.items.map(async (item) => {
+      if (!item.menuItem.modifierGroups?.length) {
+        cartEditModifierByItemId.set(item.id, null);
+        return;
+      }
+      const persisted =
+        item.selections?.map((s) => ({
+          modifierOptionId: s.modifierOptionId,
+          quantity: s.quantity,
+        })) ?? [];
+      const payload = await getCartEditModifierModalPayload(item.menuItemId, persisted);
+      cartEditModifierByItemId.set(item.id, payload);
+    })
+  );
 
   const shellBaseByVendorParentPlu = await getShellBasePriceCentsByVendorParentPlu(cart.items);
 
@@ -255,6 +277,8 @@ export default async function CartPage({
                         modifierConfig={
                           item.menuItem.modifierGroups?.length
                             ? (() => {
+                                const merged = cartEditModifierByItemId.get(item.id)?.config;
+                                if (merged) return merged;
                                 const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
                                 const shellBase =
                                   pplu != null
@@ -269,10 +293,13 @@ export default async function CartPage({
                               })()
                             : undefined
                         }
-                        initialSelections={item.selections?.map((s) => ({
-                          modifierOptionId: s.modifierOptionId,
-                          quantity: s.quantity,
-                        }))}
+                        initialSelections={
+                          cartEditModifierByItemId.get(item.id)?.initialSelections ??
+                          item.selections?.map((s) => ({
+                            modifierOptionId: s.modifierOptionId,
+                            quantity: s.quantity,
+                          }))
+                        }
                       />
                     </div>
                     </div>
