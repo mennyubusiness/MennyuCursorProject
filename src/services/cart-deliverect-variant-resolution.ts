@@ -114,13 +114,18 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
 }): Promise<{
   menuItem: MenuItemForVariantResolution;
   selections: CartItemSelectionInput[] | null;
+  /**
+   * Sum of (price × qty) for parent-shell variant options (size) that are **not** persisted on the
+   * cart line. Add to `menuItem.priceCents` when computing line totals so base + size is not lost.
+   */
+  variantSelectionsPriceCents: number;
 }> {
   let { menuItem } = args;
   let selections = args.selections ?? null;
 
   if (menuItem.deliverectVariantParentPlu?.trim()) {
     if (!selections?.length) {
-      return { menuItem, selections };
+      return { menuItem, selections, variantSelectionsPriceCents: 0 };
     }
     const parent = await findParentShellMenuItemByPlu(
       menuItem.vendorId,
@@ -140,7 +145,7 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
     (l) => l.modifierGroup.deliverectIsVariantGroup === true
   );
   if (!hasVariantGroupOnItem) {
-    return { menuItem, selections };
+    return { menuItem, selections, variantSelectionsPriceCents: 0 };
   }
 
   if (!selections?.length) {
@@ -157,6 +162,7 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
       id: true,
       modifierGroupId: true,
       deliverectModifierPlu: true,
+      priceCents: true,
       modifierGroup: { select: { id: true, deliverectIsVariantGroup: true } },
     },
   });
@@ -171,6 +177,7 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
 
   const variantSelected: typeof optionRows = [];
   const nonVariantSelections: CartItemSelectionInput[] = [];
+  let variantSelectionsPriceCents = 0;
   for (const s of selections) {
     if (s.quantity < 1) continue;
     const opt = byId.get(s.modifierOptionId);
@@ -182,6 +189,7 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
     }
     if (parentShellVariantGroupIds.has(opt.modifierGroupId)) {
       variantSelected.push(opt);
+      variantSelectionsPriceCents += opt.priceCents * s.quantity;
     } else {
       nonVariantSelections.push(s);
     }
@@ -234,7 +242,11 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
   }
 
   const remapped = await remapSelectionsToLeafMenuItemIfNeeded(leaf.id, nonVariantSelections);
-  return { menuItem: leaf, selections: remapped.length > 0 ? remapped : null };
+  return {
+    menuItem: leaf,
+    selections: remapped.length > 0 ? remapped : null,
+    variantSelectionsPriceCents,
+  };
 }
 
 /**

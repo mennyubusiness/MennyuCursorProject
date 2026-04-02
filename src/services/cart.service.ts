@@ -151,11 +151,14 @@ export async function addCartItem(
   if (!vendorInPod) throw new Error("Menu item vendor is not in this pod");
 
   /** Validate modifiers only after variant resolution: parent shell graphs do not include leaf-only option ids. */
-  const { menuItem: menuItemResolved, selections: selectionsResolved } =
+  const { menuItem: menuItemResolved, selections: selectionsResolved, variantSelectionsPriceCents } =
     await resolveDeliverectVariantLeafForCartLine({
       menuItem: menuItemInitial,
       selections,
     });
+
+  /** Leaf row base + variant (size) charges stripped from persisted selections — both must count toward unit price. */
+  const baseUnitCents = menuItemResolved.priceCents + variantSelectionsPriceCents;
 
   if (!(await isMenuItemIdOperational(menuItemResolved.vendorId, menuItemResolved.id))) {
     throw new CartValidationError(
@@ -204,10 +207,10 @@ export async function addCartItem(
               const withPrices = selectionsForLeaf
                 .filter((s) => s.quantity >= 1)
                 .map((s) => ({ priceCents: byId.get(s.modifierOptionId) ?? 0, quantity: s.quantity }));
-              return computeEffectiveUnitPriceCents(menuItemResolved.priceCents, withPrices);
+              return computeEffectiveUnitPriceCents(baseUnitCents, withPrices);
             });
         })()
-      : Promise.resolve(menuItemResolved.priceCents);
+      : Promise.resolve(baseUnitCents);
 
   const priceCentsToStore = await effectiveUnitPriceCents;
 
@@ -402,11 +405,13 @@ export async function updateCartItem(
     );
 
     /** Validate only after resolve: merged UI sends parent + leaf option ids; parent graph does not list leaf ids. */
-    const { menuItem: menuItemResolved, selections: selectionsResolved } =
+    const { menuItem: menuItemResolved, selections: selectionsResolved, variantSelectionsPriceCents } =
       await resolveDeliverectVariantLeafForCartLine({
         menuItem: menuItemInitial,
         selections: selectionsWithImplicitVariant,
       });
+
+    const baseUnitCents = menuItemResolved.priceCents + variantSelectionsPriceCents;
 
     if (!(await isMenuItemIdOperational(menuItemResolved.vendorId, menuItemResolved.id))) {
       throw new CartValidationError(
@@ -461,10 +466,10 @@ export async function updateCartItem(
                 const withPrices = selectionsForLeaf
                   .filter((s) => s.quantity >= 1)
                   .map((s) => ({ priceCents: byId.get(s.modifierOptionId) ?? 0, quantity: s.quantity }));
-                return computeEffectiveUnitPriceCents(menuItemResolved.priceCents, withPrices);
+                return computeEffectiveUnitPriceCents(baseUnitCents, withPrices);
               });
           })()
-        : Promise.resolve(menuItemResolved.priceCents);
+        : Promise.resolve(baseUnitCents);
 
     const priceCentsToStore = await effectiveUnitPriceCents;
 
