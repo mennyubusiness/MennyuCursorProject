@@ -53,25 +53,38 @@ export async function augmentSelectionsWithImplicitVariantFromLeaf(
   const parent = await findParentShellMenuItemByPlu(leaf.vendorId, parentPlu);
   if (!parent) return selections;
 
+  const parentShellVariantGroupIds = new Set(
+    parent.modifierGroups
+      .filter((l) => l.modifierGroup.deliverectIsVariantGroup === true)
+      .map((l) => l.modifierGroup.id)
+  );
+
   const selIds = selections.map((s) => s.modifierOptionId);
   if (selIds.length > 0) {
     const selectedOpts = await prisma.modifierOption.findMany({
       where: { id: { in: selIds } },
-      include: { modifierGroup: { select: { deliverectIsVariantGroup: true } } },
+      select: { modifierGroupId: true },
     });
-    if (selectedOpts.some((o) => o.modifierGroup.deliverectIsVariantGroup === true)) {
+    if (selectedOpts.some((o) => parentShellVariantGroupIds.has(o.modifierGroupId))) {
       return selections;
     }
   }
 
   const variantOpt = await prisma.modifierOption.findFirst({
-    where: {
-      deliverectModifierPlu: leafPlu,
-      modifierGroup: {
-        deliverectIsVariantGroup: true,
-        menuItems: { some: { menuItemId: parent.id } },
-      },
-    },
+    where:
+      parentShellVariantGroupIds.size > 0
+        ? {
+            deliverectModifierPlu: leafPlu,
+            modifierGroupId: { in: [...parentShellVariantGroupIds] },
+            modifierGroup: { menuItems: { some: { menuItemId: parent.id } } },
+          }
+        : {
+            deliverectModifierPlu: leafPlu,
+            modifierGroup: {
+              deliverectIsVariantGroup: true,
+              menuItems: { some: { menuItemId: parent.id } },
+            },
+          },
   });
   if (!variantOpt) return selections;
 
@@ -140,11 +153,21 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
 
   const optionRows = await prisma.modifierOption.findMany({
     where: { id: { in: selections.map((s) => s.modifierOptionId) } },
-    include: {
+    select: {
+      id: true,
+      modifierGroupId: true,
+      deliverectModifierPlu: true,
       modifierGroup: { select: { id: true, deliverectIsVariantGroup: true } },
     },
   });
   const byId = new Map(optionRows.map((o) => [o.id, o]));
+
+  /** Only options under groups linked to the parent shell as variant (e.g. size). Do not use the global `deliverectIsVariantGroup` flag — leaf-only groups may be mis-tagged and must stay in non-variant selections. */
+  const parentShellVariantGroupIds = new Set(
+    menuItem.modifierGroups
+      .filter((l) => l.modifierGroup.deliverectIsVariantGroup === true)
+      .map((l) => l.modifierGroup.id)
+  );
 
   const variantSelected: typeof optionRows = [];
   const nonVariantSelections: CartItemSelectionInput[] = [];
@@ -157,7 +180,7 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
         menuItemName: menuItem.name,
       });
     }
-    if (opt.modifierGroup.deliverectIsVariantGroup === true) {
+    if (parentShellVariantGroupIds.has(opt.modifierGroupId)) {
       variantSelected.push(opt);
     } else {
       nonVariantSelections.push(s);
