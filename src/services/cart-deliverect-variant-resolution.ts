@@ -231,8 +231,13 @@ async function remapSelectionsToLeafMenuItemIfNeeded(
         include: {
           modifierGroup: {
             include: {
-              options: true,
-              nestedModifierGroups: { include: { options: true } },
+              options: {
+                include: {
+                  nestedModifierGroups: {
+                    include: { options: true },
+                  },
+                },
+              },
             },
           },
         },
