@@ -108,7 +108,7 @@ export async function getCartEditModifierModalPayload(
   const parentConfig = serializeModifierConfig(parentFull);
   const leafConfig = serializeModifierConfig(leafFull);
   const config = mergeVariantParentAndLeafModifierConfig(parentConfig, leafConfig, {
-    menuItemName: leafFull.name,
+    menuItemName: parentFull.name,
   });
   return { config, initialSelections };
 }

@@ -367,18 +367,14 @@ export async function shellBasePriceCentsForMenuItem(
   return parent?.priceCents ?? menuItem.priceCents;
 }
 
-/**
- * Size/variation charge implied by a leaf row when variant-group rows are omitted from persisted cart selections.
- * Matches the parent-shell variant option whose `deliverectModifierPlu` equals the leaf's `deliverectPlu`.
- */
-export async function variantSelectionsPriceCentsForLeafCartLine(
+async function findVariantModifierOptionForLeaf(
   leaf: Pick<MenuItemForVariantResolution, "vendorId" | "deliverectPlu" | "deliverectVariantParentPlu">
-): Promise<number> {
+): Promise<{ priceCents: number; name: string } | null> {
   const parentPlu = leaf.deliverectVariantParentPlu?.trim();
   const leafPlu = leaf.deliverectPlu?.trim();
-  if (!parentPlu || !leafPlu) return 0;
+  if (!parentPlu || !leafPlu) return null;
   const parent = await findParentShellMenuItemByPlu(leaf.vendorId, parentPlu);
-  if (!parent) return 0;
+  if (!parent) return null;
   const parentShellVariantGroupIds = new Set(
     parent.modifierGroups
       .filter((l) => l.modifierGroup.deliverectIsVariantGroup === true)
@@ -399,22 +395,53 @@ export async function variantSelectionsPriceCentsForLeafCartLine(
               menuItems: { some: { menuItemId: parent.id } },
             },
           },
-    select: { priceCents: true },
+    select: { priceCents: true, name: true },
   });
-  return variantOpt?.priceCents ?? 0;
+  return variantOpt ?? null;
+}
+
+/**
+ * Size/variation charge implied by a leaf row when variant-group rows are omitted from persisted cart selections.
+ * Matches the parent-shell variant option whose `deliverectModifierPlu` equals the leaf's `deliverectPlu`.
+ */
+export async function variantSelectionsPriceCentsForLeafCartLine(
+  leaf: Pick<MenuItemForVariantResolution, "vendorId" | "deliverectPlu" | "deliverectVariantParentPlu">
+): Promise<number> {
+  const o = await findVariantModifierOptionForLeaf(leaf);
+  return o?.priceCents ?? 0;
+}
+
+/** Customer-facing label for the selected size/variation (e.g. "Medium") for cart/checkout display. */
+export async function getVariantOptionDisplayNameForLeaf(
+  vendorId: string,
+  deliverectVariantParentPlu: string | null | undefined,
+  deliverectLeafPlu: string | null | undefined
+): Promise<string | null> {
+  const o = await findVariantModifierOptionForLeaf({
+    vendorId,
+    deliverectPlu: deliverectLeafPlu ?? null,
+    deliverectVariantParentPlu: deliverectVariantParentPlu ?? null,
+  });
+  return o?.name ?? null;
 }
 
 const SHELL_BASE_KEY_SEP = "\u001e";
 
-/** Map key for {@link getShellBasePriceCentsByVendorParentPlu} — parent shell PLU is the variant-family id on leaf rows. */
+/** Map key for parent-shell lookups — parent shell PLU is the variant-family id on leaf rows. */
 export function shellBasePriceKey(vendorId: string, parentPlu: string): string {
   return `${vendorId}${SHELL_BASE_KEY_SEP}${parentPlu.trim()}`;
 }
 
-/** Batch-load parent shell list prices for cart lines that reference a variant leaf (for edit UI / display). */
-export async function getShellBasePriceCentsByVendorParentPlu(
+export type ParentShellCartInfo = {
+  priceCents: number;
+  name: string;
+  imageUrl: string | null;
+};
+
+/** Batch-load parent shell rows (name, image, list price) for variant leaf cart lines. */
+export async function getParentShellInfoByVendorParentPlu(
   items: Array<{ vendorId: string; menuItem: { deliverectVariantParentPlu?: string | null } }>
-): Promise<Map<string, number>> {
+): Promise<Map<string, ParentShellCartInfo>> {
   const keys = new Set<string>();
   for (const item of items) {
     const p = item.menuItem.deliverectVariantParentPlu?.trim();
@@ -429,7 +456,24 @@ export async function getShellBasePriceCentsByVendorParentPlu(
   });
   const parents = await prisma.menuItem.findMany({
     where: { OR: orClause },
-    select: { vendorId: true, deliverectPlu: true, priceCents: true },
+    select: { vendorId: true, deliverectPlu: true, priceCents: true, name: true, imageUrl: true },
   });
-  return new Map(parents.map((p) => [shellBasePriceKey(p.vendorId, p.deliverectPlu ?? ""), p.priceCents]));
+  return new Map(
+    parents.map((p) => [
+      shellBasePriceKey(p.vendorId, p.deliverectPlu ?? ""),
+      {
+        priceCents: p.priceCents,
+        name: p.name,
+        imageUrl: p.imageUrl,
+      },
+    ])
+  );
+}
+
+/** @deprecated Use {@link getParentShellInfoByVendorParentPlu} when name/image are needed. */
+export async function getShellBasePriceCentsByVendorParentPlu(
+  items: Array<{ vendorId: string; menuItem: { deliverectVariantParentPlu?: string | null } }>
+): Promise<Map<string, number>> {
+  const m = await getParentShellInfoByVendorParentPlu(items);
+  return new Map([...m.entries()].map(([k, v]) => [k, v.priceCents]));
 }

@@ -10,7 +10,8 @@ import { MenuItemImage } from "@/components/images/MenuItemImage";
 import { serializeModifierConfig } from "@/lib/modifier-config";
 import { getCartEditModifierModalPayload } from "@/actions/variant-modifier-config.actions";
 import {
-  getShellBasePriceCentsByVendorParentPlu,
+  getParentShellInfoByVendorParentPlu,
+  getVariantOptionDisplayNameForLeaf,
   shellBasePriceKey,
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartItemActions } from "./CartItemActions";
@@ -113,7 +114,24 @@ export default async function CartPage({
     })
   );
 
-  const shellBaseByVendorParentPlu = await getShellBasePriceCentsByVendorParentPlu(cart.items);
+  const parentShellByVendorParentPlu = await getParentShellInfoByVendorParentPlu(cart.items);
+
+  const variantSizeLabelByCartItemId = new Map<string, string | null>();
+  await Promise.all(
+    cart.items.map(async (item) => {
+      const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
+      if (!pplu) {
+        variantSizeLabelByCartItemId.set(item.id, null);
+        return;
+      }
+      const label = await getVariantOptionDisplayNameForLeaf(
+        item.vendorId,
+        item.menuItem.deliverectVariantParentPlu,
+        item.menuItem.deliverectPlu
+      );
+      variantSizeLabelByCartItemId.set(item.id, label);
+    })
+  );
 
   const cartForValidation: CartForValidation = {
     podId: cart.podId,
@@ -218,8 +236,18 @@ export default async function CartPage({
             <ul className="divide-y divide-stone-100">
               {group.items.map((item) => {
                 const itemError = errorByCartItemId.get(item.id);
-                const modLines =
-                  item.selections
+                const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
+                const parentShell = pplu
+                  ? parentShellByVendorParentPlu.get(shellBasePriceKey(item.vendorId, pplu))
+                  : undefined;
+                const lineTitle = parentShell?.name ?? item.menuItem.name;
+                const lineImageUrl = parentShell?.imageUrl ?? item.menuItem.imageUrl;
+                const sizeLabel = variantSizeLabelByCartItemId.get(item.id);
+                const modLines = [
+                  ...(sizeLabel
+                    ? [{ key: "__variant_size", label: sizeLabel }]
+                    : []),
+                  ...(item.selections
                     ?.map((s) => ({
                       key: s.modifierOptionId,
                       label:
@@ -227,20 +255,18 @@ export default async function CartPage({
                           ? `${s.modifierOption.name} ×${s.quantity}`
                           : s.modifierOption.name,
                     }))
-                    .filter((m) => Boolean(m.label)) ?? [];
+                    .filter((m) => Boolean(m.label)) ?? []),
+                ];
                 return (
                   <li
                     key={item.id}
                     className={`flex gap-3 px-4 py-4 sm:px-5 ${itemError ? "bg-amber-50/50" : ""}`}
                   >
-                    <MenuItemImage
-                      imageUrl={item.menuItem.imageUrl}
-                      itemName={item.menuItem.name}
-                    />
+                    <MenuItemImage imageUrl={lineImageUrl} itemName={lineTitle} />
                     <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-stone-900">
-                          {item.menuItem.name}
+                          {lineTitle}
                           <span className="ml-2 font-normal text-stone-500">× {item.quantity}</span>
                         </p>
                         {modLines.length > 0 && (
@@ -282,9 +308,9 @@ export default async function CartPage({
                                 const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
                                 const shellBase =
                                   pplu != null
-                                    ? shellBaseByVendorParentPlu.get(
+                                    ? parentShellByVendorParentPlu.get(
                                         shellBasePriceKey(item.vendorId, pplu)
-                                      )
+                                      )?.priceCents
                                     : undefined;
                                 const serialized = serializeModifierConfig(item.menuItem);
                                 return shellBase !== undefined

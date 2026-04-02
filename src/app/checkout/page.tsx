@@ -6,6 +6,11 @@ import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutProgress } from "./CheckoutProgress";
 import { computeOrderTotals } from "@/domain/fees";
 import { getCheckoutDefaultScheduledPickup, validateCartForOrder } from "@/services/order.service";
+import {
+  getParentShellInfoByVendorParentPlu,
+  getVariantOptionDisplayNameForLeaf,
+  shellBasePriceKey,
+} from "@/services/cart-deliverect-variant-resolution";
 
 export default async function CheckoutPage({
   searchParams,
@@ -64,6 +69,26 @@ export default async function CheckoutPage({
     redirect(`/cart?error=${encodeURIComponent(validation.code)}`);
   }
 
+  const parentShellByVendorParentPlu = await getParentShellInfoByVendorParentPlu(cart.items);
+  const checkoutLineNameByItemId = new Map<string, string>();
+  await Promise.all(
+    cart.items.map(async (item) => {
+      const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
+      if (!pplu) {
+        checkoutLineNameByItemId.set(item.id, item.menuItem.name);
+        return;
+      }
+      const parent = parentShellByVendorParentPlu.get(shellBasePriceKey(item.vendorId, pplu));
+      const size = await getVariantOptionDisplayNameForLeaf(
+        item.vendorId,
+        item.menuItem.deliverectVariantParentPlu,
+        item.menuItem.deliverectPlu
+      );
+      const base = parent?.name ?? item.menuItem.name;
+      checkoutLineNameByItemId.set(item.id, size ? `${base} · ${size}` : base);
+    })
+  );
+
   const byVendor = new Map<
     string,
     { name: string; lines: Array<{ name: string; qty: number; cents: number }> }
@@ -72,7 +97,7 @@ export default async function CheckoutPage({
     const lineCents = item.priceCents * item.quantity;
     const g = byVendor.get(item.vendorId);
     const line = {
-      name: item.menuItem.name,
+      name: checkoutLineNameByItemId.get(item.id) ?? item.menuItem.name,
       qty: item.quantity,
       cents: lineCents,
     };
