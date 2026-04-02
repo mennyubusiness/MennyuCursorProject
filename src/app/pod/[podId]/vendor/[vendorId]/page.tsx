@@ -92,6 +92,7 @@ function MenuItemRow({
         <AddToCartButton
           cartId={cartId}
           menuItemId={item.id}
+          shellDeliverectPlu={item.deliverectPlu}
           podId={podId}
           vendorId={vendorId}
           vendorCartItems={vendorCartItems}

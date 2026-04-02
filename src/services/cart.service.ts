@@ -12,24 +12,21 @@ import { selectCartForSessionAndPod } from "@/lib/cart-selection";
 import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
 import { isMenuItemIdOperational } from "@/services/menu-active-scope.service";
 import { normalizedConfigurationKey } from "@/lib/cart-line-identity";
+import {
+  augmentSelectionsWithImplicitVariantFromLeaf,
+  loadMenuItemForVariantResolution,
+  menuItemForModifierValidation,
+  resolveDeliverectVariantLeafForCartLine,
+} from "@/services/cart-deliverect-variant-resolution";
+import { CartValidationError } from "@/services/cart-validation-error";
+
+export { CartValidationError } from "@/services/cart-validation-error";
 
 /** TEMP: set false to silence add-to-cart trace logs */
 const DEBUG_ADD_TO_CART_TRACE = true;
 
 /** TEMP: set false to silence stale-checkout unlink trace logs */
 const DEBUG_DISCARD_STALE_CHECKOUT = true;
-
-/** Thrown when add/update cart item fails validation (modifiers, availability, etc.). Callers can return structured JSON. */
-export class CartValidationError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public details?: { cartItemId?: string; menuItemId?: string; menuItemName?: string }
-  ) {
-    super(message);
-    this.name = "CartValidationError";
-  }
-}
 
 /**
  * Completed / in-flight orders (anything except unpaid `pending_payment` or retryable `failed`) may
@@ -98,11 +95,8 @@ export async function addCartItem(
   if (DEBUG_ADD_TO_CART_TRACE) {
     console.log("[addCartItem] enter", { cartId, menuItemId, quantity });
   }
-  const menuItem = await prisma.menuItem.findUnique({
-    where: { id: menuItemId },
-    include: { vendor: true, modifierGroups: true },
-  });
-  if (!menuItem) {
+  const menuItemInitial = await loadMenuItemForVariantResolution(menuItemId);
+  if (!menuItemInitial) {
     if (DEBUG_ADD_TO_CART_TRACE) {
       console.error("[addCartItem] MenuItem not found", { menuItemId });
     }
@@ -110,24 +104,24 @@ export async function addCartItem(
   }
   if (DEBUG_ADD_TO_CART_TRACE) {
     console.log("[addCartItem] menuItem loaded", {
-      menuItemId: menuItem.id,
-      vendorId: menuItem.vendorId,
-      name: menuItem.name,
+      menuItemId: menuItemInitial.id,
+      vendorId: menuItemInitial.vendorId,
+      name: menuItemInitial.name,
     });
   }
-  if (!(await isMenuItemIdOperational(menuItem.vendorId, menuItem.id))) {
-    throw new CartValidationError(`${menuItem.name} is not on the current menu.`, "ITEM_NOT_IN_CURRENT_MENU", {
-      menuItemId: menuItem.id,
-      menuItemName: menuItem.name,
+  if (!(await isMenuItemIdOperational(menuItemInitial.vendorId, menuItemInitial.id))) {
+    throw new CartValidationError(`${menuItemInitial.name} is not on the current menu.`, "ITEM_NOT_IN_CURRENT_MENU", {
+      menuItemId: menuItemInitial.id,
+      menuItemName: menuItemInitial.name,
     });
   }
-  if (!menuItem.isAvailable) {
-    throw new CartValidationError(`${menuItem.name} is no longer available.`, "ITEM_UNAVAILABLE", {
-      menuItemId: menuItem.id,
-      menuItemName: menuItem.name,
+  if (!menuItemInitial.isAvailable) {
+    throw new CartValidationError(`${menuItemInitial.name} is no longer available.`, "ITEM_UNAVAILABLE", {
+      menuItemId: menuItemInitial.id,
+      menuItemName: menuItemInitial.name,
     });
   }
-  const vendorAvailability = getVendorAvailability(menuItem.vendor);
+  const vendorAvailability = getVendorAvailability(menuItemInitial.vendor);
   if (!vendorAvailability.orderable) {
     const message =
       vendorAvailability.status === "inactive"
@@ -151,19 +145,24 @@ export async function addCartItem(
   if (!cart) throw new Error("Cart not found");
   const vendorInPod = await prisma.podVendor.findUnique({
     where: {
-      podId_vendorId: { podId: cart.podId, vendorId: menuItem.vendorId },
+      podId_vendorId: { podId: cart.podId, vendorId: menuItemInitial.vendorId },
     },
   });
   if (!vendorInPod) throw new Error("Menu item vendor is not in this pod");
 
-  const hasModifierGroups = menuItem.modifierGroups.length > 0;
+  const menuItemForValidation = await menuItemForModifierValidation(menuItemInitial);
+  const hasModifierGroups = menuItemForValidation.modifierGroups.length > 0;
   const selectionsToValidate = selections ?? [];
   if (hasModifierGroups || selectionsToValidate.length > 0) {
     const modResult = await validateCartItemModifiers({
       id: "",
-      menuItemId,
+      menuItemId: menuItemForValidation.id,
       quantity,
-      menuItem: { name: menuItem.name, isAvailable: menuItem.isAvailable, basketMaxQuantity: menuItem.basketMaxQuantity ?? undefined },
+      menuItem: {
+        name: menuItemForValidation.name,
+        isAvailable: menuItemForValidation.isAvailable,
+        basketMaxQuantity: menuItemForValidation.basketMaxQuantity ?? undefined,
+      },
       selections: selectionsToValidate,
     });
     if (!modResult.valid) {
@@ -174,32 +173,77 @@ export async function addCartItem(
     }
   }
 
+  const { menuItem: menuItemResolved, selections: selectionsResolved } =
+    await resolveDeliverectVariantLeafForCartLine({
+      menuItem: menuItemInitial,
+      selections,
+    });
+
+  if (!(await isMenuItemIdOperational(menuItemResolved.vendorId, menuItemResolved.id))) {
+    throw new CartValidationError(
+      `${menuItemResolved.name} is not on the current menu.`,
+      "ITEM_NOT_IN_CURRENT_MENU",
+      { menuItemId: menuItemResolved.id, menuItemName: menuItemResolved.name }
+    );
+  }
+  if (!menuItemResolved.isAvailable) {
+    throw new CartValidationError(`${menuItemResolved.name} is no longer available.`, "ITEM_UNAVAILABLE", {
+      menuItemId: menuItemResolved.id,
+      menuItemName: menuItemResolved.name,
+    });
+  }
+
+  const hasModifierGroupsResolved = menuItemResolved.modifierGroups.length > 0;
+  const selectionsForLeaf = selectionsResolved ?? [];
+  if (hasModifierGroupsResolved || selectionsForLeaf.length > 0) {
+    const modLeaf = await validateCartItemModifiers({
+      id: "",
+      menuItemId: menuItemResolved.id,
+      quantity,
+      menuItem: {
+        name: menuItemResolved.name,
+        isAvailable: menuItemResolved.isAvailable,
+        basketMaxQuantity: menuItemResolved.basketMaxQuantity ?? undefined,
+      },
+      selections: selectionsForLeaf,
+    });
+    if (!modLeaf.valid) {
+      throw new CartValidationError(modLeaf.message, modLeaf.code, {
+        menuItemId: modLeaf.menuItemId,
+        menuItemName: modLeaf.menuItemName,
+      });
+    }
+  }
+
   const effectiveUnitPriceCents =
-    selections != null && selections.length > 0
+    selectionsForLeaf.length > 0
       ? (() => {
-          const optionIds = [...new Set(selections.map((s) => s.modifierOptionId))];
+          const optionIds = [...new Set(selectionsForLeaf.map((s) => s.modifierOptionId))];
           return prisma.modifierOption
             .findMany({ where: { id: { in: optionIds } }, select: { id: true, priceCents: true } })
             .then((opts) => {
               const byId = new Map(opts.map((o) => [o.id, o.priceCents]));
-              const withPrices = selections
+              const withPrices = selectionsForLeaf
                 .filter((s) => s.quantity >= 1)
                 .map((s) => ({ priceCents: byId.get(s.modifierOptionId) ?? 0, quantity: s.quantity }));
-              return computeEffectiveUnitPriceCents(menuItem.priceCents, withPrices);
+              return computeEffectiveUnitPriceCents(menuItemResolved.priceCents, withPrices);
             });
         })()
-      : Promise.resolve(menuItem.priceCents);
+      : Promise.resolve(menuItemResolved.priceCents);
 
   const priceCentsToStore = await effectiveUnitPriceCents;
 
+  const resolvedMenuItemId = menuItemResolved.id;
   const incomingKey = normalizedConfigurationKey(
     specialInstructions,
-    selections?.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity })) ?? null
+    selectionsForLeaf.length > 0
+      ? selectionsForLeaf.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity }))
+      : null
   );
 
   if (DEBUG_ADD_TO_CART_TRACE) {
     const previewCandidates = await prisma.cartItem.findMany({
-      where: { cartId, menuItemId },
+      where: { cartId, menuItemId: resolvedMenuItemId },
       include: { selections: true },
     });
     const previewMatch =
@@ -225,7 +269,7 @@ export async function addCartItem(
 
   await prisma.$transaction(async (tx) => {
     const candidates = await tx.cartItem.findMany({
-      where: { cartId, menuItemId },
+      where: { cartId, menuItemId: resolvedMenuItemId },
       include: { selections: true },
     });
 
@@ -254,7 +298,7 @@ export async function addCartItem(
       });
       if (selections != null) {
         await tx.cartItemSelection.deleteMany({ where: { cartItemId: row.id } });
-        for (const s of selections) {
+        for (const s of selectionsForLeaf) {
           if (s.quantity < 1) continue;
           await tx.cartItemSelection.create({
             data: { cartItemId: row.id, modifierOptionId: s.modifierOptionId, quantity: s.quantity },
@@ -266,8 +310,8 @@ export async function addCartItem(
       const created = await tx.cartItem.create({
         data: {
           cartId,
-          menuItemId,
-          vendorId: menuItem.vendorId,
+          menuItemId: resolvedMenuItemId,
+          vendorId: menuItemResolved.vendorId,
           quantity,
           priceCents: priceCentsToStore,
           specialInstructions: specialInstructions ?? null,
@@ -277,8 +321,8 @@ export async function addCartItem(
       if (DEBUG_ADD_TO_CART_TRACE) {
         console.log("[addCartItem] tx path=create", { cartItemId: created.id });
       }
-      if (selections != null && selections.length > 0) {
-        for (const s of selections) {
+      if (selectionsForLeaf.length > 0) {
+        for (const s of selectionsForLeaf) {
           if (s.quantity < 1) continue;
           await tx.cartItemSelection.create({
             data: { cartItemId: created.id, modifierOptionId: s.modifierOptionId, quantity: s.quantity },
@@ -351,36 +395,126 @@ export async function updateCartItem(
   }
 
   if (selections != null) {
-    const modResult = await validateCartItemModifiers({
-      id: cartItemId,
-      menuItemId: existingItem.menuItemId,
-      quantity,
-      menuItem: {
-        name: existingItem.menuItem.name,
-        isAvailable: existingItem.menuItem.isAvailable,
-        basketMaxQuantity: existingItem.menuItem.basketMaxQuantity ?? undefined,
-      },
-      selections,
-    });
-    if (!modResult.valid) {
-      throw new CartValidationError(modResult.message, modResult.code, {
-        cartItemId: modResult.cartItemId,
-        menuItemId: modResult.menuItemId,
-        menuItemName: modResult.menuItemName,
+    const menuItemInitial = await loadMenuItemForVariantResolution(existingItem.menuItemId);
+    if (!menuItemInitial) {
+      throw new CartValidationError("Menu item not found.", "ITEM_NOT_FOUND", { cartItemId });
+    }
+    if (!(await isMenuItemIdOperational(menuItemInitial.vendorId, menuItemInitial.id))) {
+      throw new CartValidationError(
+        `${menuItemInitial.name} is not on the current menu.`,
+        "ITEM_NOT_IN_CURRENT_MENU",
+        {
+          cartItemId,
+          menuItemId: menuItemInitial.id,
+          menuItemName: menuItemInitial.name,
+        }
+      );
+    }
+    if (!menuItemInitial.isAvailable) {
+      throw new CartValidationError(`${menuItemInitial.name} is no longer available.`, "ITEM_UNAVAILABLE", {
+        cartItemId,
+        menuItemId: menuItemInitial.id,
+        menuItemName: menuItemInitial.name,
       });
     }
-    const optionIds = [...new Set(selections.map((s) => s.modifierOptionId))];
-    const opts = await prisma.modifierOption.findMany({
-      where: { id: { in: optionIds } },
-      select: { id: true, priceCents: true },
-    });
-    const byId = new Map(opts.map((o) => [o.id, o.priceCents]));
-    const withPrices = selections
-      .filter((s) => s.quantity >= 1)
-      .map((s) => ({ priceCents: byId.get(s.modifierOptionId) ?? 0, quantity: s.quantity }));
-    const priceCentsToStore = computeEffectiveUnitPriceCents(existingItem.menuItem.priceCents, withPrices);
+
+    const selectionsWithImplicitVariant = await augmentSelectionsWithImplicitVariantFromLeaf(
+      menuItemInitial,
+      selections ?? []
+    );
+
+    const menuItemForValidation = await menuItemForModifierValidation(menuItemInitial);
+    const hasModifierGroups = menuItemForValidation.modifierGroups.length > 0;
+    const selectionsToValidate = selectionsWithImplicitVariant;
+    if (hasModifierGroups || selectionsToValidate.length > 0) {
+      const modResult = await validateCartItemModifiers({
+        id: cartItemId,
+        menuItemId: menuItemForValidation.id,
+        quantity,
+        menuItem: {
+          name: menuItemForValidation.name,
+          isAvailable: menuItemForValidation.isAvailable,
+          basketMaxQuantity: menuItemForValidation.basketMaxQuantity ?? undefined,
+        },
+        selections: selectionsToValidate,
+      });
+      if (!modResult.valid) {
+        throw new CartValidationError(modResult.message, modResult.code, {
+          cartItemId: modResult.cartItemId,
+          menuItemId: modResult.menuItemId,
+          menuItemName: modResult.menuItemName,
+        });
+      }
+    }
+
+    const { menuItem: menuItemResolved, selections: selectionsResolved } =
+      await resolveDeliverectVariantLeafForCartLine({
+        menuItem: menuItemInitial,
+        selections: selectionsWithImplicitVariant,
+      });
+
+    if (!(await isMenuItemIdOperational(menuItemResolved.vendorId, menuItemResolved.id))) {
+      throw new CartValidationError(
+        `${menuItemResolved.name} is not on the current menu.`,
+        "ITEM_NOT_IN_CURRENT_MENU",
+        {
+          cartItemId,
+          menuItemId: menuItemResolved.id,
+          menuItemName: menuItemResolved.name,
+        }
+      );
+    }
+    if (!menuItemResolved.isAvailable) {
+      throw new CartValidationError(`${menuItemResolved.name} is no longer available.`, "ITEM_UNAVAILABLE", {
+        cartItemId,
+        menuItemId: menuItemResolved.id,
+        menuItemName: menuItemResolved.name,
+      });
+    }
+
+    const selectionsForLeaf = selectionsResolved ?? [];
+    const hasModifierGroupsResolved = menuItemResolved.modifierGroups.length > 0;
+    if (hasModifierGroupsResolved || selectionsForLeaf.length > 0) {
+      const modLeaf = await validateCartItemModifiers({
+        id: cartItemId,
+        menuItemId: menuItemResolved.id,
+        quantity,
+        menuItem: {
+          name: menuItemResolved.name,
+          isAvailable: menuItemResolved.isAvailable,
+          basketMaxQuantity: menuItemResolved.basketMaxQuantity ?? undefined,
+        },
+        selections: selectionsForLeaf,
+      });
+      if (!modLeaf.valid) {
+        throw new CartValidationError(modLeaf.message, modLeaf.code, {
+          cartItemId: modLeaf.cartItemId,
+          menuItemId: modLeaf.menuItemId,
+          menuItemName: modLeaf.menuItemName,
+        });
+      }
+    }
+
+    const effectiveUnitPriceCents =
+      selectionsForLeaf.length > 0
+        ? (() => {
+            const optionIds = [...new Set(selectionsForLeaf.map((s) => s.modifierOptionId))];
+            return prisma.modifierOption
+              .findMany({ where: { id: { in: optionIds } }, select: { id: true, priceCents: true } })
+              .then((opts) => {
+                const byId = new Map(opts.map((o) => [o.id, o.priceCents]));
+                const withPrices = selectionsForLeaf
+                  .filter((s) => s.quantity >= 1)
+                  .map((s) => ({ priceCents: byId.get(s.modifierOptionId) ?? 0, quantity: s.quantity }));
+                return computeEffectiveUnitPriceCents(menuItemResolved.priceCents, withPrices);
+              });
+          })()
+        : Promise.resolve(menuItemResolved.priceCents);
+
+    const priceCentsToStore = await effectiveUnitPriceCents;
+
     await prisma.cartItemSelection.deleteMany({ where: { cartItemId } });
-    for (const s of selections) {
+    for (const s of selectionsForLeaf) {
       if (s.quantity < 1) continue;
       await prisma.cartItemSelection.create({
         data: { cartItemId, modifierOptionId: s.modifierOptionId, quantity: s.quantity },
@@ -388,7 +522,13 @@ export async function updateCartItem(
     }
     await prisma.cartItem.updateMany({
       where: { id: cartItemId, cartId },
-      data: { quantity, priceCents: priceCentsToStore, ...(specialInstructions !== undefined ? { specialInstructions: specialInstructions === "" ? null : specialInstructions } : {}) },
+      data: {
+        quantity,
+        priceCents: priceCentsToStore,
+        menuItemId: menuItemResolved.id,
+        vendorId: menuItemResolved.vendorId,
+        ...(specialInstructions !== undefined ? { specialInstructions: specialInstructions === "" ? null : specialInstructions } : {}),
+      },
     });
     return getCartByIdOrThrow(cartId);
   }
@@ -411,14 +551,19 @@ export async function updateCartItem(
     modifierOptionId: s.modifierOptionId,
     quantity: s.quantity,
   }));
+  const menuItemForPersistedCheck = await loadMenuItemForVariantResolution(existingItem.menuItemId);
+  if (!menuItemForPersistedCheck) {
+    throw new CartValidationError("Menu item not found.", "ITEM_NOT_FOUND", { cartItemId });
+  }
+  const menuItemForPersistedValidation = await menuItemForModifierValidation(menuItemForPersistedCheck);
   const modResult = await validateCartItemModifiers({
     id: cartItemId,
-    menuItemId: existingItem.menuItemId,
+    menuItemId: menuItemForPersistedValidation.id,
     quantity,
     menuItem: {
-      name: existingItem.menuItem.name,
-      isAvailable: existingItem.menuItem.isAvailable,
-      basketMaxQuantity: existingItem.menuItem.basketMaxQuantity ?? undefined,
+      name: menuItemForPersistedValidation.name,
+      isAvailable: menuItemForPersistedValidation.isAvailable,
+      basketMaxQuantity: menuItemForPersistedValidation.basketMaxQuantity ?? undefined,
     },
     selections: persistedSelections,
   });
@@ -621,7 +766,7 @@ function toCartWithGroups(
       quantity: number;
       priceCents: number;
       specialInstructions: string | null;
-      menuItem: { name: string };
+      menuItem: { name: string; deliverectPlu?: string | null; deliverectVariantParentPlu?: string | null };
       vendor: { name: string };
       selections?: Array<{
         modifierOptionId: string;
@@ -647,7 +792,11 @@ function toCartWithGroups(
       quantity: item.quantity,
       priceCents: item.priceCents,
       specialInstructions: item.specialInstructions,
-      menuItem: { name: item.menuItem.name },
+      menuItem: {
+        name: item.menuItem.name,
+        deliverectPlu: item.menuItem.deliverectPlu ?? undefined,
+        deliverectVariantParentPlu: item.menuItem.deliverectVariantParentPlu ?? undefined,
+      },
       selections:
         item.selections?.map((s) => ({
           modifierOptionId: s.modifierOptionId,
@@ -686,7 +835,11 @@ function toCartWithGroups(
       quantity: i.quantity,
       priceCents: i.priceCents,
       specialInstructions: i.specialInstructions,
-      menuItem: { name: i.menuItem.name },
+      menuItem: {
+        name: i.menuItem.name,
+        deliverectPlu: i.menuItem.deliverectPlu ?? undefined,
+        deliverectVariantParentPlu: i.menuItem.deliverectVariantParentPlu ?? undefined,
+      },
       selections: i.selections?.map((s) => ({
         modifierOptionId: s.modifierOptionId,
         modifierOptionName: s.modifierOption.name,

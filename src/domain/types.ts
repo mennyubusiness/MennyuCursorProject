@@ -101,7 +101,12 @@ export interface CartItem {
   quantity: number;
   priceCents: number;
   specialInstructions: string | null;
-  menuItem?: { name: string };
+  menuItem?: {
+    name: string;
+    /** Parent shell PLU when this line is a Deliverect variant leaf row. */
+    deliverectPlu?: string | null;
+    deliverectVariantParentPlu?: string | null;
+  };
   /** Present when cart item has modifier selections (e.g. from future modifier UI). */
   selections?: CartItemSelection[];
 }

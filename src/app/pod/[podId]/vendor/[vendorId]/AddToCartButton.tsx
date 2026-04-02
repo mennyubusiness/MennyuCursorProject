@@ -65,6 +65,8 @@ function CartLineQtyControls({
 export function AddToCartButton({
   cartId,
   menuItemId,
+  /** Parent shell Deliverect PLU — cart lines may store a leaf row whose `deliverectVariantParentPlu` matches. */
+  shellDeliverectPlu,
   modifierConfig,
   podId,
   vendorId,
@@ -75,6 +77,7 @@ export function AddToCartButton({
 }: {
   cartId: string;
   menuItemId: string;
+  shellDeliverectPlu?: string | null;
   modifierConfig?: ModifierConfigForUI;
   podId: string;
   vendorId: string;
@@ -89,10 +92,14 @@ export function AddToCartButton({
   const hasModifiers = Boolean(modifierConfig && modifierConfig.groups.length > 0);
   const buttonDisabled = loading || !cartId || orderingDisabled;
 
-  const linesForThisItem = useMemo(
-    () => vendorCartItems.filter((i) => i.menuItemId === menuItemId),
-    [vendorCartItems, menuItemId]
-  );
+  const linesForThisItem = useMemo(() => {
+    const shellPlu = shellDeliverectPlu?.trim();
+    return vendorCartItems.filter((i) => {
+      if (i.menuItemId === menuItemId) return true;
+      if (shellPlu && i.menuItem?.deliverectVariantParentPlu === shellPlu) return true;
+      return false;
+    });
+  }, [vendorCartItems, menuItemId, shellDeliverectPlu]);
 
   useEffect(() => {
     if (!DEBUG_ADD_TO_CART_TRACE) return;
