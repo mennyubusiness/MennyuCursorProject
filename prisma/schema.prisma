@@ -325,6 +325,8 @@ model ModifierGroup {
   updatedAt                 DateTime                @updatedAt
   /// Stable identity for Deliverect-first menu publish (upsert / soft-remove).
   deliverectModifierGroupId String?
+  /// Deliverect `isVariantGroup` / productType 3 — options are nested `subItems`, not flat `modifiers`.
+  deliverectIsVariantGroup    Boolean?
   menuItems                 MenuItemModifierGroup[]
   parentModifierOption      ModifierOption?         @relation("NestedModifierGroups", fields: [parentModifierOptionId], references: [id], onDelete: Cascade)
   vendor                    Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)

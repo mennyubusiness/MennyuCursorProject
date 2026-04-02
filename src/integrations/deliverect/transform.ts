@@ -94,10 +94,48 @@ function buildModifiersForLine(selections: Selection[]): DeliverectModifier[] | 
   return topLevel.map((m) => attachNested(m));
 }
 
+function selectionIsDeliverectVariantGroup(sel: Selection): boolean {
+  return sel.modifierOption.modifierGroup.deliverectIsVariantGroup === true;
+}
+
+/** One Deliverect variant step (size / nested variation) — never use `modifiers` for these. */
+function selectionToVariantSubLine(sel: Selection): DeliverectOrderSubLine {
+  const plu = sel.modifierOption.deliverectModifierPlu?.trim();
+  if (!plu) {
+    const label = sel.modifierOption.name ?? sel.modifierOptionId;
+    throw new Error(`Missing Deliverect PLU for variant option "${label}" (${sel.modifierOptionId})`);
+  }
+  const externalModifierId = sel.modifierOption.deliverectModifierId?.trim() ?? null;
+  return {
+    plu,
+    name: sel.nameSnapshot,
+    quantity: sel.quantity,
+    price: Math.round(sel.priceCentsSnapshot),
+    ...(externalModifierId ? { externalModifierId } : {}),
+  };
+}
+
+/**
+ * Nest Deliverect variant-group selections (sorted by modifier group order) inside-out:
+ * last group = innermost `subItems` node.
+ */
+function nestVariantGroupSelections(sels: Selection[]): DeliverectOrderSubLine {
+  const sorted = [...sels].sort(
+    (a, b) => a.modifierOption.modifierGroup.sortOrder - b.modifierOption.modifierGroup.sortOrder
+  );
+  const last = sorted[sorted.length - 1]!;
+  let node = selectionToVariantSubLine(last);
+  for (let i = sorted.length - 2; i >= 0; i--) {
+    const outer = selectionToVariantSubLine(sorted[i]!);
+    node = { ...outer, subItems: [node] };
+  }
+  return node;
+}
+
 /**
  * Map one Mennyu line item to Deliverect order item.
- * `plu` must be the POS PLU (`MenuItem.deliverectPlu`), never Mongo `deliverectProductId` or Mennyu ids.
- * `externalProductId` may carry Deliverect product `_id` when present.
+ * Variant products (`deliverectVariantParentPlu`): top-level parent PLU, price 0, chosen variation + nested variant steps in `subItems`.
+ * Deliverect variant groups (`deliverectIsVariantGroup`) emit nested `subItems`, not flat `modifiers`.
  */
 function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
   const variationPlu = line.menuItem?.deliverectPlu?.trim();
@@ -105,27 +143,37 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
     const label = line.menuItem?.name ?? line.name;
     throw new Error(`Missing Deliverect PLU for menu item "${label}" (${line.menuItemId})`);
   }
-  const modifiers = buildModifiersForLine(line.selections);
   const itemNote = line.specialInstructions?.trim();
+
+  const variantGroupSels = line.selections.filter(selectionIsDeliverectVariantGroup);
+  const modifierSels = line.selections.filter((s) => !selectionIsDeliverectVariantGroup(s));
+  const modifierOnly = buildModifiersForLine(modifierSels);
 
   const parentPlu = line.menuItem?.deliverectVariantParentPlu?.trim();
   const parentName = line.menuItem?.deliverectVariantParentName?.trim();
+  const leafExternalId = line.menuItem?.deliverectProductId?.trim() ?? undefined;
 
   if (parentPlu) {
-    const subLine: DeliverectOrderSubLine = {
+    const variationSubLine: DeliverectOrderSubLine = {
       plu: variationPlu,
       name: line.name,
       quantity: line.quantity,
       price: Math.round(line.priceCents),
       ...(itemNote ? { remarks: itemNote } : {}),
-      ...(modifiers && modifiers.length > 0 ? { modifiers } : {}),
+      ...(leafExternalId ? { externalProductId: leafExternalId } : {}),
     };
+    if (variantGroupSels.length > 0) {
+      variationSubLine.subItems = [nestVariantGroupSelections(variantGroupSels)];
+    }
+    if (modifierOnly && modifierOnly.length > 0) {
+      variationSubLine.modifiers = modifierOnly;
+    }
     return {
       plu: parentPlu,
       name: parentName ?? parentPlu,
       quantity: line.quantity,
       price: 0,
-      subItems: [subLine],
+      subItems: [variationSubLine],
     };
   }
 
@@ -137,7 +185,7 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
     quantity: line.quantity,
     price: Math.round(line.priceCents),
     ...(itemNote ? { remark: itemNote, remarks: itemNote } : {}),
-    ...(modifiers && modifiers.length > 0 ? { modifiers } : {}),
+    ...(modifierOnly && modifierOnly.length > 0 ? { modifiers: modifierOnly } : {}),
   };
 }
 

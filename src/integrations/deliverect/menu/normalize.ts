@@ -1201,6 +1201,7 @@ function buildModifierGroupTree(
     isRequired: min > 0,
     sortOrder,
     parentDeliverectOptionId: parentOptionId,
+    isVariantGroup: isDeliverectVariantGroupNode(g),
     options,
   };
 }
@@ -1270,6 +1271,7 @@ function modifierGroupsStructurallyEqual(
 ): boolean {
   if (a.deliverectId !== b.deliverectId) return false;
   if (a.name !== b.name) return false;
+  if (Boolean(a.isVariantGroup) !== Boolean(b.isVariantGroup)) return false;
   if (a.minSelections !== b.minSelections || a.maxSelections !== b.maxSelections) return false;
   if (a.options.length !== b.options.length) return false;
   for (let i = 0; i < a.options.length; i++) {

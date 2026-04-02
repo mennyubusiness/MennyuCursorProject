@@ -67,7 +67,13 @@ export interface DeliverectOrderSubLine {
   quantity: number;
   price: number;
   remarks?: string;
-  /** Nested modifier selections on this variation line. */
+  /** Deliverect product `_id` when this line is a product variation leaf. */
+  externalProductId?: string;
+  /** Deliverect modifier `_id` when this line is a variant-group option (e.g. size PLU). */
+  externalModifierId?: string;
+  /** Further nested variation steps (e.g. size under flavor), per Deliverect variant tree. */
+  subItems?: DeliverectOrderSubLine[];
+  /** Non-variant add-ons (productType modifier) under this line. */
   modifiers?: DeliverectModifier[];
 }
 

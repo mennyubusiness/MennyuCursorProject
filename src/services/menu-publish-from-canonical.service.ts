@@ -108,6 +108,7 @@ export async function applyCanonicalMenuToLiveTables(
       isAvailable: true,
       parentModifierOptionId: parentDbId,
       deliverectModifierGroupId: g.deliverectId,
+      deliverectIsVariantGroup: g.isVariantGroup === true,
     };
 
     const dbGroup = existingG

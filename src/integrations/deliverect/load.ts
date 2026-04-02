@@ -32,7 +32,17 @@ export async function getVendorOrderForDeliverect(vendorOrderId: string) {
           selections: {
             include: {
               modifierOption: {
-                include: { modifierGroup: true },
+                include: {
+                  modifierGroup: {
+                    select: {
+                      id: true,
+                      name: true,
+                      sortOrder: true,
+                      parentModifierOptionId: true,
+                      deliverectIsVariantGroup: true,
+                    },
+                  },
+                },
               },
             },
           },
@@ -67,7 +77,17 @@ export async function getOrderVendorOrdersForDeliverect(orderId: string) {
           selections: {
             include: {
               modifierOption: {
-                include: { modifierGroup: true },
+                include: {
+                  modifierGroup: {
+                    select: {
+                      id: true,
+                      name: true,
+                      sortOrder: true,
+                      parentModifierOptionId: true,
+                      deliverectIsVariantGroup: true,
+                    },
+                  },
+                },
               },
             },
           },

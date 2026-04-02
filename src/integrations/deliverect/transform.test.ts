@@ -159,7 +159,73 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     expect(payload.items[0]?.subItems?.[0]?.plu).toBe("P-SPICY-RANCH");
     expect(payload.items[0]?.subItems?.[0]?.name).toBe("Spicy Ranch");
     expect(payload.items[0]?.subItems?.[0]?.price).toBe(1000);
+    expect(payload.items[0]?.subItems?.[0]?.externalProductId).toBe("leaf-mongo");
     expect(payload.items[0]?.externalProductId).toBeUndefined();
+  });
+
+  it("nests Deliverect variant-group options (e.g. size) under variation subItems, not top-level modifiers", () => {
+    const base = minimalVendorOrder();
+    const payload = mennyuVendorOrderToDeliverectPayload({
+      vendorOrder: {
+        ...base,
+        lineItems: [
+          {
+            id: "line-sr",
+            menuItemId: "mi-sr",
+            name: "Spicy Ranch Pizza",
+            quantity: 1,
+            priceCents: 3200,
+            specialInstructions: null,
+            menuItem: {
+              id: "mi-sr",
+              name: "Spicy Ranch Pizza",
+              deliverectProductId: "69cdbf449a0ea43f52bb1d7b",
+              deliverectPlu: "P-SPICY-RANCH",
+              deliverectVariantParentPlu: "PARENT-PIZZA",
+              deliverectVariantParentName: "Pizza",
+            },
+            selections: [
+              {
+                modifierOptionId: "opt-small",
+                nameSnapshot: "Small Spicy Ranch Pizza",
+                priceCentsSnapshot: 0,
+                quantity: 1,
+                modifierOption: {
+                  id: "opt-small",
+                  name: "Small Spicy Ranch Pizza",
+                  deliverectModifierId: "69cdbf449a0ea43f52bb1d78",
+                  deliverectModifierPlu: "VAR-SMALL-#V0#-",
+                  modifierGroupId: "mg-size",
+                  modifierGroup: {
+                    id: "mg-size",
+                    name: "Size",
+                    sortOrder: 0,
+                    parentModifierOptionId: null,
+                    deliverectIsVariantGroup: true,
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      } as NonNullable<HydratedVendorOrder>,
+      channelLinkId: "ch-link-cert",
+    });
+
+    const item = payload.items[0]!;
+    expect(item.plu).toBe("PARENT-PIZZA");
+    expect(item.name).toBe("Pizza");
+    expect(item.price).toBe(0);
+    expect(item.modifiers).toBeUndefined();
+    expect(item.subItems).toHaveLength(1);
+    const variation = item.subItems![0]!;
+    expect(variation.plu).toBe("P-SPICY-RANCH");
+    expect(variation.price).toBe(3200);
+    expect(variation.externalProductId).toBe("69cdbf449a0ea43f52bb1d7b");
+    expect(variation.subItems).toHaveLength(1);
+    expect(variation.subItems![0]!.plu).toBe("VAR-SMALL-#V0#-");
+    expect(variation.subItems![0]!.externalModifierId).toBe("69cdbf449a0ea43f52bb1d78");
+    expect(variation.modifiers).toBeUndefined();
   });
 
   it("payment.amount excludes Mennyu platform service fee — restaurant-facing total only", () => {

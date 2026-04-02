@@ -30,6 +30,8 @@ export const mennyuCanonicalModifierGroupSchema = z.object({
   isRequired: z.boolean(),
   sortOrder: z.number().int(),
   parentDeliverectOptionId: z.string().min(1).nullable(),
+  /** Deliverect variant group — outbound order uses `subItems`, not `modifiers`, for these options. */
+  isVariantGroup: z.boolean().optional(),
   options: z.array(mennyuCanonicalModifierOptionSchema),
 });
 

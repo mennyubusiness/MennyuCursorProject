@@ -16,7 +16,10 @@ import { env } from "@/lib/env";
 import { submitOrder, type DeliverectSubmitResult } from "@/integrations/deliverect/client";
 import { getVendorOrderForDeliverect } from "@/integrations/deliverect/load";
 import { mennyuVendorOrderToDeliverectPayload } from "@/integrations/deliverect/transform";
-import { validateForSubmission } from "@/integrations/deliverect/validate";
+import {
+  validateForSubmission,
+  validateLiveMenuItemsAgainstPublishedCanonicalVariantParents,
+} from "@/integrations/deliverect/validate";
 
 const LOG_PREFIX = "[Deliverect]";
 
@@ -69,6 +72,18 @@ export async function submitVendorOrderToDeliverect(
       return {
         success: false,
         error: validation.error,
+        code: "VALIDATION_FAILED",
+      };
+    }
+    const canonicalVariantValidation =
+      await validateLiveMenuItemsAgainstPublishedCanonicalVariantParents(vendorOrder);
+    if (!canonicalVariantValidation.valid) {
+      console.warn(
+        `${LOG_PREFIX} Canonical variant validation failed vendorOrderId=${vendorOrderId} vendorId=${vendorOrder.vendor.id} error=${canonicalVariantValidation.error}`
+      );
+      return {
+        success: false,
+        error: canonicalVariantValidation.error,
         code: "VALIDATION_FAILED",
       };
     }
