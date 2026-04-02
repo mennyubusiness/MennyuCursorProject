@@ -6,6 +6,7 @@ import { serializeModifierConfig, mergeVariantParentAndLeafModifierConfig } from
 import { CUSTOMER_VENDOR_MENU_ITEM_INCLUDE } from "@/services/vendor-customer-menu.service";
 import {
   augmentSelectionsWithImplicitVariantFromLeaf,
+  findDeliverectProductVariantGroupIdForLeaf,
   loadMenuItemForVariantResolution,
   resolveDeliverectVariantLeafForCartLine,
 } from "@/services/cart-deliverect-variant-resolution";
@@ -105,8 +106,33 @@ export async function getCartEditModifierModalPayload(
     };
   }
 
-  const parentConfig = serializeModifierConfig(parentFull);
+  let parentConfig = serializeModifierConfig(parentFull);
   const leafConfig = serializeModifierConfig(leafFull);
+
+  const hasFlaggedVariantOnParent = parentConfig.groups.some(
+    (g) => g.modifierGroup.deliverectIsVariantGroup === true
+  );
+  if (!hasFlaggedVariantOnParent) {
+    const variantGroupId = await findDeliverectProductVariantGroupIdForLeaf(parentFull.id, leafFull);
+    if (variantGroupId) {
+      parentConfig = {
+        ...parentConfig,
+        groups: parentConfig.groups.map((link) =>
+          link.modifierGroup.id === variantGroupId
+            ? {
+                ...link,
+                modifierGroup: {
+                  ...link.modifierGroup,
+                  deliverectIsVariantGroup: true,
+                },
+              }
+            : link
+        ),
+        useLeafModifierMerge: true,
+      };
+    }
+  }
+
   const config = mergeVariantParentAndLeafModifierConfig(parentConfig, leafConfig, {
     menuItemName: parentFull.name,
   });

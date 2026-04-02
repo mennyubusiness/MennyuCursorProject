@@ -425,6 +425,51 @@ export async function getVariantOptionDisplayNameForLeaf(
   return o?.name ?? null;
 }
 
+/**
+ * Deliverect maps each **product variant** (leaf `MenuItem`) to a **modifier option** on the parent
+ * shell whose `deliverectModifierPlu` matches the leaf's `deliverectPlu`. That option's
+ * `ModifierGroup` is the variation group (size, style, etc.).
+ *
+ * Used to mark exactly one group for parent+leaf UI merge when `deliverectIsVariantGroup` was not
+ * imported — without treating every “parent-only” modifier group as a variant (which breaks other
+ * flows such as build-your-own pizzas).
+ */
+export async function findDeliverectProductVariantGroupIdForLeaf(
+  parentMenuItemId: string,
+  leaf: {
+    deliverectPlu: string | null;
+    modifierGroups: Array<{ modifierGroup: { id: string } }>;
+  }
+): Promise<string | null> {
+  const leafPlu = leaf.deliverectPlu?.trim();
+  if (!leafPlu) return null;
+  const leafGroupIds = new Set(leaf.modifierGroups.map((l) => l.modifierGroup.id));
+
+  const candidates = await prisma.modifierOption.findMany({
+    where: {
+      deliverectModifierPlu: leafPlu,
+      modifierGroup: {
+        menuItems: { some: { menuItemId: parentMenuItemId } },
+      },
+    },
+    select: {
+      modifierGroupId: true,
+      modifierGroup: {
+        select: { id: true, deliverectIsVariantGroup: true },
+      },
+    },
+  });
+  if (candidates.length === 0) return null;
+
+  const flagged = candidates.find((c) => c.modifierGroup.deliverectIsVariantGroup === true);
+  if (flagged) return flagged.modifierGroupId;
+
+  const parentOnly = candidates.find((c) => !leafGroupIds.has(c.modifierGroup.id));
+  if (parentOnly) return parentOnly.modifierGroupId;
+
+  return candidates[0]?.modifierGroupId ?? null;
+}
+
 const SHELL_BASE_KEY_SEP = "\u001e";
 
 /** Map key for parent-shell lookups — parent shell PLU is the variant-family id on leaf rows. */

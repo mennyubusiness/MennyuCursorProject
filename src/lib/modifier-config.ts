@@ -172,22 +172,17 @@ export function mergeVariantParentAndLeafModifierConfig(
   leafConfig: ModifierConfigForUI,
   opts?: { menuItemName?: string }
 ): ModifierConfigForUI {
-  const leafGroupIds = new Set(leafConfig.groups.map((g) => g.modifierGroup.id));
-
-  /** Prefer explicit Deliverect variant flag on the parent shell. */
-  let variantGroups = parentConfig.groups.filter(
+  /**
+   * Only groups flagged `deliverectIsVariantGroup` on the parent belong in the “variation / size”
+   * slice. Do not infer variant groups by set difference (parent minus leaf): some products (e.g.
+   * build-your-own) attach extra modifier groups only to the parent that are not Deliverect product
+   * variants — treating them as variant groups breaks leaf resolution.
+   *
+   * When flags are missing in the DB, the cart-edit flow may mark the correct group before merging.
+   */
+  const variantGroups = parentConfig.groups.filter(
     (g) => g.modifierGroup.deliverectIsVariantGroup === true
   );
-
-  /**
-   * If the size group is missing `deliverectIsVariantGroup` in the DB, the merge would drop it and
-   * the cart edit modal would show only leaf groups. Treat parent-only groups (ids not linked on
-   * the leaf) as the variant/shell slice — typically “Choose size”.
-   */
-  if (variantGroups.length === 0) {
-    variantGroups = parentConfig.groups.filter((g) => !leafGroupIds.has(g.modifierGroup.id));
-  }
-
   const parentVariantModifierGroupIds = new Set(variantGroups.map((g) => g.modifierGroup.id));
   const leafExtras = leafConfig.groups.filter(
     (g) => !parentVariantModifierGroupIds.has(g.modifierGroup.id)
@@ -198,6 +193,6 @@ export function mergeVariantParentAndLeafModifierConfig(
     menuItemName: opts?.menuItemName ?? parentConfig.menuItemName,
     priceCents: parentConfig.priceCents,
     groups: merged,
-    useLeafModifierMerge: parentConfig.useLeafModifierMerge || variantGroups.length > 0,
+    useLeafModifierMerge: parentConfig.useLeafModifierMerge,
   };
 }
