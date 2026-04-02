@@ -246,6 +246,32 @@ async function upsertMenuItemAndLinks(
         data: { vendorId, ...itemData },
       });
 
+  /**
+   * Duplicate `MenuItem` rows for the same `deliverectProductId` can exist (legacy / race).
+   * `findFirst` only updates one row; orders reference `menuItemId` and may point at another duplicate
+   * with stale `deliverectVariantParentPlu` / PLU — breaking Deliverect variant order shape.
+   */
+  await tx.menuItem.updateMany({
+    where: {
+      vendorId,
+      deliverectProductId: p.deliverectId,
+      NOT: { id: row.id },
+    },
+    data: {
+      name: itemData.name,
+      description: itemData.description,
+      priceCents: itemData.priceCents,
+      imageUrl: itemData.imageUrl,
+      sortOrder: itemData.sortOrder,
+      isAvailable: itemData.isAvailable,
+      basketMaxQuantity: itemData.basketMaxQuantity,
+      deliverectPlu: itemData.deliverectPlu,
+      deliverectVariantParentPlu: itemData.deliverectVariantParentPlu,
+      deliverectVariantParentName: itemData.deliverectVariantParentName,
+      deliverectCategoryId: itemData.deliverectCategoryId,
+    },
+  });
+
   await tx.menuItemModifierGroup.deleteMany({ where: { menuItemId: row.id } });
 
   let linkOrder = 0;
