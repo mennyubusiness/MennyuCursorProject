@@ -49,4 +49,30 @@ describe("mergeVariantParentAndLeafModifierConfig", () => {
     expect(merged.groups.map((g) => g.modifierGroup.name)).toEqual(["Choose Size", "Choose Pizza Crust"]);
     expect(merged.priceCents).toBe(parent.priceCents);
   });
+
+  it("includes parent size group when deliverectIsVariantGroup is false on parent (parent-only group ids)", () => {
+    const parent: ModifierConfigForUI = {
+      menuItemId: "parent",
+      menuItemName: "Spicy Ranch Pizza",
+      priceCents: 3200,
+      groups: [
+        mkGroup("g-size", "Choose Size", { variant: false, sortOrder: 0, options: [] }),
+      ],
+      useLeafModifierMerge: false,
+    };
+    const leaf: ModifierConfigForUI = {
+      menuItemId: "leaf",
+      menuItemName: "Medium Spicy Ranch Pizza",
+      priceCents: 1800,
+      groups: [mkGroup("g-crust", "Choose Pizza Crust", { variant: false, sortOrder: 1, options: [] })],
+    };
+    const merged = mergeVariantParentAndLeafModifierConfig(parent, leaf, {
+      menuItemName: "Spicy Ranch Pizza",
+    });
+    expect(merged.groups.map((g) => g.modifierGroup.name)).toEqual([
+      "Choose Size",
+      "Choose Pizza Crust",
+    ]);
+    expect(merged.useLeafModifierMerge).toBe(true);
+  });
 });
