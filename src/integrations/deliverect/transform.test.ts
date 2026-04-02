@@ -228,6 +228,83 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     expect(variation.modifiers).toBeUndefined();
   });
 
+  it("single-SKU shell (no variant parent PLU): variant-group steps use subItems; other modifiers stay on the line", () => {
+    const base = minimalVendorOrder();
+    const payload = mennyuVendorOrderToDeliverectPayload({
+      vendorOrder: {
+        ...base,
+        lineItems: [
+          {
+            id: "line-byo",
+            menuItemId: "mi-byo",
+            name: "Build your own Pizza",
+            quantity: 1,
+            priceCents: 1500,
+            specialInstructions: null,
+            menuItem: {
+              id: "mi-byo",
+              name: "Build your own Pizza",
+              deliverectProductId: "prod-byo",
+              deliverectPlu: "BYO-PIZZA",
+            },
+            selections: [
+              {
+                modifierOptionId: "opt-med",
+                nameSnapshot: "Medium",
+                priceCentsSnapshot: 300,
+                quantity: 1,
+                modifierOption: {
+                  id: "opt-med",
+                  name: "Medium",
+                  deliverectModifierId: "mod-med",
+                  deliverectModifierPlu: "SIZE-MED",
+                  modifierGroupId: "mg-size",
+                  modifierGroup: {
+                    id: "mg-size",
+                    name: "Size",
+                    sortOrder: 0,
+                    parentModifierOptionId: null,
+                    deliverectIsVariantGroup: true,
+                  },
+                },
+              },
+              {
+                modifierOptionId: "opt-cheese",
+                nameSnapshot: "Extra cheese",
+                priceCentsSnapshot: 200,
+                quantity: 1,
+                modifierOption: {
+                  id: "opt-cheese",
+                  name: "Extra cheese",
+                  deliverectModifierId: "mod-ch",
+                  deliverectModifierPlu: "TOP-CHEESE",
+                  modifierGroupId: "mg-top",
+                  modifierGroup: {
+                    id: "mg-top",
+                    name: "Toppings",
+                    sortOrder: 1,
+                    parentModifierOptionId: null,
+                    deliverectIsVariantGroup: false,
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      } as NonNullable<HydratedVendorOrder>,
+      channelLinkId: "ch-link-cert",
+    });
+
+    const item = payload.items[0]!;
+    expect(item.plu).toBe("BYO-PIZZA");
+    expect(item.price).toBe(1500);
+    expect(item.externalProductId).toBe("prod-byo");
+    expect(item.subItems).toHaveLength(1);
+    expect(item.subItems![0]!.plu).toBe("SIZE-MED");
+    expect(item.modifiers).toHaveLength(1);
+    expect(item.modifiers![0]!.plu).toBe("TOP-CHEESE");
+  });
+
   it("payment.amount excludes Mennyu platform service fee — restaurant-facing total only", () => {
     const payload = mennyuVendorOrderToDeliverectPayload({
       vendorOrder: minimalVendorOrder({

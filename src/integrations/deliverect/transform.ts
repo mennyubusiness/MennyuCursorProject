@@ -177,16 +177,27 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
     };
   }
 
+  /**
+   * Single product row (no `deliverectVariantParentPlu`): shell PLU is the line. Variant-group
+   * modifiers (e.g. size on build-your-own) belong in `subItems`, not flat `modifiers` — same as the
+   * inner variation node for leaf products, otherwise Deliverect drops or misroutes them.
+   */
   const externalProductId = line.menuItem?.deliverectProductId?.trim() ?? null;
-  return {
+  const item: DeliverectOrderItem = {
     plu: variationPlu,
     ...(externalProductId ? { externalProductId } : {}),
     name: line.name,
     quantity: line.quantity,
     price: Math.round(line.priceCents),
     ...(itemNote ? { remark: itemNote, remarks: itemNote } : {}),
-    ...(modifierOnly && modifierOnly.length > 0 ? { modifiers: modifierOnly } : {}),
   };
+  if (variantGroupSels.length > 0) {
+    item.subItems = [nestVariantGroupSelections(variantGroupSels)];
+  }
+  if (modifierOnly && modifierOnly.length > 0) {
+    item.modifiers = modifierOnly;
+  }
+  return item;
 }
 
 /**

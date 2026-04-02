@@ -25,11 +25,6 @@ export type ValidationResult =
   | {
       valid: false;
       error: string;
-      code: "VARIANT_PARENT_MISSING";
-    }
-  | {
-      valid: false;
-      error: string;
       code: "MENU_REPUBLISH_REQUIRED";
     };
 
@@ -96,19 +91,13 @@ export function validateForSubmission(
     };
   }
 
-  for (const line of vendorOrder.lineItems) {
-    const hasVariantGroupSel = line.selections.some(
-      (s) => s.modifierOption.modifierGroup.deliverectIsVariantGroup === true
-    );
-    if (hasVariantGroupSel && !line.menuItem?.deliverectVariantParentPlu?.trim()) {
-      return {
-        valid: false,
-        error:
-          "A line uses Deliverect variant-group selections (e.g. size), but the menu item has no variant parent PLU. Republish the menu after import so live rows receive variant metadata.",
-        code: "VARIANT_PARENT_MISSING",
-      };
-    }
-  }
+  /**
+   * Variant-group selections (e.g. size) are valid in two shapes:
+   * - **Leaf** `MenuItem`: `deliverectVariantParentPlu` set; transform nests under parent PLU.
+   * - **Parent / single-SKU** (e.g. build-your-own): no `deliverectVariantParentPlu`; the product PLU
+   *   is the shell row and variant steps are nested `subItems` on that line (see `transform.ts`).
+   * Do not require a parent PLU on the menu item row when the line is already the shell product.
+   */
 
   return { valid: true };
 }
