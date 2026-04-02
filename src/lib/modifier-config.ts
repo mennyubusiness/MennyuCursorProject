@@ -35,6 +35,8 @@ export interface ModifierGroupLinkForUI {
     maxSelections: number;
     isRequired: boolean;
     isAvailable: boolean;
+    /** Deliverect variant group (size) — only on parent shell; leaf rows use non-variant groups (e.g. crust). */
+    deliverectIsVariantGroup?: boolean | null;
     options: ModifierOptionForUI[];
   };
 }
@@ -62,6 +64,7 @@ type MenuItemWithModifiers = {
       maxSelections: number;
       isRequired: boolean;
       isAvailable: boolean;
+      deliverectIsVariantGroup?: boolean | null;
       parentModifierOptionId?: string | null;
       options: Array<{
         id: string;
@@ -106,6 +109,7 @@ export function serializeModifierConfig(item: MenuItemWithModifiers): ModifierCo
         maxSelections: link.modifierGroup.maxSelections,
         isRequired: link.modifierGroup.isRequired,
         isAvailable: link.modifierGroup.isAvailable,
+        deliverectIsVariantGroup: link.modifierGroup.deliverectIsVariantGroup ?? null,
         options: link.modifierGroup.options.map(
           (opt): ModifierOptionForUI => ({
             id: opt.id,
@@ -141,5 +145,29 @@ export function serializeModifierConfig(item: MenuItemWithModifiers): ModifierCo
     menuItemName: item.name,
     priceCents: item.priceCents,
     groups,
+  };
+}
+
+/**
+ * Combine parent shell variant group(s) (size) with all non-variant groups from the resolved leaf
+ * (crust, toppings, …). Server-side validation uses the leaf; the UI must show the same groups.
+ */
+export function mergeVariantParentAndLeafModifierConfig(
+  parentConfig: ModifierConfigForUI,
+  leafConfig: ModifierConfigForUI,
+  opts?: { menuItemName?: string; priceCents?: number }
+): ModifierConfigForUI {
+  const variantGroups = parentConfig.groups.filter(
+    (g) => g.modifierGroup.deliverectIsVariantGroup === true
+  );
+  const leafNonVariant = leafConfig.groups.filter(
+    (g) => g.modifierGroup.deliverectIsVariantGroup !== true
+  );
+  const merged = [...variantGroups, ...leafNonVariant].sort((a, b) => a.sortOrder - b.sortOrder);
+  return {
+    menuItemId: parentConfig.menuItemId,
+    menuItemName: opts?.menuItemName ?? parentConfig.menuItemName,
+    priceCents: opts?.priceCents ?? leafConfig.priceCents,
+    groups: merged,
   };
 }

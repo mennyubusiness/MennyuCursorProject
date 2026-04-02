@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import type {
   ModifierConfigForUI,
   ModifierGroupLinkForUI,
   ModifierOptionForUI,
 } from "./modifier-config";
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
+import { getVariantMergedModifierConfigAction } from "@/actions/variant-modifier-config.actions";
 import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
 
 /** TEMP: set false to silence add-to-cart trace logs */
@@ -52,6 +53,28 @@ function nestedOptionIdsUnderTopLevelOption(option: ModifierOptionForUI): string
   return ids;
 }
 
+function collectAllOptionIds(cfg: ModifierConfigForUI): Set<string> {
+  const ids = new Set<string>();
+  for (const link of cfg.groups) {
+    for (const opt of link.modifierGroup.options) {
+      ids.add(opt.id);
+      for (const ng of opt.nestedModifierGroups ?? []) {
+        for (const n of ng.options) ids.add(n.id);
+      }
+    }
+  }
+  return ids;
+}
+
+function pruneSelectionsToConfig(selections: SelectionState, cfg: ModifierConfigForUI): SelectionState {
+  const allowed = collectAllOptionIds(cfg);
+  const next: SelectionState = {};
+  for (const [id, qty] of Object.entries(selections)) {
+    if (qty >= 1 && allowed.has(id)) next[id] = qty;
+  }
+  return next;
+}
+
 export function ModifierModal({
   config,
   cartId,
@@ -77,6 +100,11 @@ export function ModifierModal({
   initialSpecialInstructions?: string | null;
 }) {
   const isEditMode = !!cartItemId;
+
+  const isVariantFamily = useMemo(
+    () => config.groups.some((g) => g.modifierGroup.deliverectIsVariantGroup === true),
+    [config.groups]
+  );
 
   const defaults = useMemo(() => {
     if (initialSelections && initialSelections.length > 0) {
@@ -104,6 +132,43 @@ export function ModifierModal({
   const [specialInstructions, setSpecialInstructions] = useState(initialSpecialInstructions ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [displayConfig, setDisplayConfig] = useState<ModifierConfigForUI>(config);
+
+  useEffect(() => {
+    setDisplayConfig(config);
+  }, [config]);
+
+  const selectionsList = useMemo(() => {
+    const list: { modifierOptionId: string; quantity: number }[] = [];
+    for (const [id, qty] of Object.entries(selections)) {
+      if (qty >= 1) list.push({ modifierOptionId: id, quantity: qty });
+    }
+    return list;
+  }, [selections]);
+
+  useEffect(() => {
+    if (!isVariantFamily || isEditMode) return;
+    let cancelled = false;
+    const list: { modifierOptionId: string; quantity: number }[] = [];
+    for (const [id, qty] of Object.entries(selections)) {
+      if (qty >= 1) list.push({ modifierOptionId: id, quantity: qty });
+    }
+    void (async () => {
+      const res = await getVariantMergedModifierConfigAction(config.menuItemId, list);
+      if (cancelled || !res?.config) return;
+      setDisplayConfig(res.config);
+      setSelections((prev) => {
+        const next = pruneSelectionsToConfig(prev, res.config);
+        const same =
+          Object.keys(prev).length === Object.keys(next).length &&
+          Object.keys(next).every((k) => prev[k] === next[k]);
+        return same ? prev : next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isVariantFamily, isEditMode, config.menuItemId, selections]);
 
   const setOptionQty = useCallback(
     (optionId: string, delta: number) => {
@@ -113,7 +178,7 @@ export function ModifierModal({
         const v = Math.max(0, cur + delta);
         if (v === 0) {
           delete next[optionId];
-          for (const link of config.groups) {
+          for (const link of displayConfig.groups) {
             for (const opt of link.modifierGroup.options) {
               if (opt.id !== optionId) continue;
               for (const nid of nestedOptionIdsUnderTopLevelOption(opt)) delete next[nid];
@@ -126,20 +191,12 @@ export function ModifierModal({
       });
       setError(null);
     },
-    [config.groups]
+    [displayConfig.groups]
   );
 
-  const selectionsList = useMemo(() => {
-    const list: { modifierOptionId: string; quantity: number }[] = [];
-    for (const [id, qty] of Object.entries(selections)) {
-      if (qty >= 1) list.push({ modifierOptionId: id, quantity: qty });
-    }
-    return list;
-  }, [selections]);
-
   const totalCents = useMemo(() => {
-    let sum = config.priceCents;
-    for (const link of config.groups) {
+    let sum = displayConfig.priceCents;
+    for (const link of displayConfig.groups) {
       for (const opt of link.modifierGroup.options) {
         const qty = selections[opt.id] ?? 0;
         sum += opt.priceCents * qty;
@@ -154,16 +211,16 @@ export function ModifierModal({
       }
     }
     return sum;
-  }, [config, selections]);
+  }, [displayConfig, selections]);
 
   const requiredSatisfied = useMemo(() => {
-    for (const link of config.groups) {
+    for (const link of displayConfig.groups) {
       if (!link.modifierGroup.isAvailable) continue;
       const total = totalSelectedInGroup(link, selections);
       if (link.required && total < link.minSelections) return false;
       if (total > link.maxSelections) return false;
     }
-    for (const link of config.groups) {
+    for (const link of displayConfig.groups) {
       for (const opt of link.modifierGroup.options) {
         const qty = selections[opt.id] ?? 0;
         if (qty < 1) continue;
@@ -176,7 +233,7 @@ export function ModifierModal({
       }
     }
     return true;
-  }, [config.groups, selections]);
+  }, [displayConfig.groups, selections]);
 
   const canSubmit = requiredSatisfied;
 
@@ -219,14 +276,14 @@ export function ModifierModal({
       if (DEBUG_ADD_TO_CART_TRACE) {
         console.log("[ModifierModal] submit → addToCartAction", {
           cartId,
-          menuItemId: config.menuItemId,
+          menuItemId: displayConfig.menuItemId,
           podId,
           vendorId,
         });
       }
       const result = await addToCartAction(
         cartId,
-        config.menuItemId,
+        displayConfig.menuItemId,
         1,
         specialInstructions.trim() || null,
         selectionsList
@@ -253,7 +310,7 @@ export function ModifierModal({
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-200 bg-white px-4 py-3">
           <h2 id="modifier-modal-title" className="text-lg font-semibold text-stone-900">
-            {config.menuItemName}
+            {displayConfig.menuItemName}
           </h2>
           <button
             type="button"
@@ -267,10 +324,10 @@ export function ModifierModal({
 
         <div className="space-y-4 p-4">
           <p className="text-sm text-stone-600">
-            Base price: ${(config.priceCents / 100).toFixed(2)}
+            Base price: ${(displayConfig.priceCents / 100).toFixed(2)}
           </p>
 
-          {config.groups
+          {displayConfig.groups
             .filter((link) => link.modifierGroup.isAvailable)
             .map((link) => {
               const total = totalSelectedInGroup(link, selections);
