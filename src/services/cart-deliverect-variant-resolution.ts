@@ -234,6 +234,27 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
   });
 
   if (!leaf) {
+    /**
+     * Some menus (e.g. “Build your own”) flag a size/variation group as `deliverectIsVariantGroup`
+     * but have **no** separate child `MenuItem` rows — only the parent SKU exists. Deliverect
+     * still prices those options as modifiers. In that case there is no leaf to resolve; keep the
+     * parent row and persist **all** selections (including “variant” options) so pricing matches
+     * `computeEffectiveUnitPriceCents(parentBase, selections)` without a separate variant surcharge
+     * term (see `variantSelectionsPriceCents: 0` below).
+     */
+    const variantChildCount = await prisma.menuItem.count({
+      where: {
+        vendorId: menuItem.vendorId,
+        deliverectVariantParentPlu: parentPlu,
+      },
+    });
+    if (variantChildCount === 0) {
+      return {
+        menuItem,
+        selections,
+        variantSelectionsPriceCents: 0,
+      };
+    }
     throw new CartValidationError(
       "No menu row matches the selected variation. Try again or contact support.",
       "VARIANT_LEAF_MENU_ITEM_NOT_FOUND",
