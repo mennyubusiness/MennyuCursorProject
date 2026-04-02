@@ -1,6 +1,8 @@
 "use server";
 
+import { prisma } from "@/lib/db";
 import { serializeModifierConfig, mergeVariantParentAndLeafModifierConfig } from "@/lib/modifier-config";
+import { CUSTOMER_VENDOR_MENU_ITEM_INCLUDE } from "@/services/vendor-customer-menu.service";
 import {
   loadMenuItemForVariantResolution,
   resolveDeliverectVariantLeafForCartLine,
@@ -8,6 +10,14 @@ import {
 import { CartValidationError } from "@/services/cart-validation-error";
 
 export type CartItemSelectionInput = { modifierOptionId: string; quantity: number };
+
+/** Full graph for `serializeModifierConfig` (variant resolution uses a slimmer include). */
+async function loadMenuItemForSerializeConfig(menuItemId: string) {
+  return prisma.menuItem.findUnique({
+    where: { id: menuItemId },
+    include: CUSTOMER_VENDOR_MENU_ITEM_INCLUDE,
+  });
+}
 
 /**
  * For Deliverect variant families, the vendor page loads modifier groups from the **parent shell** only.
@@ -18,31 +28,38 @@ export async function getVariantMergedModifierConfigAction(
   parentMenuItemId: string,
   selections: CartItemSelectionInput[]
 ) {
-  const parent = await loadMenuItemForVariantResolution(parentMenuItemId);
-  if (!parent) return null;
+  const parentSlim = await loadMenuItemForVariantResolution(parentMenuItemId);
+  if (!parentSlim) return null;
 
-  const hasVariantGroup = parent.modifierGroups.some(
+  const parentFull = await loadMenuItemForSerializeConfig(parentMenuItemId);
+  if (!parentFull) return null;
+
+  const hasVariantGroup = parentSlim.modifierGroups.some(
     (l) => l.modifierGroup.deliverectIsVariantGroup === true
   );
   if (!hasVariantGroup) {
-    return { config: serializeModifierConfig(parent) };
+    return { config: serializeModifierConfig(parentFull) };
   }
 
   try {
-    const { menuItem: leaf } = await resolveDeliverectVariantLeafForCartLine({
-      menuItem: parent,
+    const { menuItem: leafSlim } = await resolveDeliverectVariantLeafForCartLine({
+      menuItem: parentSlim,
       selections,
     });
-    const parentConfig = serializeModifierConfig(parent);
-    const leafConfig = serializeModifierConfig(leaf);
+    const leafFull = await loadMenuItemForSerializeConfig(leafSlim.id);
+    if (!leafFull) {
+      return { config: serializeModifierConfig(parentFull) };
+    }
+    const parentConfig = serializeModifierConfig(parentFull);
+    const leafConfig = serializeModifierConfig(leafFull);
     const config = mergeVariantParentAndLeafModifierConfig(parentConfig, leafConfig, {
-      menuItemName: leaf.name,
-      priceCents: leaf.priceCents,
+      menuItemName: leafFull.name,
+      priceCents: leafFull.priceCents,
     });
     return { config };
   } catch (e) {
     if (e instanceof CartValidationError) {
-      return { config: serializeModifierConfig(parent) };
+      return { config: serializeModifierConfig(parentFull) };
     }
     throw e;
   }
