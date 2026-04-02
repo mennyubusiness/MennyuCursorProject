@@ -150,29 +150,7 @@ export async function addCartItem(
   });
   if (!vendorInPod) throw new Error("Menu item vendor is not in this pod");
 
-  const menuItemForValidation = await menuItemForModifierValidation(menuItemInitial);
-  const hasModifierGroups = menuItemForValidation.modifierGroups.length > 0;
-  const selectionsToValidate = selections ?? [];
-  if (hasModifierGroups || selectionsToValidate.length > 0) {
-    const modResult = await validateCartItemModifiers({
-      id: "",
-      menuItemId: menuItemForValidation.id,
-      quantity,
-      menuItem: {
-        name: menuItemForValidation.name,
-        isAvailable: menuItemForValidation.isAvailable,
-        basketMaxQuantity: menuItemForValidation.basketMaxQuantity ?? undefined,
-      },
-      selections: selectionsToValidate,
-    });
-    if (!modResult.valid) {
-      throw new CartValidationError(modResult.message, modResult.code, {
-        menuItemId: modResult.menuItemId,
-        menuItemName: modResult.menuItemName,
-      });
-    }
-  }
-
+  /** Validate modifiers only after variant resolution: parent shell graphs do not include leaf-only option ids. */
   const { menuItem: menuItemResolved, selections: selectionsResolved } =
     await resolveDeliverectVariantLeafForCartLine({
       menuItem: menuItemInitial,
@@ -423,30 +401,7 @@ export async function updateCartItem(
       selections ?? []
     );
 
-    const menuItemForValidation = await menuItemForModifierValidation(menuItemInitial);
-    const hasModifierGroups = menuItemForValidation.modifierGroups.length > 0;
-    const selectionsToValidate = selectionsWithImplicitVariant;
-    if (hasModifierGroups || selectionsToValidate.length > 0) {
-      const modResult = await validateCartItemModifiers({
-        id: cartItemId,
-        menuItemId: menuItemForValidation.id,
-        quantity,
-        menuItem: {
-          name: menuItemForValidation.name,
-          isAvailable: menuItemForValidation.isAvailable,
-          basketMaxQuantity: menuItemForValidation.basketMaxQuantity ?? undefined,
-        },
-        selections: selectionsToValidate,
-      });
-      if (!modResult.valid) {
-        throw new CartValidationError(modResult.message, modResult.code, {
-          cartItemId: modResult.cartItemId,
-          menuItemId: modResult.menuItemId,
-          menuItemName: modResult.menuItemName,
-        });
-      }
-    }
-
+    /** Validate only after resolve: merged UI sends parent + leaf option ids; parent graph does not list leaf ids. */
     const { menuItem: menuItemResolved, selections: selectionsResolved } =
       await resolveDeliverectVariantLeafForCartLine({
         menuItem: menuItemInitial,
