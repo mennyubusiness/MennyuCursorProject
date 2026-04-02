@@ -11,6 +11,11 @@ import { validateCartItemModifiers, validateCartBasketLimits } from "@/services/
 import { getVendorAvailability } from "@/lib/vendor-availability";
 import { getOperationalMenuItemIdsForVendor } from "@/services/menu-active-scope.service";
 import { formatPickupDetailLine } from "@/lib/pickup-display";
+import { computeEffectiveUnitPriceCents } from "@/domain/money";
+import {
+  shellBasePriceCentsForMenuItem,
+  variantSelectionsPriceCentsForLeafCartLine,
+} from "@/services/cart-deliverect-variant-resolution";
 import {
   getDefaultScheduledSuggestion,
   resolvePickupTimezone,
@@ -21,6 +26,36 @@ import {
 export interface CreateOrderResult {
   order: Order;
   vendorOrders: VendorOrderType[];
+}
+
+async function expectedCartItemUnitPriceCents(item: {
+  vendorId: string;
+  menuItem: {
+    priceCents: number;
+    deliverectPlu?: string | null;
+    deliverectVariantParentPlu?: string | null;
+  };
+  selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
+}): Promise<number> {
+  const shellBase = await shellBasePriceCentsForMenuItem({
+    vendorId: item.vendorId,
+    priceCents: item.menuItem.priceCents,
+    deliverectVariantParentPlu: item.menuItem.deliverectVariantParentPlu ?? null,
+  });
+  const variantCharge = await variantSelectionsPriceCentsForLeafCartLine({
+    vendorId: item.vendorId,
+    deliverectPlu: item.menuItem.deliverectPlu ?? null,
+    deliverectVariantParentPlu: item.menuItem.deliverectVariantParentPlu ?? null,
+  });
+  const base = shellBase + variantCharge;
+  const withPrices =
+    item.selections
+      ?.filter((s) => s.quantity >= 1)
+      .map((s) => ({
+        priceCents: s.modifierOption?.priceCents ?? 0,
+        quantity: s.quantity,
+      })) ?? [];
+  return computeEffectiveUnitPriceCents(base, withPrices);
 }
 
 export class OrderValidationError extends Error {
@@ -58,6 +93,8 @@ export async function validateCartForOrder(cart: {
       basketMaxQuantity?: number | null;
       /** Used with vendorId for effective availability (duplicate Deliverect product rows). */
       deliverectProductId?: string | null;
+      deliverectPlu?: string | null;
+      deliverectVariantParentPlu?: string | null;
     };
     vendor: { isActive?: boolean; mennyuOrdersPaused?: boolean; posOpen?: boolean };
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
@@ -100,21 +137,16 @@ export async function validateCartForOrder(cart: {
     if (!vendorInPod?.isActive) {
       return { valid: false, code: "VENDOR_NOT_IN_POD", message: "A vendor in your cart is not in this pod." };
     }
-    const hasSelections = item.selections && item.selections.length > 0;
-    if (!hasSelections) {
-      if (item.priceCents !== item.menuItem.priceCents) {
-        return { valid: false, code: "PRICE_CHANGED", message: `A price has changed for ${item.menuItem.name}; please review your cart.`, cartItemId: item.id, menuItemId: item.menuItemId, menuItemName: item.menuItem.name };
-      }
-    } else {
-      const expectedUnitCents =
-        item.menuItem.priceCents +
-        item.selections!.reduce(
-          (sum, s) => sum + (s.modifierOption?.priceCents ?? 0) * s.quantity,
-          0
-        );
-      if (item.priceCents !== expectedUnitCents) {
-        return { valid: false, code: "PRICE_CHANGED", message: `A price has changed for ${item.menuItem.name}; please review your cart.`, cartItemId: item.id, menuItemId: item.menuItemId, menuItemName: item.menuItem.name };
-      }
+    const expectedUnitCents = await expectedCartItemUnitPriceCents(item);
+    if (item.priceCents !== expectedUnitCents) {
+      return {
+        valid: false,
+        code: "PRICE_CHANGED",
+        message: `A price has changed for ${item.menuItem.name}; please review your cart.`,
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      };
     }
   }
 
@@ -163,6 +195,8 @@ export type CartForValidation = {
       basketMaxQuantity?: number | null;
       /** Used with vendorId for effective availability (duplicate Deliverect product rows). */
       deliverectProductId?: string | null;
+      deliverectPlu?: string | null;
+      deliverectVariantParentPlu?: string | null;
     };
     vendor: { isActive?: boolean; mennyuOrdersPaused?: boolean; posOpen?: boolean };
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
@@ -231,33 +265,15 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
       });
       continue;
     }
-    const hasSelections = item.selections && item.selections.length > 0;
-    if (!hasSelections) {
-      if (item.priceCents !== item.menuItem.priceCents) {
-        errors.push({
-          code: "PRICE_CHANGED",
-          message: `Price has changed for ${item.menuItem.name}; please review.`,
-          cartItemId: item.id,
-          menuItemId: item.menuItemId,
-          menuItemName: item.menuItem.name,
-        });
-      }
-    } else {
-      const expectedUnitCents =
-        item.menuItem.priceCents +
-        item.selections!.reduce(
-          (sum, s) => sum + (s.modifierOption?.priceCents ?? 0) * s.quantity,
-          0
-        );
-      if (item.priceCents !== expectedUnitCents) {
-        errors.push({
-          code: "PRICE_CHANGED",
-          message: `Price has changed for ${item.menuItem.name}; please review.`,
-          cartItemId: item.id,
-          menuItemId: item.menuItemId,
-          menuItemName: item.menuItem.name,
-        });
-      }
+    const expectedUnitCents = await expectedCartItemUnitPriceCents(item);
+    if (item.priceCents !== expectedUnitCents) {
+      errors.push({
+        code: "PRICE_CHANGED",
+        message: `Price has changed for ${item.menuItem.name}; please review.`,
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      });
     }
   }
 

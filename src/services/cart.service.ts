@@ -17,6 +17,7 @@ import {
   loadMenuItemForVariantResolution,
   menuItemForModifierValidation,
   resolveDeliverectVariantLeafForCartLine,
+  shellBasePriceCentsForMenuItem,
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartValidationError } from "@/services/cart-validation-error";
 
@@ -157,8 +158,9 @@ export async function addCartItem(
       selections,
     });
 
-  /** Leaf row base + variant (size) charges stripped from persisted selections — both must count toward unit price. */
-  const baseUnitCents = menuItemResolved.priceCents + variantSelectionsPriceCents;
+  /** Parent shell list price + variant (size) charges — matches vendor modal (not leaf list + size). */
+  const shellBase = await shellBasePriceCentsForMenuItem(menuItemInitial);
+  const baseUnitCents = shellBase + variantSelectionsPriceCents;
 
   if (!(await isMenuItemIdOperational(menuItemResolved.vendorId, menuItemResolved.id))) {
     throw new CartValidationError(
@@ -411,7 +413,8 @@ export async function updateCartItem(
         selections: selectionsWithImplicitVariant,
       });
 
-    const baseUnitCents = menuItemResolved.priceCents + variantSelectionsPriceCents;
+    const shellBase = await shellBasePriceCentsForMenuItem(menuItemInitial);
+    const baseUnitCents = shellBase + variantSelectionsPriceCents;
 
     if (!(await isMenuItemIdOperational(menuItemResolved.vendorId, menuItemResolved.id))) {
       throw new CartValidationError(

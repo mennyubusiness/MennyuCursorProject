@@ -353,3 +353,83 @@ export async function findParentShellMenuItemByPlu(
     include: menuItemVariantInclude,
   });
 }
+
+/**
+ * List price for the product family: parent shell when the row is a variant leaf, otherwise the row's own price.
+ * Cart line totals must match the vendor modal: shell base + size charge + other modifiers — not leaf list + size again.
+ */
+export async function shellBasePriceCentsForMenuItem(
+  menuItem: Pick<MenuItemForVariantResolution, "vendorId" | "priceCents" | "deliverectVariantParentPlu">
+): Promise<number> {
+  const pplu = menuItem.deliverectVariantParentPlu?.trim();
+  if (!pplu) return menuItem.priceCents;
+  const parent = await findParentShellMenuItemByPlu(menuItem.vendorId, pplu);
+  return parent?.priceCents ?? menuItem.priceCents;
+}
+
+/**
+ * Size/variation charge implied by a leaf row when variant-group rows are omitted from persisted cart selections.
+ * Matches the parent-shell variant option whose `deliverectModifierPlu` equals the leaf's `deliverectPlu`.
+ */
+export async function variantSelectionsPriceCentsForLeafCartLine(
+  leaf: Pick<MenuItemForVariantResolution, "vendorId" | "deliverectPlu" | "deliverectVariantParentPlu">
+): Promise<number> {
+  const parentPlu = leaf.deliverectVariantParentPlu?.trim();
+  const leafPlu = leaf.deliverectPlu?.trim();
+  if (!parentPlu || !leafPlu) return 0;
+  const parent = await findParentShellMenuItemByPlu(leaf.vendorId, parentPlu);
+  if (!parent) return 0;
+  const parentShellVariantGroupIds = new Set(
+    parent.modifierGroups
+      .filter((l) => l.modifierGroup.deliverectIsVariantGroup === true)
+      .map((l) => l.modifierGroup.id)
+  );
+  const variantOpt = await prisma.modifierOption.findFirst({
+    where:
+      parentShellVariantGroupIds.size > 0
+        ? {
+            deliverectModifierPlu: leafPlu,
+            modifierGroupId: { in: [...parentShellVariantGroupIds] },
+            modifierGroup: { menuItems: { some: { menuItemId: parent.id } } },
+          }
+        : {
+            deliverectModifierPlu: leafPlu,
+            modifierGroup: {
+              deliverectIsVariantGroup: true,
+              menuItems: { some: { menuItemId: parent.id } },
+            },
+          },
+    select: { priceCents: true },
+  });
+  return variantOpt?.priceCents ?? 0;
+}
+
+const SHELL_BASE_KEY_SEP = "\u001e";
+
+/** Map key for {@link getShellBasePriceCentsByVendorParentPlu} — parent shell PLU is the variant-family id on leaf rows. */
+export function shellBasePriceKey(vendorId: string, parentPlu: string): string {
+  return `${vendorId}${SHELL_BASE_KEY_SEP}${parentPlu.trim()}`;
+}
+
+/** Batch-load parent shell list prices for cart lines that reference a variant leaf (for edit UI / display). */
+export async function getShellBasePriceCentsByVendorParentPlu(
+  items: Array<{ vendorId: string; menuItem: { deliverectVariantParentPlu?: string | null } }>
+): Promise<Map<string, number>> {
+  const keys = new Set<string>();
+  for (const item of items) {
+    const p = item.menuItem.deliverectVariantParentPlu?.trim();
+    if (p) keys.add(shellBasePriceKey(item.vendorId, p));
+  }
+  if (keys.size === 0) return new Map();
+  const orClause = [...keys].map((k) => {
+    const sep = k.indexOf(SHELL_BASE_KEY_SEP);
+    const vendorId = k.slice(0, sep);
+    const plu = k.slice(sep + SHELL_BASE_KEY_SEP.length);
+    return { vendorId, deliverectPlu: plu, deliverectVariantParentPlu: null };
+  });
+  const parents = await prisma.menuItem.findMany({
+    where: { OR: orClause },
+    select: { vendorId: true, deliverectPlu: true, priceCents: true },
+  });
+  return new Map(parents.map((p) => [shellBasePriceKey(p.vendorId, p.deliverectPlu ?? ""), p.priceCents]));
+}

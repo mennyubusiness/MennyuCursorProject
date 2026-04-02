@@ -45,6 +45,8 @@ export default async function CheckoutPage({
         name: i.menuItem.name,
         basketMaxQuantity: i.menuItem.basketMaxQuantity ?? null,
         deliverectProductId: i.menuItem.deliverectProductId ?? null,
+        deliverectPlu: i.menuItem.deliverectPlu ?? null,
+        deliverectVariantParentPlu: i.menuItem.deliverectVariantParentPlu ?? null,
       },
       vendor: {
         isActive: i.vendor.isActive,

@@ -8,6 +8,10 @@ import { getActiveOrderByCustomerPhone, validateCartItemsForDisplay, getCartVali
 import type { CartForValidation } from "@/services/order.service";
 import { MenuItemImage } from "@/components/images/MenuItemImage";
 import { serializeModifierConfig } from "@/lib/modifier-config";
+import {
+  getShellBasePriceCentsByVendorParentPlu,
+  shellBasePriceKey,
+} from "@/services/cart-deliverect-variant-resolution";
 import { CartItemActions } from "./CartItemActions";
 import { CheckoutProgress } from "../checkout/CheckoutProgress";
 
@@ -87,6 +91,8 @@ export default async function CartPage({
   const totalCents = Array.from(byVendor.values()).reduce((a, v) => a + v.subtotalCents, 0);
   const vendorCount = byVendor.size;
 
+  const shellBaseByVendorParentPlu = await getShellBasePriceCentsByVendorParentPlu(cart.items);
+
   const cartForValidation: CartForValidation = {
     podId: cart.podId,
     items: cart.items.map((i) => ({
@@ -101,6 +107,8 @@ export default async function CartPage({
         name: i.menuItem.name,
         basketMaxQuantity: i.menuItem.basketMaxQuantity ?? null,
         deliverectProductId: i.menuItem.deliverectProductId ?? null,
+        deliverectPlu: i.menuItem.deliverectPlu ?? null,
+        deliverectVariantParentPlu: i.menuItem.deliverectVariantParentPlu ?? null,
       },
       vendor: {
         isActive: i.vendor.isActive,
@@ -246,7 +254,19 @@ export default async function CartPage({
                         specialInstructions={item.specialInstructions}
                         modifierConfig={
                           item.menuItem.modifierGroups?.length
-                            ? serializeModifierConfig(item.menuItem)
+                            ? (() => {
+                                const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
+                                const shellBase =
+                                  pplu != null
+                                    ? shellBaseByVendorParentPlu.get(
+                                        shellBasePriceKey(item.vendorId, pplu)
+                                      )
+                                    : undefined;
+                                const serialized = serializeModifierConfig(item.menuItem);
+                                return shellBase !== undefined
+                                  ? { ...serialized, priceCents: shellBase }
+                                  : serialized;
+                              })()
                             : undefined
                         }
                         initialSelections={item.selections?.map((s) => ({
