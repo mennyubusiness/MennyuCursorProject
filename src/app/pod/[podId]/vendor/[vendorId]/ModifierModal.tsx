@@ -101,9 +101,12 @@ export function ModifierModal({
 }) {
   const isEditMode = !!cartItemId;
 
+  /** Prefer server flag; fallback to scanning groups (older serialized configs). */
   const isVariantFamily = useMemo(
-    () => config.groups.some((g) => g.modifierGroup.deliverectIsVariantGroup === true),
-    [config.groups]
+    () =>
+      config.useLeafModifierMerge ??
+      config.groups.some((g) => g.modifierGroup.deliverectIsVariantGroup === true),
+    [config.groups, config.useLeafModifierMerge]
   );
 
   const defaults = useMemo(() => {

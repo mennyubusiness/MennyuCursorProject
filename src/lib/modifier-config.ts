@@ -46,6 +46,11 @@ export interface ModifierConfigForUI {
   menuItemName: string;
   priceCents: number;
   groups: ModifierGroupLinkForUI[];
+  /**
+   * Server: parent shell has at least one Deliverect variant group (size). Drives modal leaf merge;
+   * redundant with checking groups for deliverectIsVariantGroup but explicit for callers.
+   */
+  useLeafModifierMerge?: boolean;
 }
 
 type MenuItemWithModifiers = {
@@ -140,17 +145,24 @@ export function serializeModifierConfig(item: MenuItemWithModifiers): ModifierCo
         ),
       },
     }));
+  const useLeafModifierMerge = item.modifierGroups.some(
+    (l) => l.modifierGroup.deliverectIsVariantGroup === true
+  );
+
   return {
     menuItemId: item.id,
     menuItemName: item.name,
     priceCents: item.priceCents,
     groups,
+    useLeafModifierMerge,
   };
 }
 
 /**
- * Combine parent shell variant group(s) (size) with all non-variant groups from the resolved leaf
- * (crust, toppings, …). Server-side validation uses the leaf; the UI must show the same groups.
+ * Combine parent shell variant group(s) (size) with leaf-only groups (crust, toppings, …).
+ * Prefer **excluding by parent variant ModifierGroup id** rather than `deliverectIsVariantGroup` on
+ * the leaf row: some publishes mis-tag non-size groups on the leaf, which would hide them from UI
+ * while validation still requires them.
  */
 export function mergeVariantParentAndLeafModifierConfig(
   parentConfig: ModifierConfigForUI,
@@ -160,14 +172,16 @@ export function mergeVariantParentAndLeafModifierConfig(
   const variantGroups = parentConfig.groups.filter(
     (g) => g.modifierGroup.deliverectIsVariantGroup === true
   );
-  const leafNonVariant = leafConfig.groups.filter(
-    (g) => g.modifierGroup.deliverectIsVariantGroup !== true
+  const parentVariantModifierGroupIds = new Set(variantGroups.map((g) => g.modifierGroup.id));
+  const leafExtras = leafConfig.groups.filter(
+    (g) => !parentVariantModifierGroupIds.has(g.modifierGroup.id)
   );
-  const merged = [...variantGroups, ...leafNonVariant].sort((a, b) => a.sortOrder - b.sortOrder);
+  const merged = [...variantGroups, ...leafExtras].sort((a, b) => a.sortOrder - b.sortOrder);
   return {
     menuItemId: parentConfig.menuItemId,
     menuItemName: opts?.menuItemName ?? parentConfig.menuItemName,
     priceCents: opts?.priceCents ?? leafConfig.priceCents,
     groups: merged,
+    useLeafModifierMerge: parentConfig.useLeafModifierMerge,
   };
 }
