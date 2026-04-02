@@ -54,7 +54,6 @@ export async function getVariantMergedModifierConfigAction(
     const leafConfig = serializeModifierConfig(leafFull);
     const config = mergeVariantParentAndLeafModifierConfig(parentConfig, leafConfig, {
       menuItemName: leafFull.name,
-      priceCents: leafFull.priceCents,
     });
     return { config };
   } catch (e) {

@@ -163,11 +163,14 @@ export function serializeModifierConfig(item: MenuItemWithModifiers): ModifierCo
  * Prefer **excluding by parent variant ModifierGroup id** rather than `deliverectIsVariantGroup` on
  * the leaf row: some publishes mis-tag non-size groups on the leaf, which would hide them from UI
  * while validation still requires them.
+ *
+ * **Display base:** Always keep `priceCents` from the **parent shell** (`parentConfig`). Leaf rows
+ * often carry duplicate or zero base prices; the modal total is base + selected option deltas.
  */
 export function mergeVariantParentAndLeafModifierConfig(
   parentConfig: ModifierConfigForUI,
   leafConfig: ModifierConfigForUI,
-  opts?: { menuItemName?: string; priceCents?: number }
+  opts?: { menuItemName?: string }
 ): ModifierConfigForUI {
   const variantGroups = parentConfig.groups.filter(
     (g) => g.modifierGroup.deliverectIsVariantGroup === true
@@ -180,7 +183,7 @@ export function mergeVariantParentAndLeafModifierConfig(
   return {
     menuItemId: parentConfig.menuItemId,
     menuItemName: opts?.menuItemName ?? parentConfig.menuItemName,
-    priceCents: opts?.priceCents ?? leafConfig.priceCents,
+    priceCents: parentConfig.priceCents,
     groups: merged,
     useLeafModifierMerge: parentConfig.useLeafModifierMerge,
   };

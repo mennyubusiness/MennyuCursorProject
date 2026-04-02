@@ -45,8 +45,8 @@ describe("mergeVariantParentAndLeafModifierConfig", () => {
     };
     const merged = mergeVariantParentAndLeafModifierConfig(parent, leaf, {
       menuItemName: leaf.menuItemName,
-      priceCents: leaf.priceCents,
     });
     expect(merged.groups.map((g) => g.modifierGroup.name)).toEqual(["Choose Size", "Choose Pizza Crust"]);
+    expect(merged.priceCents).toBe(parent.priceCents);
   });
 });
