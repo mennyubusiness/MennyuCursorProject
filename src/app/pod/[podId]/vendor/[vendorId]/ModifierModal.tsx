@@ -134,9 +134,14 @@ export function ModifierModal({
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [displayConfig, setDisplayConfig] = useState<ModifierConfigForUI>(config);
 
+  /** `serializeModifierConfig` returns a new object each parent render; do not reset merged leaf groups for variant families. */
   useEffect(() => {
-    setDisplayConfig(config);
-  }, [config]);
+    if (isEditMode || !isVariantFamily) {
+      setDisplayConfig(config);
+      return;
+    }
+    setDisplayConfig((prev) => (prev.menuItemId === config.menuItemId ? prev : config));
+  }, [config, isEditMode, isVariantFamily]);
 
   const selectionsList = useMemo(() => {
     const list: { modifierOptionId: string; quantity: number }[] = [];
