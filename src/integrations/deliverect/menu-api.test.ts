@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchDeliverectCommerceStoreMenus } from "./menu-api";
 import { pickNormalizerInputFromCommerceMenusResponse } from "@/integrations/deliverect/menu-api";
 
@@ -24,11 +24,6 @@ describe("fetchDeliverectCommerceStoreMenus", () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    vi.unstubAllEnvs();
-  });
-
-  beforeEach(() => {
-    vi.stubEnv("DELIVERECT_API_KEY", "test-key");
   });
 
   it("calls Commerce menus URL with account and store (channel link) ids", async () => {

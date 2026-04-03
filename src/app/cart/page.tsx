@@ -7,8 +7,8 @@ import { discardStaleCheckoutCartsForSession, loadActiveDisplayCartForSession } 
 import { getActiveOrderByCustomerPhone, validateCartItemsForDisplay, getCartValidationMessage } from "@/services/order.service";
 import type { CartForValidation } from "@/services/order.service";
 import { MenuItemImage } from "@/components/images/MenuItemImage";
-import { serializeModifierConfig } from "@/lib/modifier-config";
-import { getCartEditModifierModalPayload } from "@/actions/variant-modifier-config.actions";
+import { loadCartEditModifierPayloadsForCartPage } from "@/services/cart-edit-modal-payload.service";
+import { cartPagePerfMark, cartPagePerfNow, CART_PAGE_PERF_LOG } from "@/lib/cart-page-perf";
 import {
   getParentShellInfoByVendorParentPlu,
   getVariantOptionDisplayNameForLeaf,
@@ -16,6 +16,10 @@ import {
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartItemActions } from "./CartItemActions";
 import { CheckoutProgress } from "../checkout/CheckoutProgress";
+
+function modifierGroupCountFromDisplayMenuItem(menuItem: { _count?: { modifierGroups: number } }): number {
+  return menuItem._count?.modifierGroups ?? 0;
+}
 
 export default async function CartPage({
   searchParams,
@@ -39,7 +43,11 @@ export default async function CartPage({
   const reorderSkipped = params.reorder_skipped ? parseInt(params.reorder_skipped, 10) : 0;
   const reorderAdded = params.reorder_added ? parseInt(params.reorder_added, 10) : 0;
   const checkoutErrorCode = params.error ? decodeURIComponent(params.error) : null;
+  const perfT0 = cartPagePerfNow();
   const cart = await loadActiveDisplayCartForSession(sessionId, currentPodId);
+  cartPagePerfMark("load_active_display_cart", perfT0, {
+    itemCount: cart?.items.length ?? 0,
+  });
   if (!cart || cart.items.length === 0) {
     return (
       <div className="mx-auto max-w-lg px-2 py-12">
@@ -93,29 +101,28 @@ export default async function CartPage({
   const totalCents = Array.from(byVendor.values()).reduce((a, v) => a + v.subtotalCents, 0);
   const vendorCount = byVendor.size;
 
-  /** Parent+leaf merge + implicit size selection — matches vendor ModifierModal; edit mode skips client merge. */
-  const cartEditModifierByItemId = new Map<
-    string,
-    Awaited<ReturnType<typeof getCartEditModifierModalPayload>>
-  >();
-  await Promise.all(
-    cart.items.map(async (item) => {
-      if (!item.menuItem.modifierGroups?.length) {
-        cartEditModifierByItemId.set(item.id, null);
-        return;
-      }
-      const persisted =
+  const tEdit = cartPagePerfNow();
+  const cartEditModifierByItemId = await loadCartEditModifierPayloadsForCartPage(
+    cart.items.map((item) => ({
+      cartItemId: item.id,
+      menuItemId: item.menuItemId,
+      persistedSelections:
         item.selections?.map((s) => ({
           modifierOptionId: s.modifierOptionId,
           quantity: s.quantity,
-        })) ?? [];
-      const payload = await getCartEditModifierModalPayload(item.menuItemId, persisted);
-      cartEditModifierByItemId.set(item.id, payload);
-    })
+        })) ?? [],
+      modifierGroupCount: modifierGroupCountFromDisplayMenuItem(item.menuItem),
+    }))
   );
+  cartPagePerfMark("cart_edit_modifier_payloads_batch", tEdit, {
+    lineCount: cart.items.length,
+  });
 
+  const tShell = cartPagePerfNow();
   const parentShellByVendorParentPlu = await getParentShellInfoByVendorParentPlu(cart.items);
+  cartPagePerfMark("parent_shell_batch", tShell);
 
+  const tVar = cartPagePerfNow();
   const variantSizeLabelByCartItemId = new Map<string, string | null>();
   await Promise.all(
     cart.items.map(async (item) => {
@@ -132,7 +139,9 @@ export default async function CartPage({
       variantSizeLabelByCartItemId.set(item.id, label);
     })
   );
+  cartPagePerfMark("variant_size_labels_parallel", tVar);
 
+  const tVal = cartPagePerfNow();
   const cartForValidation: CartForValidation = {
     podId: cart.podId,
     items: cart.items.map((i) => ({
@@ -163,6 +172,13 @@ export default async function CartPage({
     })),
   };
   const { valid: cartValid, errors: validationErrors } = await validateCartItemsForDisplay(cartForValidation);
+  cartPagePerfMark("validate_cart_items_for_display", tVal, {
+    itemCount: cart.items.length,
+  });
+  cartPagePerfMark("cart_page_ssr_total", perfT0, {
+    itemCount: cart.items.length,
+    perfLogEnabled: CART_PAGE_PERF_LOG,
+  });
   const errorByCartItemId = new Map<string, string>();
   for (const e of validationErrors) {
     if (e.cartItemId) {
@@ -303,22 +319,8 @@ export default async function CartPage({
                         vendorUsesDeliverect={Boolean(item.vendor.deliverectChannelLinkId?.trim())}
                         menuItemDeliverectVariantParentPlu={item.menuItem.deliverectVariantParentPlu}
                         modifierConfig={
-                          item.menuItem.modifierGroups?.length
-                            ? (() => {
-                                const merged = cartEditModifierByItemId.get(item.id)?.config;
-                                if (merged) return merged;
-                                const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
-                                const shellBase =
-                                  pplu != null
-                                    ? parentShellByVendorParentPlu.get(
-                                        shellBasePriceKey(item.vendorId, pplu)
-                                      )?.priceCents
-                                    : undefined;
-                                const serialized = serializeModifierConfig(item.menuItem);
-                                return shellBase !== undefined
-                                  ? { ...serialized, priceCents: shellBase }
-                                  : serialized;
-                              })()
+                          modifierGroupCountFromDisplayMenuItem(item.menuItem) > 0
+                            ? cartEditModifierByItemId.get(item.id)?.config
                             : undefined
                         }
                         initialSelections={

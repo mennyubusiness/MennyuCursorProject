@@ -8,7 +8,8 @@ import { CartValidationError } from "@/services/cart-validation-error";
 
 export type CartItemSelectionInput = { modifierOptionId: string; quantity: number };
 
-const menuItemVariantInclude = {
+/** Exported for batch cart SSR (paired with full menu include). */
+export const MENU_ITEM_VARIANT_RESOLUTION_INCLUDE = {
   vendor: true,
   modifierGroups: {
     include: {
@@ -25,7 +26,7 @@ const menuItemVariantInclude = {
 } satisfies Prisma.MenuItemInclude;
 
 export type MenuItemForVariantResolution = Prisma.MenuItemGetPayload<{
-  include: typeof menuItemVariantInclude;
+  include: typeof MENU_ITEM_VARIANT_RESOLUTION_INCLUDE;
 }>;
 
 /**
@@ -230,7 +231,7 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
       deliverectPlu: { in: variantPlus },
       isAvailable: true,
     },
-    include: menuItemVariantInclude,
+    include: MENU_ITEM_VARIANT_RESOLUTION_INCLUDE,
   });
 
   if (!leaf) {
@@ -354,7 +355,7 @@ export async function loadMenuItemForVariantResolution(
 ): Promise<MenuItemForVariantResolution | null> {
   return prisma.menuItem.findUnique({
     where: { id: menuItemId },
-    include: menuItemVariantInclude,
+    include: MENU_ITEM_VARIANT_RESOLUTION_INCLUDE,
   });
 }
 
@@ -371,7 +372,7 @@ export async function findParentShellMenuItemByPlu(
       deliverectPlu: parentPlu.trim(),
       deliverectVariantParentPlu: null,
     },
-    include: menuItemVariantInclude,
+    include: MENU_ITEM_VARIANT_RESOLUTION_INCLUDE,
   });
 }
 

@@ -2,11 +2,35 @@
  * Deliverect-compliant modifier validation for cart and order.
  * Enforces min/max selections, required groups, snooze/availability, and basket limits.
  */
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   getOperationalModifierOptionIdsForVendor,
   isMenuItemIdOperational,
 } from "@/services/menu-active-scope.service";
+
+/** Full graph for rule checks (same shape as legacy findUnique include). */
+export const MODIFIER_VALIDATION_MENU_ITEM_INCLUDE = {
+  modifierGroups: {
+    include: {
+      modifierGroup: {
+        include: {
+          options: {
+            include: {
+              nestedModifierGroups: {
+                include: { options: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+} satisfies Prisma.MenuItemInclude;
+
+export type MenuItemLoadedForModifierValidation = Prisma.MenuItemGetPayload<{
+  include: typeof MODIFIER_VALIDATION_MENU_ITEM_INCLUDE;
+}>;
 
 export type ModifierValidationResult =
   | { valid: true }
@@ -21,47 +45,31 @@ type CartItemForValidation = {
 };
 
 /**
- * Validate a single cart item's modifier selections against the item's modifier group rules.
- * Enforces: required groups, min/max per group, quantity >= 1 per selection, nested group rules, snooze (isAvailable).
+ * Validate using a preloaded menu row + pre-fetched operational modifier ids (batch cart validation).
  */
-export async function validateCartItemModifiers(cartItem: CartItemForValidation): Promise<ModifierValidationResult> {
-  const menuItem = await prisma.menuItem.findUnique({
-    where: { id: cartItem.menuItemId },
-    include: {
-      modifierGroups: {
-        include: {
-          modifierGroup: {
-            include: {
-              options: {
-                include: {
-                  nestedModifierGroups: {
-                    include: { options: true },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!menuItem) {
-    return { valid: false, code: "ITEM_NOT_FOUND", message: "Menu item not found.", menuItemId: cartItem.menuItemId, menuItemName: cartItem.menuItem?.name };
-  }
-
+export function validateCartItemModifiersWithLoadedMenuItem(
+  cartItem: CartItemForValidation,
+  menuItem: MenuItemLoadedForModifierValidation,
+  operationalModifierOptionIds: Set<string>
+): ModifierValidationResult {
   if (!menuItem.isAvailable) {
-    return { valid: false, code: "ITEM_UNAVAILABLE", message: `${menuItem.name} is no longer available.`, cartItemId: cartItem.id, menuItemId: cartItem.menuItemId, menuItemName: menuItem.name };
+    return {
+      valid: false,
+      code: "ITEM_UNAVAILABLE",
+      message: `${menuItem.name} is no longer available.`,
+      cartItemId: cartItem.id,
+      menuItemId: cartItem.menuItemId,
+      menuItemName: menuItem.name,
+    };
   }
 
   const selections = cartItem.selections ?? [];
   const selectionByOptionId = new Map(selections.map((s) => [s.modifierOptionId, s.quantity]));
 
   if (selections.length > 0) {
-    const operationalOpts = await getOperationalModifierOptionIdsForVendor(menuItem.vendorId);
     for (const s of selections) {
       if (s.quantity < 1) continue;
-      if (!operationalOpts.has(s.modifierOptionId)) {
+      if (!operationalModifierOptionIds.has(s.modifierOptionId)) {
         return {
           valid: false,
           code: "MODIFIER_OPTION_NOT_IN_CURRENT_MENU",
@@ -196,6 +204,30 @@ export async function validateCartItemModifiers(cartItem: CartItemForValidation)
 }
 
 /**
+ * Validate a single cart item's modifier selections against the item's modifier group rules.
+ * Enforces: required groups, min/max per group, quantity >= 1 per selection, nested group rules, snooze (isAvailable).
+ */
+export async function validateCartItemModifiers(cartItem: CartItemForValidation): Promise<ModifierValidationResult> {
+  const menuItem = await prisma.menuItem.findUnique({
+    where: { id: cartItem.menuItemId },
+    include: MODIFIER_VALIDATION_MENU_ITEM_INCLUDE,
+  });
+
+  if (!menuItem) {
+    return {
+      valid: false,
+      code: "ITEM_NOT_FOUND",
+      message: "Menu item not found.",
+      menuItemId: cartItem.menuItemId,
+      menuItemName: cartItem.menuItem?.name,
+    };
+  }
+
+  const operationalOpts = await getOperationalModifierOptionIdsForVendor(menuItem.vendorId);
+  return validateCartItemModifiersWithLoadedMenuItem(cartItem, menuItem, operationalOpts);
+}
+
+/**
  * Validate basket (multimax) limits: total quantity per menu item across the cart must not exceed MenuItem.basketMaxQuantity when set.
  */
 export async function validateCartBasketLimits(items: Array<{ menuItemId: string; quantity: number }>): Promise<ModifierValidationResult> {
@@ -203,14 +235,25 @@ export async function validateCartBasketLimits(items: Array<{ menuItemId: string
   for (const item of items) {
     byMenuItem.set(item.menuItemId, (byMenuItem.get(item.menuItemId) ?? 0) + item.quantity);
   }
+  const menuItemIds = [...byMenuItem.keys()];
+  if (menuItemIds.length === 0) return { valid: true };
+
+  const rows = await prisma.menuItem.findMany({
+    where: { id: { in: menuItemIds } },
+    select: { id: true, name: true, basketMaxQuantity: true },
+  });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+
   for (const [menuItemId, totalQty] of byMenuItem) {
-    const menuItem = await prisma.menuItem.findUnique({
-      where: { id: menuItemId },
-      select: { name: true, basketMaxQuantity: true },
-    });
+    const menuItem = byId.get(menuItemId);
     if (!menuItem?.basketMaxQuantity) continue;
     if (totalQty > menuItem.basketMaxQuantity) {
-      return { valid: false, code: "BASKET_LIMIT_EXCEEDED", message: `${menuItem.name} has a maximum of ${menuItem.basketMaxQuantity} per order.`, menuItemId };
+      return {
+        valid: false,
+        code: "BASKET_LIMIT_EXCEEDED",
+        message: `${menuItem.name} has a maximum of ${menuItem.basketMaxQuantity} per order.`,
+        menuItemId,
+      };
     }
   }
   return { valid: true };

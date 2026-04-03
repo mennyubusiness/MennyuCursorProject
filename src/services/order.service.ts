@@ -7,9 +7,17 @@ import { prisma } from "@/lib/db";
 import { computeOrderTotals } from "@/domain/fees";
 import type { Order, VendorOrder as VendorOrderType, CheckoutInput } from "@/domain/types";
 import { buildIdempotencyKey } from "@/lib/idempotency";
-import { validateCartItemModifiers, validateCartBasketLimits } from "@/services/modifier-validation";
+import {
+  validateCartItemModifiers,
+  validateCartItemModifiersWithLoadedMenuItem,
+  validateCartBasketLimits,
+  MODIFIER_VALIDATION_MENU_ITEM_INCLUDE,
+} from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
-import { getOperationalMenuItemIdsForVendor } from "@/services/menu-active-scope.service";
+import {
+  getOperationalMenuItemIdsForVendor,
+  getOperationalModifierOptionIdsForVendor,
+} from "@/services/menu-active-scope.service";
 import { formatPickupDetailLine } from "@/lib/pickup-display";
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
 import {
@@ -311,10 +319,36 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
   const errors: CartItemValidationError[] = [];
 
   const vendorIdsDisplay = [...new Set(cart.items.map((i) => i.vendorId))];
+  const menuItemIds = [...new Set(cart.items.map((i) => i.menuItemId))];
+
+  const [podVendors, menuItemsLoaded, opMenuResults, opModResults] = await Promise.all([
+    prisma.podVendor.findMany({
+      where: { podId: cart.podId, vendorId: { in: vendorIdsDisplay } },
+      select: { vendorId: true, isActive: true },
+    }),
+    prisma.menuItem.findMany({
+      where: { id: { in: menuItemIds } },
+      include: MODIFIER_VALIDATION_MENU_ITEM_INCLUDE,
+    }),
+    Promise.all(vendorIdsDisplay.map((vid) => getOperationalMenuItemIdsForVendor(vid))),
+    Promise.all(vendorIdsDisplay.map((vid) => getOperationalModifierOptionIdsForVendor(vid))),
+  ]);
+
+  const podVendorActive = new Map(podVendors.map((pv) => [pv.vendorId, pv.isActive]));
+  const menuItemById = new Map(menuItemsLoaded.map((m) => [m.id, m]));
+
   const operationalByVendorDisplay = new Map<string, Set<string>>();
-  for (const vid of vendorIdsDisplay) {
-    operationalByVendorDisplay.set(vid, await getOperationalMenuItemIdsForVendor(vid));
+  const operationalModOptsByVendor = new Map<string, Set<string>>();
+  for (let i = 0; i < vendorIdsDisplay.length; i++) {
+    const vid = vendorIdsDisplay[i];
+    operationalByVendorDisplay.set(vid, opMenuResults[i]);
+    operationalModOptsByVendor.set(vid, opModResults[i]);
   }
+
+  const priceChecks = await Promise.all(
+    cart.items.map((item) => expectedCartItemUnitPriceCents(item).then((cents) => ({ item, cents })))
+  );
+  const expectedPriceByCartItemId = new Map(priceChecks.map((p) => [p.item.id, p.cents]));
 
   for (const item of cart.items) {
     const operational = operationalByVendorDisplay.get(item.vendorId)?.has(item.menuItemId) ?? false;
@@ -346,13 +380,21 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
           : vendorAvailability.status === "closed"
             ? "This vendor is currently closed."
             : "This vendor is not accepting orders right now.";
-      errors.push({ code: vendorAvailability.status === "inactive" ? "VENDOR_INACTIVE" : vendorAvailability.status === "closed" ? "VENDOR_CLOSED" : "VENDOR_PAUSED_MENNYU", message, cartItemId: item.id, menuItemId: item.menuItemId, menuItemName: item.menuItem.name });
+      errors.push({
+        code:
+          vendorAvailability.status === "inactive"
+            ? "VENDOR_INACTIVE"
+            : vendorAvailability.status === "closed"
+              ? "VENDOR_CLOSED"
+              : "VENDOR_PAUSED_MENNYU",
+        message,
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      });
       continue;
     }
-    const vendorInPod = await prisma.podVendor.findUnique({
-      where: { podId_vendorId: { podId: cart.podId, vendorId: item.vendorId } },
-    });
-    if (!vendorInPod?.isActive) {
+    if (podVendorActive.get(item.vendorId) !== true) {
       errors.push({
         code: "VENDOR_NOT_IN_POD",
         message: "This vendor is no longer in this pod.",
@@ -362,8 +404,8 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
       });
       continue;
     }
-    const expectedUnitCents = await expectedCartItemUnitPriceCents(item);
-    if (item.priceCents !== expectedUnitCents) {
+    const expectedUnitCents = expectedPriceByCartItemId.get(item.id);
+    if (expectedUnitCents !== undefined && item.priceCents !== expectedUnitCents) {
       errors.push({
         code: "PRICE_CHANGED",
         message: `Price has changed for ${item.menuItem.name}; please review.`,
@@ -374,7 +416,9 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
     }
   }
 
-  const basketResult = await validateCartBasketLimits(cart.items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })));
+  const basketResult = await validateCartBasketLimits(
+    cart.items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity }))
+  );
   if (!basketResult.valid) {
     errors.push({
       code: basketResult.code,
@@ -384,13 +428,33 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
   }
 
   for (const item of cart.items) {
-    const modResult = await validateCartItemModifiers({
-      id: item.id,
-      menuItemId: item.menuItemId,
-      quantity: item.quantity,
-      menuItem: { name: item.menuItem.name, isAvailable: item.menuItem.isAvailable, basketMaxQuantity: item.menuItem.basketMaxQuantity ?? undefined },
-      selections: item.selections?.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity })),
-    });
+    const loaded = menuItemById.get(item.menuItemId);
+    if (!loaded) {
+      errors.push({
+        code: "ITEM_NOT_FOUND",
+        message: `Menu item not found.`,
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      });
+      continue;
+    }
+    const modOpts = operationalModOptsByVendor.get(item.vendorId) ?? new Set<string>();
+    const modResult = validateCartItemModifiersWithLoadedMenuItem(
+      {
+        id: item.id,
+        menuItemId: item.menuItemId,
+        quantity: item.quantity,
+        menuItem: {
+          name: item.menuItem.name,
+          isAvailable: item.menuItem.isAvailable,
+          basketMaxQuantity: item.menuItem.basketMaxQuantity ?? undefined,
+        },
+        selections: item.selections?.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity })),
+      },
+      loaded,
+      modOpts
+    );
     if (!modResult.valid) {
       errors.push({
         code: modResult.code,

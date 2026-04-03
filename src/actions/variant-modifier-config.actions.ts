@@ -1,26 +1,19 @@
 "use server";
 
-import { prisma } from "@/lib/db";
 import type { ModifierConfigForUI } from "@/lib/modifier-config";
 import { serializeModifierConfig, mergeVariantParentAndLeafModifierConfig } from "@/lib/modifier-config";
-import { CUSTOMER_VENDOR_MENU_ITEM_INCLUDE } from "@/services/vendor-customer-menu.service";
 import {
-  augmentSelectionsWithImplicitVariantFromLeaf,
-  findDeliverectProductVariantGroupIdForLeaf,
   loadMenuItemForVariantResolution,
   resolveDeliverectVariantLeafForCartLine,
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartValidationError } from "@/services/cart-validation-error";
+import {
+  loadMenuItemForSerializeConfig,
+  getCartEditModifierModalPayloadSingle,
+  type CartItemSelectionInput,
+} from "@/services/cart-edit-modal-payload.service";
 
-export type CartItemSelectionInput = { modifierOptionId: string; quantity: number };
-
-/** Full graph for `serializeModifierConfig` (variant resolution uses a slimmer include). */
-async function loadMenuItemForSerializeConfig(menuItemId: string) {
-  return prisma.menuItem.findUnique({
-    where: { id: menuItemId },
-    include: CUSTOMER_VENDOR_MENU_ITEM_INCLUDE,
-  });
-}
+export type { CartItemSelectionInput };
 
 /**
  * For Deliverect variant families, the vendor page loads modifier groups from the **parent shell** only.
@@ -72,69 +65,12 @@ export async function getVariantMergedModifierConfigAction(
  * {@link getVariantMergedModifierConfigAction}, so we must supply parent-shell variant groups (size)
  * merged with the leaf graph here. Also re-inject the size option into `initialSelections` because
  * the cart line omits variant rows from persisted selections.
+ *
+ * For /cart SSR, prefer {@link loadCartEditModifierPayloadsForCartPage} (batched).
  */
 export async function getCartEditModifierModalPayload(
   leafMenuItemId: string,
   persistedSelections: CartItemSelectionInput[]
 ): Promise<{ config: ModifierConfigForUI; initialSelections: CartItemSelectionInput[] } | null> {
-  const leafFull = await loadMenuItemForSerializeConfig(leafMenuItemId);
-  const leafSlim = await loadMenuItemForVariantResolution(leafMenuItemId);
-  if (!leafFull || !leafSlim) return null;
-
-  const initialSelections = await augmentSelectionsWithImplicitVariantFromLeaf(leafSlim, persistedSelections);
-
-  const pplu = leafFull.deliverectVariantParentPlu?.trim();
-  if (!pplu) {
-    return {
-      config: serializeModifierConfig(leafFull),
-      initialSelections,
-    };
-  }
-
-  const parentFull = await prisma.menuItem.findFirst({
-    where: {
-      vendorId: leafFull.vendorId,
-      deliverectPlu: pplu,
-      deliverectVariantParentPlu: null,
-    },
-    include: CUSTOMER_VENDOR_MENU_ITEM_INCLUDE,
-  });
-  if (!parentFull) {
-    return {
-      config: serializeModifierConfig(leafFull),
-      initialSelections,
-    };
-  }
-
-  let parentConfig = serializeModifierConfig(parentFull);
-  const leafConfig = serializeModifierConfig(leafFull);
-
-  const hasFlaggedVariantOnParent = parentConfig.groups.some(
-    (g) => g.modifierGroup.deliverectIsVariantGroup === true
-  );
-  if (!hasFlaggedVariantOnParent) {
-    const variantGroupId = await findDeliverectProductVariantGroupIdForLeaf(parentFull.id, leafFull);
-    if (variantGroupId) {
-      parentConfig = {
-        ...parentConfig,
-        groups: parentConfig.groups.map((link) =>
-          link.modifierGroup.id === variantGroupId
-            ? {
-                ...link,
-                modifierGroup: {
-                  ...link.modifierGroup,
-                  deliverectIsVariantGroup: true,
-                },
-              }
-            : link
-        ),
-        useLeafModifierMerge: true,
-      };
-    }
-  }
-
-  const config = mergeVariantParentAndLeafModifierConfig(parentConfig, leafConfig, {
-    menuItemName: parentFull.name,
-  });
-  return { config, initialSelections };
+  return getCartEditModifierModalPayloadSingle(leafMenuItemId, persistedSelections);
 }

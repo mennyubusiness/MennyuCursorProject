@@ -3,6 +3,7 @@
  * Cart is session-scoped (one per pod per session). Future multi-user/group ordering could
  * introduce a shared cart or order-group id while keeping single-payer and this session model.
  */
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { Cart, CartGroup, CartItem } from "@/domain/types";
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
@@ -657,6 +658,39 @@ export async function clearCheckoutSourceCartForOrder(orderId: string): Promise<
  * completed order still pointed at it, and it did not clear `sourceCartId` — so every /cart load
  * cleared items again. Line cleanup after successful payment remains `clearCheckoutSourceCartForOrder`.
  */
+/**
+ * /cart SSR: lean menu rows + selection labels — full modifier graph is loaded on demand for edit modal
+ * ({@link loadCartEditModifierPayloadsForCartPage}) to avoid huge nested includes per line item.
+ */
+export const CART_DISPLAY_SESSION_CART_INCLUDE = {
+  items: {
+    include: {
+      menuItem: {
+        select: {
+          id: true,
+          vendorId: true,
+          name: true,
+          description: true,
+          priceCents: true,
+          imageUrl: true,
+          sortOrder: true,
+          isAvailable: true,
+          basketMaxQuantity: true,
+          deliverectProductId: true,
+          deliverectPlu: true,
+          deliverectVariantParentPlu: true,
+          deliverectVariantParentName: true,
+          deliverectCategoryId: true,
+          _count: { select: { modifierGroups: true } },
+        },
+      },
+      vendor: true,
+      selections: { include: { modifierOption: true } },
+    },
+  },
+  pod: true,
+} satisfies Prisma.CartInclude;
+
 export async function discardStaleCheckoutCartsForSession(sessionId: string): Promise<void> {
   const carts = await prisma.cart.findMany({
     where: { sessionId, items: { some: {} } },
@@ -720,38 +754,7 @@ export async function loadActiveDisplayCartForSession(
 ) {
   const rows = await prisma.cart.findMany({
     where: { sessionId },
-    include: {
-      items: {
-        include: {
-          menuItem: {
-            include: {
-              modifierGroups: {
-                orderBy: { sortOrder: "asc" },
-                include: {
-                  modifierGroup: {
-                    include: {
-                      options: {
-                        orderBy: { sortOrder: "asc" },
-                        include: {
-                          nestedModifierGroups: {
-                            include: {
-                              options: { orderBy: { sortOrder: "asc" } },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          vendor: true,
-          selections: { include: { modifierOption: true } },
-        },
-      },
-      pod: true,
-    },
+    include: CART_DISPLAY_SESSION_CART_INCLUDE,
     orderBy: { updatedAt: "desc" },
   });
   return selectCartForSessionAndPod(rows, preferredPodId);
