@@ -24,14 +24,6 @@ export async function reconcilePaymentIfSucceededAction(orderId: string) {
 export async function pollOrderAfterPaymentAction(orderId: string) {
   const reconcileResult = await reconcilePaymentFromRedirect(orderId);
   const order = await getOrderWithUnifiedStatus(orderId);
-  // TEMP DEBUG: remove after post-payment flow verification
-  console.info("[mennyu:post-payment-debug] pollOrderAfterPaymentAction", {
-    orderId,
-    reconciled: reconcileResult.reconciled,
-    reconcileError: reconcileResult.error,
-    orderStatus: order?.status,
-    derivedStatus: order?.derivedStatus,
-  });
   return { reconcileResult, order };
 }
 

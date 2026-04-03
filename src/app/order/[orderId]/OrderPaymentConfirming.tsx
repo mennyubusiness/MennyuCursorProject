@@ -21,28 +21,15 @@ export function OrderPaymentConfirming({ orderId }: { orderId: string }) {
 
   useEffect(() => {
     startedAtRef.current = Date.now();
-    // TEMP DEBUG: remove after post-payment flow verification
-    console.info("[mennyu:post-payment-debug] OrderPaymentConfirming mounted", { orderId });
 
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     async function pollOnce() {
       if (doneRef.current) return;
       try {
-        const { reconcileResult, order } = await pollOrderAfterPaymentAction(orderId);
+        const { order } = await pollOrderAfterPaymentAction(orderId);
         const s = order?.status;
         const keepWaiting = !order || s === "pending_payment";
-
-        // TEMP DEBUG: remove after post-payment flow verification
-        console.info("[mennyu:post-payment-debug] poll tick decision", {
-          orderId,
-          reconciled: reconcileResult.reconciled,
-          reconcileError: reconcileResult.error,
-          rawStatus: s,
-          derivedStatus: order?.derivedStatus,
-          keepWaiting,
-          redirect: !keepWaiting,
-        });
 
         if (!keepWaiting) {
           doneRef.current = true;
@@ -51,12 +38,8 @@ export function OrderPaymentConfirming({ orderId }: { orderId: string }) {
           router.refresh();
           return;
         }
-      } catch (err) {
-        // TEMP DEBUG
-        console.info("[mennyu:post-payment-debug] pollOrderAfterPaymentAction failed", {
-          orderId,
-          error: err instanceof Error ? err.message : String(err),
-        });
+      } catch {
+        /* poll again on transient errors */
       }
 
       if (Date.now() - startedAtRef.current > MAX_MS) {
