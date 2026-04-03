@@ -118,6 +118,9 @@ function selectionToVariantSubLine(sel: Selection): DeliverectOrderSubLine {
 /**
  * Nest Deliverect variant-group selections (sorted by modifier group order) inside-out:
  * last group = innermost `subItems` node.
+ *
+ * Deliverect allows at most 3 levels of nested `subItems`; depth is enforced in
+ * `validateDeliverectSubItemNesting` and cart validation before submit.
  */
 function nestVariantGroupSelections(sels: Selection[]): DeliverectOrderSubLine {
   const sorted = [...sels].sort(

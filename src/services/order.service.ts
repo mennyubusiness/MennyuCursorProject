@@ -22,6 +22,10 @@ import {
   validateScheduledPickup,
   wallTimeInZoneToUtc,
 } from "@/lib/pickup-scheduling";
+import {
+  deliverectSubItemNestingBlockedMessage,
+  isDeliverectSubItemDepthAllowed,
+} from "@/lib/deliverect-subitem-nesting";
 
 export interface CreateOrderResult {
   order: Order;
@@ -72,6 +76,82 @@ export class OrderValidationError extends Error {
 export type CartValidationResult =
   | { valid: true }
   | { valid: false; code: string; message: string; cartItemId?: string; menuItemId?: string; menuItemName?: string };
+
+/**
+ * Deliverect-linked vendors: block checkout when variant-group nesting would exceed API max
+ * (same rule as {@link validateDeliverectSubItemNesting} at submission).
+ */
+async function findDeliverectSubItemNestingViolations(cart: CartForValidation): Promise<
+  Array<{
+    code: string;
+    message: string;
+    cartItemId?: string;
+    menuItemId?: string;
+    menuItemName?: string;
+  }>
+> {
+  const vendorIds = [...new Set(cart.items.map((i) => i.vendorId))];
+  const vendors = await prisma.vendor.findMany({
+    where: { id: { in: vendorIds } },
+    select: { id: true, deliverectChannelLinkId: true },
+  });
+  const deliverectVendorIds = new Set(
+    vendors.filter((v) => v.deliverectChannelLinkId?.trim()).map((v) => v.id)
+  );
+  if (deliverectVendorIds.size === 0) return [];
+
+  const itemsNeedingCheck = cart.items.filter((i) => deliverectVendorIds.has(i.vendorId));
+  if (itemsNeedingCheck.length === 0) return [];
+
+  const cartItemIds = itemsNeedingCheck.map((i) => i.id);
+  const selections = await prisma.cartItemSelection.findMany({
+    where: { cartItemId: { in: cartItemIds } },
+    include: {
+      modifierOption: {
+        include: { modifierGroup: { select: { deliverectIsVariantGroup: true } } },
+      },
+    },
+  });
+
+  const byCartItem = new Map<string, typeof selections>();
+  for (const s of selections) {
+    const list = byCartItem.get(s.cartItemId) ?? [];
+    list.push(s);
+    byCartItem.set(s.cartItemId, list);
+  }
+
+  const out: Array<{
+    code: string;
+    message: string;
+    cartItemId?: string;
+    menuItemId?: string;
+    menuItemName?: string;
+  }> = [];
+
+  for (const item of itemsNeedingCheck) {
+    const sels = byCartItem.get(item.id) ?? [];
+    const vgCount = sels.filter(
+      (s) =>
+        s.quantity >= 1 && s.modifierOption.modifierGroup.deliverectIsVariantGroup === true
+    ).length;
+    if (
+      !isDeliverectSubItemDepthAllowed({
+        hasDeliverectVariantParentPlu: Boolean(item.menuItem.deliverectVariantParentPlu?.trim()),
+        variantGroupSelectionCount: vgCount,
+      })
+    ) {
+      out.push({
+        code: "DELIVERECT_SUBITEMS_NESTING_LIMIT",
+        message: deliverectSubItemNestingBlockedMessage(item.menuItem.name),
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      });
+    }
+  }
+
+  return out;
+}
 
 /**
  * Revalidate cart server-side before creating order.
@@ -166,6 +246,19 @@ export async function validateCartForOrder(cart: {
     if (!modResult.valid) {
       return { valid: false, code: modResult.code, message: modResult.message, cartItemId: modResult.cartItemId, menuItemId: modResult.menuItemId, menuItemName: modResult.menuItemName };
     }
+  }
+
+  const nestingViolations = await findDeliverectSubItemNestingViolations(cart as CartForValidation);
+  if (nestingViolations.length > 0) {
+    const v = nestingViolations[0]!;
+    return {
+      valid: false,
+      code: v.code,
+      message: v.message,
+      cartItemId: v.cartItemId,
+      menuItemId: v.menuItemId,
+      menuItemName: v.menuItemName,
+    };
   }
 
   return { valid: true };
@@ -305,6 +398,8 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
     }
   }
 
+  errors.push(...(await findDeliverectSubItemNestingViolations(cart)));
+
   return { valid: errors.length === 0, errors };
 }
 
@@ -327,6 +422,8 @@ export function getCartValidationMessage(code: string): string {
     INVALID_NESTED_MODIFIER: "A nested modifier selection needs to be updated.",
     BASKET_LIMIT_EXCEEDED: "Quantity exceeds the maximum allowed for an item.",
     MODIFIER_OPTION_NOT_IN_CURRENT_MENU: "A modifier selection is not on the vendor's current menu.",
+    DELIVERECT_SUBITEMS_NESTING_LIMIT:
+      "An item has too many nested variant steps for the kitchen system. Remove some options or ask the restaurant to change modifier setup.",
   };
   return map[code] ?? "Your cart needs attention. Please review or remove items.";
 }

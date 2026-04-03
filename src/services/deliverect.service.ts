@@ -23,6 +23,31 @@ import {
 
 const LOG_PREFIX = "[Deliverect]";
 
+/** Persist failed preflight (validation / channel config) so ops see `deliverectLastError` and routing issues. */
+async function recordDeliverectPrecheckFailure(vendorOrderId: string, error: string): Promise<void> {
+  const vo = await prisma.vendorOrder.findUnique({
+    where: { id: vendorOrderId },
+    select: { routingStatus: true, deliverectAttempts: true },
+  });
+  if (!vo || vo.routingStatus !== "pending") return;
+  await prisma.vendorOrder.update({
+    where: { id: vendorOrderId },
+    data: {
+      deliverectAttempts: vo.deliverectAttempts + 1,
+      deliverectLastError: error,
+      routingStatus: "failed",
+    },
+  });
+  const { createVendorOrderIssue, getVendorOrderIssues } = await import("@/services/issues.service");
+  const existing = await getVendorOrderIssues(vendorOrderId, "OPEN");
+  if (!existing.some((i) => i.type === "routing_failure")) {
+    await createVendorOrderIssue(vendorOrderId, "routing_failure", "HIGH", {
+      notes: error,
+      createdBy: "system",
+    });
+  }
+}
+
 export interface SubmitVendorOrderResult {
   success: boolean;
   deliverectOrderId?: string;
@@ -69,6 +94,7 @@ export async function submitVendorOrderToDeliverect(
       console.warn(
         `${LOG_PREFIX} Validation failed vendorOrderId=${vendorOrderId} vendorId=${vendorOrder.vendor.id} error=${validation.error}`
       );
+      await recordDeliverectPrecheckFailure(vendorOrderId, validation.error);
       return {
         success: false,
         error: validation.error,
@@ -81,6 +107,7 @@ export async function submitVendorOrderToDeliverect(
       console.warn(
         `${LOG_PREFIX} Canonical variant validation failed vendorOrderId=${vendorOrderId} vendorId=${vendorOrder.vendor.id} error=${canonicalVariantValidation.error}`
       );
+      await recordDeliverectPrecheckFailure(vendorOrderId, canonicalVariantValidation.error);
       return {
         success: false,
         error: canonicalVariantValidation.error,
@@ -90,9 +117,11 @@ export async function submitVendorOrderToDeliverect(
   }
 
   if (!channelLinkId || String(channelLinkId).trim() === "") {
+    const msg = "Vendor has no Deliverect channel link ID; cannot submit.";
+    await recordDeliverectPrecheckFailure(vendorOrderId, msg);
     return {
       success: false,
-      error: "Vendor has no Deliverect channel link ID; cannot submit.",
+      error: msg,
       code: "VALIDATION_FAILED",
     };
   }

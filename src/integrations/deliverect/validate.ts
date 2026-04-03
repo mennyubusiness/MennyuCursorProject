@@ -4,6 +4,10 @@
  */
 import { MenuVersionState } from "@prisma/client";
 import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import {
+  deliverectSubItemNestingBlockedMessage,
+  isDeliverectSubItemDepthAllowed,
+} from "@/lib/deliverect-subitem-nesting";
 import { prisma } from "@/lib/db";
 import type { HydratedVendorOrder } from "./load";
 
@@ -26,7 +30,47 @@ export type ValidationResult =
       valid: false;
       error: string;
       code: "MENU_REPUBLISH_REQUIRED";
+    }
+  | {
+      valid: false;
+      error: string;
+      code: "SUBITEMS_NESTING_LIMIT";
     };
+
+function countDeliverectVariantGroupSelections(
+  line: NonNullable<HydratedVendorOrder>["lineItems"][number]
+): number {
+  return line.selections.filter(
+    (s) => s.modifierOption.modifierGroup.deliverectIsVariantGroup === true
+  ).length;
+}
+
+/**
+ * Deliverect rejects orders when nested `subItems` from variant groups exceed API max depth.
+ * Must stay aligned with {@link nestVariantGroupSelections} in `transform.ts`.
+ */
+export function validateDeliverectSubItemNesting(
+  vendorOrder: NonNullable<HydratedVendorOrder>
+): ValidationResult {
+  for (const line of vendorOrder.lineItems) {
+    const hasParent = Boolean(line.menuItem?.deliverectVariantParentPlu?.trim());
+    const vgCount = countDeliverectVariantGroupSelections(line);
+    if (
+      !isDeliverectSubItemDepthAllowed({
+        hasDeliverectVariantParentPlu: hasParent,
+        variantGroupSelectionCount: vgCount,
+      })
+    ) {
+      const label = line.menuItem?.name ?? line.name;
+      return {
+        valid: false,
+        error: deliverectSubItemNestingBlockedMessage(label),
+        code: "SUBITEMS_NESTING_LIMIT",
+      };
+    }
+  }
+  return { valid: true };
+}
 
 /**
  * Validate that a hydrated VendorOrder has all identifiers required for Deliverect submission.
@@ -98,6 +142,11 @@ export function validateForSubmission(
    *   is the shell row and variant steps are nested `subItems` on that line (see `transform.ts`).
    * Do not require a parent PLU on the menu item row when the line is already the shell product.
    */
+
+  const nesting = validateDeliverectSubItemNesting(vendorOrder);
+  if (!nesting.valid) {
+    return nesting;
+  }
 
   return { valid: true };
 }
