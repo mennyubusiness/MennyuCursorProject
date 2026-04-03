@@ -9,7 +9,10 @@ import type {
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
 import { getVariantMergedModifierConfigAction } from "@/actions/variant-modifier-config.actions";
 import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
-import { maxDeliverectVariantGroupSelectionsForMenuItem } from "@/lib/deliverect-subitem-nesting";
+import {
+  customerFacingDeliverectVariantLimitExceeded,
+  maxDeliverectVariantGroupSelectionsForMenuItem,
+} from "@/lib/deliverect-subitem-nesting";
 
 /** TEMP: set false to silence add-to-cart trace logs */
 const DEBUG_ADD_TO_CART_TRACE = true;
@@ -306,13 +309,21 @@ export function ModifierModal({
     return true;
   }, [displayConfig.groups, selections]);
 
-  const canSubmit = requiredSatisfied && !deliverectVariantOverLimit;
-
   async function submit() {
-    if (!canSubmit) {
+    if (!requiredSatisfied) {
       if (DEBUG_ADD_TO_CART_TRACE) {
-        console.log("[ModifierModal] submit skipped (canSubmit=false)");
+        console.log("[ModifierModal] submit skipped (requiredSatisfied=false)");
       }
+      return;
+    }
+    if (deliverectVariantOverLimit && maxDeliverectVariantSteps != null) {
+      setError({
+        message: customerFacingDeliverectVariantLimitExceeded(
+          displayConfig.menuItemName,
+          maxDeliverectVariantSteps
+        ),
+        code: "DELIVERECT_SUBITEMS_NESTING_LIMIT",
+      });
       return;
     }
     setLoading(true);
@@ -398,29 +409,6 @@ export function ModifierModal({
             Base price: ${(displayConfig.priceCents / 100).toFixed(2)}
           </p>
 
-          {vendorUsesDeliverect && maxDeliverectVariantSteps != null && (
-            <p className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600">
-              Online orders allow up to <strong>{maxDeliverectVariantSteps}</strong>{" "}
-              {maxDeliverectVariantSteps === 1 ? "variation step" : "variation steps"} total for this
-              item (kitchen system limit).
-              {deliverectVariantStepCount > 0 && (
-                <span className="mt-1 block text-stone-500">
-                  {deliverectVariantStepCount} of {maxDeliverectVariantSteps} used.
-                </span>
-              )}
-            </p>
-          )}
-
-          {deliverectVariantOverLimit && maxDeliverectVariantSteps != null && (
-            <p
-              className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
-              role="alert"
-            >
-              Too many variation steps ({deliverectVariantStepCount} selected; max{" "}
-              {maxDeliverectVariantSteps} for online orders). Remove some choices to add to cart.
-            </p>
-          )}
-
           {displayConfig.groups
             .filter((link) => link.modifierGroup.isAvailable)
             .map((link) => {
@@ -501,7 +489,7 @@ export function ModifierModal({
               <button
                 type="button"
                 onClick={submit}
-                disabled={loading || !canSubmit}
+                disabled={loading || !requiredSatisfied}
                 className="rounded-lg bg-mennyu-primary px-4 py-2 text-sm font-medium text-black hover:bg-mennyu-secondary disabled:opacity-50"
               >
                 {loading ? (isEditMode ? "Saving…" : "Adding…") : isEditMode ? "Save changes" : "Add to cart"}
