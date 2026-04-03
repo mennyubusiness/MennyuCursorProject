@@ -20,6 +20,8 @@ export interface NestedModifierGroupForUI {
   maxSelections: number;
   isRequired: boolean;
   isAvailable: boolean;
+  /** When true, counts toward Deliverect `subItems` nesting cap in the kitchen integration. */
+  deliverectIsVariantGroup?: boolean | null;
   options: Omit<ModifierOptionForUI, "nestedModifierGroups">[];
 }
 
@@ -85,6 +87,7 @@ type MenuItemWithModifiers = {
           maxSelections: number;
           isRequired: boolean;
           isAvailable: boolean;
+          deliverectIsVariantGroup?: boolean | null;
           options: Array<{
             id: string;
             name: string;
@@ -131,6 +134,7 @@ export function serializeModifierConfig(item: MenuItemWithModifiers): ModifierCo
                 maxSelections: ng.maxSelections,
                 isRequired: ng.isRequired,
                 isAvailable: ng.isAvailable,
+                deliverectIsVariantGroup: ng.deliverectIsVariantGroup ?? null,
                 options: ng.options.map((o) => ({
                   id: o.id,
                   name: o.name,

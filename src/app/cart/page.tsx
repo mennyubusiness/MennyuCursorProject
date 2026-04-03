@@ -300,6 +300,8 @@ export default async function CartPage({
                         cartItemId={item.id}
                         quantity={item.quantity}
                         specialInstructions={item.specialInstructions}
+                        vendorUsesDeliverect={Boolean(item.vendor.deliverectChannelLinkId?.trim())}
+                        menuItemDeliverectVariantParentPlu={item.menuItem.deliverectVariantParentPlu}
                         modifierConfig={
                           item.menuItem.modifierGroups?.length
                             ? (() => {

@@ -52,6 +52,7 @@ function MenuItemRow({
   vendorId,
   vendorCartItems,
   orderingDisabled,
+  vendorUsesDeliverect,
 }: {
   item: CustomerVendorMenuItem;
   cartId: string;
@@ -59,6 +60,7 @@ function MenuItemRow({
   vendorId: string;
   vendorCartItems: CartItem[];
   orderingDisabled: boolean;
+  vendorUsesDeliverect: boolean;
 }) {
   const itemUnavailable = orderingDisabled || !item.isAvailable;
   return (
@@ -98,6 +100,8 @@ function MenuItemRow({
           vendorCartItems={vendorCartItems}
           modifierConfig={item.modifierGroups?.length ? serializeModifierConfig(item) : undefined}
           orderingDisabled={itemUnavailable}
+          vendorUsesDeliverect={vendorUsesDeliverect}
+          menuItemDeliverectVariantParentPlu={item.deliverectVariantParentPlu}
         />
       </div>
     </div>
@@ -266,6 +270,7 @@ export default async function VendorMenuPage({
                       vendorId={vendorId}
                       vendorCartItems={vendorCartItems}
                       orderingDisabled={unavailable}
+                      vendorUsesDeliverect={Boolean(vendor.deliverectChannelLinkId?.trim())}
                     />
                   ))}
                 </div>

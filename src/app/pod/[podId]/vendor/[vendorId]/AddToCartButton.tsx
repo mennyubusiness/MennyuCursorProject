@@ -74,6 +74,8 @@ export function AddToCartButton({
   vendorCartItems,
   /** True when vendor is closed/paused or this menu item is snoozed / unavailable. */
   orderingDisabled = false,
+  vendorUsesDeliverect = false,
+  menuItemDeliverectVariantParentPlu,
 }: {
   cartId: string;
   menuItemId: string;
@@ -83,6 +85,8 @@ export function AddToCartButton({
   vendorId: string;
   vendorCartItems: CartItem[];
   orderingDisabled?: boolean;
+  vendorUsesDeliverect?: boolean;
+  menuItemDeliverectVariantParentPlu?: string | null;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -242,6 +246,8 @@ export function AddToCartButton({
           vendorId={vendorId}
           onClose={() => setModalOpen(false)}
           onSuccess={handleModalSuccess}
+          vendorUsesDeliverect={vendorUsesDeliverect}
+          menuItemDeliverectVariantParentPlu={menuItemDeliverectVariantParentPlu}
         />
       )}
     </div>

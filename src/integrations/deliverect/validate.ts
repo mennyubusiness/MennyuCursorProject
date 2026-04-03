@@ -5,8 +5,9 @@
 import { MenuVersionState } from "@prisma/client";
 import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import {
-  deliverectSubItemNestingBlockedMessage,
+  deliverectSubItemNestingCartSummaryMessage,
   isDeliverectSubItemDepthAllowed,
+  maxDeliverectVariantGroupSelectionsForMenuItem,
 } from "@/lib/deliverect-subitem-nesting";
 import { prisma } from "@/lib/db";
 import type { HydratedVendorOrder } from "./load";
@@ -62,9 +63,10 @@ export function validateDeliverectSubItemNesting(
       })
     ) {
       const label = line.menuItem?.name ?? line.name;
+      const max = maxDeliverectVariantGroupSelectionsForMenuItem(hasParent);
       return {
         valid: false,
-        error: deliverectSubItemNestingBlockedMessage(label),
+        error: deliverectSubItemNestingCartSummaryMessage(label, max),
         code: "SUBITEMS_NESTING_LIMIT",
       };
     }

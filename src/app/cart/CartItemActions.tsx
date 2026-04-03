@@ -17,6 +17,8 @@ export function CartItemActions({
   specialInstructions,
   modifierConfig,
   initialSelections,
+  vendorUsesDeliverect = false,
+  menuItemDeliverectVariantParentPlu,
 }: {
   cartId: string;
   cartItemId: string;
@@ -24,6 +26,8 @@ export function CartItemActions({
   specialInstructions?: string | null;
   modifierConfig?: ModifierConfigForUI;
   initialSelections?: Array<{ modifierOptionId: string; quantity: number }>;
+  vendorUsesDeliverect?: boolean;
+  menuItemDeliverectVariantParentPlu?: string | null;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -142,6 +146,8 @@ export function CartItemActions({
             setModifierModalOpen(false);
             refresh();
           }}
+          vendorUsesDeliverect={vendorUsesDeliverect}
+          menuItemDeliverectVariantParentPlu={menuItemDeliverectVariantParentPlu}
         />
       )}
       {editing && (

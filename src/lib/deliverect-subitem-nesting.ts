@@ -25,7 +25,29 @@ export function isDeliverectSubItemDepthAllowed(args: {
   return deliverectSubItemDepthFromLine(args) <= DELIVERECT_MAX_SUBITEM_NESTING;
 }
 
-/** Customer-facing copy when cart or submission is blocked by this limit. */
+/**
+ * Max number of `deliverectIsVariantGroup` selections allowed for this product shape.
+ * Variant parent + leaf uses one nesting level for the leaf line, so fewer variant-group steps fit.
+ */
+export function maxDeliverectVariantGroupSelectionsForMenuItem(
+  hasDeliverectVariantParentPlu: boolean
+): number {
+  return hasDeliverectVariantParentPlu
+    ? Math.max(0, DELIVERECT_MAX_SUBITEM_NESTING - 1)
+    : DELIVERECT_MAX_SUBITEM_NESTING;
+}
+
+/** Cart / checkout / validation — short, non-technical. */
+export function deliverectSubItemNestingCartSummaryMessage(itemName: string, max: number): string {
+  return `“${itemName}” allows at most ${max} variation ${max === 1 ? "step" : "steps"} for online orders. Remove a few choices and try again.`;
+}
+
+/** Add-to-cart / save modifier line — matches server {@link assertDeliverectVariantGroupNestingAllowed}. */
+export function customerFacingDeliverectVariantLimitExceeded(itemName: string, max: number): string {
+  return `Too many variation choices for “${itemName}”. For online orders, pick at most ${max}. Remove one or more and try again.`;
+}
+
+/** @deprecated Prefer {@link deliverectSubItemNestingCartSummaryMessage} with a computed max. */
 export function deliverectSubItemNestingBlockedMessage(itemName: string): string {
-  return `${itemName} has too many nested “variant group” modifiers for the kitchen integration (Deliverect allows at most ${DELIVERECT_MAX_SUBITEM_NESTING} levels). Remove some options or ask the restaurant to configure extra toppings as regular modifiers instead of variant groups.`;
+  return deliverectSubItemNestingCartSummaryMessage(itemName, DELIVERECT_MAX_SUBITEM_NESTING);
 }

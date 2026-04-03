@@ -23,8 +23,9 @@ import {
   wallTimeInZoneToUtc,
 } from "@/lib/pickup-scheduling";
 import {
-  deliverectSubItemNestingBlockedMessage,
+  deliverectSubItemNestingCartSummaryMessage,
   isDeliverectSubItemDepthAllowed,
+  maxDeliverectVariantGroupSelectionsForMenuItem,
 } from "@/lib/deliverect-subitem-nesting";
 
 export interface CreateOrderResult {
@@ -140,9 +141,12 @@ async function findDeliverectSubItemNestingViolations(cart: CartForValidation): 
         variantGroupSelectionCount: vgCount,
       })
     ) {
+      const max = maxDeliverectVariantGroupSelectionsForMenuItem(
+        Boolean(item.menuItem.deliverectVariantParentPlu?.trim())
+      );
       out.push({
         code: "DELIVERECT_SUBITEMS_NESTING_LIMIT",
-        message: deliverectSubItemNestingBlockedMessage(item.menuItem.name),
+        message: deliverectSubItemNestingCartSummaryMessage(item.menuItem.name, max),
         cartItemId: item.id,
         menuItemId: item.menuItemId,
         menuItemName: item.menuItem.name,
@@ -423,7 +427,7 @@ export function getCartValidationMessage(code: string): string {
     BASKET_LIMIT_EXCEEDED: "Quantity exceeds the maximum allowed for an item.",
     MODIFIER_OPTION_NOT_IN_CURRENT_MENU: "A modifier selection is not on the vendor's current menu.",
     DELIVERECT_SUBITEMS_NESTING_LIMIT:
-      "An item has too many nested variant steps for the kitchen system. Remove some options or ask the restaurant to change modifier setup.",
+      "An item has too many variation steps for online orders. Remove some choices on that item.",
   };
   return map[code] ?? "Your cart needs attention. Please review or remove items.";
 }
