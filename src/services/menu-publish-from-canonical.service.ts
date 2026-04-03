@@ -11,6 +11,10 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
+  getMenuPublishTransactionOptions,
+  logMenuPublish,
+} from "@/lib/menu-publish-transaction";
+import {
   mennyuCanonicalMenuSchema,
   type MennyuCanonicalMenu,
   type MennyuCanonicalProduct,
@@ -73,15 +77,105 @@ export function evaluateMenuImportPublishEligibility(input: {
   return { canPublish: reasons.length === 0, reasons };
 }
 
+const menuImportPublishInclude = {
+  issues: true,
+  draftVersion: true,
+} as const;
+
+export type MenuImportJobForPublish = Prisma.MenuImportJobGetPayload<{
+  include: typeof menuImportPublishInclude;
+}>;
+
+/**
+ * Validates job + draft and parses canonical menu. Used before starting a DB transaction
+ * (fast-fail) and again inside the transaction against a fresh read.
+ */
+export function classifyMenuImportForPublish(job: MenuImportJobForPublish):
+  | { kind: "already_published"; menuVersionId: string }
+  | {
+      kind: "ready";
+      menu: MennyuCanonicalMenu;
+      vendorId: string;
+      draftVersionId: string;
+      jobId: string;
+    } {
+  if (!job.draftVersionId || !job.draftVersion) {
+    throw new MenuPublishValidationError("NO_DRAFT", "No draft MenuVersion on this job");
+  }
+
+  if (job.draftVersion.state === MenuVersionState.published) {
+    return { kind: "already_published", menuVersionId: job.draftVersionId };
+  }
+
+  if (job.draftVersion.state !== MenuVersionState.draft) {
+    throw new MenuPublishValidationError(
+      "INVALID_VERSION_STATE",
+      `MenuVersion must be draft to publish (is ${job.draftVersion.state})`
+    );
+  }
+
+  if (job.status !== MenuImportJobStatus.awaiting_review) {
+    throw new MenuPublishValidationError(
+      "JOB_NOT_REVIEWABLE",
+      `Job must be awaiting_review to publish (is ${job.status})`
+    );
+  }
+
+  const blocking = job.issues.filter(
+    (i) => i.severity === MenuImportIssueSeverity.blocking && !i.waived
+  ).length;
+  if (blocking > 0) {
+    throw new MenuPublishValidationError(
+      "BLOCKING_ISSUES",
+      `Resolve ${blocking} blocking issue(s) before publish`
+    );
+  }
+
+  const parsed = mennyuCanonicalMenuSchema.safeParse(job.draftVersion.canonicalSnapshot);
+  if (!parsed.success) {
+    throw new MenuPublishValidationError("INVALID_CANONICAL", "Canonical snapshot failed schema validation");
+  }
+
+  const menu = parsed.data;
+  if (menu.vendorId !== job.vendorId) {
+    throw new MenuPublishValidationError(
+      "VENDOR_MISMATCH",
+      "Canonical menu vendorId does not match import job vendor"
+    );
+  }
+
+  if (menu.products.length === 0) {
+    throw new MenuPublishValidationError("EMPTY_MENU", "Cannot publish a canonical menu with zero products");
+  }
+
+  return {
+    kind: "ready",
+    menu,
+    vendorId: job.vendorId,
+    draftVersionId: job.draftVersionId,
+    jobId: job.id,
+  };
+}
+
 /** Exported for rollback: same upsert + soft-disable rules as publish. */
 export async function applyCanonicalMenuToLiveTables(
   tx: Prisma.TransactionClient,
   vendorId: string,
-  menu: MennyuCanonicalMenu
+  menu: MennyuCanonicalMenu,
+  logCtx?: { jobId?: string; source?: string }
 ): Promise<void> {
   const orderedGroups = orderModifierGroupsForPublish(menu.modifierGroupDefinitions);
   const groupDeliverectToDbId = new Map<string, string>();
   const optionDeliverectToDbId = new Map<string, string>();
+
+  let sectionMs = Date.now();
+  logMenuPublish("apply_phase", {
+    phase: "modifier_groups_start",
+    vendorId,
+    ...logCtx,
+    modifierGroupCount: orderedGroups.length,
+    modifierOptionCount: orderedGroups.reduce((n, g) => n + g.options.length, 0),
+  });
 
   for (const g of orderedGroups) {
     let parentDbId: string | null = null;
@@ -148,6 +242,22 @@ export async function applyCanonicalMenuToLiveTables(
     }
   }
 
+  logMenuPublish("apply_phase", {
+    phase: "modifier_groups_done",
+    vendorId,
+    ...logCtx,
+    elapsedMs: Date.now() - sectionMs,
+  });
+
+  sectionMs = Date.now();
+  logMenuPublish("apply_phase", {
+    phase: "menu_items_start",
+    vendorId,
+    ...logCtx,
+    categoryCount: menu.categories.length,
+    productCount: menu.products.length,
+  });
+
   const draftProductIds = new Set(menu.products.map((p) => p.deliverectId));
   const draftGroupIds = new Set(menu.modifierGroupDefinitions.map((gr) => gr.deliverectId));
   const productById = new Map(menu.products.map((p) => [p.deliverectId, p]));
@@ -170,6 +280,16 @@ export async function applyCanonicalMenuToLiveTables(
     }
   }
 
+  logMenuPublish("apply_phase", {
+    phase: "menu_items_done",
+    vendorId,
+    ...logCtx,
+    elapsedMs: Date.now() - sectionMs,
+  });
+
+  sectionMs = Date.now();
+  logMenuPublish("apply_phase", { phase: "orphan_options_off_start", vendorId, ...logCtx });
+
   for (const g of menu.modifierGroupDefinitions) {
     const dbGid = groupDeliverectToDbId.get(g.deliverectId);
     if (!dbGid) continue;
@@ -188,6 +308,22 @@ export async function applyCanonicalMenuToLiveTables(
       }
     }
   }
+
+  logMenuPublish("apply_phase", {
+    phase: "orphan_options_off_done",
+    vendorId,
+    ...logCtx,
+    elapsedMs: Date.now() - sectionMs,
+  });
+
+  sectionMs = Date.now();
+  logMenuPublish("apply_phase", {
+    phase: "soft_disable_stale_start",
+    vendorId,
+    ...logCtx,
+    draftProductIdCount: draftProductIds.size,
+    draftGroupIdCount: draftGroupIds.size,
+  });
 
   if (draftProductIds.size > 0) {
     await tx.menuItem.updateMany({
@@ -208,6 +344,13 @@ export async function applyCanonicalMenuToLiveTables(
       data: { isAvailable: false },
     });
   }
+
+  logMenuPublish("apply_phase", {
+    phase: "soft_disable_stale_done",
+    vendorId,
+    ...logCtx,
+    elapsedMs: Date.now() - sectionMs,
+  });
 }
 
 async function upsertMenuItemAndLinks(
@@ -320,127 +463,132 @@ export async function publishMenuImportDraftToLive(params: {
     throw new MenuPublishValidationError("INVALID_JOB", "jobId is required");
   }
 
+  logMenuPublish("publish_start", { jobId });
+
   const publishedByTrim = params.publishedBy?.trim() ?? null;
 
-  const result = await prisma.$transaction(async (tx) => {
-    const job = await tx.menuImportJob.findUnique({
-      where: { id: jobId },
-      include: {
-        issues: true,
-        draftVersion: true,
-      },
-    });
+  const prepStarted = Date.now();
+  const previewJob = await prisma.menuImportJob.findUnique({
+    where: { id: jobId },
+    include: menuImportPublishInclude,
+  });
 
-    if (!job) {
-      throw new MenuPublishValidationError("NOT_FOUND", "Menu import job not found");
-    }
+  if (!previewJob) {
+    throw new MenuPublishValidationError("NOT_FOUND", "Menu import job not found");
+  }
 
-    if (!job.draftVersionId || !job.draftVersion) {
-      throw new MenuPublishValidationError("NO_DRAFT", "No draft MenuVersion on this job");
-    }
+  const preview = classifyMenuImportForPublish(previewJob);
+  if (preview.kind === "already_published") {
+    return { status: "already_published", menuVersionId: preview.menuVersionId };
+  }
 
-    if (job.draftVersion.state === MenuVersionState.published) {
-      return { status: "already_published" as const, menuVersionId: job.draftVersionId };
-    }
+  const { menu: menuPreview, vendorId: vendorIdPreview } = preview;
+  const txOpts = getMenuPublishTransactionOptions();
+  logMenuPublish("publish_prep_done", {
+    jobId,
+    vendorId: vendorIdPreview,
+    txTimeoutMs: txOpts.timeout,
+    txMaxWaitMs: txOpts.maxWait,
+    categoryCount: menuPreview.categories.length,
+    productCount: menuPreview.products.length,
+    modifierGroupCount: menuPreview.modifierGroupDefinitions.length,
+    prepElapsedMs: Date.now() - prepStarted,
+  });
 
-    if (job.draftVersion.state !== MenuVersionState.draft) {
-      throw new MenuPublishValidationError(
-        "INVALID_VERSION_STATE",
-        `MenuVersion must be draft to publish (is ${job.draftVersion.state})`
-      );
-    }
-
-    if (job.status !== MenuImportJobStatus.awaiting_review) {
-      throw new MenuPublishValidationError(
-        "JOB_NOT_REVIEWABLE",
-        `Job must be awaiting_review to publish (is ${job.status})`
-      );
-    }
-
-    const blocking = job.issues.filter(
-      (i) => i.severity === MenuImportIssueSeverity.blocking && !i.waived
-    ).length;
-    if (blocking > 0) {
-      throw new MenuPublishValidationError(
-        "BLOCKING_ISSUES",
-        `Resolve ${blocking} blocking issue(s) before publish`
-      );
-    }
-
-    const parsed = mennyuCanonicalMenuSchema.safeParse(job.draftVersion.canonicalSnapshot);
-    if (!parsed.success) {
-      throw new MenuPublishValidationError("INVALID_CANONICAL", "Canonical snapshot failed schema validation");
-    }
-
-    const menu = parsed.data;
-    if (menu.vendorId !== job.vendorId) {
-      throw new MenuPublishValidationError(
-        "VENDOR_MISMATCH",
-        "Canonical menu vendorId does not match import job vendor"
-      );
-    }
-
-    if (menu.products.length === 0) {
-      throw new MenuPublishValidationError("EMPTY_MENU", "Cannot publish a canonical menu with zero products");
-    }
-
-    const draftId = job.draftVersionId;
-
-    const prevPublished = await tx.menuVersion.findFirst({
-      where: {
-        vendorId: job.vendorId,
-        state: MenuVersionState.published,
-        NOT: { id: draftId },
-      },
-      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-    });
-
-    if (prevPublished) {
-      await tx.menuVersion.update({
-        where: { id: prevPublished.id },
-        data: { state: MenuVersionState.archived },
+  const publishStarted = Date.now();
+  const result = await prisma.$transaction(
+    async (tx) => {
+      logMenuPublish("tx_open", {
+        jobId,
+        sincePublishStartMs: Date.now() - publishStarted,
       });
-    }
 
-    const versionUpdate = await tx.menuVersion.updateMany({
-      where: {
-        id: draftId,
+      const job = await tx.menuImportJob.findUnique({
+        where: { id: jobId },
+        include: menuImportPublishInclude,
+      });
+
+      if (!job) {
+        throw new MenuPublishValidationError("NOT_FOUND", "Menu import job not found");
+      }
+
+      const classified = classifyMenuImportForPublish(job);
+      if (classified.kind === "already_published") {
+        return { status: "already_published" as const, menuVersionId: classified.menuVersionId };
+      }
+
+      const { menu, vendorId, draftVersionId: draftId } = classified;
+
+      logMenuPublish("tx_write_phase", {
+        phase: "version_pointer_and_live_tables",
+        jobId,
+        vendorId,
+        sincePublishStartMs: Date.now() - publishStarted,
+      });
+
+      const prevPublished = await tx.menuVersion.findFirst({
+        where: {
+          vendorId: job.vendorId,
+          state: MenuVersionState.published,
+          NOT: { id: draftId },
+        },
+        orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+      });
+
+      if (prevPublished) {
+        await tx.menuVersion.update({
+          where: { id: prevPublished.id },
+          data: { state: MenuVersionState.archived },
+        });
+      }
+
+      const versionUpdate = await tx.menuVersion.updateMany({
+        where: {
+          id: draftId,
+          vendorId: job.vendorId,
+          state: MenuVersionState.draft,
+        },
+        data: {
+          state: MenuVersionState.published,
+          publishedAt: new Date(),
+          publishedBy: publishedByTrim,
+          previousPublishedVersionId: prevPublished?.id ?? null,
+        },
+      });
+
+      if (versionUpdate.count !== 1) {
+        throw new MenuPublishValidationError(
+          "VERSION_CONFLICT",
+          "Draft MenuVersion could not be locked (already published or missing)"
+        );
+      }
+
+      await applyCanonicalMenuToLiveTables(tx, vendorId, menu, { jobId });
+
+      await tx.menuImportJob.update({
+        where: { id: job.id },
+        data: {
+          status: MenuImportJobStatus.succeeded,
+          completedAt: new Date(),
+          errorCode: null,
+          errorMessage: null,
+        },
+      });
+
+      return {
+        status: "published" as const,
+        menuVersionId: draftId,
+        previousPublishedMenuVersionId: prevPublished?.id ?? null,
         vendorId: job.vendorId,
-        state: MenuVersionState.draft,
-      },
-      data: {
-        state: MenuVersionState.published,
-        publishedAt: new Date(),
-        publishedBy: publishedByTrim,
-        previousPublishedVersionId: prevPublished?.id ?? null,
-      },
-    });
+      };
+    },
+    txOpts
+  );
 
-    if (versionUpdate.count !== 1) {
-      throw new MenuPublishValidationError(
-        "VERSION_CONFLICT",
-        "Draft MenuVersion could not be locked (already published or missing)"
-      );
-    }
-
-    await applyCanonicalMenuToLiveTables(tx, job.vendorId, menu);
-
-    await tx.menuImportJob.update({
-      where: { id: job.id },
-      data: {
-        status: MenuImportJobStatus.succeeded,
-        completedAt: new Date(),
-        errorCode: null,
-        errorMessage: null,
-      },
-    });
-
-    return {
-      status: "published" as const,
-      menuVersionId: draftId,
-      previousPublishedMenuVersionId: prevPublished?.id ?? null,
-      vendorId: job.vendorId,
-    };
+  logMenuPublish("publish_tx_finished", {
+    jobId,
+    status: result.status,
+    totalElapsedMs: Date.now() - publishStarted,
   });
 
   if (result.status === "already_published") {
@@ -471,6 +619,13 @@ export async function publishMenuImportDraftToLive(params: {
       codes: menuParity.issues.map((i) => i.code),
     });
   }
+
+  logMenuPublish("publish_end", {
+    jobId,
+    menuVersionId: result.menuVersionId,
+    vendorId: result.vendorId,
+    parityOk: menuParity.ok,
+  });
 
   return {
     status: "published",
