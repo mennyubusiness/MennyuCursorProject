@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { agentDebugDeliverect, redactIdTail } from "@/lib/agent-debug-deliverect";
 import { prisma } from "@/lib/db";
 import { webhookIdempotencyKey } from "@/lib/idempotency";
 import {
@@ -11,6 +12,7 @@ import {
 import type { DeliverectWebhookPayload } from "@/integrations/deliverect/payloads";
 import { applyDeliverectStatusWebhook } from "@/services/order-status.service";
 import {
+  extractChannelLinkIdSecret,
   getDeliverectSignatureFromRequest,
   isDeliverectWebhookProduction,
   parseDeliverectWebhookJsonObject,
@@ -85,12 +87,26 @@ function logDeliverectWebhookChannelLinkShape(parsed: Record<string, unknown>): 
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
+  agentDebugDeliverect({
+    hypothesisId: "H_webhook_inbound",
+    message: "webhook_POST_received",
+    data: {
+      path: request.nextUrl.pathname,
+      rawBodyBytes: rawBody.length,
+      contentType: request.headers.get("content-type")?.slice(0, 64) ?? null,
+    },
+  });
   logDeliverectWebhookHeaderDiagnostics(request);
 
   const signature = getDeliverectSignatureFromRequest(request);
 
   const parsedResult = parseDeliverectWebhookJsonObject(rawBody);
   if (!parsedResult.ok) {
+    agentDebugDeliverect({
+      hypothesisId: "H_webhook_parse",
+      message: "webhook_invalid_json",
+      data: { rawBodyBytes: rawBody.length },
+    });
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   const parsed = parsedResult.parsed;
@@ -117,6 +133,14 @@ export async function POST(request: NextRequest) {
   });
 
   if (!verificationSecret) {
+    agentDebugDeliverect({
+      hypothesisId: "H_webhook_verify",
+      message: "webhook_no_verification_secret",
+      data: {
+        production,
+        hasChannelLinkId: channelLinkIdForLog,
+      },
+    });
     return NextResponse.json(
       {
         error: production
@@ -127,14 +151,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (
-    !verifyDeliverectSignature(rawBody, signature, verificationSecret, {
-      nodeEnv: production ? "production" : "development",
-      allowUnsignedDev: false,
-    })
-  ) {
+  const sigOk = verifyDeliverectSignature(rawBody, signature, verificationSecret, {
+    nodeEnv: production ? "production" : "development",
+    allowUnsignedDev: false,
+  });
+  if (!sigOk) {
+    agentDebugDeliverect({
+      hypothesisId: "H_webhook_verify",
+      message: "webhook_hmac_invalid",
+      data: {
+        production,
+        hasSignatureHeader: Boolean(signature?.trim()),
+        channelLinkTail: redactIdTail(extractChannelLinkIdSecret(parsed) ?? undefined),
+      },
+    });
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
+  agentDebugDeliverect({
+    hypothesisId: "H_webhook_verify",
+    message: "webhook_hmac_ok",
+    data: { production },
+  });
 
   const payload = parsed as DeliverectWebhookPayload;
   const flat = flattenDeliverectWebhookPayload(payload);
@@ -145,6 +182,11 @@ export async function POST(request: NextRequest) {
     where: { idempotencyKey: idemKey },
   });
   if (existing) {
+    agentDebugDeliverect({
+      hypothesisId: "H_webhook_idempotency",
+      message: "webhook_duplicate_event",
+      data: { processed: existing.processed, idempotencyKeyLen: idemKey.length },
+    });
     return NextResponse.json({ received: true, duplicate: true, processed: existing.processed });
   }
 
@@ -177,7 +219,26 @@ export async function POST(request: NextRequest) {
     if (byExternal) vendorOrderId = byExternal.id;
   }
 
+  agentDebugDeliverect({
+    hypothesisId: "H_webhook_match",
+    message: "webhook_resolve_vendor_order",
+    data: {
+      hasInternalId: Boolean(internalVendorOrderId),
+      hasExternalId: Boolean(externalOrderId),
+      resolved: Boolean(vendorOrderId),
+      externalIdLen: externalOrderId?.length ?? 0,
+    },
+  });
+
   if (!vendorOrderId) {
+    agentDebugDeliverect({
+      hypothesisId: "H_webhook_match",
+      message: "webhook_match_failed",
+      data: {
+        internalVendorOrderIdPresent: Boolean(internalVendorOrderId),
+        externalOrderIdPresent: Boolean(externalOrderId),
+      },
+    });
     await prisma.webhookEvent.updateMany({
       where: { idempotencyKey: idemKey },
       data: {
@@ -205,8 +266,22 @@ export async function POST(request: NextRequest) {
         errorMessage: null,
       },
     });
+    agentDebugDeliverect({
+      hypothesisId: "H_webhook_apply",
+      message: "webhook_apply_success",
+      data: {
+        vendorOrderId,
+        outcome: applyResult.outcome,
+        updatedVendorOrderState: applyResult.updatedVendorOrderState,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    agentDebugDeliverect({
+      hypothesisId: "H_webhook_apply",
+      message: "webhook_apply_threw",
+      data: { vendorOrderId, error: message.slice(0, 200) },
+    });
     await prisma.webhookEvent.updateMany({
       where: { idempotencyKey: idemKey },
       data: { processed: false, errorMessage: message },

@@ -4,6 +4,7 @@
  * Order creation URL per Deliverect docs: {base}/{channelName}/order/{channelLinkId} (channel name case-sensitive).
  */
 import { env } from "@/lib/env";
+import { agentDebugDeliverect, redactIdTail } from "@/lib/agent-debug-deliverect";
 import { getDeliverectAuthHeaders } from "@/integrations/deliverect/auth";
 import type { DeliverectOrderRequest, DeliverectOrderResponse } from "./payloads";
 
@@ -162,6 +163,20 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
     };
 
     if (!res.ok) {
+      agentDebugDeliverect({
+        hypothesisId: "H_submit_http_error",
+        message: "submitOrder_non2xx",
+        data: {
+          httpStatus: res.status,
+          requestHost: new URL(url).host,
+          requestPath: new URL(url).pathname,
+          channelOrderId: payload.channelOrderId,
+          channelLinkTail: redactIdTail(payload.channelLinkId),
+          itemCount: payload.items?.length ?? 0,
+          responseBodyKeys:
+            raw && typeof raw === "object" ? Object.keys(raw as object).join(",") : "(non-object)",
+        },
+      });
       console.warn(`${LOG_PREFIX} Non-2xx response status=${res.status}`);
       submitDiagnostics(res.status, raw);
       if (deliverectVerboseDebug()) {
@@ -187,6 +202,22 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
 
     const externalOrderId = extractDeliverectOrderId(raw);
     if (externalOrderId) {
+      agentDebugDeliverect({
+        hypothesisId: "H_submit_201_with_id",
+        message: "submitOrder_success_sync_order_id",
+        data: {
+          httpStatus: res.status,
+          requestHost: new URL(url).host,
+          requestPath: new URL(url).pathname,
+          channelOrderId: payload.channelOrderId,
+          channelLinkTail: redactIdTail(payload.channelLinkId),
+          locationTail: redactIdTail(payload.locationId),
+          itemCount: payload.items?.length ?? 0,
+          orderType: payload.orderType,
+          hasPayment: payload.payment != null,
+          externalOrderIdLen: externalOrderId.length,
+        },
+      });
       return {
         success: true,
         externalOrderId,
@@ -196,6 +227,15 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
     }
 
     if (deliverectBodyIndicatesError(raw)) {
+      agentDebugDeliverect({
+        hypothesisId: "H_submit_body_error_flag",
+        message: "submitOrder_body_indicates_error",
+        data: {
+          httpStatus: res.status,
+          channelOrderId: payload.channelOrderId,
+          channelLinkTail: redactIdTail(payload.channelLinkId),
+        },
+      });
       const err = `Deliverect ${res.status}: error/validation in body: ${safeJsonForLog(raw)}`;
       console.warn(`${LOG_PREFIX} ${err}`);
       if (deliverectVerboseDebug()) {
@@ -217,6 +257,26 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
       );
     }
 
+    agentDebugDeliverect({
+      hypothesisId: "H_submit_201_no_sync_id",
+      message: "submitOrder_accepted_webhook_expected",
+      data: {
+        httpStatus: res.status,
+        requestHost: new URL(url).host,
+        requestPath: new URL(url).pathname,
+        channelOrderId: payload.channelOrderId,
+        channelLinkTail: redactIdTail(payload.channelLinkId),
+        locationTail: redactIdTail(payload.locationId),
+        itemCount: payload.items?.length ?? 0,
+        orderType: payload.orderType,
+        hasPayment: payload.payment != null,
+        pickupTimePresent: payload.pickupTime != null,
+        preparationTime: payload.preparationTime ?? null,
+        responseBodyKeys: bodyKeys,
+        locationHeader: headerDiag.location != null,
+        note: "If no webhook follows, check Deliverect staging webhook URL + channel subscription (not Mennyu code).",
+      },
+    });
     return {
       success: true,
       raw,
@@ -225,6 +285,14 @@ export async function submitOrder(payload: DeliverectOrderRequest): Promise<Deli
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    agentDebugDeliverect({
+      hypothesisId: "H_submit_transport_error",
+      message: "submitOrder_fetch_threw",
+      data: {
+        channelOrderId: payload.channelOrderId,
+        errorType: e instanceof Error ? e.name : "unknown",
+      },
+    });
     return { success: false, error: message };
   }
 }
