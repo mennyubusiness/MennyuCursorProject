@@ -44,7 +44,8 @@ export function deliverectSubItemNestingCartSummaryMessage(itemName: string, max
 
 /** Add-to-cart / save modifier line — matches server {@link assertDeliverectVariantGroupNestingAllowed}. */
 export function customerFacingDeliverectVariantLimitExceeded(itemName: string, max: number): string {
-  return `Too many variation choices for “${itemName}”. For online orders, pick at most ${max}. Remove one or more and try again.`;
+  const n = max === 1 ? "choice" : "choices";
+  return `Too many variation ${n} for “${itemName}”. Online orders allow at most ${max} across all size/style variation groups combined. Remove a variation and try again.`;
 }
 
 /** @deprecated Prefer {@link deliverectSubItemNestingCartSummaryMessage} with a computed max. */
