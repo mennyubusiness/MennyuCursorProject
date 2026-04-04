@@ -43,6 +43,8 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().min(32).optional(),
   /** Optional. When set, admin routes require this value (query param or cookie). TODO: Replace with proper auth. */
   ADMIN_SECRET: z.string().optional(),
+  /** Bearer or query secret for internal cron/job routes (e.g. Deliverect auto reconciliation). */
+  INTERNAL_JOB_SECRET: z.string().optional(),
   /**
    * Required in production for signed vendor dashboard magic links (`/api/vendor/.../session/grant`).
    * Min 32 characters; use a random secret (e.g. openssl rand -hex 32).

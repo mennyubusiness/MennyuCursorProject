@@ -486,6 +486,10 @@ model VendorOrder {
   lastExternalStatusAt    DateTime?
   /// Last Deliverect webhook apply outcome + debug fields (JSON)
   deliverectWebhookLastApply Json?
+  /// Set once per overdue episode when the automatic cron attempts Deliverect GET fallback (recovery-only).
+  deliverectAutoRecheckAttemptedAt DateTime?
+  /// Short outcome code from last automatic recheck: applied, noop, no_match, ambiguous, not_eligible, error.
+  deliverectAutoRecheckResult     String?
   lineItems               OrderLineItem[]
   paymentAllocations      PaymentAllocation[]
   order                   Order                       @relation(fields: [orderId], references: [id], onDelete: Cascade)

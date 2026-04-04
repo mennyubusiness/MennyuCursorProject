@@ -29,11 +29,15 @@ export type DeliverectFallbackResult =
   | { outcome: "not_eligible"; reason: string }
   | { outcome: "noop"; deliverectWebhookApplyOutcome: string };
 
+export type DeliverectFallbackTrigger = "manual" | "automatic";
+
 export type DeliverectFallbackOptions = {
   /** If true, only run when past reconciliation stale threshold. */
   onlyIfOverdue?: boolean;
   /** If false (default), skip when manually recovered (admin_override path). */
   allowAfterManualRecovery?: boolean;
+  /** Distinguishes admin UI/cron automation in logs (default manual). */
+  trigger?: DeliverectFallbackTrigger;
 };
 
 function resolveLookupDeliverectOrderId(vo: {
@@ -52,10 +56,11 @@ export async function attemptDeliverectReconciliationFallback(
 ): Promise<DeliverectFallbackResult> {
   const onlyIfOverdue = options?.onlyIfOverdue ?? false;
   const allowAfterManualRecovery = options?.allowAfterManualRecovery ?? false;
+  const trigger: DeliverectFallbackTrigger = options?.trigger ?? "manual";
   const now = new Date();
 
   console.info(
-    `${LOG} fallback_attempt_started vendorOrderId=${vendorOrderId} onlyIfOverdue=${onlyIfOverdue} allowAfterManualRecovery=${allowAfterManualRecovery}`
+    `${LOG} fallback_attempt_started trigger=${trigger} vendorOrderId=${vendorOrderId} onlyIfOverdue=${onlyIfOverdue} allowAfterManualRecovery=${allowAfterManualRecovery}`
   );
 
   const vo = await prisma.vendorOrder.findUnique({
@@ -200,7 +205,9 @@ export async function attemptDeliverectReconciliationFallback(
     return { outcome: "ambiguous", reason: match.reason };
   }
 
-  console.info(`${LOG} fallback_match_found vendorOrderId=${vendorOrderId} lookupDeliverectOrderId=${lookupDeliverectOrderId}`);
+  console.info(
+    `${LOG} fallback_match_found trigger=${trigger} vendorOrderId=${vendorOrderId} lookupDeliverectOrderId=${lookupDeliverectOrderId}`
+  );
 
   const applyResult = await applyDeliverectStatusFromFallbackLookup(
     vendorOrderId,

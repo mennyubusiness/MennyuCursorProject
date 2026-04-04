@@ -217,7 +217,12 @@ async function persistDeliverectWebhookAuditOnly(
       lastStatusSource: statusSource,
       ...authorityPromotion,
       ...(externalAudit != null
-        ? { lastExternalStatus: externalAudit, lastExternalStatusAt: new Date() }
+        ? {
+            lastExternalStatus: externalAudit,
+            lastExternalStatusAt: new Date(),
+            deliverectAutoRecheckAttemptedAt: null,
+            deliverectAutoRecheckResult: null,
+          }
         : {}),
     },
   });

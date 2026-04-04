@@ -94,6 +94,9 @@ export async function applyVendorOrderStatusWithMeta(
   if (params.externalStatus !== undefined) {
     data.lastExternalStatus = params.externalStatus;
     data.lastExternalStatusAt = new Date();
+    /** New reconciliation episode: allow a future automatic Deliverect GET fallback if needed. */
+    data.deliverectAutoRecheckAttemptedAt = null;
+    data.deliverectAutoRecheckResult = null;
   }
 
   await prisma.vendorOrder.update({
