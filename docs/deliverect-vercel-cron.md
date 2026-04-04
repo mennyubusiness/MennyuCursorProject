@@ -30,25 +30,30 @@ Accepted:
 2. Vercel typically injects **`Authorization: Bearer <CRON_SECRET>`** on cron requests when `CRON_SECRET` is set. No `secret` query param is required on the cron URL.
 3. If the Bearer header is missing in your environment (rare; see [issues](https://github.com/vercel/vercel/issues/11303)), fall back: **Vercel → Cron Jobs** → edit the job URL to `...?take=40&secret=<your secret>` (same value as `CRON_SECRET` / `INTERNAL_JOB_SECRET`).
 
-`vercel.json` cannot interpolate env into the path; the default path `?take=40` is enough when Bearer auth works.
+`vercel.json` cannot interpolate env into the path. Example path: `/api/internal/jobs/deliverect-reconciliation-fallback?take=40` (add `&secret=…` if needed).
 
 If the request has **no** valid Bearer and **no** valid `secret` query, the route returns **401**.
 
 ## Schedule and batch size
 
-- Default schedule in `vercel.json`: **every 10 minutes** (`*/10 * * * *`). With a **25-minute** overdue threshold, this picks up newly overdue orders within roughly one cron window without hammering Deliverect.
-- Default `take=40` per run (max vendor orders processed per invocation). Adjust query: `?take=40` (combined with `secret` as `?secret=…&take=40`).
+**This repo does not ship a `crons` entry in `vercel.json`.** On **Vercel Hobby**, [cron is limited to at most once per day](https://vercel.com/docs/cron-jobs/usage-and-pricing); schedules like every 10 minutes **fail deployment** (“Hobby accounts are limited to daily cron jobs”). Use one of:
+
+- **External scheduler** (e.g. GitHub Actions, cron-job.org) `GET`/`POST` the job URL with auth on your chosen interval.
+- **Vercel Pro** if you want platform cron with sub-daily schedules, then add the job in the Vercel dashboard (or restore a `crons` entry that matches your plan limits).
+
+Recommended when using a scheduler: interval on the order of **every 10 minutes** with a **25-minute** overdue threshold, and **`take=40`** (tune as needed).
 
 ## Disable cron safely
 
-1. Remove or comment out the `crons` entry in `vercel.json` and redeploy, **or** disable the job in the Vercel Cron UI.  
+1. Remove scheduled triggers in your external scheduler **or** delete cron jobs in the Vercel dashboard (if any).  
 2. Unset **both** `INTERNAL_JOB_SECRET` and `CRON_SECRET` — the endpoint returns **503** and does not run the job.
 
 ## Setup after merge
 
 1. Add **`CRON_SECRET`** (recommended for scheduled runs) and/or **`INTERNAL_JOB_SECRET`** to **Production** — same value in both if you use both.  
 2. Deploy.  
-3. **Vercel → Cron Jobs:** confirm the job path is `/api/internal/jobs/deliverect-reconciliation-fallback?take=40`. If cron returns **401**, add `&secret=...` to the URL or verify `CRON_SECRET` is set and redeploy.  
+3. **Scheduler (Hobby):** configure an **external** cron (or GitHub Actions) to call `GET` or `POST`  
+   `/api/internal/jobs/deliverect-reconciliation-fallback?take=40` with `Authorization: Bearer …` or `&secret=…`. On **Pro**, you may add a Vercel Cron job in the dashboard instead, respecting plan limits.  
 4. Optional: set `DELIVERECT_GET_ORDER_URL_TEMPLATE` if GET order by id uses a non-default path.  
 5. Watch **Logs** for `[Deliverect auto-reconciliation cron]` and `[Deliverect auto-reconciliation job]`.
 

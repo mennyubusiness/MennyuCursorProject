@@ -14,6 +14,14 @@ function authSecret(): string {
   if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
     return "dev-only-auth-secret-min-32-chars!!!!";
   }
+  // `next build` sets NODE_ENV=production but sessions are not used; AUTH_SECRET may be unset locally/CI.
+  const isNextCompileBuild =
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.NEXT_PHASE === "phase-development-build" ||
+    (process.env.NODE_ENV === "production" && process.env.npm_lifecycle_event === "build");
+  if (isNextCompileBuild) {
+    return "build-time-placeholder-auth-secret-32chars!!";
+  }
   throw new Error("AUTH_SECRET must be set in production (min 32 characters).");
 }
 
