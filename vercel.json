@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/internal/jobs/deliverect-reconciliation-fallback?take=40",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}

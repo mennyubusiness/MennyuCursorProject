@@ -1,0 +1,64 @@
+# Deliverect automatic reconciliation — Vercel Cron
+
+Webhook remains the primary reconciliation path. This job runs **at most one** automatic GET fallback per overdue vendor order per episode (see `deliverectAutoRecheckAttemptedAt` on `VendorOrder`).
+
+## Required environment variables
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `INTERNAL_JOB_SECRET` | One of these | Bearer token or `secret` query value (manual runs, scripts). |
+| `CRON_SECRET` | One of these | Same semantics; [Vercel](https://vercel.com/docs/cron-jobs/manage-cron-jobs) can send `Authorization: Bearer <CRON_SECRET>` on scheduled cron invocations when this env var is set. |
+| — | **Yes** | At least **one** of `INTERNAL_JOB_SECRET` or `CRON_SECRET` must be set or the endpoint returns **503**. |
+| `DELIVERECT_GET_ORDER_URL_TEMPLATE` | No | Override Deliverect GET order URL if the default `{baseUrl}/orders/{orderId}` 404s. |
+
+Generate a strong secret, e.g. `openssl rand -hex 32`.
+
+## Auth model
+
+The handler compares the incoming credential (timing-safe) against **`INTERNAL_JOB_SECRET` or `CRON_SECRET`** (first non-empty wins in code — use the **same value** in both if you set both, to avoid confusion).
+
+Accepted:
+
+1. `Authorization: Bearer <secret>` — matches either env var above.
+2. `?secret=<secret>` on the URL — for GET crons or tools that cannot set headers.
+
+**Do not** commit secrets in `vercel.json`; configure only in Vercel **Environment Variables**.
+
+### Vercel Cron (recommended)
+
+1. Add **`CRON_SECRET`** in Vercel Production (same random string you use for internal jobs, or duplicate `INTERNAL_JOB_SECRET` there).
+2. Vercel typically injects **`Authorization: Bearer <CRON_SECRET>`** on cron requests when `CRON_SECRET` is set. No `secret` query param is required on the cron URL.
+3. If the Bearer header is missing in your environment (rare; see [issues](https://github.com/vercel/vercel/issues/11303)), fall back: **Vercel → Cron Jobs** → edit the job URL to `...?take=40&secret=<your secret>` (same value as `CRON_SECRET` / `INTERNAL_JOB_SECRET`).
+
+`vercel.json` cannot interpolate env into the path; the default path `?take=40` is enough when Bearer auth works.
+
+If the request has **no** valid Bearer and **no** valid `secret` query, the route returns **401**.
+
+## Schedule and batch size
+
+- Default schedule in `vercel.json`: **every 10 minutes** (`*/10 * * * *`). With a **25-minute** overdue threshold, this picks up newly overdue orders within roughly one cron window without hammering Deliverect.
+- Default `take=40` per run (max vendor orders processed per invocation). Adjust query: `?take=40` (combined with `secret` as `?secret=…&take=40`).
+
+## Disable cron safely
+
+1. Remove or comment out the `crons` entry in `vercel.json` and redeploy, **or** disable the job in the Vercel Cron UI.  
+2. Unset **both** `INTERNAL_JOB_SECRET` and `CRON_SECRET` — the endpoint returns **503** and does not run the job.
+
+## Setup after merge
+
+1. Add **`CRON_SECRET`** (recommended for scheduled runs) and/or **`INTERNAL_JOB_SECRET`** to **Production** — same value in both if you use both.  
+2. Deploy.  
+3. **Vercel → Cron Jobs:** confirm the job path is `/api/internal/jobs/deliverect-reconciliation-fallback?take=40`. If cron returns **401**, add `&secret=...` to the URL or verify `CRON_SECRET` is set and redeploy.  
+4. Optional: set `DELIVERECT_GET_ORDER_URL_TEMPLATE` if GET order by id uses a non-default path.  
+5. Watch **Logs** for `[Deliverect auto-reconciliation cron]` and `[Deliverect auto-reconciliation job]`.
+
+## Plan limits
+
+- **Hobby:** Cron may be limited or unavailable; check [Vercel Cron pricing](https://vercel.com/docs/cron-jobs/usage-and-pricing).  
+- **Pro:** Cron jobs and longer `maxDuration` if you raise it on the route.
+
+## Safety (recap)
+
+- **Duplicate crons:** `updateMany` claim on `deliverectAutoRecheckAttemptedAt IS NULL` prevents double processing.  
+- **Late webhook:** Row no longer matches eligibility → skipped.  
+- **Manual recovery:** `manuallyRecoveredAt` blocks automatic fallback.

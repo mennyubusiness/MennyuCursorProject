@@ -46,6 +46,11 @@ const envSchema = z.object({
   /** Bearer or query secret for internal cron/job routes (e.g. Deliverect auto reconciliation). */
   INTERNAL_JOB_SECRET: z.string().optional(),
   /**
+   * Vercel Cron may send `Authorization: Bearer <CRON_SECRET>` automatically when this is set
+   * in the Vercel project. Use the same value as INTERNAL_JOB_SECRET or set only one of them.
+   */
+  CRON_SECRET: z.string().optional(),
+  /**
    * Required in production for signed vendor dashboard magic links (`/api/vendor/.../session/grant`).
    * Min 32 characters; use a random secret (e.g. openssl rand -hex 32).
    */
