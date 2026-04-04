@@ -38,9 +38,11 @@ import {
 } from "@/services/vendor-order-status-instrumentation";
 import { sendOrderStatusUpdate } from "./sms.service";
 import { resolvePickupTimezone } from "@/lib/pickup-scheduling";
+import { DELIVERECT_RECONCILIATION_STALE_MINUTES } from "@/lib/admin-exceptions";
 
 /** Source tag for dev simulator; SMS is skipped when source is this value. */
 const DEV_SIMULATOR_SOURCE = "dev_simulator";
+const WEBHOOK_LOG_PREFIX = "[Deliverect webhook]";
 
 /**
  * Derive parent order status from vendor orders using effective child state (recovery-normalized).
@@ -236,9 +238,13 @@ export async function applyDeliverectStatusWebhook(
       routingStatus: true,
       fulfillmentStatus: true,
       deliverectOrderId: true,
+      lastExternalStatusAt: true,
+      deliverectSubmittedAt: true,
     },
   });
   if (!vo) throw new Error("Vendor order not found");
+
+  const webhookProcessedAt = new Date();
 
   const payloadObj =
     rawPayload && typeof rawPayload === "object"
@@ -346,6 +352,18 @@ export async function applyDeliverectStatusWebhook(
     };
   }
 
+  const firstExternalSignal = vo.lastExternalStatusAt == null;
+  const minutesAfterDeliverectSubmit =
+    firstExternalSignal && vo.deliverectSubmittedAt
+      ? Math.max(
+          0,
+          Math.floor((webhookProcessedAt.getTime() - vo.deliverectSubmittedAt.getTime()) / 60_000)
+        )
+      : null;
+  const reconciledAfterStaleThreshold =
+    minutesAfterDeliverectSubmit != null &&
+    minutesAfterDeliverectSubmit >= DELIVERECT_RECONCILIATION_STALE_MINUTES;
+
   const apply: DeliverectWebhookLastApplyRecord = {
     outcome: "applied",
     processedAt: nowIso(),
@@ -359,6 +377,13 @@ export async function applyDeliverectStatusWebhook(
     interpretedRouting,
     proposedFulfillment: nextFulfillment,
     proposedRouting: nextRouting,
+    ...(firstExternalSignal
+      ? {
+          firstExternalSignal: true,
+          minutesAfterDeliverectSubmit,
+          reconciledAfterStaleThreshold,
+        }
+      : {}),
   };
 
   const patch: {
@@ -393,6 +418,22 @@ export async function applyDeliverectStatusWebhook(
     },
     "deliverect"
   );
+
+  console.info(
+    `${WEBHOOK_LOG_PREFIX} applied vendorOrderId=${vendorOrderId} orderId=${vo.orderId} ` +
+      `firstExternalSignal=${firstExternalSignal} deliverectOrderIdBackfill=${Boolean(idBackfill)} ` +
+      `routingChanged=${routingChanged} fulfillmentChanged=${fulfillmentChanged}` +
+      (minutesAfterDeliverectSubmit != null
+        ? ` minutesAfterDeliverectSubmit=${minutesAfterDeliverectSubmit} reconciledAfterStaleThreshold=${reconciledAfterStaleThreshold}`
+        : "")
+  );
+
+  if (reconciledAfterStaleThreshold) {
+    console.info(
+      `${WEBHOOK_LOG_PREFIX} late_reconciliation_resolved vendorOrderId=${vendorOrderId} orderId=${vo.orderId} ` +
+        `minutesAfterDeliverectSubmit=${minutesAfterDeliverectSubmit} (threshold ${DELIVERECT_RECONCILIATION_STALE_MINUTES}m)`
+    );
+  }
 
   return {
     outcome: "applied",

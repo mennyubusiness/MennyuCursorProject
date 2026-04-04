@@ -67,3 +67,13 @@ export function getExceptionReason(vo: VendorOrderForException, type: ExceptionT
 
 /** Minutes used for routing_stuck; export for display if needed. */
 export const ROUTING_STUCK_THRESHOLD_MINUTES = ROUTING_STUCK_MINUTES;
+
+/**
+ * After Deliverect HTTP success, if no POS webhook has set `lastExternalStatusAt` within this window,
+ * ops should treat reconciliation as overdue (admin attention + diagnostics).
+ *
+ * Clock anchor: `VendorOrder.deliverectSubmittedAt` is advanced only on successful submit or while
+ * routing is still `pending` (see `submitVendorOrderToDeliverect`) — failed retries on an already-`sent`
+ * order do not reset the clock, so overdue detection stays honest.
+ */
+export const DELIVERECT_RECONCILIATION_STALE_MINUTES = 25;

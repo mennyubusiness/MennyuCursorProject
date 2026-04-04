@@ -42,12 +42,6 @@ export function deliverectSubItemNestingCartSummaryMessage(itemName: string, max
   return `“${itemName}” allows at most ${max} variation ${max === 1 ? "step" : "steps"} for online orders. Remove a few choices and try again.`;
 }
 
-/** Add-to-cart / save modifier line — matches server {@link assertDeliverectVariantGroupNestingAllowed}. */
-export function customerFacingDeliverectVariantLimitExceeded(itemName: string, max: number): string {
-  const n = max === 1 ? "choice" : "choices";
-  return `Too many variation ${n} for “${itemName}”. Online orders allow at most ${max} across all size/style variation groups combined. Remove a variation and try again.`;
-}
-
 /** @deprecated Prefer {@link deliverectSubItemNestingCartSummaryMessage} with a computed max. */
 export function deliverectSubItemNestingBlockedMessage(itemName: string): string {
   return deliverectSubItemNestingCartSummaryMessage(itemName, DELIVERECT_MAX_SUBITEM_NESTING);

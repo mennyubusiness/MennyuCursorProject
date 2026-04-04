@@ -150,6 +150,9 @@ export function ExceptionList({
 
             {/* Why + deliverect details only when relevant */}
             <p className="mt-2 text-sm text-stone-700">{item.reasonLabel}</p>
+            {item.deliverectDiagnostic ? (
+              <p className="mt-1 text-xs leading-relaxed text-stone-600">{item.deliverectDiagnostic}</p>
+            ) : null}
             {(item.deliverectAttempts != null && item.deliverectAttempts > 0) ||
             item.deliverectSubmittedAt ||
             item.deliverectLastError ? (

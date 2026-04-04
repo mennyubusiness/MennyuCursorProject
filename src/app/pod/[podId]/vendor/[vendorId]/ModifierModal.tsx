@@ -1,30 +1,12 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from "react";
-import type {
-  ModifierConfigForUI,
-  ModifierGroupLinkForUI,
-  ModifierOptionForUI,
-} from "./modifier-config";
+import type { ModifierConfigForUI, ModifierOptionForUI } from "./modifier-config";
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
 import { getVariantMergedModifierConfigAction } from "@/actions/variant-modifier-config.actions";
-import {
-  countDeliverectVariantGroupSelectionsInState,
-  minimumDeliverectVariantStepsRequiredByRules,
-  totalSelectedInGroup,
-  totalSelectedInNested,
-  canIncreaseTopLevelModifierOption,
-  canIncreaseNestedModifierOption,
-} from "@/lib/modifier-deliverect-variant-steps";
-import {
-  deliverectVariantMenuRulesExceedOnlineCap,
-  formatModifierGroupSelectionHint,
-  menuConfigurationConflictMessage,
-} from "@/lib/modifier-group-display";
-import {
-  customerFacingDeliverectVariantLimitExceeded,
-  maxDeliverectVariantGroupSelectionsForMenuItem,
-} from "@/lib/deliverect-subitem-nesting";
+import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
+import { totalSelectedInGroup, totalSelectedInNested } from "@/lib/modifier-deliverect-variant-steps";
+import { formatModifierGroupShortNote } from "@/lib/modifier-group-display";
 
 const DEBUG_ADD_TO_CART_TRACE = false;
 
@@ -73,9 +55,8 @@ export function ModifierModal({
   quantity: editQuantity = 1,
   initialSelections,
   initialSpecialInstructions,
-  /** When the vendor uses Deliverect, show nesting limits and “choose up to N” on variant groups. */
-  vendorUsesDeliverect = false,
-  /** From `MenuItem.deliverectVariantParentPlu` — leaf+parent products allow one fewer variant step. */
+  vendorUsesDeliverect: _vendorUsesDeliverect = false,
+  /** From `MenuItem.deliverectVariantParentPlu` — leaf rows use parent shell for variant merge. */
   menuItemDeliverectVariantParentPlu,
 }: {
   config: ModifierConfigForUI;
@@ -145,29 +126,6 @@ export function ModifierModal({
     }
     return list;
   }, [selections]);
-
-  const maxDeliverectVariantSteps = useMemo(() => {
-    if (!vendorUsesDeliverect) return null;
-    return maxDeliverectVariantGroupSelectionsForMenuItem(
-      Boolean(menuItemDeliverectVariantParentPlu?.trim())
-    );
-  }, [vendorUsesDeliverect, menuItemDeliverectVariantParentPlu]);
-
-  const deliverectVariantStepCount = useMemo(
-    () => countDeliverectVariantGroupSelectionsInState(selections, displayConfig),
-    [selections, displayConfig]
-  );
-
-  const deliverectVariantOverLimit =
-    maxDeliverectVariantSteps != null && deliverectVariantStepCount > maxDeliverectVariantSteps;
-
-  const menuConfigurationUnsatisfiable = useMemo(() => {
-    if (!vendorUsesDeliverect || maxDeliverectVariantSteps == null) return false;
-    return deliverectVariantMenuRulesExceedOnlineCap(
-      minimumDeliverectVariantStepsRequiredByRules(displayConfig),
-      maxDeliverectVariantSteps
-    );
-  }, [vendorUsesDeliverect, maxDeliverectVariantSteps, displayConfig]);
 
   useEffect(() => {
     if (!isVariantFamily || isEditMode) return;
@@ -265,16 +223,6 @@ export function ModifierModal({
       }
       return;
     }
-    if (deliverectVariantOverLimit && maxDeliverectVariantSteps != null) {
-      setError({
-        message: customerFacingDeliverectVariantLimitExceeded(
-          displayConfig.menuItemName,
-          maxDeliverectVariantSteps
-        ),
-        code: "DELIVERECT_SUBITEMS_NESTING_LIMIT",
-      });
-      return;
-    }
     setLoading(true);
     setError(null);
     if (isEditMode && cartItemId) {
@@ -358,24 +306,6 @@ export function ModifierModal({
             Base price: ${(displayConfig.priceCents / 100).toFixed(2)}
           </p>
 
-          {menuConfigurationUnsatisfiable && (
-            <div
-              className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950"
-              role="alert"
-            >
-              {menuConfigurationConflictMessage()}
-            </div>
-          )}
-
-          {vendorUsesDeliverect && maxDeliverectVariantSteps != null && !menuConfigurationUnsatisfiable && (
-            <p className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700">
-              Online orders allow at most {maxDeliverectVariantSteps} variation choice
-              {maxDeliverectVariantSteps === 1 ? "" : "s"} in total across all size/style variation
-              groups for this item. Group labels show per-section limits; the total cannot exceed this
-              cap.
-            </p>
-          )}
-
           {displayConfig.groups
             .filter((link) => link.modifierGroup.isAvailable)
             .map((link) => {
@@ -387,17 +317,11 @@ export function ModifierModal({
                 <fieldset key={link.modifierGroup.id} className="rounded-lg border border-stone-200 p-3">
                   <legend className="text-sm font-medium text-stone-900">
                     {link.modifierGroup.name}
-                    <span className="ml-1 text-stone-500">
-                      (
-                      {formatModifierGroupSelectionHint({
+                    <span className="ml-2 font-normal text-stone-500">
+                      {`(${formatModifierGroupShortNote({
                         minSelections: link.minSelections,
                         maxSelections: link.maxSelections,
-                        required: link.required,
-                        deliverectIsVariantGroup: link.modifierGroup.deliverectIsVariantGroup === true,
-                        deliverectOnlineOrderApplies: vendorUsesDeliverect,
-                        deliverectMaxVariantStepsForItem: maxDeliverectVariantSteps,
-                      })}
-                      )
+                      })})`}
                     </span>
                   </legend>
                   {requiredMissing && (
@@ -409,16 +333,14 @@ export function ModifierModal({
                     {link.modifierGroup.options.map((opt) => (
                       <OptionRow
                         key={opt.id}
-                        link={link}
                         option={opt}
                         quantity={selections[opt.id] ?? 0}
-                        displayConfig={displayConfig}
+                        maxForGroup={link.maxSelections}
+                        totalInGroup={total}
                         onIncrease={() => setOptionQty(opt.id, 1)}
                         onDecrease={() => setOptionQty(opt.id, -1)}
                         selections={selections}
                         setOptionQty={setOptionQty}
-                        vendorUsesDeliverect={vendorUsesDeliverect}
-                        maxDeliverectVariantSteps={maxDeliverectVariantSteps}
                       />
                     ))}
                   </div>
@@ -461,12 +383,7 @@ export function ModifierModal({
               <button
                 type="button"
                 onClick={submit}
-                disabled={
-                  loading ||
-                  !requiredSatisfied ||
-                  deliverectVariantOverLimit ||
-                  menuConfigurationUnsatisfiable
-                }
+                disabled={loading || !requiredSatisfied}
                 className="rounded-lg bg-mennyu-primary px-4 py-2 text-sm font-medium text-black hover:bg-mennyu-secondary disabled:opacity-50"
               >
                 {loading ? (isEditMode ? "Saving…" : "Adding…") : isEditMode ? "Save changes" : "Add to cart"}
@@ -480,36 +397,26 @@ export function ModifierModal({
 }
 
 function OptionRow({
-  link,
   option,
   quantity,
-  displayConfig,
+  maxForGroup,
+  totalInGroup,
   onIncrease,
   onDecrease,
   selections,
   setOptionQty,
-  vendorUsesDeliverect,
-  maxDeliverectVariantSteps,
 }: {
-  link: ModifierGroupLinkForUI;
   option: ModifierOptionForUI;
   quantity: number;
-  displayConfig: ModifierConfigForUI;
+  maxForGroup: number;
+  totalInGroup: number;
   onIncrease: () => void;
   onDecrease: () => void;
   selections: SelectionState;
   setOptionQty: (id: string, delta: number) => void;
-  vendorUsesDeliverect: boolean;
-  maxDeliverectVariantSteps?: number | null;
 }) {
-  const canAdd = canIncreaseTopLevelModifierOption({
-    link,
-    option,
-    state: selections,
-    cfg: displayConfig,
-    maxDeliverectVariantSteps: maxDeliverectVariantSteps ?? null,
-    deliverectOnlineOrderApplies: vendorUsesDeliverect,
-  });
+  const canAdd =
+    modifierMaxSelectionsIsUnbounded(maxForGroup) || totalInGroup < maxForGroup;
   const disabled = !option.isAvailable;
 
   return (
@@ -557,31 +464,22 @@ function OptionRow({
             return (
               <fieldset key={nested.id} className="rounded border border-stone-100 p-2">
                 <legend className="text-xs font-medium text-stone-700">
-                  {nested.name} (
-                  {formatModifierGroupSelectionHint({
-                    minSelections: nested.minSelections,
-                    maxSelections: nested.maxSelections,
-                    required: nested.isRequired,
-                    deliverectIsVariantGroup: nested.deliverectIsVariantGroup === true,
-                    deliverectOnlineOrderApplies: vendorUsesDeliverect,
-                    deliverectMaxVariantStepsForItem: maxDeliverectVariantSteps ?? null,
-                  })}
-                  )
+                  {nested.name}
+                  <span className="ml-1.5 font-normal text-stone-500">
+                    {`(${formatModifierGroupShortNote({
+                      minSelections: nested.minSelections,
+                      maxSelections: nested.maxSelections,
+                    })})`}
+                  </span>
                 </legend>
                 {nRequiredMissing && (
                   <p className="mb-1 text-xs text-red-600">Select at least {nested.minSelections}.</p>
                 )}
                 <div className="mt-1 space-y-1">
                   {nested.options.map((nopt) => {
-                    const canAddNested = canIncreaseNestedModifierOption({
-                      nested,
-                      option: nopt,
-                      state: selections,
-                      cfg: displayConfig,
-                      nTotal,
-                      maxDeliverectVariantSteps: maxDeliverectVariantSteps ?? null,
-                      deliverectOnlineOrderApplies: vendorUsesDeliverect,
-                    });
+                    const canAddNested =
+                      modifierMaxSelectionsIsUnbounded(nested.maxSelections) ||
+                      nTotal < nested.maxSelections;
                     return (
                     <div key={nopt.id} className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1">

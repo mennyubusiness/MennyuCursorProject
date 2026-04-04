@@ -39,10 +39,32 @@ export async function findStalledPosManagedVendorOrders(opts: {
     where: {
       routingStatus: { in: ["sent", "confirmed"] },
       fulfillmentStatus: { in: stuck },
-      updatedAt: { lt: cutoff },
-      OR: [
-        { deliverectChannelLinkId: { not: null } },
-        { vendor: { is: { deliverectChannelLinkId: { not: null } } } },
+      AND: [
+        {
+          /** Idle clock: last POS signal, else submit time, else legacy updatedAt (avoids false stalls from unrelated VO touches). */
+          OR: [
+            { lastExternalStatusAt: { lt: cutoff } },
+            {
+              AND: [
+                { lastExternalStatusAt: null },
+                { deliverectSubmittedAt: { not: null, lt: cutoff } },
+              ],
+            },
+            {
+              AND: [
+                { lastExternalStatusAt: null },
+                { deliverectSubmittedAt: null },
+                { updatedAt: { lt: cutoff } },
+              ],
+            },
+          ],
+        },
+        {
+          OR: [
+            { deliverectChannelLinkId: { not: null } },
+            { vendor: { is: { deliverectChannelLinkId: { not: null } } } },
+          ],
+        },
       ],
     },
     select: {
@@ -51,6 +73,7 @@ export async function findStalledPosManagedVendorOrders(opts: {
       routingStatus: true,
       fulfillmentStatus: true,
       updatedAt: true,
+      deliverectSubmittedAt: true,
       lastExternalStatus: true,
       lastExternalStatusAt: true,
       statusAuthority: true,
@@ -75,7 +98,7 @@ export async function findStalledPosManagedVendorOrders(opts: {
 
     if (authority !== "pos") continue;
 
-    const activityAt = vo.lastExternalStatusAt ?? vo.updatedAt;
+    const activityAt = vo.lastExternalStatusAt ?? vo.deliverectSubmittedAt ?? vo.updatedAt;
     const idleMs = now.getTime() - activityAt.getTime();
     const minutesSinceActivity = Math.floor(idleMs / 60_000);
 

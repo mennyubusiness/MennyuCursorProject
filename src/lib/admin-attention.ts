@@ -6,7 +6,11 @@
 
 import { VendorFulfillmentStatus, VendorRoutingStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { ROUTING_STUCK_THRESHOLD_MINUTES } from "@/lib/admin-exceptions";
+import {
+  DELIVERECT_RECONCILIATION_STALE_MINUTES,
+  ROUTING_STUCK_THRESHOLD_MINUTES,
+} from "@/lib/admin-exceptions";
+import { describeDeliverectReconciliationForAdmin } from "@/lib/deliverect-reconciliation-helpers";
 import { getExceptionUrgency } from "@/lib/admin-urgency";
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
 import { ageMinutes as ageMinutesUtil } from "@/lib/date-utils";
@@ -18,6 +22,7 @@ export type AdminAttentionScope = "order" | "vendor_order" | "issue";
 export type AdminAttentionReason =
   | "routing_failed"
   | "routing_stuck"
+  | "deliverect_reconciliation_overdue"
   | "fulfillment_stuck"
   | "open_issue"
   | "refund_failed"
@@ -64,11 +69,14 @@ export interface AdminAttentionItem {
   deliverectLastError?: string | null;
   deliverectAttempts?: number | null;
   deliverectSubmittedAt?: Date | null;
+  /** Longer plain-English diagnostic for Deliverect reconciliation cases. */
+  deliverectDiagnostic?: string | null;
 }
 
 // ---- Constants (aligned with exceptions page and orders filter) ----
 
 const ROUTING_STUCK_MS = ROUTING_STUCK_THRESHOLD_MINUTES * 60 * 1000;
+const DELIVERECT_RECONCILIATION_STALE_MS = DELIVERECT_RECONCILIATION_STALE_MINUTES * 60 * 1000;
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const TAKE_VO = 200;
 const TAKE_OPEN_ISSUE_ORDERS = 500;
@@ -98,6 +106,7 @@ function reasonToBucket(reason: AdminAttentionReason): AdminAttentionBucket {
   switch (reason) {
     case "routing_failed":
     case "routing_stuck":
+    case "deliverect_reconciliation_overdue":
     case "fulfillment_stuck":
     case "manual_recovery_required":
       return "recoverable";
@@ -116,6 +125,7 @@ function reasonToRecommendedAction(
   switch (reason) {
     case "routing_failed":
     case "routing_stuck":
+    case "deliverect_reconciliation_overdue":
     case "manual_recovery_required":
       return fulfillmentStatus === "pending" ? "retry_routing" : "view_order";
     case "fulfillment_stuck":
@@ -142,6 +152,8 @@ function reasonToLabel(
         : "Routing failed";
     case "routing_stuck":
       return `Routing still pending after ${ROUTING_STUCK_THRESHOLD_MINUTES}+ min`;
+    case "deliverect_reconciliation_overdue":
+      return `Submitted to Deliverect, but no POS webhook confirmation after ${DELIVERECT_RECONCILIATION_STALE_MINUTES}+ min`;
     case "fulfillment_stuck":
       return "Fulfillment in early state for too long";
     case "open_issue":
@@ -166,9 +178,10 @@ function buildCurrentStatus(routingStatus: string, fulfillmentStatus: string): s
 /** Build VO-based attention items from the same queries as the exceptions page. */
 async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttentionItem[]> {
   const stuckBefore = new Date(now.getTime() - ROUTING_STUCK_MS);
+  const reconciliationStaleBefore = new Date(now.getTime() - DELIVERECT_RECONCILIATION_STALE_MS);
   const twoHoursAgo = new Date(now.getTime() - TWO_HOURS_MS);
 
-  const [failed, stuckPending, stuckSentConfirmed] = await Promise.all([
+  const [failed, stuckPending, deliverectReconciliationOverdue, stuckSentConfirmed] = await Promise.all([
     prisma.vendorOrder.findMany({
       where: { routingStatus: VendorRoutingStatus.failed },
       include: VO_INCLUDE,
@@ -186,6 +199,18 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
     }),
     prisma.vendorOrder.findMany({
       where: {
+        routingStatus: VendorRoutingStatus.sent,
+        fulfillmentStatus: VendorFulfillmentStatus.pending,
+        lastExternalStatusAt: null,
+        deliverectSubmittedAt: { not: null, lt: reconciliationStaleBefore },
+        OR: [{ deliverectChannelLinkId: { not: null } }, { vendor: { deliverectChannelLinkId: { not: null } } }],
+      },
+      include: VO_INCLUDE,
+      orderBy: { deliverectSubmittedAt: "desc" },
+      take: TAKE_VO,
+    }),
+    prisma.vendorOrder.findMany({
+      where: {
         fulfillmentStatus: VendorFulfillmentStatus.pending,
         routingStatus: { in: [VendorRoutingStatus.sent, VendorRoutingStatus.confirmed] },
         createdAt: { lt: twoHoursAgo },
@@ -196,7 +221,20 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
     }),
   ]);
 
+  if (deliverectReconciliationOverdue.length > 0) {
+    const sample = deliverectReconciliationOverdue
+      .slice(0, 12)
+      .map((v) => v.id)
+      .join(",");
+    console.info(
+      `[Deliverect reconciliation] overdue_queue_snapshot count=${deliverectReconciliationOverdue.length} ` +
+        `thresholdMinutes=${DELIVERECT_RECONCILIATION_STALE_MINUTES} sampleVendorOrderIds=${sample}` +
+        (deliverectReconciliationOverdue.length > 12 ? "…" : "")
+    );
+  }
+
   const items: AdminAttentionItem[] = [];
+  const seenVoIds = new Set<string>();
 
   for (const vo of failed) {
     if (vo.fulfillmentStatus !== "pending") continue;
@@ -246,9 +284,48 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
       deliverectAttempts: vo.deliverectAttempts,
       deliverectSubmittedAt: vo.deliverectSubmittedAt,
     });
+    seenVoIds.add(vo.id);
+  }
+
+  for (const vo of deliverectReconciliationOverdue) {
+    const urgency = getExceptionUrgency(vo.deliverectSubmittedAt ?? vo.createdAt);
+    const reason: AdminAttentionReason = "deliverect_reconciliation_overdue";
+    items.push({
+      id: `vendor_order:${vo.id}`,
+      scope: "vendor_order",
+      reason,
+      bucket: reasonToBucket(reason),
+      severity: urgencyToSeverity(urgency.urgency),
+      ageMinutes: urgency.ageMinutes,
+      recommendedAction: reasonToRecommendedAction(reason, vo.fulfillmentStatus),
+      reasonLabel: reasonToLabel(reason, vo),
+      currentStatus: buildCurrentStatus(vo.routingStatus, vo.fulfillmentStatus),
+      orderId: vo.orderId,
+      vendorOrderId: vo.id,
+      primaryEntityHref: `/admin/orders/${vo.orderId}`,
+      order: vo.order ?? undefined,
+      vendor: vo.vendor ?? undefined,
+      deliverectLastError: vo.deliverectLastError,
+      deliverectAttempts: vo.deliverectAttempts,
+      deliverectSubmittedAt: vo.deliverectSubmittedAt,
+      deliverectDiagnostic: describeDeliverectReconciliationForAdmin(
+        {
+          routingStatus: vo.routingStatus,
+          fulfillmentStatus: vo.fulfillmentStatus,
+          deliverectOrderId: vo.deliverectOrderId,
+          lastDeliverectResponse: vo.lastDeliverectResponse,
+          lastExternalStatusAt: vo.lastExternalStatusAt,
+          deliverectSubmittedAt: vo.deliverectSubmittedAt,
+          createdAt: vo.createdAt,
+        },
+        { now, staleMinutes: DELIVERECT_RECONCILIATION_STALE_MINUTES }
+      ),
+    });
+    seenVoIds.add(vo.id);
   }
 
   for (const vo of stuckSentConfirmed) {
+    if (seenVoIds.has(vo.id)) continue;
     const urgency = getExceptionUrgency(vo.createdAt);
     const reason: AdminAttentionReason = "fulfillment_stuck";
     items.push({
@@ -369,9 +446,11 @@ export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
 export async function getOrderIdsNeedingAttention(): Promise<string[]> {
   const now = new Date();
   const stuckBefore = new Date(now.getTime() - ROUTING_STUCK_MS);
+  const reconciliationStaleBefore = new Date(now.getTime() - DELIVERECT_RECONCILIATION_STALE_MS);
   const twoHoursAgo = new Date(now.getTime() - TWO_HOURS_MS);
 
-  const [failed, stuckPending, stuckSentConfirmed, openIssueOrderIds, refundFailed] = await Promise.all([
+  const [failed, stuckPending, deliverectReconciliationOverdue, stuckSentConfirmed, openIssueOrderIds, refundFailed] =
+    await Promise.all([
     prisma.vendorOrder.findMany({
       where: {
         routingStatus: VendorRoutingStatus.failed,
@@ -385,6 +464,17 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
         routingStatus: VendorRoutingStatus.pending,
         fulfillmentStatus: VendorFulfillmentStatus.pending,
         createdAt: { lt: stuckBefore },
+      },
+      select: { orderId: true },
+      take: TAKE_VO,
+    }),
+    prisma.vendorOrder.findMany({
+      where: {
+        routingStatus: VendorRoutingStatus.sent,
+        fulfillmentStatus: VendorFulfillmentStatus.pending,
+        lastExternalStatusAt: null,
+        deliverectSubmittedAt: { not: null, lt: reconciliationStaleBefore },
+        OR: [{ deliverectChannelLinkId: { not: null } }, { vendor: { deliverectChannelLinkId: { not: null } } }],
       },
       select: { orderId: true },
       take: TAKE_VO,
@@ -406,7 +496,9 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
     }),
   ]);
 
-  const voOrderIds = [...failed, ...stuckPending, ...stuckSentConfirmed].map((v) => v.orderId);
+  const voOrderIds = [...failed, ...stuckPending, ...deliverectReconciliationOverdue, ...stuckSentConfirmed].map(
+    (v) => v.orderId
+  );
   const refundOrderIds = refundFailed.map((r) => r.orderId);
   const orderIds = [...new Set([...voOrderIds, ...openIssueOrderIds, ...refundOrderIds])];
   return orderIds;

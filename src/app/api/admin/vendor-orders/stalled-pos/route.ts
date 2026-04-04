@@ -1,6 +1,6 @@
 /**
  * GET: List POS-managed vendor orders that may be stalled (heuristic).
- * Query: minMinutes (default 45) — VendorOrder.updatedAt older than this threshold.
+ * Query: minMinutes (default 45) — idle time from last POS signal, else Deliverect submit time, else updatedAt.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { findStalledPosManagedVendorOrders } from "@/services/pos-stalled-vendor-orders.service";

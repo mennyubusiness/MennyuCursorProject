@@ -21,54 +21,8 @@ import {
   shellBasePriceCentsForMenuItem,
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartValidationError } from "@/services/cart-validation-error";
-import {
-  customerFacingDeliverectVariantLimitExceeded,
-  maxDeliverectVariantGroupSelectionsForMenuItem,
-} from "@/lib/deliverect-subitem-nesting";
 
 export { CartValidationError } from "@/services/cart-validation-error";
-
-/**
- * Deliverect-linked vendors: block cart writes when variant-group steps exceed API nesting max
- * (aligned with {@link validateDeliverectSubItemNesting} and modifier modal limits).
- */
-async function assertDeliverectVariantGroupNestingAllowed(params: {
-  vendorId: string;
-  menuItemName: string;
-  deliverectVariantParentPlu?: string | null;
-  selections: Array<{ modifierOptionId: string; quantity: number }>;
-}): Promise<void> {
-  const vendor = await prisma.vendor.findUnique({
-    where: { id: params.vendorId },
-    select: { deliverectChannelLinkId: true },
-  });
-  if (!vendor?.deliverectChannelLinkId?.trim()) return;
-
-  const max = maxDeliverectVariantGroupSelectionsForMenuItem(
-    Boolean(params.deliverectVariantParentPlu?.trim())
-  );
-  const active = params.selections.filter((s) => s.quantity >= 1);
-  if (active.length === 0) return;
-
-  const optionIds = [...new Set(active.map((s) => s.modifierOptionId))];
-  const options = await prisma.modifierOption.findMany({
-    where: { id: { in: optionIds } },
-    include: { modifierGroup: { select: { deliverectIsVariantGroup: true } } },
-  });
-  const byId = new Map(options.map((o) => [o.id, o]));
-  let count = 0;
-  for (const s of active) {
-    const o = byId.get(s.modifierOptionId);
-    if (o?.modifierGroup.deliverectIsVariantGroup === true) count += 1;
-  }
-  if (count > max) {
-    throw new CartValidationError(
-      customerFacingDeliverectVariantLimitExceeded(params.menuItemName, max),
-      "DELIVERECT_SUBITEMS_NESTING_LIMIT",
-      { menuItemName: params.menuItemName }
-    );
-  }
-}
 
 /** TEMP: set false to silence add-to-cart trace logs */
 const DEBUG_ADD_TO_CART_TRACE = true;
@@ -243,12 +197,6 @@ export async function addCartItem(
         menuItemName: modLeaf.menuItemName,
       });
     }
-    await assertDeliverectVariantGroupNestingAllowed({
-      vendorId: menuItemResolved.vendorId,
-      menuItemName: menuItemResolved.name,
-      deliverectVariantParentPlu: menuItemResolved.deliverectVariantParentPlu,
-      selections: selectionsForLeaf,
-    });
   }
 
   const effectiveUnitPriceCents =
@@ -509,12 +457,6 @@ export async function updateCartItem(
           menuItemName: modLeaf.menuItemName,
         });
       }
-      await assertDeliverectVariantGroupNestingAllowed({
-        vendorId: menuItemResolved.vendorId,
-        menuItemName: menuItemResolved.name,
-        deliverectVariantParentPlu: menuItemResolved.deliverectVariantParentPlu,
-        selections: selectionsForLeaf,
-      });
     }
 
     const effectiveUnitPriceCents =
@@ -596,12 +538,6 @@ export async function updateCartItem(
       menuItemName: modResult.menuItemName,
     });
   }
-  await assertDeliverectVariantGroupNestingAllowed({
-    vendorId: existingItem.menuItem.vendorId,
-    menuItemName: menuItemForPersistedValidation.name,
-    deliverectVariantParentPlu: menuItemForPersistedValidation.deliverectVariantParentPlu,
-    selections: persistedSelections,
-  });
 
   const data: { quantity: number; specialInstructions?: string | null } = { quantity };
   if (specialInstructions !== undefined) {

@@ -24,6 +24,12 @@ export interface DeliverectWebhookLastApplyRecord {
   proposedRouting?: string | null;
   currentFulfillment?: string;
   currentRouting?: string;
+  /** First webhook that set lastExternalStatusAt (POS signal). */
+  firstExternalSignal?: boolean;
+  /** Minutes between deliverectSubmittedAt and this apply (ops / audit). */
+  minutesAfterDeliverectSubmit?: number | null;
+  /** True if first POS signal arrived after DELIVERECT_RECONCILIATION_STALE_MINUTES window. */
+  reconciledAfterStaleThreshold?: boolean;
 }
 
 export interface DeliverectWebhookApplyResult {

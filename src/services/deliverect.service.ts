@@ -203,13 +203,20 @@ export async function submitVendorOrderToDeliverect(
         ? { routingStatus: "failed" as const }
         : {};
 
+  /**
+   * Reconciliation overdue clock (`deliverectSubmittedAt`) = last *successful* HTTP submit to Deliverect.
+   * Do not advance it when a retry fails while already `sent` (or `confirmed`) — that would hide
+   * how long we have been waiting for the first POS webhook.
+   */
+  const advanceDeliverectSubmitClock = result.success || currentRouting === "pending";
+
   await prisma.vendorOrder.update({
     where: { id: vendorOrderId },
     data: {
       deliverectAttempts: vendorOrder.deliverectAttempts + 1,
       lastDeliverectPayload: payload as unknown as object,
       lastDeliverectResponse: responsePayload != null ? (responsePayload as Prisma.InputJsonValue) : Prisma.DbNull,
-      deliverectSubmittedAt: now,
+      ...(advanceDeliverectSubmitClock ? { deliverectSubmittedAt: now } : {}),
       deliverectLastError: failureMessage,
       ...statusUpdate,
     },
@@ -227,6 +234,10 @@ export async function submitVendorOrderToDeliverect(
   }
 
   if (result.success) {
+    console.info(
+      `${LOG_PREFIX} Reconciliation clock started vendorOrderId=${vendorOrderId} deliverectSubmittedAt=${now.toISOString()} ` +
+        `hasSyncExternalId=${Boolean(result.externalOrderId)} pendingWebhookFlag=${Boolean(result.acceptedWithoutExternalId)}`
+    );
     const snap = await prisma.vendorOrder.findUnique({
       where: { id: vendorOrderId },
       select: {

@@ -91,6 +91,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (!vendorOrderId) {
+    const hint = JSON.stringify({
+      internalVendorOrderId: internalVendorOrderId ?? null,
+      externalOrderId: externalOrderId ?? null,
+      eventId: eventId ?? null,
+    });
+    console.warn(
+      `[Deliverect webhook] match_failed: could not resolve VendorOrder (channelOrderId / mennyuVendorOrderId / deliverectOrderId). ${hint}`
+    );
     await prisma.webhookEvent.updateMany({
       where: { idempotencyKey: idemKey },
       data: {
