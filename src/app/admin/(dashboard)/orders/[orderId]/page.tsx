@@ -13,6 +13,17 @@ import { buildAdminOrderTimeline } from "@/lib/admin-order-timeline";
 import { AdminVendorOrderExceptionActions } from "./AdminVendorOrderExceptionActions";
 import { AdminVendorOrderTransition } from "./AdminVendorOrderTransition";
 import { AdminOrderIssuesPanel } from "./AdminOrderIssuesPanel";
+import { AdminDeliverectRecheck } from "./AdminDeliverectRecheck";
+
+function isDeliverectRecheckEligible(vo: AdminOrderDetail["vendorOrders"][number]): boolean {
+  const ch = vo.deliverectChannelLinkId ?? vo.vendor.deliverectChannelLinkId;
+  if (ch == null || String(ch).trim() === "") return false;
+  if (vo.routingStatus !== "sent") return false;
+  if (vo.fulfillmentStatus !== "pending") return false;
+  if (vo.lastExternalStatusAt != null) return false;
+  if (vo.manuallyRecoveredAt != null) return false;
+  return true;
+}
 
 function fulfillmentLabel(fulfillmentStatus: string): string {
   switch (fulfillmentStatus) {
@@ -312,6 +323,30 @@ export default async function AdminOrderDetailPage({
           })}
         </div>
       </section>
+
+      {/* 4b. Deliverect reconciliation fallback */}
+      {vendorContexts.some((c) => isDeliverectRecheckEligible(c.vo)) && (
+        <section className="rounded-lg border border-stone-200 bg-white p-4">
+          <h2 className="text-lg font-semibold text-stone-900">Deliverect reconciliation</h2>
+          <p className="mt-1 text-sm text-stone-600">
+            If webhooks are delayed, re-fetch order status from Deliverect (GET by stored external id). Webhooks remain
+            the primary path.
+          </p>
+          <div className="mt-4 space-y-4">
+            {vendorContexts
+              .filter((c) => isDeliverectRecheckEligible(c.vo))
+              .map(({ vo }) => (
+                <div key={vo.id} className="rounded-lg border border-stone-100 bg-stone-50/50 p-3">
+                  <p className="text-sm font-medium text-stone-900">{vo.vendor.name}</p>
+                  <p className="mt-1 text-xs text-stone-500">
+                    Channel order id (sent to Deliverect) = vendor order id <span className="font-mono">{vo.id}</span>
+                  </p>
+                  <AdminDeliverectRecheck vendorOrderId={vo.id} onlyIfOverdueDefault={false} />
+                </div>
+              ))}
+          </div>
+        </section>
+      )}
 
       {/* 5. Timeline (collapsed) */}
       {timeline.length > 0 && (

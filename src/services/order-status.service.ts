@@ -8,6 +8,7 @@ import {
   VendorRoutingStatus,
   VendorFulfillmentStatus,
   type VendorOrderStatusAuthority,
+  type VendorOrderStatusSource,
 } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
@@ -198,7 +199,8 @@ async function persistDeliverectWebhookAuditOnly(
   orderId: string,
   rawPayload: unknown,
   externalAudit: string | null,
-  apply: DeliverectWebhookLastApplyRecord
+  apply: DeliverectWebhookLastApplyRecord,
+  statusSource: VendorOrderStatusSource = "deliverect_webhook"
 ): Promise<void> {
   const payloadJson =
     rawPayload === undefined || rawPayload === null
@@ -212,7 +214,7 @@ async function persistDeliverectWebhookAuditOnly(
     data: {
       lastWebhookPayload: payloadJson,
       deliverectWebhookLastApply: apply as unknown as Prisma.InputJsonValue,
-      lastStatusSource: "deliverect_webhook",
+      lastStatusSource: statusSource,
       ...authorityPromotion,
       ...(externalAudit != null
         ? { lastExternalStatus: externalAudit, lastExternalStatusAt: new Date() }
@@ -222,15 +224,28 @@ async function persistDeliverectWebhookAuditOnly(
   await recomputeAndPersistParentStatus(orderId, "deliverect");
 }
 
+type DeliverectInboundKind = "webhook" | "fallback";
+
+function deliverectInboundLogPrefix(kind: DeliverectInboundKind): string {
+  return kind === "webhook" ? WEBHOOK_LOG_PREFIX : "[Deliverect fallback]";
+}
+
 /**
- * Apply Deliverect status webhook: strict mapper, monotonic reconciliation, explicit outcomes,
- * and VendorOrder.deliverectWebhookLastApply audit JSON.
+ * Shared inbound pipeline: webhook POST and reconciliation fallback use the same mapper + merge + applyVendorOrderStatusWithMeta.
  */
-export async function applyDeliverectStatusWebhook(
+async function applyDeliverectInboundStatus(
   vendorOrderId: string,
   deliverectExternalId: string | null,
-  rawPayload: unknown
+  rawPayload: unknown,
+  inbound: DeliverectInboundKind
 ): Promise<DeliverectWebhookApplyResult> {
+  const statusSource: VendorOrderStatusSource =
+    inbound === "webhook" ? "deliverect_webhook" : "deliverect_fallback";
+  const historySource = inbound === "webhook" ? "deliverect" : "deliverect_fallback";
+  const applySource: DeliverectWebhookLastApplyRecord["applySource"] =
+    inbound === "webhook" ? "webhook" : "fallback";
+  const logPrefix = deliverectInboundLogPrefix(inbound);
+
   const vo = await prisma.vendorOrder.findUnique({
     where: { id: vendorOrderId },
     select: {
@@ -244,7 +259,7 @@ export async function applyDeliverectStatusWebhook(
   });
   if (!vo) throw new Error("Vendor order not found");
 
-  const webhookProcessedAt = new Date();
+  const processedAt = new Date();
 
   const payloadObj =
     rawPayload && typeof rawPayload === "object"
@@ -262,9 +277,12 @@ export async function applyDeliverectStatusWebhook(
   if (interpretation.kind === "unmapped") {
     const apply: DeliverectWebhookLastApplyRecord = {
       outcome: "unmapped_status",
+      applySource,
       processedAt: nowIso(),
       detail:
-        "Deliverect payload did not resolve to a mapped Mennyu status (strict allowlist). Raw codes/events are logged server-side.",
+        inbound === "fallback"
+          ? "Deliverect API lookup: payload did not map to a Mennyu status (strict allowlist)."
+          : "Deliverect payload did not resolve to a mapped Mennyu status (strict allowlist). Raw codes/events are logged server-side.",
       currentFulfillment: vo.fulfillmentStatus,
       currentRouting: vo.routingStatus,
       rawNumericCode: interpretation.rawNumericCode,
@@ -279,7 +297,8 @@ export async function applyDeliverectStatusWebhook(
       vo.orderId,
       rawPayload,
       externalAudit,
-      apply
+      apply,
+      statusSource
     );
     return {
       outcome: "unmapped_status",
@@ -325,10 +344,13 @@ export async function applyDeliverectStatusWebhook(
       : "noop_same_status";
     const apply: DeliverectWebhookLastApplyRecord = {
       outcome,
+      applySource,
       processedAt: nowIso(),
       detail: backward
         ? `Ignored POS fulfillment regression vs current ${vo.fulfillmentStatus} (webhook proposed ${interpretedFulfillment}).`
-        : "Mapped status matches current Mennyu state after reconciliation.",
+        : inbound === "fallback"
+          ? "Deliverect API lookup: mapped status matches current Mennyu state (no row change)."
+          : "Mapped status matches current Mennyu state after reconciliation.",
       currentFulfillment: vo.fulfillmentStatus,
       currentRouting: vo.routingStatus,
       rawNumericCode: interpretation.rawNumericCode,
@@ -342,7 +364,8 @@ export async function applyDeliverectStatusWebhook(
       vo.orderId,
       rawPayload,
       externalAudit,
-      apply
+      apply,
+      statusSource
     );
     return {
       outcome,
@@ -357,7 +380,7 @@ export async function applyDeliverectStatusWebhook(
     firstExternalSignal && vo.deliverectSubmittedAt
       ? Math.max(
           0,
-          Math.floor((webhookProcessedAt.getTime() - vo.deliverectSubmittedAt.getTime()) / 60_000)
+          Math.floor((processedAt.getTime() - vo.deliverectSubmittedAt.getTime()) / 60_000)
         )
       : null;
   const reconciledAfterStaleThreshold =
@@ -366,10 +389,16 @@ export async function applyDeliverectStatusWebhook(
 
   const apply: DeliverectWebhookLastApplyRecord = {
     outcome: "applied",
+    applySource,
     processedAt: nowIso(),
-    detail: idBackfill
-      ? "Vendor order updated from Deliverect (includes deliverectOrderId backfill)."
-      : "Vendor order updated from Deliverect.",
+    detail:
+      idBackfill
+        ? inbound === "fallback"
+          ? "Vendor order updated from Deliverect API lookup (includes deliverectOrderId backfill)."
+          : "Vendor order updated from Deliverect (includes deliverectOrderId backfill)."
+        : inbound === "fallback"
+          ? "Vendor order updated from Deliverect API lookup (reconciliation fallback)."
+          : "Vendor order updated from Deliverect.",
     currentFulfillment: vo.fulfillmentStatus,
     currentRouting: vo.routingStatus,
     rawNumericCode: interpretation.rawNumericCode,
@@ -400,8 +429,8 @@ export async function applyDeliverectStatusWebhook(
       vendorOrderId,
       orderId: vo.orderId,
       patch,
-      statusSource: "deliverect_webhook",
-      historySource: "deliverect",
+      statusSource,
+      historySource,
       ...(externalAudit != null ? { externalStatus: externalAudit } : {}),
       rawPayload,
       extraVendorOrderUpdate: {
@@ -416,12 +445,12 @@ export async function applyDeliverectStatusWebhook(
       historyRoutingStatus: nextRouting,
       historyFulfillmentStatus: nextFulfillment,
     },
-    "deliverect"
+    historySource
   );
 
   console.info(
-    `${WEBHOOK_LOG_PREFIX} applied vendorOrderId=${vendorOrderId} orderId=${vo.orderId} ` +
-      `firstExternalSignal=${firstExternalSignal} deliverectOrderIdBackfill=${Boolean(idBackfill)} ` +
+    `${logPrefix} applied vendorOrderId=${vendorOrderId} orderId=${vo.orderId} ` +
+      `inbound=${inbound} firstExternalSignal=${firstExternalSignal} deliverectOrderIdBackfill=${Boolean(idBackfill)} ` +
       `routingChanged=${routingChanged} fulfillmentChanged=${fulfillmentChanged}` +
       (minutesAfterDeliverectSubmit != null
         ? ` minutesAfterDeliverectSubmit=${minutesAfterDeliverectSubmit} reconciledAfterStaleThreshold=${reconciledAfterStaleThreshold}`
@@ -429,10 +458,17 @@ export async function applyDeliverectStatusWebhook(
   );
 
   if (reconciledAfterStaleThreshold) {
-    console.info(
-      `${WEBHOOK_LOG_PREFIX} late_reconciliation_resolved vendorOrderId=${vendorOrderId} orderId=${vo.orderId} ` +
-        `minutesAfterDeliverectSubmit=${minutesAfterDeliverectSubmit} (threshold ${DELIVERECT_RECONCILIATION_STALE_MINUTES}m)`
-    );
+    if (inbound === "fallback") {
+      console.info(
+        `[Deliverect] fallback_reconciliation_resolved_after_timeout vendorOrderId=${vendorOrderId} orderId=${vo.orderId} ` +
+          `minutesAfterDeliverectSubmit=${minutesAfterDeliverectSubmit} (threshold ${DELIVERECT_RECONCILIATION_STALE_MINUTES}m)`
+      );
+    } else {
+      console.info(
+        `${WEBHOOK_LOG_PREFIX} late_reconciliation_resolved vendorOrderId=${vendorOrderId} orderId=${vo.orderId} ` +
+          `minutesAfterDeliverectSubmit=${minutesAfterDeliverectSubmit} (threshold ${DELIVERECT_RECONCILIATION_STALE_MINUTES}m)`
+      );
+    }
   }
 
   return {
@@ -441,6 +477,29 @@ export async function applyDeliverectStatusWebhook(
     vendorOrderId,
     updatedVendorOrderState: true,
   };
+}
+
+/**
+ * Apply Deliverect status webhook: strict mapper, monotonic reconciliation, explicit outcomes,
+ * and VendorOrder.deliverectWebhookLastApply audit JSON.
+ */
+export async function applyDeliverectStatusWebhook(
+  vendorOrderId: string,
+  deliverectExternalId: string | null,
+  rawPayload: unknown
+): Promise<DeliverectWebhookApplyResult> {
+  return applyDeliverectInboundStatus(vendorOrderId, deliverectExternalId, rawPayload, "webhook");
+}
+
+/**
+ * Same pipeline as webhook, with source `deliverect_fallback` (admin/API reconciliation lookup).
+ */
+export async function applyDeliverectStatusFromFallbackLookup(
+  vendorOrderId: string,
+  deliverectExternalId: string | null,
+  rawPayload: unknown
+): Promise<DeliverectWebhookApplyResult> {
+  return applyDeliverectInboundStatus(vendorOrderId, deliverectExternalId, rawPayload, "fallback");
 }
 
 export interface ApplyVendorOrderTransitionResult {

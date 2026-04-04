@@ -715,6 +715,8 @@ enum VendorOrderStatusAuthority {
 
 enum VendorOrderStatusSource {
   deliverect_webhook
+  /// Active reconciliation via Deliverect API lookup (not webhook).
+  deliverect_fallback
   dma_action
   vendor_dashboard
   admin_action

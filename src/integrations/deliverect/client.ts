@@ -272,3 +272,65 @@ export async function postDeliverectOrderStatusUpdate(
 
   return { httpStatus: res.status, body };
 }
+
+export type FetchDeliverectOrderByIdResult =
+  | { ok: true; httpStatus: number; body: unknown }
+  | { ok: false; httpStatus: number; body: unknown; error: string };
+
+/**
+ * GET Deliverect order by external order id (Mongo-style `_id` from create response).
+ * URL template: env `DELIVERECT_GET_ORDER_URL_TEMPLATE` with `{baseUrl}` and `{orderId}`, or default `{baseUrl}/orders/{orderId}`.
+ * Auth: same as submit (OAuth or DELIVERECT_API_KEY).
+ *
+ * **Limitation:** Exact path may differ by Deliverect API version/account — configure the template if the default 404s.
+ */
+export async function fetchDeliverectOrderById(deliverectOrderId: string): Promise<FetchDeliverectOrderByIdResult> {
+  const id = String(deliverectOrderId).trim();
+  if (!id) {
+    return { ok: false, httpStatus: 0, body: null, error: "missing_deliverect_order_id" };
+  }
+  const baseUrl = BASE_URL.replace(/\/$/, "");
+  const template =
+    env.DELIVERECT_GET_ORDER_URL_TEMPLATE?.trim() ?? "{baseUrl}/orders/{orderId}";
+  const url = template
+    .replace(/\{baseUrl\}/g, baseUrl)
+    .replace(/\{orderId\}/g, encodeURIComponent(id));
+
+  const apiKey = env.DELIVERECT_API_KEY?.trim();
+  const authHeaders: Record<string, string> = apiKey
+    ? { Authorization: `Bearer ${apiKey}` }
+    : await getDeliverectAuthHeaders();
+
+  if (deliverectVerboseDebug()) {
+    console.info(`${LOG_PREFIX} GET order lookup url=${url}`);
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        ...authHeaders,
+      },
+    });
+    const rawText = await res.text();
+    let body: unknown = rawText;
+    try {
+      body = rawText ? JSON.parse(rawText) : null;
+    } catch {
+      body = rawText;
+    }
+    if (!res.ok) {
+      return {
+        ok: false,
+        httpStatus: res.status,
+        body,
+        error: `http_${res.status}`,
+      };
+    }
+    return { ok: true, httpStatus: res.status, body };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, httpStatus: 0, body: null, error: message };
+  }
+}

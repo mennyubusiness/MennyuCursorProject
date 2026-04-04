@@ -30,7 +30,9 @@ export const adminOrderDetailSelect = Prisma.validator<Prisma.OrderSelect>()({
       deliverectSubmittedAt: true,
       deliverectLastError: true,
       deliverectOrderId: true,
-      vendor: { select: { id: true, name: true } },
+      lastExternalStatusAt: true,
+      deliverectChannelLinkId: true,
+      vendor: { select: { id: true, name: true, deliverectChannelLinkId: true } },
       issues: { orderBy: { createdAt: "desc" }, select: { id: true, type: true, severity: true, status: true, notes: true, createdAt: true, resolvedAt: true } },
       statusHistory: { orderBy: { createdAt: "asc" }, select: { id: true, createdAt: true, source: true, routingStatus: true, fulfillmentStatus: true } },
       lineItems: {

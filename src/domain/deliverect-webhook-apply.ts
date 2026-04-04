@@ -12,6 +12,8 @@ export type DeliverectWebhookApplyOutcomeResolved =
 export interface DeliverectWebhookLastApplyRecord {
   outcome: DeliverectWebhookApplyOutcomeResolved;
   processedAt: string;
+  /** Distinguishes webhook vs admin/API reconciliation fallback in audit JSON. */
+  applySource?: "webhook" | "fallback";
   /** Human-readable detail for admins / logs */
   detail?: string;
   rawNumericCode?: number | null;

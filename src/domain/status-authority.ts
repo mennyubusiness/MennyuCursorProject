@@ -13,6 +13,7 @@ export type VendorOrderStatusAuthority =
 
 export type VendorOrderStatusSource =
   | "deliverect_webhook"
+  | "deliverect_fallback"
   | "dma_action"
   | "vendor_dashboard"
   | "admin_action"
@@ -27,6 +28,7 @@ export const VENDOR_ORDER_STATUS_AUTHORITIES: VendorOrderStatusAuthority[] = [
 
 export const VENDOR_ORDER_STATUS_SOURCES: VendorOrderStatusSource[] = [
   "deliverect_webhook",
+  "deliverect_fallback",
   "dma_action",
   "vendor_dashboard",
   "admin_action",
@@ -100,7 +102,8 @@ export function shouldApplyStatusUpdate(
   if (authority === "admin_override") return { allowed: true };
 
   if (authority === "pos") {
-    if (source === "deliverect_webhook" || source === "system") return { allowed: true };
+    if (source === "deliverect_webhook" || source === "deliverect_fallback" || source === "system")
+      return { allowed: true };
     if (source === "vendor_dashboard" || source === "dma_action") {
       return { allowed: false, reason: "POS_MANAGED_USE_FALLBACK" };
     }
