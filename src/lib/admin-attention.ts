@@ -11,7 +11,11 @@ import {
   ROUTING_STUCK_THRESHOLD_MINUTES,
 } from "@/lib/admin-exceptions";
 import { describeDeliverectReconciliationForAdmin } from "@/lib/deliverect-reconciliation-helpers";
-import { getDeliverectAdminCompactBadges } from "@/lib/deliverect-admin-lifecycle";
+import {
+  getDeliverectAdminActionGuidance,
+  getDeliverectAdminCompactBadges,
+  type DeliverectActionSeverity,
+} from "@/lib/deliverect-admin-lifecycle";
 import { getExceptionUrgency } from "@/lib/admin-urgency";
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
 import { ageMinutes as ageMinutesUtil } from "@/lib/date-utils";
@@ -74,6 +78,14 @@ export interface AdminAttentionItem {
   deliverectDiagnostic?: string | null;
   /** Compact pills aligned with order-detail Deliverect diagnostics. */
   deliverectBadges?: { label: string; className: string }[];
+  /** Action-oriented copy for vendor-order triage (Deliverect-aware). */
+  deliverectGuidance?: {
+    stateSummary: string;
+    recommendedAction: string;
+    severity: DeliverectActionSeverity;
+    automaticFallbackAttempted: boolean;
+    manualRecoveryBlocksAuto: boolean;
+  };
 }
 
 // ---- Constants (aligned with exceptions page and orders filter) ----
@@ -145,15 +157,17 @@ function reasonToRecommendedAction(
 }
 
 /** Maps queue VO rows to compact Deliverect pills (same helper as order detail). */
-function deliverectBadgesForAttentionVo(vo: {
+function voToDeliverectInput(vo: {
   routingStatus: string;
   fulfillmentStatus: string;
   deliverectOrderId: string | null;
   lastDeliverectResponse: unknown;
   lastExternalStatusAt: Date | null;
+  lastExternalStatus?: string | null;
   deliverectSubmittedAt: Date | null;
   createdAt: Date;
   manuallyRecoveredAt: Date | null;
+  deliverectLastError?: string | null;
   statusAuthority: import("@prisma/client").VendorOrderStatusAuthority | null;
   lastStatusSource: import("@prisma/client").VendorOrderStatusSource | null;
   deliverectAutoRecheckAttemptedAt: Date | null;
@@ -161,22 +175,39 @@ function deliverectBadgesForAttentionVo(vo: {
   deliverectChannelLinkId: string | null;
   vendor: { deliverectChannelLinkId: string | null } | null;
 }) {
-  return getDeliverectAdminCompactBadges({
+  return {
     routingStatus: vo.routingStatus,
     fulfillmentStatus: vo.fulfillmentStatus,
+    lastExternalStatus: vo.lastExternalStatus ?? undefined,
     deliverectOrderId: vo.deliverectOrderId,
     lastDeliverectResponse: vo.lastDeliverectResponse,
     lastExternalStatusAt: vo.lastExternalStatusAt,
     deliverectSubmittedAt: vo.deliverectSubmittedAt,
     createdAt: vo.createdAt,
     manuallyRecoveredAt: vo.manuallyRecoveredAt,
+    deliverectLastError: vo.deliverectLastError,
     statusAuthority: vo.statusAuthority,
     lastStatusSource: vo.lastStatusSource,
     deliverectAutoRecheckAttemptedAt: vo.deliverectAutoRecheckAttemptedAt,
     deliverectAutoRecheckResult: vo.deliverectAutoRecheckResult,
     deliverectChannelLinkId: vo.deliverectChannelLinkId,
     vendorDeliverectChannelLinkId: vo.vendor?.deliverectChannelLinkId,
-  });
+  };
+}
+
+function deliverectBadgesForAttentionVo(vo: Parameters<typeof voToDeliverectInput>[0]) {
+  return getDeliverectAdminCompactBadges(voToDeliverectInput(vo));
+}
+
+function deliverectGuidanceForAttentionVo(vo: Parameters<typeof voToDeliverectInput>[0]) {
+  const g = getDeliverectAdminActionGuidance(voToDeliverectInput(vo));
+  return {
+    stateSummary: g.stateSummary,
+    recommendedAction: g.recommendedAction,
+    severity: g.severity,
+    automaticFallbackAttempted: g.automaticFallbackAttempted,
+    manualRecoveryBlocksAuto: g.manualRecoveryBlocksAuto,
+  };
 }
 
 function reasonToLabel(
@@ -297,6 +328,7 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
       deliverectAttempts: vo.deliverectAttempts,
       deliverectSubmittedAt: vo.deliverectSubmittedAt,
       deliverectBadges: deliverectBadgesForAttentionVo(vo),
+      deliverectGuidance: deliverectGuidanceForAttentionVo(vo),
     });
   }
 
@@ -361,6 +393,7 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
         { now, staleMinutes: DELIVERECT_RECONCILIATION_STALE_MINUTES }
       ),
       deliverectBadges: deliverectBadgesForAttentionVo(vo),
+      deliverectGuidance: deliverectGuidanceForAttentionVo(vo),
     });
     seenVoIds.add(vo.id);
   }
@@ -388,6 +421,7 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
       deliverectAttempts: vo.deliverectAttempts,
       deliverectSubmittedAt: vo.deliverectSubmittedAt,
       deliverectBadges: deliverectBadgesForAttentionVo(vo),
+      deliverectGuidance: deliverectGuidanceForAttentionVo(vo),
     });
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDeliverectAdminLifecycle } from "./deliverect-admin-lifecycle";
+import { buildDeliverectAdminLifecycle, getDeliverectAdminActionGuidance } from "./deliverect-admin-lifecycle";
 import { DELIVERECT_RECONCILIATION_STALE_MINUTES } from "./admin-exceptions";
 
 const base = {
@@ -63,5 +63,25 @@ describe("buildDeliverectAdminLifecycle", () => {
     });
     expect(life.phaseKey).toBe("reconciled_webhook");
     expect(life.reconciledLate).toBe(true);
+  });
+});
+
+describe("getDeliverectAdminActionGuidance", () => {
+  it("overdue + no_match recommends manual review", () => {
+    const now = new Date("2026-01-01T12:00:00.000Z");
+    const g = getDeliverectAdminActionGuidance(
+      {
+        ...base,
+        routingStatus: "sent",
+        lastExternalStatusAt: null,
+        deliverectSubmittedAt: new Date("2026-01-01T10:00:00.000Z"),
+        deliverectAutoRecheckAttemptedAt: new Date("2026-01-01T11:30:00.000Z"),
+        deliverectAutoRecheckResult: "no_match",
+      },
+      { now, staleMinutes: DELIVERECT_RECONCILIATION_STALE_MINUTES }
+    );
+    expect(g.severity).toBe("urgent");
+    expect(g.automaticFallbackAttempted).toBe(true);
+    expect(g.recommendedAction).toContain("Manual review");
   });
 });

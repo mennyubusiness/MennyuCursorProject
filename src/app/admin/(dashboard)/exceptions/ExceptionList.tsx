@@ -158,6 +158,28 @@ export function ExceptionList({
 
             {/* Why + deliverect details only when relevant */}
             <p className="mt-2 text-sm text-stone-700">{item.reasonLabel}</p>
+            {item.deliverectGuidance && (
+              <div
+                className={`mt-2 rounded-md border px-2.5 py-2 text-sm ${
+                  item.deliverectGuidance.severity === "urgent"
+                    ? "border-red-200 bg-red-50/80 text-red-950"
+                    : item.deliverectGuidance.severity === "attention"
+                      ? "border-amber-200 bg-amber-50/80 text-amber-950"
+                      : item.deliverectGuidance.severity === "success"
+                        ? "border-emerald-200 bg-emerald-50/70 text-emerald-950"
+                        : "border-stone-200 bg-stone-50 text-stone-800"
+                }`}
+              >
+                <p className="font-medium leading-snug">{item.deliverectGuidance.recommendedAction}</p>
+                <p className="mt-1 text-xs leading-relaxed opacity-90">{item.deliverectGuidance.stateSummary}</p>
+                <p className="mt-1.5 text-[10px] uppercase tracking-wide text-stone-600">
+                  {item.deliverectGuidance.manualRecoveryBlocksAuto && "Manual recovery blocks auto fallback · "}
+                  {item.deliverectGuidance.automaticFallbackAttempted
+                    ? "Automatic re-check attempted"
+                    : "Automatic re-check not in this episode"}
+                </p>
+              </div>
+            )}
             {item.deliverectDiagnostic ? (
               <p className="mt-1 text-xs leading-relaxed text-stone-600">{item.deliverectDiagnostic}</p>
             ) : null}

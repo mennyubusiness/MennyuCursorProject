@@ -1,5 +1,6 @@
 import {
   buildDeliverectAdminLifecycle,
+  getDeliverectAdminActionGuidance,
   shouldShowDeliverectAdminDiagnostics,
   type DeliverectAdminVoInput,
 } from "@/lib/deliverect-admin-lifecycle";
@@ -47,6 +48,7 @@ function toLifecycleInput(vo: VoRow): DeliverectAdminVoInput {
     deliverectAutoRecheckResult: vo.deliverectAutoRecheckResult,
     deliverectChannelLinkId: vo.deliverectChannelLinkId,
     vendorDeliverectChannelLinkId: vo.vendor.deliverectChannelLinkId,
+    deliverectLastError: vo.deliverectLastError,
   };
 }
 
@@ -56,6 +58,10 @@ export function AdminDeliverectDiagnosticsPanel({ vo }: { vo: VoRow }) {
   const now = new Date();
   const live = isRoutingRetryAvailable();
   const life = buildDeliverectAdminLifecycle(toLifecycleInput(vo), {
+    now,
+    routingModeDeliverect: live,
+  });
+  const guidance = getDeliverectAdminActionGuidance(toLifecycleInput(vo), {
     now,
     routingModeDeliverect: live,
   });
@@ -75,7 +81,28 @@ export function AdminDeliverectDiagnosticsPanel({ vo }: { vo: VoRow }) {
         <h4 className="font-semibold text-stone-900">Deliverect</h4>
         <span className="text-xs text-stone-500">{life.routingProviderLabel}</span>
       </div>
-      <p className="mt-1 text-xs font-medium text-stone-700">{life.phaseTitle}</p>
+      <div
+        className={`mt-2 rounded-md border px-2.5 py-2 text-xs ${
+          guidance.severity === "urgent"
+            ? "border-red-200 bg-red-50/90 text-red-950"
+            : guidance.severity === "attention"
+              ? "border-amber-200 bg-amber-50/90 text-amber-950"
+              : guidance.severity === "success"
+                ? "border-emerald-200 bg-emerald-50/90 text-emerald-950"
+                : "border-stone-200 bg-white text-stone-800"
+        }`}
+      >
+        <p className="font-semibold leading-snug">Next step</p>
+        <p className="mt-0.5 font-medium">{guidance.recommendedAction}</p>
+        <p className="mt-1 text-[11px] leading-relaxed opacity-95">{guidance.stateSummary}</p>
+        <p className="mt-1 text-[10px] uppercase tracking-wide text-stone-600">
+          {guidance.manualRecoveryBlocksAuto ? "Manual recovery blocks auto fallback · " : ""}
+          {guidance.automaticFallbackAttempted
+            ? "Automatic re-check attempted"
+            : "Automatic re-check not in this episode"}
+        </p>
+      </div>
+      <p className="mt-2 text-xs font-medium text-stone-700">{life.phaseTitle}</p>
       <p className="mt-0.5 text-xs text-stone-600">{life.phaseDetail}</p>
       {life.operatorHints.length > 0 && (
         <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs text-stone-600">
