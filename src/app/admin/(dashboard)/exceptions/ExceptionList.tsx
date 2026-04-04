@@ -125,6 +125,14 @@ export function ExceptionList({
 
             {/* Reason + status + urgency */}
             <div className="mt-2 flex flex-wrap items-center gap-2">
+              {item.deliverectBadges?.map((b, bi) => (
+                <span
+                  key={`${b.label}-${bi}`}
+                  className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${b.className}`}
+                >
+                  {b.label}
+                </span>
+              ))}
               <span
                 className={`rounded px-1.5 py-0.5 text-xs font-medium ${
                   isRefundFailed

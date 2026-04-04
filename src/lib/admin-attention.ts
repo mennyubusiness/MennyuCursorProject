@@ -11,6 +11,7 @@ import {
   ROUTING_STUCK_THRESHOLD_MINUTES,
 } from "@/lib/admin-exceptions";
 import { describeDeliverectReconciliationForAdmin } from "@/lib/deliverect-reconciliation-helpers";
+import { getDeliverectAdminCompactBadges } from "@/lib/deliverect-admin-lifecycle";
 import { getExceptionUrgency } from "@/lib/admin-urgency";
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
 import { ageMinutes as ageMinutesUtil } from "@/lib/date-utils";
@@ -71,6 +72,8 @@ export interface AdminAttentionItem {
   deliverectSubmittedAt?: Date | null;
   /** Longer plain-English diagnostic for Deliverect reconciliation cases. */
   deliverectDiagnostic?: string | null;
+  /** Compact pills aligned with order-detail Deliverect diagnostics. */
+  deliverectBadges?: { label: string; className: string }[];
 }
 
 // ---- Constants (aligned with exceptions page and orders filter) ----
@@ -84,7 +87,7 @@ const TAKE_REFUND_FAILED = 100;
 
 const VO_INCLUDE = {
   order: { select: { id: true, customerPhone: true, pod: { select: { name: true } } } },
-  vendor: { select: { name: true } },
+  vendor: { select: { name: true, deliverectChannelLinkId: true } },
 } as const;
 
 // ---- Helpers ----
@@ -139,6 +142,41 @@ function reasonToRecommendedAction(
     default:
       return "investigate";
   }
+}
+
+/** Maps queue VO rows to compact Deliverect pills (same helper as order detail). */
+function deliverectBadgesForAttentionVo(vo: {
+  routingStatus: string;
+  fulfillmentStatus: string;
+  deliverectOrderId: string | null;
+  lastDeliverectResponse: unknown;
+  lastExternalStatusAt: Date | null;
+  deliverectSubmittedAt: Date | null;
+  createdAt: Date;
+  manuallyRecoveredAt: Date | null;
+  statusAuthority: import("@prisma/client").VendorOrderStatusAuthority | null;
+  lastStatusSource: import("@prisma/client").VendorOrderStatusSource | null;
+  deliverectAutoRecheckAttemptedAt: Date | null;
+  deliverectAutoRecheckResult: string | null;
+  deliverectChannelLinkId: string | null;
+  vendor: { deliverectChannelLinkId: string | null } | null;
+}) {
+  return getDeliverectAdminCompactBadges({
+    routingStatus: vo.routingStatus,
+    fulfillmentStatus: vo.fulfillmentStatus,
+    deliverectOrderId: vo.deliverectOrderId,
+    lastDeliverectResponse: vo.lastDeliverectResponse,
+    lastExternalStatusAt: vo.lastExternalStatusAt,
+    deliverectSubmittedAt: vo.deliverectSubmittedAt,
+    createdAt: vo.createdAt,
+    manuallyRecoveredAt: vo.manuallyRecoveredAt,
+    statusAuthority: vo.statusAuthority,
+    lastStatusSource: vo.lastStatusSource,
+    deliverectAutoRecheckAttemptedAt: vo.deliverectAutoRecheckAttemptedAt,
+    deliverectAutoRecheckResult: vo.deliverectAutoRecheckResult,
+    deliverectChannelLinkId: vo.deliverectChannelLinkId,
+    vendorDeliverectChannelLinkId: vo.vendor?.deliverectChannelLinkId,
+  });
 }
 
 function reasonToLabel(
@@ -258,6 +296,7 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
       deliverectLastError: vo.deliverectLastError,
       deliverectAttempts: vo.deliverectAttempts,
       deliverectSubmittedAt: vo.deliverectSubmittedAt,
+      deliverectBadges: deliverectBadgesForAttentionVo(vo),
     });
   }
 
@@ -283,6 +322,7 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
       deliverectLastError: vo.deliverectLastError,
       deliverectAttempts: vo.deliverectAttempts,
       deliverectSubmittedAt: vo.deliverectSubmittedAt,
+      deliverectBadges: deliverectBadgesForAttentionVo(vo),
     });
     seenVoIds.add(vo.id);
   }
@@ -320,6 +360,7 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
         },
         { now, staleMinutes: DELIVERECT_RECONCILIATION_STALE_MINUTES }
       ),
+      deliverectBadges: deliverectBadgesForAttentionVo(vo),
     });
     seenVoIds.add(vo.id);
   }
@@ -346,6 +387,7 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
       deliverectLastError: vo.deliverectLastError,
       deliverectAttempts: vo.deliverectAttempts,
       deliverectSubmittedAt: vo.deliverectSubmittedAt,
+      deliverectBadges: deliverectBadgesForAttentionVo(vo),
     });
   }
 

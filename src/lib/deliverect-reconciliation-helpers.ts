@@ -1,6 +1,9 @@
 /**
  * Derives Deliverect submit vs webhook reconciliation state from persisted VendorOrder fields.
- * Used for admin surfacing, stalled heuristics, and logging — no new DB columns required.
+ * Used for admin surfacing (`describeDeliverectReconciliationForAdmin`, `deliverect-admin-lifecycle`),
+ * stalled heuristics, and logging — no new DB columns required.
+ * Wording aligns with `[Deliverect reconciliation]` / `[Deliverect] fallback_*` log lines and
+ * `DELIVERECT_RECONCILIATION_STALE_MINUTES` in admin-exceptions.
  */
 
 import { DELIVERECT_RECONCILIATION_STALE_MINUTES } from "@/lib/admin-exceptions";

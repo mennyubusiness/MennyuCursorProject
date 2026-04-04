@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Prisma, VendorRoutingStatus, VendorFulfillmentStatus } from "@prisma/client";
 import { getOrderIdsNeedingAttention } from "@/lib/admin-attention";
+import { getDeliverectAdminCompactBadges } from "@/lib/deliverect-admin-lifecycle";
 import { prisma } from "@/lib/db";
 import { adminOperationalParentStatusLabel } from "@/domain/order-state";
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
@@ -135,7 +136,18 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
             id: true,
             routingStatus: true,
             fulfillmentStatus: true,
-            vendor: { select: { id: true, name: true } },
+            createdAt: true,
+            deliverectOrderId: true,
+            lastDeliverectResponse: true,
+            lastExternalStatusAt: true,
+            deliverectSubmittedAt: true,
+            manuallyRecoveredAt: true,
+            statusAuthority: true,
+            lastStatusSource: true,
+            deliverectAutoRecheckAttemptedAt: true,
+            deliverectAutoRecheckResult: true,
+            deliverectChannelLinkId: true,
+            vendor: { select: { id: true, name: true, deliverectChannelLinkId: true } },
           },
         },
       },
@@ -313,9 +325,39 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                     <p className="mt-0.5 text-xs text-stone-500">{formatDate(order.createdAt)}</p>
                     <p className="text-sm text-stone-600">{order.customerPhone}</p>
                     <p className="text-sm text-stone-700">{order.pod.name}</p>
-                    <p className="text-xs text-stone-500">
-                      {order.vendorOrders.map((vo) => vo.vendor.name).join(", ")}
-                    </p>
+                    <div className="text-xs text-stone-500">
+                      {order.vendorOrders.map((vo) => {
+                        const badges = getDeliverectAdminCompactBadges({
+                          routingStatus: vo.routingStatus,
+                          fulfillmentStatus: vo.fulfillmentStatus,
+                          deliverectOrderId: vo.deliverectOrderId,
+                          lastDeliverectResponse: vo.lastDeliverectResponse,
+                          lastExternalStatusAt: vo.lastExternalStatusAt,
+                          deliverectSubmittedAt: vo.deliverectSubmittedAt,
+                          createdAt: vo.createdAt,
+                          manuallyRecoveredAt: vo.manuallyRecoveredAt,
+                          statusAuthority: vo.statusAuthority,
+                          lastStatusSource: vo.lastStatusSource,
+                          deliverectAutoRecheckAttemptedAt: vo.deliverectAutoRecheckAttemptedAt,
+                          deliverectAutoRecheckResult: vo.deliverectAutoRecheckResult,
+                          deliverectChannelLinkId: vo.deliverectChannelLinkId,
+                          vendorDeliverectChannelLinkId: vo.vendor.deliverectChannelLinkId,
+                        });
+                        return (
+                          <span key={vo.id} className="mr-2 inline-flex flex-wrap items-center gap-1 last:mr-0">
+                            <span className="text-stone-600">{vo.vendor.name}</span>
+                            {badges.map((b, bi) => (
+                              <span
+                                key={`${b.label}-${bi}`}
+                                className={`rounded px-1 py-0.5 text-[9px] font-medium ${b.className}`}
+                              >
+                                {b.label}
+                              </span>
+                            ))}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium text-stone-900">

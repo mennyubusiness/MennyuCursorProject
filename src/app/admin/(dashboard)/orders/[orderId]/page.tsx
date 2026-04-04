@@ -14,6 +14,8 @@ import { AdminVendorOrderExceptionActions } from "./AdminVendorOrderExceptionAct
 import { AdminVendorOrderTransition } from "./AdminVendorOrderTransition";
 import { AdminOrderIssuesPanel } from "./AdminOrderIssuesPanel";
 import { AdminDeliverectRecheck } from "./AdminDeliverectRecheck";
+import { AdminDeliverectDiagnosticsPanel } from "./AdminDeliverectDiagnosticsPanel";
+import { getDeliverectAdminCompactBadges } from "@/lib/deliverect-admin-lifecycle";
 
 function isDeliverectRecheckEligible(vo: AdminOrderDetail["vendorOrders"][number]): boolean {
   const ch = vo.deliverectChannelLinkId ?? vo.vendor.deliverectChannelLinkId;
@@ -64,6 +66,22 @@ export default async function AdminOrderDetailPage({
   const timeline = buildAdminOrderTimeline(adminOrder);
 
   const vendorContexts = adminOrder.vendorOrders.map((vo) => {
+    const deliverectBadges = getDeliverectAdminCompactBadges({
+      routingStatus: vo.routingStatus,
+      fulfillmentStatus: vo.fulfillmentStatus,
+      deliverectOrderId: vo.deliverectOrderId,
+      lastDeliverectResponse: vo.lastDeliverectResponse,
+      lastExternalStatusAt: vo.lastExternalStatusAt,
+      deliverectSubmittedAt: vo.deliverectSubmittedAt,
+      createdAt: vo.createdAt,
+      manuallyRecoveredAt: vo.manuallyRecoveredAt,
+      statusAuthority: vo.statusAuthority,
+      lastStatusSource: vo.lastStatusSource,
+      deliverectAutoRecheckAttemptedAt: vo.deliverectAutoRecheckAttemptedAt,
+      deliverectAutoRecheckResult: vo.deliverectAutoRecheckResult,
+      deliverectChannelLinkId: vo.deliverectChannelLinkId,
+      vendorDeliverectChannelLinkId: vo.vendor.deliverectChannelLinkId,
+    });
     const exceptionType = getExceptionType(vo);
     const actionState = getAdminActionState(vo, routingAvailable);
     const reason = exceptionType ? getExceptionReason(vo, exceptionType) : null;
@@ -78,6 +96,7 @@ export default async function AdminOrderDetailPage({
       actionState.hasAnyProgressionAction && progressionTargetsFiltered.length > 0;
     return {
       vo,
+      deliverectBadges,
       exceptionType,
       actionState,
       reason,
@@ -142,10 +161,18 @@ export default async function AdminOrderDetailPage({
 
         <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-stone-500">Vendors</h3>
         <ul className="mt-2 divide-y divide-stone-100">
-          {vendorContexts.map(({ vo, exceptionType, showRecoveredBadge }) => (
+          {vendorContexts.map(({ vo, deliverectBadges, exceptionType, showRecoveredBadge }) => (
             <li key={vo.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 first:pt-0">
               <span className="font-medium text-stone-900">{vo.vendor.name}</span>
               <span className="text-sm text-stone-600">{fulfillmentLabel(vo.fulfillmentStatus)}</span>
+              {deliverectBadges.map((b, bi) => (
+                <span
+                  key={`${b.label}-${bi}`}
+                  className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${b.className}`}
+                >
+                  {b.label}
+                </span>
+              ))}
               {exceptionType && (
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
                   {exceptionType.replace(/_/g, " ")}
@@ -261,6 +288,7 @@ export default async function AdminOrderDetailPage({
             return (
               <div key={vo.id} className="border-t border-stone-100 pt-4 first:border-t-0 first:pt-0">
                 <p className="font-medium text-stone-800">{vo.vendor.name}</p>
+                <AdminDeliverectDiagnosticsPanel vo={vo} />
                 {vo.fulfillmentStatus === "cancelled" && (() => {
                   if (latestRefund?.status === "succeeded") {
                     return (
