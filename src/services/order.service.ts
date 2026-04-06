@@ -4,7 +4,8 @@
  */
 import { type OrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { computeOrderTotals } from "@/domain/fees";
+import { computeOrderPricing } from "@/domain/fees";
+import { getActivePricingRatesSnapshot } from "@/services/pricing-config.service";
 import type { Order, VendorOrder as VendorOrderType, CheckoutInput } from "@/domain/types";
 import { buildIdempotencyKey } from "@/lib/idempotency";
 import {
@@ -500,11 +501,15 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
     );
   }
   const vendorSubtotalsCents = vendorGroups.map((v) => v.subtotalCents);
-  const totals = computeOrderTotals({
-    vendorSubtotalsCents,
-    tipCents: input.tipCents,
-    pickupSalesTaxBps: cart.pod.pickupSalesTaxBps,
-  });
+  const { pricingConfigId, rates } = await getActivePricingRatesSnapshot();
+  const totals = computeOrderPricing(
+    {
+      vendorSubtotalsCents,
+      tipCents: input.tipCents,
+      pickupSalesTaxBps: cart.pod.pickupSalesTaxBps,
+    },
+    rates
+  );
 
   const pickupMode = input.pickupMode ?? "asap";
   let requestedPickupAt: Date | null = null;
@@ -557,6 +562,11 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
         tipCents: totals.tipCents,
         taxCents: totals.taxCents,
         totalCents: totals.totalCents,
+        pricingConfigId: pricingConfigId ?? undefined,
+        customerServiceFeeBpsApplied: rates.customerServiceFeeBps,
+        customerServiceFeeFlatCentsApplied: rates.customerServiceFeeFlatCents,
+        vendorProcessingFeeBpsApplied: rates.vendorProcessingFeeBps,
+        vendorProcessingFeeFlatCentsApplied: rates.vendorProcessingFeeFlatCents,
         idempotencyKey: idemKey,
         status: "pending_payment",
         sourceCartId: cart.id,
@@ -580,7 +590,11 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
           taxCents: alloc.taxCents,
           serviceFeeCents: alloc.serviceFeeCents,
           totalCents: alloc.totalCents,
-          platformCommissionCents: alloc.platformCommissionCents,
+          vendorProcessingFeeRecoveryCents: alloc.vendorProcessingFeeRecoveryCents,
+          vendorProcessingFeeBpsApplied: rates.vendorProcessingFeeBps,
+          vendorProcessingFeeFlatCentsApplied: rates.vendorProcessingFeeFlatCents,
+          vendorGrossPayableCents: alloc.vendorGrossPayableCents,
+          vendorNetPayoutCents: alloc.vendorNetPayoutCents,
           routingStatus: "pending",
           fulfillmentStatus: "pending",
         },
@@ -737,7 +751,7 @@ function toVendorOrder(row: {
   taxCents: number;
   serviceFeeCents: number;
   totalCents: number;
-  platformCommissionCents: number;
+  vendorProcessingFeeRecoveryCents: number;
   deliverectOrderId: string | null;
   deliverectChannelLinkId: string | null;
   routingStatus: string;
@@ -755,7 +769,7 @@ function toVendorOrder(row: {
     taxCents: row.taxCents,
     serviceFeeCents: row.serviceFeeCents,
     totalCents: row.totalCents,
-    platformCommissionCents: row.platformCommissionCents,
+    vendorProcessingFeeRecoveryCents: row.vendorProcessingFeeRecoveryCents,
     deliverectOrderId: row.deliverectOrderId,
     deliverectChannelLinkId: row.deliverectChannelLinkId,
     routingStatus: row.routingStatus as VendorOrderType["routingStatus"],

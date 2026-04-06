@@ -6,7 +6,7 @@
  * **Money scope:** Shell `price` is the menu base after subtracting surcharges already carried on
  * `subItems` (variant groups) and `modifiers` (flat options). Order-level
  * `payment.amount` and tax fields must follow {@link deliverectRestaurantFacingPaymentCents} —
- * never include Mennyu’s 3.5% platform service fee (see `deliverect-financial-scope.ts`).
+ * never include Mennyu’s customer service fee (see `deliverect-financial-scope.ts`).
  */
 import type {
   DeliverectOrderRequest,
@@ -317,7 +317,7 @@ export function mennyuVendorOrderToDeliverectPayload(input: TransformInput): Del
 
   /**
    * Prepaid amount for Deliverect: food + restaurant tax + tip for this vendor.
-   * Do NOT use `vendorOrder.totalCents` — it includes `serviceFeeCents` (Mennyu 3.5% platform fee).
+   * Do NOT use `vendorOrder.totalCents` — it includes `serviceFeeCents` (Mennyu customer service fee).
    * Use the same item-only subtotal as payload validation (`vendorOrderItemSubtotalCents`).
    */
   const itemSubtotalCents = vendorOrderItemSubtotalCents(vendorOrder);

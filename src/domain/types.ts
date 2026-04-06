@@ -161,7 +161,8 @@ export interface VendorOrder {
   taxCents: number;
   serviceFeeCents: number;
   totalCents: number;
-  platformCommissionCents: number;
+  /** Pass-through processing recovery on vendor food subtotal (tips not included in base). */
+  vendorProcessingFeeRecoveryCents: number;
   deliverectOrderId: string | null;
   deliverectChannelLinkId: string | null;
   routingStatus: VendorOrderRoutingStatus;

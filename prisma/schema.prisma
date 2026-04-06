@@ -8,6 +8,27 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+/// Global checkout pricing: customer service fee (Mennyu revenue) and vendor-side processing recovery.
+/// Only one row should have `isActive` at a time; new orders snapshot `PricingConfig.id` and applied bps.
+model PricingConfig {
+  id                            String   @id @default(cuid())
+  /// Basis points (350 = 3.50%) applied to food subtotal for the customer-facing service fee.
+  customerServiceFeeBps         Int
+  /// Added after percent-based service fee (cents).
+  customerServiceFeeFlatCents   Int      @default(0)
+  /// Basis points applied to each vendor’s food subtotal for processing-cost recovery (not assessed on tips).
+  vendorProcessingFeeBps        Int
+  /// Flat cents per vendor order slice, after percent (cents).
+  vendorProcessingFeeFlatCents  Int      @default(0)
+  isActive                      Boolean  @default(true)
+  effectiveAt                   DateTime @default(now())
+  notes                         String?
+  createdByUserId               String?
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+  orders                        Order[]
+}
+
 model Pod {
   id                 String                 @id @default(cuid())
   name               String
@@ -432,6 +453,14 @@ model Order {
   tipCents              Int                  @default(0)
   taxCents              Int                  @default(0)
   totalCents            Int
+  /// Pricing config row used when this order was created (immutable snapshot reference).
+  pricingConfigId       String?
+  /// Snapshot: customer service fee basis points applied to food subtotal.
+  customerServiceFeeBpsApplied         Int?
+  customerServiceFeeFlatCentsApplied   Int?
+  /// Snapshot: vendor processing recovery basis points (same for all vendor slices on this order).
+  vendorProcessingFeeBpsApplied        Int?
+  vendorProcessingFeeFlatCentsApplied  Int?
   idempotencyKey        String?              @unique
   status                OrderStatus
   stripePaymentIntentId String?
@@ -444,6 +473,7 @@ model Order {
   sourceCartId          String?
   /// Customer-requested pickup instant (UTC). Null = ASAP pickup.
   requestedPickupAt     DateTime?
+  pricingConfig         PricingConfig?       @relation(fields: [pricingConfigId], references: [id], onDelete: SetNull)
   pod                   Pod                  @relation(fields: [podId], references: [id])
   issues                OrderIssue[]
   statusHistory         OrderStatusHistory[]
@@ -464,7 +494,15 @@ model VendorOrder {
   taxCents                Int                         @default(0)
   serviceFeeCents         Int                         @default(0)
   totalCents              Int
-  platformCommissionCents Int                         @default(0)
+  /// Mennyu pass-through processing recovery on vendor food subtotal (not a commission; not taken from tips).
+  vendorProcessingFeeRecoveryCents Int              @default(0)
+  /// Snapshot of vendor processing fee bps applied to this vendor’s food subtotal.
+  vendorProcessingFeeBpsApplied        Int?
+  vendorProcessingFeeFlatCentsApplied  Int?
+  /// Restaurant-facing gross for this slice: subtotal + tax + tip (excludes customer service fee).
+  vendorGrossPayableCents              Int?
+  /// After subtracting vendor processing recovery from gross payable (Stripe card fees are applied later at payment).
+  vendorNetPayoutCents                 Int?
   deliverectOrderId       String?
   deliverectChannelLinkId String?
   routingStatus           VendorRoutingStatus

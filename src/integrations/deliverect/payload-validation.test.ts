@@ -17,7 +17,7 @@ function minimalVo(over: Partial<NonNullable<HydratedVendorOrder>> = {}): NonNul
     taxCents: 0,
     serviceFeeCents: 0,
     totalCents: 1000,
-    platformCommissionCents: 0,
+    vendorProcessingFeeRecoveryCents: 0,
     deliverectAttempts: 0,
     routingStatus: "pending",
     fulfillmentStatus: "pending",

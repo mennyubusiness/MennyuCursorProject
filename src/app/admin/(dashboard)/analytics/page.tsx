@@ -101,7 +101,7 @@ export default async function AdminAnalyticsPage({
                 <p className="text-2xl font-semibold text-stone-900">
                   {formatMoney(summary.mennyuRevenueCents)}
                 </p>
-                <p className="text-sm text-stone-600">Mennyu revenue</p>
+                <p className="text-sm text-stone-600">Mennyu service fee revenue</p>
               </div>
               <div className="rounded-lg border border-stone-200 bg-white p-4">
                 <p className="text-2xl font-semibold text-stone-900">{summary.activeVendors}</p>
@@ -127,13 +127,15 @@ export default async function AdminAnalyticsPage({
                   <p className="text-lg font-medium text-stone-900">
                     {formatMoney(summary.serviceFeeRevenueCents)}
                   </p>
-                  <p className="text-xs text-stone-600">Service fee (3.5%)</p>
+                  <p className="text-xs text-stone-600">Customer service fee (configurable)</p>
                 </div>
                 <div>
                   <p className="text-lg font-medium text-stone-900">
-                    {formatMoney(summary.commissionRevenueCents)}
+                    {formatMoney(summary.vendorProcessingRecoveryTotalCents)}
                   </p>
-                  <p className="text-xs text-stone-600">Vendor commission (2.75%)</p>
+                  <p className="text-xs text-stone-600">
+                    Vendor processing recovery (food subtotal; tips not reduced)
+                  </p>
                 </div>
                 <div>
                   <p className="text-lg font-medium text-stone-900">

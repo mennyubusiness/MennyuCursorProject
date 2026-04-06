@@ -36,10 +36,11 @@ export interface AdminAnalyticsSummary {
   activePods: number;
   averageOrderValueCents: number;
   ordersNeedingAttention: number;
-  /** Mennyu revenue = service fee + vendor commission (no tips/tax). */
+  /** Mennyu revenue from customer service fee only (no tips/tax; excludes vendor processing recovery). */
   mennyuRevenueCents: number;
   serviceFeeRevenueCents: number;
-  commissionRevenueCents: number;
+  /** Sum of vendor-side processing recovery on food subtotals (tips excluded from recovery base). */
+  vendorProcessingRecoveryTotalCents: number;
   revenuePerOrderCents: number;
 }
 
@@ -100,7 +101,7 @@ export async function getAdminAnalytics(range: AdminAnalyticsRange): Promise<Adm
     totalOrders,
     grossSalesAgg,
     serviceFeeAgg,
-    commissionAgg,
+    processingRecoveryAgg,
     activeVendorsAgg,
     activePodsAgg,
     needsAttentionFailed,
@@ -127,7 +128,7 @@ export async function getAdminAnalytics(range: AdminAnalyticsRange): Promise<Adm
     }),
     prisma.vendorOrder.aggregate({
       where: { createdAt: { gte: start, lte: end } },
-      _sum: { platformCommissionCents: true },
+      _sum: { vendorProcessingFeeRecoveryCents: true },
     }),
     prisma.vendorOrder.groupBy({
       by: ["vendorId"],
@@ -202,8 +203,9 @@ export async function getAdminAnalytics(range: AdminAnalyticsRange): Promise<Adm
 
   const grossSalesCents = grossSalesAgg._sum.totalCents ?? 0;
   const serviceFeeRevenueCents = serviceFeeAgg._sum.serviceFeeCents ?? 0;
-  const commissionRevenueCents = commissionAgg._sum.platformCommissionCents ?? 0;
-  const mennyuRevenueCents = serviceFeeRevenueCents + commissionRevenueCents;
+  const vendorProcessingRecoveryTotalCents =
+    processingRecoveryAgg._sum.vendorProcessingFeeRecoveryCents ?? 0;
+  const mennyuRevenueCents = serviceFeeRevenueCents;
   const ordersNeedingAttention = needsAttentionFailed + needsAttentionStuck;
   const averageOrderValueCents =
     totalOrders > 0 ? Math.round(grossSalesCents / totalOrders) : 0;
@@ -219,7 +221,7 @@ export async function getAdminAnalytics(range: AdminAnalyticsRange): Promise<Adm
     ordersNeedingAttention,
     mennyuRevenueCents,
     serviceFeeRevenueCents,
-    commissionRevenueCents,
+    vendorProcessingRecoveryTotalCents,
     revenuePerOrderCents,
   };
 

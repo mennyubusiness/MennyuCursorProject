@@ -26,16 +26,6 @@ export function roundCents(value: number): number {
   return Math.round(value);
 }
 
-/** 3.5% service fee on subtotal (customer-facing). */
-export function serviceFeeFromSubtotalCents(subtotalCents: number): number {
-  return roundCents(subtotalCents * 0.035);
-}
-
-/** 2.75% platform commission on vendor subtotal. */
-export function platformCommissionFromSubtotalCents(subtotalCents: number): number {
-  return roundCents(subtotalCents * 0.0275);
-}
-
 /**
  * Pickup sales tax computed by Mennyu from the pod’s configured rate — not vendor-entered per order.
  * @param taxRateBps — basis points (825 = 8.25%). Null, undefined, or ≤0 → no tax.

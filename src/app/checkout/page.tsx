@@ -4,7 +4,8 @@ import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 import { prisma } from "@/lib/db";
 import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutProgress } from "./CheckoutProgress";
-import { computeOrderTotals } from "@/domain/fees";
+import { computeOrderPricing } from "@/domain/fees";
+import { getActivePricingRatesSnapshot } from "@/services/pricing-config.service";
 import { getCheckoutDefaultScheduledPickup, validateCartForOrder } from "@/services/order.service";
 import {
   getParentShellInfoByVendorParentPlu,
@@ -111,11 +112,16 @@ export default async function CheckoutPage({
   const vendorSubtotalsCents = Array.from(byVendor.values()).map((g) =>
     g.lines.reduce((a, l) => a + l.cents, 0)
   );
-  const totals = computeOrderTotals({
-    vendorSubtotalsCents,
-    tipCents: 0,
-    pickupSalesTaxBps: cart.pod.pickupSalesTaxBps,
-  });
+  const { rates } = await getActivePricingRatesSnapshot();
+  const totals = computeOrderPricing(
+    {
+      vendorSubtotalsCents,
+      tipCents: 0,
+      pickupSalesTaxBps: cart.pod.pickupSalesTaxBps,
+    },
+    rates
+  );
+  const serviceFeePercentLabel = `${(rates.customerServiceFeeBps / 100).toFixed(2)}%`;
   const vendorCount = byVendor.size;
   const scheduledDefaults = getCheckoutDefaultScheduledPickup(cart.pod);
 
@@ -174,7 +180,7 @@ export default async function CheckoutPage({
             </dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">Service fee (3.5%)</dt>
+            <dt className="text-stone-600">Service fee ({serviceFeePercentLabel})</dt>
             <dd className="tabular-nums text-stone-800">
               ${(totals.serviceFeeCents / 100).toFixed(2)}
             </dd>

@@ -6,8 +6,8 @@
  * - `subtotalCents` — menu + modifiers (restaurant revenue base)
  * - `taxCents` — allocated tax (MVP may be 0; still “customer tax” in our model)
  * - `tipCents` — customer tip allocated to this vendor
- * - `serviceFeeCents` — **Mennyu 3.5% platform fee on subtotal share** (customer-facing; stays in Mennyu/Stripe accounting)
- * - `platformCommissionCents` — internal commission record; not sent to Deliverect
+ * - `serviceFeeCents` — **Mennyu customer service fee** on subtotal share (customer-facing; stays in Mennyu/Stripe accounting)
+ * - `vendorProcessingFeeRecoveryCents` — pass-through processing recovery on vendor food subtotal (not assessed on tips); not sent to Deliverect
  * - `totalCents` — subtotal + tax + tip + service fee for this vendor slice (matches what we charge the customer on a pro-rata basis)
  *
  * **Deliverect / restaurant / POS (restaurant-facing only)**  
