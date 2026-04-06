@@ -9,7 +9,7 @@ import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema
 import { prisma } from "@/lib/db";
 import {
   isTopLevelDeliverectVariantGroupModifierGroup,
-  maxDeliverectVariantGroupSelectionsForMenuItem,
+  maxSubItemsChainVariantStepsForProductShape,
 } from "@/lib/deliverect-subitem-nesting";
 import { getOperationalMenuItemIdsForVendor } from "@/services/menu-active-scope.service";
 
@@ -23,7 +23,7 @@ export type DeliverectMenuIntegrityFindingType =
   | "inconsistent_variant_parent_without_plu"
   | "duplicate_product_plu"
   | "duplicate_modifier_plu"
-  | "variant_nesting_depth_risk"
+  | "deliverect_subitems_chain_depth_risk"
   | "stale_canonical_variant_mapping"
   | "missing_external_product_id"
   | "missing_external_modifier_id"
@@ -293,14 +293,15 @@ export async function evaluateDeliverectMenuIntegrityForVendor(
       }
     }
 
-    const maxVg = maxDeliverectVariantGroupSelectionsForMenuItem(Boolean(parentPlu));
-    if (variantGroupCount > maxVg) {
+    const maxChain = maxSubItemsChainVariantStepsForProductShape(Boolean(parentPlu));
+    if (variantGroupCount > maxChain) {
       findings.push(
         finding({
           severity: "warning",
-          type: "variant_nesting_depth_risk",
-          message: `“${it.name}” has ${variantGroupCount} variant group(s); Deliverect allows at most ${maxVg} for this product shape — orders with all steps may be rejected.`,
-          suggestedFix: "Reduce nested variant groups or split the product in Deliverect / Mennyu.",
+          type: "deliverect_subitems_chain_depth_risk",
+          message: `“${it.name}” has ${variantGroupCount} top-level Deliverect variant group(s) on the main item; online orders can only nest ${maxChain} in the subItems chain for this product shape (Deliverect limit — not a cap on toppings).`,
+          suggestedFix:
+            "Reduce top-level variant groups used as size/style chains, or split the product in Deliverect. Groups nested under another modifier do not count toward this limit.",
           menuItemId: it.id,
           menuItemName: it.name,
         })

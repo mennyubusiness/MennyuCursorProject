@@ -5,10 +5,10 @@
 import { MenuVersionState } from "@prisma/client";
 import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import {
-  countTopLevelDeliverectVariantGroupSelections,
-  deliverectSubItemNestingCartSummaryMessage,
-  isDeliverectSubItemDepthAllowed,
-  maxDeliverectVariantGroupSelectionsForMenuItem,
+  countSubItemsChainVariantSelections,
+  deliverectSubItemsChainLimitMessage,
+  isDeliverectSubItemsChainDepthAllowed,
+  maxSubItemsChainVariantStepsForProductShape,
 } from "@/lib/deliverect-subitem-nesting";
 import { prisma } from "@/lib/db";
 import type { HydratedVendorOrder } from "./load";
@@ -39,40 +39,37 @@ export type ValidationResult =
       code: "SUBITEMS_NESTING_LIMIT";
     };
 
-function countDeliverectVariantGroupSelections(
-  line: NonNullable<HydratedVendorOrder>["lineItems"][number]
-): number {
-  return countTopLevelDeliverectVariantGroupSelections(line);
-}
-
 /**
- * Deliverect rejects orders when nested `subItems` from **top-level** variant groups exceed API max
- * depth. Nested modifier groups (`parentModifierOptionId`) do not add root `subItems` levels — see
- * {@link countTopLevelDeliverectVariantGroupSelections}. Must stay aligned with `transform.ts`.
+ * Ensures outbound payloads do not exceed Deliverect’s nested `subItems` depth (see
+ * {@link countSubItemsChainVariantSelections}). Aligned with `nestVariantGroupSelections` in
+ * `transform.ts`. Nested modifier groups under another option do not count.
  */
-export function validateDeliverectSubItemNesting(
+export function validateDeliverectSubItemsChainDepth(
   vendorOrder: NonNullable<HydratedVendorOrder>
 ): ValidationResult {
   for (const line of vendorOrder.lineItems) {
     const hasParent = Boolean(line.menuItem?.deliverectVariantParentPlu?.trim());
-    const vgCount = countDeliverectVariantGroupSelections(line);
+    const chainSteps = countSubItemsChainVariantSelections(line);
     if (
-      !isDeliverectSubItemDepthAllowed({
+      !isDeliverectSubItemsChainDepthAllowed({
         hasDeliverectVariantParentPlu: hasParent,
-        variantGroupSelectionCount: vgCount,
+        chainVariantStepCount: chainSteps,
       })
     ) {
       const label = line.menuItem?.name ?? line.name;
-      const max = maxDeliverectVariantGroupSelectionsForMenuItem(hasParent);
+      const max = maxSubItemsChainVariantStepsForProductShape(hasParent);
       return {
         valid: false,
-        error: deliverectSubItemNestingCartSummaryMessage(label, max),
+        error: deliverectSubItemsChainLimitMessage(label, max),
         code: "SUBITEMS_NESTING_LIMIT",
       };
     }
   }
   return { valid: true };
 }
+
+/** @deprecated Use {@link validateDeliverectSubItemsChainDepth}. */
+export const validateDeliverectSubItemNesting = validateDeliverectSubItemsChainDepth;
 
 /**
  * Validate that a hydrated VendorOrder has all identifiers required for Deliverect submission.
@@ -145,9 +142,9 @@ export function validateForSubmission(
    * Do not require a parent PLU on the menu item row when the line is already the shell product.
    */
 
-  const nesting = validateDeliverectSubItemNesting(vendorOrder);
-  if (!nesting.valid) {
-    return nesting;
+  const subItemsChainDepth = validateDeliverectSubItemsChainDepth(vendorOrder);
+  if (!subItemsChainDepth.valid) {
+    return subItemsChainDepth;
   }
 
   return { valid: true };

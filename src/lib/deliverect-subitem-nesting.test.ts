@@ -1,80 +1,81 @@
 import { describe, expect, it } from "vitest";
 import {
-  DELIVERECT_MAX_SUBITEM_NESTING,
-  countTopLevelDeliverectVariantGroupSelections,
-  deliverectSubItemDepthFromLine,
-  isDeliverectSubItemDepthAllowed,
+  DELIVERECT_MAX_SUBITEMS_NESTING_DEPTH,
+  countSubItemsChainVariantSelections,
+  deliverectSubItemsChainDepth,
+  deliverectSubItemsChainLimitMessage,
+  isDeliverectSubItemsChainDepthAllowed,
   isTopLevelDeliverectVariantGroupModifierGroup,
 } from "./deliverect-subitem-nesting";
 
-describe("deliverectSubItemDepthFromLine", () => {
-  it("counts shell-only variant groups without parent PLU", () => {
+describe("deliverectSubItemsChainDepth", () => {
+  it("counts chain variant steps without parent PLU wrapper", () => {
     expect(
-      deliverectSubItemDepthFromLine({
+      deliverectSubItemsChainDepth({
         hasDeliverectVariantParentPlu: false,
-        variantGroupSelectionCount: 3,
+        chainVariantStepCount: 3,
       })
     ).toBe(3);
     expect(
-      deliverectSubItemDepthFromLine({
+      deliverectSubItemsChainDepth({
         hasDeliverectVariantParentPlu: false,
-        variantGroupSelectionCount: 4,
+        chainVariantStepCount: 4,
       })
     ).toBe(4);
   });
 
   it("adds one level when using Deliverect variant parent + leaf PLU", () => {
     expect(
-      deliverectSubItemDepthFromLine({
+      deliverectSubItemsChainDepth({
         hasDeliverectVariantParentPlu: true,
-        variantGroupSelectionCount: 2,
+        chainVariantStepCount: 2,
       })
     ).toBe(3);
     expect(
-      deliverectSubItemDepthFromLine({
+      deliverectSubItemsChainDepth({
         hasDeliverectVariantParentPlu: true,
-        variantGroupSelectionCount: 3,
+        chainVariantStepCount: 3,
       })
     ).toBe(4);
   });
 
-  it("enforces MAX nesting", () => {
-    expect(DELIVERECT_MAX_SUBITEM_NESTING).toBe(3);
+  it("enforces Deliverect max subItems nesting depth", () => {
+    expect(DELIVERECT_MAX_SUBITEMS_NESTING_DEPTH).toBe(3);
     expect(
-      isDeliverectSubItemDepthAllowed({
+      isDeliverectSubItemsChainDepthAllowed({
         hasDeliverectVariantParentPlu: false,
-        variantGroupSelectionCount: 3,
+        chainVariantStepCount: 3,
       })
     ).toBe(true);
     expect(
-      isDeliverectSubItemDepthAllowed({
+      isDeliverectSubItemsChainDepthAllowed({
         hasDeliverectVariantParentPlu: false,
-        variantGroupSelectionCount: 4,
+        chainVariantStepCount: 4,
       })
     ).toBe(false);
     expect(
-      isDeliverectSubItemDepthAllowed({
+      isDeliverectSubItemsChainDepthAllowed({
         hasDeliverectVariantParentPlu: true,
-        variantGroupSelectionCount: 2,
+        chainVariantStepCount: 2,
       })
     ).toBe(true);
     expect(
-      isDeliverectSubItemDepthAllowed({
+      isDeliverectSubItemsChainDepthAllowed({
         hasDeliverectVariantParentPlu: true,
-        variantGroupSelectionCount: 3,
+        chainVariantStepCount: 3,
       })
     ).toBe(false);
   });
 });
 
-describe("countTopLevelDeliverectVariantGroupSelections", () => {
+describe("countSubItemsChainVariantSelections", () => {
   const g = (variant: boolean, parent: string | null) => ({
     modifierGroup: { deliverectIsVariantGroup: variant, parentModifierOptionId: parent },
   });
 
-  it("counts only top-level variant groups toward the subItems chain", () => {
+  it("counts only top-level variant groups toward the root subItems chain", () => {
     expect(
-      countTopLevelDeliverectVariantGroupSelections({
+      countSubItemsChainVariantSelections({
         selections: [
           { modifierOption: g(true, null) },
           { modifierOption: g(true, null) },
@@ -85,8 +86,22 @@ describe("countTopLevelDeliverectVariantGroupSelections", () => {
   });
 
   it("does not count nested groups even when flagged as variant group", () => {
-    expect(isTopLevelDeliverectVariantGroupModifierGroup({ deliverectIsVariantGroup: true, parentModifierOptionId: "p1" })).toBe(
-      false
-    );
+    expect(
+      isTopLevelDeliverectVariantGroupModifierGroup({
+        deliverectIsVariantGroup: true,
+        parentModifierOptionId: "p1",
+      })
+    ).toBe(false);
+  });
+});
+
+describe("deliverectSubItemsChainLimitMessage", () => {
+  it("mentions Deliverect, top-level variant groups, and excludes nested add-ons", () => {
+    const msg = deliverectSubItemsChainLimitMessage("Pizza", 2);
+    expect(msg).toContain("Deliverect");
+    expect(msg).toContain("Pizza");
+    expect(msg).toMatch(/2 nested menu levels/);
+    expect(msg).toMatch(/main item/);
+    expect(msg).toMatch(/not toppings or add-ons nested under another choice/);
   });
 });

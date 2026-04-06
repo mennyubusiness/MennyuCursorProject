@@ -20,7 +20,10 @@ export interface NestedModifierGroupForUI {
   maxSelections: number;
   isRequired: boolean;
   isAvailable: boolean;
-  /** When true, counts toward Deliverect `subItems` nesting cap in the kitchen integration. */
+  /**
+   * Deliverect “variant group” flag on a nested row. Does **not** add levels to the **root** `subItems`
+   * chain (those serialize under modifiers); only root groups on the menu item do.
+   */
   deliverectIsVariantGroup?: boolean | null;
   options: Omit<ModifierOptionForUI, "nestedModifierGroups">[];
 }

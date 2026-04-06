@@ -160,7 +160,7 @@ function selectionToVariantSubLine(sel: Selection): DeliverectOrderSubLine {
  * last group = innermost `subItems` node.
  *
  * Deliverect allows at most 3 levels of nested `subItems`; depth is enforced in
- * `validateDeliverectSubItemNesting` and cart validation before submit.
+ * `validateDeliverectSubItemsChainDepth` and cart/checkout validation before submit.
  */
 function nestVariantGroupSelections(sels: Selection[]): DeliverectOrderSubLine {
   const sorted = [...sels].sort(
@@ -178,7 +178,8 @@ function nestVariantGroupSelections(sels: Selection[]): DeliverectOrderSubLine {
 /**
  * Map one Mennyu line item to Deliverect order item.
  * Variant products (`deliverectVariantParentPlu`): top-level parent PLU, price 0, chosen variation + nested variant steps in `subItems`.
- * Deliverect variant groups (`deliverectIsVariantGroup`) emit nested `subItems`, not flat `modifiers`.
+ * Top-level Deliverect variant groups (`deliverectIsVariantGroup` on the main item) emit nested
+ * `subItems` via {@link nestVariantGroupSelections}; other selections use flat `modifiers`.
  */
 function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
   const variationPlu = line.menuItem?.deliverectPlu?.trim();

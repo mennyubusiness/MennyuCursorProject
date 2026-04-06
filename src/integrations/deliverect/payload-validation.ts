@@ -4,7 +4,7 @@
  *
  * For proactive mapping issues before checkout, see {@link evaluateDeliverectMenuIntegrityForVendor}.
  */
-import { DELIVERECT_MAX_SUBITEM_NESTING } from "@/lib/deliverect-subitem-nesting";
+import { DELIVERECT_MAX_SUBITEMS_NESTING_DEPTH } from "@/lib/deliverect-subitem-nesting";
 import {
   deliverectRestaurantFacingPaymentCents,
   vendorOrderItemSubtotalCents,
@@ -117,11 +117,11 @@ function validateSubLine(
     errors.push(err("invalid_price", "Subline price must be a non-negative integer (cents)", `${path}.price`));
   }
   const depth = subItemChainDepth(s);
-  if (depth > DELIVERECT_MAX_SUBITEM_NESTING) {
+  if (depth > DELIVERECT_MAX_SUBITEMS_NESTING_DEPTH) {
     errors.push(
       err(
         "invalid_nesting",
-        `subItems nesting exceeds Deliverect maximum (${DELIVERECT_MAX_SUBITEM_NESTING})`,
+        `subItems chain depth exceeds Deliverect maximum for online orders (${DELIVERECT_MAX_SUBITEMS_NESTING_DEPTH} levels)`,
         path
       )
     );

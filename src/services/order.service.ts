@@ -21,10 +21,10 @@ import {
 import { formatPickupDetailLine } from "@/lib/pickup-display";
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
 import {
-  deliverectSubItemNestingCartSummaryMessage,
-  isDeliverectSubItemDepthAllowed,
+  deliverectSubItemsChainLimitMessage,
+  isDeliverectSubItemsChainDepthAllowed,
   isTopLevelDeliverectVariantGroupModifierGroup,
-  maxDeliverectVariantGroupSelectionsForMenuItem,
+  maxSubItemsChainVariantStepsForProductShape,
 } from "@/lib/deliverect-subitem-nesting";
 import {
   shellBasePriceCentsForMenuItem,
@@ -205,25 +205,25 @@ export async function validateCartForOrder(cart: {
       if (!item.vendor?.deliverectChannelLinkId?.trim()) continue;
       const sels = item.selections ?? [];
       if (sels.length === 0) continue;
-      let topLevelVariantSteps = 0;
+      let subItemsChainVariantSteps = 0;
       for (const s of sels) {
         const row = optGroupById.get(s.modifierOptionId);
         if (row && isTopLevelDeliverectVariantGroupModifierGroup(row.modifierGroup)) {
-          topLevelVariantSteps += 1;
+          subItemsChainVariantSteps += 1;
         }
       }
       const hasParentPlu = Boolean(item.menuItem.deliverectVariantParentPlu?.trim());
       if (
-        !isDeliverectSubItemDepthAllowed({
+        !isDeliverectSubItemsChainDepthAllowed({
           hasDeliverectVariantParentPlu: hasParentPlu,
-          variantGroupSelectionCount: topLevelVariantSteps,
+          chainVariantStepCount: subItemsChainVariantSteps,
         })
       ) {
-        const max = maxDeliverectVariantGroupSelectionsForMenuItem(hasParentPlu);
+        const max = maxSubItemsChainVariantStepsForProductShape(hasParentPlu);
         return {
           valid: false,
           code: "DELIVERECT_SUBITEMS_NESTING_LIMIT",
-          message: deliverectSubItemNestingCartSummaryMessage(item.menuItem.name, max),
+          message: deliverectSubItemsChainLimitMessage(item.menuItem.name, max),
           cartItemId: item.id,
           menuItemId: item.menuItemId,
           menuItemName: item.menuItem.name,
@@ -448,7 +448,7 @@ export function getCartValidationMessage(code: string): string {
     BASKET_LIMIT_EXCEEDED: "Quantity exceeds the maximum allowed for an item.",
     MODIFIER_OPTION_NOT_IN_CURRENT_MENU: "A modifier selection is not on the vendor's current menu.",
     DELIVERECT_SUBITEMS_NESTING_LIMIT:
-      "An item has too many nested size/variation steps for Deliverect (top-level variant groups only). Remove a step or contact the restaurant.",
+      "An item exceeds Deliverect’s limit for nested menu levels on online orders (top-level variant groups only — not add-ons). Update the cart or contact the restaurant.",
   };
   return map[code] ?? "Your cart needs attention. Please review or remove items.";
 }
