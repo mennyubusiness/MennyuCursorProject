@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { validateDeliverectPayload } from "./payload-validation";
 import { mennyuVendorOrderToDeliverectPayload } from "./transform";
 import type { HydratedVendorOrder } from "./load";
 
@@ -297,12 +298,94 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
 
     const item = payload.items[0]!;
     expect(item.plu).toBe("BYO-PIZZA");
-    expect(item.price).toBe(1500);
+    // Shell = effective unit − variant surcharges − flat modifier surcharges (avoid double-count with subItems + modifiers).
+    expect(item.price).toBe(1000);
     expect(item.externalProductId).toBe("prod-byo");
     expect(item.subItems).toHaveLength(1);
     expect(item.subItems![0]!.plu).toBe("SIZE-MED");
     expect(item.modifiers).toHaveLength(1);
     expect(item.modifiers![0]!.plu).toBe("TOP-CHEESE");
+  });
+
+  it("built payload passes pre-submit validation when line has flat modifiers (no double-count)", () => {
+    const base = minimalVendorOrder();
+    const vo = {
+      ...base,
+      id: "vo_steak",
+      subtotalCents: 1700,
+      taxCents: 140,
+      serviceFeeCents: 60,
+      tipCents: 340,
+      totalCents: 1700 + 140 + 60 + 340,
+      lineItems: [
+        {
+          id: "li-steak",
+          menuItemId: "mi-steak",
+          name: "Delicious Steak Frites",
+          quantity: 1,
+          priceCents: 1700,
+          specialInstructions: null,
+          menuItem: {
+            id: "mi-steak",
+            name: "Delicious Steak Frites",
+            deliverectProductId: null,
+            deliverectPlu: "STEAK-PLU",
+            deliverectVariantParentPlu: null,
+            deliverectVariantParentName: null,
+          },
+          selections: [
+            {
+              modifierOptionId: "opt-mr",
+              nameSnapshot: "Medium Rare",
+              priceCentsSnapshot: 0,
+              quantity: 1,
+              modifierOption: {
+                id: "opt-mr",
+                name: "Medium Rare",
+                deliverectModifierId: "mod-mr",
+                deliverectModifierPlu: "MR",
+                modifierGroupId: "mg-doneness",
+                modifierGroup: {
+                  id: "mg-doneness",
+                  name: "Doneness",
+                  sortOrder: 0,
+                  parentModifierOptionId: null,
+                  deliverectIsVariantGroup: false,
+                },
+              },
+            },
+            {
+              modifierOptionId: "opt-salad",
+              nameSnapshot: "Salad",
+              priceCentsSnapshot: 200,
+              quantity: 1,
+              modifierOption: {
+                id: "opt-salad",
+                name: "Salad",
+                deliverectModifierId: "mod-salad",
+                deliverectModifierPlu: "SIDE-SALAD",
+                modifierGroupId: "mg-side",
+                modifierGroup: {
+                  id: "mg-side",
+                  name: "Side",
+                  sortOrder: 1,
+                  parentModifierOptionId: null,
+                  deliverectIsVariantGroup: false,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    } as NonNullable<HydratedVendorOrder>;
+
+    const payload = mennyuVendorOrderToDeliverectPayload({
+      vendorOrder: vo,
+      channelLinkId: "ch-link-cert",
+    });
+    const v = validateDeliverectPayload(payload, vo);
+    expect(v.isValid).toBe(true);
+    expect(v.errors).toHaveLength(0);
   });
 
   it("payment.amount excludes Mennyu platform service fee — restaurant-facing total only", () => {

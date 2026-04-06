@@ -3,7 +3,8 @@
  * Maps line items, modifier selections (including nested), item/order notes, and prices.
  * No live API calls; output is ready for future submission.
  *
- * **Money scope:** Line item `price` fields are menu/modifier unit prices only. Order-level
+ * **Money scope:** Shell `price` is the menu base after subtracting surcharges already carried on
+ * `subItems` (variant groups) and `modifiers` (flat options). Order-level
  * `payment.amount` and tax fields must follow {@link deliverectRestaurantFacingPaymentCents} —
  * never include Mennyu’s 3.5% platform service fee (see `deliverect-financial-scope.ts`).
  */
@@ -101,6 +102,36 @@ function selectionIsDeliverectVariantGroup(sel: Selection): boolean {
   return sel.modifierOption.modifierGroup.deliverectIsVariantGroup === true;
 }
 
+/** Per-selection surcharge (cents) toward `line.priceCents`, matching cart `computeEffectiveUnitPriceCents`. */
+function selectionUnitExtraCents(sel: Selection): number {
+  return Math.round(sel.priceCentsSnapshot) * sel.quantity;
+}
+
+function variantGroupUnitExtraCents(line: LineItem): number {
+  return line.selections.filter(selectionIsDeliverectVariantGroup).reduce((s, sel) => s + selectionUnitExtraCents(sel), 0);
+}
+
+/** Non–variant-group modifiers (flat `modifiers` array), excluding nested variant steps. */
+function nonVariantModifierUnitExtraCents(line: LineItem): number {
+  return line.selections.filter((s) => !selectionIsDeliverectVariantGroup(s)).reduce((s, sel) => s + selectionUnitExtraCents(sel), 0);
+}
+
+/**
+ * Unit price for the Deliverect **shell** row (`items[].price` or the variation `subItems` node).
+ *
+ * `OrderLineItem.priceCents` is the **effective** unit price (base + variant surcharges + flat modifiers).
+ * We also emit variant steps in `subItems` and flat modifiers with their own `price` fields. Those amounts
+ * must be subtracted here so totals are not double-counted (e.g. 1700¢ line + 200¢ modifiers → 1900¢).
+ *
+ * @see {@link computeEffectiveUnitPriceCents}
+ */
+function deliverectShellUnitPriceCents(line: LineItem): number {
+  return Math.max(
+    0,
+    Math.round(line.priceCents) - variantGroupUnitExtraCents(line) - nonVariantModifierUnitExtraCents(line)
+  );
+}
+
 /** One Deliverect variant step (size / nested variation) — never use `modifiers` for these. */
 function selectionToVariantSubLine(sel: Selection): DeliverectOrderSubLine {
   const plu = sel.modifierOption.deliverectModifierPlu?.trim();
@@ -164,7 +195,7 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
       plu: variationPlu,
       name: line.name,
       quantity: line.quantity,
-      price: Math.round(line.priceCents),
+      price: deliverectShellUnitPriceCents(line),
       ...(itemNote ? { remarks: itemNote } : {}),
       ...(leafExternalId ? { externalProductId: leafExternalId } : {}),
     };
@@ -194,7 +225,7 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
     ...(externalProductId ? { externalProductId } : {}),
     name: line.name,
     quantity: line.quantity,
-    price: Math.round(line.priceCents),
+    price: deliverectShellUnitPriceCents(line),
     ...(itemNote ? { remark: itemNote, remarks: itemNote } : {}),
   };
   if (variantGroupSels.length > 0) {
