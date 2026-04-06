@@ -5,6 +5,7 @@
 import { MenuVersionState } from "@prisma/client";
 import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import {
+  countTopLevelDeliverectVariantGroupSelections,
   deliverectSubItemNestingCartSummaryMessage,
   isDeliverectSubItemDepthAllowed,
   maxDeliverectVariantGroupSelectionsForMenuItem,
@@ -41,14 +42,13 @@ export type ValidationResult =
 function countDeliverectVariantGroupSelections(
   line: NonNullable<HydratedVendorOrder>["lineItems"][number]
 ): number {
-  return line.selections.filter(
-    (s) => s.modifierOption.modifierGroup.deliverectIsVariantGroup === true
-  ).length;
+  return countTopLevelDeliverectVariantGroupSelections(line);
 }
 
 /**
- * Deliverect rejects orders when nested `subItems` from variant groups exceed API max depth.
- * Must stay aligned with {@link nestVariantGroupSelections} in `transform.ts`.
+ * Deliverect rejects orders when nested `subItems` from **top-level** variant groups exceed API max
+ * depth. Nested modifier groups (`parentModifierOptionId`) do not add root `subItems` levels — see
+ * {@link countTopLevelDeliverectVariantGroupSelections}. Must stay aligned with `transform.ts`.
  */
 export function validateDeliverectSubItemNesting(
   vendorOrder: NonNullable<HydratedVendorOrder>

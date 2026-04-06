@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   DELIVERECT_MAX_SUBITEM_NESTING,
+  countTopLevelDeliverectVariantGroupSelections,
   deliverectSubItemDepthFromLine,
   isDeliverectSubItemDepthAllowed,
+  isTopLevelDeliverectVariantGroupModifierGroup,
 } from "./deliverect-subitem-nesting";
 
 describe("deliverectSubItemDepthFromLine", () => {
@@ -62,5 +64,29 @@ describe("deliverectSubItemDepthFromLine", () => {
         variantGroupSelectionCount: 3,
       })
     ).toBe(false);
+  });
+});
+
+describe("countTopLevelDeliverectVariantGroupSelections", () => {
+  const g = (variant: boolean, parent: string | null) => ({
+    modifierGroup: { deliverectIsVariantGroup: variant, parentModifierOptionId: parent },
+  });
+
+  it("counts only top-level variant groups toward the subItems chain", () => {
+    expect(
+      countTopLevelDeliverectVariantGroupSelections({
+        selections: [
+          { modifierOption: g(true, null) },
+          { modifierOption: g(true, null) },
+          { modifierOption: g(true, "opt-parent") },
+        ],
+      })
+    ).toBe(2);
+  });
+
+  it("does not count nested groups even when flagged as variant group", () => {
+    expect(isTopLevelDeliverectVariantGroupModifierGroup({ deliverectIsVariantGroup: true, parentModifierOptionId: "p1" })).toBe(
+      false
+    );
   });
 });

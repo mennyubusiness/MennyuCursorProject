@@ -7,7 +7,10 @@ import "server-only";
 import { MenuVersionState } from "@prisma/client";
 import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { prisma } from "@/lib/db";
-import { maxDeliverectVariantGroupSelectionsForMenuItem } from "@/lib/deliverect-subitem-nesting";
+import {
+  isTopLevelDeliverectVariantGroupModifierGroup,
+  maxDeliverectVariantGroupSelectionsForMenuItem,
+} from "@/lib/deliverect-subitem-nesting";
 import { getOperationalMenuItemIdsForVendor } from "@/services/menu-active-scope.service";
 
 export type DeliverectMenuIntegritySeverity = "critical" | "warning" | "info";
@@ -282,7 +285,7 @@ export async function evaluateDeliverectMenuIntegrityForVendor(
 
     let variantGroupCount = 0;
     for (const link of it.modifierGroups) {
-      if (link.modifierGroup.deliverectIsVariantGroup === true) variantGroupCount++;
+      if (isTopLevelDeliverectVariantGroupModifierGroup(link.modifierGroup)) variantGroupCount++;
       if (!relevantGroupIds.has(link.modifierGroup.id)) continue;
       for (const opt of link.modifierGroup.options) {
         if (opt.isAvailable) optionIdsNeedingPlu.add(opt.id);

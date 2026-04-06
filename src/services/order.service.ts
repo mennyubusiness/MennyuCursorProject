@@ -21,6 +21,12 @@ import {
 import { formatPickupDetailLine } from "@/lib/pickup-display";
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
 import {
+  deliverectSubItemNestingCartSummaryMessage,
+  isDeliverectSubItemDepthAllowed,
+  isTopLevelDeliverectVariantGroupModifierGroup,
+  maxDeliverectVariantGroupSelectionsForMenuItem,
+} from "@/lib/deliverect-subitem-nesting";
+import {
   shellBasePriceCentsForMenuItem,
   variantSelectionsPriceCentsForLeafCartLine,
 } from "@/services/cart-deliverect-variant-resolution";
@@ -103,7 +109,13 @@ export async function validateCartForOrder(cart: {
       deliverectPlu?: string | null;
       deliverectVariantParentPlu?: string | null;
     };
-    vendor: { isActive?: boolean; mennyuOrdersPaused?: boolean; posOpen?: boolean };
+    vendor: {
+      isActive?: boolean;
+      mennyuOrdersPaused?: boolean;
+      posOpen?: boolean;
+      /** When set, enforce Deliverect `subItems` depth limits (same as outbound validation). */
+      deliverectChannelLinkId?: string | null;
+    };
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
   }>;
 }): Promise<CartValidationResult> {
@@ -172,6 +184,51 @@ export async function validateCartForOrder(cart: {
     });
     if (!modResult.valid) {
       return { valid: false, code: modResult.code, message: modResult.message, cartItemId: modResult.cartItemId, menuItemId: modResult.menuItemId, menuItemName: modResult.menuItemName };
+    }
+  }
+
+  const optionIdsForNesting = [
+    ...new Set(cart.items.flatMap((i) => i.selections?.map((s) => s.modifierOptionId) ?? [])),
+  ];
+  if (optionIdsForNesting.length > 0) {
+    const optsWithGroup = await prisma.modifierOption.findMany({
+      where: { id: { in: optionIdsForNesting } },
+      select: {
+        id: true,
+        modifierGroup: {
+          select: { deliverectIsVariantGroup: true, parentModifierOptionId: true },
+        },
+      },
+    });
+    const optGroupById = new Map(optsWithGroup.map((o) => [o.id, o]));
+    for (const item of cart.items) {
+      if (!item.vendor?.deliverectChannelLinkId?.trim()) continue;
+      const sels = item.selections ?? [];
+      if (sels.length === 0) continue;
+      let topLevelVariantSteps = 0;
+      for (const s of sels) {
+        const row = optGroupById.get(s.modifierOptionId);
+        if (row && isTopLevelDeliverectVariantGroupModifierGroup(row.modifierGroup)) {
+          topLevelVariantSteps += 1;
+        }
+      }
+      const hasParentPlu = Boolean(item.menuItem.deliverectVariantParentPlu?.trim());
+      if (
+        !isDeliverectSubItemDepthAllowed({
+          hasDeliverectVariantParentPlu: hasParentPlu,
+          variantGroupSelectionCount: topLevelVariantSteps,
+        })
+      ) {
+        const max = maxDeliverectVariantGroupSelectionsForMenuItem(hasParentPlu);
+        return {
+          valid: false,
+          code: "DELIVERECT_SUBITEMS_NESTING_LIMIT",
+          message: deliverectSubItemNestingCartSummaryMessage(item.menuItem.name, max),
+          cartItemId: item.id,
+          menuItemId: item.menuItemId,
+          menuItemName: item.menuItem.name,
+        };
+      }
     }
   }
 
@@ -391,7 +448,7 @@ export function getCartValidationMessage(code: string): string {
     BASKET_LIMIT_EXCEEDED: "Quantity exceeds the maximum allowed for an item.",
     MODIFIER_OPTION_NOT_IN_CURRENT_MENU: "A modifier selection is not on the vendor's current menu.",
     DELIVERECT_SUBITEMS_NESTING_LIMIT:
-      "An item has too many variation steps for online orders. Remove some choices on that item.",
+      "An item has too many nested size/variation steps for Deliverect (top-level variant groups only). Remove a step or contact the restaurant.",
   };
   return map[code] ?? "Your cart needs attention. Please review or remove items.";
 }

@@ -57,6 +57,7 @@ export default async function CheckoutPage({
         isActive: i.vendor.isActive,
         mennyuOrdersPaused: i.vendor.mennyuOrdersPaused ?? undefined,
         posOpen: undefined,
+        deliverectChannelLinkId: i.vendor.deliverectChannelLinkId ?? null,
       },
       selections: i.selections?.map((s) => ({
         modifierOptionId: s.modifierOptionId,

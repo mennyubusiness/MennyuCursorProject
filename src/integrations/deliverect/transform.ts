@@ -15,6 +15,7 @@ import type {
   DeliverectModifier,
 } from "./payloads";
 import type { HydratedVendorOrder } from "./load";
+import { isTopLevelDeliverectVariantGroupModifierGroup } from "@/lib/deliverect-subitem-nesting";
 import {
   deliverectRestaurantFacingPaymentCents,
   vendorOrderItemSubtotalCents,
@@ -98,8 +99,9 @@ function buildModifiersForLine(selections: Selection[]): DeliverectModifier[] | 
   return topLevel.map((m) => attachNested(m));
 }
 
-function selectionIsDeliverectVariantGroup(sel: Selection): boolean {
-  return sel.modifierOption.modifierGroup.deliverectIsVariantGroup === true;
+/** Variant group on the main product line — drives `nestVariantGroupSelections` / subItems depth. */
+function selectionIsTopLevelDeliverectVariantGroup(sel: Selection): boolean {
+  return isTopLevelDeliverectVariantGroupModifierGroup(sel.modifierOption.modifierGroup);
 }
 
 /** Per-selection surcharge (cents) toward `line.priceCents`, matching cart `computeEffectiveUnitPriceCents`. */
@@ -108,12 +110,16 @@ function selectionUnitExtraCents(sel: Selection): number {
 }
 
 function variantGroupUnitExtraCents(line: LineItem): number {
-  return line.selections.filter(selectionIsDeliverectVariantGroup).reduce((s, sel) => s + selectionUnitExtraCents(sel), 0);
+  return line.selections
+    .filter(selectionIsTopLevelDeliverectVariantGroup)
+    .reduce((s, sel) => s + selectionUnitExtraCents(sel), 0);
 }
 
-/** Non–variant-group modifiers (flat `modifiers` array), excluding nested variant steps. */
+/** Modifiers not in the top-level variant chain (flat + nested under options). */
 function nonVariantModifierUnitExtraCents(line: LineItem): number {
-  return line.selections.filter((s) => !selectionIsDeliverectVariantGroup(s)).reduce((s, sel) => s + selectionUnitExtraCents(sel), 0);
+  return line.selections
+    .filter((s) => !selectionIsTopLevelDeliverectVariantGroup(s))
+    .reduce((s, sel) => s + selectionUnitExtraCents(sel), 0);
 }
 
 /**
@@ -182,8 +188,8 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
   }
   const itemNote = line.specialInstructions?.trim();
 
-  const variantGroupSels = line.selections.filter(selectionIsDeliverectVariantGroup);
-  const modifierSels = line.selections.filter((s) => !selectionIsDeliverectVariantGroup(s));
+  const variantGroupSels = line.selections.filter(selectionIsTopLevelDeliverectVariantGroup);
+  const modifierSels = line.selections.filter((s) => !selectionIsTopLevelDeliverectVariantGroup(s));
   const modifierOnly = buildModifiersForLine(modifierSels);
 
   const parentPlu = line.menuItem?.deliverectVariantParentPlu?.trim();

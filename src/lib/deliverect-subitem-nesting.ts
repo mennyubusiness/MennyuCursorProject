@@ -2,11 +2,37 @@
  * Deliverect channel order API rejects payloads when `subItems` nesting exceeds this depth
  * (Pydantic: "Maximum allowed level of subitems nesting reached. MAX.: 3").
  *
- * Our transform nests each `deliverectIsVariantGroup` selection as one `subItems` level; variant
- * products also wrap the variation line as an extra level under the parent PLU.
+ * Our transform nests each **top-level** `deliverectIsVariantGroup` selection as one `subItems`
+ * level in {@link nestVariantGroupSelections}. Variant products also wrap the variation line as an
+ * extra level under the parent PLU.
+ *
+ * Modifier groups nested under another option (`ModifierGroup.parentModifierOptionId`) are serialized
+ * under `modifiers` / `nestedModifiers`, not as extra root `subItems` levels — they must **not**
+ * count toward this limit (mis-counting caused false blocks when many add-on groups were flagged).
  */
 
 export const DELIVERECT_MAX_SUBITEM_NESTING = 3;
+
+/** True when this group is a Deliverect variant step on the main product (contributes to `subItems` chain depth). */
+export function isTopLevelDeliverectVariantGroupModifierGroup(group: {
+  deliverectIsVariantGroup: boolean | null;
+  parentModifierOptionId: string | null;
+}): boolean {
+  return group.deliverectIsVariantGroup === true && group.parentModifierOptionId == null;
+}
+
+/** Selections that form the nested `subItems` chain on the order line (same basis as `transform.ts`). */
+export function countTopLevelDeliverectVariantGroupSelections(line: {
+  selections: Array<{
+    modifierOption: {
+      modifierGroup: { deliverectIsVariantGroup: boolean | null; parentModifierOptionId: string | null };
+    };
+  }>;
+}): number {
+  return line.selections.filter((s) =>
+    isTopLevelDeliverectVariantGroupModifierGroup(s.modifierOption.modifierGroup)
+  ).length;
+}
 
 export function deliverectSubItemDepthFromLine(args: {
   hasDeliverectVariantParentPlu: boolean;
@@ -39,7 +65,8 @@ export function maxDeliverectVariantGroupSelectionsForMenuItem(
 
 /** Cart / checkout / validation — short, non-technical. */
 export function deliverectSubItemNestingCartSummaryMessage(itemName: string, max: number): string {
-  return `“${itemName}” allows at most ${max} variation ${max === 1 ? "step" : "steps"} for online orders. Remove a few choices and try again.`;
+  const stepLabel = max === 1 ? "step" : "steps";
+  return `“${itemName}” exceeds the ${max} nested size/variation ${stepLabel} allowed for online orders (Deliverect limit). This counts only top-level variant groups (e.g. size), not nested add-ons. Remove a variation choice or ask the restaurant to fix variant-group flags on the menu.`;
 }
 
 /** @deprecated Prefer {@link deliverectSubItemNestingCartSummaryMessage} with a computed max. */

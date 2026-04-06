@@ -2,6 +2,7 @@
  * Deliverect variant families: parent shell MenuItem (e.g. PLU P-SPICY-RANCH) + variant-group
  * selections (size) must map to a leaf MenuItem row (e.g. VAR-SMALL…) for cart/order lines.
  */
+import { isTopLevelDeliverectVariantGroupModifierGroup } from "@/lib/deliverect-subitem-nesting";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { CartValidationError } from "@/services/cart-validation-error";
@@ -19,6 +20,7 @@ export const MENU_ITEM_VARIANT_RESOLUTION_INCLUDE = {
           name: true,
           sortOrder: true,
           deliverectIsVariantGroup: true,
+          parentModifierOptionId: true,
         },
       },
     },
@@ -56,7 +58,7 @@ export async function augmentSelectionsWithImplicitVariantFromLeaf(
 
   const parentShellVariantGroupIds = new Set(
     parent.modifierGroups
-      .filter((l) => l.modifierGroup.deliverectIsVariantGroup === true)
+      .filter((l) => isTopLevelDeliverectVariantGroupModifierGroup(l.modifierGroup))
       .map((l) => l.modifierGroup.id)
   );
 
@@ -142,8 +144,8 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
     menuItem = parent;
   }
 
-  const hasVariantGroupOnItem = menuItem.modifierGroups.some(
-    (l) => l.modifierGroup.deliverectIsVariantGroup === true
+  const hasVariantGroupOnItem = menuItem.modifierGroups.some((l) =>
+    isTopLevelDeliverectVariantGroupModifierGroup(l.modifierGroup)
   );
   if (!hasVariantGroupOnItem) {
     return { menuItem, selections, variantSelectionsPriceCents: 0 };
@@ -164,15 +166,15 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
       modifierGroupId: true,
       deliverectModifierPlu: true,
       priceCents: true,
-      modifierGroup: { select: { id: true, deliverectIsVariantGroup: true } },
+      modifierGroup: { select: { id: true, deliverectIsVariantGroup: true, parentModifierOptionId: true } },
     },
   });
   const byId = new Map(optionRows.map((o) => [o.id, o]));
 
-  /** Only options under groups linked to the parent shell as variant (e.g. size). Do not use the global `deliverectIsVariantGroup` flag — leaf-only groups may be mis-tagged and must stay in non-variant selections. */
+  /** Only options under top-level variant groups on the parent shell (e.g. size). Nested groups use a different serialization path. */
   const parentShellVariantGroupIds = new Set(
     menuItem.modifierGroups
-      .filter((l) => l.modifierGroup.deliverectIsVariantGroup === true)
+      .filter((l) => isTopLevelDeliverectVariantGroupModifierGroup(l.modifierGroup))
       .map((l) => l.modifierGroup.id)
   );
 
@@ -399,7 +401,7 @@ async function findVariantModifierOptionForLeaf(
   if (!parent) return null;
   const parentShellVariantGroupIds = new Set(
     parent.modifierGroups
-      .filter((l) => l.modifierGroup.deliverectIsVariantGroup === true)
+      .filter((l) => isTopLevelDeliverectVariantGroupModifierGroup(l.modifierGroup))
       .map((l) => l.modifierGroup.id)
   );
   const variantOpt = await prisma.modifierOption.findFirst({
@@ -483,7 +485,7 @@ export async function findDeliverectProductVariantGroupIdForLeaf(
   });
   if (candidates.length === 0) return null;
 
-  const flagged = candidates.find((c) => c.modifierGroup.deliverectIsVariantGroup === true);
+  const flagged = candidates.find((c) => isTopLevelDeliverectVariantGroupModifierGroup(c.modifierGroup));
   if (flagged) return flagged.modifierGroupId;
 
   const parentOnly = candidates.find((c) => !leafGroupIds.has(c.modifierGroup.id));
