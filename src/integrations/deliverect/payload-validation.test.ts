@@ -95,6 +95,78 @@ describe("validateDeliverectPayload", () => {
     expect(r.errors.some((e) => e.type === "price_mismatch")).toBe(true);
   });
 
+  it("accepts item sum vs item-only total when tax and platform fee are non-zero", () => {
+    const vo = minimalVo({
+      subtotalCents: 1700,
+      taxCents: 140,
+      serviceFeeCents: 60,
+      tipCents: 0,
+      totalCents: 1900,
+      lineItems: [
+        {
+          id: "li1",
+          vendorOrderId: "vo1",
+          name: "Meal",
+          quantity: 1,
+          priceCents: 1700,
+          specialInstructions: null,
+          createdAt: new Date("2024-01-01T00:00:00.000Z"),
+          menuItemId: "m1",
+          menuItem: {
+            id: "m1",
+            name: "Meal",
+            deliverectProductId: null,
+            deliverectPlu: "PLU-M",
+            deliverectVariantParentPlu: null,
+            deliverectVariantParentName: null,
+          },
+          selections: [],
+        },
+      ],
+    });
+    const payload = basePayload({
+      items: [{ plu: "PLU-M", name: "Meal", quantity: 1, price: 1700 }],
+      payment: { amount: 1840, type: 0 },
+    });
+    const r = validateDeliverectPayload(payload, vo);
+    expect(r.isValid).toBe(true);
+    expect(r.errors).toHaveLength(0);
+  });
+
+  it("rejects when payload item sum does not match item-only total (excluding tax/fees)", () => {
+    const vo = minimalVo({
+      subtotalCents: 1700,
+      taxCents: 140,
+      serviceFeeCents: 60,
+      tipCents: 0,
+      totalCents: 1900,
+    });
+    const payload = basePayload({
+      items: [{ plu: "PLU-B", name: "Burger", quantity: 1, price: 1800 }],
+      payment: { amount: 1840, type: 0 },
+    });
+    const r = validateDeliverectPayload(payload, vo);
+    expect(r.isValid).toBe(false);
+    expect(r.errors.some((e) => e.type === "price_mismatch" && e.path === "items")).toBe(true);
+  });
+
+  it("uses total − tax − fee − tip for item subtotal so a stale subtotalCents field does not false-fail", () => {
+    const vo = minimalVo({
+      subtotalCents: 999,
+      taxCents: 140,
+      serviceFeeCents: 60,
+      tipCents: 0,
+      totalCents: 1900,
+    });
+    const payload = basePayload({
+      items: [{ plu: "PLU-B", name: "Burger", quantity: 1, price: 1700 }],
+      payment: { amount: 1840, type: 0 },
+    });
+    const r = validateDeliverectPayload(payload, vo);
+    expect(r.isValid).toBe(true);
+    expect(r.errors).toHaveLength(0);
+  });
+
   it("flags missing externalProductId when menu item has deliverectProductId", () => {
     const vo = minimalVo({
       lineItems: [

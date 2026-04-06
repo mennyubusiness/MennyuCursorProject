@@ -14,7 +14,10 @@ import type {
   DeliverectModifier,
 } from "./payloads";
 import type { HydratedVendorOrder } from "./load";
-import { deliverectRestaurantFacingPaymentCents } from "./deliverect-financial-scope";
+import {
+  deliverectRestaurantFacingPaymentCents,
+  vendorOrderItemSubtotalCents,
+} from "./deliverect-financial-scope";
 
 export interface TransformInput {
   /** Fully loaded VendorOrder from getVendorOrderForDeliverect. */
@@ -277,9 +280,11 @@ export function mennyuVendorOrderToDeliverectPayload(input: TransformInput): Del
   /**
    * Prepaid amount for Deliverect: food + restaurant tax + tip for this vendor.
    * Do NOT use `vendorOrder.totalCents` — it includes `serviceFeeCents` (Mennyu 3.5% platform fee).
+   * Use the same item-only subtotal as payload validation (`vendorOrderItemSubtotalCents`).
    */
+  const itemSubtotalCents = vendorOrderItemSubtotalCents(vendorOrder);
   const restaurantFacingPaymentCents = deliverectRestaurantFacingPaymentCents({
-    subtotalCents: Math.max(0, Math.round(vendorOrder.subtotalCents)),
+    subtotalCents: itemSubtotalCents,
     taxCents,
     tipCents: Math.max(0, Math.round(vendorOrder.tipCents)),
   });

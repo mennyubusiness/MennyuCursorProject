@@ -5,7 +5,10 @@
  * For proactive mapping issues before checkout, see {@link evaluateDeliverectMenuIntegrityForVendor}.
  */
 import { DELIVERECT_MAX_SUBITEM_NESTING } from "@/lib/deliverect-subitem-nesting";
-import { deliverectRestaurantFacingPaymentCents } from "./deliverect-financial-scope";
+import {
+  deliverectRestaurantFacingPaymentCents,
+  vendorOrderItemSubtotalCents,
+} from "./deliverect-financial-scope";
 import type { DeliverectModifier, DeliverectOrderItem, DeliverectOrderRequest, DeliverectOrderSubLine } from "./payloads";
 import type { HydratedVendorOrder } from "./load";
 
@@ -271,16 +274,17 @@ export function validateDeliverectPayload(
 
   validateExternalProductIds(payload, vendorOrder, errors);
 
-  const subtotalSum = sumPayloadSubtotalCents(payload);
-  const expectedSubtotal = Math.max(0, Math.round(vendorOrder.subtotalCents));
+  const payloadItemsSumCents = sumPayloadSubtotalCents(payload);
+  /** Menu + modifiers only — excludes tax, platform fee, and tip (see `vendorOrderItemSubtotalCents`). */
+  const expectedItemSubtotalCents = vendorOrderItemSubtotalCents(vendorOrder);
   if (
-    Math.abs(subtotalSum - expectedSubtotal) > DELIVERECT_PAYLOAD_MONEY_TOLERANCE_CENTS &&
+    Math.abs(payloadItemsSumCents - expectedItemSubtotalCents) > DELIVERECT_PAYLOAD_MONEY_TOLERANCE_CENTS &&
     payload.items.length > 0
   ) {
     errors.push(
       err(
         "price_mismatch",
-        `Line totals (${subtotalSum}¢) do not match vendor order subtotal (${expectedSubtotal}¢) within ${DELIVERECT_PAYLOAD_MONEY_TOLERANCE_CENTS}¢`,
+        `Item line totals (${payloadItemsSumCents}¢) do not match item subtotal excluding tax and fees (${expectedItemSubtotalCents}¢) within ${DELIVERECT_PAYLOAD_MONEY_TOLERANCE_CENTS}¢`,
         "items"
       )
     );
@@ -288,7 +292,7 @@ export function validateDeliverectPayload(
 
   const taxCents = Math.max(0, Math.round(vendorOrder.taxCents));
   const expectedPayment = deliverectRestaurantFacingPaymentCents({
-    subtotalCents: expectedSubtotal,
+    subtotalCents: expectedItemSubtotalCents,
     taxCents,
     tipCents: Math.max(0, Math.round(vendorOrder.tipCents)),
   });
@@ -304,7 +308,7 @@ export function validateDeliverectPayload(
       errors.push(
         err(
           "price_mismatch",
-          `payment.amount (${payload.payment.amount}¢) does not match restaurant-facing total (${expectedPayment}¢ = subtotal + tax + tip) within ${DELIVERECT_PAYLOAD_MONEY_TOLERANCE_CENTS}¢`,
+          `payment.amount (${payload.payment.amount}¢) does not match restaurant-facing total (${expectedPayment}¢ = item subtotal excluding tax/fees + tax + tip) within ${DELIVERECT_PAYLOAD_MONEY_TOLERANCE_CENTS}¢`,
           "payment.amount"
         )
       );

@@ -25,6 +25,29 @@
 import { addCents } from "@/domain/money";
 
 /**
+ * Food + modifiers subtotal for one vendor slice, **excluding** tax, tip, and Mennyu’s platform
+ * service fee. Canonical definition for Deliverect line-item totals and payment math:
+ *
+ * `totalCents - taxCents - serviceFeeCents - tipCents`
+ *
+ * This matches `VendorOrder.subtotalCents` for orders created by `computeOrderTotals` (since
+ * `total = subtotal + fee + tax + tip`). Prefer this **derived** value when cross-checking payloads
+ * so validation stays aligned with checkout totals even if `subtotalCents` is stale or inconsistent.
+ */
+export function vendorOrderItemSubtotalCents(vo: {
+  totalCents: number;
+  taxCents: number;
+  serviceFeeCents: number;
+  tipCents: number;
+}): number {
+  const total = Math.max(0, Math.round(vo.totalCents));
+  const tax = Math.max(0, Math.round(vo.taxCents));
+  const fee = Math.max(0, Math.round(vo.serviceFeeCents));
+  const tip = Math.max(0, Math.round(vo.tipCents));
+  return Math.max(0, total - tax - fee - tip);
+}
+
+/**
  * Total paid amount (minor units) that the restaurant/POS should reconcile against — pickup order,
  * one vendor slice. Excludes Mennyu’s platform service fee (`serviceFeeCents`).
  */
