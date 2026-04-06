@@ -43,6 +43,38 @@ function isPayloadValidationSnapshot(v: unknown): v is DeliverectPayloadValidati
   );
 }
 
+function DeliverectPayloadValidationBlock({ raw }: { raw: unknown }) {
+  if (!isPayloadValidationSnapshot(raw)) return null;
+  const s = raw;
+  return (
+    <div className="mt-3 rounded-md border border-red-200 bg-red-50/90 px-2.5 py-2 text-xs text-red-950">
+      <p className="font-semibold">Pre-submit payload validation</p>
+      <p className="mt-0.5 font-medium">{s.summary}</p>
+      <p className="mt-1 text-[11px] text-red-900/90">
+        {s.validatedAt ? `Validated ${formatWhen(new Date(s.validatedAt))}` : null}
+      </p>
+      <details className="mt-2">
+        <summary className="cursor-pointer font-medium text-red-900 hover:underline">
+          Detailed errors ({s.errors.length})
+        </summary>
+        <ul className="mt-2 list-none space-y-2 border-t border-red-200/80 pt-2">
+          {s.errors.map((e, i) => (
+            <li
+              key={i}
+              className="rounded border border-red-100 bg-white/80 px-2 py-1.5 font-mono text-[10px] leading-snug"
+            >
+              <span className="text-red-700">{e.severity}</span> ·{" "}
+              <span className="text-red-800">{e.type}</span>
+              <div className="mt-0.5 text-stone-800">{e.message}</div>
+              <div className="mt-0.5 text-stone-500">{e.path}</div>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </div>
+  );
+}
+
 function toLifecycleInput(vo: VoRow): DeliverectAdminVoInput {
   return {
     routingStatus: vo.routingStatus,
@@ -204,32 +236,7 @@ export function AdminDeliverectDiagnosticsPanel({ vo }: { vo: VoRow }) {
         </div>
       </dl>
 
-      {isPayloadValidationSnapshot(vo.deliverectPayloadValidation) && (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50/90 px-2.5 py-2 text-xs text-red-950">
-          <p className="font-semibold">Pre-submit payload validation</p>
-          <p className="mt-0.5 font-medium">{vo.deliverectPayloadValidation.summary}</p>
-          <p className="mt-1 text-[11px] text-red-900/90">
-            {vo.deliverectPayloadValidation.validatedAt
-              ? `Validated ${formatWhen(new Date(vo.deliverectPayloadValidation.validatedAt))}`
-              : null}
-          </p>
-          <details className="mt-2">
-            <summary className="cursor-pointer font-medium text-red-900 hover:underline">
-              Detailed errors ({vo.deliverectPayloadValidation.errors.length})
-            </summary>
-            <ul className="mt-2 list-none space-y-2 border-t border-red-200/80 pt-2">
-              {vo.deliverectPayloadValidation.errors.map((e, i) => (
-                <li key={i} className="rounded border border-red-100 bg-white/80 px-2 py-1.5 font-mono text-[10px] leading-snug">
-                  <span className="text-red-700">{e.severity}</span> ·{" "}
-                  <span className="text-red-800">{e.type}</span>
-                  <div className="mt-0.5 text-stone-800">{e.message}</div>
-                  <div className="mt-0.5 text-stone-500">{e.path}</div>
-                </li>
-              ))}
-            </ul>
-          </details>
-        </div>
-      )}
+      <DeliverectPayloadValidationBlock raw={vo.deliverectPayloadValidation} />
 
       <div className="mt-3 space-y-2 border-t border-stone-200 pt-2">
         <details className="group">
