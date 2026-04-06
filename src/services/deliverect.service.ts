@@ -16,6 +16,12 @@ import { env } from "@/lib/env";
 import { submitOrder, type DeliverectSubmitResult } from "@/integrations/deliverect/client";
 import { getVendorOrderForDeliverect } from "@/integrations/deliverect/load";
 import { mennyuVendorOrderToDeliverectPayload } from "@/integrations/deliverect/transform";
+import type { DeliverectOrderRequest } from "@/integrations/deliverect/payloads";
+import {
+  buildDeliverectPayloadValidationSnapshot,
+  summarizeDeliverectPayloadValidationErrors,
+  validateDeliverectPayload,
+} from "@/integrations/deliverect/payload-validation";
 import {
   validateForSubmission,
   validateLiveMenuItemsAgainstPublishedCanonicalVariantParents,
@@ -43,6 +49,39 @@ async function recordDeliverectPrecheckFailure(vendorOrderId: string, error: str
   if (!existing.some((i) => i.type === "routing_failure")) {
     await createVendorOrderIssue(vendorOrderId, "routing_failure", "HIGH", {
       notes: error,
+      createdBy: "system",
+    });
+  }
+}
+
+/** Persist invalid built payload + structured errors; does not call Deliverect. */
+async function recordDeliverectPayloadValidationFailure(
+  vendorOrderId: string,
+  payload: DeliverectOrderRequest,
+  summary: string,
+  snapshot: ReturnType<typeof buildDeliverectPayloadValidationSnapshot>
+): Promise<void> {
+  const vo = await prisma.vendorOrder.findUnique({
+    where: { id: vendorOrderId },
+    select: { routingStatus: true, deliverectAttempts: true },
+  });
+  if (!vo || vo.routingStatus !== "pending") return;
+  const line = `Deliverect payload validation failed: ${summary}`;
+  await prisma.vendorOrder.update({
+    where: { id: vendorOrderId },
+    data: {
+      deliverectAttempts: vo.deliverectAttempts + 1,
+      deliverectLastError: line,
+      routingStatus: "failed",
+      lastDeliverectPayload: payload as unknown as Prisma.InputJsonValue,
+      deliverectPayloadValidation: snapshot as unknown as Prisma.InputJsonValue,
+    },
+  });
+  const { createVendorOrderIssue, getVendorOrderIssues } = await import("@/services/issues.service");
+  const existing = await getVendorOrderIssues(vendorOrderId, "OPEN");
+  if (!existing.some((i) => i.type === "routing_failure")) {
+    await createVendorOrderIssue(vendorOrderId, "routing_failure", "HIGH", {
+      notes: line,
       createdBy: "system",
     });
   }
@@ -135,6 +174,43 @@ export async function submitVendorOrderToDeliverect(
     preparationTimeMinutes,
   });
 
+  if (env.ROUTING_MODE === "deliverect") {
+    const payloadValidation = validateDeliverectPayload(payload, vendorOrder);
+    if (!payloadValidation.isValid) {
+      const snapshot = buildDeliverectPayloadValidationSnapshot(payloadValidation.errors);
+      const summary = summarizeDeliverectPayloadValidationErrors(payloadValidation.errors);
+      const errorTypes = [
+        ...new Set(
+          payloadValidation.errors.filter((e) => e.severity === "error").map((e) => e.type)
+        ),
+      ];
+      console.warn(
+        JSON.stringify({
+          event: "validation_failed",
+          scope: "deliverect_payload",
+          vendorOrderId,
+          vendorId: vendorOrder.vendor.id,
+          summary,
+          errorTypes,
+        })
+      );
+      await recordDeliverectPayloadValidationFailure(vendorOrderId, payload, summary, snapshot);
+      return {
+        success: false,
+        error: `Deliverect payload validation failed: ${summary}`,
+        code: "VALIDATION_FAILED",
+      };
+    }
+    console.info(
+      JSON.stringify({
+        event: "validation_passed",
+        scope: "deliverect_payload",
+        vendorOrderId,
+        vendorId: vendorOrder.vendor.id,
+      })
+    );
+  }
+
   const now = new Date();
   let result: DeliverectSubmitResult;
 
@@ -218,6 +294,7 @@ export async function submitVendorOrderToDeliverect(
       lastDeliverectResponse: responsePayload != null ? (responsePayload as Prisma.InputJsonValue) : Prisma.DbNull,
       ...(advanceDeliverectSubmitClock ? { deliverectSubmittedAt: now } : {}),
       deliverectLastError: failureMessage,
+      ...(result.success ? { deliverectPayloadValidation: Prisma.DbNull } : {}),
       ...statusUpdate,
     },
   });

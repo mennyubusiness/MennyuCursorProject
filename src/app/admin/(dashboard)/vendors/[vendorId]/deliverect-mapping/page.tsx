@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { DeliverectMenuHealthPanel } from "@/components/deliverect/DeliverectMenuHealthPanel";
 import { prisma } from "@/lib/db";
 import { getLatestActionableMenuImportJobForVendor } from "@/lib/admin-menu-import-queries";
+import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
 import { DeliverectMappingClient } from "./DeliverectMappingClient";
 
 export default async function AdminVendorDeliverectMappingPage({
@@ -63,6 +65,8 @@ export default async function AdminVendorDeliverectMappingPage({
   const missingProductId = menuItems.filter((m) => !m.deliverectProductId?.trim()).length;
   const missingModifierId = options.filter((o) => !o.deliverectModifierId?.trim()).length;
 
+  const integrityReport = await evaluateDeliverectMenuIntegrityForVendor(vendorId);
+
   return (
     <div>
       <p className="text-sm text-stone-500">
@@ -77,6 +81,10 @@ export default async function AdminVendorDeliverectMappingPage({
         Attach Deliverect product and modifier IDs to existing Mennyu menu data for{" "}
         <strong>{vendor.name}</strong>. Clear a field and save to unset.
       </p>
+
+      <div className="mt-5">
+        <DeliverectMenuHealthPanel report={integrityReport} />
+      </div>
 
       {latestMenuImport && (
         <div

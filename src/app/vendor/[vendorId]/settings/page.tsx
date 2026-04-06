@@ -1,7 +1,9 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { DeliverectMenuHealthPanel } from "@/components/deliverect/DeliverectMenuHealthPanel";
 import { prisma } from "@/lib/db";
+import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
 import { VendorPauseToggle } from "../dashboard/VendorPauseToggle";
 import { VendorPodRequests } from "../dashboard/VendorPodRequests";
 import { VendorRecentPodRequests } from "../dashboard/VendorRecentPodRequests";
@@ -31,6 +33,7 @@ export default async function VendorSettingsPage({
         mennyuOrdersPaused: true,
         autoPublishMenus: true,
         vendorDashboardToken: true,
+        deliverectChannelLinkId: true,
       },
     }),
     prisma.podMembershipRequest.findMany({
@@ -51,6 +54,11 @@ export default async function VendorSettingsPage({
   ]);
 
   if (!vendor) notFound();
+
+  const deliverectMenuIntegrity =
+    vendor.deliverectChannelLinkId?.trim() != null && vendor.deliverectChannelLinkId.trim() !== ""
+      ? await evaluateDeliverectMenuIntegrityForVendor(vendorId)
+      : null;
 
   const pendingRequestsForComponent = pendingRequests.map((r) => ({
     id: r.id,
@@ -127,6 +135,18 @@ export default async function VendorSettingsPage({
           <VendorAutoPublishToggle vendorId={vendor.id} initialAutoPublishMenus={vendor.autoPublishMenus ?? false} />
         </div>
       </section>
+
+      {deliverectMenuIntegrity && (
+        <section className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-stone-900">Kitchen POS (Deliverect)</h3>
+            <p className="mt-1 text-sm text-stone-500">
+              Mapping health for orders sent to the kitchen. Contact Mennyu support if you see critical issues.
+            </p>
+          </div>
+          <DeliverectMenuHealthPanel report={deliverectMenuIntegrity} title="Menu mapping health" />
+        </section>
+      )}
 
       {/* Pod membership */}
       <section className="space-y-4">

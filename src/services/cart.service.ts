@@ -199,6 +199,33 @@ export async function addCartItem(
     }
   }
 
+  /** Narrow gate: Deliverect-routed vendors cannot take lines that would fail {@link validateForSubmission}. */
+  const deliverectRouted = Boolean(menuItemResolved.vendor.deliverectChannelLinkId?.trim());
+  if (deliverectRouted) {
+    if (!menuItemResolved.deliverectPlu?.trim()) {
+      throw new CartValidationError(
+        "This item is not available for online ordering until the kitchen menu mapping is fixed. Please choose something else.",
+        "DELIVERECT_PLU_MISSING",
+        { menuItemId: menuItemResolved.id, menuItemName: menuItemResolved.name }
+      );
+    }
+    if (selectionsForLeaf.length > 0) {
+      const optIds = [...new Set(selectionsForLeaf.map((s) => s.modifierOptionId))];
+      const optsWithPlu = await prisma.modifierOption.findMany({
+        where: { id: { in: optIds } },
+        select: { id: true, deliverectModifierPlu: true },
+      });
+      const badPlu = optsWithPlu.some((o) => !o.deliverectModifierPlu?.trim());
+      if (badPlu) {
+        throw new CartValidationError(
+          "A customization for this item is not available for online ordering. Try different options or contact the restaurant.",
+          "DELIVERECT_MODIFIER_PLU_MISSING",
+          { menuItemId: menuItemResolved.id, menuItemName: menuItemResolved.name }
+        );
+      }
+    }
+  }
+
   const effectiveUnitPriceCents =
     selectionsForLeaf.length > 0
       ? (() => {

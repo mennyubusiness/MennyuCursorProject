@@ -490,6 +490,8 @@ model VendorOrder {
   deliverectAutoRecheckAttemptedAt DateTime?
   /// Short outcome code from last automatic recheck: applied, noop, no_match, ambiguous, not_eligible, error.
   deliverectAutoRecheckResult     String?
+  /// Pre-submit Deliverect payload validation snapshot (structured errors); cleared after successful submission.
+  deliverectPayloadValidation Json?
   lineItems               OrderLineItem[]
   paymentAllocations      PaymentAllocation[]
   order                   Order                       @relation(fields: [orderId], references: [id], onDelete: Cascade)

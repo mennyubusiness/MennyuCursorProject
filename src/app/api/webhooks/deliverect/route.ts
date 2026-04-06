@@ -1,5 +1,7 @@
+import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logDeliverectOrderWebhook } from "@/integrations/deliverect/deliverect-webhook-structured-log";
 import { webhookIdempotencyKey } from "@/lib/idempotency";
 import {
   verifyDeliverectSignature,
@@ -15,6 +17,11 @@ import {
   parseDeliverectWebhookJsonObject,
   resolveDeliverectWebhookVerificationSecret,
 } from "@/integrations/deliverect/webhook-inbound-shared";
+import { persistDeliverectOrderWebhookRejection } from "./verification-audit";
+
+function bodyShaPrefix(rawBody: string, n = 12): string {
+  return createHash("sha256").update(rawBody, "utf8").digest("hex").slice(0, n);
+}
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
@@ -23,6 +30,11 @@ export async function POST(request: NextRequest) {
 
   const parsedResult = parseDeliverectWebhookJsonObject(rawBody);
   if (!parsedResult.ok) {
+    logDeliverectOrderWebhook("invalid_json", {
+      bodyLength: rawBody.length,
+      bodySha256Prefix: bodyShaPrefix(rawBody),
+    });
+    await persistDeliverectOrderWebhookRejection(rawBody, "invalid_json");
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   const parsed = parsedResult.parsed;
@@ -31,6 +43,12 @@ export async function POST(request: NextRequest) {
   const { secret: verificationSecret } = resolveDeliverectWebhookVerificationSecret(parsed, production);
 
   if (!verificationSecret) {
+    logDeliverectOrderWebhook("verification_failed", {
+      reason: "missing_verification_secret",
+      production,
+      bodySha256Prefix: bodyShaPrefix(rawBody),
+    });
+    await persistDeliverectOrderWebhookRejection(rawBody, "missing_verification_secret");
     return NextResponse.json(
       {
         error: production
@@ -46,6 +64,13 @@ export async function POST(request: NextRequest) {
     allowUnsignedDev: false,
   });
   if (!sigOk) {
+    logDeliverectOrderWebhook("verification_failed", {
+      reason: "bad_signature",
+      production,
+      hasSignature: Boolean(signature?.trim()),
+      bodySha256Prefix: bodyShaPrefix(rawBody),
+    });
+    await persistDeliverectOrderWebhookRejection(rawBody, "bad_signature");
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -58,7 +83,19 @@ export async function POST(request: NextRequest) {
     where: { idempotencyKey: idemKey },
   });
   if (existing) {
-    return NextResponse.json({ received: true, duplicate: true, processed: existing.processed });
+    logDeliverectOrderWebhook("duplicate_ignored", {
+      idempotencyKey: idemKey,
+      eventId: eventId ?? existing.eventId ?? null,
+      processed: existing.processed,
+      existingError: existing.errorMessage ?? null,
+    });
+    return NextResponse.json({
+      received: true,
+      duplicate: true,
+      processed: existing.processed,
+      eventId: existing.eventId ?? eventId ?? null,
+      outcome: "duplicate" as const,
+    });
   }
 
   const parsedPayload = parsed as object;
@@ -91,14 +128,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (!vendorOrderId) {
-    const hint = JSON.stringify({
+    logDeliverectOrderWebhook("match_failed", {
       internalVendorOrderId: internalVendorOrderId ?? null,
       externalOrderId: externalOrderId ?? null,
       eventId: eventId ?? null,
+      idempotencyKey: idemKey,
+      bodySha256Prefix: bodyShaPrefix(rawBody),
     });
-    console.warn(
-      `[Deliverect webhook] match_failed: could not resolve VendorOrder (channelOrderId / mennyuVendorOrderId / deliverectOrderId). ${hint}`
-    );
     await prisma.webhookEvent.updateMany({
       where: { idempotencyKey: idemKey },
       data: {
@@ -112,6 +148,7 @@ export async function POST(request: NextRequest) {
       received: true,
       resolved: false,
       outcome: "match_failed" as const,
+      eventId: eventId ?? null,
     });
   }
 
@@ -128,6 +165,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    logDeliverectOrderWebhook("webhook_apply_error", {
+      vendorOrderId,
+      eventId: eventId ?? null,
+      message,
+      idempotencyKey: idemKey,
+    });
     await prisma.webhookEvent.updateMany({
       where: { idempotencyKey: idemKey },
       data: { processed: false, errorMessage: message },
@@ -140,5 +183,8 @@ export async function POST(request: NextRequest) {
     resolved: true,
     outcome: applyResult.outcome,
     updatedVendorOrderState: applyResult.updatedVendorOrderState,
+    vendorOrderId: applyResult.vendorOrderId,
+    orderId: applyResult.orderId,
+    eventId: eventId ?? null,
   });
 }

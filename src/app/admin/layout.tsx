@@ -31,6 +31,12 @@ export default function AdminLayout({
             <Link href="/admin/vendors" className="text-stone-600 hover:text-stone-900">
               Vendors
             </Link>
+            <Link
+              href="/admin/deliverect-webhook-incidents"
+              className="text-stone-600 hover:text-stone-900"
+            >
+              Deliverect webhooks
+            </Link>
             <Link href="/admin/pods" className="text-stone-600 hover:text-stone-900">
               Pods
             </Link>

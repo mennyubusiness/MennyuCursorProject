@@ -40,10 +40,10 @@ import {
 import { sendOrderStatusUpdate } from "./sms.service";
 import { resolvePickupTimezone } from "@/lib/pickup-scheduling";
 import { DELIVERECT_RECONCILIATION_STALE_MINUTES } from "@/lib/admin-exceptions";
+import { logDeliverectOrderWebhook } from "@/integrations/deliverect/deliverect-webhook-structured-log";
 
 /** Source tag for dev simulator; SMS is skipped when source is this value. */
 const DEV_SIMULATOR_SOURCE = "dev_simulator";
-const WEBHOOK_LOG_PREFIX = "[Deliverect webhook]";
 
 /**
  * Derive parent order status from vendor orders using effective child state (recovery-normalized).
@@ -113,7 +113,8 @@ const FULFILLMENT_RANK: Record<VendorOrderFulfillmentStatus, number> = {
   cancelled: 100,
 };
 
-function mergeDeliverectMappedIntoVendorOrder(
+/** Exported for tests — monotonic merge of mapped POS state onto current VendorOrder row. */
+export function mergeDeliverectMappedIntoVendorOrder(
   vo: {
     routingStatus: VendorOrderRoutingStatus;
     fulfillmentStatus: VendorOrderFulfillmentStatus;
@@ -231,10 +232,6 @@ async function persistDeliverectWebhookAuditOnly(
 
 type DeliverectInboundKind = "webhook" | "fallback";
 
-function deliverectInboundLogPrefix(kind: DeliverectInboundKind): string {
-  return kind === "webhook" ? WEBHOOK_LOG_PREFIX : "[Deliverect fallback]";
-}
-
 /**
  * Shared inbound pipeline: webhook POST and reconciliation fallback use the same mapper + merge + applyVendorOrderStatusWithMeta.
  */
@@ -249,7 +246,6 @@ async function applyDeliverectInboundStatus(
   const historySource = inbound === "webhook" ? "deliverect" : "deliverect_fallback";
   const applySource: DeliverectWebhookLastApplyRecord["applySource"] =
     inbound === "webhook" ? "webhook" : "fallback";
-  const logPrefix = deliverectInboundLogPrefix(inbound);
 
   const vo = await prisma.vendorOrder.findUnique({
     where: { id: vendorOrderId },
@@ -260,6 +256,9 @@ async function applyDeliverectInboundStatus(
       deliverectOrderId: true,
       lastExternalStatusAt: true,
       deliverectSubmittedAt: true,
+      manuallyRecoveredAt: true,
+      statusAuthority: true,
+      deliverectAutoRecheckResult: true,
     },
   });
   if (!vo) throw new Error("Vendor order not found");
@@ -305,6 +304,12 @@ async function applyDeliverectInboundStatus(
       apply,
       statusSource
     );
+    logDeliverectOrderWebhook("unmapped_status_audit_only", {
+      vendorOrderId,
+      orderId: vo.orderId,
+      inbound,
+      rawNumericCode: interpretation.rawNumericCode,
+    });
     return {
       outcome: "unmapped_status",
       orderId: vo.orderId,
@@ -372,6 +377,25 @@ async function applyDeliverectInboundStatus(
       apply,
       statusSource
     );
+    logDeliverectOrderWebhook(
+      backward ? "webhook_ignored_backward" : "webhook_noop_same_status",
+      {
+        vendorOrderId,
+        orderId: vo.orderId,
+        inbound,
+        backward,
+        currentFulfillment: vo.fulfillmentStatus,
+        interpretedFulfillment,
+      }
+    );
+    if (inbound === "webhook" && vo.manuallyRecoveredAt != null) {
+      logDeliverectOrderWebhook("late_webhook_after_manual_recovery", {
+        vendorOrderId,
+        orderId: vo.orderId,
+        outcome,
+        manuallyRecoveredAt: vo.manuallyRecoveredAt.toISOString(),
+      });
+    }
     return {
       outcome,
       orderId: vo.orderId,
@@ -392,18 +416,27 @@ async function applyDeliverectInboundStatus(
     minutesAfterDeliverectSubmit != null &&
     minutesAfterDeliverectSubmit >= DELIVERECT_RECONCILIATION_STALE_MINUTES;
 
+  const priorFallbackEpisode =
+    inbound === "webhook" && vo.deliverectAutoRecheckResult != null && String(vo.deliverectAutoRecheckResult).trim() !== "";
+
   const apply: DeliverectWebhookLastApplyRecord = {
     outcome: "applied",
     applySource,
     processedAt: nowIso(),
     detail:
-      idBackfill
+      (inbound === "webhook" && vo.manuallyRecoveredAt != null
+        ? "POS webhook after manual recovery episode (audit only — state still follows POS). "
+        : "") +
+      (priorFallbackEpisode
+        ? "Webhook arrived after a prior automatic Deliverect recheck episode on this row. "
+        : "") +
+      (idBackfill
         ? inbound === "fallback"
           ? "Vendor order updated from Deliverect API lookup (includes deliverectOrderId backfill)."
           : "Vendor order updated from Deliverect (includes deliverectOrderId backfill)."
         : inbound === "fallback"
           ? "Vendor order updated from Deliverect API lookup (reconciliation fallback)."
-          : "Vendor order updated from Deliverect.",
+          : "Vendor order updated from Deliverect."),
     currentFulfillment: vo.fulfillmentStatus,
     currentRouting: vo.routingStatus,
     rawNumericCode: interpretation.rawNumericCode,
@@ -453,27 +486,49 @@ async function applyDeliverectInboundStatus(
     historySource
   );
 
-  console.info(
-    `${logPrefix} applied vendorOrderId=${vendorOrderId} orderId=${vo.orderId} ` +
-      `inbound=${inbound} firstExternalSignal=${firstExternalSignal} deliverectOrderIdBackfill=${Boolean(idBackfill)} ` +
-      `routingChanged=${routingChanged} fulfillmentChanged=${fulfillmentChanged}` +
-      (minutesAfterDeliverectSubmit != null
-        ? ` minutesAfterDeliverectSubmit=${minutesAfterDeliverectSubmit} reconciledAfterStaleThreshold=${reconciledAfterStaleThreshold}`
-        : "")
-  );
+  logDeliverectOrderWebhook("webhook_applied", {
+    vendorOrderId,
+    orderId: vo.orderId,
+    inbound,
+    firstExternalSignal,
+    deliverectOrderIdBackfill: Boolean(idBackfill),
+    routingChanged,
+    fulfillmentChanged,
+    minutesAfterDeliverectSubmit,
+    reconciledAfterStaleThreshold,
+  });
 
-  if (reconciledAfterStaleThreshold) {
-    if (inbound === "fallback") {
-      console.info(
-        `[Deliverect] fallback_reconciliation_resolved_after_timeout vendorOrderId=${vendorOrderId} orderId=${vo.orderId} ` +
-          `minutesAfterDeliverectSubmit=${minutesAfterDeliverectSubmit} (threshold ${DELIVERECT_RECONCILIATION_STALE_MINUTES}m)`
-      );
-    } else {
-      console.info(
-        `${WEBHOOK_LOG_PREFIX} late_reconciliation_resolved vendorOrderId=${vendorOrderId} orderId=${vo.orderId} ` +
-          `minutesAfterDeliverectSubmit=${minutesAfterDeliverectSubmit} (threshold ${DELIVERECT_RECONCILIATION_STALE_MINUTES}m)`
-      );
-    }
+  if (reconciledAfterStaleThreshold && inbound === "webhook") {
+    logDeliverectOrderWebhook("late_webhook_after_overdue", {
+      vendorOrderId,
+      orderId: vo.orderId,
+      minutesAfterDeliverectSubmit,
+      thresholdMinutes: DELIVERECT_RECONCILIATION_STALE_MINUTES,
+    });
+  }
+  if (reconciledAfterStaleThreshold && inbound === "fallback") {
+    logDeliverectOrderWebhook("late_webhook_after_overdue", {
+      vendorOrderId,
+      orderId: vo.orderId,
+      minutesAfterDeliverectSubmit,
+      thresholdMinutes: DELIVERECT_RECONCILIATION_STALE_MINUTES,
+      inbound: "fallback",
+    });
+  }
+  if (inbound === "webhook" && vo.manuallyRecoveredAt != null) {
+    logDeliverectOrderWebhook("late_webhook_after_manual_recovery", {
+      vendorOrderId,
+      orderId: vo.orderId,
+      manuallyRecoveredAt: vo.manuallyRecoveredAt.toISOString(),
+      statusAuthority: vo.statusAuthority,
+    });
+  }
+  if (priorFallbackEpisode) {
+    logDeliverectOrderWebhook("late_webhook_after_fallback_episode", {
+      vendorOrderId,
+      orderId: vo.orderId,
+      priorAutoRecheckResult: vo.deliverectAutoRecheckResult,
+    });
   }
 
   return {
