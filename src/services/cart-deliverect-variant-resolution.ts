@@ -479,7 +479,7 @@ export async function findDeliverectProductVariantGroupIdForLeaf(
     select: {
       modifierGroupId: true,
       modifierGroup: {
-        select: { id: true, deliverectIsVariantGroup: true },
+        select: { id: true, deliverectIsVariantGroup: true, parentModifierOptionId: true },
       },
     },
   });

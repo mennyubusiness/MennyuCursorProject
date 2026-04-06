@@ -183,6 +183,7 @@ export async function evaluateDeliverectMenuIntegrityForVendor(
               id: true,
               name: true,
               deliverectIsVariantGroup: true,
+              parentModifierOptionId: true,
               options: {
                 select: {
                   id: true,
