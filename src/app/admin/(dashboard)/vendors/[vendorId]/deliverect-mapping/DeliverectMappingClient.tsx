@@ -26,12 +26,15 @@ type OptionRow = {
 export function DeliverectMappingClient({
   vendorId,
   deliverectChannelLinkId,
+  hasActivePosConnection,
   menuItems,
   options,
   stats,
 }: {
   vendorId: string;
   deliverectChannelLinkId: string | null;
+  /** Vendor-level Deliverect IDs present (channel / location / etc.) */
+  hasActivePosConnection: boolean;
   menuItems: MenuItemRow[];
   options: OptionRow[];
   stats: {
@@ -82,10 +85,18 @@ export function DeliverectMappingClient({
           Unmapped rows are highlighted. Copy IDs from Deliverect sandbox/POS; Mennyu remains the menu
           source of truth — only external IDs are stored here.
         </p>
-        {!deliverectChannelLinkId && (
+        {!hasActivePosConnection ? (
+          <p className="mt-2 text-sm text-stone-600">
+            No vendor-level Deliverect channel is active — new orders won&apos;t submit to Deliverect until identifiers
+            are set again. Menu PLU mappings below are unchanged.
+          </p>
+        ) : !deliverectChannelLinkId?.trim() ? (
           <p className="mt-2 text-sm text-amber-800">
-            This vendor has no <code className="text-xs">deliverectChannelLinkId</code> yet — set it in
-            the DB or onboarding flow before live routing.
+            Channel link ID is missing — set it before relying on live Deliverect routing.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-stone-600">
+            Vendor-level channel link is set. Use mapping tables below for menu payloads.
           </p>
         )}
       </div>

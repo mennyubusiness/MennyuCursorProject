@@ -4,6 +4,8 @@ import { DeliverectMenuHealthPanel } from "@/components/deliverect/DeliverectMen
 import { prisma } from "@/lib/db";
 import { getLatestActionableMenuImportJobForVendor } from "@/lib/admin-menu-import-queries";
 import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
+import { vendorHasActivePosConnection } from "@/lib/admin-vendor-pos";
+import { AdminVendorPosDisconnect } from "./AdminVendorPosDisconnect";
 import { DeliverectMappingClient } from "./DeliverectMappingClient";
 
 export default async function AdminVendorDeliverectMappingPage({
@@ -20,6 +22,10 @@ export default async function AdminVendorDeliverectMappingPage({
       name: true,
       slug: true,
       deliverectChannelLinkId: true,
+      deliverectLocationId: true,
+      deliverectAccountId: true,
+      deliverectAccountEmail: true,
+      posConnectionStatus: true,
     },
   });
   if (!vendor) notFound();
@@ -67,6 +73,8 @@ export default async function AdminVendorDeliverectMappingPage({
 
   const integrityReport = await evaluateDeliverectMenuIntegrityForVendor(vendorId);
 
+  const hasActivePosConnection = vendorHasActivePosConnection(vendor);
+
   return (
     <div>
       <p className="text-sm text-stone-500">
@@ -82,7 +90,12 @@ export default async function AdminVendorDeliverectMappingPage({
         <strong>{vendor.name}</strong>. Clear a field and save to unset.
       </p>
 
-      <div className="mt-5">
+      <div className="mt-5 space-y-4">
+        <AdminVendorPosDisconnect
+          vendorId={vendor.id}
+          vendorName={vendor.name}
+          hasActivePosConnection={hasActivePosConnection}
+        />
         <DeliverectMenuHealthPanel report={integrityReport} />
       </div>
 
@@ -110,6 +123,7 @@ export default async function AdminVendorDeliverectMappingPage({
         <DeliverectMappingClient
           vendorId={vendor.id}
           deliverectChannelLinkId={vendor.deliverectChannelLinkId}
+          hasActivePosConnection={hasActivePosConnection}
           menuItems={menuItems}
           options={options}
           stats={{
