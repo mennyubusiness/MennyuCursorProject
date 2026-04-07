@@ -30,6 +30,10 @@ export default async function VendorConnectPosPage({
       posProvider: true,
       posType: true,
       posConnectionStatus: true,
+      pendingDeliverectConnectionKey: true,
+      deliverectAutoMapLastAt: true,
+      deliverectAutoMapLastOutcome: true,
+      deliverectAutoMapLastDetail: true,
     },
   });
   if (!vendor) notFound();

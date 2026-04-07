@@ -19,6 +19,8 @@ export function posConnectionLabel(status: PosConnectionStatus): string {
       return "Connected";
     case "onboarding":
       return "In progress";
+    case "error":
+      return "Needs attention";
     case "not_connected":
     default:
       return "Not connected";

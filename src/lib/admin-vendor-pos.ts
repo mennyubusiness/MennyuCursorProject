@@ -6,11 +6,13 @@ export function vendorHasActivePosConnection(vendor: {
   deliverectLocationId: string | null;
   deliverectAccountId: string | null;
   deliverectAccountEmail: string | null;
+  pendingDeliverectConnectionKey?: string | null;
   posConnectionStatus: PosConnectionStatus;
 }): boolean {
   if (vendor.deliverectChannelLinkId?.trim()) return true;
   if (vendor.deliverectLocationId?.trim()) return true;
   if (vendor.deliverectAccountId?.trim()) return true;
   if (vendor.deliverectAccountEmail?.trim()) return true;
+  if (vendor.pendingDeliverectConnectionKey?.trim()) return true;
   return vendor.posConnectionStatus === "connected" || vendor.posConnectionStatus === "onboarding";
 }

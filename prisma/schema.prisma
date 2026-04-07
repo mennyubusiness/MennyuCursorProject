@@ -114,6 +114,8 @@ enum PosConnectionStatus {
   not_connected
   onboarding
   connected
+  /// Last automatic Deliverect channel registration failed; use admin tools or retry onboarding.
+  error
 }
 
 /// Unified auth: one User can hold multiple role-specific memberships (vendor, pod, customer profile).
@@ -208,6 +210,12 @@ model Vendor {
   deliverectAccountId     String?
   /// Deliverect login email (for support / matching); optional.
   deliverectAccountEmail  String?
+  /// Opaque key generated when the vendor starts guided POS onboarding; matched exactly by channel-registration webhook.
+  pendingDeliverectConnectionKey String? @unique
+  /// Last outcome from automatic Deliverect channel link assignment (success, no_match, ambiguous, etc.).
+  deliverectAutoMapLastOutcome String?
+  deliverectAutoMapLastDetail  String?
+  deliverectAutoMapLastAt      DateTime?
   /// Declared POS brand during guided setup (e.g. toast, square); complements posType.
   posProvider             String?
   posConnectionStatus     PosConnectionStatus      @default(not_connected)

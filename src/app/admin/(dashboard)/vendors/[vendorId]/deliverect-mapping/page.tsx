@@ -25,6 +25,10 @@ export default async function AdminVendorDeliverectMappingPage({
       deliverectLocationId: true,
       deliverectAccountId: true,
       deliverectAccountEmail: true,
+      pendingDeliverectConnectionKey: true,
+      deliverectAutoMapLastAt: true,
+      deliverectAutoMapLastOutcome: true,
+      deliverectAutoMapLastDetail: true,
       posConnectionStatus: true,
     },
   });
@@ -91,6 +95,47 @@ export default async function AdminVendorDeliverectMappingPage({
       </p>
 
       <div className="mt-5 space-y-4">
+        <section className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-700">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+            Deliverect auto-mapping (channel registration)
+          </h2>
+          <p className="mt-2 text-stone-600">
+            When Deliverect activates the channel, Mennyu can assign the channel link ID automatically. Use this panel
+            to see onboarding / last outcome; manual ID entry remains available if automatic matching fails.
+          </p>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-medium text-stone-500">POS connection status</dt>
+              <dd className="mt-0.5 font-medium text-stone-900">{vendor.posConnectionStatus}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-stone-500">Pending connection key</dt>
+              <dd className="mt-0.5 break-all font-mono text-xs text-stone-800">
+                {vendor.pendingDeliverectConnectionKey ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-stone-500">Last auto-map outcome</dt>
+              <dd className="mt-0.5 font-mono text-xs text-stone-800">
+                {vendor.deliverectAutoMapLastOutcome ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-stone-500">Last auto-map at</dt>
+              <dd className="mt-0.5 font-mono text-xs text-stone-800">
+                {vendor.deliverectAutoMapLastAt
+                  ? vendor.deliverectAutoMapLastAt.toISOString()
+                  : "—"}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium text-stone-500">Last auto-map detail</dt>
+              <dd className="mt-0.5 break-words font-mono text-xs text-stone-800">
+                {vendor.deliverectAutoMapLastDetail ?? "—"}
+              </dd>
+            </div>
+          </dl>
+        </section>
         <AdminVendorPosDisconnect
           vendorId={vendor.id}
           vendorName={vendor.name}
