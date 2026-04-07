@@ -32,6 +32,7 @@ export function VendorSetupForm() {
         cuisineCategory: String(fd.get("cuisineCategory") ?? ""),
         posType: String(fd.get("posType") ?? "unknown"),
         description: String(fd.get("description") ?? "") || undefined,
+        locationSummary: String(fd.get("locationSummary") ?? "").trim() || undefined,
       });
       if (!r.ok) {
         setError(r.error);
@@ -51,7 +52,7 @@ export function VendorSetupForm() {
       <div>
         <h1 className="text-xl font-semibold text-stone-900">Restaurant profile</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Enough to create your vendor workspace. You’ll connect POS and menus from the dashboard.
+          Create your workspace now — payouts and POS connection are next steps you can finish when you&apos;re ready.
         </p>
       </div>
       <label className="block text-sm">
@@ -99,6 +100,14 @@ export function VendorSetupForm() {
           name="cuisineCategory"
           required
           placeholder="e.g. Pizza, Mexican, Coffee"
+          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="font-medium text-stone-800">Location (city or area)</span>
+        <input
+          name="locationSummary"
+          placeholder="e.g. Austin, TX"
           className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
         />
       </label>

@@ -6,6 +6,8 @@ import {
   isDeliverectVendorOrderRoutingDegraded,
   shouldOmitVendorOrderFromDeliverectDashboard,
 } from "@/lib/vendor-deliverect-dashboard-visibility";
+import { VendorOnboardingProgress } from "../dashboard/VendorOnboardingProgress";
+import { VendorPosIntegrationCard } from "../dashboard/VendorPosIntegrationCard";
 import { VendorOrdersOperationsBar } from "../dashboard/VendorOrdersOperationsBar";
 import { VendorDashboardLiveOrders } from "../dashboard/VendorDashboardLiveOrders";
 
@@ -17,6 +19,7 @@ const getVendorOrdersPageData = cache(async (vendorId: string) => {
       name: true,
       mennyuOrdersPaused: true,
       deliverectChannelLinkId: true,
+      posConnectionStatus: true,
     },
   });
   if (!vendor) return null;
@@ -113,6 +116,19 @@ export default async function VendorOrdersPage({
           Your live queue — one status and one action area per order below.
         </p>
       </div>
+
+      <VendorOnboardingProgress
+        vendorId={vendor.id}
+        posConnectionStatus={vendor.posConnectionStatus}
+        deliverectChannelLinkId={vendor.deliverectChannelLinkId}
+      />
+
+      <VendorPosIntegrationCard
+        vendorId={vendor.id}
+        vendorName={vendor.name}
+        posConnectionStatus={vendor.posConnectionStatus}
+        deliverectChannelLinkId={vendor.deliverectChannelLinkId}
+      />
 
       <VendorOrdersOperationsBar
         vendorId={vendor.id}

@@ -109,6 +109,13 @@ enum AccountOnboardingStatus {
   ready_for_next_step
 }
 
+/// POS ↔ Mennyu integration lifecycle (Deliverect-backed kitchen routing).
+enum PosConnectionStatus {
+  not_connected
+  onboarding
+  connected
+}
+
 /// Unified auth: one User can hold multiple role-specific memberships (vendor, pod, customer profile).
 model User {
   id            String   @id @default(cuid())
@@ -199,6 +206,13 @@ model Vendor {
   deliverectChannelLinkId String?
   deliverectLocationId    String?
   deliverectAccountId     String?
+  /// Deliverect login email (for support / matching); optional.
+  deliverectAccountEmail  String?
+  /// Declared POS brand during guided setup (e.g. toast, square); complements posType.
+  posProvider             String?
+  posConnectionStatus     PosConnectionStatus      @default(not_connected)
+  /// Short location line for onboarding (city / neighborhood).
+  locationSummary         String?
   /// When true, block new Mennyu orders for this vendor (intake only); existing orders still visible.
   mennyuOrdersPaused      Boolean                @default(false)
   /// When true, Deliverect menu webhook imports may auto-publish when eligibility rules pass (see menu-auto-publish.service).

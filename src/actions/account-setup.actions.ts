@@ -105,6 +105,8 @@ export async function createVendorProfile(input: {
   cuisineCategory: string;
   posType: string;
   description?: string;
+  /** City / area — optional onboarding field */
+  locationSummary?: string;
 }): Promise<ActionResult & { vendorId?: string }> {
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "Not signed in." };
@@ -130,6 +132,7 @@ export async function createVendorProfile(input: {
 
   const slug = await uniqueVendorSlugFromName(businessName);
   const description = input.description?.trim() || null;
+  const locationSummary = input.locationSummary?.trim() || null;
 
   const vendor = await prisma.vendor.create({
     data: {
@@ -141,6 +144,7 @@ export async function createVendorProfile(input: {
       contactPhone,
       cuisineCategory,
       posType,
+      locationSummary,
       onboardingStatus: AccountOnboardingStatus.ready_for_next_step,
       vendorMemberships: {
         create: {
