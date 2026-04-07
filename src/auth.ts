@@ -1,7 +1,7 @@
 /**
  * Unified Auth.js (NextAuth v5) — credentials + JWT session cookie.
- * Phase 1: vendor access via VendorMembership; platform admin via User.isPlatformAdmin (JWT);
- * legacy vendorDashboardToken + ADMIN_SECRET cookie bridge remain for migration.
+ * Vendor access: VendorMembership + session (preferred); ADMIN_SECRET bridge for admin tooling;
+ * Vendor.vendorDashboardToken + magic-link grant + Bearer — automation / migration (see docs/AUTH_UNIFIED.md).
  */
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";

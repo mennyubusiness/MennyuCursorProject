@@ -10,7 +10,6 @@ import { VendorRecentPodRequests } from "../dashboard/VendorRecentPodRequests";
 import { VendorAutoPublishToggle } from "./VendorAutoPublishToggle";
 import { VendorDashboardAccessCard } from "./VendorDashboardAccessCard";
 import { VendorAccessQueryMessages } from "./VendorAccessMessages";
-import { VendorAdvancedAccessSection } from "./VendorAdvancedAccessSection";
 import { VendorBrandProfileForm } from "./VendorBrandProfileForm";
 
 export default async function VendorSettingsPage({
@@ -158,25 +157,11 @@ export default async function VendorSettingsPage({
         <VendorRecentPodRequests recentRequests={recentRequestsForComponent} />
       </section>
 
-      {/* Access / sign-in */}
+      {/* Access: NextAuth + membership primary; temporary link + automation/API key collapsed */}
       <section className="space-y-3">
         <h3 className="text-lg font-semibold text-stone-900">Access &amp; sign-in</h3>
         <VendorDashboardAccessCard vendorId={vendor.id} hasDashboardSecret={hasToken} />
       </section>
-
-      {/* Advanced */}
-      <details className="rounded-xl border border-stone-200 bg-white shadow-sm">
-        <summary className="cursor-pointer list-none px-5 py-4 text-lg font-semibold text-stone-900 marker:hidden [&::-webkit-details-marker]:hidden">
-          Advanced
-        </summary>
-        <div className="space-y-5 border-t border-stone-100 px-5 pb-5 pt-4">
-          <p className="text-sm text-stone-600">
-            <span className="font-medium text-stone-800">Integrations:</span> POS / Deliverect connection coming soon.
-            Orders stay in Mennyu until then.
-          </p>
-          <VendorAdvancedAccessSection vendorId={vendor.id} hasDashboardToken={hasToken} />
-        </div>
-      </details>
     </div>
   );
 }

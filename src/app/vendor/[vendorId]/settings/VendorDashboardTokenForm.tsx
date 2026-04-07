@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { bindVendorDashboardSession } from "@/actions/vendor-dashboard.actions";
 
+/** Binds the long-lived API access key to an httpOnly dashboard cookie — technical / edge-case only. */
 export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
-  const [token, setToken] = useState("");
+  const [keyValue, setKeyValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -13,13 +14,13 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
     setMessage(null);
     setLoading(true);
     try {
-      const res = await bindVendorDashboardSession(vendorId, token);
+      const res = await bindVendorDashboardSession(vendorId, keyValue);
       if (res.ok) {
         setMessage({
-          text: "Session saved in this browser.",
+          text: "Browser session updated for this vendor.",
           ok: true,
         });
-        setToken("");
+        setKeyValue("");
       } else {
         setMessage({ text: res.error ?? "Failed", ok: false });
       }
@@ -29,37 +30,31 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4">
-      <h4 className="text-sm font-semibold text-stone-800">Manual access token</h4>
-      <p className="mt-1 text-xs text-stone-500">
-        Same session as an admin secure link — use only when you must paste a token (e.g. API/automation).
-      </p>
-      <form onSubmit={onSubmit} className="mt-3 space-y-2">
-        <label htmlFor="vdash-token" className="sr-only">
-          Access token
-        </label>
-        <input
-          id="vdash-token"
-          type="password"
-          autoComplete="off"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder="Paste token"
-          className="w-full rounded border border-stone-300 px-3 py-2 font-mono text-sm"
-        />
-        <button
-          type="submit"
-          disabled={loading || !token.trim()}
-          className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {loading ? "Saving…" : "Save session"}
-        </button>
-      </form>
+    <form onSubmit={onSubmit} className="space-y-2">
+      <label htmlFor="vdash-api-key" className="sr-only">
+        API access key
+      </label>
+      <input
+        id="vdash-api-key"
+        type="password"
+        autoComplete="off"
+        value={keyValue}
+        onChange={(e) => setKeyValue(e.target.value)}
+        placeholder="Paste API access key"
+        className="w-full rounded border border-stone-300 px-3 py-2 font-mono text-sm"
+      />
+      <button
+        type="submit"
+        disabled={loading || !keyValue.trim()}
+        className="rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+      >
+        {loading ? "Saving…" : "Bind session in this browser"}
+      </button>
       {message && (
-        <p className={`mt-2 text-sm ${message.ok ? "text-emerald-800" : "text-red-700"}`} role="status">
+        <p className={`text-xs ${message.ok ? "text-emerald-800" : "text-red-700"}`} role="status">
           {message.text}
         </p>
       )}
-    </div>
+    </form>
   );
 }

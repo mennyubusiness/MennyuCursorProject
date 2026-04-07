@@ -55,7 +55,7 @@ async function authorizeVendorSettingsWrite(vendorId: string): Promise<
   return {
     ok: false,
     error:
-      "Unauthorized: sign in with a vendor-linked account, or use a legacy vendor session token.",
+      "Unauthorized: sign in with a vendor-linked account, or complete access using an API/browser session from Settings → Automation & API access.",
   };
 }
 
@@ -137,10 +137,13 @@ export async function bindVendorDashboardSession(
     select: { vendorDashboardToken: true },
   });
   if (!v?.vendorDashboardToken?.trim()) {
-    return { ok: false, error: "No access token is configured for this vendor yet. Ask your Mennyu admin to generate one." };
+    return {
+      ok: false,
+      error: "No API access key is configured for this vendor yet. Ask your Mennyu administrator to generate one.",
+    };
   }
   if (!timingSafeStringEqual(tokenPlain.trim(), v.vendorDashboardToken.trim())) {
-    return { ok: false, error: "Token does not match." };
+    return { ok: false, error: "API access key does not match." };
   }
 
   await setVendorDashboardSessionCookie(vendorId, tokenPlain.trim());

@@ -57,3 +57,6 @@ Migration: `prisma/migrations/20250315130000_unified_auth_user_vendor_membership
 - `src/lib/auth/password.ts` — bcrypt hash/verify.
 - `src/lib/vendor-dashboard-auth.ts` — vendor checks.
 - `src/app/login/*` — sign-in UI.
+- `src/app/register/*` — account creation → `/account/role` (see **`docs/AUTH_UNIFIED.md`**).
+
+**Note:** There is no second legacy `/login` route — a single login page serves all intents. Vendor dashboard secrets (`vendorDashboardToken`) are **not** a duplicate login system; they back magic-link cookie grants and API Bearer auth (`docs/AUTH_UNIFIED.md`).

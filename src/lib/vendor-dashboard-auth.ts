@@ -1,8 +1,8 @@
 /**
- * Vendor dashboard access (Phase 1 unified auth):
- * 1) Mennyu platform admin: `mennyu_admin` cookie / `?admin=` **or** `User.isPlatformAdmin` session
- * 2) Preferred: Auth.js session + VendorMembership for vendorId
- * 3) Legacy: Vendor.vendorDashboardToken via Bearer or mennyu_vdash_{vendorId} cookie (migration / automation)
+ * Vendor dashboard access:
+ * 1) Platform admin: `mennyu_admin` cookie / `?admin=` **or** `User.isPlatformAdmin` session
+ * 2) **Primary:** Auth.js session + VendorMembership for vendorId
+ * 3) **Secondary:** API access key (`vendorDashboardToken`) via Bearer or `mennyu_vdash_{vendorId}` httpOnly cookie — automation / bootstrap only (see docs/AUTH_UNIFIED.md)
  * Development: open unless overridden.
  */
 import "server-only";

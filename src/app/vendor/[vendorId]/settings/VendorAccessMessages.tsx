@@ -32,14 +32,15 @@ export function VendorAccessQueryMessages() {
       tone: "warn",
     },
     needs_session: {
-      title: "Please sign in to continue",
+      title: "Sign in to continue",
       body: (
         <>
           Use{" "}
           <Link href="/login?intent=vendor" className="font-medium text-sky-800 underline">
             Sign in
           </Link>{" "}
-          or your admin secure link. Token access is under <strong>Advanced</strong> on Settings.
+          with your restaurant account, or open a <strong>temporary access link</strong> from your Mennyu
+          administrator. Technical API key binding is under Settings → <strong>Automation &amp; API access</strong>.
         </>
       ),
       tone: "warn",
