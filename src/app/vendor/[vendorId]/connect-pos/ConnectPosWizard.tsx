@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { PosConnectionStatus } from "@prisma/client";
 import { saveVendorPosConnection } from "@/actions/vendor-pos.actions";
+import { MennyuLocationIdField } from "@/components/vendor/MennyuLocationIdField";
 
 const POS_BRANDS = [
   { id: "toast", label: "Toast" },
@@ -114,6 +115,7 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
               place.
             </li>
           </ol>
+          <MennyuLocationIdField mennyuLocationId={vendor.id} className="mt-4" />
           <p className="text-xs text-stone-500">
             If you’re not ready yet, you can still use Mennyu — orders can be handled manually until you connect.
           </p>
@@ -142,6 +144,8 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
             Add what you have today — you can update this later. The <strong>channel link ID</strong> is the main value
             Mennyu needs to send orders to your kitchen once your account is wired on our side.
           </p>
+
+          <MennyuLocationIdField mennyuLocationId={vendor.id} />
 
           <label className="block text-sm">
             <span className="font-medium text-stone-800">POS system</span>

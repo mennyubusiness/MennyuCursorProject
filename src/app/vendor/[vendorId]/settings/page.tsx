@@ -11,6 +11,7 @@ import { VendorRecentPodRequests } from "../dashboard/VendorRecentPodRequests";
 import { VendorAutoPublishToggle } from "./VendorAutoPublishToggle";
 import { VendorDashboardAccessCard } from "./VendorDashboardAccessCard";
 import { VendorAccessQueryMessages } from "./VendorAccessMessages";
+import { MennyuLocationIdField } from "@/components/vendor/MennyuLocationIdField";
 import { VendorBrandProfileForm } from "./VendorBrandProfileForm";
 
 export default async function VendorSettingsPage({
@@ -108,6 +109,17 @@ export default async function VendorSettingsPage({
             initialAccentColor={vendor.accentColor}
           />
         </div>
+      </section>
+
+      {/* POS & routing — identifiers (not secrets) */}
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-stone-900">POS &amp; routing</h3>
+          <p className="mt-1 text-sm text-stone-500">
+            Your restaurant&apos;s identifier in Mennyu — for POS setup and support.
+          </p>
+        </div>
+        <MennyuLocationIdField mennyuLocationId={vendor.id} />
       </section>
 
       {/* Ordering & availability */}
