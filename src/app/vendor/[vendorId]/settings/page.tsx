@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { auth } from "@/auth";
 import { DeliverectMenuHealthPanel } from "@/components/deliverect/DeliverectMenuHealthPanel";
 import { prisma } from "@/lib/db";
 import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
@@ -18,6 +19,7 @@ export default async function VendorSettingsPage({
   params: Promise<{ vendorId: string }>;
 }) {
   const { vendorId } = await params;
+  const session = await auth();
 
   const [vendor, pendingRequests, recentRequests, currentPod] = await Promise.all([
     prisma.vendor.findUnique({
@@ -81,7 +83,7 @@ export default async function VendorSettingsPage({
     <div className="space-y-10">
       <header>
         <h2 className="text-xl font-semibold text-stone-900">Settings</h2>
-        <p className="mt-1 text-sm text-stone-500">Profile, orders, menu, and sign-in.</p>
+        <p className="mt-1 text-sm text-stone-500">Brand, menu, ordering, and pod membership.</p>
       </header>
 
       <Suspense fallback={null}>
@@ -157,10 +159,14 @@ export default async function VendorSettingsPage({
         <VendorRecentPodRequests recentRequests={recentRequestsForComponent} />
       </section>
 
-      {/* Access: NextAuth + membership primary; temporary link + automation/API key collapsed */}
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold text-stone-900">Access &amp; sign-in</h3>
-        <VendorDashboardAccessCard vendorId={vendor.id} hasDashboardSecret={hasToken} />
+        <h3 className="text-lg font-semibold text-stone-900">Account</h3>
+        <VendorDashboardAccessCard
+          vendorId={vendor.id}
+          hasDashboardSecret={hasToken}
+          userEmail={session?.user?.email ?? null}
+          isPlatformAdmin={Boolean(session?.user?.isPlatformAdmin)}
+        />
       </section>
     </div>
   );

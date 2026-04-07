@@ -28,19 +28,17 @@ export function VendorAccessQueryMessages() {
     },
     no_secret: {
       title: "This location isn’t fully set up yet",
-      body: "Your administrator still needs to finish setup. You can try again after they’ve sent a link or enabled sign-in.",
+      body: "Your Mennyu administrator still needs to finish setup for this restaurant. Try again after they’ve completed onboarding.",
       tone: "warn",
     },
     needs_session: {
-      title: "Sign in to continue",
+      title: "Session required",
       body: (
         <>
-          Use{" "}
           <Link href="/login?intent=vendor" className="font-medium text-sky-800 underline">
             Sign in
           </Link>{" "}
-          with your restaurant account, or open a <strong>temporary access link</strong> from your Mennyu
-          administrator. Technical API key binding is under Settings → <strong>Automation &amp; API access</strong>.
+          with your restaurant team account, or contact your Mennyu administrator if you need access.
         </>
       ),
       tone: "warn",
