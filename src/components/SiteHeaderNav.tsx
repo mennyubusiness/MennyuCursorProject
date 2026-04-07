@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useCallback, useState } from "react";
 
+import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
+
 type SiteHeaderNavProps = {
   /** Path for login callback (usually current path from middleware). */
   callbackPath: string;
   customerPhone: string | null;
   /** Server snapshot: user has a NextAuth session (vendor/admin). */
   hasServerSession: boolean;
+  navMode: HeaderNavMode;
+  dashboardHref: string | null;
+  accountLabel: string | null;
   activeOrderHref: string | null;
   cartHref: string;
 };
@@ -30,6 +35,9 @@ export function SiteHeaderNav({
   callbackPath,
   customerPhone,
   hasServerSession,
+  navMode,
+  dashboardHref,
+  accountLabel,
   activeOrderHref,
   cartHref,
 }: SiteHeaderNavProps) {
@@ -38,11 +46,15 @@ export function SiteHeaderNav({
   const [signingOut, setSigningOut] = useState(false);
 
   const hasPhoneSession = Boolean(customerPhone);
-  const hasNextAuthSession =
-    hasServerSession || status === "authenticated";
+  const hasNextAuthSession = hasServerSession || status === "authenticated";
   const isSignedIn = hasPhoneSession || hasNextAuthSession;
 
   const loginHref = buildLoginHref(callbackPath);
+
+  const showCustomerOrdering = navMode === "guest" || navMode === "customer";
+  const showDashboard =
+    (navMode === "vendor" || navMode === "pod" || navMode === "admin") &&
+    Boolean(dashboardHref);
 
   const handleSignOut = useCallback(async () => {
     setSigningOut(true);
@@ -63,35 +75,48 @@ export function SiteHeaderNav({
       <Link href="/explore" className="text-stone-600 hover:text-mennyu-primary">
         Explore pods
       </Link>
-      <Link
-        href="/orders"
-        className="text-stone-600 hover:text-mennyu-primary"
-        title="Your orders — link your phone from checkout to see history"
-      >
-        Orders
-      </Link>
-      <Link
-        href={activeOrderHref ?? cartHref}
-        className="text-stone-600 hover:text-mennyu-primary"
-      >
-        Cart
-      </Link>
-      {!isSignedIn && (
+      {showDashboard && dashboardHref && (
+        <Link
+          href={dashboardHref}
+          className="font-medium text-mennyu-primary hover:underline"
+          title="Your restaurant or pod dashboard"
+        >
+          Dashboard
+        </Link>
+      )}
+      {showCustomerOrdering && (
         <>
           <Link
-            href="/register"
-            className="font-medium text-stone-700 hover:text-mennyu-primary hover:underline"
+            href="/orders"
+            className="text-stone-600 hover:text-mennyu-primary"
+            title="Your orders — link your phone from checkout to see history"
           >
-            Register
+            Orders
           </Link>
           <Link
-            href={loginHref}
-            className="font-medium text-mennyu-primary hover:underline"
-            title="Email sign-in (staff accounts). For order history, use Orders and your phone number."
+            href={activeOrderHref ?? cartHref}
+            className="text-stone-600 hover:text-mennyu-primary"
           >
-            Sign in
+            Cart
           </Link>
         </>
+      )}
+      {isSignedIn && accountLabel && (
+        <span
+          className="max-w-[8rem] truncate rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600"
+          title="Signed-in account type"
+        >
+          {accountLabel}
+        </span>
+      )}
+      {!isSignedIn && (
+        <Link
+          href={loginHref}
+          className="font-medium text-mennyu-primary hover:underline"
+          title="Email sign-in. New accounts can be created from the login page."
+        >
+          Sign in
+        </Link>
       )}
       {isSignedIn && (
         <button

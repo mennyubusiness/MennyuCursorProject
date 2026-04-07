@@ -6,6 +6,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { AuthSessionProvider } from "@/components/AuthSessionProvider";
 import { SiteHeaderNav } from "@/components/SiteHeaderNav";
+import { resolveHeaderNavContext } from "@/lib/auth/header-nav-context";
 import { getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getActiveOrderByCustomerPhone } from "@/services/order.service";
 
@@ -27,6 +28,7 @@ export default async function RootLayout({
   const customerPhone = getCustomerPhoneFromHeaders(headersList);
   const session = await auth();
   const hasServerSession = Boolean(session?.user);
+  const headerNav = await resolveHeaderNavContext(session?.user?.id ?? null, customerPhone);
   const activeOrder =
     !isAdmin && customerPhone ? await getActiveOrderCached(customerPhone) : null;
 
@@ -43,6 +45,9 @@ export default async function RootLayout({
               callbackPath={pathname || "/"}
               customerPhone={customerPhone}
               hasServerSession={hasServerSession}
+              navMode={headerNav.mode}
+              dashboardHref={headerNav.dashboardHref}
+              accountLabel={headerNav.accountLabel}
               activeOrderHref={
                 activeOrder ? `/order/${activeOrder.id}` : null
               }
