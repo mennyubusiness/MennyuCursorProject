@@ -77,13 +77,21 @@ export function SiteHeaderNav({
         Cart
       </Link>
       {!isSignedIn && (
-        <Link
-          href={loginHref}
-          className="font-medium text-mennyu-primary hover:underline"
-          title="Email sign-in (staff accounts). For order history, use Orders and your phone number."
-        >
-          Sign in
-        </Link>
+        <>
+          <Link
+            href="/register"
+            className="font-medium text-stone-700 hover:text-mennyu-primary hover:underline"
+          >
+            Register
+          </Link>
+          <Link
+            href={loginHref}
+            className="font-medium text-mennyu-primary hover:underline"
+            title="Email sign-in (staff accounts). For order history, use Orders and your phone number."
+          >
+            Sign in
+          </Link>
+        </>
       )}
       {isSignedIn && (
         <button

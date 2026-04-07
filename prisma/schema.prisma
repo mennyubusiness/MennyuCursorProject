@@ -33,6 +33,9 @@ model Pod {
   id                 String                 @id @default(cuid())
   name               String
   slug               String                 @unique
+  /// Display / contact for the pod owner (may overlap with User.email).
+  ownerContactName   String?
+  ownerContactPhone  String?
   description        String?
   imageUrl           String?
   /// Customer-facing accent, e.g. #1d4ed8 — validated app-side; null = default Mennyu styling.
@@ -45,6 +48,7 @@ model Pod {
   /// Pickup-only sales tax rate in basis points (e.g. 825 = 8.25%). Applied to food subtotal by Mennyu at checkout — not vendor-entered per order. Null/omit = no automatic tax.
   pickupSalesTaxBps  Int?
   isActive           Boolean                @default(true)
+  onboardingStatus   AccountOnboardingStatus @default(ready_for_next_step)
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
   carts              Cart[]
@@ -91,7 +95,21 @@ model PodMembershipRequest {
   @@index([vendorId, status])
 }
 
-/// Unified auth: one User can hold multiple role-specific memberships (vendor first; pod/customer/admin later).
+enum RegistrationIntent {
+  customer
+  vendor
+  pod_owner
+}
+
+/// Lightweight lifecycle for vendor/pod onboarding UIs — not a full workflow engine.
+enum AccountOnboardingStatus {
+  account_created
+  profile_incomplete
+  onboarding_in_progress
+  ready_for_next_step
+}
+
+/// Unified auth: one User can hold multiple role-specific memberships (vendor, pod, customer profile).
 model User {
   id            String   @id @default(cuid())
   email         String   @unique
@@ -102,10 +120,28 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  vendorMemberships VendorMembership[]
-  podMemberships    PodMembership[]
+  /// Set when the user finishes role selection after registration; null = legacy accounts / not in guided setup.
+  registrationIntent RegistrationIntent?
+  /// True only for new email signups until they pick a role on `/account/role`.
+  needsAccountRoleSelection Boolean @default(false)
+  vendorMemberships  VendorMembership[]
+  podMemberships       PodMembership[]
+  customerProfile      CustomerProfile?
   /// Platform (Mennyu internal) admin; same User + session as vendors. Complements temporary ADMIN_SECRET cookie bridge.
   isPlatformAdmin Boolean @default(false)
+}
+
+/// Customer-specific profile (optional — many diners use phone-only checkout without a User).
+model CustomerProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  firstName String
+  lastName  String
+  /// E.164 or local; optional at signup.
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum PodMembershipRole {
@@ -169,6 +205,14 @@ model Vendor {
   autoPublishMenus        Boolean                @default(false)
   /// Legacy: shared secret for Bearer/automation and magic-link cookie bootstrap. Prefer User session + VendorMembership.
   vendorDashboardToken    String?
+  /// Business / kitchen contact (may match User email for sole operators).
+  contactName               String?
+  contactEmail              String?
+  contactPhone              String?
+  cuisineCategory           String?
+  /// e.g. toast, square, clover, other, unknown
+  posType                   String?
+  onboardingStatus          AccountOnboardingStatus @default(ready_for_next_step)
   cartItems               CartItem[]
   menuItems               MenuItem[]
   modifierGroups          ModifierGroup[]

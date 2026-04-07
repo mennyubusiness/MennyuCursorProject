@@ -11,6 +11,10 @@ export default function LoginPage() {
         <LoginForm />
       </Suspense>
       <p className="text-center text-sm text-stone-500">
+        <Link href="/register" className="font-medium text-mennyu-primary hover:underline">
+          Create an account
+        </Link>
+        {" · "}
         <Link href="/" className="underline hover:text-stone-800">
           Back to Mennyu
         </Link>

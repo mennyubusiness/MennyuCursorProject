@@ -6,6 +6,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { LoginIntent } from "@/lib/auth/login-intent";
 import { extractVendorIdFromVendorPath } from "@/lib/auth/login-intent";
+import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
 
 export type PostLoginDestinationResult =
   | { kind: "redirect"; path: string }
@@ -34,6 +35,11 @@ export async function resolvePostLoginDestination(
   intent: LoginIntent,
   callbackUrl: string | null
 ): Promise<PostLoginDestinationResult> {
+  const pendingSetup = await getPendingAccountSetupRedirect(userId);
+  if (pendingSetup) {
+    return { kind: "redirect", path: pendingSetup };
+  }
+
   if (intent === "admin") {
     const u = await prisma.user.findUnique({
       where: { id: userId },
