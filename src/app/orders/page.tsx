@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { auth } from "@/auth";
-import { getCustomerPhoneFromHeaders } from "@/lib/session";
+import { resolveCustomerPhoneForSession } from "@/lib/customer-phone-resolution";
 import { getOrdersByCustomerPhoneAction } from "@/actions/order.actions";
 import { customerOrderHeaderStatus } from "@/domain/order-state";
 import type { ParentOrderStatus } from "@/domain/types";
@@ -32,8 +32,8 @@ function stubVendorOrders(count: number): Array<{ routingStatus: string; fulfill
 
 export default async function OrdersPage() {
   const headersList = await headers();
-  const customerPhone = getCustomerPhoneFromHeaders(headersList);
   const session = await auth();
+  const customerPhone = await resolveCustomerPhoneForSession(headersList, session?.user?.id ?? null);
   const sessionEmail = session?.user?.email ?? null;
 
   if (!customerPhone) {

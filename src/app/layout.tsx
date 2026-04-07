@@ -6,8 +6,8 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { AuthSessionProvider } from "@/components/AuthSessionProvider";
 import { SiteHeaderNav } from "@/components/SiteHeaderNav";
+import { resolveCustomerPhoneForSession } from "@/lib/customer-phone-resolution";
 import { resolveHeaderNavContext } from "@/lib/auth/header-nav-context";
-import { getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getActiveOrderByCustomerPhone } from "@/services/order.service";
 
 export const metadata: Metadata = {
@@ -25,8 +25,8 @@ export default async function RootLayout({
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? "";
   const isAdmin = pathname.startsWith("/admin");
-  const customerPhone = getCustomerPhoneFromHeaders(headersList);
   const session = await auth();
+  const customerPhone = await resolveCustomerPhoneForSession(headersList, session?.user?.id ?? null);
   const hasServerSession = Boolean(session?.user);
   const headerNav = await resolveHeaderNavContext(session?.user?.id ?? null, customerPhone);
   const activeOrder =

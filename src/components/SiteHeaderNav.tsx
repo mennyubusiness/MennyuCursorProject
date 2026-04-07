@@ -71,6 +71,14 @@ export function SiteHeaderNav({
 
   return (
     <nav className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 text-sm sm:gap-x-6 sm:text-base">
+      {isSignedIn && accountLabel && (
+        <span
+          className="max-w-[8rem] shrink-0 truncate rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600"
+          title="Signed-in account type"
+        >
+          {accountLabel}
+        </span>
+      )}
       <Link href="/explore" className="text-stone-600 hover:text-mennyu-primary">
         Explore pods
       </Link>
@@ -99,14 +107,6 @@ export function SiteHeaderNav({
             Cart
           </Link>
         </>
-      )}
-      {isSignedIn && accountLabel && (
-        <span
-          className="max-w-[8rem] truncate rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600"
-          title="Signed-in account type"
-        >
-          {accountLabel}
-        </span>
       )}
       {!isSignedIn && (
         <Link
