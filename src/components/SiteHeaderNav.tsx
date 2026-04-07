@@ -26,7 +26,6 @@ function buildLoginHref(callbackPath: string): string {
       ? callbackPath
       : "/";
   const q = new URLSearchParams();
-  q.set("intent", "customer");
   q.set("callbackUrl", safe);
   return `/login?${q.toString()}`;
 }

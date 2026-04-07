@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 export default async function VendorSelectPage() {
   const session = await auth();
   if (!session?.user?.id) {
-    redirect("/login?intent=vendor");
+    redirect(`/login?callbackUrl=${encodeURIComponent("/vendor/select")}`);
   }
 
   const rows = await prisma.vendorMembership.findMany({
@@ -16,7 +16,7 @@ export default async function VendorSelectPage() {
   });
 
   if (rows.length === 0) {
-    redirect("/login?intent=vendor");
+    redirect(`/login?callbackUrl=${encodeURIComponent("/vendor/select")}`);
   }
 
   if (rows.length === 1) {

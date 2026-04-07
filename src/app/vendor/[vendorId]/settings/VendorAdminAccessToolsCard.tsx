@@ -13,7 +13,7 @@ export function VendorAdminAccessToolsCard({
   hasDashboardSecret: boolean;
 }) {
   const vendorUrl = `/vendor/${vendorId}`;
-  const loginHref = `/login?intent=vendor&callbackUrl=${encodeURIComponent(vendorUrl)}`;
+  const loginHref = `/login?callbackUrl=${encodeURIComponent(vendorUrl)}`;
 
   return (
     <div className="space-y-4 rounded-xl border border-dashed border-stone-300 bg-stone-50/80 p-5 text-sm text-stone-600">

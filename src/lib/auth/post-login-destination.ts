@@ -1,17 +1,15 @@
 /**
- * Post-login routing for /login — vendor flow fully implemented; customer intent redirects to
- * the order hub (/orders or a safe callback); pod/admin have separate handling.
+ * Post-login routing: optional safe callbackUrl, else role-based default
+ * (admin → /admin, vendor → /vendor/dashboard, pod → /pod/dashboard, else /orders).
  */
 import "server-only";
-import { prisma } from "@/lib/db";
-import type { LoginIntent } from "@/lib/auth/login-intent";
+
 import { extractVendorIdFromVendorPath } from "@/lib/auth/login-intent";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
+import { prisma } from "@/lib/db";
+import { canViewPod, canViewVendor, getUserAccessContext, isAdminUser } from "@/lib/permissions";
 
-export type PostLoginDestinationResult =
-  | { kind: "redirect"; path: string }
-  | { kind: "no_access"; headline: string; body: string }
-  | { kind: "coming_soon"; headline: string; body: string };
+export type PostLoginDestinationResult = { kind: "redirect"; path: string };
 
 function safeInternalPath(raw: string | null): string | null {
   if (!raw || typeof raw !== "string") return null;
@@ -20,19 +18,86 @@ function safeInternalPath(raw: string | null): string | null {
   return t;
 }
 
-/** Safe redirects after customer-intent email sign-in (order hub + browse; never vendor/admin). */
-function isCustomerHubRedirectPath(path: string): boolean {
+async function canRedirectToPath(userId: string, path: string): Promise<boolean> {
   const clean = path.split("?")[0]?.trim() ?? "";
   if (!clean.startsWith("/")) return false;
-  if (clean === "/orders" || clean === "/explore" || clean === "/cart" || clean === "/") return true;
-  if (clean.startsWith("/pod/")) return true;
+
+  if (clean === "/admin" || clean.startsWith("/admin/")) {
+    return isAdminUser(userId);
+  }
+
+  if (clean === "/vendor/dashboard" || clean === "/vendor/select") {
+    const ctx = await getUserAccessContext(userId);
+    if (!ctx) return false;
+    if (ctx.isPlatformAdmin) return true;
+    return ctx.vendorIds.length > 0;
+  }
+
+  if (clean === "/pod/dashboard") {
+    const ctx = await getUserAccessContext(userId);
+    if (!ctx) return false;
+    if (ctx.isPlatformAdmin) return true;
+    return ctx.podIds.length > 0;
+  }
+
+  const vendorId = extractVendorIdFromVendorPath(clean);
+  if (vendorId) {
+    return canViewVendor(userId, vendorId);
+  }
+
+  const podMatch = clean.match(/^\/pod\/([^/]+)/);
+  if (podMatch) {
+    const podId = podMatch[1];
+    if (podId === "dashboard") return false;
+    return canViewPod(userId, podId);
+  }
+
+  if (
+    clean === "/orders" ||
+    clean === "/explore" ||
+    clean === "/cart" ||
+    clean === "/" ||
+    clean === "/register"
+  ) {
+    return true;
+  }
   if (clean.startsWith("/order/")) return true;
+  if (clean.startsWith("/account/")) return true;
+
   return false;
+}
+
+async function resolveDefaultDestinationForUser(userId: string): Promise<PostLoginDestinationResult> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      isPlatformAdmin: true,
+      vendorMemberships: { select: { vendorId: true }, orderBy: { createdAt: "desc" } },
+      podMemberships: { select: { podId: true }, orderBy: { createdAt: "desc" } },
+    },
+  });
+
+  if (!user) {
+    return { kind: "redirect", path: "/orders" };
+  }
+
+  if (user.isPlatformAdmin) {
+    return { kind: "redirect", path: "/admin" };
+  }
+
+  if (user.vendorMemberships.length > 0) {
+    return { kind: "redirect", path: "/vendor/dashboard" };
+  }
+
+  if (user.podMemberships.length > 0) {
+    return { kind: "redirect", path: "/pod/dashboard" };
+  }
+
+  return { kind: "redirect", path: "/orders" };
 }
 
 export async function resolvePostLoginDestination(
   userId: string,
-  intent: LoginIntent,
   callbackUrl: string | null
 ): Promise<PostLoginDestinationResult> {
   const pendingSetup = await getPendingAccountSetupRedirect(userId);
@@ -40,84 +105,13 @@ export async function resolvePostLoginDestination(
     return { kind: "redirect", path: pendingSetup };
   }
 
-  if (intent === "admin") {
-    const u = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { isPlatformAdmin: true },
-    });
-    if (u?.isPlatformAdmin) {
-      return { kind: "redirect", path: "/admin" };
-    }
-    return {
-      kind: "coming_soon",
-      headline: "No Mennyu team access on this account",
-      body: "You’re signed in, but this account isn’t marked as a platform admin. Ask your team to grant access, or use the admin secret link you were given. The vendor area still works if you have a restaurant membership.",
-    };
-  }
-
-  if (intent === "customer") {
-    const cb = safeInternalPath(callbackUrl);
-    if (cb && isCustomerHubRedirectPath(cb)) {
+  const cb = safeInternalPath(callbackUrl);
+  if (cb) {
+    const allowed = await canRedirectToPath(userId, cb);
+    if (allowed) {
       return { kind: "redirect", path: cb };
     }
-    return { kind: "redirect", path: "/orders" };
   }
 
-  if (intent === "pod") {
-    const podRows = await prisma.podMembership.findMany({
-      where: { userId },
-      select: { podId: true },
-      orderBy: { createdAt: "asc" },
-    });
-    const cb = safeInternalPath(callbackUrl);
-    if (cb?.startsWith("/pod/")) {
-      const m = cb.match(/^\/pod\/([^/]+)/);
-      const podFromUrl = m?.[1];
-      if (podFromUrl && podRows.some((r) => r.podId === podFromUrl)) {
-        return { kind: "redirect", path: cb };
-      }
-    }
-    if (podRows.length === 0) {
-      return {
-        kind: "no_access",
-        headline: "No pod access yet",
-        body: "You’re signed in, but this account isn’t linked to a pod. Ask your team to add you as a pod member.",
-      };
-    }
-    return { kind: "redirect", path: `/pod/${podRows[0].podId}/dashboard` };
-  }
-
-  const memberships = await prisma.vendorMembership.findMany({
-    where: { userId },
-    select: { vendorId: true },
-  });
-
-  const vendorIds = new Set(memberships.map((m) => m.vendorId));
-  const callbackPath = safeInternalPath(callbackUrl);
-  const vendorFromCallback = callbackPath ? extractVendorIdFromVendorPath(callbackPath) : null;
-
-  if (vendorFromCallback) {
-    if (vendorIds.has(vendorFromCallback)) {
-      return { kind: "redirect", path: callbackPath! };
-    }
-    return {
-      kind: "no_access",
-      headline: "No access to this vendor",
-      body: "You’re signed in, but this email isn’t linked to that restaurant. Ask an owner to invite you, or switch accounts.",
-    };
-  }
-
-  if (memberships.length === 0) {
-    return {
-      kind: "no_access",
-      headline: "No vendor access yet",
-      body: "You’re signed in, but you’re not linked to a restaurant on Mennyu yet. Ask your team to invite this email, or contact support.",
-    };
-  }
-
-  if (memberships.length === 1) {
-    return { kind: "redirect", path: `/vendor/${memberships[0].vendorId}` };
-  }
-
-  return { kind: "redirect", path: "/vendor/select" };
+  return resolveDefaultDestinationForUser(userId);
 }

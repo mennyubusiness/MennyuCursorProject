@@ -35,7 +35,7 @@ export function VendorAccessQueryMessages() {
       title: "Session required",
       body: (
         <>
-          <Link href="/login?intent=vendor" className="font-medium text-sky-800 underline">
+          <Link href="/login" className="font-medium text-sky-800 underline">
             Sign in
           </Link>{" "}
           with your restaurant team account, or contact your Mennyu administrator if you need access.

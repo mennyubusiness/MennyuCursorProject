@@ -30,7 +30,7 @@ export default async function VendorAreaLayout({
         redirect(`/vendor/${vendorId}/settings?access=needs_session`);
       }
       redirect(
-        `/login?intent=vendor&callbackUrl=${encodeURIComponent(`/vendor/${vendorId}`)}`
+        `/login?callbackUrl=${encodeURIComponent(`/vendor/${vendorId}`)}`
       );
     }
   }

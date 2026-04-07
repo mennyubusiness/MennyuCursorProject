@@ -22,7 +22,7 @@ export default async function PodDashboardLayout({
     if (env.NODE_ENV === "production") {
       const session = await auth();
       if (!session?.user?.id) {
-        redirect(`/login?intent=pod&callbackUrl=${encodeURIComponent(`/pod/${podId}/dashboard`)}`);
+        redirect(`/login?callbackUrl=${encodeURIComponent(`/pod/${podId}/dashboard`)}`);
       }
       redirect("/admin/access-denied");
     }

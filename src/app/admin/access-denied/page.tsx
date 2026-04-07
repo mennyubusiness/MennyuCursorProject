@@ -40,7 +40,7 @@ export default function AdminAccessDeniedPage() {
       </p>
       <p className="text-sm text-stone-600">
         If you have a platform admin account, you can also{" "}
-        <Link href="/login?intent=admin" className="font-medium text-sky-800 underline">
+        <Link href={`/login?callbackUrl=${encodeURIComponent("/admin")}`} className="font-medium text-sky-800 underline">
           sign in with email
         </Link>{" "}
         (Mennyu team access).
