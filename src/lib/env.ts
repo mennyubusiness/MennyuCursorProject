@@ -38,6 +38,11 @@ const envSchema = z.object({
   /** When "mock", Deliverect submission is skipped (payload still built and audited). Use "deliverect" for live submission. */
   ROUTING_MODE: z.enum(["mock", "deliverect"]).default("mock"),
   NEXTAUTH_URL: z.string().url().optional(),
+  /**
+   * Public https origin for this deployment (no trailing slash), e.g. https://app.mennyu.com
+   * Used to build Deliverect channel-registration callback URLs. Falls back to request Host / NEXTAUTH_URL.
+   */
+  PUBLIC_APP_URL: z.string().url().optional(),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   /** Required in production for Auth.js (JWT session). Generate: openssl rand -base64 32 */
   AUTH_SECRET: z.string().min(32).optional(),

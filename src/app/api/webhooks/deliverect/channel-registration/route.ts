@@ -24,9 +24,32 @@ import {
 import { prisma } from "@/lib/db";
 import { webhookIdempotencyKey } from "@/lib/idempotency";
 import { persistDeliverectOrderWebhookRejection } from "../verification-audit";
+import {
+  buildDeliverectChannelRegistrationResponseBody,
+  resolveDeliverectPublicOrigin,
+} from "@/integrations/deliverect/deliverect-channel-registration-response";
 
 function bodyShaPrefix(rawBody: string, n = 12): string {
   return createHash("sha256").update(rawBody, "utf8").digest("hex").slice(0, n);
+}
+
+/**
+ * Deliverect expects the registration response body to list callback URLs (see Deliverect channel registration docs).
+ * Mennyu internal outcomes are exposed only via the `X-Mennyu-Channel-Registration-Outcome` header for observability.
+ */
+function deliverectRegistrationContractResponse(
+  request: NextRequest,
+  outcome: string,
+  status = 200
+) {
+  const origin = resolveDeliverectPublicOrigin(request);
+  const body = buildDeliverectChannelRegistrationResponseBody(origin);
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "X-Mennyu-Channel-Registration-Outcome": outcome,
+    },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -96,13 +119,7 @@ export async function POST(request: NextRequest) {
       processed: existing.processed,
       existingError: existing.errorMessage ?? null,
     });
-    return NextResponse.json({
-      received: true,
-      duplicate: true,
-      processed: existing.processed,
-      eventId: existing.eventId ?? eventId,
-      outcome: "duplicate" as const,
-    });
+    return deliverectRegistrationContractResponse(request, "duplicate");
   }
 
   await prisma.webhookEvent.create({
@@ -130,14 +147,8 @@ export async function POST(request: NextRequest) {
         errorMessage: "missing_channel_link_id",
       },
     });
-    return NextResponse.json(
-      {
-        received: true,
-        outcome: "missing_channel_link_id" as const,
-        eventId,
-      },
-      { status: 422 }
-    );
+    /** 200 + Deliverect URL contract so Deliverect can persist callbacks; matching failed internally. */
+    return deliverectRegistrationContractResponse(request, "missing_channel_link_id", 200);
   }
 
   const match = await findVendorForChannelRegistration(prisma, extract);
@@ -157,12 +168,7 @@ export async function POST(request: NextRequest) {
         errorMessage: `ambiguous:${match.vendorIds.join(",")}`,
       },
     });
-    return NextResponse.json({
-      received: true,
-      outcome: "ambiguous" as const,
-      eventId,
-      vendorIds: match.vendorIds,
-    });
+    return deliverectRegistrationContractResponse(request, `ambiguous:${match.vendorIds.join(",")}`);
   }
 
   if (match.kind === "none") {
@@ -192,11 +198,7 @@ export async function POST(request: NextRequest) {
         errorMessage: noMatchDetail,
       },
     });
-    return NextResponse.json({
-      received: true,
-      outcome: "no_match" as const,
-      eventId,
-    });
+    return deliverectRegistrationContractResponse(request, "no_match");
   }
 
   const applied = await applyChannelRegistrationToVendor(prisma, match.vendorId, extract);
@@ -234,12 +236,7 @@ export async function POST(request: NextRequest) {
         errorMessage: `channel_link_conflict:${applied.existingChannelLinkId}`,
       },
     });
-    return NextResponse.json({
-      received: true,
-      outcome: "channel_link_conflict" as const,
-      eventId,
-      vendorId: applied.vendorId,
-    });
+    return deliverectRegistrationContractResponse(request, "channel_link_conflict");
   }
 
   logDeliverectChannelRegistration(applied.outcome === "already_connected" ? "already_connected" : "matched", {
@@ -258,11 +255,5 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json({
-    received: true,
-    outcome: applied.outcome,
-    vendorId: applied.vendorId,
-    channelLinkId: applied.channelLinkId,
-    eventId,
-  });
+  return deliverectRegistrationContractResponse(request, applied.outcome);
 }
