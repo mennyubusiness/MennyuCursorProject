@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { isAdminDashboardLayoutAuthorized } from "@/lib/admin-auth";
+import { canAccessPodDashboardLayout } from "@/lib/permissions";
 import {
   normalizeVendorDescription,
   normalizeVendorDisplayName,
@@ -10,8 +10,10 @@ import {
   parseSafeHexAccentColor,
 } from "@/lib/vendor-brand";
 
-async function authorizePodSettingsWrite(): Promise<{ ok: true } | { ok: false; error: string }> {
-  const allowed = await isAdminDashboardLayoutAuthorized();
+async function authorizePodSettingsWrite(
+  podId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const allowed = await canAccessPodDashboardLayout(podId.trim());
   if (!allowed) {
     return { ok: false, error: "Unauthorized." };
   }
@@ -29,10 +31,10 @@ export async function updatePodBrandProfile(
   podId: string,
   input: PodBrandProfileInput
 ): Promise<{ ok: boolean; error?: string }> {
-  const authz = await authorizePodSettingsWrite();
+  const id = podId.trim();
+  const authz = await authorizePodSettingsWrite(id);
   if (!authz.ok) return authz;
 
-  const id = podId.trim();
   const pod = await prisma.pod.findUnique({ where: { id }, select: { id: true } });
   if (!pod) return { ok: false, error: "Pod not found." };
 
@@ -93,10 +95,10 @@ export async function updatePodVendorPresentation(
   podId: string,
   rows: PodVendorPresentationRow[]
 ): Promise<{ ok: boolean; error?: string }> {
-  const authz = await authorizePodSettingsWrite();
+  const id = podId.trim();
+  const authz = await authorizePodSettingsWrite(id);
   if (!authz.ok) return authz;
 
-  const id = podId.trim();
   const pod = await prisma.pod.findUnique({ where: { id }, select: { id: true } });
   if (!pod) return { ok: false, error: "Pod not found." };
 

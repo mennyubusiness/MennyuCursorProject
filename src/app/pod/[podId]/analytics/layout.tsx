@@ -1,10 +1,11 @@
 /**
- * Pod Analytics: same access guard as pod dashboard.
+ * Pod Analytics: same access guard as pod dashboard (pod membership or platform admin).
  */
 import { redirect, notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { isAdminDashboardLayoutAuthorized } from "@/lib/admin-auth";
 import { env } from "@/lib/env";
+import { canAccessPodDashboardLayout } from "@/lib/permissions";
 import { PodAreaNav } from "../PodAreaNav";
 
 export default async function PodAnalyticsLayout({
@@ -14,14 +15,19 @@ export default async function PodAnalyticsLayout({
   params: Promise<{ podId: string }>;
   children: React.ReactNode;
 }) {
-  const allowed = await isAdminDashboardLayoutAuthorized();
+  const { podId } = await params;
+
+  const allowed = await canAccessPodDashboardLayout(podId);
   if (!allowed) {
-    if (env.NODE_ENV === "production" && env.ADMIN_SECRET) {
+    if (env.NODE_ENV === "production") {
+      const session = await auth();
+      if (!session?.user?.id) {
+        redirect(`/login?callbackUrl=${encodeURIComponent(`/pod/${podId}/analytics`)}`);
+      }
       redirect("/admin/access-denied");
     }
   }
 
-  const { podId } = await params;
   const pod = await prisma.pod.findUnique({
     where: { id: podId },
     select: { id: true, name: true },
