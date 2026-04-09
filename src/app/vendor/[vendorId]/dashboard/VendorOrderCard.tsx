@@ -218,9 +218,9 @@ export function VendorOrderCard({
 
   return (
     <div
-      className={`rounded-lg border p-4 shadow-sm ${
-        isCancelledOrFailed ? "border-stone-200 bg-stone-50" : "border-stone-200 bg-white"
-      } ${isNew ? "ring-2 ring-emerald-400 ring-offset-2" : ""}`}
+      className={`rounded-xl border p-4 shadow-sm transition-shadow ${
+        isCancelledOrFailed ? "border-stone-200 bg-stone-50" : "border-stone-200/90 bg-white"
+      } ${isNew ? "ring-2 ring-mennyu-primary/55 ring-offset-2" : ""}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -334,8 +334,8 @@ export function VendorOrderCard({
                 disabled={loading}
                 className={
                   isMennyuControlsPrimary(operatingMode)
-                    ? "rounded border border-stone-700 bg-stone-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-50"
-                    : "rounded border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                    ? "rounded-lg border border-mennyu-primary bg-mennyu-primary px-3 py-2 text-sm font-semibold text-black shadow-sm transition hover:bg-mennyu-secondary disabled:opacity-50"
+                    : "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 shadow-sm hover:bg-stone-50 disabled:opacity-50"
                 }
               >
                 {loading ? "…" : nextAction.label}

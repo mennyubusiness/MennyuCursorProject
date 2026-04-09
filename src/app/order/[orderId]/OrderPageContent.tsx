@@ -19,6 +19,9 @@ import {
   refundDisplayMessage,
   customerStatusLabelForScheduledPickup,
 } from "./order-status-helpers";
+import { buildParentOrderProgressSteps, getVendorCustomerStage } from "./customer-order-progress";
+import { CustomerOrderProgressTimeline } from "./CustomerOrderProgressTimeline";
+import { VendorCustomerStatusStrip } from "./VendorCustomerStatusStrip";
 
 /** Order as returned by status API / server (dates may be ISO strings after JSON). */
 type OrderFromApi = Awaited<ReturnType<typeof getOrderStatusAction>>;
@@ -155,6 +158,7 @@ export function OrderPageContent({
     order.requestedPickupAt
   );
   const timelineEvents = buildTimelineEvents(order);
+  const parentProgressSteps = buildParentOrderProgressSteps(derivedStatus, failedButRecoverable);
   const pickupCode = getPickupCode(order.id);
   const pickupLine = formatPickupDetailLine(
     order.requestedPickupAt,
@@ -204,32 +208,43 @@ export function OrderPageContent({
         </ul>
       </div>
 
+      <section
+        className="mt-6 rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-5 shadow-sm sm:p-6"
+        aria-label="Order progress"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">Overall status</h2>
+            <p className="mt-1 text-lg font-semibold text-stone-900">{statusLabel}</p>
+          </div>
+        </div>
+        <div className="mt-5 border-t border-stone-100 pt-5">
+          <CustomerOrderProgressTimeline steps={parentProgressSteps} />
+        </div>
+        <p className="mt-4 text-sm leading-relaxed text-stone-600">{explanation}</p>
+        {isOrderCancelled && refundMessage && (
+          <p className="mt-2 text-sm font-medium text-stone-700">{refundMessage.line}</p>
+        )}
+        <p className="mt-3 text-xs text-stone-500">Updates will be sent to {order.customerPhone}.</p>
+      </section>
+
       {isMultiVendor && (readyCount > 0 || completedCount > 0) && (
-        <p className="mt-3 text-sm text-stone-700">
+        <p className="mt-4 rounded-lg border border-emerald-200/80 bg-emerald-50/60 px-4 py-2.5 text-sm text-emerald-950">
           {readyCount + completedCount === order.vendorOrders.length ? (
-            "All vendor orders are ready or picked up."
+            <span className="font-medium">All vendors are ready or picked up — you&apos;re good to go.</span>
           ) : (
             <>
-              {readyCount + completedCount} of {order.vendorOrders.length} vendor{" "}
-              {order.vendorOrders.length === 1 ? "order" : "orders"} ready or picked up.
+              <span className="font-medium text-emerald-900">
+                {readyCount + completedCount} of {order.vendorOrders.length} vendor portions
+              </span>{" "}
+              ready or picked up. Check each kitchen below.
             </>
           )}
         </p>
       )}
 
-      <div className="mt-6 rounded-xl border border-stone-200 bg-white p-5">
-        <p className="text-lg font-medium text-mennyu-primary">{statusLabel}</p>
-        <p className="mt-2 text-sm text-stone-600">{explanation}</p>
-        {isOrderCancelled && refundMessage && (
-          <p className="mt-2 text-sm font-medium text-stone-700">{refundMessage.line}</p>
-        )}
-        <p className="mt-3 text-xs text-stone-500">
-          Updates will be sent to {order.customerPhone}.
-        </p>
-      </div>
-
       <section className="mt-8" aria-label="Vendor order status">
-        <h2 className="text-lg font-semibold text-stone-900">Where your order is at</h2>
+        <h2 className="text-lg font-semibold text-stone-900">By kitchen</h2>
         {isMultiVendor && (
           <p className="mt-1 text-sm text-stone-600">
             This order has {order.vendorOrders.length} vendors. Items may be ready at different times.
@@ -238,14 +253,12 @@ export function OrderPageContent({
         {!isMultiVendor && (
           <p className="mt-1 text-sm text-stone-500">Status for your vendor.</p>
         )}
-        {order.vendorOrders.length > 1 && (
-          <p className="mb-3 text-sm font-medium text-stone-700">By vendor</p>
-        )}
         <div className="mt-4 space-y-5">
           {order.vendorOrders.map((vo) => {
             const isReady = vo.fulfillmentStatus === "ready";
             const isCancelled = vo.fulfillmentStatus === "cancelled";
             const recovered = isVendorOrderManuallyRecovered(vo, vo.statusHistory);
+            const vendorStage = getVendorCustomerStage(vo, recovered);
             const statusLabelVo = vendorStatusLabelForScheduledPickup(
               order.requestedPickupAt,
               vo.routingStatus,
@@ -257,18 +270,18 @@ export function OrderPageContent({
             return (
               <div
                 key={vo.id}
-                className={`rounded-xl border-2 p-4 ${
+                className={`rounded-2xl border-2 p-4 shadow-sm transition-shadow ${
                   isCancelled
                     ? "border-stone-200 bg-stone-100/80"
                     : isReady
-                      ? "border-emerald-500 bg-emerald-50/80"
-                      : "border-stone-200 bg-stone-50"
+                      ? "border-emerald-400/90 bg-emerald-50/90 shadow-emerald-100/80"
+                      : "border-stone-200/90 bg-white"
                 }`}
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="font-semibold text-stone-900">{vo.vendor.name}</h3>
+                  <h3 className="text-base font-semibold text-stone-900">{vo.vendor.name}</h3>
                   <span
-                    className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${
+                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold sm:text-sm ${
                       isCancelled
                         ? "bg-stone-300 text-stone-600"
                         : isReady
@@ -279,6 +292,7 @@ export function OrderPageContent({
                     {statusLabelVo}
                   </span>
                 </div>
+                <VendorCustomerStatusStrip stage={vendorStage} />
                 {isReady && !isCancelled && (
                   <p className="mt-2 text-sm font-medium text-emerald-800">
                     This vendor&apos;s portion is ready for pickup.
@@ -386,7 +400,7 @@ export function OrderPageContent({
           <p className="mt-1 text-sm text-stone-500">
             Latest activity on your order, newest at the bottom.
           </p>
-          <ul className="mt-3 space-y-2 rounded-lg border border-stone-200 bg-stone-50 p-4">
+          <ul className="mt-3 space-y-2 rounded-xl border border-stone-200/90 bg-white p-4 shadow-sm">
             {timelineEvents.map((evt, i) => (
               <li
                 key={i}

@@ -116,10 +116,10 @@ export default async function VendorOrdersPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-xl font-semibold text-stone-900">Orders</h2>
-        <p className="mt-1 text-sm text-stone-600">
-          Your live queue — one status and one action area per order below.
+      <div className="border-b border-stone-200/80 pb-6">
+        <h2 className="text-2xl font-bold tracking-tight text-stone-900">Orders</h2>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600">
+          Your live queue — newest actions at the top of each section. One primary action per order.
         </p>
       </div>
 

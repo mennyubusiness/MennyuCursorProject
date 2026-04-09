@@ -15,6 +15,7 @@ import {
 import { getPickupCode } from "@/lib/pickup-code";
 import { VendorOrderCard } from "./VendorOrderCard";
 import { NewOrderSoundAlert } from "./NewOrderSoundAlert";
+import { VendorOrdersSummaryStrip } from "./VendorOrdersSummaryStrip";
 
 type GroupKey = "new" | "preparing" | "ready" | "completed" | "cancelled_failed";
 
@@ -182,18 +183,36 @@ export function VendorDashboardLiveOrders({
   const highlightNow = Date.now();
   const newOrderIdsForSound = grouped.new?.map((vo) => vo.id) ?? [];
   const needsActionCount = grouped.new?.length ?? 0;
-  const inProgressCount = (grouped.preparing?.length ?? 0) + (grouped.ready?.length ?? 0);
+  const preparingOnlyCount = grouped.preparing?.length ?? 0;
+  const inProgressCount = preparingOnlyCount + (grouped.ready?.length ?? 0);
   const readyCount = grouped.ready?.length ?? 0;
   const completedCount = grouped.completed?.length ?? 0;
+
+  const startOfTodayMs = (() => {
+    const d = new Date(nowMs);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  })();
+  const ordersToday = vendorOrders.filter(
+    (vo) => new Date(vo.order.createdAt).getTime() >= startOfTodayMs
+  ).length;
 
   return (
     <>
       <NewOrderSoundAlert newOrderIds={newOrderIdsForSound} />
       {vendorOrders.length > 0 && (
+        <VendorOrdersSummaryStrip
+          ordersToday={ordersToday}
+          needsAttention={needsActionCount}
+          inProgress={inProgressCount}
+          ready={readyCount}
+        />
+      )}
+      {vendorOrders.length > 0 && (
         <p className="mb-4 text-sm text-stone-600">
           <span className="font-medium text-stone-800">{needsActionCount}</span> need action
           <span className="text-stone-400"> · </span>
-          <span className="font-medium text-stone-800">{inProgressCount}</span> in progress
+          <span className="font-medium text-stone-800">{preparingOnlyCount}</span> preparing
           <span className="text-stone-400"> · </span>
           <span className="font-medium text-stone-800">{readyCount}</span> ready
           <span className="text-stone-400"> · </span>
@@ -209,7 +228,11 @@ export function VendorDashboardLiveOrders({
           const isTerminalSection = key === "cancelled_failed";
           return (
             <section key={key}>
-              <h2 className={`mb-3 font-medium ${isTerminalSection ? "text-stone-500" : "text-stone-800"}`}>
+              <h2
+                className={`mb-3 text-xs font-semibold uppercase tracking-[0.14em] ${
+                  isTerminalSection ? "text-stone-400" : "text-stone-600"
+                }`}
+              >
                 {GROUP_LABELS[key]}
               </h2>
               <div className="space-y-4">
