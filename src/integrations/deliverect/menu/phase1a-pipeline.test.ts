@@ -438,4 +438,42 @@ describe("runPhase1aDeliverectMenuImport", () => {
     expect(byId.get("var-2")?.deliverectVariantParentPlu).toBe("VAR-PROD-1");
     expect(byId.get("parent-mongo")?.deliverectVariantParentPlu).toBeUndefined();
   });
+
+  it("maps modifier group multiMax, option defaultQuantity, and product-level multiMax basket cap", () => {
+    const result = runPhase1aDeliverectMenuImport({
+      raw: {
+        categories: [{ _id: "c1", name: "X", productIds: ["p1"] }],
+        products: [
+          {
+            _id: "p1",
+            name: "Pizza",
+            price: 1000,
+            multiMax: 3,
+            subProducts: [
+              {
+                _id: "tops",
+                name: "Toppings",
+                min: 0,
+                max: 5,
+                multiMax: 2,
+                subProducts: [
+                  { _id: "pep", name: "Pepperoni", price: 100, defaultQuantity: 1 },
+                  { _id: "bac", name: "Bacon", price: 150 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      vendorId: "v1",
+      deliverect: { sourcePayloadKind: "deliverect_menu_api_v1" },
+    });
+    expect(result.menu).not.toBeNull();
+    const p = result.menu!.products.find((x) => x.deliverectId === "p1");
+    expect(p?.basketMaxQuantity).toBe(3);
+    const g = result.menu!.modifierGroupDefinitions.find((x) => x.deliverectId === "tops");
+    expect(g?.multiMax).toBe(2);
+    const pep = g?.options.find((o) => o.deliverectId === "pep");
+    expect(pep?.isDefault).toBe(true);
+  });
 });

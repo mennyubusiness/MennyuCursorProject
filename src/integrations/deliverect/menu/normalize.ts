@@ -18,6 +18,9 @@
  * - `subProducts` entries may be **string/number references** to rows in top-level `modifierGroups` / `modifiers` (or maps under `data` / `payload`)
  * - **Nested modifier groups** under another group's `subProducts` (no option price on the inner node) are **flattened**: leaf options bubble up to the parent group's option list
  * - Modifier bounds: `min`/`max`, `minQty`/`maxQty`, `minimum`/`maximum`, `minSelection`/`maxSelection`, `minSelections`/`maxSelections` (Deliverect variants). `min=0` + `max=0` means optional unbounded selections.
+ * - Per-option repeat: Deliverect `multiMax` on a **modifier group** caps how many times each modifier may be chosen (multi-select same topping). Mapped to canonical `multiMax` / DB `deliverectMultiMax` (null ⇒ treat as 1).
+ * - Product-level max units per order: `multiMax` on the **product** (Deliverect) — also read as `basketMaxQuantity` when `maxQuantity`/`basketMax` absent.
+ * - Default pre-selection: `defaultQuantity` > 0 on an option sets `isDefault` (with `default` / `isDefault`).
  *
  * No database or network I/O.
  */
@@ -1040,7 +1043,9 @@ function buildProduct(
     basketMaxQuantity:
       pr.maxQuantity != null || pr.basketMax != null
         ? coerceInt(pr.maxQuantity ?? pr.basketMax, 99)
-        : null,
+        : pr.multiMax != null || pr.multi_max != null
+          ? coerceInt(pr.multiMax ?? pr.multi_max, 99)
+          : null,
     modifierGroupDeliverectIds,
   };
 }
@@ -1135,6 +1140,17 @@ function readDeliverectModifierGroupBounds(g: Record<string, unknown>): { min: n
   return { min, max };
 }
 
+/**
+ * Deliverect `multiMax` on a modifier group: each option may be selected at most this many times.
+ * @see https://developers.deliverect.com/page/product-types — multi-select modifiers
+ */
+function readDeliverectGroupMultiMax(g: Record<string, unknown>): number | null {
+  const raw = g.multiMax ?? g.multi_max;
+  if (raw == null) return null;
+  const n = coerceInt(raw, 1);
+  return n >= 1 ? n : null;
+}
+
 function buildModifierGroupTree(
   g: Record<string, unknown>,
   gid: string,
@@ -1147,6 +1163,7 @@ function buildModifierGroupTree(
 ): MennyuCanonicalModifierGroup | null {
   const name = asString(g.name) ?? asString(g.title) ?? "(modifier group)";
   const { min, max } = readDeliverectModifierGroupBounds(g);
+  const multiMax = readDeliverectGroupMultiMax(g);
 
   const leafOptionSpecs = collectLeafOptionsFromGroupNode(g, lookups, issues, {
     entityPath: `/modifierGroupDefinitions/${gid}`,
@@ -1169,6 +1186,7 @@ function buildModifierGroupTree(
     );
 
     const optPrice = asNumber(o.price) ?? asNumber(o.unitPrice) ?? 0;
+    const defaultQty = coerceInt(o.defaultQuantity ?? o.default_qty, 0);
 
     options.push({
       deliverectId: oid,
@@ -1176,7 +1194,7 @@ function buildModifierGroupTree(
       name: asString(o.name) ?? "Option",
       priceCents: Math.max(0, Math.round(optPrice)),
       sortOrder: oi,
-      isDefault: Boolean(o.default ?? o.isDefault),
+      isDefault: Boolean(o.default ?? o.isDefault) || defaultQty > 0,
       isAvailable: !(o.snoozed === true || o.isSnoozed === true),
       nestedGroupDeliverectIds: nestedGroupIds,
     });
@@ -1202,6 +1220,7 @@ function buildModifierGroupTree(
     sortOrder,
     parentDeliverectOptionId: parentOptionId,
     isVariantGroup: isDeliverectVariantGroupNode(g),
+    multiMax,
     options,
   };
 }
@@ -1272,6 +1291,7 @@ function modifierGroupsStructurallyEqual(
   if (a.deliverectId !== b.deliverectId) return false;
   if (a.name !== b.name) return false;
   if (Boolean(a.isVariantGroup) !== Boolean(b.isVariantGroup)) return false;
+  if ((a.multiMax ?? null) !== (b.multiMax ?? null)) return false;
   if (a.minSelections !== b.minSelections || a.maxSelections !== b.maxSelections) return false;
   if (a.options.length !== b.options.length) return false;
   for (let i = 0; i < a.options.length; i++) {

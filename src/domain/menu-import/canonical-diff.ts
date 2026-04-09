@@ -48,6 +48,9 @@ function describeGroupMetaChanges(
   if (d.minSelections !== p.minSelections || d.maxSelections !== p.maxSelections) {
     out.push(`selections min/max (${p.minSelections}/${p.maxSelections} → ${d.minSelections}/${d.maxSelections})`);
   }
+  if ((d.multiMax ?? null) !== (p.multiMax ?? null)) {
+    out.push(`multiMax (${p.multiMax ?? "—"} → ${d.multiMax ?? "—"})`);
+  }
   if (d.isRequired !== p.isRequired) out.push("required flag");
   if (d.sortOrder !== p.sortOrder) out.push("sort order");
   const parentD = d.parentDeliverectOptionId ?? null;

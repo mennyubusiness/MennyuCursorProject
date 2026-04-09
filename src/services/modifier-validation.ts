@@ -153,6 +153,21 @@ export function validateCartItemModifiersWithLoadedMenuItem(
     if (totalQty > link.maxSelections) {
       return { valid: false, code: "MODIFIER_MAX_SELECTIONS", message: `"${group.name}" for ${menuItem.name} allows at most ${link.maxSelections} selection(s).`, cartItemId: cartItem.id, menuItemId: cartItem.menuItemId, menuItemName: menuItem.name };
     }
+
+    const perOptionCap = group.deliverectMultiMax ?? 1;
+    for (const opt of group.options) {
+      const q = selectionByOptionId.get(opt.id) ?? 0;
+      if (q > perOptionCap) {
+        return {
+          valid: false,
+          code: "MODIFIER_OPTION_MAX_QUANTITY",
+          message: `"${opt.name}" for ${menuItem.name} allows at most ${perOptionCap} in "${group.name}" (Deliverect multiMax).`,
+          cartItemId: cartItem.id,
+          menuItemId: cartItem.menuItemId,
+          menuItemName: menuItem.name,
+        };
+      }
+    }
   }
 
   for (const link of menuItem.modifierGroups) {
@@ -180,6 +195,21 @@ export function validateCartItemModifiersWithLoadedMenuItem(
         }
         if (nestedTotal > nestedGroup.maxSelections) {
           return { valid: false, code: "MODIFIER_MAX_SELECTIONS", message: `"${nestedGroup.name}" for ${menuItem.name} allows at most ${nestedGroup.maxSelections} selection(s).`, cartItemId: cartItem.id, menuItemId: cartItem.menuItemId, menuItemName: menuItem.name };
+        }
+
+        const nestedPerOptionCap = nestedGroup.deliverectMultiMax ?? 1;
+        for (const no of nestedGroup.options) {
+          const nq = selectionByOptionId.get(no.id) ?? 0;
+          if (nq > nestedPerOptionCap) {
+            return {
+              valid: false,
+              code: "MODIFIER_OPTION_MAX_QUANTITY",
+              message: `"${no.name}" for ${menuItem.name} allows at most ${nestedPerOptionCap} in "${nestedGroup.name}" (Deliverect multiMax).`,
+              cartItemId: cartItem.id,
+              menuItemId: cartItem.menuItemId,
+              menuItemName: menuItem.name,
+            };
+          }
         }
       }
     }

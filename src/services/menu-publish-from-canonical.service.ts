@@ -203,6 +203,7 @@ export async function applyCanonicalMenuToLiveTables(
       parentModifierOptionId: parentDbId,
       deliverectModifierGroupId: g.deliverectId,
       deliverectIsVariantGroup: g.isVariantGroup === true,
+      deliverectMultiMax: g.multiMax ?? null,
     };
 
     const dbGroup = existingG

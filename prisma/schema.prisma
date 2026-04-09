@@ -416,6 +416,8 @@ model ModifierGroup {
   deliverectModifierGroupId String?
   /// Deliverect `isVariantGroup` / productType 3 — options are nested `subItems`, not flat `modifiers`.
   deliverectIsVariantGroup    Boolean?
+  /// Deliverect modifier-group `multiMax`: max times each option may be selected (null = 1 per option).
+  deliverectMultiMax          Int?
   menuItems                 MenuItemModifierGroup[]
   parentModifierOption      ModifierOption?         @relation("NestedModifierGroups", fields: [parentModifierOptionId], references: [id], onDelete: Cascade)
   vendor                    Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)

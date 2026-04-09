@@ -32,6 +32,8 @@ export const mennyuCanonicalModifierGroupSchema = z.object({
   parentDeliverectOptionId: z.string().min(1).nullable(),
   /** Deliverect variant group — outbound order uses `subItems`, not `modifiers`, for these options. */
   isVariantGroup: z.boolean().optional(),
+  /** Deliverect `multiMax` on the modifier group: max selections per option (same modifier multiple times). */
+  multiMax: z.number().int().positive().nullable().optional(),
   options: z.array(mennyuCanonicalModifierOptionSchema),
 });
 

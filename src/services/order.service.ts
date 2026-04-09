@@ -444,6 +444,7 @@ export function getCartValidationMessage(code: string): string {
     INVALID_MODIFIER_OPTION: "A modifier selection changed and needs review.",
     MODIFIER_MIN_SELECTIONS: "A modifier selection needs to be updated.",
     MODIFIER_MAX_SELECTIONS: "A modifier selection needs to be updated.",
+    MODIFIER_OPTION_MAX_QUANTITY: "A modifier selection needs to be updated.",
     INVALID_MODIFIER_QUANTITY: "A modifier selection needs to be updated.",
     INVALID_NESTED_MODIFIER: "A nested modifier selection needs to be updated.",
     BASKET_LIMIT_EXCEEDED: "Quantity exceeds the maximum allowed for an item.",
