@@ -32,29 +32,6 @@ export interface SubmitVendorOrderContext {
 const DEFAULT_PREP_MINUTES = 15;
 
 /**
- * Resolve routing provider for a vendor order. Uses existing Deliverect config fields;
- * no schema change. Future: Vendor.routingProvider enum or capability flags can override.
- */
-async function getRoutingProvider(
-  vendorOrderId: string
-): Promise<"deliverect" | "manual" | null> {
-  const vo = await prisma.vendorOrder.findUnique({
-    where: { id: vendorOrderId },
-    select: {
-      deliverectChannelLinkId: true,
-      vendor: { select: { deliverectChannelLinkId: true } },
-    },
-  });
-  if (!vo) return null;
-  const channelLinkId =
-    vo.vendor.deliverectChannelLinkId ?? vo.deliverectChannelLinkId;
-  if (channelLinkId != null && String(channelLinkId).trim() !== "") {
-    return "deliverect";
-  }
-  return "manual";
-}
-
-/**
  * Submit a vendor order for routing. Used after payment (post-payment flow) and by any flow
  * that needs to send a pending vendor order to the kitchen/POS.
  *
@@ -65,10 +42,21 @@ export async function submitVendorOrder(
   vendorOrderId: string,
   context: SubmitVendorOrderContext
 ): Promise<RoutingResult> {
-  const provider = await getRoutingProvider(vendorOrderId);
-  if (provider === null) {
+  const voHead = await prisma.vendorOrder.findUnique({
+    where: { id: vendorOrderId },
+    select: {
+      deliverectChannelLinkId: true,
+      vendor: { select: { deliverectChannelLinkId: true, deliverectBusyDelayMinutes: true } },
+    },
+  });
+  if (!voHead) {
     return { success: false, error: "Vendor order not found" };
   }
+  const channelLinkId =
+    voHead.vendor.deliverectChannelLinkId ?? voHead.deliverectChannelLinkId;
+  const provider: "deliverect" | "manual" =
+    channelLinkId != null && String(channelLinkId).trim() !== "" ? "deliverect" : "manual";
+  const busyDelay = voHead.vendor.deliverectBusyDelayMinutes ?? 0;
 
   if (provider === "manual") {
     const vo = await prisma.vendorOrder.findUnique({
@@ -99,13 +87,28 @@ export async function submitVendorOrder(
     return { success: true, skipped: true };
   }
 
-  const prep = context.preparationTimeMinutes ?? DEFAULT_PREP_MINUTES;
+  const prep = Math.max(
+    context.preparationTimeMinutes ?? DEFAULT_PREP_MINUTES,
+    busyDelay
+  );
   const result = await submitVendorOrderToDeliverect(
     vendorOrderId,
     context.customerPhone,
     context.customerEmail,
     prep
   );
+  if (!result.success && !result.skipped) {
+    console.warn(
+      JSON.stringify({
+        event: "submit_vendor_order_failed",
+        scope: "routing",
+        vendorOrderId,
+        preparationTimeMinutes: prep,
+        error: result.error ?? null,
+        code: result.code ?? null,
+      })
+    );
+  }
   if (result.success) {
     const cur = await prisma.vendorOrder.findUnique({
       where: { id: vendorOrderId },

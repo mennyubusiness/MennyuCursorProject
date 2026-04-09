@@ -2,8 +2,8 @@
  * Deliverect Channel Registration handshake: response body must list webhook URLs Deliverect will call
  * for this integration (see https://developers.deliverect.com/reference/channel-registration).
  *
- * Field names match Deliverect’s documented JSON (camelCase). Optional URLs may be omitted; we include
- * stubs where we expose a verified endpoint that currently acknowledges but does not implement business logic.
+ * Field names match Deliverect’s documented JSON (camelCase). Courier/payment routes may remain
+ * acknowledge-only; busy mode and prep time are implemented for pickup certification.
  */
 import type { NextRequest } from "next/server";
 import { env } from "@/lib/env";

@@ -100,7 +100,9 @@ export function parseDeliverectWebhookJsonObject(
 }
 
 /**
- * Production: `DELIVERECT_WEBHOOK_SECRET`. Staging: channel link id extracted from payload.
+ * Production: `DELIVERECT_WEBHOOK_SECRET`.
+ * Staging/sandbox: prefer channel link id from JSON (HMAC key per Deliverect sandbox docs); if absent
+ * (e.g. prep-time / busy-mode bodies), fall back to `DELIVERECT_WEBHOOK_SECRET` when set.
  */
 export function resolveDeliverectWebhookVerificationSecret(
   parsed: Record<string, unknown>,
@@ -113,5 +115,9 @@ export function resolveDeliverectWebhookVerificationSecret(
     };
   }
   const ch = extractChannelLinkIdSecret(parsed);
-  return { secret: ch ?? undefined, hasChannelLinkId: !!ch };
+  if (ch) {
+    return { secret: ch, hasChannelLinkId: true };
+  }
+  const partner = env.DELIVERECT_WEBHOOK_SECRET?.trim();
+  return { secret: partner || undefined, hasChannelLinkId: false };
 }

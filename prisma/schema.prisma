@@ -223,6 +223,8 @@ model Vendor {
   locationSummary         String?
   /// When true, block new Mennyu orders for this vendor (intake only); existing orders still visible.
   mennyuOrdersPaused      Boolean                @default(false)
+  /// Deliverect busy-mode ORANGE: minimum extra lead time (minutes) merged into outbound prep for new orders. Null = not in orange busy.
+  deliverectBusyDelayMinutes Int?
   /// When true, Deliverect menu webhook imports may auto-publish when eligibility rules pass (see menu-auto-publish.service).
   autoPublishMenus        Boolean                @default(false)
   /// Legacy: shared secret for Bearer/automation and magic-link cookie bootstrap. Prefer User session + VendorMembership.
