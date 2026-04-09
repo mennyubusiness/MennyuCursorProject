@@ -51,6 +51,12 @@ export default async function AdminPodsPage() {
                   >
                     Pod overview
                   </Link>
+                  <Link
+                    href={`/admin/pods/${p.id}/qr`}
+                    className="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-stone-100"
+                  >
+                    QR code
+                  </Link>
                   <AdminPodToggle podId={p.id} isActive={p.isActive} />
                 </td>
               </tr>

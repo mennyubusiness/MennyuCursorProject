@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getPublicSiteOrigin } from "@/lib/public-site-url";
+import { PodOrderingQrSection } from "@/components/pod/PodOrderingQrSection";
 import Link from "next/link";
 import { PodBrandProfileForm } from "./PodBrandProfileForm";
 
@@ -22,6 +24,8 @@ export default async function PodSettingsPage({
     },
   });
   if (!pod) notFound();
+
+  const publicOrigin = await getPublicSiteOrigin();
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
@@ -55,6 +59,7 @@ export default async function PodSettingsPage({
         </div>
       </section>
 
+      <PodOrderingQrSection podId={pod.id} podSlug={pod.slug} podName={pod.name} publicOrigin={publicOrigin} />
     </div>
   );
 }

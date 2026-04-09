@@ -4,11 +4,22 @@ import { PodLogo } from "@/components/images/PodLogo";
 import { VendorLogo } from "@/components/images/VendorLogo";
 import { FavoritePodButton } from "@/components/retention/FavoritePodButton";
 import { RecentPodViewTracker } from "@/components/retention/RecentViewTracker";
+import { POD_QR_ENTRY_VALUE } from "@/lib/pod-ordering-url";
 import { prisma } from "@/lib/db";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
 
-export default async function PodPage({ params }: { params: Promise<{ podId: string }> }) {
+export default async function PodPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ podId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { podId } = await params;
+  const sp = await searchParams;
+  const entryRaw = sp.entry;
+  const entry = Array.isArray(entryRaw) ? entryRaw[0] : entryRaw;
+  const isQrEntry = entry === POD_QR_ENTRY_VALUE;
   const pod = await prisma.pod.findUnique({
     where: { id: podId },
     include: {
@@ -38,6 +49,15 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
   return (
     <div className="space-y-10">
       <RecentPodViewTracker podId={pod.id} podName={pod.name} />
+      {isQrEntry && (
+        <div
+          className="rounded-xl border border-emerald-200/90 bg-emerald-50/95 px-4 py-3 text-sm text-emerald-950 shadow-sm"
+          role="status"
+        >
+          <p className="font-medium">You&apos;re ordering from {pod.name}</p>
+          <p className="mt-1 text-emerald-900/90">Scan, order, and pick up in one trip.</p>
+        </div>
+      )}
       <header
         className="border-b border-stone-200 pb-8"
         style={
