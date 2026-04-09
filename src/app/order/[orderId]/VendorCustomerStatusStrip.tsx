@@ -4,7 +4,7 @@ import type { VendorStageKey } from "./customer-order-progress";
 
 const SEGMENTS: { key: VendorStageKey; label: string }[] = [
   { key: "confirming", label: "Confirming" },
-  { key: "kitchen", label: "Kitchen" },
+  { key: "kitchen", label: "Preparing" },
   { key: "ready", label: "Ready" },
   { key: "done", label: "Done" },
 ];

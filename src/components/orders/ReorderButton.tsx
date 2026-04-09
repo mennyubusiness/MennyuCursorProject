@@ -22,7 +22,9 @@ export function ReorderButton({ orderId }: { orderId: string }) {
           ? `/cart?reorder_skipped=${skipped.length}&reorder_added=${addedCount}`
           : "/cart";
       if (skipped.length > 0) {
-        setMessage(`${addedCount} item(s) added. ${skipped.length} item(s) could not be added (no longer available).`);
+        setMessage(
+          `${addedCount} item(s) added. ${skipped.length} item(s) could not be added (no longer available).`
+        );
       }
       window.location.href = `/api/orders/set-pod?podId=${encodeURIComponent(cart.podId)}&next=${encodeURIComponent(next)}`;
     } catch {
@@ -38,9 +40,9 @@ export function ReorderButton({ orderId }: { orderId: string }) {
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className="rounded bg-stone-800 px-3 py-1.5 text-sm text-white hover:bg-stone-900 disabled:opacity-50"
+        className="inline-flex min-h-[40px] min-w-[7rem] items-center justify-center rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition duration-200 hover:bg-stone-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98] disabled:opacity-50"
       >
-        {loading ? "…" : "Reorder"}
+        {loading ? "…" : "Order again"}
       </button>
       {message && <p className="mt-1 text-xs text-amber-800">{message}</p>}
     </div>

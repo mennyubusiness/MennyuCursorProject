@@ -60,8 +60,8 @@ export default async function CartPage({
           </div>
           <h1 className="mt-5 text-2xl font-semibold text-stone-900">Your cart is empty</h1>
           <p className="mt-3 text-stone-600">
-            Choose a pod, then add items from one or more vendors. Everything stays in one cart with a
-            single checkout.
+            Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen prepares
+            its part of your order.
           </p>
           <Link
             href="/explore"
@@ -72,7 +72,7 @@ export default async function CartPage({
           <p className="mt-6 text-sm text-stone-500">
             Already ordered?{" "}
             <Link href="/orders" className="font-medium text-mennyu-primary hover:underline">
-              View your orders
+              View orders and order again
             </Link>
           </p>
         </div>
@@ -203,7 +203,7 @@ export default async function CartPage({
           )}
         </p>
         <p className="mt-2 text-sm text-stone-500">
-          Vendors are notified only after your payment succeeds.
+          Vendors get your order after payment — you&apos;ll see live status updates here.
         </p>
       </header>
 
@@ -377,27 +377,34 @@ export default async function CartPage({
           >
             Back to pod
           </Link>
-          <div className="order-1 flex flex-col gap-3 sm:order-2 sm:ml-auto sm:flex-row sm:items-center sm:gap-6 sm:text-right">
-            <div className="flex items-baseline justify-between gap-4 sm:block sm:text-right">
-              <span className="text-xs font-medium uppercase tracking-wide text-stone-500 sm:hidden">
+          <div className="order-1 flex w-full flex-col gap-3 sm:order-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-6">
+            <div className="flex items-baseline justify-between gap-4 sm:hidden">
+              <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
                 Food subtotal
               </span>
-              <span className="text-lg font-bold tabular-nums text-stone-900 sm:hidden">
+              <span className="text-lg font-bold tabular-nums text-stone-900">
                 ${(totalCents / 100).toFixed(2)}
               </span>
             </div>
-            {canCheckout ? (
-              <Link
-                href={`/checkout?cartId=${cart.id}`}
-                className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-mennyu-primary px-8 py-3.5 text-center text-base font-bold text-black shadow-md transition duration-200 hover:bg-mennyu-secondary hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98] sm:min-w-[14rem] sm:w-auto"
-              >
-                Continue to checkout
-              </Link>
-            ) : (
-              <span className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-500 sm:w-auto">
-                Fix items above to continue
-              </span>
-            )}
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:items-end">
+              {canCheckout && (
+                <p className="text-center text-xs leading-snug text-stone-500 sm:text-right">
+                  Secure checkout with Stripe · Each vendor is notified after you pay
+                </p>
+              )}
+              {canCheckout ? (
+                <Link
+                  href={`/checkout?cartId=${cart.id}`}
+                  className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-mennyu-primary px-8 py-3.5 text-center text-base font-bold text-black shadow-md transition duration-200 hover:bg-mennyu-secondary hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98] sm:min-w-[14rem] sm:w-auto"
+                >
+                  Continue to checkout
+                </Link>
+              ) : (
+                <span className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-500 sm:w-auto">
+                  Fix items above to continue
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <Link

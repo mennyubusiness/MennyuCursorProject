@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useMemo } from "react";
 import { PodLogo } from "@/components/images/PodLogo";
+import { FavoritePodButton } from "@/components/retention/FavoritePodButton";
 
 type PodForList = {
   id: string;
@@ -55,10 +56,9 @@ export function ExplorePodList({ pods }: { pods: PodForList[] }) {
             const vendorCount = pod.vendors.length;
             const featuredVendorName = pod.vendors[0]?.vendor.name;
             return (
-              <Link
+              <div
                 key={pod.id}
-                href={`/pod/${pod.id}`}
-                className="group relative flex gap-4 overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm ring-1 ring-black/[0.03] transition duration-200 hover:-translate-y-0.5 hover:border-mennyu-primary/35 hover:shadow-lg hover:ring-mennyu-primary/15 active:scale-[0.99] sm:p-6"
+                className="group relative overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm ring-1 ring-black/[0.03] transition duration-200 hover:-translate-y-0.5 hover:border-mennyu-primary/35 hover:shadow-lg hover:ring-mennyu-primary/15 motion-reduce:transform-none"
                 style={
                   pod.accentColor
                     ? {
@@ -69,6 +69,15 @@ export function ExplorePodList({ pods }: { pods: PodForList[] }) {
                     : undefined
                 }
               >
+                <FavoritePodButton
+                  podId={pod.id}
+                  podName={pod.name}
+                  className="absolute right-3 top-3 z-10 shadow-md backdrop-blur-sm"
+                />
+                <Link
+                  href={`/pod/${pod.id}`}
+                  className="flex gap-4 p-5 transition active:scale-[0.99] sm:p-6"
+                >
                 <PodLogo
                   imageUrl={pod.imageUrl}
                   podName={pod.name}
@@ -111,7 +120,8 @@ export function ExplorePodList({ pods }: { pods: PodForList[] }) {
                     View pod →
                   </p>
                 </div>
-              </Link>
+                </Link>
+              </div>
             );
           })}
         </div>

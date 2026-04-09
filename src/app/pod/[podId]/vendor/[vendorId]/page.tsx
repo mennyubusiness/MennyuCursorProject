@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MenuItemImage } from "@/components/images/MenuItemImage";
 import { VendorLogo } from "@/components/images/VendorLogo";
+import { FavoriteVendorButton } from "@/components/retention/FavoriteVendorButton";
+import { RecentVendorViewTracker } from "@/components/retention/RecentViewTracker";
 import { prisma } from "@/lib/db";
 import {
   customerMenuCategoryDomId,
@@ -146,6 +148,7 @@ export default async function VendorMenuPage({
 
   return (
     <div>
+      <RecentVendorViewTracker vendorId={vendorId} podId={podId} vendorName={vendor.name} />
       <nav
         className="mb-8 border-b border-stone-100 pb-3 text-xs text-stone-500"
         aria-label="Breadcrumb"
@@ -192,6 +195,7 @@ export default async function VendorMenuPage({
               <h1 className="text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
                 {vendor.name}
               </h1>
+              <FavoriteVendorButton vendorId={vendorId} podId={podId} vendorName={vendor.name} />
               <VendorStatusBadge status={availabilityStatus} />
             </div>
             {vendor.description && (

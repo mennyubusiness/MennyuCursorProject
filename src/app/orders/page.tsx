@@ -7,7 +7,7 @@ import { customerOrderHeaderStatus } from "@/domain/order-state";
 import type { ParentOrderStatus } from "@/domain/types";
 import { ClearPhoneSessionButton } from "./ClearPhoneSessionButton";
 import { OrderHistoryPhoneForm } from "./OrderHistoryPhoneForm";
-import { ReorderButton } from "./ReorderButton";
+import { ReorderButton } from "@/components/orders/ReorderButton";
 
 function formatDate(d: Date): string {
   return new Intl.DateTimeFormat("en-US", {

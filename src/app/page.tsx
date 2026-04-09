@@ -1,6 +1,11 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { HomeHero } from "@/components/home/HomeHero";
+import { HomeRecentOrdersSection } from "@/components/home/HomeRecentOrdersSection";
+import { CustomerRetentionStrip } from "@/components/retention/CustomerRetentionStrip";
+import { resolveCustomerPhoneForSession } from "@/lib/customer-phone-resolution";
 
 export default async function HomePage() {
   const featuredPodsRaw = await prisma.pod.findMany({
@@ -24,9 +29,17 @@ export default async function HomePage() {
     vendorCount: p._count.vendors,
   }));
 
+  const headersList = await headers();
+  const session = await auth();
+  const customerPhone = await resolveCustomerPhoneForSession(headersList, session?.user?.id ?? null);
+
   return (
     <div className="mx-auto max-w-3xl space-y-14 py-10 sm:space-y-16 sm:py-14">
       <HomeHero featuredPods={featuredPods} />
+
+      <HomeRecentOrdersSection customerPhone={customerPhone} />
+
+      <CustomerRetentionStrip />
 
       <section className="rounded-2xl border border-stone-200/90 bg-mennyu-muted/80 p-8 shadow-sm">
         <h2 className="text-xl font-semibold tracking-tight text-stone-900">How it works</h2>

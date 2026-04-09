@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import type { ModifierConfigForUI, ModifierOptionForUI } from "./modifier-config";
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
+import { dispatchCartItemAdded } from "@/lib/cart-ui-feedback";
 import { getVariantMergedModifierConfigAction } from "@/actions/variant-modifier-config.actions";
 import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
 import { totalSelectedInGroup, totalSelectedInNested } from "@/lib/modifier-deliverect-variant-steps";
@@ -276,6 +277,7 @@ export function ModifierModal({
         });
       }
       if (result.success) {
+        dispatchCartItemAdded();
         onSuccess();
         onClose();
       } else {

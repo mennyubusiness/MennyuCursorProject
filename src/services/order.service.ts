@@ -863,6 +863,19 @@ export async function getOrdersByCustomerPhone(customerPhone: string): Promise<O
   });
 }
 
+/**
+ * Recent orders suitable for "order again" surfaces (completed outcomes only).
+ * Omits in-flight and unpaid orders.
+ */
+export async function getRecentCompletedOrdersForPhone(
+  customerPhone: string,
+  take: number
+): Promise<OrderHistoryEntry[]> {
+  const all = await getOrdersByCustomerPhone(customerPhone);
+  const terminal = all.filter((o) => o.status === "completed" || o.status === "partially_completed");
+  return terminal.slice(0, Math.max(0, take));
+}
+
 /** Server-only helper for checkout page default scheduled fields. */
 export function getCheckoutDefaultScheduledPickup(pod: { pickupTimezone: string | null }) {
   const tz = resolvePickupTimezone(pod);

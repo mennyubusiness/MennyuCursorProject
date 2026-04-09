@@ -596,10 +596,15 @@ export function CheckoutForm({
         </p>
       )}
 
+      <p className="mx-auto max-w-lg text-center text-sm leading-relaxed text-stone-600">
+        After you pay, each vendor receives their part of the order. Pickup timing can vary slightly by
+        kitchen.
+      </p>
+
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl bg-mennyu-primary py-4 text-base font-semibold text-black hover:bg-mennyu-secondary disabled:opacity-50"
+        className="w-full rounded-xl bg-mennyu-primary py-4 text-base font-semibold text-black transition hover:bg-mennyu-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.99] disabled:opacity-50"
       >
         {loading ? "Preparing payment…" : "Continue to payment"}
       </button>

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PodLogo } from "@/components/images/PodLogo";
 import { VendorLogo } from "@/components/images/VendorLogo";
+import { FavoritePodButton } from "@/components/retention/FavoritePodButton";
+import { RecentPodViewTracker } from "@/components/retention/RecentViewTracker";
 import { prisma } from "@/lib/db";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
 
@@ -35,6 +37,7 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
 
   return (
     <div className="space-y-10">
+      <RecentPodViewTracker podId={pod.id} podName={pod.name} />
       <header
         className="border-b border-stone-200 pb-8"
         style={
@@ -50,9 +53,10 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
         >
           Food pod
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
-          {pod.name}
-        </h1>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">{pod.name}</h1>
+          <FavoritePodButton podId={pod.id} podName={pod.name} labeled />
+        </div>
         {pod.address && (
           <p className="mt-3 max-w-2xl text-base text-stone-600">{pod.address}</p>
         )}
@@ -73,8 +77,8 @@ export default async function PodPage({ params }: { params: Promise<{ podId: str
               Vendors
             </h2>
             <p className="mt-1 text-sm text-stone-500">
-              Browse menus and build one cart for checkout. Availability updates here before you
-              order.
+              Browse menus into one cart — vendors prepare separately, and pickup timing can vary by
+              kitchen.
             </p>
           </div>
         </div>

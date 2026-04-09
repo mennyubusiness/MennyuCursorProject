@@ -244,14 +244,14 @@ export function OrderPageContent({
       )}
 
       <section className="mt-8" aria-label="Vendor order status">
-        <h2 className="text-lg font-semibold text-stone-900">By kitchen</h2>
+        <h2 className="text-lg font-semibold text-stone-900">By vendor</h2>
         {isMultiVendor && (
           <p className="mt-1 text-sm text-stone-600">
             This order has {order.vendorOrders.length} vendors. Items may be ready at different times.
           </p>
         )}
         {!isMultiVendor && (
-          <p className="mt-1 text-sm text-stone-500">Status for your vendor.</p>
+          <p className="mt-1 text-sm text-stone-500">Individual order statuses</p>
         )}
         <div className="mt-4 space-y-5">
           {order.vendorOrders.map((vo) => {
