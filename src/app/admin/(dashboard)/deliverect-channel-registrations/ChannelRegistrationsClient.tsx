@@ -3,7 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { adminApplyChannelRegistrationPayloadToVendor } from "@/actions/admin-deliverect-channel-registration.actions";
+import {
+  adminApplyChannelRegistrationPayloadToVendor,
+  adminRetryChannelRegistrationMatch,
+} from "@/actions/admin-deliverect-channel-registration.actions";
 
 export type ChannelRegistrationRow = {
   id: string;
@@ -45,21 +48,27 @@ export function ChannelRegistrationsClient({ rows }: { rows: ChannelRegistration
               <th className="px-3 py-2 text-left font-medium text-stone-700">channelLocationId</th>
               <th className="px-3 py-2 text-left font-medium text-stone-700">locationId</th>
               <th className="px-3 py-2 text-left font-medium text-stone-700">Outcome</th>
+              <th className="px-3 py-2 text-left font-medium text-stone-700">Retry match</th>
               <th className="px-3 py-2 text-left font-medium text-stone-700">Attach to vendor</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-stone-500">
+                <td colSpan={7} className="px-3 py-6 text-stone-500">
                   No channel registration webhooks recorded yet.
                 </td>
               </tr>
             ) : (
               rows.map((r) => {
-                const isNoMatch = r.errorMessage?.startsWith("no_match") ?? false;
+                const needsReview =
+                  r.errorMessage?.startsWith("no_match") || r.errorMessage?.startsWith("ambiguous:");
+                const canRetry =
+                  Boolean(r.channelLinkId) &&
+                  Boolean(r.errorMessage) &&
+                  (r.errorMessage?.startsWith("no_match") || r.errorMessage?.startsWith("ambiguous:"));
                 return (
-                  <tr key={r.id} className={`border-b border-stone-100 ${isNoMatch ? "bg-amber-50/50" : ""}`}>
+                  <tr key={r.id} className={`border-b border-stone-100 ${needsReview ? "bg-amber-50/50" : ""}`}>
                     <td className="px-3 py-2 align-top font-mono text-xs text-stone-700">{r.createdAtIso}</td>
                     <td className="px-3 py-2 align-top font-mono text-xs break-all">{r.channelLinkId ?? "—"}</td>
                     <td className="px-3 py-2 align-top font-mono text-xs break-all">{r.channelLocationId ?? "—"}</td>
@@ -72,6 +81,40 @@ export function ChannelRegistrationsClient({ rows }: { rows: ChannelRegistration
                         </span>
                       ) : null}
                       <span className="mt-1 block text-[10px] text-stone-400">keys: {r.payloadKeys.join(", ") || "—"}</span>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      {canRetry ? (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          className="rounded border border-amber-600/40 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+                          onClick={() => {
+                            setMessage(null);
+                            setError(null);
+                            startTransition(async () => {
+                              const res = await adminRetryChannelRegistrationMatch(r.id);
+                              if (!res.ok) {
+                                setError(res.error);
+                                return;
+                              }
+                              if (res.outcome === "still_no_match") {
+                                setMessage("Retry completed — still no automatic match. Fix channelLocationId / vendor data and retry again, or apply manually.");
+                              } else if (String(res.outcome).startsWith("ambiguous")) {
+                                setMessage(`Still ambiguous: ${res.outcome}`);
+                              } else {
+                                setMessage(
+                                  `Matched — vendor ${res.vendorId ?? ""} channelLinkId ${res.channelLinkId ?? ""}`
+                                );
+                              }
+                              router.refresh();
+                            });
+                          }}
+                        >
+                          Retry match
+                        </button>
+                      ) : (
+                        <span className="text-xs text-stone-400">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 align-top">
                       {r.channelLinkId ? (

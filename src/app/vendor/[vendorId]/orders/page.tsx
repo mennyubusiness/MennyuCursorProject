@@ -6,8 +6,9 @@ import {
   isDeliverectVendorOrderRoutingDegraded,
   shouldOmitVendorOrderFromDeliverectDashboard,
 } from "@/lib/vendor-deliverect-dashboard-visibility";
+import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
+import { VendorPosConnectionPanel } from "@/components/vendor/VendorPosConnectionPanel";
 import { VendorOnboardingProgress } from "../dashboard/VendorOnboardingProgress";
-import { VendorPosIntegrationCard } from "../dashboard/VendorPosIntegrationCard";
 import { VendorOrdersOperationsBar } from "../dashboard/VendorOrdersOperationsBar";
 import { VendorDashboardLiveOrders } from "../dashboard/VendorDashboardLiveOrders";
 
@@ -19,10 +20,15 @@ const getVendorOrdersPageData = cache(async (vendorId: string) => {
       name: true,
       mennyuOrdersPaused: true,
       deliverectChannelLinkId: true,
+      deliverectLocationId: true,
       posConnectionStatus: true,
+      pendingDeliverectConnectionKey: true,
+      deliverectAutoMapLastOutcome: true,
+      deliverectAutoMapLastAt: true,
     },
   });
   if (!vendor) return null;
+  const hasUnmatchedChannelRegistration = await hasUnmatchedChannelRegistrationForVendorById(vendorId);
   const vendorOrders = await prisma.vendorOrder.findMany({
     where: {
       vendorId,
@@ -68,7 +74,7 @@ const getVendorOrdersPageData = cache(async (vendorId: string) => {
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  return { vendor, vendorOrders };
+  return { vendor, vendorOrders, hasUnmatchedChannelRegistration };
 });
 
 export default async function VendorOrdersPage({
@@ -80,7 +86,7 @@ export default async function VendorOrdersPage({
 
   const data = await getVendorOrdersPageData(vendorId);
   if (!data) notFound();
-  const { vendor, vendorOrders } = data;
+  const { vendor, vendorOrders, hasUnmatchedChannelRegistration } = data;
   const isDeliverectLive = isRoutingRetryAvailable();
 
   const initialNowMs = Date.now();
@@ -121,13 +127,21 @@ export default async function VendorOrdersPage({
         vendorId={vendor.id}
         posConnectionStatus={vendor.posConnectionStatus}
         deliverectChannelLinkId={vendor.deliverectChannelLinkId}
+        pendingDeliverectConnectionKey={vendor.pendingDeliverectConnectionKey}
+        deliverectAutoMapLastOutcome={vendor.deliverectAutoMapLastOutcome}
+        hasUnmatchedChannelRegistration={hasUnmatchedChannelRegistration}
       />
 
-      <VendorPosIntegrationCard
+      <VendorPosConnectionPanel
         vendorId={vendor.id}
         vendorName={vendor.name}
-        posConnectionStatus={vendor.posConnectionStatus}
         deliverectChannelLinkId={vendor.deliverectChannelLinkId}
+        deliverectLocationId={vendor.deliverectLocationId}
+        posConnectionStatus={vendor.posConnectionStatus}
+        pendingDeliverectConnectionKey={vendor.pendingDeliverectConnectionKey}
+        deliverectAutoMapLastOutcome={vendor.deliverectAutoMapLastOutcome}
+        deliverectAutoMapLastAt={vendor.deliverectAutoMapLastAt}
+        hasUnmatchedChannelRegistration={hasUnmatchedChannelRegistration}
       />
 
       <VendorOrdersOperationsBar

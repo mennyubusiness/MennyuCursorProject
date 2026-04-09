@@ -1,16 +1,32 @@
 import type { PosConnectionStatus } from "@prisma/client";
 import Link from "next/link";
-import { effectivePosConnectionStatus, posConnectionLabel } from "@/lib/vendor-pos-connection";
+import { deriveVendorPosUiState, vendorPosUiStateLabel } from "@/lib/vendor-pos-ui-state";
 
 type Props = {
   vendorId: string;
   posConnectionStatus: PosConnectionStatus;
   deliverectChannelLinkId: string | null;
+  pendingDeliverectConnectionKey: string | null;
+  deliverectAutoMapLastOutcome: string | null;
+  hasUnmatchedChannelRegistration: boolean;
 };
 
-export function VendorOnboardingProgress({ vendorId, posConnectionStatus, deliverectChannelLinkId }: Props) {
-  const posEffective = effectivePosConnectionStatus({ posConnectionStatus, deliverectChannelLinkId });
-  const posLabel = posConnectionLabel(posEffective);
+export function VendorOnboardingProgress({
+  vendorId,
+  posConnectionStatus,
+  deliverectChannelLinkId,
+  pendingDeliverectConnectionKey,
+  deliverectAutoMapLastOutcome,
+  hasUnmatchedChannelRegistration,
+}: Props) {
+  const ui = deriveVendorPosUiState({
+    deliverectChannelLinkId,
+    posConnectionStatus,
+    deliverectAutoMapLastOutcome,
+    pendingDeliverectConnectionKey,
+    hasUnmatchedChannelRegistrationForVendor: hasUnmatchedChannelRegistration,
+  });
+  const posLabel = vendorPosUiStateLabel(ui);
 
   return (
     <section className="rounded-xl border border-stone-200 bg-stone-50/80 p-4 text-sm text-stone-700">
@@ -26,16 +42,16 @@ export function VendorOnboardingProgress({ vendorId, posConnectionStatus, delive
         </li>
         <li className="text-stone-800">
           <span className="font-medium">POS connection</span> — {posLabel}
-          {posEffective !== "connected" ? (
+          {ui !== "connected" ? (
             <>
               {" "}
               <Link href={`/vendor/${vendorId}/connect-pos`} className="font-medium text-mennyu-primary hover:underline">
-                Connect your POS
+                Set up POS connection
               </Link>{" "}
-              when you can — optional, manual mode always available.
+              — optional until you want live kitchen routing.
             </>
           ) : (
-            <span className="text-stone-500"> — you can update details anytime.</span>
+            <span className="text-stone-500"> — manage anytime from Orders.</span>
           )}
         </li>
       </ol>

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canViewVendor } from "@/lib/permissions";
+import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { ConnectPosWizard } from "./ConnectPosWizard";
 
 export default async function VendorConnectPosPage({
@@ -38,6 +39,8 @@ export default async function VendorConnectPosPage({
   });
   if (!vendor) notFound();
 
+  const hasUnmatchedChannelRegistration = await hasUnmatchedChannelRegistrationForVendorById(vendorId);
+
   return (
     <div className="space-y-6">
       <div>
@@ -49,7 +52,7 @@ export default async function VendorConnectPosPage({
         <h2 className="mt-2 text-xl font-semibold text-stone-900">Connect your POS</h2>
         <p className="mt-1 text-sm text-stone-600">{vendor.name}</p>
       </div>
-      <ConnectPosWizard vendor={vendor} />
+      <ConnectPosWizard vendor={{ ...vendor, hasUnmatchedChannelRegistration }} />
     </div>
   );
 }

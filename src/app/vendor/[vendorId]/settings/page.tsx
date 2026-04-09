@@ -12,6 +12,8 @@ import { VendorAutoPublishToggle } from "./VendorAutoPublishToggle";
 import { VendorDashboardAccessCard } from "./VendorDashboardAccessCard";
 import { VendorAccessQueryMessages } from "./VendorAccessMessages";
 import { MennyuLocationIdField } from "@/components/vendor/MennyuLocationIdField";
+import { VendorPosConnectionPanel } from "@/components/vendor/VendorPosConnectionPanel";
+import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { VendorBrandProfileForm } from "./VendorBrandProfileForm";
 
 export default async function VendorSettingsPage({
@@ -36,6 +38,11 @@ export default async function VendorSettingsPage({
         autoPublishMenus: true,
         vendorDashboardToken: true,
         deliverectChannelLinkId: true,
+        deliverectLocationId: true,
+        posConnectionStatus: true,
+        pendingDeliverectConnectionKey: true,
+        deliverectAutoMapLastOutcome: true,
+        deliverectAutoMapLastAt: true,
       },
     }),
     prisma.podMembershipRequest.findMany({
@@ -56,6 +63,8 @@ export default async function VendorSettingsPage({
   ]);
 
   if (!vendor) notFound();
+
+  const hasUnmatchedChannelRegistration = await hasUnmatchedChannelRegistrationForVendorById(vendorId);
 
   const deliverectMenuIntegrity =
     vendor.deliverectChannelLinkId?.trim() != null && vendor.deliverectChannelLinkId.trim() !== ""
@@ -116,9 +125,22 @@ export default async function VendorSettingsPage({
         <div>
           <h3 className="text-lg font-semibold text-stone-900">POS &amp; routing</h3>
           <p className="mt-1 text-sm text-stone-500">
-            Your restaurant&apos;s identifier in Mennyu — for POS setup and support.
+            Kitchen connection status, identifiers, and Deliverect setup. Your Mennyu Location ID is what you paste into
+            Deliverect as <strong>channelLocationId</strong>; the channel link ID is applied automatically when
+            activation succeeds.
           </p>
         </div>
+        <VendorPosConnectionPanel
+          vendorId={vendor.id}
+          vendorName={vendor.name}
+          deliverectChannelLinkId={vendor.deliverectChannelLinkId}
+          deliverectLocationId={vendor.deliverectLocationId}
+          posConnectionStatus={vendor.posConnectionStatus}
+          pendingDeliverectConnectionKey={vendor.pendingDeliverectConnectionKey}
+          deliverectAutoMapLastOutcome={vendor.deliverectAutoMapLastOutcome}
+          deliverectAutoMapLastAt={vendor.deliverectAutoMapLastAt}
+          hasUnmatchedChannelRegistration={hasUnmatchedChannelRegistration}
+        />
         <MennyuLocationIdField mennyuLocationId={vendor.id} />
       </section>
 

@@ -8,6 +8,7 @@ import {
   applyChannelRegistrationToVendor,
   parseChannelRegistrationPayload,
 } from "@/services/deliverect-channel-registration.service";
+import { retryChannelRegistrationMatchForWebhookEventById } from "@/services/deliverect-channel-registration-retry.service";
 
 export type AdminApplyChannelRegistrationResult =
   | { ok: true; outcome: string; vendorId: string; channelLinkId: string }
@@ -95,5 +96,66 @@ export async function adminApplyChannelRegistrationPayloadToVendor(
     outcome: applied.outcome,
     vendorId: applied.vendorId,
     channelLinkId: applied.channelLinkId,
+  };
+}
+
+export type AdminRetryChannelRegistrationResult =
+  | { ok: true; outcome: string; vendorId?: string; channelLinkId?: string }
+  | { ok: false; error: string };
+
+/**
+ * Re-runs automatic matching for a stored channel-registration webhook (same matcher as inbound POST).
+ * Does not create a duplicate WebhookEvent row.
+ */
+export async function adminRetryChannelRegistrationMatch(
+  webhookEventId: string
+): Promise<AdminRetryChannelRegistrationResult> {
+  const allowed = await isAdminDashboardLayoutAuthorized();
+  if (!allowed) {
+    return { ok: false, error: "Unauthorized." };
+  }
+
+  const wid = webhookEventId.trim();
+  if (!wid) {
+    return { ok: false, error: "Webhook event id is required." };
+  }
+
+  const result = await retryChannelRegistrationMatchForWebhookEventById(wid);
+
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  if (result.outcome === "still_no_match") {
+    return { ok: true, outcome: "still_no_match" };
+  }
+
+  if (result.outcome === "ambiguous") {
+    return { ok: true, outcome: `ambiguous:${result.vendorIds.join(",")}` };
+  }
+
+  revalidatePath("/admin/deliverect-channel-registrations");
+  if (result.vendorId) {
+    revalidatePath(`/admin/vendors/${result.vendorId}/deliverect-mapping`);
+    revalidatePath(`/vendor/${result.vendorId}/connect-pos`);
+    revalidatePath(`/vendor/${result.vendorId}/orders`);
+  }
+
+  console.info(
+    "[admin:channel_registration_retry]",
+    JSON.stringify({
+      at: new Date().toISOString(),
+      webhookEventId: wid,
+      outcome: result.outcome,
+      vendorId: result.vendorId ?? null,
+      channelLinkId: result.channelLinkId ?? null,
+    })
+  );
+
+  return {
+    ok: true,
+    outcome: result.outcome,
+    vendorId: result.vendorId,
+    channelLinkId: result.channelLinkId,
   };
 }
