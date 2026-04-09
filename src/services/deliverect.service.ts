@@ -75,7 +75,7 @@ async function recordDeliverectPayloadValidationFailure(
       routingStatus: "failed",
       lastDeliverectPayload: payload as unknown as Prisma.InputJsonValue,
       deliverectPayloadValidation: snapshot as unknown as Prisma.InputJsonValue,
-    },
+    } as Prisma.VendorOrderUncheckedUpdateInput,
   });
   const { createVendorOrderIssue, getVendorOrderIssues } = await import("@/services/issues.service");
   const existing = await getVendorOrderIssues(vendorOrderId, "OPEN");
