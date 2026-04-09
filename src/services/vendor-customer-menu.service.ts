@@ -10,6 +10,7 @@ import {
   mennyuCanonicalMenuSchema,
   type MennyuCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
+import { computeCustomerMenuBrowseExcludedProductIds } from "@/domain/menu-import/customer-menu-browse";
 import {
   computeOperationalProductPools,
   getOperationalMenuItemIdsForVendor,
@@ -65,11 +66,13 @@ function buildSectionsFromCanonical(
   byProductId: Map<string, CustomerVendorMenuItem>
 ): CustomerVendorMenuCategorySection[] {
   const sections: CustomerVendorMenuCategorySection[] = [];
+  const browseExcludedProductIds = computeCustomerMenuBrowseExcludedProductIds(menu);
 
   const sortedCategories = [...menu.categories].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const cat of sortedCategories) {
     const items: CustomerVendorMenuItem[] = [];
     for (const pid of cat.productDeliverectIds) {
+      if (browseExcludedProductIds.has(pid)) continue;
       const row = byProductId.get(pid);
       if (row) items.push(row);
     }
@@ -93,6 +96,7 @@ function buildSectionsFromCanonical(
   const sortedProducts = [...menu.products].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const p of sortedProducts) {
     if (inAnyCategory.has(p.deliverectId)) continue;
+    if (browseExcludedProductIds.has(p.deliverectId)) continue;
     const row = byProductId.get(p.deliverectId);
     if (row) uncategorized.push(row);
   }
@@ -177,7 +181,12 @@ export async function loadCustomerVendorMenuSections(
     }),
     getOperationalMenuItemIdsForVendor(vendorId),
   ]);
-  const activeRows = rows.filter((r) => operationalIds.has(r.id));
+  const activeRows = rows.filter(
+    (r) =>
+      operationalIds.has(r.id) &&
+      /** Without a published canonical we cannot classify modifier-only SKUs; hide obvious variant leaves. */
+      !r.deliverectVariantParentPlu?.trim()
+  );
 
   return {
     sections:
