@@ -27,7 +27,9 @@ export function logDeliverectChannelRegistration(
     event === "verification_failed" ||
     event === "invalid_json" ||
     event === "missing_channel_link_id" ||
-    event === "apply_error"
+    event === "apply_error" ||
+    event === "no_match" ||
+    event === "ambiguous"
   ) {
     console.warn(line);
   } else {

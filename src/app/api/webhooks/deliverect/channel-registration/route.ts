@@ -16,8 +16,10 @@ import {
   applyChannelRegistrationToVendor,
   findVendorForChannelRegistration,
   flattenChannelRegistrationPayload,
+  formatChannelRegistrationNoMatchDetail,
   getDeliverectChannelRegistrationEventId,
   parseChannelRegistrationPayload,
+  summarizeChannelRegistrationPayload,
 } from "@/services/deliverect-channel-registration.service";
 import { prisma } from "@/lib/db";
 import { webhookIdempotencyKey } from "@/lib/idempotency";
@@ -164,20 +166,30 @@ export async function POST(request: NextRequest) {
   }
 
   if (match.kind === "none") {
+    const summary = summarizeChannelRegistrationPayload(parsed, extract);
+    const noMatchDetail = formatChannelRegistrationNoMatchDetail(summary);
     logDeliverectChannelRegistration("no_match", {
       eventId,
       idempotencyKey: idemKey,
+      receivedAt: new Date().toISOString(),
+      payloadTopLevelKeys: summary.payloadTopLevelKeys,
       channelLinkId: extract.channelLinkId,
+      channelLocationId: extract.channelLocationId,
+      deliverectPortalLocationId: extract.deliverectPortalLocationId,
+      status: extract.status,
+      channelLinkName: extract.channelLinkName,
       hadEmail: Boolean(extract.email),
       hadCorrelationKey: Boolean(extract.mennyuCorrelationKey),
       hadAccountId: Boolean(extract.accountId),
+      note:
+        "Deliverect channel-registration payloads (see docs) include channelLinkId, channelLocationId, locationId, status — not email. Mennyu matches channelLocationId to Vendor.id (Mennyu Location ID), or portal locationId to Vendor.deliverectLocationId when onboarding.",
     });
     await prisma.webhookEvent.updateMany({
       where: { idempotencyKey: idemKey },
       data: {
         processed: true,
         processedAt: new Date(),
-        errorMessage: "no_match",
+        errorMessage: noMatchDetail,
       },
     });
     return NextResponse.json({

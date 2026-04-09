@@ -40,6 +40,12 @@ export default function AdminLayout({
             >
               Deliverect webhooks
             </Link>
+            <Link
+              href="/admin/deliverect-channel-registrations"
+              className="text-stone-600 hover:text-stone-900"
+            >
+              Channel registration
+            </Link>
             <Link href="/admin/pods" className="text-stone-600 hover:text-stone-900">
               Pods
             </Link>

@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import { verifyDeliverectSignature } from "@/integrations/deliverect/webhook-handler";
 import {
   flattenChannelRegistrationPayload,
+  formatChannelRegistrationNoMatchDetail,
   getDeliverectChannelRegistrationEventId,
   parseChannelRegistrationPayload,
   resolveSequentialVendorMatch,
+  summarizeChannelRegistrationPayload,
 } from "./deliverect-channel-registration.service";
 
 describe("parseChannelRegistrationPayload", () => {
@@ -16,7 +18,25 @@ describe("parseChannelRegistrationPayload", () => {
     };
     const r = parseChannelRegistrationPayload(parsed);
     expect(r.channelLinkId).toBe("ch-1");
-    expect(r.locationId).toBe("loc-9");
+    expect(r.deliverectPortalLocationId).toBe("loc-9");
+  });
+
+  it("parses official Deliverect channel-registration request shape", () => {
+    const parsed = {
+      status: "active",
+      channelLocationId: "external-or-mennyu-vendor-id",
+      channelLinkId: "69d70c860cff69a10c787516",
+      locationId: "portal-loc-1",
+      channelLinkName: "Order Boss",
+    };
+    const r = parseChannelRegistrationPayload(parsed);
+    expect(r.status).toBe("active");
+    expect(r.channelLocationId).toBe("external-or-mennyu-vendor-id");
+    expect(r.channelLinkId).toBe("69d70c860cff69a10c787516");
+    expect(r.deliverectPortalLocationId).toBe("portal-loc-1");
+    expect(r.channelLinkName).toBe("Order Boss");
+    expect(r.email).toBeNull();
+    expect(r.mennyuCorrelationKey).toBeNull();
   });
 
   it("reads mennyu correlation key from metadata", () => {
@@ -69,6 +89,26 @@ describe("getDeliverectChannelRegistrationEventId", () => {
     const flat = { ...parsed };
     const id = getDeliverectChannelRegistrationEventId(parsed, flat, "{}");
     expect(id).toBe("deliverect:chreg:msg:w-99");
+  });
+});
+
+describe("formatChannelRegistrationNoMatchDetail", () => {
+  it("includes payload keys and extracted ids", () => {
+    const extract = parseChannelRegistrationPayload({
+      status: "register",
+      channelLinkId: "cl1",
+      channelLocationId: "ext1",
+      locationId: "loc1",
+    });
+    const s = summarizeChannelRegistrationPayload(
+      { status: "register", channelLinkId: "cl1", channelLocationId: "ext1", locationId: "loc1" },
+      extract
+    );
+    const d = formatChannelRegistrationNoMatchDetail(s);
+    expect(d).toContain("no_match");
+    expect(d).toContain("channelLinkId=cl1");
+    expect(d).toContain("channelLocationId=ext1");
+    expect(d).toContain("portalLocationId=loc1");
   });
 });
 

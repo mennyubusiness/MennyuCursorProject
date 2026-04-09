@@ -13,12 +13,55 @@ import {
 
 export type ChannelRegistrationExtract = {
   channelLinkId: string | null;
-  locationId: string | null;
+  /** Deliverect request field `locationId` — id of the location in the Deliverect portal (not necessarily Mennyu’s field name). */
+  deliverectPortalLocationId: string | null;
+  /**
+   * Deliverect request field `channelLocationId` — unique id of the merchant in the *channel* platform.
+   * When the channel is Mennyu, this should be the Mennyu `Vendor.id` (see Mennyu Location ID in vendor UI).
+   */
+  channelLocationId: string | null;
+  /** Deliverect `status`: register | active | inactive */
+  status: string | null;
+  channelLinkName: string | null;
   accountId: string | null;
   /** Normalized lowercase email for exact DB match */
   email: string | null;
   mennyuCorrelationKey: string | null;
 };
+
+/** Shallow summary for logs and WebhookEvent rows (no fuzzy logic). */
+export function summarizeChannelRegistrationPayload(
+  parsed: Record<string, unknown>,
+  extract: ChannelRegistrationExtract
+): {
+  payloadTopLevelKeys: string[];
+  extract: ChannelRegistrationExtract;
+} {
+  return {
+    payloadTopLevelKeys: Object.keys(parsed).sort(),
+    extract,
+  };
+}
+
+export function formatChannelRegistrationNoMatchDetail(summary: {
+  payloadTopLevelKeys: string[];
+  extract: ChannelRegistrationExtract;
+}): string {
+  const e = summary.extract;
+  const parts = [
+    "no_match",
+    `keys=${summary.payloadTopLevelKeys.join(",")}`,
+    `status=${e.status ?? ""}`,
+    `channelLinkId=${e.channelLinkId ?? ""}`,
+    `channelLocationId=${e.channelLocationId ?? ""}`,
+    `portalLocationId=${e.deliverectPortalLocationId ?? ""}`,
+    `channelLinkName=${e.channelLinkName ?? ""}`,
+    `email=${e.email ? "[set]" : ""}`,
+    `corr=${e.mennyuCorrelationKey ? "[set]" : ""}`,
+    `accountId=${e.accountId ?? ""}`,
+  ];
+  return parts.join("|").slice(0, 2000);
+}
 
 /** Merge common Deliverect nesting for registration-style payloads (channel, account, metadata). */
 export function flattenChannelRegistrationPayload(parsed: Record<string, unknown>): Record<string, unknown> {
@@ -88,14 +131,24 @@ export function parseChannelRegistrationPayload(parsed: Record<string, unknown>)
     channelLinkFromSecret ??
     null;
 
-  const locationId =
+  /** Deliverect channel-registration webhook: `locationId` in portal; also accept common aliases. */
+  const deliverectPortalLocationId =
     nonEmptyStringField(mergedFlat.locationId) ??
     nonEmptyStringField(mergedFlat.location_id) ??
+    nonEmptyStringField(mergedFlat.deliverectLocationId) ??
     nonEmptyStringField(mergedFlat.storeId) ??
     nonEmptyStringField(mergedFlat.store_id) ??
-    nonEmptyStringField(mergedFlat.deliverectLocationId) ??
     nonEmptyStringField(mergedFlat.location__id) ??
     null;
+
+  /** Deliverect channel-registration: external merchant id (use Mennyu Vendor.id when Mennyu is the channel). */
+  const channelLocationId =
+    nonEmptyStringField(mergedFlat.channelLocationId) ??
+    nonEmptyStringField(mergedFlat.channel_location_id) ??
+    null;
+
+  const status = nonEmptyStringField(mergedFlat.status);
+  const channelLinkName = nonEmptyStringField(mergedFlat.channelLinkName) ?? nonEmptyStringField(mergedFlat.channel_link_name);
 
   const accountObj =
     parsed.account && typeof parsed.account === "object" && !Array.isArray(parsed.account)
@@ -125,7 +178,10 @@ export function parseChannelRegistrationPayload(parsed: Record<string, unknown>)
 
   return {
     channelLinkId,
-    locationId,
+    deliverectPortalLocationId,
+    channelLocationId,
+    status,
+    channelLinkName,
     accountId,
     email,
     mennyuCorrelationKey,
@@ -166,13 +222,15 @@ export type VendorMatchResult =
   | { kind: "ambiguous"; vendorIds: string[] };
 
 /**
- * Exact matching only, ordered: email (onboarding) → pending correlation key → Deliverect account id.
+ * Exact matching only. Order:
+ * 1) email (onboarding) 2) pending correlation key 3) Deliverect `channelLocationId` === Mennyu Vendor.id
+ * 4) Deliverect portal `locationId` === Vendor.deliverectLocationId 5) Deliverect account id
  */
 export async function findVendorForChannelRegistration(
   db: PrismaClient,
   extract: ChannelRegistrationExtract
 ): Promise<VendorMatchResult> {
-  const { email, mennyuCorrelationKey, accountId } = extract;
+  const { email, mennyuCorrelationKey, accountId, channelLocationId, deliverectPortalLocationId } = extract;
 
   const awaitingOnly = {
     OR: [
@@ -199,6 +257,30 @@ export async function findVendorForChannelRegistration(
       where: {
         deliverectChannelLinkId: null,
         pendingDeliverectConnectionKey: mennyuCorrelationKey,
+      },
+      select: { id: true },
+    });
+    if (rows.length === 1) return { kind: "single", vendorId: rows[0].id };
+    if (rows.length > 1) return { kind: "ambiguous", vendorIds: rows.map((r) => r.id) };
+  }
+
+  if (channelLocationId) {
+    const row = await db.vendor.findFirst({
+      where: {
+        id: channelLocationId,
+        deliverectChannelLinkId: null,
+      },
+      select: { id: true },
+    });
+    if (row) return { kind: "single", vendorId: row.id };
+  }
+
+  if (deliverectPortalLocationId) {
+    const rows = await db.vendor.findMany({
+      where: {
+        deliverectChannelLinkId: null,
+        deliverectLocationId: deliverectPortalLocationId,
+        ...awaitingOnly,
       },
       select: { id: true },
     });
@@ -239,7 +321,7 @@ export async function applyChannelRegistrationToVendor(
   vendorId: string,
   extract: ChannelRegistrationExtract
 ): Promise<ApplyChannelRegistrationResult> {
-  const { channelLinkId, locationId, accountId } = extract;
+  const { channelLinkId, deliverectPortalLocationId, accountId } = extract;
   if (!channelLinkId) {
     return { outcome: "error", message: "missing_channel_link_id" };
   }
@@ -266,7 +348,7 @@ export async function applyChannelRegistrationToVendor(
           deliverectAutoMapLastAt: new Date(),
           deliverectAutoMapLastOutcome: AUTO_MAP_OUTCOMES.already_connected,
           deliverectAutoMapLastDetail: null,
-          ...(locationId ? { deliverectLocationId: locationId } : {}),
+          ...(deliverectPortalLocationId ? { deliverectLocationId: deliverectPortalLocationId } : {}),
           ...(accountId ? { deliverectAccountId: accountId } : {}),
         },
       });
@@ -293,7 +375,7 @@ export async function applyChannelRegistrationToVendor(
     where: { id: vendorId },
     data: {
       deliverectChannelLinkId: channelLinkId,
-      ...(locationId ? { deliverectLocationId: locationId } : {}),
+      ...(deliverectPortalLocationId ? { deliverectLocationId: deliverectPortalLocationId } : {}),
       ...(accountId ? { deliverectAccountId: accountId } : {}),
       posConnectionStatus: PosConnectionStatus.connected,
       pendingDeliverectConnectionKey: null,
