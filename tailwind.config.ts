@@ -16,6 +16,21 @@ const config: Config = {
           muted: "var(--mennyu-muted)",
         },
       },
+      keyframes: {
+        "mennyu-fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "mennyu-cart-nudge": {
+          "0%, 100%": { transform: "scale(1)" },
+          "35%": { transform: "scale(1.12)" },
+          "60%": { transform: "scale(1)" },
+        },
+      },
+      animation: {
+        "mennyu-fade-in": "mennyu-fade-in 0.45s ease-out forwards",
+        "mennyu-cart-nudge": "mennyu-cart-nudge 0.55s ease-out",
+      },
     },
   },
   plugins: [],

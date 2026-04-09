@@ -65,7 +65,7 @@ export default async function CartPage({
           </p>
           <Link
             href="/explore"
-            className="mt-8 inline-flex rounded-xl bg-mennyu-primary px-6 py-3 font-semibold text-black hover:bg-mennyu-secondary"
+            className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-mennyu-primary px-6 py-3 font-semibold text-black shadow-sm transition duration-200 hover:bg-mennyu-secondary hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98]"
           >
             Browse pods
           </Link>
@@ -192,12 +192,12 @@ export default async function CartPage({
   const canCheckout = cartValid;
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
       <CheckoutProgress activeStep={1} />
-      <header className="border-b border-stone-200 pb-6">
-        <h1 className="text-2xl font-semibold text-stone-900">Your cart</h1>
-        <p className="mt-2 text-stone-600">
-          <span className="font-medium text-stone-800">{cart.pod.name}</span>
+      <header className="border-b border-stone-200/90 pb-8">
+        <h1 className="text-3xl font-bold tracking-tight text-stone-900">Your cart</h1>
+        <p className="mt-3 text-base text-stone-600">
+          <span className="font-semibold text-stone-800">{cart.pod.name}</span>
           {vendorCount > 1 && (
             <span className="text-stone-500"> · {vendorCount} vendors</span>
           )}
@@ -225,22 +225,22 @@ export default async function CartPage({
         </p>
       )}
 
-      <div className="mt-8 space-y-8">
+      <div className="mt-10 space-y-10">
         {Array.from(byVendor.entries()).map(([vendorId, group]) => (
           <section
             key={vendorId}
-            className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm"
+            className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_1px_0_rgba(0,0,0,0.04),0_8px_24px_-8px_rgba(0,0,0,0.08)]"
             aria-labelledby={`vendor-${vendorId}-heading`}
           >
-            <div className="border-b border-stone-100 bg-stone-50/90 px-4 py-4 sm:px-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Vendor</p>
+            <div className="border-b border-stone-200/80 bg-gradient-to-r from-stone-50 to-mennyu-muted/40 px-4 py-4 sm:px-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">Vendor</p>
               <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
                 <h2 id={`vendor-${vendorId}-heading`} className="text-lg font-semibold text-stone-900">
                   {group.name}
                 </h2>
                 <Link
                   href={`/pod/${cart.podId}/vendor/${vendorId}`}
-                  className="text-sm font-medium text-mennyu-primary hover:underline"
+                  className="text-sm font-semibold text-mennyu-primary underline-offset-4 transition hover:underline"
                 >
                   Add more from this vendor
                 </Link>
@@ -249,7 +249,7 @@ export default async function CartPage({
                 {group.items.length} line{group.items.length !== 1 ? "s" : ""} in this group
               </p>
             </div>
-            <ul className="divide-y divide-stone-100">
+            <ul className="divide-y divide-stone-100/90">
               {group.items.map((item) => {
                 const itemError = errorByCartItemId.get(item.id);
                 const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
@@ -347,40 +347,65 @@ export default async function CartPage({
         ))}
       </div>
 
-      <div className="mt-10 rounded-2xl border-2 border-stone-200 bg-stone-50 p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Order summary</h2>
-        <div className="mt-3 flex items-baseline justify-between gap-4">
-          <span className="text-base text-stone-700">Food subtotal</span>
-          <span className="text-2xl font-bold tabular-nums text-stone-900">
-            ${(totalCents / 100).toFixed(2)}
-          </span>
-        </div>
-        <p className="mt-3 text-xs text-stone-500">
-          Service fee and tip are added at checkout. One payment covers all vendors in this cart.
-        </p>
+      <div className="mt-12 rounded-2xl border-2 border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-6 shadow-sm sm:p-8">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Order summary</h2>
+        <dl className="mt-5 space-y-3">
+          <div className="flex items-baseline justify-between gap-4 border-b border-stone-100 pb-3">
+            <dt className="text-base text-stone-700">Food subtotal</dt>
+            <dd className="text-xl font-bold tabular-nums text-stone-900">
+              ${(totalCents / 100).toFixed(2)}
+            </dd>
+          </div>
+          <div className="flex flex-wrap gap-x-2 text-xs leading-relaxed text-stone-500">
+            <span>
+              <span className="font-medium text-stone-600">Tax</span> (if applicable) and{" "}
+              <span className="font-medium text-stone-600">service fee</span> are calculated at checkout.
+            </span>
+          </div>
+          <div className="pt-1 text-xs text-stone-500">
+            One payment covers every vendor in this cart. Tips are optional and added at checkout.
+          </div>
+        </dl>
       </div>
 
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      {/* Sticky checkout strip on small screens; flows inline from md+ */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200/90 bg-white/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.1)] backdrop-blur-md supports-[backdrop-filter]:bg-white/90 sm:static sm:z-auto sm:mt-10 sm:border-0 sm:bg-transparent sm:p-0 sm:pb-0 sm:shadow-none sm:backdrop-blur-none">
+        <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <Link
+            href={`/pod/${cart.podId}`}
+            className="order-2 hidden rounded-xl border-2 border-stone-300 bg-white px-5 py-3 text-center text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400 active:scale-[0.99] sm:order-1 sm:inline-flex sm:justify-center"
+          >
+            Back to pod
+          </Link>
+          <div className="order-1 flex flex-col gap-3 sm:order-2 sm:ml-auto sm:flex-row sm:items-center sm:gap-6 sm:text-right">
+            <div className="flex items-baseline justify-between gap-4 sm:block sm:text-right">
+              <span className="text-xs font-medium uppercase tracking-wide text-stone-500 sm:hidden">
+                Food subtotal
+              </span>
+              <span className="text-lg font-bold tabular-nums text-stone-900 sm:hidden">
+                ${(totalCents / 100).toFixed(2)}
+              </span>
+            </div>
+            {canCheckout ? (
+              <Link
+                href={`/checkout?cartId=${cart.id}`}
+                className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-mennyu-primary px-8 py-3.5 text-center text-base font-bold text-black shadow-md transition duration-200 hover:bg-mennyu-secondary hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98] sm:min-w-[14rem] sm:w-auto"
+              >
+                Continue to checkout
+              </Link>
+            ) : (
+              <span className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-500 sm:w-auto">
+                Fix items above to continue
+              </span>
+            )}
+          </div>
+        </div>
         <Link
           href={`/pod/${cart.podId}`}
-          className="order-2 rounded-xl border-2 border-stone-300 px-5 py-3 text-center font-medium text-stone-700 hover:bg-stone-100 sm:order-1"
+          className="mt-2 block text-center text-sm font-medium text-stone-600 underline-offset-4 transition hover:text-stone-900 hover:underline sm:hidden"
         >
-          Back to pod
+          ← Back to pod
         </Link>
-        <div className="order-1 sm:order-2 sm:text-right">
-          {canCheckout ? (
-            <Link
-              href={`/checkout?cartId=${cart.id}`}
-              className="inline-flex w-full justify-center rounded-xl bg-mennyu-primary px-8 py-3 text-center font-semibold text-black hover:bg-mennyu-secondary sm:w-auto"
-            >
-              Continue to checkout
-            </Link>
-          ) : (
-            <span className="inline-flex w-full justify-center rounded-xl bg-stone-200 px-8 py-3 font-medium text-stone-500 sm:w-auto">
-              Fix items above to continue
-            </span>
-          )}
-        </div>
       </div>
     </div>
   );

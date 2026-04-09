@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
+import { dispatchCartItemAdded } from "@/lib/cart-ui-feedback";
 import { ModifierModal } from "./ModifierModal";
 import type { ModifierConfigForUI } from "./modifier-config";
 import type { CartItem } from "@/domain/types";
@@ -140,6 +141,7 @@ export function AddToCartButton({
         });
       }
       if (result.success) {
+        dispatchCartItemAdded();
         router.refresh();
       } else {
         setError(result.error);
@@ -201,7 +203,7 @@ export function AddToCartButton({
           type="button"
           onClick={handleClickAdd}
           disabled={buttonDisabled}
-          className="rounded-lg border border-mennyu-primary bg-white px-4 py-2 text-sm font-medium text-black hover:bg-mennyu-muted disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl border-2 border-mennyu-primary bg-white px-4 py-2.5 text-sm font-semibold text-black shadow-sm transition duration-200 hover:bg-mennyu-muted hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
         >
           {orderingDisabled ? "Unavailable" : loading ? "Adding…" : "Add to cart"}
         </button>

@@ -7,15 +7,21 @@ export default async function ExplorePage() {
     orderBy: { name: "asc" },
     include: {
       vendors: {
-        include: { vendor: true },
+        include: { vendor: { select: { name: true } } },
         where: { isActive: true },
+        orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
       },
     },
   });
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-stone-900">Explore pods</h1>
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight text-stone-900">Explore pods</h1>
+        <p className="mt-2 max-w-xl text-stone-600">
+          Pick a hub, mix vendors, and check out once — your order stays grouped for easy pickup.
+        </p>
+      </header>
       <ExplorePodList
         pods={pods.map((p) => ({
           id: p.id,

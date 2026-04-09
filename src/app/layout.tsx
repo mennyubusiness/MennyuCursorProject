@@ -38,7 +38,10 @@ export default async function RootLayout({
         <AuthSessionProvider session={session}>
         <header className="border-b border-stone-200 bg-white">
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-            <Link href="/" className="text-xl font-semibold text-black hover:text-mennyu-primary">
+            <Link
+              href="/"
+              className="text-xl font-semibold text-black transition-colors duration-200 hover:text-mennyu-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary"
+            >
               Mennyu
             </Link>
             <SiteHeaderNav

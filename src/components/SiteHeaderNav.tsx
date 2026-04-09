@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
 
@@ -43,6 +43,21 @@ export function SiteHeaderNav({
   const router = useRouter();
   const { status } = useSession();
   const [signingOut, setSigningOut] = useState(false);
+  const [cartPulse, setCartPulse] = useState(false);
+
+  useEffect(() => {
+    let clearTimer: ReturnType<typeof setTimeout> | undefined;
+    const onCartAdded = () => {
+      setCartPulse(true);
+      if (clearTimer) clearTimeout(clearTimer);
+      clearTimer = setTimeout(() => setCartPulse(false), 650);
+    };
+    window.addEventListener("mennyu:cart-added", onCartAdded);
+    return () => {
+      window.removeEventListener("mennyu:cart-added", onCartAdded);
+      if (clearTimer) clearTimeout(clearTimer);
+    };
+  }, []);
 
   const hasPhoneSession = Boolean(customerPhone);
   const hasNextAuthSession = hasServerSession || status === "authenticated";
@@ -79,7 +94,10 @@ export function SiteHeaderNav({
           {accountLabel}
         </span>
       )}
-      <Link href="/explore" className="text-stone-600 hover:text-mennyu-primary">
+      <Link
+        href="/explore"
+        className="rounded-md text-stone-600 transition-colors duration-200 hover:text-mennyu-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary"
+      >
         Explore pods
       </Link>
       {showDashboard && dashboardHref && (
@@ -95,14 +113,17 @@ export function SiteHeaderNav({
         <>
           <Link
             href="/orders"
-            className="text-stone-600 hover:text-mennyu-primary"
+            className="rounded-md text-stone-600 transition-colors duration-200 hover:text-mennyu-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary"
             title="Your orders — link your phone from checkout to see history"
           >
             Orders
           </Link>
           <Link
             href={activeOrderHref ?? cartHref}
-            className="text-stone-600 hover:text-mennyu-primary"
+            className={`rounded-md text-stone-600 transition hover:text-mennyu-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary ${
+              cartPulse ? "animate-mennyu-cart-nudge motion-reduce:animate-none" : ""
+            }`}
+            title="Your cart"
           >
             Cart
           </Link>
