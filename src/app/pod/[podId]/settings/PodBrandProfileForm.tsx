@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { updatePodBrandProfile } from "@/actions/pod-settings.actions";
+import { BrandLogoUploadField } from "@/components/uploads/BrandLogoUploadField";
 
 const DEFAULT_PICKER_FALLBACK = "#2563eb";
 
@@ -84,23 +85,13 @@ export function PodBrandProfileForm({
         <p className="mt-0.5 text-right text-xs text-stone-400">{description.length} / 2000</p>
       </div>
 
-      <div>
-        <label htmlFor="pod-brand-logo-url" className="block text-sm font-medium text-stone-800">
-          Logo URL
-        </label>
-        <p className="mt-0.5 text-xs text-stone-500">
-          Use an <strong>https</strong> image link. Leave blank to show initials instead.
-        </p>
-        <input
-          id="pod-brand-logo-url"
-          type="url"
-          inputMode="url"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          placeholder="https://…"
-          className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-mono text-stone-900 shadow-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
-        />
-      </div>
+      <BrandLogoUploadField
+        scope="pod"
+        entityId={podId}
+        label="Pod logo"
+        value={imageUrl}
+        onChange={setImageUrl}
+      />
 
       <div className="rounded-md border border-stone-200 bg-stone-50/80 p-3">
         <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-stone-800">

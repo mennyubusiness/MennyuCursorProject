@@ -66,6 +66,12 @@ const envSchema = z.object({
   DEBUG_DELIVERECT: z.enum(["true", "false"]).optional(),
   /** IANA timezone when Pod.pickupTimezone is unset (scheduled pickup checkout & display). */
   DEFAULT_PICKUP_TIMEZONE: z.string().optional(),
+  /** Supabase project URL (public). Used for Storage public URLs and optional admin client. */
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
+  /** Service role key — server-only; never expose to the client. Required for logo uploads to Storage. */
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  /** Storage bucket for brand logos (public). Default: mennyu-assets. Create in Supabase Dashboard → Storage. */
+  SUPABASE_STORAGE_BUCKET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

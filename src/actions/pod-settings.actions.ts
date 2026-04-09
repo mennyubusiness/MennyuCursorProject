@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { canAccessPodDashboardLayout } from "@/lib/permissions";
+import { deleteSupabasePublicObjectIfInBucket } from "@/lib/supabase/storage-cleanup";
 import {
   normalizeVendorDescription,
   normalizeVendorDisplayName,
@@ -35,7 +36,7 @@ export async function updatePodBrandProfile(
   const authz = await authorizePodSettingsWrite(id);
   if (!authz.ok) return authz;
 
-  const pod = await prisma.pod.findUnique({ where: { id }, select: { id: true } });
+  const pod = await prisma.pod.findUnique({ where: { id }, select: { id: true, imageUrl: true } });
   if (!pod) return { ok: false, error: "Pod not found." };
 
   const nameResult = normalizeVendorDisplayName(input.name);
@@ -75,6 +76,10 @@ export async function updatePodBrandProfile(
       accentColor,
     },
   });
+
+  if (pod.imageUrl && pod.imageUrl !== logoUrl) {
+    void deleteSupabasePublicObjectIfInBucket(pod.imageUrl);
+  }
 
   revalidatePath(`/pod/${id}`);
   revalidatePath(`/pod/${id}/settings`);

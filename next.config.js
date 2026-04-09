@@ -10,6 +10,8 @@ const nextConfig = {
       { protocol: "https", hostname: "cdn.squarecdn.com", pathname: "/**" },
       { protocol: "https", hostname: "res.cloudinary.com", pathname: "/**" },
       { protocol: "https", hostname: "images.ctfassets.net", pathname: "/**" },
+      /** Supabase Storage public URLs (`*.supabase.co/storage/v1/object/public/...`) */
+      { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/**" },
     ],
   },
 };
