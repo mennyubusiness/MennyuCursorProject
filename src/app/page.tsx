@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { HomeHero } from "@/components/home/HomeHero";
+import { JoinGroupOrderByCodeForm } from "@/app/cart/JoinGroupOrderByCodeForm";
 import { HomeRecentOrdersSection } from "@/components/home/HomeRecentOrdersSection";
 import { CustomerRetentionStrip } from "@/components/retention/CustomerRetentionStrip";
 import { resolveCustomerPhoneForSession } from "@/lib/customer-phone-resolution";
@@ -36,6 +37,10 @@ export default async function HomePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-14 py-10 sm:space-y-16 sm:py-14">
       <HomeHero featuredPods={featuredPods} />
+
+      <section className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
+        <JoinGroupOrderByCodeForm />
+      </section>
 
       <HomeRecentOrdersSection customerPhone={customerPhone} />
 

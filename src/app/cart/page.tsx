@@ -31,6 +31,7 @@ import {
   effectiveLineParticipantId,
   findParticipantRow,
 } from "@/lib/group-order-cart-read-model";
+import { JoinGroupOrderByCodeForm } from "./JoinGroupOrderByCodeForm";
 
 function modifierGroupCountFromDisplayMenuItem(menuItem: { _count?: { modifierGroups: number } }): number {
   return menuItem._count?.modifierGroups ?? 0;
@@ -90,6 +91,9 @@ export default async function CartPage({
             Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen prepares
             its part of your order.
           </p>
+          <div className="mt-8 text-left">
+            <JoinGroupOrderByCodeForm />
+          </div>
           <Link
             href="/explore"
             className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-mennyu-primary px-6 py-3 font-semibold text-black shadow-sm transition duration-200 hover:bg-mennyu-secondary hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98]"
@@ -268,6 +272,7 @@ export default async function CartPage({
     <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
       <GroupOrderCartPoll enabled={pollGroupCart} />
       <CheckoutProgress activeStep={1} />
+      <JoinGroupOrderByCodeForm visible={!goState.active} className="mb-4" />
       <GroupOrderCartPanel
         cartId={cart.id}
         podId={cart.podId}
