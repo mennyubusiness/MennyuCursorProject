@@ -451,6 +451,12 @@ export function getCartValidationMessage(code: string): string {
     MODIFIER_OPTION_NOT_IN_CURRENT_MENU: "A modifier selection is not on the vendor's current menu.",
     DELIVERECT_SUBITEMS_NESTING_LIMIT:
       "An item exceeds Deliverect’s limit for nested menu levels on online orders (top-level variant groups only — not add-ons). Update the cart or contact the restaurant.",
+    GROUP_ORDER_LOCKED: "This cart is locked while the host checks out.",
+    GROUP_ORDER_AUTH_REQUIRED: "Join this group order to add or change items.",
+    GROUP_ORDER_ITEM_NOT_OWNED: "You can only edit your own items in this group order.",
+    GROUP_ORDER_CLOSED: "This group order is closed.",
+    GROUP_ORDER_POD_MISMATCH: "That item isn’t part of this pod’s group order.",
+    group_checkout_host_only: "Only the host can check out a group order.",
   };
   return map[code] ?? "Your cart needs attention. Please review or remove items.";
 }
@@ -483,6 +489,22 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
   });
   if (!cart || cart.items.length === 0) {
     throw new OrderValidationError("CART_EMPTY", "Cart not found or empty");
+  }
+
+  const groupSession = await prisma.groupOrderSession.findUnique({
+    where: { cartId: cart.id },
+    select: { id: true, hostUserId: true, status: true },
+  });
+  if (groupSession) {
+    if (!input.groupOrderHostUserId || input.groupOrderHostUserId !== groupSession.hostUserId) {
+      throw new OrderValidationError(
+        "GROUP_ORDER_HOST_CHECKOUT",
+        "Only the host can check out a group order."
+      );
+    }
+    if (groupSession.status !== "active" && groupSession.status !== "locked_checkout") {
+      throw new OrderValidationError("GROUP_ORDER_CLOSED", "This group order is no longer active.");
+    }
   }
 
   const validation = await validateCartForOrder(cart);
@@ -555,6 +577,7 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
     const order = await tx.order.create({
       data: {
         podId: cart.podId,
+        groupOrderSessionId: groupSession?.id,
         customerPhone: input.customerPhone,
         customerEmail: input.customerEmail ?? null,
         orderNotes: input.orderNotes ?? null,
@@ -574,6 +597,13 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
         requestedPickupAt,
       },
     });
+
+    if (groupSession) {
+      await tx.groupOrderSession.update({
+        where: { id: groupSession.id },
+        data: { status: "submitted", lockedAt: new Date() },
+      });
+    }
 
     for (let i = 0; i < vendorGroups.length; i++) {
       const group = vendorGroups[i]!;
@@ -609,6 +639,7 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
             quantity: line.quantity,
             priceCents: line.unitPriceCents,
             specialInstructions: line.specialInstructions ?? null,
+            groupOrderParticipantId: line.groupOrderParticipantId ?? undefined,
           },
         });
         for (const sel of line.selections) {
@@ -647,6 +678,8 @@ interface VendorGroup {
   vendorId: string;
   subtotalCents: number;
   lines: Array<{
+    cartItemId: string;
+    groupOrderParticipantId: string | null;
     menuItemId: string;
     name: string;
     quantity: number;
@@ -663,6 +696,8 @@ interface VendorGroup {
 
 function groupCartByVendorSubtotals(
   items: Array<{
+    id: string;
+    groupOrderParticipantId: string | null;
     menuItemId: string;
     vendorId: string;
     quantity: number;
@@ -688,6 +723,8 @@ function groupCartByVendorSubtotals(
     const g = byVendor.get(item.vendorId)!;
     g.subtotalCents += lineTotal;
     g.lines.push({
+      cartItemId: item.id,
+      groupOrderParticipantId: item.groupOrderParticipantId,
       menuItemId: item.menuItemId,
       name: item.menuItem.name,
       quantity: item.quantity,

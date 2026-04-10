@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { auth } from "@/auth";
 import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 import { discardStaleCheckoutCartsForSession, loadActiveDisplayCartForSession } from "@/services/cart.service";
@@ -16,6 +17,20 @@ import {
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartItemActions } from "./CartItemActions";
 import { CheckoutProgress } from "../checkout/CheckoutProgress";
+import { GROUP_ORDER_JOIN_TOKEN_COOKIE } from "@/lib/group-order-cookies";
+import { unlockGroupCheckoutAction } from "@/actions/group-order.actions";
+import { getGroupOrderStateAction } from "@/actions/group-order.actions";
+import { GroupOrderCartPanel } from "./GroupOrderCartPanel";
+import { GroupOrderCartPoll } from "./GroupOrderCartPoll";
+import { GroupOrderLockedBanner } from "./GroupOrderLockedBanner";
+import { ParticipantGroupOrderSummary } from "./ParticipantGroupOrderSummary";
+import { resolveActorForGroupCart } from "@/services/group-order.service";
+import {
+  buildGroupOrderCartReadModel,
+  canEditGroupCartLine,
+  effectiveLineParticipantId,
+  findParticipantRow,
+} from "@/lib/group-order-cart-read-model";
 
 function modifierGroupCountFromDisplayMenuItem(menuItem: { _count?: { modifierGroups: number } }): number {
   return menuItem._count?.modifierGroups ?? 0;
@@ -24,7 +39,13 @@ function modifierGroupCountFromDisplayMenuItem(menuItem: { _count?: { modifierGr
 export default async function CartPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reorder_skipped?: string; reorder_added?: string; error?: string }>;
+  searchParams: Promise<{
+    reorder_skipped?: string;
+    reorder_added?: string;
+    error?: string;
+    groupUnlock?: string;
+    groupError?: string;
+  }>;
 }) {
   const headersList = await headers();
   const customerPhone = getCustomerPhoneFromHeaders(headersList);
@@ -43,8 +64,14 @@ export default async function CartPage({
   const reorderSkipped = params.reorder_skipped ? parseInt(params.reorder_skipped, 10) : 0;
   const reorderAdded = params.reorder_added ? parseInt(params.reorder_added, 10) : 0;
   const checkoutErrorCode = params.error ? decodeURIComponent(params.error) : null;
+  const groupStartError = params.groupError ? decodeURIComponent(params.groupError) : null;
+  const joinTok = (await cookies()).get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null;
   const perfT0 = cartPagePerfNow();
-  const cart = await loadActiveDisplayCartForSession(sessionId, currentPodId);
+  let cart = await loadActiveDisplayCartForSession(sessionId, currentPodId, joinTok);
+  if (params.groupUnlock === "1" && cart?.id) {
+    await unlockGroupCheckoutAction(cart.id);
+    redirect("/cart");
+  }
   cartPagePerfMark("load_active_display_cart", perfT0, {
     itemCount: cart?.items.length ?? 0,
   });
@@ -191,11 +218,69 @@ export default async function CartPage({
   }
   const canCheckout = cartValid;
 
+  const authSession = await auth();
+  const goState = await getGroupOrderStateAction(cart.id);
+  const groupActor = goState.active
+    ? await resolveActorForGroupCart(cart.id, {
+        hostUserId: authSession?.user?.id ?? null,
+        joinTokenFromCookie: joinTok,
+      })
+    : null;
+
+  const groupReadModel = goState.active
+    ? buildGroupOrderCartReadModel(
+        cart.items.map((i) => ({
+          id: i.id,
+          priceCents: i.priceCents,
+          quantity: i.quantity,
+          groupOrderParticipantId: i.groupOrderParticipantId ?? null,
+        })),
+        goState.participants.map((p) => ({
+          id: p.id,
+          displayName: p.displayName,
+          isHost: p.isHost,
+        }))
+      )
+    : null;
+
+  const sessionLocked = goState.active && goState.status === "locked_checkout";
+  const viewerIsHost = groupActor?.role === "host";
+  const viewerParticipantId = groupActor?.participantId ?? null;
+  const hostParticipantId = groupReadModel?.hostParticipantId ?? "";
+
+  const nameByParticipantId = new Map(
+    goState.active ? goState.participants.map((p) => [p.id, p.displayName] as const) : []
+  );
+
+  function lineOwnerLabel(lineParticipantId: string | null): string {
+    const eff = effectiveLineParticipantId(lineParticipantId, hostParticipantId);
+    return nameByParticipantId.get(eff) ?? "Host";
+  }
+
+  const showParticipantTotalsOnly = Boolean(goState.active && groupActor?.role === "participant");
+  const pollGroupCart = Boolean(goState.active);
+  const myParticipantRow =
+    showParticipantTotalsOnly && groupReadModel && viewerParticipantId
+      ? findParticipantRow(groupReadModel, viewerParticipantId)
+      : undefined;
+
   return (
     <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+      <GroupOrderCartPoll enabled={pollGroupCart} />
       <CheckoutProgress activeStep={1} />
+      <GroupOrderCartPanel
+        cartId={cart.id}
+        podId={cart.podId}
+        goState={goState}
+        canStartGroup={Boolean(authSession?.user?.id)}
+        readModel={groupReadModel}
+        locked={sessionLocked}
+      />
+      <GroupOrderLockedBanner locked={sessionLocked} viewerIsHost={Boolean(viewerIsHost)} />
       <header className="border-b border-stone-200/90 pb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-stone-900">Your cart</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-stone-900">
+          {goState.active ? "Group order" : "Your cart"}
+        </h1>
         <p className="mt-3 text-base text-stone-600">
           <span className="font-semibold text-stone-800">{cart.pod.name}</span>
           {vendorCount > 1 && (
@@ -203,10 +288,28 @@ export default async function CartPage({
           )}
         </p>
         <p className="mt-2 text-sm text-stone-500">
-          Vendors get your order after payment — you&apos;ll see live status updates here.
+          {goState.active ? (
+            showParticipantTotalsOnly ? (
+              <>
+                Group order for this pod only. Add items from vendors here — the host pays once at checkout.
+              </>
+            ) : (
+              <>
+                Shared cart for this pod. Participants add their own lines; you&apos;ll see everyone&apos;s items
+                labeled below.
+              </>
+            )
+          ) : (
+            <>Vendors get your order after payment — you&apos;ll see live status updates here.</>
+          )}
         </p>
       </header>
 
+      {groupStartError && (
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+          {groupStartError}
+        </p>
+      )}
       {checkoutErrorCode && (
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
           {getCartValidationMessage(checkoutErrorCode)} Update or remove items below, then try again.
@@ -251,6 +354,30 @@ export default async function CartPage({
             </div>
             <ul className="divide-y divide-stone-100/90">
               {group.items.map((item) => {
+                const lineInteraction =
+                  !goState.active
+                    ? { disabled: false as const, reason: null as string | null }
+                    : sessionLocked
+                      ? { disabled: true as const, reason: "Checkout in progress — cart is locked." }
+                      : !groupActor
+                        ? {
+                            disabled: true as const,
+                            reason:
+                              "Join this group order (or sign in as the host) to add or change items.",
+                          }
+                        : canEditGroupCartLine({
+                            sessionLocked,
+                            viewerIsHost: Boolean(viewerIsHost),
+                            viewerParticipantId,
+                            hostParticipantId,
+                            lineGroupOrderParticipantId: item.groupOrderParticipantId ?? null,
+                          })
+                          ? { disabled: false as const, reason: null as string | null }
+                          : {
+                              disabled: true as const,
+                              reason:
+                                "This is another participant's line — only they or the host can change it.",
+                            };
                 const itemError = errorByCartItemId.get(item.id);
                 const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
                 const parentShell = pplu
@@ -318,6 +445,8 @@ export default async function CartPage({
                         specialInstructions={item.specialInstructions}
                         vendorUsesDeliverect={Boolean(item.vendor.deliverectChannelLinkId?.trim())}
                         menuItemDeliverectVariantParentPlu={item.menuItem.deliverectVariantParentPlu}
+                        interactionDisabled={lineInteraction.disabled}
+                        interactionDisabledReason={lineInteraction.reason}
                         modifierConfig={
                           modifierGroupCountFromDisplayMenuItem(item.menuItem) > 0
                             ? cartEditModifierByItemId.get(item.id)?.config
@@ -347,26 +476,43 @@ export default async function CartPage({
         ))}
       </div>
 
-      <div className="mt-12 rounded-2xl border-2 border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-6 shadow-sm sm:p-8">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Order summary</h2>
-        <dl className="mt-5 space-y-3">
-          <div className="flex items-baseline justify-between gap-4 border-b border-stone-100 pb-3">
-            <dt className="text-base text-stone-700">Food subtotal</dt>
-            <dd className="text-xl font-bold tabular-nums text-stone-900">
-              ${(totalCents / 100).toFixed(2)}
-            </dd>
-          </div>
-          <div className="flex flex-wrap gap-x-2 text-xs leading-relaxed text-stone-500">
-            <span>
-              <span className="font-medium text-stone-600">Tax</span> (if applicable) and{" "}
-              <span className="font-medium text-stone-600">service fee</span> are calculated at checkout.
-            </span>
-          </div>
-          <div className="pt-1 text-xs text-stone-500">
-            One payment covers every vendor in this cart. Tips are optional and added at checkout.
-          </div>
-        </dl>
-      </div>
+      {showParticipantTotalsOnly && groupReadModel && viewerParticipantId ? (
+        <ParticipantGroupOrderSummary model={groupReadModel} viewerParticipantId={viewerParticipantId} />
+      ) : showParticipantTotalsOnly ? (
+        <div className="mt-12 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950">
+          We couldn&apos;t load your personal totals. Refresh the page or re-open the join link.
+        </div>
+      ) : (
+        <div className="mt-12 rounded-2xl border-2 border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-6 shadow-sm sm:p-8">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Order summary</h2>
+          <dl className="mt-5 space-y-3">
+            <div className="flex items-baseline justify-between gap-4 border-b border-stone-100 pb-3">
+              <dt className="text-base text-stone-700">Food subtotal</dt>
+              <dd className="text-xl font-bold tabular-nums text-stone-900">
+                ${(totalCents / 100).toFixed(2)}
+              </dd>
+            </div>
+            <div className="flex flex-wrap gap-x-2 text-xs leading-relaxed text-stone-500">
+              <span>
+                <span className="font-medium text-stone-600">Tax</span> (if applicable) and{" "}
+                <span className="font-medium text-stone-600">service fee</span> are calculated at checkout.
+              </span>
+            </div>
+            <div className="pt-1 text-xs text-stone-500">
+              {goState.active ? (
+                <>
+                  One payment covers every vendor in this group order. You&apos;ll set the tip at checkout as host —
+                  each person&apos;s share of the tip follows their share of food (see breakdown above).
+                </>
+              ) : (
+                <>
+                  One payment covers every vendor in this cart. Tips are optional and added at checkout.
+                </>
+              )}
+            </div>
+          </dl>
+        </div>
+      )}
 
       {/* Sticky checkout strip on small screens; flows inline from md+ */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200/90 bg-white/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.1)] backdrop-blur-md supports-[backdrop-filter]:bg-white/90 sm:static sm:z-auto sm:mt-10 sm:border-0 sm:bg-transparent sm:p-0 sm:pb-0 sm:shadow-none sm:backdrop-blur-none">
@@ -379,20 +525,53 @@ export default async function CartPage({
           </Link>
           <div className="order-1 flex w-full flex-col gap-3 sm:order-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-6">
             <div className="flex items-baseline justify-between gap-4 sm:hidden">
-              <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                Food subtotal
-              </span>
-              <span className="text-lg font-bold tabular-nums text-stone-900">
-                ${(totalCents / 100).toFixed(2)}
-              </span>
+              {showParticipantTotalsOnly && myParticipantRow ? (
+                <>
+                  <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                    Your food
+                  </span>
+                  <span className="text-lg font-bold tabular-nums text-stone-900">
+                    ${(myParticipantRow.subtotalCents / 100).toFixed(2)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                    Food subtotal
+                  </span>
+                  <span className="text-lg font-bold tabular-nums text-stone-900">
+                    ${(totalCents / 100).toFixed(2)}
+                  </span>
+                </>
+              )}
             </div>
             <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:items-end">
-              {canCheckout && (
+              {canCheckout && !showParticipantTotalsOnly && (
                 <p className="text-center text-xs leading-snug text-stone-500 sm:text-right">
                   Secure checkout with Stripe · Each vendor is notified after you pay
                 </p>
               )}
-              {canCheckout ? (
+              {showParticipantTotalsOnly ? (
+                <div className="w-full text-center sm:text-right">
+                  {!canCheckout ? (
+                    <p className="text-xs text-amber-900">
+                      Some items need attention before checkout — only the host can complete fixes for the whole group.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-stone-500">
+                        The host completes payment for the full order — you won&apos;t be charged here.
+                      </p>
+                      <span
+                        className="mt-2 inline-flex min-h-[48px] w-full cursor-not-allowed items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-600 sm:min-w-[14rem] sm:w-auto"
+                        aria-disabled
+                      >
+                        Host checks out
+                      </span>
+                    </>
+                  )}
+                </div>
+              ) : canCheckout ? (
                 <Link
                   href={`/checkout?cartId=${cart.id}`}
                   className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-mennyu-primary px-8 py-3.5 text-center text-base font-bold text-black shadow-md transition duration-200 hover:bg-mennyu-secondary hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98] sm:min-w-[14rem] sm:w-auto"

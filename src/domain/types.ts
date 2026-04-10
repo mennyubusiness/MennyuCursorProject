@@ -231,6 +231,8 @@ export interface CheckoutInput {
   scheduledPickupDate?: string;
   /** Required when pickupMode is `scheduled` (HH:mm, 24h, in pod timezone). */
   scheduledPickupTime?: string;
+  /** When the cart is a group order, must be the host user id (verified in checkout API). */
+  groupOrderHostUserId?: string | null;
 }
 
 // ---- Deliverect (integration) ----

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
 import { createOrderFromCart, OrderValidationError } from "@/services/order.service";
 import { createPaymentIntent } from "@/services/payment.service";
 
@@ -49,6 +51,23 @@ export async function POST(request: NextRequest) {
     scheduledPickupTime,
   } = parsed.data;
 
+  const authSession = await auth();
+  const groupSession = await prisma.groupOrderSession.findUnique({
+    where: { cartId },
+    select: { hostUserId: true },
+  });
+  let groupOrderHostUserId: string | undefined;
+  if (groupSession) {
+    const uid = authSession?.user?.id;
+    if (!uid || uid !== groupSession.hostUserId) {
+      return NextResponse.json(
+        { error: "Only the host can check out a group order.", code: "GROUP_ORDER_HOST_CHECKOUT" },
+        { status: 403 }
+      );
+    }
+    groupOrderHostUserId = uid;
+  }
+
   let result;
   try {
     result = await createOrderFromCart({
@@ -60,6 +79,7 @@ export async function POST(request: NextRequest) {
       pickupMode,
       scheduledPickupDate,
       scheduledPickupTime,
+      groupOrderHostUserId,
     });
   } catch (err) {
     if (err instanceof OrderValidationError) {

@@ -4,6 +4,7 @@
  */
 import { prisma } from "@/lib/db";
 import { getOrCreateCart, getCartById, addCartItem, CartValidationError } from "@/services/cart.service";
+import { getHostActorForCartIfGroupOrder } from "@/services/group-order.service";
 import type { Cart } from "@/domain/types";
 
 export interface ReorderSkippedItem {
@@ -64,7 +65,15 @@ export async function reorderFromOrder(
           : undefined;
 
       try {
-        await addCartItem(cart.id, line.menuItemId, line.quantity, line.specialInstructions ?? null, selections);
+        const goActor = await getHostActorForCartIfGroupOrder(cart.id);
+        await addCartItem(
+          cart.id,
+          line.menuItemId,
+          line.quantity,
+          line.specialInstructions ?? null,
+          selections,
+          goActor
+        );
         addedCount += 1;
       } catch (e) {
         const message = e instanceof CartValidationError ? e.message : e instanceof Error ? e.message : "Unavailable";

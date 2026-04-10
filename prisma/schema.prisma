@@ -56,6 +56,7 @@ model Pod {
   membershipRequests PodMembershipRequest[]
   vendors            PodVendor[]
   memberships        PodMembership[]
+  groupOrderSessions GroupOrderSession[]
 }
 
 model PodVendor {
@@ -138,6 +139,8 @@ model User {
   customerProfile      CustomerProfile?
   /// Platform (Mennyu internal) admin; same User + session as vendors. Complements temporary ADMIN_SECRET cookie bridge.
   isPlatformAdmin Boolean @default(false)
+  hostedGroupOrderSessions GroupOrderSession[] @relation("GroupOrderHost")
+  groupOrderParticipants   GroupOrderParticipant[]
 }
 
 /// Customer-specific profile (optional — many diners use phone-only checkout without a User).
@@ -475,6 +478,8 @@ model Cart {
   updatedAt DateTime   @updatedAt
   pod       Pod        @relation(fields: [podId], references: [id], onDelete: Cascade)
   items     CartItem[]
+  /// At most one active group-order session per cart (host-started shared cart).
+  groupOrderSession GroupOrderSession?
 
   @@unique([podId, sessionId])
 }
@@ -487,15 +492,19 @@ model CartItem {
   quantity            Int                 @default(1)
   priceCents          Int
   specialInstructions String?
+  /// Group order: line owner for permissions and internal post-order attribution (not shown to vendors).
+  groupOrderParticipantId String?
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   cart                Cart                @relation(fields: [cartId], references: [id], onDelete: Cascade)
   menuItem            MenuItem            @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   vendor              Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  groupOrderParticipant GroupOrderParticipant? @relation(fields: [groupOrderParticipantId], references: [id], onDelete: SetNull)
   selections          CartItemSelection[]
 
   @@index([cartId])
   @@index([vendorId])
+  @@index([groupOrderParticipantId])
 }
 
 model CartItemSelection {
@@ -513,9 +522,70 @@ model CartItemSelection {
   @@index([modifierOptionId])
 }
 
+/// Shared multi-customer cart session (MVP). One cart, host pays; internal attribution only.
+model GroupOrderSession {
+  id          String                  @id @default(cuid())
+  /// Six-digit numeric join code (unique).
+  joinCode    String                  @unique
+  podId       String
+  cartId      String                  @unique
+  hostUserId  String
+  status      GroupOrderSessionStatus   @default(active)
+  lockedAt    DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+
+  pod         Pod                     @relation(fields: [podId], references: [id], onDelete: Cascade)
+  cart        Cart                    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  host        User                    @relation("GroupOrderHost", fields: [hostUserId], references: [id], onDelete: Cascade)
+  participants GroupOrderParticipant[]
+  orders      Order[]
+
+  @@index([podId])
+  @@index([joinCode])
+}
+
+model GroupOrderParticipant {
+  id                    String                   @id @default(cuid())
+  groupOrderSessionId   String
+  userId                String?
+  role                  GroupOrderParticipantRole
+  displayName           String
+  /// E.164; stored privately for future SMS. Required for participants; may be null for host.
+  phoneE164             String?
+  joinToken             String                   @unique
+  leftAt                DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  groupOrderSession     GroupOrderSession        @relation(fields: [groupOrderSessionId], references: [id], onDelete: Cascade)
+  user                  User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  cartItems             CartItem[]
+  orderLineItems        OrderLineItem[]
+
+  @@index([groupOrderSessionId])
+  @@index([joinToken])
+}
+
+enum GroupOrderSessionStatus {
+  active
+  locked_checkout
+  submitted
+  ended
+  expired
+}
+
+enum GroupOrderParticipantRole {
+  host
+  participant
+}
+
 model Order {
   id                    String               @id @default(cuid())
   podId                 String
+  /// When set, this order was created from a group-order checkout (internal / admin use).
+  groupOrderSessionId   String?
   customerPhone         String
   customerEmail         String?
   subtotalCents         Int
@@ -545,6 +615,7 @@ model Order {
   requestedPickupAt     DateTime?
   pricingConfig         PricingConfig?       @relation(fields: [pricingConfigId], references: [id], onDelete: SetNull)
   pod                   Pod                  @relation(fields: [podId], references: [id])
+  groupOrderSession     GroupOrderSession?   @relation(fields: [groupOrderSessionId], references: [id], onDelete: SetNull)
   issues                OrderIssue[]
   statusHistory         OrderStatusHistory[]
   payments              Payment[]
@@ -553,6 +624,7 @@ model Order {
 
   @@index([stripePaymentIntentId])
   @@index([sourceCartId])
+  @@index([groupOrderSessionId])
 }
 
 model VendorOrder {
@@ -620,10 +692,15 @@ model OrderLineItem {
   quantity            Int
   priceCents          Int
   specialInstructions String?
+  /// Copied from CartItem at order creation for internal attribution (admin / future SMS). Not shown to vendors.
+  groupOrderParticipantId String?
   createdAt           DateTime                 @default(now())
   menuItem            MenuItem                 @relation(fields: [menuItemId], references: [id])
   vendorOrder         VendorOrder              @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+  groupOrderParticipant GroupOrderParticipant? @relation(fields: [groupOrderParticipantId], references: [id], onDelete: SetNull)
   selections          OrderLineItemSelection[]
+
+  @@index([groupOrderParticipantId])
 }
 
 model OrderLineItemSelection {

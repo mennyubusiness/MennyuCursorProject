@@ -19,6 +19,9 @@ export function CartItemActions({
   initialSelections,
   vendorUsesDeliverect = false,
   menuItemDeliverectVariantParentPlu,
+  /** When set, line is view-only (group lock or not your item). */
+  interactionDisabled = false,
+  interactionDisabledReason,
 }: {
   cartId: string;
   cartItemId: string;
@@ -28,6 +31,8 @@ export function CartItemActions({
   initialSelections?: Array<{ modifierOptionId: string; quantity: number }>;
   vendorUsesDeliverect?: boolean;
   menuItemDeliverectVariantParentPlu?: string | null;
+  interactionDisabled?: boolean;
+  interactionDisabledReason?: string | null;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -37,6 +42,17 @@ export function CartItemActions({
   const [modifierModalOpen, setModifierModalOpen] = useState(false);
 
   const hasModifiers = modifierConfig && modifierConfig.groups.length > 0;
+
+  if (interactionDisabled) {
+    return (
+      <div className="text-right text-xs text-stone-500">
+        <span className="font-medium text-stone-600">View only</span>
+        {interactionDisabledReason ? (
+          <p className="mt-1 max-w-[14rem] text-stone-500">{interactionDisabledReason}</p>
+        ) : null}
+      </div>
+    );
+  }
 
   async function refresh() {
     router.refresh();

@@ -21,8 +21,12 @@ import {
   shellBasePriceCentsForMenuItem,
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartValidationError } from "@/services/cart-validation-error";
+import type { ResolvedGroupCartActor } from "@/services/group-order.service";
+import { enforceGroupOrderCartMutation } from "@/services/group-order.service";
 
 export { CartValidationError } from "@/services/cart-validation-error";
+
+export type { ResolvedGroupCartActor } from "@/services/group-order.service";
 
 /** TEMP: set false to silence add-to-cart trace logs */
 const DEBUG_ADD_TO_CART_TRACE = true;
@@ -92,7 +96,9 @@ export async function addCartItem(
   menuItemId: string,
   quantity: number,
   specialInstructions?: string | null,
-  selections?: CartItemSelectionInput[] | null
+  selections?: CartItemSelectionInput[] | null,
+  /** When the cart is in a group-order session, pass the resolved host/participant actor. */
+  groupOrderActor?: ResolvedGroupCartActor | null
 ): Promise<Cart> {
   if (DEBUG_ADD_TO_CART_TRACE) {
     console.log("[addCartItem] enter", { cartId, menuItemId, quantity });
@@ -145,6 +151,12 @@ export async function addCartItem(
     include: { items: true },
   });
   if (!cart) throw new Error("Cart not found");
+  if (groupOrderActor && cart.podId !== groupOrderActor.podId) {
+    throw new CartValidationError(
+      "This item isn’t available for the pod your group order is using.",
+      "GROUP_ORDER_POD_MISMATCH"
+    );
+  }
   const vendorInPod = await prisma.podVendor.findUnique({
     where: {
       podId_vendorId: { podId: cart.podId, vendorId: menuItemInitial.vendorId },
@@ -252,19 +264,29 @@ export async function addCartItem(
       : null
   );
 
-  if (DEBUG_ADD_TO_CART_TRACE) {
-    const previewCandidates = await prisma.cartItem.findMany({
-      where: { cartId, menuItemId: resolvedMenuItemId },
-      include: { selections: true },
+  const previewCandidates = await prisma.cartItem.findMany({
+    where: { cartId, menuItemId: resolvedMenuItemId },
+    include: { selections: true },
+  });
+  const previewMatch =
+    previewCandidates.find((c) => {
+      const key = normalizedConfigurationKey(
+        c.specialInstructions,
+        c.selections.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity }))
+      );
+      return key === incomingKey;
+    }) ?? null;
+
+  if (previewMatch) {
+    await enforceGroupOrderCartMutation(cartId, groupOrderActor ?? null, {
+      kind: "mutate",
+      cartItemId: previewMatch.id,
     });
-    const previewMatch =
-      previewCandidates.find((c) => {
-        const key = normalizedConfigurationKey(
-          c.specialInstructions,
-          c.selections.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity }))
-        );
-        return key === incomingKey;
-      }) ?? null;
+  } else {
+    await enforceGroupOrderCartMutation(cartId, groupOrderActor ?? null, { kind: "add" });
+  }
+
+  if (DEBUG_ADD_TO_CART_TRACE) {
     console.log("[addCartItem] pre-write", {
       cartId,
       incomingKey,
@@ -326,6 +348,7 @@ export async function addCartItem(
           quantity,
           priceCents: priceCentsToStore,
           specialInstructions: specialInstructions ?? null,
+          groupOrderParticipantId: groupOrderActor?.participantId ?? null,
         },
       });
       primaryCartItemId = created.id;
@@ -378,9 +401,14 @@ export async function updateCartItem(
   cartItemId: string,
   quantity: number,
   specialInstructions?: string | null,
-  selections?: CartItemSelectionInput[] | null
+  selections?: CartItemSelectionInput[] | null,
+  groupOrderActor?: ResolvedGroupCartActor | null
 ): Promise<Cart> {
   if (quantity <= 0) {
+    await enforceGroupOrderCartMutation(cartId, groupOrderActor ?? null, {
+      kind: "mutate",
+      cartItemId,
+    });
     await prisma.cartItem.deleteMany({ where: { id: cartItemId, cartId } });
     return getCartByIdOrThrow(cartId);
   }
@@ -392,6 +420,11 @@ export async function updateCartItem(
     },
   });
   if (!existingItem) return getCartByIdOrThrow(cartId);
+
+  await enforceGroupOrderCartMutation(cartId, groupOrderActor ?? null, {
+    kind: "mutate",
+    cartItemId,
+  });
 
   if (!(await isMenuItemIdOperational(existingItem.menuItem.vendorId, existingItem.menuItemId))) {
     throw new CartValidationError(
@@ -577,7 +610,15 @@ export async function updateCartItem(
   return getCartByIdOrThrow(cartId);
 }
 
-export async function removeCartItem(cartId: string, cartItemId: string): Promise<Cart> {
+export async function removeCartItem(
+  cartId: string,
+  cartItemId: string,
+  groupOrderActor?: ResolvedGroupCartActor | null
+): Promise<Cart> {
+  await enforceGroupOrderCartMutation(cartId, groupOrderActor ?? null, {
+    kind: "mutate",
+    cartItemId,
+  });
   await prisma.cartItem.deleteMany({ where: { id: cartItemId, cartId } });
   return getCartByIdOrThrow(cartId);
 }
@@ -713,8 +754,25 @@ export async function discardStaleCheckoutCartsForSession(sessionId: string): Pr
  */
 export async function loadActiveDisplayCartForSession(
   sessionId: string,
-  preferredPodId: string | null
+  preferredPodId: string | null,
+  /** Joiner participant token — loads the shared group cart for this pod when present. */
+  groupJoinToken?: string | null
 ) {
+  if (groupJoinToken && preferredPodId) {
+    const { resolveSharedGroupCartIdForPod } = await import("@/services/group-order.service");
+    const gid = await resolveSharedGroupCartIdForPod(preferredPodId, groupJoinToken);
+    if (gid) {
+      const row = await prisma.cart.findUnique({
+        where: { id: gid },
+        include: CART_DISPLAY_SESSION_CART_INCLUDE,
+      });
+      if (row) {
+        await unlinkCompletedCheckoutOrdersFromCart(row.id);
+        /** Same shape as `selectCartForSessionAndPod` below — /cart needs full vendor/menuItem on each line. */
+        return row;
+      }
+    }
+  }
   const rows = await prisma.cart.findMany({
     where: { sessionId },
     include: CART_DISPLAY_SESSION_CART_INCLUDE,

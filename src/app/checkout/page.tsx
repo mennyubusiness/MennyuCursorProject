@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 import { prisma } from "@/lib/db";
+import { lockGroupOrderSessionForCheckout } from "@/services/group-order.service";
 import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutProgress } from "./CheckoutProgress";
 import { computeOrderPricing } from "@/domain/fees";
@@ -22,8 +24,8 @@ export default async function CheckoutPage({
   if (!cartId) redirect("/cart");
 
   const sessionId = (await getMennyuSessionIdForRequest()) ?? "";
-  const cart = await prisma.cart.findFirst({
-    where: { id: cartId, sessionId },
+  const cart = await prisma.cart.findUnique({
+    where: { id: cartId },
     include: {
       items: {
         include: {
@@ -36,6 +38,20 @@ export default async function CheckoutPage({
     },
   });
   if (!cart || cart.items.length === 0) redirect("/cart");
+
+  const groupSession = await prisma.groupOrderSession.findUnique({
+    where: { cartId: cart.id },
+    select: { id: true, hostUserId: true, status: true },
+  });
+  const authSession = await auth();
+  if (groupSession) {
+    if (authSession?.user?.id !== groupSession.hostUserId) {
+      redirect("/cart?error=group_checkout_host_only");
+    }
+    await lockGroupOrderSessionForCheckout(cart.id, groupSession.hostUserId);
+  } else if (cart.sessionId !== sessionId) {
+    redirect("/cart");
+  }
 
   const validation = await validateCartForOrder({
     podId: cart.podId,
@@ -130,7 +146,7 @@ export default async function CheckoutPage({
       <CheckoutProgress activeStep={2} />
       <div className="mb-2">
         <Link
-          href={`/cart`}
+          href={groupSession ? "/cart?groupUnlock=1" : "/cart"}
           className="text-sm font-medium text-stone-600 hover:text-stone-900 hover:underline"
         >
           ← Back to cart
