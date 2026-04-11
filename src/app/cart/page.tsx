@@ -31,6 +31,7 @@ import {
   effectiveLineParticipantId,
   findParticipantRow,
 } from "@/lib/group-order-cart-read-model";
+import { shouldPollCollaborativeGroupCart } from "@/lib/collaborative-cart-freshness";
 import { JoinGroupOrderByCodeForm } from "./JoinGroupOrderByCodeForm";
 
 function modifierGroupCountFromDisplayMenuItem(menuItem: { _count?: { modifierGroups: number } }): number {
@@ -262,7 +263,10 @@ export default async function CartPage({
   }
 
   const showParticipantTotalsOnly = Boolean(goState.active && groupActor?.role === "participant");
-  const pollGroupCart = Boolean(goState.active);
+  const pollGroupCart = shouldPollCollaborativeGroupCart({
+    hasGroupSession: goState.active,
+    sessionStatus: goState.active ? goState.status : "",
+  });
   const myParticipantRow =
     showParticipantTotalsOnly && groupReadModel && viewerParticipantId
       ? findParticipantRow(groupReadModel, viewerParticipantId)
@@ -270,7 +274,7 @@ export default async function CartPage({
 
   return (
     <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
-      <GroupOrderCartPoll enabled={pollGroupCart} />
+      <GroupOrderCartPoll enabled={pollGroupCart} cartId={pollGroupCart ? cart.id : null} />
       <CheckoutProgress activeStep={1} />
       <JoinGroupOrderByCodeForm visible={!goState.active} className="mb-4" />
       <GroupOrderCartPanel

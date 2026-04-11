@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateCartItemAction, removeFromCartAction } from "@/actions/cart.actions";
+import { dispatchCartItemAdded } from "@/lib/cart-ui-feedback";
 import { ModifierModal } from "@/components/ModifierModal";
 import type { ModifierConfigForUI } from "@/lib/modifier-config";
 
@@ -63,7 +64,10 @@ export function CartItemActions({
     setLoading(true);
     try {
       const result = await updateCartItemAction(cartId, cartItemId, q, specialInstructions ?? null);
-      if (result?.success) await refresh();
+      if (result?.success) {
+        dispatchCartItemAdded();
+        await refresh();
+      }
       else if (result && !result.success) setError(result.error);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
@@ -94,6 +98,7 @@ export function CartItemActions({
     setLoading(true);
     try {
       await removeFromCartAction(cartId, cartItemId);
+      dispatchCartItemAdded();
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Remove failed");
@@ -160,6 +165,7 @@ export function CartItemActions({
           onClose={() => setModifierModalOpen(false)}
           onSuccess={() => {
             setModifierModalOpen(false);
+            dispatchCartItemAdded();
             refresh();
           }}
           vendorUsesDeliverect={vendorUsesDeliverect}

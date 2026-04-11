@@ -11,7 +11,6 @@ import {
   leaveGroupOrderAsParticipant,
   endGroupOrderAsHost,
   unlockGroupOrderSessionFromCheckout,
-  listParticipantsPublicForHost,
   findSessionByCartId,
 } from "@/services/group-order.service";
 import { getCartById } from "@/services/cart.service";
@@ -148,11 +147,18 @@ export async function getGroupOrderStateAction(cartId: string) {
   const hostId = authSession?.user?.id ?? null;
   const s = await findSessionByCartId(cartId);
   if (!s) return { active: false as const };
-  const data = await listParticipantsPublicForHost(cartId);
-  if (!data) return { active: false as const };
+  /** Single query — same payload as former findSession + listParticipantsPublicForHost. */
   return {
     active: true as const,
-    ...data,
+    sessionId: s.id,
+    joinCode: s.joinCode,
+    status: s.status,
+    podId: s.podId,
+    participants: s.participants.map((p) => ({
+      id: p.id,
+      displayName: p.displayName,
+      isHost: p.role === "host",
+    })),
     isHost: Boolean(hostId && s.hostUserId === hostId),
   };
 }

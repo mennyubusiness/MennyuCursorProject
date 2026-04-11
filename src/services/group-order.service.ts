@@ -3,7 +3,7 @@
  * See prisma GroupOrderSession / GroupOrderParticipant.
  */
 import { randomBytes, randomInt } from "crypto";
-import type { GroupOrderParticipantRole, GroupOrderSessionStatus } from "@prisma/client";
+import type { GroupOrderSessionStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CartValidationError } from "@/services/cart-validation-error";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
@@ -377,30 +377,5 @@ export async function getHostActorForCartIfGroupOrder(cartId: string): Promise<R
     podId: session.podId,
     participantId: hostP.id,
     role: "host",
-  };
-}
-
-export async function listParticipantsPublicForHost(cartId: string) {
-  const s = await prisma.groupOrderSession.findUnique({
-    where: { cartId },
-    include: {
-      participants: {
-        where: { leftAt: null },
-        select: { id: true, role: true, displayName: true, userId: true },
-      },
-    },
-  });
-  if (!s) return null;
-  return {
-    sessionId: s.id,
-    joinCode: s.joinCode,
-    status: s.status,
-    podId: s.podId,
-    participants: s.participants.map((p) => ({
-      id: p.id,
-      role: p.role as GroupOrderParticipantRole,
-      displayName: p.displayName,
-      isHost: p.role === "host",
-    })),
   };
 }

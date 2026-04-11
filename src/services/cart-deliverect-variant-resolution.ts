@@ -2,6 +2,7 @@
  * Deliverect variant families: parent shell MenuItem (e.g. PLU P-SPICY-RANCH) + variant-group
  * selections (size) must map to a leaf MenuItem row (e.g. VAR-SMALL…) for cart/order lines.
  */
+import { cache } from "react";
 import { isTopLevelDeliverectVariantGroupModifierGroup } from "@/lib/deliverect-subitem-nesting";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
@@ -436,18 +437,35 @@ export async function variantSelectionsPriceCentsForLeafCartLine(
 }
 
 /** Customer-facing label for the selected size/variation (e.g. "Medium") for cart/checkout display. */
-export async function getVariantOptionDisplayNameForLeaf(
+async function getVariantOptionDisplayNameForLeafImpl(
   vendorId: string,
-  deliverectVariantParentPlu: string | null | undefined,
-  deliverectLeafPlu: string | null | undefined
+  deliverectVariantParentPlu: string | null,
+  deliverectLeafPlu: string | null
 ): Promise<string | null> {
   const o = await findVariantModifierOptionForLeaf({
     vendorId,
-    deliverectPlu: deliverectLeafPlu ?? null,
-    deliverectVariantParentPlu: deliverectVariantParentPlu ?? null,
+    deliverectPlu: deliverectLeafPlu,
+    deliverectVariantParentPlu: deliverectVariantParentPlu,
   });
   return o?.name ?? null;
 }
+
+/**
+ * Request-scoped memoization (React `cache`): duplicate lines sharing the same vendor + parent/leaf PLU
+ * in one SSR request hit a single `findVariantModifierOptionForLeaf` chain. Does not cache across requests.
+ */
+export const getVariantOptionDisplayNameForLeaf = cache(
+  async (
+    vendorId: string,
+    deliverectVariantParentPlu: string | null | undefined,
+    deliverectLeafPlu: string | null | undefined
+  ): Promise<string | null> =>
+    getVariantOptionDisplayNameForLeafImpl(
+      vendorId,
+      deliverectVariantParentPlu ?? null,
+      deliverectLeafPlu ?? null
+    )
+);
 
 /**
  * Deliverect maps each **product variant** (leaf `MenuItem`) to a **modifier option** on the parent
