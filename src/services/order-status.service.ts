@@ -7,6 +7,7 @@ import {
   Prisma,
   VendorRoutingStatus,
   VendorFulfillmentStatus,
+  type OrderStatus,
   type VendorOrderStatusAuthority,
   type VendorOrderStatusSource,
 } from "@prisma/client";
@@ -60,6 +61,47 @@ export function deriveParentStatusFromVendorOrders(
     getEffectiveChildStateForParentDerivation(vo, vo.statusHistory ?? null)
   );
   return deriveParentStatusFromChildren(children);
+}
+
+/**
+ * Attach `derivedStatus`, `statusLabel`, and `resolvedPickupTimezone` using the same rules as
+ * {@link getOrderWithUnifiedStatus}. Used by both the full order read and the slim customer poll snapshot.
+ */
+export function attachUnifiedStatusDerivedFields<
+  T extends {
+    status: OrderStatus;
+    statusHistory: Array<{ status: string; createdAt: Date }>;
+    pod: { pickupTimezone: string | null };
+    vendorOrders: Array<{
+      routingStatus: string;
+      fulfillmentStatus: string;
+      statusHistory?: Array<{ source?: string | null }> | null;
+    }>;
+  },
+>(order: T): T & {
+  derivedStatus: ParentOrderStatus;
+  statusLabel: string;
+  resolvedPickupTimezone: string;
+} {
+  const derivedFromChildren = deriveParentStatusFromChildren(
+    order.vendorOrders.map((vo) =>
+      getEffectiveChildStateForParentDerivation(vo, vo.statusHistory ?? null)
+    )
+  );
+  const lastFromHistory =
+    order.statusHistory.length > 0
+      ? (order.statusHistory[order.statusHistory.length - 1].status as ParentOrderStatus)
+      : null;
+  const derived =
+    lastFromHistory ??
+    (order.status === "pending_payment" || order.status === "paid" ? order.status : derivedFromChildren) ??
+    derivedFromChildren;
+  return {
+    ...order,
+    derivedStatus: derived,
+    statusLabel: parentStatusLabel(derived),
+    resolvedPickupTimezone: resolvePickupTimezone(order.pod),
+  };
 }
 
 export async function updateVendorOrderStatus(
@@ -766,27 +808,31 @@ async function getOrderWithUnifiedStatusImpl(orderId: string) {
     },
   });
   if (!order) return null;
-  const derivedFromChildren = deriveParentStatusFromChildren(
-    order.vendorOrders.map((vo) =>
-      getEffectiveChildStateForParentDerivation(vo, vo.statusHistory)
-    )
-  );
-  // Current status = latest we recorded (last in statusHistory). Derivation from children never
-  // returns pending_payment/paid; when those are the latest, use parent order.status.
-  const lastFromHistory =
-    order.statusHistory.length > 0
-      ? (order.statusHistory[order.statusHistory.length - 1].status as ParentOrderStatus)
-      : null;
-  const derived =
-    lastFromHistory ??
-    (order.status === "pending_payment" || order.status === "paid" ? order.status : derivedFromChildren) ??
-    derivedFromChildren;
-  return {
-    ...order,
-    derivedStatus: derived,
-    statusLabel: parentStatusLabel(derived),
-    resolvedPickupTimezone: resolvePickupTimezone(order.pod),
-  };
+  return attachUnifiedStatusDerivedFields(order);
+}
+
+/**
+ * Customer status polling: same derived fields as the full order read, but without line items /
+ * modifier selections (large nested trees). Merge client-side with the initial full order to keep
+ * line-item UI stable.
+ */
+export async function getCustomerOrderStatusPollSnapshot(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      vendorOrders: {
+        include: {
+          vendor: { select: { id: true, name: true } },
+          statusHistory: { orderBy: { createdAt: "asc" } },
+        },
+      },
+      pod: true,
+      statusHistory: { orderBy: { createdAt: "asc" } },
+      refundAttempts: { orderBy: { createdAt: "desc" } },
+    },
+  });
+  if (!order) return null;
+  return attachUnifiedStatusDerivedFields(order);
 }
 
 export const getOrderWithUnifiedStatus = cache(getOrderWithUnifiedStatusImpl);

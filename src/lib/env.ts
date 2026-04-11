@@ -8,6 +8,8 @@ import { z } from "zod";
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   STRIPE_SECRET_KEY: z.string().optional(),
+  /** ISO country code for new Stripe Connect Express accounts (default US). */
+  STRIPE_CONNECT_ACCOUNT_COUNTRY: z.string().length(2).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   TWILIO_ACCOUNT_SID: z.string().optional(),

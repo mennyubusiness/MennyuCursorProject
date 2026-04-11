@@ -240,6 +240,15 @@ model Vendor {
   /// e.g. toast, square, clover, other, unknown
   posType                   String?
   onboardingStatus          AccountOnboardingStatus @default(ready_for_next_step)
+  /// Stripe Connect Express account id (acct_…); set when vendor starts payout onboarding.
+  stripeConnectedAccountId    String? @unique
+  stripeDetailsSubmitted      Boolean @default(false)
+  stripeChargesEnabled        Boolean @default(false)
+  stripePayoutsEnabled        Boolean @default(false)
+  /// First time both charges and payouts were enabled (payout-ready).
+  stripeOnboardingCompletedAt DateTime?
+  /// Snapshot of `requirements.currently_due` from Stripe for incomplete/restricted UX.
+  stripeRequirementsCurrentlyDue Json?
   cartItems               CartItem[]
   menuItems               MenuItem[]
   modifierGroups          ModifierGroup[]

@@ -1,4 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("react", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("react")>();
+  return { ...mod, cache: <T extends (...args: unknown[]) => unknown>(fn: T) => fn };
+});
+
 import { mergeDeliverectMappedIntoVendorOrder } from "./order-status.service";
 
 describe("mergeDeliverectMappedIntoVendorOrder", () => {

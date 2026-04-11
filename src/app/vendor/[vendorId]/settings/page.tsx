@@ -1,7 +1,10 @@
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { canManageVendor } from "@/lib/permissions";
+import { env } from "@/lib/env";
+import { retrieveAndSyncVendorConnectedAccount } from "@/services/stripe-connect.service";
 import { DeliverectMenuHealthPanel } from "@/components/deliverect/DeliverectMenuHealthPanel";
 import { prisma } from "@/lib/db";
 import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
@@ -15,14 +18,39 @@ import { MennyuLocationIdField } from "@/components/vendor/MennyuLocationIdField
 import { VendorPosConnectionPanel } from "@/components/vendor/VendorPosConnectionPanel";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { VendorBrandProfileForm } from "./VendorBrandProfileForm";
+import { VendorStripePayoutCard } from "./VendorStripePayoutCard";
+
+function countStripeRequirementsDue(value: unknown): number {
+  if (value == null) return 0;
+  return Array.isArray(value) ? value.length : 0;
+}
 
 export default async function VendorSettingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ vendorId: string }>;
+  searchParams: Promise<{ stripe_connect?: string; payout_notice?: string }>;
 }) {
   const { vendorId } = await params;
+  const sp = await searchParams;
   const session = await auth();
+
+  const connect = sp.stripe_connect;
+  if (connect === "return" || connect === "refresh") {
+    const userId = session?.user?.id;
+    if (userId && (await canManageVendor(userId, vendorId))) {
+      try {
+        await retrieveAndSyncVendorConnectedAccount(vendorId);
+      } catch (e) {
+        console.error("[vendor settings] Stripe Connect sync failed", e);
+      }
+    }
+    if (connect === "refresh") {
+      redirect(`/vendor/${vendorId}/settings?payout_notice=link_expired`);
+    }
+    redirect(`/vendor/${vendorId}/settings`);
+  }
 
   const [vendor, pendingRequests, recentRequests, currentPod] = await Promise.all([
     prisma.vendor.findUnique({
@@ -43,6 +71,11 @@ export default async function VendorSettingsPage({
         pendingDeliverectConnectionKey: true,
         deliverectAutoMapLastOutcome: true,
         deliverectAutoMapLastAt: true,
+        stripeConnectedAccountId: true,
+        stripeChargesEnabled: true,
+        stripePayoutsEnabled: true,
+        stripeOnboardingCompletedAt: true,
+        stripeRequirementsCurrentlyDue: true,
       },
     }),
     prisma.podMembershipRequest.findMany({
@@ -191,6 +224,20 @@ export default async function VendorSettingsPage({
           currentPod={currentPod ? { id: currentPod.pod.id, name: currentPod.pod.name } : null}
         />
         <VendorRecentPodRequests recentRequests={recentRequestsForComponent} />
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-lg font-semibold text-stone-900">Payouts</h3>
+        <VendorStripePayoutCard
+          vendorId={vendor.id}
+          stripeConnectConfigured={Boolean(env.STRIPE_SECRET_KEY)}
+          stripeConnectedAccountId={vendor.stripeConnectedAccountId ?? null}
+          stripeChargesEnabled={vendor.stripeChargesEnabled ?? false}
+          stripePayoutsEnabled={vendor.stripePayoutsEnabled ?? false}
+          stripeOnboardingCompletedAt={vendor.stripeOnboardingCompletedAt?.toISOString() ?? null}
+          requirementsPendingCount={countStripeRequirementsDue(vendor.stripeRequirementsCurrentlyDue)}
+          payoutNotice={sp.payout_notice === "link_expired" ? "link_expired" : null}
+        />
       </section>
 
       <section className="space-y-3">

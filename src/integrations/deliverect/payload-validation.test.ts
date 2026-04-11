@@ -110,6 +110,7 @@ describe("validateDeliverectPayload", () => {
           quantity: 1,
           priceCents: 1700,
           specialInstructions: null,
+          groupOrderParticipantId: null,
           createdAt: new Date("2024-01-01T00:00:00.000Z"),
           menuItemId: "m1",
           menuItem: {
@@ -177,6 +178,7 @@ describe("validateDeliverectPayload", () => {
           quantity: 1,
           priceCents: 500,
           specialInstructions: null,
+          groupOrderParticipantId: null,
           createdAt: new Date("2024-01-01T00:00:00.000Z"),
           menuItemId: "m1",
           menuItem: {

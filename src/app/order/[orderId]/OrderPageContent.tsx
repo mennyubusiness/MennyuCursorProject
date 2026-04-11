@@ -22,6 +22,7 @@ import {
 import { buildParentOrderProgressSteps, getVendorCustomerStage } from "./customer-order-progress";
 import { CustomerOrderProgressTimeline } from "./CustomerOrderProgressTimeline";
 import { VendorCustomerStatusStrip } from "./VendorCustomerStatusStrip";
+import { mergeCustomerOrderPollPatch } from "./merge-customer-order-poll";
 
 /** Order as returned by status API / server (dates may be ISO strings after JSON). */
 type OrderFromApi = Awaited<ReturnType<typeof getOrderStatusAction>>;
@@ -104,14 +105,17 @@ export function OrderPageContent({
         });
         if (!res.ok) return;
         const next = (await res.json()) as NonNullable<OrderFromApi>;
-        const fp = orderStatusFingerprint(next);
-        if (fp === lastFingerprintRef.current) return;
-        lastFingerprintRef.current = fp;
-        setOrder(normalizeOrderDates(next));
-        const nextDerived = next.derivedStatus ?? next.status;
-        if (isTerminalStatus(nextDerived as Parameters<typeof isTerminalStatus>[0])) {
-          clearPoll();
-        }
+        let becameTerminal = false;
+        setOrder((prev) => {
+          const merged = mergeCustomerOrderPollPatch(prev, next);
+          const fp = orderStatusFingerprint(merged);
+          if (fp === lastFingerprintRef.current) return prev;
+          lastFingerprintRef.current = fp;
+          const nextDerived = merged.derivedStatus ?? merged.status;
+          becameTerminal = isTerminalStatus(nextDerived as Parameters<typeof isTerminalStatus>[0]);
+          return normalizeOrderDates(merged);
+        });
+        if (becameTerminal) clearPoll();
       } catch {
         // ignore
       }
