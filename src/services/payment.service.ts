@@ -14,6 +14,10 @@ import {
   fetchStripeProcessingFeeCents,
   isDevBypassStripePaymentIntentId,
 } from "@/services/stripe-processing-fee.service";
+import {
+  ensureVendorPayoutTransferRecordsForPayment,
+  ensureVendorPayoutTransferRecordsForPaymentInTx,
+} from "@/services/vendor-payout-transfer.service";
 
 /** Development-only: bypass real Stripe when key is missing or placeholder. Not used in production. */
 function isDevPaymentBypass(): boolean {
@@ -203,6 +207,7 @@ export async function recordPaymentAndAllocations(
         },
       });
     }
+    await ensureVendorPayoutTransferRecordsForPaymentInTx(tx, payment.id);
   });
   return { created: true };
 }

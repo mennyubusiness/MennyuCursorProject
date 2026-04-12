@@ -255,6 +255,7 @@ model Vendor {
   podMembershipRequests   PodMembershipRequest[]
   pods                    PodVendor[]
   vendorOrders            VendorOrder[]
+  vendorPayoutTransfers   VendorPayoutTransfer[]
   menuImportJobs          MenuImportJob[]
   menuVersions            MenuVersion[]
   vendorMemberships       VendorMembership[]
@@ -683,6 +684,7 @@ model VendorOrder {
   deliverectPayloadValidation Json?
   lineItems               OrderLineItem[]
   paymentAllocations      PaymentAllocation[]
+  vendorPayoutTransfers   VendorPayoutTransfer[]
   order                   Order                       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   vendor                  Vendor                      @relation(fields: [vendorId], references: [id])
   issues                  VendorOrderIssue[]
@@ -783,9 +785,42 @@ model PaymentAllocation {
   createdAt                   DateTime    @default(now())
   payment                     Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   vendorOrder                 VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+  payoutTransfer              VendorPayoutTransfer?
 
   @@unique([paymentId, vendorOrderId])
   @@index([paymentId])
+}
+
+/// Stripe Connect transfer execution (one row per PaymentAllocation). Amount math comes from PaymentAllocation; this is execution truth.
+model VendorPayoutTransfer {
+  id                   String    @id @default(cuid())
+  paymentAllocationId  String    @unique
+  vendorId             String
+  vendorOrderId        String
+  /// Connected account acct_… when payout-ready; literal "blocked" when vendor not ready for transfers.
+  destinationAccountId String
+  amountCents          Int
+  currency             String    @default("usd")
+  /// pending | blocked | submitted | paid | failed
+  status               String
+  blockedReason        String?
+  stripeTransferId     String?   @unique
+  /// Stable key for Stripe idempotency (mennyu_vpt_<paymentAllocationId>).
+  idempotencyKey       String    @unique
+  batchKey             String?
+  failureMessage       String?
+  submittedAt          DateTime?
+  failedAt             DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  paymentAllocation PaymentAllocation @relation(fields: [paymentAllocationId], references: [id], onDelete: Cascade)
+  vendor            Vendor            @relation(fields: [vendorId], references: [id])
+  vendorOrder       VendorOrder       @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([batchKey])
+  @@index([vendorId])
 }
 
 model OrderStatusHistory {

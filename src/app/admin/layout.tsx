@@ -29,6 +29,9 @@ export default function AdminLayout({
             <Link href="/admin/pricing" className="text-stone-600 hover:text-stone-900">
               Pricing
             </Link>
+            <Link href="/admin/payout-transfers" className="text-stone-600 hover:text-stone-900">
+              Payout transfers
+            </Link>
             <span className="text-stone-400">|</span>
             <span className="text-xs uppercase tracking-wide text-stone-400">Marketplace</span>
             <Link href="/admin/vendors" className="text-stone-600 hover:text-stone-900">
