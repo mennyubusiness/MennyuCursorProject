@@ -19,6 +19,7 @@ import { mennyuVendorOrderToDeliverectPayload } from "@/integrations/deliverect/
 import type { DeliverectOrderRequest } from "@/integrations/deliverect/payloads";
 import {
   buildDeliverectPayloadValidationSnapshot,
+  describeDeliverectPayloadNestingForDebug,
   summarizeDeliverectPayloadValidationErrors,
   validateDeliverectPayload,
 } from "@/integrations/deliverect/payload-validation";
@@ -192,6 +193,9 @@ export async function submitVendorOrderToDeliverect(
           vendorId: vendorOrder.vendor.id,
           summary,
           errorTypes,
+          ...(errorTypes.includes("invalid_nesting")
+            ? { payloadNestingOutline: describeDeliverectPayloadNestingForDebug(payload) }
+            : {}),
         })
       );
       await recordDeliverectPayloadValidationFailure(vendorOrderId, payload, summary, snapshot);

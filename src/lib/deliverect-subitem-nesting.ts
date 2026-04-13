@@ -30,19 +30,117 @@ export function isTopLevelDeliverectVariantGroupModifierGroup(group: {
 }
 
 /**
- * How many **selected** top-level variant-group options sit on this line — each becomes one level in
- * `nestVariantGroupSelections` (same basis as `transform.ts` and cart checks).
+ * Line shape shared by cart checks, {@link validateDeliverectSubItemsChainDepth}, and
+ * {@link partitionTopLevelVariantSelectionsForDeliverectChain} / `transform.ts`.
  */
-export function countSubItemsChainVariantSelections(line: {
+export type LineSelectionsForDeliverectVariantChain = {
   selections: Array<{
     modifierOption: {
-      modifierGroup: { deliverectIsVariantGroup: boolean | null; parentModifierOptionId: string | null };
+      modifierGroup: {
+        id: string;
+        sortOrder: number;
+        name?: string;
+        deliverectIsVariantGroup: boolean | null;
+        parentModifierOptionId: string | null;
+      };
     };
   }>;
-}): number {
-  return line.selections.filter((s) =>
+};
+
+/** Compact JSON-safe detail when subItems chain validation fails (logs / support). */
+export function deliverectSubitemsChainValidationDetail(
+  line: LineSelectionsForDeliverectVariantChain & {
+    menuItem?: { id?: string; name?: string | null };
+  }
+): {
+  menuItemId?: string;
+  menuItemName?: string | null;
+  topLevelVariantGroups: Array<{
+    modifierGroupId: string;
+    modifierGroupName?: string;
+    selectionCount: number;
+    countsTowardSubItemsChain: boolean;
+  }>;
+  chainStepCount: number;
+  demotedToFlatModifierSelectionCount: number;
+} {
+  const variantSels = line.selections.filter((s) =>
     isTopLevelDeliverectVariantGroupModifierGroup(s.modifierOption.modifierGroup)
-  ).length;
+  );
+  const byGroup = new Map<
+    string,
+    { name?: string; selectionCount: number }
+  >();
+  for (const s of variantSels) {
+    const g = s.modifierOption.modifierGroup;
+    const cur = byGroup.get(g.id) ?? { name: g.name, selectionCount: 0 };
+    cur.selectionCount += 1;
+    byGroup.set(g.id, cur);
+  }
+  const { chainSelections, demotedToFlatModifierSelections } =
+    partitionTopLevelVariantSelectionsForDeliverectChain(line);
+  return {
+    menuItemId: line.menuItem?.id,
+    menuItemName: line.menuItem?.name ?? null,
+    topLevelVariantGroups: [...byGroup.entries()].map(([modifierGroupId, v]) => ({
+      modifierGroupId,
+      modifierGroupName: v.name,
+      selectionCount: v.selectionCount,
+      countsTowardSubItemsChain: v.selectionCount === 1,
+    })),
+    chainStepCount: chainSelections.length,
+    demotedToFlatModifierSelectionCount: demotedToFlatModifierSelections.length,
+  };
+}
+
+/**
+ * Top-level Deliverect “variant group” selections split for `subItems` nesting vs flat `modifiers`.
+ *
+ * Only **one** selection per modifier group may participate in the vertical `subItems` chain (e.g. Size →
+ * Crust). If the customer picks **multiple** options from the **same** variant-flagged group (multi-max
+ * “pick up to N”), those are **not** extra chain levels — they are sent as flat modifiers like normal
+ * add-ons. Counting raw selections here was a false positive when max selection > 1.
+ */
+export function partitionTopLevelVariantSelectionsForDeliverectChain(
+  line: LineSelectionsForDeliverectVariantChain
+): {
+  /** One entry per distinct variant group that has exactly one selected option on this line (chain depth). */
+  chainSelections: LineSelectionsForDeliverectVariantChain["selections"];
+  /** Multi-select from the same variant-flagged group — serialize as `modifiers`, not nested `subItems`. */
+  demotedToFlatModifierSelections: LineSelectionsForDeliverectVariantChain["selections"];
+} {
+  const variantSels = line.selections.filter((s) =>
+    isTopLevelDeliverectVariantGroupModifierGroup(s.modifierOption.modifierGroup)
+  );
+  const byGroup = new Map<string, LineSelectionsForDeliverectVariantChain["selections"]>();
+  for (const s of variantSels) {
+    const gid = s.modifierOption.modifierGroup.id;
+    const list = byGroup.get(gid) ?? [];
+    list.push(s);
+    byGroup.set(gid, list);
+  }
+  const chainSelections: LineSelectionsForDeliverectVariantChain["selections"] = [];
+  const demotedToFlatModifierSelections: LineSelectionsForDeliverectVariantChain["selections"] = [];
+  for (const [, list] of byGroup) {
+    if (list.length === 1) {
+      chainSelections.push(list[0]!);
+    } else {
+      demotedToFlatModifierSelections.push(...list);
+    }
+  }
+  chainSelections.sort(
+    (a, b) => a.modifierOption.modifierGroup.sortOrder - b.modifierOption.modifierGroup.sortOrder
+  );
+  return { chainSelections, demotedToFlatModifierSelections };
+}
+
+/**
+ * How many **vertical** `subItems` steps we will emit for variant groups on this line (same basis as
+ * `nestVariantGroupSelections` in `transform.ts`). Not the raw count of variant-flagged options when
+ * multi-select is used within one group.
+ */
+export function countSubItemsChainVariantSelections(line: LineSelectionsForDeliverectVariantChain): number {
+  return partitionTopLevelVariantSelectionsForDeliverectChain(line).chainSelections.length;
 }
 
 export function deliverectSubItemsChainDepth(args: {

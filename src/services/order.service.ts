@@ -22,9 +22,9 @@ import {
 import { formatPickupDetailLine } from "@/lib/pickup-display";
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
 import {
+  countSubItemsChainVariantSelections,
   deliverectSubItemsChainLimitMessage,
   isDeliverectSubItemsChainDepthAllowed,
-  isTopLevelDeliverectVariantGroupModifierGroup,
   maxSubItemsChainVariantStepsForProductShape,
 } from "@/lib/deliverect-subitem-nesting";
 import {
@@ -197,7 +197,12 @@ export async function validateCartForOrder(cart: {
       select: {
         id: true,
         modifierGroup: {
-          select: { deliverectIsVariantGroup: true, parentModifierOptionId: true },
+          select: {
+            id: true,
+            sortOrder: true,
+            deliverectIsVariantGroup: true,
+            parentModifierOptionId: true,
+          },
         },
       },
     });
@@ -206,13 +211,15 @@ export async function validateCartForOrder(cart: {
       if (!item.vendor?.deliverectChannelLinkId?.trim()) continue;
       const sels = item.selections ?? [];
       if (sels.length === 0) continue;
-      let subItemsChainVariantSteps = 0;
-      for (const s of sels) {
-        const row = optGroupById.get(s.modifierOptionId);
-        if (row && isTopLevelDeliverectVariantGroupModifierGroup(row.modifierGroup)) {
-          subItemsChainVariantSteps += 1;
-        }
-      }
+      const subItemsChainVariantSteps = countSubItemsChainVariantSelections({
+        selections: sels
+          .map((s) => {
+            const row = optGroupById.get(s.modifierOptionId);
+            if (!row) return null;
+            return { modifierOption: { modifierGroup: row.modifierGroup } };
+          })
+          .filter((x): x is NonNullable<typeof x> => x != null),
+      });
       const hasParentPlu = Boolean(item.menuItem.deliverectVariantParentPlu?.trim());
       if (
         !isDeliverectSubItemsChainDepthAllowed({

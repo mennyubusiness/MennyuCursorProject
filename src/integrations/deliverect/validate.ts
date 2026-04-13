@@ -6,6 +6,7 @@ import { MenuVersionState } from "@prisma/client";
 import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import {
   countSubItemsChainVariantSelections,
+  deliverectSubitemsChainValidationDetail,
   deliverectSubItemsChainLimitMessage,
   isDeliverectSubItemsChainDepthAllowed,
   maxSubItemsChainVariantStepsForProductShape,
@@ -58,6 +59,19 @@ export function validateDeliverectSubItemsChainDepth(
     ) {
       const label = line.menuItem?.name ?? line.name;
       const max = maxSubItemsChainVariantStepsForProductShape(hasParent);
+      console.warn(
+        JSON.stringify({
+          event: "deliverect_subitems_chain_validation_failed",
+          code: "SUBITEMS_NESTING_LIMIT",
+          hasDeliverectVariantParentPlu: hasParent,
+          maxChainStepsAllowed: max,
+          countedChainSteps: chainSteps,
+          detail: deliverectSubitemsChainValidationDetail({
+            ...line,
+            menuItem: line.menuItem ?? undefined,
+          }),
+        })
+      );
       return {
         valid: false,
         error: deliverectSubItemsChainLimitMessage(label, max),

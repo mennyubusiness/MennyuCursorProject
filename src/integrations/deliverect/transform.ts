@@ -15,7 +15,10 @@ import type {
   DeliverectModifier,
 } from "./payloads";
 import type { HydratedVendorOrder } from "./load";
-import { isTopLevelDeliverectVariantGroupModifierGroup } from "@/lib/deliverect-subitem-nesting";
+import {
+  isTopLevelDeliverectVariantGroupModifierGroup,
+  partitionTopLevelVariantSelectionsForDeliverectChain,
+} from "@/lib/deliverect-subitem-nesting";
 import {
   deliverectRestaurantFacingPaymentCents,
   vendorOrderItemSubtotalCents,
@@ -189,8 +192,12 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
   }
   const itemNote = line.specialInstructions?.trim();
 
-  const variantGroupSels = line.selections.filter(selectionIsTopLevelDeliverectVariantGroup);
-  const modifierSels = line.selections.filter((s) => !selectionIsTopLevelDeliverectVariantGroup(s));
+  const { chainSelections: variantGroupSels, demotedToFlatModifierSelections: demotedVariantAsModifiers } =
+    partitionTopLevelVariantSelectionsForDeliverectChain({ selections: line.selections });
+  const modifierSels = [
+    ...line.selections.filter((s) => !selectionIsTopLevelDeliverectVariantGroup(s)),
+    ...demotedVariantAsModifiers,
+  ];
   const modifierOnly = buildModifiersForLine(modifierSels);
 
   const parentPlu = line.menuItem?.deliverectVariantParentPlu?.trim();

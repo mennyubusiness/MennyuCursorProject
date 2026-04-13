@@ -69,20 +69,38 @@ describe("deliverectSubItemsChainDepth", () => {
 });
 
 describe("countSubItemsChainVariantSelections", () => {
-  const g = (variant: boolean, parent: string | null) => ({
-    modifierGroup: { deliverectIsVariantGroup: variant, parentModifierOptionId: parent },
+  const g = (variant: boolean, parent: string | null, id: string, sortOrder = 0) => ({
+    modifierGroup: {
+      id,
+      sortOrder,
+      deliverectIsVariantGroup: variant,
+      parentModifierOptionId: parent,
+    },
   });
 
-  it("counts only top-level variant groups toward the root subItems chain", () => {
+  it("counts distinct top-level variant groups (chain steps), not raw selections", () => {
     expect(
       countSubItemsChainVariantSelections({
         selections: [
-          { modifierOption: g(true, null) },
-          { modifierOption: g(true, null) },
-          { modifierOption: g(true, "opt-parent") },
+          { modifierOption: g(true, null, "mg-a", 0) },
+          { modifierOption: g(true, null, "mg-b", 1) },
+          { modifierOption: g(true, "opt-parent", "mg-nested", 2) },
         ],
       })
     ).toBe(2);
+  });
+
+  it("does not count multiple picks from the same variant-flagged group as multiple chain levels", () => {
+    expect(
+      countSubItemsChainVariantSelections({
+        selections: [
+          { modifierOption: g(true, null, "mg-ing", 0) },
+          { modifierOption: g(true, null, "mg-ing", 0) },
+          { modifierOption: g(true, null, "mg-ing", 0) },
+          { modifierOption: g(true, null, "mg-ing", 0) },
+        ],
+      })
+    ).toBe(0);
   });
 
   it("does not count nested groups even when flagged as variant group", () => {

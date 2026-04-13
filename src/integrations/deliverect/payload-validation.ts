@@ -97,6 +97,47 @@ function subItemChainDepth(s: DeliverectOrderSubLine): number {
   return 1 + Math.max(...s.subItems.map(subItemChainDepth));
 }
 
+function modifierNestedOutline(m: DeliverectModifier): { plu: string; nestedChildCount: number; children?: ReturnType<typeof modifierNestedOutline>[] } {
+  const nested = m.nestedModifiers?.filter((x) => x != null) ?? [];
+  return {
+    plu: m.plu,
+    nestedChildCount: nested.length,
+    ...(nested.length > 0 ? { children: nested.map(modifierNestedOutline) } : {}),
+  };
+}
+
+function subLineNestingOutline(s: DeliverectOrderSubLine): {
+  plu: string;
+  subItemsDepthBelow: number;
+  subItemChildren: ReturnType<typeof subLineNestingOutline>[];
+  modifierOutlines: ReturnType<typeof modifierNestedOutline>[];
+} {
+  return {
+    plu: s.plu,
+    subItemsDepthBelow: subItemChainDepth(s),
+    subItemChildren: (s.subItems ?? []).map(subLineNestingOutline),
+    modifierOutlines: (s.modifiers ?? []).map(modifierNestedOutline),
+  };
+}
+
+/**
+ * Compact outline of `subItems` depth and modifier `nestedModifiers` (non-empty only) for debugging validation failures.
+ */
+export function describeDeliverectPayloadNestingForDebug(payload: DeliverectOrderRequest): unknown {
+  return {
+    items: payload.items.map((it, index) => ({
+      index,
+      plu: it.plu,
+      rootSubItemsMaxDepth:
+        (it.subItems?.length ?? 0) === 0
+          ? 0
+          : Math.max(...(it.subItems ?? []).map(subItemChainDepth)),
+      subItems: (it.subItems ?? []).map(subLineNestingOutline),
+      topLevelModifiers: (it.modifiers ?? []).map(modifierNestedOutline),
+    })),
+  };
+}
+
 function validateSubLine(
   s: DeliverectOrderSubLine,
   path: string,
@@ -160,7 +201,8 @@ function validateModifier(
       err("invalid_modifier", "Modifier price must be a non-negative integer (cents)", `${path}.price`)
     );
   }
-  (m.nestedModifiers ?? []).forEach((nm, i) => {
+  const nestedMods = m.nestedModifiers?.filter((x) => x != null) ?? [];
+  nestedMods.forEach((nm, i) => {
     validateModifier(nm, `${path}.nestedModifiers[${i}]`, errors, nestDepth + 1);
   });
 }

@@ -229,6 +229,91 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     expect(variation.modifiers).toBeUndefined();
   });
 
+  it("multi-select from one variant-flagged group: flat modifiers only, no false subItems depth", () => {
+    const base = minimalVendorOrder();
+    const ingGroup = {
+      id: "mg-ingredients",
+      name: "Ingredients",
+      sortOrder: 0,
+      parentModifierOptionId: null,
+      deliverectIsVariantGroup: true,
+    };
+    const mkSel = (optId: string, plu: string, name: string) => ({
+      modifierOptionId: optId,
+      nameSnapshot: name,
+      priceCentsSnapshot: 0,
+      quantity: 1,
+      modifierOption: {
+        id: optId,
+        name,
+        deliverectModifierId: `mod-${optId}`,
+        deliverectModifierPlu: plu,
+        modifierGroupId: ingGroup.id,
+        modifierGroup: ingGroup,
+      },
+    });
+    const payload = mennyuVendorOrderToDeliverectPayload({
+      vendorOrder: {
+        ...base,
+        lineItems: [
+          {
+            id: "line-multi-ing",
+            menuItemId: "mi-salad",
+            name: "Salad",
+            quantity: 1,
+            priceCents: 900,
+            specialInstructions: null,
+            menuItem: {
+              id: "mi-salad",
+              name: "Salad",
+              deliverectProductId: "prod-salad",
+              deliverectPlu: "SALAD-001",
+            },
+            selections: [
+              mkSel("o1", "ING-1", "Tomato"),
+              mkSel("o2", "ING-2", "Cucumber"),
+              mkSel("o3", "ING-3", "Feta"),
+              mkSel("o4", "ING-4", "Olives"),
+            ],
+          },
+        ],
+      } as NonNullable<HydratedVendorOrder>,
+      channelLinkId: "ch-link-cert",
+    });
+
+    const item = payload.items[0]!;
+    expect(item.subItems).toBeUndefined();
+    expect(item.modifiers).toHaveLength(4);
+    expect(item.modifiers?.every((m) => m.plu.startsWith("ING-"))).toBe(true);
+
+    const vo = {
+      ...base,
+      lineItems: [
+        {
+          id: "line-multi-ing",
+          menuItemId: "mi-salad",
+          name: "Salad",
+          quantity: 1,
+          priceCents: 900,
+          specialInstructions: null,
+          menuItem: {
+            id: "mi-salad",
+            name: "Salad",
+            deliverectProductId: "prod-salad",
+            deliverectPlu: "SALAD-001",
+          },
+          selections: [
+            mkSel("o1", "ING-1", "Tomato"),
+            mkSel("o2", "ING-2", "Cucumber"),
+            mkSel("o3", "ING-3", "Feta"),
+            mkSel("o4", "ING-4", "Olives"),
+          ],
+        },
+      ],
+    } as NonNullable<HydratedVendorOrder>;
+    expect(validateDeliverectPayload(payload, vo).isValid).toBe(true);
+  });
+
   it("single-SKU shell (no variant parent PLU): variant-group steps use subItems; other modifiers stay on the line", () => {
     const base = minimalVendorOrder();
     const payload = mennyuVendorOrderToDeliverectPayload({
