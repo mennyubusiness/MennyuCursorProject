@@ -3,26 +3,46 @@ import { PayoutTransferBatchPanel } from "./PayoutTransferBatchPanel";
 import { TransferReversalBatchPanel } from "./TransferReversalBatchPanel";
 
 export default async function AdminPayoutTransfersPage() {
-  const transfers = await prisma.vendorPayoutTransfer.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 80,
-    select: {
-      id: true,
-      paymentAllocationId: true,
-      vendorOrderId: true,
-      vendorId: true,
-      destinationAccountId: true,
-      amountCents: true,
-      currency: true,
-      status: true,
-      blockedReason: true,
-      stripeTransferId: true,
-      idempotencyKey: true,
-      batchKey: true,
-      failureMessage: true,
-      createdAt: true,
-    },
-  });
+  const [transfers, reversals] = await Promise.all([
+    prisma.vendorPayoutTransfer.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 80,
+      select: {
+        id: true,
+        paymentAllocationId: true,
+        vendorOrderId: true,
+        vendorId: true,
+        destinationAccountId: true,
+        amountCents: true,
+        currency: true,
+        status: true,
+        blockedReason: true,
+        stripeTransferId: true,
+        idempotencyKey: true,
+        batchKey: true,
+        failureMessage: true,
+        createdAt: true,
+      },
+    }),
+    prisma.vendorPayoutTransferReversal.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 80,
+      select: {
+        id: true,
+        vendorPayoutTransferId: true,
+        vendorOrderId: true,
+        orderId: true,
+        refundAttemptId: true,
+        amountCents: true,
+        currency: true,
+        status: true,
+        stripeTransferReversalId: true,
+        failureMessage: true,
+        batchKey: true,
+        createdAt: true,
+      },
+    }),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -85,6 +105,8 @@ export default async function AdminPayoutTransfersPage() {
           </tbody>
         </table>
       </div>
+
+      <TransferReversalBatchPanel />
 
       <div>
         <h2 className="text-lg font-semibold text-stone-900">Transfer reversals</h2>

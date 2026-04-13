@@ -115,6 +115,27 @@ export async function precheckRefundEligibility(
   return { eligible: true };
 }
 
+async function prepareTransferReversalsAfterSuccessfulRefund(refundAttemptId: string): Promise<void> {
+  try {
+    const r = await prepareTransferReversalsForRefundAttempt(refundAttemptId);
+    console.info(
+      JSON.stringify({
+        event: "prepare_transfer_reversals_after_refund",
+        ...r,
+      })
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(
+      JSON.stringify({
+        event: "prepare_transfer_reversals_after_refund_error",
+        refundAttemptId,
+        message: msg,
+      })
+    );
+  }
+}
+
 /**
  * Execute a refund from a RefundDecision. Checks idempotency (skip if already succeeded),
  * runs precheck, creates Stripe refund, then persists outcome in RefundAttempt.
