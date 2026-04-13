@@ -1,93 +1,67 @@
-import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { getLatestActionableMenuImportJobIdByVendorMap } from "@/lib/admin-menu-import-queries";
-import { AdminVendorToggle } from "./AdminVendorToggle";
+import { AdminVendorsTable, type AdminVendorListRow } from "./AdminVendorsTable";
 
 export default async function AdminVendorsPage() {
-  const vendors = await prisma.vendor.findMany({
-    include: {
-      pods: { include: { pod: { select: { id: true, name: true } } } },
-      _count: { select: { vendorOrders: true } },
-    },
-    orderBy: { name: "asc" },
-  });
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  const pendingJobByVendor = await getLatestActionableMenuImportJobIdByVendorMap(vendors.map((v) => v.id));
+  const [vendors, podsForFilter] = await Promise.all([
+    prisma.vendor.findMany({
+      include: {
+        pods: { include: { pod: { select: { id: true, name: true } } } },
+        _count: { select: { vendorOrders: true } },
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.pod.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  const vendorIds = vendors.map((v) => v.id);
+
+  const [activityRows, orders30dRows] =
+    vendorIds.length === 0
+      ? [[], []]
+      : await Promise.all([
+          prisma.vendorOrder.groupBy({
+            by: ["vendorId"],
+            where: { vendorId: { in: vendorIds } },
+            _max: { updatedAt: true },
+          }),
+          prisma.vendorOrder.groupBy({
+            by: ["vendorId"],
+            where: { vendorId: { in: vendorIds }, createdAt: { gte: thirtyDaysAgo } },
+            _count: { _all: true },
+          }),
+        ]);
+
+  const lastActive = new Map(
+    activityRows.map((r) => [r.vendorId, r._max.updatedAt as Date | null | undefined])
+  );
+  const orders30d = new Map(orders30dRows.map((r) => [r.vendorId, r._count._all]));
+
+  const rows: AdminVendorListRow[] = vendors.map((v) => ({
+    id: v.id,
+    name: v.name,
+    slug: v.slug,
+    isActive: v.isActive,
+    pods: v.pods.map((pv) => ({ podId: pv.pod.id, podName: pv.pod.name })),
+    ordersAllTime: v._count.vendorOrders,
+    ordersLast30Days: orders30d.get(v.id) ?? 0,
+    lastActiveAtIso: lastActive.get(v.id)?.toISOString() ?? null,
+  }));
 
   return (
     <div>
       <h1 className="text-xl font-semibold text-stone-900">Vendors</h1>
-      <p className="mt-1 text-sm text-stone-600">
-        Manage marketplace entities. Toggle active state and view pod associations.
+      <p className="mt-1 max-w-2xl text-sm text-stone-600">
+        Browse and filter vendors. Open a row or choose <strong>Manage</strong> for menu history, POS mapping, and
+        vendor tools.
       </p>
 
-      <div className="mt-6 overflow-x-auto">
-        <table className="w-full min-w-[400px] border-collapse rounded-lg border border-stone-200 bg-white">
-          <thead>
-            <tr className="border-b border-stone-200 bg-stone-50">
-              <th className="px-4 py-2 text-left text-sm font-medium text-stone-700">Name</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-stone-700">Active</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-stone-700">Pods</th>
-              <th className="px-4 py-2 text-right text-sm font-medium text-stone-700">Orders</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-stone-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {vendors.map((v) => (
-              <tr key={v.id} className="border-b border-stone-100">
-                <td className="px-4 py-2">
-                  <span className="font-medium text-stone-900">{v.name}</span>
-                  <p className="text-xs text-stone-500">{v.slug}</p>
-                  {pendingJobByVendor.has(v.id) && (
-                    <p className="mt-1">
-                      <Link
-                        href={`/admin/menu-imports/${pendingJobByVendor.get(v.id)}#admin-menu-import-publish`}
-                        className="inline-block rounded bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 hover:bg-sky-200"
-                      >
-                        Menu update available — review
-                      </Link>
-                    </p>
-                  )}
-                </td>
-                <td className="px-4 py-2">
-                  <span className={v.isActive ? "text-green-700" : "text-stone-500"}>
-                    {v.isActive ? "Yes" : "No"}
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-sm text-stone-600">
-                  {v.pods.length === 0
-                    ? "—"
-                    : v.pods.map((p) => p.pod.name).join(", ")}
-                </td>
-                <td className="px-4 py-2 text-right text-sm text-stone-600">
-                  {v._count.vendorOrders}
-                </td>
-                <td className="px-4 py-2">
-                  <AdminVendorToggle vendorId={v.id} isActive={v.isActive} />
-                  <Link
-                    href={`/admin/vendors/${v.id}/menu-history`}
-                    className="ml-2 text-sm text-sky-800 hover:underline"
-                  >
-                    Menu history
-                  </Link>
-                  <Link
-                    href={`/admin/vendors/${v.id}/deliverect-mapping`}
-                    className="ml-2 text-sm text-amber-800 hover:underline"
-                  >
-                    Deliverect IDs
-                  </Link>
-                  <Link
-                    href={`/vendor/${v.id}/orders`}
-                    className="ml-2 text-sm text-stone-600 hover:underline"
-                  >
-                    Vendor area
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <AdminVendorsTable rows={rows} podOptions={podsForFilter} />
     </div>
   );
 }

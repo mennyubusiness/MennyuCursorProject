@@ -32,12 +32,12 @@ export function menuImportListSummaryLine(
 
   if (job.status === "awaiting_review" && job.draftVersionId) {
     if (blocking > 0) {
-      return `${blocking} blocking issue${blocking === 1 ? "" : "s"} — fix in Deliverect or adjust before publish`;
+      return `${blocking} blocking issue${blocking === 1 ? "" : "s"} — resolve before publish`;
     }
-    return "Review changes and publish to update your live menu";
+    return "Unpublished changes — review to publish";
   }
   if (job.status === "succeeded") {
-    return "Live menu updated from this import";
+    return "Published";
   }
   if (job.status === "failed") {
     return "Import failed — see Advanced for details";

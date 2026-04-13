@@ -144,8 +144,11 @@ export default async function AdminMenuImportJobPage({
     <div className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Link href="/admin/menu-imports" className="text-sm text-stone-600 hover:underline">
-            ← Menu sync
+          <Link
+            href={`/admin/vendors/${job.vendorId}/menu-history#vendor-imports`}
+            className="text-sm text-stone-600 hover:underline"
+          >
+            ← Menu management
           </Link>
           <h1 className="mt-2 text-xl font-semibold text-stone-900">{job.vendor.name}</h1>
           <p className="mt-1 text-sm text-stone-700">{headlineStatus}</p>
@@ -220,8 +223,11 @@ export default async function AdminMenuImportJobPage({
           </div>
         </div>
         <p className="text-sm text-stone-600">
-          <Link href="/admin/menu-imports" className="font-medium text-sky-800 hover:underline">
-            Back to all updates
+          <Link
+            href={`/admin/vendors/${job.vendorId}/menu-history#vendor-imports`}
+            className="font-medium text-sky-800 hover:underline"
+          >
+            Back to vendor imports
           </Link>
         </p>
       </div>

@@ -94,11 +94,10 @@ export function VendorMenuHistoryClient({
 
   return (
     <div className="space-y-6">
+      <h2 className="text-lg font-semibold text-stone-900">Published snapshots</h2>
       <p className="text-sm text-stone-600">
-        Read-only versioned menus for <span className="font-medium text-stone-900">{vendorName}</span>. Rollback creates
-        a <strong>new</strong> published <code className="rounded bg-stone-100 px-0.5">MenuVersion</code> (copy of an
-        archived snapshot), archives the current published row, and reapplies the canonical menu to live tables — same
-        rules as publish. Prior rows are not edited.
+        Version history for <span className="font-medium text-stone-900">{vendorName}</span>. Rollback publishes a new
+        snapshot from an older version (live tables updated; audit trail kept).
       </p>
 
       <AdminApiAuthHint show={rollbackMissingAdminQuery} className="mt-2" />
@@ -116,7 +115,7 @@ export function VendorMenuHistoryClient({
         </p>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="border-b border-stone-200 bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
             <tr>

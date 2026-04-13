@@ -101,28 +101,44 @@ export type AdminMenuImportJobListRow = Prisma.MenuImportJobGetPayload<{
   };
 }>;
 
+const adminMenuImportJobListSelect = {
+  id: true,
+  source: true,
+  status: true,
+  startedAt: true,
+  completedAt: true,
+  draftVersionId: true,
+  errorCode: true,
+  vendorId: true,
+  vendor: { select: { id: true, name: true, slug: true } },
+  draftVersion: { select: { id: true, state: true, publishedBy: true } },
+  menuImportRawPayload: { select: { payloadSha256: true } },
+  issues: {
+    where: { severity: MenuImportIssueSeverity.blocking, waived: false },
+    select: { id: true },
+  },
+  _count: { select: { issues: true } },
+} satisfies Prisma.MenuImportJobSelect;
+
 export async function fetchAdminMenuImportJobsList(limit = 100): Promise<AdminMenuImportJobListRow[]> {
   return prisma.menuImportJob.findMany({
     take: limit,
     orderBy: { startedAt: "desc" },
-    select: {
-      id: true,
-      source: true,
-      status: true,
-      startedAt: true,
-      completedAt: true,
-      draftVersionId: true,
-      errorCode: true,
-      vendorId: true,
-      vendor: { select: { id: true, name: true, slug: true } },
-      draftVersion: { select: { id: true, state: true, publishedBy: true } },
-      menuImportRawPayload: { select: { payloadSha256: true } },
-      issues: {
-        where: { severity: MenuImportIssueSeverity.blocking, waived: false },
-        select: { id: true },
-      },
-      _count: { select: { issues: true } },
-    },
+    select: adminMenuImportJobListSelect,
+  });
+}
+
+/** Import jobs for a single vendor (admin menu management hub). */
+export async function fetchAdminMenuImportJobsForVendor(
+  vendorId: string,
+  limit = 100
+): Promise<AdminMenuImportJobListRow[]> {
+  if (!vendorId?.trim()) return [];
+  return prisma.menuImportJob.findMany({
+    where: { vendorId: vendorId.trim() },
+    take: limit,
+    orderBy: { startedAt: "desc" },
+    select: adminMenuImportJobListSelect,
   });
 }
 

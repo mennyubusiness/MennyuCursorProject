@@ -17,12 +17,17 @@ export default async function AdminPodQrPage({ params }: { params: Promise<{ pod
   return (
     <div>
       <div className="mb-6">
-        <Link
-          href="/admin/pods"
-          className="text-sm font-medium text-stone-600 underline-offset-4 hover:text-stone-900 hover:underline"
-        >
-          ← Pods
-        </Link>
+        <p className="text-sm text-stone-500">
+          <Link href="/admin/pods" className="hover:underline">
+            Pods
+          </Link>
+          <span className="mx-1">/</span>
+          <Link href={`/admin/pods/${pod.id}`} className="hover:underline">
+            {pod.name}
+          </Link>
+          <span className="mx-1">/</span>
+          <span className="text-stone-800">QR</span>
+        </p>
         <h1 className="mt-2 text-xl font-semibold text-stone-900">QR code — {pod.name}</h1>
         <p className="mt-1 text-sm text-stone-600">
           For on-site setup and support. Same link pod owners see in settings.

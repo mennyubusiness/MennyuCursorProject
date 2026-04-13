@@ -98,7 +98,7 @@ const TAKE_OPEN_ISSUE_ORDERS = 500;
 const TAKE_REFUND_FAILED = 100;
 
 const VO_INCLUDE = {
-  order: { select: { id: true, customerPhone: true, pod: { select: { name: true } } } },
+  order: { select: { id: true, customerPhone: true, pod: { select: { id: true, name: true } } } },
   vendor: { select: { name: true, deliverectChannelLinkId: true } },
 } as const;
 
@@ -432,7 +432,7 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
 async function fetchFailedRefundAttentionItems(now: Date): Promise<AdminAttentionItem[]> {
   const failed = await prisma.refundAttempt.findMany({
     where: { status: "failed", dismissedAsLegacyAt: null },
-    include: { order: { select: { id: true, customerPhone: true, pod: { select: { name: true } } } } },
+    include: { order: { select: { id: true, customerPhone: true, pod: { select: { id: true, name: true } } } } },
     orderBy: { updatedAt: "desc" },
     take: TAKE_REFUND_FAILED,
   });
@@ -480,11 +480,22 @@ export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
   let orderLevelItems: AdminAttentionItem[] = [];
   if (orderIdsNeedingOrderLevelItem.length > 0) {
     const limitedOrderIds = orderIdsNeedingOrderLevelItem.slice(0, TAKE_OPEN_ISSUE_ORDERS);
-    const orders = await prisma.order.findMany({
-      where: { id: { in: limitedOrderIds } },
-      select: { id: true, customerPhone: true, createdAt: true, pod: { select: { name: true } } },
-    });
+    const [orders, openOrderIssues] = await Promise.all([
+      prisma.order.findMany({
+        where: { id: { in: limitedOrderIds } },
+        select: { id: true, customerPhone: true, createdAt: true, pod: { select: { id: true, name: true } } },
+      }),
+      prisma.orderIssue.findMany({
+        where: { orderId: { in: limitedOrderIds }, status: "OPEN" },
+        select: { id: true, orderId: true },
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
     const orderMap = new Map(orders.map((o) => [o.id, o]));
+    const firstOpenIssueIdByOrder = new Map<string, string>();
+    for (const row of openOrderIssues) {
+      if (!firstOpenIssueIdByOrder.has(row.orderId)) firstOpenIssueIdByOrder.set(row.orderId, row.id);
+    }
 
     orderLevelItems = limitedOrderIds.map((orderId) => {
       const order = orderMap.get(orderId);
@@ -502,6 +513,7 @@ export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
         currentStatus: "Open issue",
         orderId,
         vendorOrderId: null,
+        issueId: firstOpenIssueIdByOrder.get(orderId) ?? null,
         primaryEntityHref: `/admin/orders/${orderId}`,
         order: order
           ? { id: order.id, customerPhone: order.customerPhone, pod: order.pod ?? undefined }
@@ -511,7 +523,8 @@ export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
   }
 
   const all = [...voItems, ...orderLevelItems, ...refundFailedItems];
-  return all.sort((a, b) => b.ageMinutes - a.ageMinutes);
+  /** Newest / most recent queue entries first (smaller age = order created more recently). */
+  return all.sort((a, b) => a.ageMinutes - b.ageMinutes);
 }
 
 /**

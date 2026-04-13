@@ -4,6 +4,7 @@ import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { fetchVendorMenuVersionHistoryForAdmin } from "@/lib/admin-vendor-menu-history-queries";
+import { VendorImportsSection } from "./VendorImportsSection";
 import { VendorMenuHistoryClient, type MenuHistoryRowClient } from "./VendorMenuHistoryClient";
 
 export default async function AdminVendorMenuHistoryPage({
@@ -36,14 +37,26 @@ export default async function AdminVendorMenuHistoryPage({
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <div>
-        <Link href="/admin/vendors" className="text-sm text-stone-600 hover:underline">
-          ← Vendors
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold text-stone-900">Published menu history</h1>
-        <p className="mt-0.5 font-mono text-sm text-stone-600">{vendor.name}</p>
+        <p className="text-sm text-stone-500">
+          <Link href="/admin/vendors" className="hover:underline">
+            Vendors
+          </Link>
+          <span className="mx-1">/</span>
+          <Link href={`/admin/vendors/${vendor.id}`} className="hover:underline">
+            {vendor.name}
+          </Link>
+          <span className="mx-1">/</span>
+          <span className="text-stone-800">Menu</span>
+        </p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900">Menu management</h1>
+        <p className="mt-2 max-w-2xl text-sm text-stone-600">
+          Deliverect imports, draft review, and published menu snapshots for <strong>{vendor.name}</strong>.
+        </p>
       </div>
+
+      <VendorImportsSection vendorId={vendor.id} vendorName={vendor.name} />
 
       <VendorMenuHistoryClient
         vendorId={vendor.id}

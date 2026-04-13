@@ -86,7 +86,11 @@ export default async function AdminVendorDeliverectMappingPage({
           Vendors
         </Link>
         <span className="mx-1">/</span>
-        <span className="text-stone-800">{vendor.name}</span>
+        <Link href={`/admin/vendors/${vendor.id}`} className="hover:underline">
+          {vendor.name}
+        </Link>
+        <span className="mx-1">/</span>
+        <span className="text-stone-800">POS &amp; Deliverect</span>
       </p>
       <h1 className="mt-2 text-xl font-semibold text-stone-900">Deliverect ID mapping</h1>
       <p className="mt-1 text-sm text-stone-600">
@@ -155,10 +159,10 @@ export default async function AdminVendorDeliverectMappingPage({
           </p>
           <p className="mt-2">
             <Link
-              href={`/admin/menu-imports/${latestMenuImport.id}#admin-menu-import-publish`}
+              href={`/admin/vendors/${vendorId}/menu-history#vendor-imports`}
               className="font-medium text-sky-900 underline hover:text-sky-950"
             >
-              Open import job → Review & publish
+              Open menu management → Review &amp; publish
             </Link>
           </p>
         </div>
