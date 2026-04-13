@@ -4,7 +4,10 @@
  */
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { nonEmptyStringField } from "@/integrations/deliverect/webhook-inbound-shared";
+import {
+  extractChannelLinkIdSecret,
+  nonEmptyStringField,
+} from "@/integrations/deliverect/webhook-inbound-shared";
 import { logDeliverectPrepTimeWebhook } from "@/integrations/deliverect/deliverect-aux-webhook-log";
 
 function parsePickupInstant(iso: string): Date | null {
@@ -15,6 +18,40 @@ function parsePickupInstant(iso: string): Date | null {
 export type ApplyDeliverectPrepTimeResult =
   | { ok: true; outcome: "updated" | "noop_same_time"; vendorOrderId: string; orderId: string; pickupTime: string }
   | { ok: false; error: "order_not_found" | "invalid_pickup_time"; detail?: string };
+
+/**
+ * Prep-time callbacks (Deliverect) often omit `channelLinkId` in JSON; sandbox HMAC uses the channel link id.
+ * Merge it from our Vendor row when we can resolve the order, without changing `rawBody` used for HMAC.
+ */
+export async function enrichPrepTimePayloadForWebhookVerification(
+  parsed: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  if (extractChannelLinkIdSecret(parsed)) {
+    return parsed;
+  }
+
+  const channelOrderId = nonEmptyStringField(parsed.channelOrderId);
+  const deliverectOrderId = nonEmptyStringField(parsed.orderId);
+
+  let channelLinkId: string | null = null;
+  if (channelOrderId) {
+    const row = await prisma.vendorOrder.findFirst({
+      where: { id: channelOrderId },
+      select: { vendor: { select: { deliverectChannelLinkId: true } } },
+    });
+    channelLinkId = nonEmptyStringField(row?.vendor.deliverectChannelLinkId);
+  }
+  if (!channelLinkId && deliverectOrderId) {
+    const row = await prisma.vendorOrder.findFirst({
+      where: { deliverectOrderId },
+      select: { vendor: { select: { deliverectChannelLinkId: true } } },
+    });
+    channelLinkId = nonEmptyStringField(row?.vendor.deliverectChannelLinkId);
+  }
+
+  if (!channelLinkId) return parsed;
+  return { ...parsed, channelLinkId };
+}
 
 /**
  * Apply POS preparation-time / pickup time update to the Mennyu order row.

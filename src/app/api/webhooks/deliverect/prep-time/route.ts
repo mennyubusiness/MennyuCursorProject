@@ -8,8 +8,12 @@ import { prisma } from "@/lib/db";
 import { webhookIdempotencyKey } from "@/lib/idempotency";
 import { verifyDeliverectInboundWebhookJson } from "@/integrations/deliverect/deliverect-inbound-webhook-verify";
 import { unwrapDeliverectSingleObjectPayload } from "@/integrations/deliverect/deliverect-webhook-unwrap";
+import { isDeliverectWebhookProduction } from "@/integrations/deliverect/webhook-inbound-shared";
 import { logDeliverectPrepTimeWebhook } from "@/integrations/deliverect/deliverect-aux-webhook-log";
-import { applyDeliverectPrepTimeFromPayload } from "@/services/deliverect-prep-time-webhook.service";
+import {
+  applyDeliverectPrepTimeFromPayload,
+  enrichPrepTimePayloadForWebhookVerification,
+} from "@/services/deliverect-prep-time-webhook.service";
 import { persistDeliverectOrderWebhookRejection } from "../verification-audit";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +38,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(unwrap.body, { status: unwrap.status });
   }
 
-  const v = await verifyDeliverectInboundWebhookJson(request, rawBody, unwrap.object);
+  let parsedForVerify = unwrap.object;
+  if (!isDeliverectWebhookProduction()) {
+    parsedForVerify = await enrichPrepTimePayloadForWebhookVerification(unwrap.object);
+  }
+
+  const v = await verifyDeliverectInboundWebhookJson(request, rawBody, parsedForVerify);
   if (!v.ok) return v.response;
 
   const idemKey = webhookIdempotencyKey("deliverect_prep_time", null, rawBody);
