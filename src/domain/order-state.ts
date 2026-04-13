@@ -84,6 +84,14 @@ export function deriveParentStatusFromChildren(
 
     if (completedCount === children.length) return "completed";
     if (cancelledCount === children.length) return "cancelled";
+
+    // Multi-vendor: once every child is fulfillment-terminal (completed or cancelled), the parent
+    // should complete if any line fulfilled — cancelled lines do not block (e.g. completed + cancelled).
+    const allFulfillmentTerminal = children.every(
+      (c) => c.fulfillmentStatus === "completed" || c.fulfillmentStatus === "cancelled"
+    );
+    if (allFulfillmentTerminal && completedCount > 0) return "completed";
+
     if (
       completedCount === 0 &&
       (routingFailedCount + cancelledCount === children.length)
