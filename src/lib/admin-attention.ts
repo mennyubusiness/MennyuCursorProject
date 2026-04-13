@@ -69,7 +69,7 @@ export interface AdminAttentionItem {
   /** Direct link for admin queue rows (e.g. /admin/orders/{orderId}). */
   primaryEntityHref: string;
 
-  order?: { id: string; customerPhone: string | null; pod?: { name: string } | null };
+  order?: { id: string; customerPhone: string | null; pod?: { id: string; name: string } | null };
   vendor?: { name: string };
   deliverectLastError?: string | null;
   deliverectAttempts?: number | null;
