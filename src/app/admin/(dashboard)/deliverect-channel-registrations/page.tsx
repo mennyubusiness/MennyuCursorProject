@@ -56,12 +56,12 @@ export default async function AdminDeliverectChannelRegistrationsPage() {
     <div>
       <p className="text-sm text-stone-500">
         <Link href="/admin" className="hover:underline">
-          Overview
+          Dashboard
         </Link>
         <span className="mx-1">/</span>
-        <span className="text-stone-800">Deliverect channel registration</span>
+        <span className="text-stone-800">Channel registration</span>
       </p>
-      <h1 className="mt-2 text-xl font-semibold text-stone-900">Deliverect channel registration webhooks</h1>
+      <h1 className="mt-2 text-xl font-semibold text-stone-900">Channel registration</h1>
       <p className="mt-1 max-w-3xl text-sm text-stone-600">
         Inbound registrations from Deliverect (register / active / inactive). Rows highlight likely review items when
         Mennyu could not auto-map. Use <strong>Apply payload</strong> to attach a stored <code className="text-xs">channelLinkId</code>{" "}

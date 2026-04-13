@@ -57,7 +57,7 @@ export default async function AdminAnalyticsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-stone-900">Admin Analytics</h1>
+        <h1 className="text-xl font-semibold text-stone-900">Analytics</h1>
         <p className="mt-1 text-sm text-stone-500">
           Platform-wide order and operations overview
         </p>

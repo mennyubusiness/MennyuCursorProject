@@ -6,9 +6,9 @@ export default async function AdminExceptionsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-stone-900">Needs attention</h1>
+      <h1 className="text-xl font-semibold text-stone-900">Issues</h1>
       <p className="mt-1 text-sm text-stone-600">
-        Work queue — open an order for the full action set (single place to resolve).
+        Work queue for routing failures and stuck orders — open an order for the full action set.
       </p>
 
       <ExceptionList initialItems={items} />

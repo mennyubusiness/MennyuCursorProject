@@ -1,12 +1,40 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PodLogo } from "@/components/images/PodLogo";
-import { VendorLogo } from "@/components/images/VendorLogo";
-import { FavoritePodButton } from "@/components/retention/FavoritePodButton";
+import { auth } from "@/auth";
 import { RecentPodViewTracker } from "@/components/retention/RecentViewTracker";
+import { PodPageHero } from "@/components/pod/PodPageHero";
+import { PodVendorCard } from "@/components/pod/PodVendorCard";
 import { POD_QR_ENTRY_VALUE } from "@/lib/pod-ordering-url";
 import { prisma } from "@/lib/db";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
+
+function availabilityForVendor(v: {
+  isActive: boolean;
+  mennyuOrdersPaused: boolean;
+}): {
+  unavailable: boolean;
+  statusLabel: string;
+  showBrowseHint: boolean;
+} {
+  const status = getVendorAvailabilityStatus(v);
+  const unavailable = status !== "open";
+  const isPosClosed = status === "closed";
+  const isMennyuNotAccepting = status === "mennyu_paused";
+  const isInactive = status === "inactive";
+  const statusLabel = isPosClosed
+    ? "Closed"
+    : isMennyuNotAccepting
+      ? "Not accepting orders"
+      : isInactive
+        ? "Unavailable"
+        : "Open for orders";
+
+  return {
+    unavailable,
+    statusLabel,
+    showBrowseHint: isMennyuNotAccepting || isPosClosed,
+  };
+}
 
 export default async function PodPage({
   params,
@@ -34,7 +62,6 @@ export default async function PodPage({
               isActive: true,
               mennyuOrdersPaused: true,
               imageUrl: true,
-              accentColor: true,
             },
           },
         },
@@ -44,10 +71,19 @@ export default async function PodPage({
   });
   if (!pod || !pod.isActive) notFound();
 
-  const vendorCount = pod.vendors.length;
+  const vendorRows = pod.vendors.map((pv) => ({
+    pv,
+    availability: availabilityForVendor(pv.vendor),
+  }));
+
+  const session = await auth();
+  const groupOrderCartUrl = `/cart?startGroupOrder=1&podId=${encodeURIComponent(pod.id)}`;
+  const groupOrderHref = session?.user
+    ? groupOrderCartUrl
+    : `/login?callbackUrl=${encodeURIComponent(groupOrderCartUrl)}`;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 rounded-2xl border border-stone-200/60 bg-gradient-to-b from-stone-200/40 to-stone-50/90 px-4 py-8 sm:px-6 sm:py-10">
       <RecentPodViewTracker podId={pod.id} podName={pod.name} />
       {isQrEntry && (
         <div
@@ -58,150 +94,69 @@ export default async function PodPage({
           <p className="mt-1 text-emerald-900/90">Scan, order, and pick up in one trip.</p>
         </div>
       )}
-      <header
-        className="border-b border-stone-200 pb-8"
-        style={
-          pod.accentColor
-            ? { borderBottomWidth: 2, borderBottomColor: pod.accentColor }
-            : undefined
-        }
-      >
-        <PodLogo imageUrl={pod.imageUrl} podName={pod.name} />
-        <p
-          className="mt-6 text-xs font-semibold uppercase tracking-wide text-stone-500"
-          style={pod.accentColor ? { color: pod.accentColor } : undefined}
-        >
-          Food pod
-        </p>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">{pod.name}</h1>
-          <FavoritePodButton podId={pod.id} podName={pod.name} labeled />
+
+      <PodPageHero
+        podId={pod.id}
+        name={pod.name}
+        description={pod.description}
+        address={pod.address}
+        imageUrl={pod.imageUrl}
+        accentColor={pod.accentColor}
+        vendorCount={pod.vendors.length}
+      />
+
+      {pod.vendors.length > 0 && (
+        <div className="rounded-2xl border border-stone-200/80 bg-white/80 px-4 py-4 shadow-sm sm:px-5">
+          <p className="text-center text-sm text-stone-700 sm:text-left">
+            <Link
+              href={groupOrderHref}
+              className="font-semibold text-stone-900 underline decoration-stone-300 underline-offset-4 transition hover:bg-mennyu-primary hover:text-black hover:no-underline focus-visible:rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary"
+            >
+              Ordering with friends? Start a group order →
+            </Link>
+          </p>
         </div>
-        {pod.address && (
-          <p className="mt-3 max-w-2xl text-base text-stone-600">{pod.address}</p>
-        )}
-        {pod.description && (
-          <p className="mt-3 max-w-2xl text-stone-600">{pod.description}</p>
-        )}
-        <p className="mt-4 text-sm text-stone-500">
-          {vendorCount === 0
-            ? "No vendors listed yet."
-            : `${vendorCount} vendor${vendorCount === 1 ? "" : "s"} at this location`}
-        </p>
-      </header>
+      )}
 
       <section aria-labelledby="pod-vendors-heading">
-        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 id="pod-vendors-heading" className="text-xl font-semibold text-stone-900">
-              Vendors
-            </h2>
-            <p className="mt-1 text-sm text-stone-500">
-              Browse menus into one cart — vendors prepare separately, and pickup timing can vary by
-              kitchen.
-            </p>
-          </div>
+        <div className="mb-6">
+          <h2 id="pod-vendors-heading" className="text-xl font-semibold text-stone-900 sm:text-2xl">
+            Vendors
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600">
+            Open any kitchen for its full menu — your cart is shared across vendors. Pickup timing can vary.
+          </p>
         </div>
 
         {pod.vendors.length === 0 ? (
-          <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-10 text-center">
+          <div className="rounded-2xl border border-stone-200/80 bg-white/90 p-10 text-center shadow-sm">
             <p className="text-stone-700">No vendors in this pod right now.</p>
             <p className="mt-2 text-sm text-stone-500">Check back later or explore other pods.</p>
             <Link
               href="/explore"
-              className="mt-6 inline-flex rounded-xl bg-mennyu-primary px-5 py-2.5 text-sm font-semibold text-black hover:bg-mennyu-secondary"
+              className="mt-6 inline-flex rounded-xl bg-mennyu-primary px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition hover:bg-mennyu-secondary"
             >
               Explore pods
             </Link>
           </div>
         ) : (
-          <ul className="grid gap-4 sm:grid-cols-2">
-            {pod.vendors.map((pv) => {
-              const status = getVendorAvailabilityStatus(pv.vendor);
-              const unavailable = status !== "open";
-              const isPosClosed = status === "closed";
-              const isMennyuNotAccepting = status === "mennyu_paused";
-              const isInactive = status === "inactive";
-              const statusLabel = isPosClosed
-                ? "Closed"
-                : isMennyuNotAccepting
-                  ? "Not accepting orders"
-                  : isInactive
-                    ? "Unavailable"
-                    : "Open for orders";
-
-              return (
-                <li key={pv.vendor.id}>
-                  <Link
-                    href={`/pod/${podId}/vendor/${pv.vendor.id}`}
-                    className={`flex h-full gap-4 rounded-2xl border p-4 shadow-sm transition hover:border-mennyu-primary/40 hover:shadow-md sm:p-5 ${
-                      unavailable
-                        ? "border-stone-200 bg-stone-50/90"
-                        : "border-stone-200 bg-white"
-                    }`}
-                    style={
-                      pv.vendor.accentColor
-                        ? {
-                            borderLeftWidth: 4,
-                            borderLeftStyle: "solid",
-                            borderLeftColor: pv.vendor.accentColor,
-                          }
-                        : undefined
-                    }
-                    aria-label={`${pv.vendor.name} — ${statusLabel}. View menu.`}
-                  >
-                    <VendorLogo imageUrl={pv.vendor.imageUrl} vendorName={pv.vendor.name} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold text-stone-900">{pv.vendor.name}</h3>
-                        {pv.isFeatured && (
-                          <span
-                            className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-xs font-medium text-stone-800"
-                            style={
-                              pod.accentColor
-                                ? {
-                                    borderColor: pod.accentColor,
-                                    color: pod.accentColor,
-                                    backgroundColor: "transparent",
-                                  }
-                                : undefined
-                            }
-                          >
-                            Featured
-                          </span>
-                        )}
-                        {!unavailable ? (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900">
-                            Open
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-                            {statusLabel}
-                          </span>
-                        )}
-                      </div>
-                      {pv.vendor.description && (
-                        <p className="mt-2 line-clamp-2 text-sm text-stone-600">
-                          {pv.vendor.description}
-                        </p>
-                      )}
-                      {(isMennyuNotAccepting || isPosClosed) && (
-                        <p className="mt-2 text-xs text-stone-500">You can still browse the menu.</p>
-                      )}
-                      <span
-                        className="mt-3 inline-flex items-center text-sm font-medium text-mennyu-primary"
-                        style={pv.vendor.accentColor ? { color: pv.vendor.accentColor } : undefined}
-                      >
-                        View menu
-                        <span aria-hidden className="ml-1">
-                          →
-                        </span>
-                      </span>
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
+          <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {vendorRows.map(({ pv, availability }) => (
+              <li key={pv.vendor.id} className="flex min-h-0">
+                <PodVendorCard
+                  podId={podId}
+                  variant="grid"
+                  vendor={{
+                    id: pv.vendor.id,
+                    name: pv.vendor.name,
+                    description: pv.vendor.description,
+                    imageUrl: pv.vendor.imageUrl,
+                  }}
+                  isFeatured={pv.isFeatured}
+                  availability={availability}
+                />
+              </li>
+            ))}
           </ul>
         )}
       </section>

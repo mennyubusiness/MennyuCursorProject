@@ -73,7 +73,7 @@ export function ExceptionList({
   if (items.length === 0) {
     return (
       <div className="mt-6 rounded-lg border border-stone-200 bg-white p-6 text-center">
-        <p className="text-sm font-medium text-stone-700">Nothing needs attention right now</p>
+        <p className="text-sm font-medium text-stone-700">No issues right now</p>
         <p className="mt-1 text-sm text-stone-500">
           All vendor orders are either progressing normally or already resolved.
         </p>

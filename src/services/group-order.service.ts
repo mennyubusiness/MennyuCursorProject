@@ -41,48 +41,68 @@ export async function startGroupOrderSession(args: {
   podId: string;
   hostDisplayName: string;
 }): Promise<{ sessionId: string; joinCode: string }> {
-  const existing = await prisma.groupOrderSession.findUnique({ where: { cartId: args.cartId } });
-  if (existing) {
-    throw new Error("GROUP_ORDER_SESSION_EXISTS");
-  }
-
   const cart = await prisma.cart.findUnique({ where: { id: args.cartId }, select: { id: true, podId: true } });
   if (!cart || cart.podId !== args.podId) {
     throw new Error("CART_POD_MISMATCH");
+  }
+
+  const existing = await prisma.groupOrderSession.findUnique({
+    where: { cartId: args.cartId },
+    select: { id: true, joinCode: true, hostUserId: true, podId: true },
+  });
+  if (existing) {
+    if (existing.hostUserId !== args.hostUserId || existing.podId !== args.podId) {
+      throw new Error("GROUP_ORDER_SESSION_EXISTS");
+    }
+    return { sessionId: existing.id, joinCode: existing.joinCode };
   }
 
   const joinCode = await generateUniqueJoinCode();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   const hostToken = newJoinToken();
 
-  await prisma.$transaction(async (tx) => {
-    const session = await tx.groupOrderSession.create({
-      data: {
-        joinCode,
-        podId: args.podId,
-        cartId: args.cartId,
-        hostUserId: args.hostUserId,
-        status: "active",
-        expiresAt,
-      },
-    });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const session = await tx.groupOrderSession.create({
+        data: {
+          joinCode,
+          podId: args.podId,
+          cartId: args.cartId,
+          hostUserId: args.hostUserId,
+          status: "active",
+          expiresAt,
+        },
+      });
 
-    const hostParticipant = await tx.groupOrderParticipant.create({
-      data: {
-        groupOrderSessionId: session.id,
-        userId: args.hostUserId,
-        role: "host",
-        displayName: args.hostDisplayName.slice(0, 120),
-        phoneE164: null,
-        joinToken: hostToken,
-      },
-    });
+      const hostParticipant = await tx.groupOrderParticipant.create({
+        data: {
+          groupOrderSessionId: session.id,
+          userId: args.hostUserId,
+          role: "host",
+          displayName: args.hostDisplayName.slice(0, 120),
+          phoneE164: null,
+          joinToken: hostToken,
+        },
+      });
 
-    await tx.cartItem.updateMany({
+      await tx.cartItem.updateMany({
+        where: { cartId: args.cartId },
+        data: { groupOrderParticipantId: hostParticipant.id },
+      });
+    });
+  } catch (e) {
+    const isUnique = e && typeof e === "object" && "code" in e && (e as { code: string }).code === "P2002";
+    if (!isUnique) throw e;
+    const dup = await prisma.groupOrderSession.findUnique({
       where: { cartId: args.cartId },
-      data: { groupOrderParticipantId: hostParticipant.id },
+      select: { id: true, joinCode: true, hostUserId: true, podId: true },
     });
-  });
+    if (!dup) throw e;
+    if (dup.hostUserId !== args.hostUserId || dup.podId !== args.podId) {
+      throw new Error("GROUP_ORDER_SESSION_EXISTS");
+    }
+    return { sessionId: dup.id, joinCode: dup.joinCode };
+  }
 
   const s = await prisma.groupOrderSession.findUnique({
     where: { cartId: args.cartId },

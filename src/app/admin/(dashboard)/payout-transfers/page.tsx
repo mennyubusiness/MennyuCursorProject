@@ -26,9 +26,9 @@ export default async function AdminPayoutTransfersPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold text-stone-900">Vendor payout transfers</h1>
+        <h1 className="text-2xl font-semibold text-stone-900">Payouts</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Execution state for Stripe Connect transfers (source amount: PaymentAllocation.netVendorTransferCents).
+          Stripe Connect transfer execution (source: PaymentAllocation.netVendorTransferCents).
         </p>
       </div>
 

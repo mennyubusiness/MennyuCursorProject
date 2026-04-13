@@ -15,6 +15,7 @@ type SearchParams = Promise<{
   vendor?: string;
   attention?: string;
   q?: string;
+  today?: string;
 }>;
 
 /** Filter dropdown: value is DB `OrderStatus`; label is operator-facing. */
@@ -53,11 +54,18 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
   const vendorId = params.vendor?.trim() || undefined;
   const attentionOnly = params.attention === "1";
   const searchTerm = params.q?.trim() || undefined;
+  const todayOnly = params.today === "1";
 
-  const hasFilters = Boolean(podId || statusFilter || vendorId || attentionOnly);
+  const hasFilters = Boolean(podId || statusFilter || vendorId || attentionOnly || todayOnly);
   const hasSearch = Boolean(searchTerm);
   const clearSearchHref = hasSearch
-    ? `/admin/orders${buildQueryString({ pod: podId, status: statusFilter, vendor: vendorId, attention: attentionOnly ? "1" : undefined })}`
+    ? `/admin/orders${buildQueryString({
+        pod: podId,
+        status: statusFilter,
+        vendor: vendorId,
+        attention: attentionOnly ? "1" : undefined,
+        today: todayOnly ? "1" : undefined,
+      })}`
     : null;
   const resetAllHref = hasSearch || hasFilters ? "/admin/orders" : null;
 
@@ -119,6 +127,18 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
     delete (where as Record<string, unknown>).podId;
     delete (where as Record<string, unknown>).status;
     delete (where as Record<string, unknown>).id;
+  }
+
+  if (todayOnly) {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const snapshot = JSON.parse(JSON.stringify(where)) as OrderWhere;
+    Object.keys(where).forEach((k) => delete (where as Record<string, unknown>)[k]);
+    if (Object.keys(snapshot).length === 0) {
+      where.createdAt = { gte: startOfToday };
+    } else {
+      where.AND = [snapshot, { createdAt: { gte: startOfToday } }];
+    }
   }
 
   const [orders, pods, vendors] = await Promise.all([
@@ -241,7 +261,17 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                 defaultChecked={attentionOnly}
                 className="rounded border-stone-300"
               />
-              Needs attention only
+              Issues only
+            </label>
+            <label className="flex items-center gap-2 text-sm text-stone-600">
+              <input
+                type="checkbox"
+                name="today"
+                value="1"
+                defaultChecked={todayOnly}
+                className="rounded border-stone-300"
+              />
+              Today only
             </label>
             <button
               type="submit"
@@ -255,6 +285,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
 
       {/* Search state feedback + reset */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-stone-600">
+        {todayOnly && <span className="text-stone-700">Showing orders created today (local time).</span>}
         {hasSearch && (
           <span>
             Showing results for &quot;<span className="font-medium text-stone-800">{searchTerm}</span>&quot;

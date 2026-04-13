@@ -41,7 +41,7 @@ export default async function AdminMenuImportsListPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-stone-900">Menu updates</h1>
+        <h1 className="text-xl font-semibold text-stone-900">Menu sync</h1>
         <p className="mt-1 text-sm text-stone-600">
           Review Deliverect imports and publish when ready — one row per import.
         </p>

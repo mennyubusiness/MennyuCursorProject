@@ -4,7 +4,11 @@ import { cookies, headers } from "next/headers";
 import { auth } from "@/auth";
 import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
-import { discardStaleCheckoutCartsForSession, loadActiveDisplayCartForSession } from "@/services/cart.service";
+import {
+  discardStaleCheckoutCartsForSession,
+  getOrCreateCart,
+  loadActiveDisplayCartForSession,
+} from "@/services/cart.service";
 import { getActiveOrderByCustomerPhone, validateCartItemsForDisplay, getCartValidationMessage } from "@/services/order.service";
 import type { CartForValidation } from "@/services/order.service";
 import { MenuItemImage } from "@/components/images/MenuItemImage";
@@ -18,8 +22,11 @@ import {
 import { CartItemActions } from "./CartItemActions";
 import { CheckoutProgress } from "../checkout/CheckoutProgress";
 import { GROUP_ORDER_JOIN_TOKEN_COOKIE } from "@/lib/group-order-cookies";
-import { unlockGroupCheckoutAction } from "@/actions/group-order.actions";
-import { getGroupOrderStateAction } from "@/actions/group-order.actions";
+import {
+  unlockGroupCheckoutAction,
+  getGroupOrderStateAction,
+  startGroupOrderFromCartAction,
+} from "@/actions/group-order.actions";
 import { GroupOrderCartPanel } from "./GroupOrderCartPanel";
 import { GroupOrderCartPoll } from "./GroupOrderCartPoll";
 import { GroupOrderLockedBanner } from "./GroupOrderLockedBanner";
@@ -47,6 +54,8 @@ export default async function CartPage({
     error?: string;
     groupUnlock?: string;
     groupError?: string;
+    startGroupOrder?: string;
+    podId?: string | string[];
   }>;
 }) {
   const headersList = await headers();
@@ -68,16 +77,59 @@ export default async function CartPage({
   const checkoutErrorCode = params.error ? decodeURIComponent(params.error) : null;
   const groupStartError = params.groupError ? decodeURIComponent(params.groupError) : null;
   const joinTok = (await cookies()).get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null;
+  const authSession = await auth();
+
+  const startGroupOrder = params.startGroupOrder === "1";
+  const podIdRaw = params.podId;
+  const podIdFromQuery =
+    typeof podIdRaw === "string" ? podIdRaw : Array.isArray(podIdRaw) ? podIdRaw[0] : undefined;
+  const targetPodForGroup = (podIdFromQuery?.trim() || currentPodId)?.trim() || null;
+
+  if (startGroupOrder) {
+    if (!targetPodForGroup) {
+      redirect(
+        `/cart?groupError=${encodeURIComponent("Open a pod, then use Start group order from that pod.")}`
+      );
+    }
+    if (!authSession?.user?.id) {
+      const dest = `/cart?startGroupOrder=1&podId=${encodeURIComponent(targetPodForGroup)}`;
+      redirect(`/login?callbackUrl=${encodeURIComponent(dest)}`);
+    }
+    if (sessionId !== "__no_session__") {
+      await getOrCreateCart(targetPodForGroup, sessionId);
+    }
+  }
+
+  const preferredPodId = startGroupOrder && targetPodForGroup ? targetPodForGroup : currentPodId;
   const perfT0 = cartPagePerfNow();
-  let cart = await loadActiveDisplayCartForSession(sessionId, currentPodId, joinTok);
+  let cart = await loadActiveDisplayCartForSession(sessionId, preferredPodId, joinTok);
   if (params.groupUnlock === "1" && cart?.id) {
     await unlockGroupCheckoutAction(cart.id);
     redirect("/cart");
   }
+
+  if (
+    startGroupOrder &&
+    authSession?.user?.id &&
+    cart?.id &&
+    targetPodForGroup &&
+    cart.podId === targetPodForGroup
+  ) {
+    const goExisting = await getGroupOrderStateAction(cart.id);
+    if (goExisting.active) {
+      redirect("/cart");
+    }
+    const startRes = await startGroupOrderFromCartAction(cart.id, targetPodForGroup);
+    if (startRes.success) {
+      redirect("/cart");
+    }
+    redirect(`/cart?groupError=${encodeURIComponent(startRes.error)}`);
+  }
+
   cartPagePerfMark("load_active_display_cart", perfT0, {
     itemCount: cart?.items.length ?? 0,
   });
-  if (!cart || cart.items.length === 0) {
+  if (!cart) {
     return (
       <div className="mx-auto max-w-lg px-2 py-12">
         <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
@@ -110,6 +162,44 @@ export default async function CartPage({
         </div>
       </div>
     );
+  }
+
+  if (cart.items.length === 0) {
+    const goEmpty = await getGroupOrderStateAction(cart.id);
+    if (!goEmpty.active) {
+    return (
+      <div className="mx-auto max-w-lg px-2 py-12">
+        <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+          <div
+            className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-xs font-medium text-stone-400"
+            aria-hidden
+          >
+            Cart
+          </div>
+          <h1 className="mt-5 text-2xl font-semibold text-stone-900">Your cart is empty</h1>
+          <p className="mt-3 text-stone-600">
+            Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen prepares
+            its part of your order.
+          </p>
+          <div className="mt-8 text-left">
+            <JoinGroupOrderByCodeForm />
+          </div>
+          <Link
+            href="/explore"
+            className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-mennyu-primary px-6 py-3 font-semibold text-black shadow-sm transition duration-200 hover:bg-mennyu-secondary hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98]"
+          >
+            Browse pods
+          </Link>
+          <p className="mt-6 text-sm text-stone-500">
+            Already ordered?{" "}
+            <Link href="/orders" className="font-medium text-mennyu-primary hover:underline">
+              View orders and order again
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
+    }
   }
 
   const byVendor = new Map<
@@ -223,7 +313,6 @@ export default async function CartPage({
   }
   const canCheckout = cartValid;
 
-  const authSession = await auth();
   const goState = await getGroupOrderStateAction(cart.id);
   const groupActor = goState.active
     ? await resolveActorForGroupCart(cart.id, {

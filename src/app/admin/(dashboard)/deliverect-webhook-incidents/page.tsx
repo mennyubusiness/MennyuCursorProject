@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminDeliverectTriageSection } from "@/components/admin/AdminDeliverectTriageSection";
 import {
   fetchDeliverectWebhookIncidents,
   fetchDeliverectWebhookIncidentSummary,
@@ -90,20 +91,21 @@ export default async function DeliverectWebhookIncidentsPage({
       <div>
         <p className="text-sm text-stone-500">
           <Link href="/admin" className="hover:underline">
-            Overview
+            Dashboard
           </Link>
           <span className="mx-1">/</span>
-          <span className="text-stone-800">Deliverect webhooks</span>
+          <span className="text-stone-800">POS sync</span>
         </p>
-        <h1 className="mt-2 text-xl font-semibold text-stone-900">Deliverect webhook incidents</h1>
+        <h1 className="mt-2 text-xl font-semibold text-stone-900">POS sync</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Recent pipeline issues, audit-only outcomes, and unusual applies — from{" "}
+          Webhook pipeline, Deliverect reconciliation, and incident history. Technical detail: events come from{" "}
           <code className="rounded bg-stone-100 px-1 text-xs">WebhookEvent</code> and{" "}
-          <code className="rounded bg-stone-100 px-1 text-xs">deliverectWebhookLastApply</code>. Duplicate
-          deliveries do not create a second row; use logs (
-          <span className="font-mono text-xs">duplicate_ignored</span>).
+          <code className="rounded bg-stone-100 px-1 text-xs">deliverectWebhookLastApply</code>; duplicate deliveries do
+          not create a second row (<span className="font-mono text-xs">duplicate_ignored</span>).
         </p>
       </div>
+
+      <AdminDeliverectTriageSection />
 
       <section
         className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"

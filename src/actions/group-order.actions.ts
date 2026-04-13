@@ -49,6 +49,12 @@ export async function startGroupOrderFromCartAction(cartId: string, podId: strin
     if (msg === "GROUP_ORDER_SESSION_EXISTS") {
       return { success: false as const, error: "This cart already has a group order." };
     }
+    if (msg === "CART_POD_MISMATCH") {
+      return { success: false as const, error: "This cart does not match that kiosk." };
+    }
+    if (msg.includes("Unique constraint") || msg.includes("P2002")) {
+      return { success: false as const, error: "Could not start group order. Refresh the page and try again." };
+    }
     return { success: false as const, error: msg };
   }
 }

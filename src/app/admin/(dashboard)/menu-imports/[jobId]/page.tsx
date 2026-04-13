@@ -145,7 +145,7 @@ export default async function AdminMenuImportJobPage({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link href="/admin/menu-imports" className="text-sm text-stone-600 hover:underline">
-            ← Menu updates
+            ← Menu sync
           </Link>
           <h1 className="mt-2 text-xl font-semibold text-stone-900">{job.vendor.name}</h1>
           <p className="mt-1 text-sm text-stone-700">{headlineStatus}</p>

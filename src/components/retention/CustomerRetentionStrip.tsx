@@ -18,6 +18,18 @@ function labelFor(entry: RecentViewEntry): string {
   return entry.kind === "pod" ? entry.name : `${entry.name}`;
 }
 
+function ChipThumb({ label }: { label: string }) {
+  const letter = label.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <span
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-stone-200 to-stone-300 text-xs font-bold text-stone-700 ring-2 ring-white shadow-sm"
+      aria-hidden
+    >
+      {letter}
+    </span>
+  );
+}
+
 type CustomerRetentionStripProps = {
   /** Screen-reader / section heading */
   heading?: string;
@@ -71,27 +83,28 @@ export function CustomerRetentionStrip({
 
   return (
     <section
-      className={`rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6 ${className}`}
+      className={`rounded-2xl border border-stone-200/90 bg-white p-4 shadow-sm sm:p-5 ${className}`}
       aria-labelledby="retention-strip-heading"
     >
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-        <h2 id="retention-strip-heading" className="text-lg font-semibold text-stone-900">
-          {heading}
-        </h2>
-        <p className="text-xs text-stone-500">Saved on this device only</p>
-      </div>
-      <div className="mt-4 space-y-5">
+      <h2 id="retention-strip-heading" className="text-base font-semibold text-stone-900 sm:text-lg">
+        {heading}
+      </h2>
+
+      <div className="mt-4 space-y-4">
         {recentLinks.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">Recently viewed</h3>
-            <ul className="mt-2 flex flex-wrap gap-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+              Recently viewed
+            </h3>
+            <ul className="mt-2 flex gap-2 overflow-x-auto pb-1 pt-0.5 [scrollbar-width:thin]">
               {recentLinks.map((l) => (
-                <li key={`${l.sub}-${l.href}`}>
+                <li key={`${l.sub}-${l.href}`} className="shrink-0">
                   <Link
                     href={l.href}
-                    className="inline-flex max-w-[14rem] items-center gap-2 rounded-full border border-stone-200 bg-stone-50/90 px-3 py-1.5 text-sm font-medium text-stone-800 transition hover:border-mennyu-primary/40 hover:bg-mennyu-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.99]"
+                    className="flex max-w-[16rem] items-center gap-2 rounded-full border border-stone-200/90 bg-stone-50/90 py-1 pl-1 pr-3 text-sm font-medium text-stone-800 shadow-sm transition hover:border-mennyu-primary/50 hover:bg-white hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.99]"
                   >
-                    <span className="truncate">{l.label}</span>
+                    <ChipThumb label={l.label} />
+                    <span className="min-w-0 flex-1 truncate">{l.label}</span>
                     <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
                       {l.sub}
                     </span>
@@ -103,19 +116,22 @@ export function CustomerRetentionStrip({
         )}
         {favoriteLinks.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">Saved</h3>
-            <ul className="mt-2 flex flex-wrap gap-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Saved</h3>
+            <ul className="mt-2 flex gap-2 overflow-x-auto pb-1 pt-0.5 [scrollbar-width:thin]">
               {favoriteLinks.map((l) => (
-                <li key={`fav-${l.href}`}>
+                <li key={`fav-${l.href}`} className="shrink-0">
                   <Link
                     href={l.href}
-                    className="inline-flex max-w-[14rem] items-center gap-2 rounded-full border border-rose-100 bg-rose-50/60 px-3 py-1.5 text-sm font-medium text-rose-950 transition hover:border-rose-200 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.99]"
+                    className="flex max-w-[16rem] items-center gap-2 rounded-full border border-rose-200/90 bg-rose-50/80 py-1 pl-1 pr-3 text-sm font-medium text-rose-950 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.99]"
                   >
-                    <span aria-hidden className="text-rose-600">
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-700 ring-2 ring-white shadow-sm"
+                      aria-hidden
+                    >
                       ♥
                     </span>
-                    <span className="truncate">{l.label}</span>
-                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-rose-700/80">
+                    <span className="min-w-0 flex-1 truncate">{l.label}</span>
+                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-rose-800/90">
                       {l.sub}
                     </span>
                   </Link>

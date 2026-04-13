@@ -26,10 +26,15 @@ const config: Config = {
           "35%": { transform: "scale(1.12)" },
           "60%": { transform: "scale(1)" },
         },
+        "mennyu-hero-gradient": {
+          "0%, 100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
       },
       animation: {
         "mennyu-fade-in": "mennyu-fade-in 0.45s ease-out forwards",
         "mennyu-cart-nudge": "mennyu-cart-nudge 0.55s ease-out",
+        "mennyu-hero-gradient": "mennyu-hero-gradient 14s ease-in-out infinite",
       },
     },
   },

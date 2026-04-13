@@ -1,46 +1,50 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useMemo } from "react";
-import { PodLogo } from "@/components/images/PodLogo";
-import { FavoritePodButton } from "@/components/retention/FavoritePodButton";
+import type { PodCardPod } from "@/components/explore/PodCard";
+import { PodCard } from "@/components/explore/PodCard";
 
-type PodForList = {
-  id: string;
-  name: string;
-  description: string | null;
-  imageUrl: string | null;
-  accentColor: string | null;
-  vendors: { vendor: { name: string } }[];
-};
-
-export function ExplorePodList({ pods }: { pods: PodForList[] }) {
+export function ExplorePodList({ pods }: { pods: PodCardPod[] }) {
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return pods;
-    return pods.filter((pod) => pod.name.toLowerCase().includes(q));
+    return pods.filter((pod) => {
+      if (pod.name.toLowerCase().includes(q)) return true;
+      return pod.vendors.some((v) => v.vendor.name.toLowerCase().includes(q));
+    });
   }, [pods, query]);
 
   return (
     <div>
       <div className="mb-6">
         <label htmlFor="pod-search" className="sr-only">
-          Search pods
+          Search pods or vendors
         </label>
-        <input
-          id="pod-search"
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search pods by name…"
-          className="w-full max-w-md rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-stone-900 shadow-sm placeholder:text-stone-400 transition focus:border-mennyu-primary focus:outline-none focus:ring-2 focus:ring-mennyu-primary/35"
-          aria-label="Search pods"
-        />
+        <div className="relative max-w-lg">
+          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden>
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </span>
+          <input
+            id="pod-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search pods or vendors..."
+            className="w-full rounded-xl border border-stone-300/90 bg-white py-3 pl-11 pr-4 text-stone-900 shadow-md placeholder:text-stone-400 transition focus:border-mennyu-primary focus:outline-none focus:ring-2 focus:ring-mennyu-primary/40"
+            aria-label="Search pods or vendors"
+          />
+        </div>
       </div>
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-mennyu-muted/50 p-10 text-center">
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-white/90 p-10 text-center shadow-inner">
           <p className="font-medium text-stone-800">
             {pods.length === 0
               ? "No pods yet. Run the seed script to add sample data."
@@ -51,79 +55,10 @@ export function ExplorePodList({ pods }: { pods: PodForList[] }) {
           )}
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((pod) => {
-            const vendorCount = pod.vendors.length;
-            const featuredVendorName = pod.vendors[0]?.vendor.name;
-            return (
-              <div
-                key={pod.id}
-                className="group relative overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm ring-1 ring-black/[0.03] transition duration-200 hover:-translate-y-0.5 hover:border-mennyu-primary/35 hover:shadow-lg hover:ring-mennyu-primary/15 motion-reduce:transform-none"
-                style={
-                  pod.accentColor
-                    ? {
-                        borderLeftWidth: 4,
-                        borderLeftStyle: "solid",
-                        borderLeftColor: pod.accentColor,
-                      }
-                    : undefined
-                }
-              >
-                <FavoritePodButton
-                  podId={pod.id}
-                  podName={pod.name}
-                  className="absolute right-3 top-3 z-10 shadow-md backdrop-blur-sm"
-                />
-                <Link
-                  href={`/pod/${pod.id}`}
-                  className="flex gap-4 p-5 transition active:scale-[0.99] sm:p-6"
-                >
-                <PodLogo
-                  imageUrl={pod.imageUrl}
-                  podName={pod.name}
-                  className="h-16 w-16 shrink-0 shadow-sm transition duration-200 group-hover:shadow-md sm:h-[4.5rem] sm:w-[4.5rem]"
-                  sizes="72px"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="text-lg font-semibold leading-snug text-stone-900 transition group-hover:text-stone-950">
-                      {pod.name}
-                    </h2>
-                  </div>
-                  {pod.description && (
-                    <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-stone-600">
-                      {pod.description}
-                    </p>
-                  )}
-                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                    <span
-                      className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-0.5 font-medium text-stone-800"
-                      style={
-                        pod.accentColor
-                          ? { backgroundColor: `${pod.accentColor}18`, color: pod.accentColor }
-                          : undefined
-                      }
-                    >
-                      {vendorCount} vendor{vendorCount !== 1 ? "s" : ""}
-                    </span>
-                    <span className="text-xs font-medium uppercase tracking-wide text-stone-400">
-                      Pickup hub
-                    </span>
-                  </div>
-                  {featuredVendorName && (
-                    <p className="mt-2 line-clamp-2 text-xs text-stone-500">
-                      <span className="font-medium text-stone-600">Featuring</span> · {featuredVendorName}
-                      {vendorCount > 1 ? ` + ${vendorCount - 1} more` : ""}
-                    </p>
-                  )}
-                  <p className="mt-4 text-sm font-semibold text-mennyu-primary underline-offset-4 transition group-hover:underline">
-                    View pod →
-                  </p>
-                </div>
-                </Link>
-              </div>
-            );
-          })}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((pod) => (
+            <PodCard key={pod.id} pod={pod} variant="full" />
+          ))}
         </div>
       )}
     </div>
