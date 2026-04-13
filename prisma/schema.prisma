@@ -256,6 +256,7 @@ model Vendor {
   pods                    PodVendor[]
   vendorOrders            VendorOrder[]
   vendorPayoutTransfers   VendorPayoutTransfer[]
+  vendorPayoutTransferReversals VendorPayoutTransferReversal[]
   menuImportJobs          MenuImportJob[]
   menuVersions            MenuVersion[]
   vendorMemberships       VendorMembership[]
@@ -633,6 +634,7 @@ model Order {
   payments              Payment[]
   refundAttempts        RefundAttempt[]
   vendorOrders          VendorOrder[]
+  vendorPayoutTransferReversals VendorPayoutTransferReversal[]
 
   @@index([stripePaymentIntentId])
   @@index([sourceCartId])
@@ -687,6 +689,7 @@ model VendorOrder {
   lineItems               OrderLineItem[]
   paymentAllocations      PaymentAllocation[]
   vendorPayoutTransfers   VendorPayoutTransfer[]
+  vendorPayoutTransferReversals VendorPayoutTransferReversal[]
   order                   Order                       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   vendor                  Vendor                      @relation(fields: [vendorId], references: [id])
   issues                  VendorOrderIssue[]
@@ -764,6 +767,7 @@ model RefundAttempt {
   dismissedAsLegacyAt DateTime?
   dismissedAsLegacyBy String?
   order               Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorPayoutTransferReversals VendorPayoutTransferReversal[]
 
   @@index([orderId])
   @@index([orderId, status])
@@ -819,10 +823,46 @@ model VendorPayoutTransfer {
   paymentAllocation PaymentAllocation @relation(fields: [paymentAllocationId], references: [id], onDelete: Cascade)
   vendor            Vendor            @relation(fields: [vendorId], references: [id])
   vendorOrder       VendorOrder       @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+  reversals         VendorPayoutTransferReversal[]
 
   @@index([status])
   @@index([batchKey])
   @@index([vendorId])
+}
+
+/// Stripe Connect transfer reversal execution (pull funds back from connected account after platform refund).
+/// Distinct from RefundAttempt (customer refund) — this row tracks reversing the outbound transfer.
+model VendorPayoutTransferReversal {
+  id                         String   @id @default(cuid())
+  vendorPayoutTransferId     String
+  vendorOrderId              String
+  orderId                    String
+  refundAttemptId            String
+  amountCents                Int
+  currency                   String   @default("usd")
+  /// pending | submitted | reversed | failed | not_needed
+  status                     String
+  stripeTransferReversalId   String?  @unique
+  idempotencyKey             String   @unique
+  failureMessage             String?
+  batchKey                   String?
+  submittedAt                DateTime?
+  failedAt                   DateTime?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  vendorPayoutTransfer VendorPayoutTransfer @relation(fields: [vendorPayoutTransferId], references: [id], onDelete: Cascade)
+  refundAttempt        RefundAttempt        @relation(fields: [refundAttemptId], references: [id], onDelete: Cascade)
+  vendorOrder          VendorOrder          @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+  order                Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor               Vendor               @relation(fields: [vendorId], references: [id])
+  vendorId             String
+
+  @@unique([refundAttemptId, vendorPayoutTransferId])
+  @@index([status])
+  @@index([vendorOrderId])
+  @@index([orderId])
+  @@index([refundAttemptId])
 }
 
 model OrderStatusHistory {

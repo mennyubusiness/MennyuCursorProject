@@ -7,10 +7,13 @@
 import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 import type { RefundDecision } from "@/lib/refund-decision";
+import { prepareTransferReversalsForRefundAttempt } from "@/services/vendor-payout-transfer-reversal.service";
 
 export type RefundResultSuccess = {
   success: true;
   refundId?: string;
+  /** Local RefundAttempt id — use for transfer reversal prep / support. */
+  refundAttemptId?: string;
   amountCents: number;
   message?: string;
 };
@@ -149,8 +152,10 @@ export async function executeRefund(decision: RefundDecision): Promise<RefundRes
         where: { idempotencyKey },
         select: { stripeRefundId: true, amountCents: true },
       });
+      await prepareTransferReversalsAfterSuccessfulRefund(record.id);
       return {
         success: true,
+        refundAttemptId: record.id,
         refundId: row?.stripeRefundId ?? undefined,
         amountCents: row?.amountCents ?? amountCents,
         message: "Already refunded (idempotent).",
@@ -191,8 +196,10 @@ export async function executeRefund(decision: RefundDecision): Promise<RefundRes
           select: { id: true, status: true, stripeRefundId: true, amountCents: true },
         });
         if (again?.status === "succeeded") {
+          await prepareTransferReversalsAfterSuccessfulRefund(again.id);
           return {
             success: true,
+            refundAttemptId: again.id,
             refundId: again.stripeRefundId ?? undefined,
             amountCents: again.amountCents,
             message: "Already refunded (idempotent).",
@@ -312,8 +319,11 @@ export async function executeRefund(decision: RefundDecision): Promise<RefundRes
       },
     });
 
+    await prepareTransferReversalsAfterSuccessfulRefund(record.id);
+
     return {
       success: true,
+      refundAttemptId: record.id,
       refundId: refund.id,
       amountCents,
       message: refund.status === "succeeded" ? undefined : `Refund status: ${refund.status}`,
