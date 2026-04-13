@@ -101,27 +101,27 @@ export function deliverectSubitemsChainValidationDetail(
  * “pick up to N”), those are **not** extra chain levels — they are sent as flat modifiers like normal
  * add-ons. Counting raw selections here was a false positive when max selection > 1.
  */
-export function partitionTopLevelVariantSelectionsForDeliverectChain(
-  line: LineSelectionsForDeliverectVariantChain
-): {
+export function partitionTopLevelVariantSelectionsForDeliverectChain<
+  S extends LineSelectionsForDeliverectVariantChain["selections"][number],
+>(line: { selections: readonly S[] }): {
   /** One entry per distinct variant group that has exactly one selected option on this line (chain depth). */
-  chainSelections: LineSelectionsForDeliverectVariantChain["selections"];
+  chainSelections: S[];
   /** Multi-select from the same variant-flagged group — serialize as `modifiers`, not nested `subItems`. */
-  demotedToFlatModifierSelections: LineSelectionsForDeliverectVariantChain["selections"];
+  demotedToFlatModifierSelections: S[];
 } {
   const variantSels = line.selections.filter((s) =>
     isTopLevelDeliverectVariantGroupModifierGroup(s.modifierOption.modifierGroup)
   );
-  const byGroup = new Map<string, LineSelectionsForDeliverectVariantChain["selections"]>();
+  const byGroup = new Map<string, S[]>();
   for (const s of variantSels) {
     const gid = s.modifierOption.modifierGroup.id;
     const list = byGroup.get(gid) ?? [];
     list.push(s);
     byGroup.set(gid, list);
   }
-  const chainSelections: LineSelectionsForDeliverectVariantChain["selections"] = [];
-  const demotedToFlatModifierSelections: LineSelectionsForDeliverectVariantChain["selections"] = [];
-  for (const [, list] of byGroup) {
+  const chainSelections: S[] = [];
+  const demotedToFlatModifierSelections: S[] = [];
+  for (const list of byGroup.values()) {
     if (list.length === 1) {
       chainSelections.push(list[0]!);
     } else {
