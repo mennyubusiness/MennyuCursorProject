@@ -171,7 +171,11 @@ export function OrderPageContent({
     order.requestedPickupAt
   );
   const timelineEvents = buildTimelineEvents(order);
-  const parentProgressSteps = buildParentOrderProgressSteps(derivedStatus, failedButRecoverable);
+  const parentProgressSteps = buildParentOrderProgressSteps(
+    derivedStatus,
+    failedButRecoverable,
+    order.vendorOrders
+  );
   const pickupCode = getPickupCode(order.id);
   const pickupLine = formatPickupDetailLine(
     order.requestedPickupAt,

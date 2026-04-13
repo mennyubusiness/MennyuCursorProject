@@ -175,9 +175,13 @@ export function VendorOrderCard({
       ? "Completed"
       : vendorOrder.fulfillmentStatus === "ready"
         ? "Ready"
-        : ["accepted", "preparing"].includes(vendorOrder.fulfillmentStatus)
+        : vendorOrder.fulfillmentStatus === "preparing"
           ? "Preparing"
-          : "New";
+          : vendorOrder.fulfillmentStatus === "accepted"
+            ? "Accepted"
+            : vendorOrder.fulfillmentStatus === "pending"
+              ? "Received"
+              : "New";
   async function handleStatusChange(targetState: string) {
     setError(null);
     setLoading(true);

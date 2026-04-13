@@ -16,7 +16,10 @@ const LOG_PREFIX = "[Deliverect status map]";
 export const DELIVERECT_MAPPED_NUMERIC_CODES: ReadonlySet<number> = new Set([
   ...[110, 100, 115],
   ...[120, 121, 124, 125, 35, 126],
-  ...[0, 1, 2, 3, 4, 5, 6, 7, 10, 20, 25],
+  /** Transport / pipeline — fulfillment stays `pending` (customer = Received). */
+  ...[0, 1, 2, 3, 4, 5, 6, 7, 10, 25],
+  /** POS accepted — only explicit acceptance promotes fulfillment to `accepted`. */
+  20,
   40,
   50,
   60,
@@ -63,7 +66,23 @@ function interpretNumericCode(code: number): DeliverectStatusInterpretation {
     };
   }
 
-  if ([0, 1, 2, 3, 4, 5, 6, 7, 10, 20, 25].includes(code)) {
+  /**
+   * Deliverect pipeline / DMA / POS **receipt** — not kitchen acceptance.
+   * Parsed, Sent to DMA, Received by DMA, Received by POS, NEW, Scheduled, etc. stay `pending`
+   * so customer/vendor UIs remain on “Received” until code 20 (ACCEPTED).
+   * @see https://developers.deliverect.com/page/order-status
+   */
+  if ([0, 1, 2, 3, 4, 5, 6, 7, 10, 25].includes(code)) {
+    return {
+      kind: "mapped",
+      fulfillmentStatus: "pending",
+      routingStatus: "confirmed",
+      rawNumericCode: code,
+    };
+  }
+
+  /** Explicit POS / channel acceptance — only this bucket promotes to Confirmed / Accepted. */
+  if (code === 20) {
     return {
       kind: "mapped",
       fulfillmentStatus: "accepted",

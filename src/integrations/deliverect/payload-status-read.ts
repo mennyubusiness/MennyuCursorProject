@@ -20,6 +20,11 @@ export const DELIVERECT_STATUS_NAME_TO_CODE: Record<string, number> = {
   POS_FAILED: 121,
   PARSED: 1,
   RECEIVED_BY_POS: 2,
+  /** DMA / pipeline receipt — same numeric bucket as developers.deliverect.com/order-status */
+  SENT_TO_DMA: 3,
+  RECEIVED_BY_DMA: 6,
+  PRINTED_BY_DMA: 7,
+  SCHEDULED: 25,
 };
 
 export function coerceDeliverectRawToStatusNumber(raw: unknown): number | null {

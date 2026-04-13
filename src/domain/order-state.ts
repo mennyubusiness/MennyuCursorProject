@@ -129,7 +129,8 @@ export function mapDeliverectEventToStatus(
   _payload?: unknown
 ): { routingStatus?: VendorOrderRoutingStatus; fulfillmentStatus?: VendorOrderFulfillmentStatus } {
   const normalized = eventType.toLowerCase();
-  if (normalized.includes("confirm") || normalized.includes("accepted")) {
+  /** Avoid matching "confirming" / routing copy — only explicit acceptance. */
+  if (/\baccepted\b/.test(normalized) || /\baccept\b/.test(normalized)) {
     return { routingStatus: "confirmed", fulfillmentStatus: "accepted" };
   }
   if (normalized.includes("preparing") || normalized.includes("in_preparation")) {

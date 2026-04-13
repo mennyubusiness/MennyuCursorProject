@@ -24,10 +24,10 @@ export function vendorStatusLabel(
   if (fulfillmentStatus === "accepted") return "Accepted";
   if (fulfillmentStatus === "pending") {
     if (routingStatus === "sent" || routingStatus === "confirmed" || routingStatus === "pending") {
-      return "Confirming";
+      return "Received";
     }
   }
-  return "Confirming";
+  return "Received";
 }
 
 /**
