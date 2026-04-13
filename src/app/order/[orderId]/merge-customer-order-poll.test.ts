@@ -16,6 +16,7 @@ function baseOrder(): Order {
     totalCents: 1350,
     status: "in_progress",
     requestedPickupAt: null,
+    deliverectEstimatedReadyAt: null,
     derivedStatus: "in_progress",
     statusLabel: "In progress",
     resolvedPickupTimezone: "America/New_York",

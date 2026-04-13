@@ -261,13 +261,15 @@ function toDeliverectPickupTimeIso(d: Date): string {
  * Certification-relevant pickup fields:
  * - `orderType: 1` = pickup.
  * - ASAP: `isASAP: true`, `pickupTime` = now + `preparationTime` minutes (UTC), `preparationTime` = minutes.
- * - Scheduled: `isASAP: false`, `pickupTime` = `order.requestedPickupAt` (UTC), `preparationTime` unchanged from routing.
+ * - Scheduled: `isASAP: false`, `pickupTime` = customer `order.requestedPickupAt` (UTC), `preparationTime` unchanged from routing.
+ *   (`deliverectEstimatedReadyAt` is inbound POS ETA only — never used here.)
  */
 export function mennyuVendorOrderToDeliverectPayload(input: TransformInput): DeliverectOrderRequest {
   const { vendorOrder } = input;
   const items: DeliverectOrderItem[] = vendorOrder.lineItems.map(lineItemToDeliverectItem);
 
   const prepMin = input.preparationTimeMinutes ?? 15;
+  /** Customer scheduled pickup from checkout; null means ASAP. */
   const scheduledAt = vendorOrder.order.requestedPickupAt;
   const now = Date.now();
   let pickupTime: string;

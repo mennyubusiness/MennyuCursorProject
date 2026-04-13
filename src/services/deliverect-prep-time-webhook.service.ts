@@ -108,9 +108,9 @@ export async function applyDeliverectPrepTimeFromPayload(
 
   const orderBefore = await prisma.order.findUnique({
     where: { id: vendorOrder.orderId },
-    select: { requestedPickupAt: true },
+    select: { deliverectEstimatedReadyAt: true },
   });
-  const prev = orderBefore?.requestedPickupAt?.getTime() ?? null;
+  const prev = orderBefore?.deliverectEstimatedReadyAt?.getTime() ?? null;
   const next = pickupDate.getTime();
   const same = prev != null && Math.abs(prev - next) < 1000; // 1s tolerance for ms noise
 
@@ -127,7 +127,7 @@ export async function applyDeliverectPrepTimeFromPayload(
     await prisma.$transaction([
       prisma.order.update({
         where: { id: vendorOrder.orderId },
-        data: { requestedPickupAt: pickupDate },
+        data: { deliverectEstimatedReadyAt: pickupDate },
       }),
       prisma.vendorOrder.update({
         where: { id: vendorOrder.id },

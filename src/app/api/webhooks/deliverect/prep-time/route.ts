@@ -1,5 +1,5 @@
 /**
- * Deliverect preparation time update → Mennyu `Order.requestedPickupAt`.
+ * Deliverect preparation time update → Mennyu `Order.deliverectEstimatedReadyAt` (POS ETA; not customer schedule).
  * @see https://developers.deliverect.com/reference/post-preparation-time-update
  */
 import { createHash } from "crypto";

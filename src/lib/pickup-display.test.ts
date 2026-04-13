@@ -7,6 +7,25 @@ describe("pickup display", () => {
     expect(formatPickupSmsFragment(null, "America/New_York")).toBe("ASAP pickup");
   });
 
+  it("formats ASAP with POS estimated ready time without implying scheduled checkout", () => {
+    const eta = new Date("2025-06-01T14:00:00.000Z");
+    const line = formatPickupDetailLine(null, "America/New_York", eta);
+    expect(line).toContain("ASAP");
+    expect(line).toContain("Est. ready");
+    expect(line).not.toContain("Scheduled for");
+    const sms = formatPickupSmsFragment(null, "America/New_York", eta);
+    expect(sms).toContain("ASAP pickup");
+    expect(sms).toContain("est. ready");
+  });
+
+  it("customer scheduled time wins over Deliverect ETA if both present", () => {
+    const scheduled = new Date("2025-06-02T18:00:00.000Z");
+    const eta = new Date("2025-06-01T14:00:00.000Z");
+    const line = formatPickupDetailLine(scheduled, "America/New_York", eta);
+    expect(line).toContain("Scheduled for");
+    expect(line).not.toContain("Est. ready");
+  });
+
   it("formats scheduled pickup in the given IANA timezone", () => {
     const d = new Date("2025-06-01T14:00:00.000Z");
     expect(formatPickupDetailLine(d, "America/New_York")).toContain("Scheduled for");

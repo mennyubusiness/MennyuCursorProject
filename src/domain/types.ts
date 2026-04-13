@@ -141,8 +141,10 @@ export interface Order {
   totalCents: number;
   status: ParentOrderStatus;
   stripePaymentIntentId: string | null;
-  /** Null = ASAP pickup. */
+  /** Customer-chosen scheduled pickup instant (UTC). Null = ASAP at checkout. */
   requestedPickupAt: Date | null;
+  /** Deliverect prep-time / kitchen ETA (UTC). Not customer schedule intent. */
+  deliverectEstimatedReadyAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

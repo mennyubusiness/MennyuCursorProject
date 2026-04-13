@@ -758,6 +758,7 @@ function toOrder(row: {
   status: string;
   stripePaymentIntentId: string | null;
   requestedPickupAt: Date | null;
+  deliverectEstimatedReadyAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }): Order {
@@ -775,6 +776,7 @@ function toOrder(row: {
     status: row.status as Order["status"],
     stripePaymentIntentId: row.stripePaymentIntentId,
     requestedPickupAt: row.requestedPickupAt ?? null,
+    deliverectEstimatedReadyAt: row.deliverectEstimatedReadyAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -895,7 +897,7 @@ export async function getOrdersByCustomerPhone(customerPhone: string): Promise<O
       status: o.status,
       podName: o.pod.name,
       vendorNames: [...new Set(o.vendorOrders.map((vo) => vo.vendor.name))],
-      pickupDisplayLine: formatPickupDetailLine(o.requestedPickupAt, tz),
+      pickupDisplayLine: formatPickupDetailLine(o.requestedPickupAt, tz, o.deliverectEstimatedReadyAt),
     };
   });
 }

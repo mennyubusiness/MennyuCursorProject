@@ -37,9 +37,14 @@ function normalizeOrderDates(order: NonNullable<OrderFromApi>): NonNullable<Orde
     order.requestedPickupAt != null
       ? toDate(order.requestedPickupAt as string | Date)
       : null;
+  const estimated =
+    order.deliverectEstimatedReadyAt != null
+      ? toDate(order.deliverectEstimatedReadyAt as string | Date)
+      : null;
   return {
     ...order,
     requestedPickupAt: requested,
+    deliverectEstimatedReadyAt: estimated,
     statusHistory: (order.statusHistory ?? []).map((e) => ({
       ...e,
       createdAt: toDate(e.createdAt as string | Date),
@@ -67,7 +72,11 @@ function orderStatusFingerprint(o: NonNullable<OrderFromApi>): string {
     .join("|");
   const hist = (o.statusHistory ?? []).length;
   const refunds = (o.refundAttempts ?? []).length;
-  return `${d}|${vos}|${hist}|${refunds}|${o.totalCents}`;
+  const eta =
+    o.deliverectEstimatedReadyAt != null
+      ? toDate(o.deliverectEstimatedReadyAt as string | Date).toISOString()
+      : "";
+  return `${d}|${vos}|${hist}|${refunds}|${o.totalCents}|${eta}`;
 }
 
 export function OrderPageContent({
@@ -166,7 +175,8 @@ export function OrderPageContent({
   const pickupCode = getPickupCode(order.id);
   const pickupLine = formatPickupDetailLine(
     order.requestedPickupAt,
-    order.resolvedPickupTimezone
+    order.resolvedPickupTimezone,
+    order.deliverectEstimatedReadyAt
   );
   const isMultiVendor = order.vendorOrders.length > 1;
   const customerCanCancel = canCustomerCancelOrder(order);

@@ -621,8 +621,10 @@ model Order {
   adminResolutionNotes  String?
   /// Cart row used at checkout (line items cleared after payment / cancel). Optional for legacy orders.
   sourceCartId          String?
-  /// Customer-requested pickup instant (UTC). Null = ASAP pickup.
+  /// Customer-requested pickup instant (UTC). Null = ASAP pickup. Set only at checkout when the customer chooses scheduled pickup.
   requestedPickupAt     DateTime?
+  /// Deliverect preparation-time callback / POS estimate (UTC). Does not imply customer scheduled pickup; do not use for outbound `isASAP` vs scheduled.
+  deliverectEstimatedReadyAt DateTime?
   pricingConfig         PricingConfig?       @relation(fields: [pricingConfigId], references: [id], onDelete: SetNull)
   pod                   Pod                  @relation(fields: [podId], references: [id])
   groupOrderSession     GroupOrderSession?   @relation(fields: [groupOrderSessionId], references: [id], onDelete: SetNull)
