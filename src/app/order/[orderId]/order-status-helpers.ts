@@ -6,6 +6,10 @@ import {
   customerOrderTimelineParentLabel,
 } from "@/domain/order-state";
 import type { ParentOrderStatus } from "@/domain/types";
+import {
+  maxParentFulfillmentStepRank,
+  minParentFulfillmentStepRank,
+} from "./customer-order-progress";
 
 /**
  * Customer-facing vendor order chip: Deliverect / fulfillment progression.
@@ -21,7 +25,7 @@ export function vendorStatusLabel(
   if (fulfillmentStatus === "completed") return "Completed";
   if (fulfillmentStatus === "ready") return "Ready for pickup";
   if (fulfillmentStatus === "preparing") return "Preparing";
-  if (fulfillmentStatus === "accepted") return "Accepted";
+  if (fulfillmentStatus === "accepted") return "Confirmed";
   if (fulfillmentStatus === "pending") {
     if (routingStatus === "sent" || routingStatus === "confirmed" || routingStatus === "pending") {
       return "Received";
@@ -65,7 +69,7 @@ export function vendorStatusLabelForScheduledPickup(
 
 /**
  * Parent header: show "Scheduled" when the order is future-scheduled but derived parent status
- * already reflects accepted vendor rows (→ "In progress") before any kitchen prep has started.
+ * already reflects confirmed vendor rows (→ "In progress") before any kitchen prep has started.
  */
 export function customerStatusLabelForScheduledPickup(
   derivedStatus: string,
@@ -86,64 +90,41 @@ export function customerStatusLabelForScheduledPickup(
   return customerStatusLabel(derivedStatus, vendorOrders, failedButRecoverable);
 }
 
+/**
+ * Customer-facing line tied to the slowest vendor fulfillment line (min rank) so copy never
+ * implies a stage ahead of any vendor row.
+ */
+function orderStageLineFromMinRank(minRank: number, multi: boolean): string {
+  if (minRank <= 0) return "Your order has been received.";
+  if (minRank === 1) {
+    return multi
+      ? "Restaurants have confirmed your order."
+      : "The restaurant confirmed your order.";
+  }
+  if (minRank === 2) {
+    return multi
+      ? "The restaurants are preparing your order."
+      : "The restaurant is preparing your order.";
+  }
+  if (minRank === 3) return "Your order is ready for pickup.";
+  return "Order completed.";
+}
+
 export function orderSummaryExplanation(
   derivedStatus: string,
   vendorOrders: Array<{ fulfillmentStatus: string; routingStatus: string }>,
   requestedPickupAt?: unknown
 ): string {
   const multi = vendorOrders.length > 1;
-  if (
-    requestedPickupAt != null &&
-    shouldShowScheduledPickupCustomerLabels(requestedPickupAt, vendorOrders) &&
-    (derivedStatus === "in_progress" ||
-      derivedStatus === "accepted" ||
-      derivedStatus === "preparing")
-  ) {
-    return "Your pickup is scheduled. We'll update you when the kitchen starts preparing your order.";
-  }
-  const ready = vendorOrders.filter((v) => v.fulfillmentStatus === "ready").length;
-  const preparing = vendorOrders.filter((v) =>
-    ["accepted", "preparing"].includes(v.fulfillmentStatus)
-  ).length;
+  const minRank = minParentFulfillmentStepRank(vendorOrders);
+  const maxRank = maxParentFulfillmentStepRank(vendorOrders);
   const total = vendorOrders.length;
 
   if (derivedStatus === "completed") {
-    return "Your order is complete. Thank you!";
+    return "Order completed.";
   }
-  if (derivedStatus === "ready") {
-    return "Your order is ready for pickup.";
-  }
-  if (derivedStatus === "in_progress") {
-    if (multi && ready > 0 && preparing > 0) {
-      return `${ready} ${ready === 1 ? "vendor has" : "vendors have"} your items ready; ${preparing} ${preparing === 1 ? "is" : "are"} still preparing.`;
-    }
-    if (ready > 0) return "Your items are ready for pickup.";
-    return multi
-      ? "We're preparing your order with each vendor."
-      : "The restaurant is preparing your order.";
-  }
-  if (derivedStatus === "partially_completed") {
-    return "Part of your order is complete; we'll update you on the rest.";
-  }
-  if (derivedStatus === "routing") {
-    return multi
-      ? "Each vendor is getting your order. You'll see updates as they accept."
-      : "The restaurant is receiving your order.";
-  }
-  if (derivedStatus === "routed_partial" && multi) {
-    const confirmed = vendorOrders.filter((v) => v.routingStatus === "confirmed").length;
-    if (confirmed > 0 && confirmed < total)
-      return "Some vendors have already accepted; we're waiting on the others.";
-    return "We're waiting on each vendor to confirm your order.";
-  }
-  if (derivedStatus === "routed" || derivedStatus === "routed_partial") {
-    return multi
-      ? "You'll get updates as each vendor accepts."
-      : "You'll get updates as soon as the restaurant accepts.";
-  }
-  if (derivedStatus === "paid" || derivedStatus === "pending_payment") {
-    return multi ? "We're getting your order to each vendor." : "We're getting your order to the restaurant.";
-  }
+  if (derivedStatus === "cancelled") return "This order was cancelled.";
+
   if (derivedStatus === "failed") {
     const allRecoverable =
       vendorOrders.length > 0 &&
@@ -156,7 +137,66 @@ export function orderSummaryExplanation(
       return "We're confirming your order. We'll update you shortly.";
     return "We couldn't complete this order. Contact us if you need help.";
   }
-  if (derivedStatus === "cancelled") return "This order was cancelled.";
+
+  if (derivedStatus === "ready") {
+    return "Your order is ready for pickup.";
+  }
+
+  if (derivedStatus === "partially_completed") {
+    return "Part of your order is complete; we'll update you on the rest.";
+  }
+
+  const scheduledPreKitchen =
+    requestedPickupAt != null &&
+    shouldShowScheduledPickupCustomerLabels(requestedPickupAt, vendorOrders) &&
+    (derivedStatus === "in_progress" ||
+      derivedStatus === "accepted" ||
+      derivedStatus === "preparing") &&
+    maxRank < 2;
+
+  if (scheduledPreKitchen) {
+    return `Your pickup is scheduled. ${orderStageLineFromMinRank(minRank, multi)}`;
+  }
+
+  if (
+    derivedStatus === "in_progress" ||
+    derivedStatus === "accepted" ||
+    derivedStatus === "preparing"
+  ) {
+    if (vendorOrders.length === 0) {
+      return "We'll send updates to your phone as things progress.";
+    }
+    const ready = vendorOrders.filter((v) => v.fulfillmentStatus === "ready").length;
+    const stillKitchen = vendorOrders.filter((v) =>
+      ["accepted", "preparing"].includes(v.fulfillmentStatus)
+    ).length;
+    if (multi && ready > 0 && stillKitchen > 0) {
+      return `${ready} ${ready === 1 ? "vendor has" : "vendors have"} your items ready; ${stillKitchen} ${stillKitchen === 1 ? "is" : "are"} still preparing.`;
+    }
+    if (!multi && ready > 0) return "Your order is ready for pickup.";
+    if (multi && ready > 0 && stillKitchen === 0) return "Your items are ready for pickup.";
+    return orderStageLineFromMinRank(minRank, multi);
+  }
+
+  if (derivedStatus === "routing") {
+    return multi
+      ? "Each vendor is getting your order. You'll see updates as they confirm."
+      : "Your order has been received.";
+  }
+  if (derivedStatus === "routed_partial" && multi) {
+    const confirmed = vendorOrders.filter((v) => v.routingStatus === "confirmed").length;
+    if (confirmed > 0 && confirmed < total)
+      return "Some vendors have already confirmed; we're waiting on the others.";
+    return "We're waiting on each vendor to confirm your order.";
+  }
+  if (derivedStatus === "routed" || derivedStatus === "routed_partial") {
+    return multi
+      ? "You'll get updates as each vendor confirms."
+      : "You'll get updates as soon as the restaurant confirms.";
+  }
+  if (derivedStatus === "paid" || derivedStatus === "pending_payment") {
+    return multi ? "We're getting your order to each vendor." : "We're getting your order to the restaurant.";
+  }
   return "We'll send updates to your phone as things progress.";
 }
 

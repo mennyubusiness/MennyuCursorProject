@@ -66,9 +66,9 @@ describe("scheduled pickup display overrides", () => {
     expect(vendorStatusLabelForScheduledPickup(future, "failed", "pending", false)).toBe("Failed");
   });
 
-  it("ASAP order: vendor accepted shows Accepted, not Scheduled", () => {
+  it("ASAP order: vendor confirmed shows Confirmed, not Scheduled", () => {
     expect(vendorStatusLabelForScheduledPickup(null, "confirmed", "accepted", false)).toBe(
-      "Accepted"
+      "Confirmed"
     );
   });
 });

@@ -178,7 +178,7 @@ export function VendorOrderCard({
         : vendorOrder.fulfillmentStatus === "preparing"
           ? "Preparing"
           : vendorOrder.fulfillmentStatus === "accepted"
-            ? "Accepted"
+            ? "Confirmed"
             : vendorOrder.fulfillmentStatus === "pending"
               ? "Received"
               : "New";

@@ -26,7 +26,7 @@ export function getVendorOrderHistoryEventLabel(entry: HistoryEntryForLabel): st
   if (fulfillment === "completed") return "Completed";
   if (fulfillment === "ready") return "Ready";
   if (fulfillment === "preparing") return "Preparing";
-  if (fulfillment === "accepted") return "Accepted";
+  if (fulfillment === "accepted") return "Confirmed";
   if (fulfillment === "pending") return "Pending";
 
   if (routing === "failed") return "Routing failed";

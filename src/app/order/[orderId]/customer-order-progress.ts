@@ -32,6 +32,18 @@ export function maxParentFulfillmentStepRank(
   );
 }
 
+/** Slowest vendor line (bottleneck); drives conservative customer copy so messaging does not outpace any line. */
+export function minParentFulfillmentStepRank(
+  vendorOrders: Array<{ fulfillmentStatus: string }> | undefined
+): number {
+  if (!vendorOrders?.length) return 0;
+  const ranks = vendorOrders
+    .filter((v) => v.fulfillmentStatus !== "cancelled")
+    .map((v) => FULFILLMENT_STEP_MAX[v.fulfillmentStatus] ?? 0);
+  if (!ranks.length) return 0;
+  return Math.min(...ranks);
+}
+
 /**
  * Five-step parent journey: Received → Confirmed → Preparing → Ready → Completed.
  * Does not replace domain status; visual grouping only.
@@ -130,7 +142,7 @@ export function buildParentOrderProgressSteps(
         received,
         {
           key: "confirm",
-          label: "Restaurant accepted order",
+          label: "Restaurant confirmed your order",
           shortLabel: "Confirmed",
           state: "current",
         },

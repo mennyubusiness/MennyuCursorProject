@@ -30,9 +30,9 @@ function isDeliverectRecheckEligible(vo: AdminOrderDetail["vendorOrders"][number
 function fulfillmentLabel(fulfillmentStatus: string): string {
   switch (fulfillmentStatus) {
     case "pending":
-      return "Awaiting acceptance";
+      return "Awaiting confirmation";
     case "accepted":
-      return "Accepted";
+      return "Confirmed";
     case "preparing":
       return "Preparing";
     case "ready":
