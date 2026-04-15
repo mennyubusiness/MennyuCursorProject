@@ -1,6 +1,7 @@
 /**
  * Customer-facing pickup labels (ASAP vs scheduled). Safe for client or server.
- * Uses `Intl` with the pod (or default) IANA timezone — distinct from Deliverect `pickupTime`, which is always UTC.
+ * Uses `Intl` with the pod (or default) IANA timezone. `deliverectEstimatedReadyAt` is stored as a UTC
+ * instant; inbound Deliverect `pickupTime` is normalized to UTC at ingest (see `parseDeliverectInboundPickupUtc`).
  * - `requestedPickupAt`: customer scheduled pickup from checkout only.
  * - `estimatedReadyAt`: optional POS / Deliverect prep-time estimate; does not mean the customer chose scheduled ordering.
  * Order history uses {@link formatPickupDetailLine} via `getOrdersByCustomerPhone`; keep wording aligned with the order status page.

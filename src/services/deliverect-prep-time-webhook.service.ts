@@ -9,11 +9,7 @@ import {
   nonEmptyStringField,
 } from "@/integrations/deliverect/webhook-inbound-shared";
 import { logDeliverectPrepTimeWebhook } from "@/integrations/deliverect/deliverect-aux-webhook-log";
-
-function parsePickupInstant(iso: string): Date | null {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
+import { parseDeliverectInboundPickupUtc } from "@/lib/deliverect-pickup-time-parse";
 
 export type ApplyDeliverectPrepTimeResult =
   | { ok: true; outcome: "updated" | "noop_same_time"; vendorOrderId: string; orderId: string; pickupTime: string }
@@ -75,7 +71,7 @@ export async function applyDeliverectPrepTimeFromPayload(
     return { ok: false, error: "invalid_pickup_time", detail: "missing_pickupTime" };
   }
 
-  const pickupDate = parsePickupInstant(pickupTimeRaw);
+  const pickupDate = parseDeliverectInboundPickupUtc(pickupTimeRaw);
   if (!pickupDate) {
     logDeliverectPrepTimeWebhook("invalid_pickup_time", {
       reason: "unparseable_pickupTime",
