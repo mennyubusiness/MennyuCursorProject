@@ -10,12 +10,11 @@ import { canCustomerCancelOrder, canCustomerCancelVendorOrder } from "@/lib/canc
 import { SetCustomerPhoneFromOrder } from "./SetCustomerPhoneFromOrder";
 import { OrderCancelButton } from "./OrderCancelButton";
 import { VendorOrderCancelButton } from "./VendorOrderCancelButton";
-import { formatPickupDetailLine } from "@/lib/pickup-display";
+import { formatOrderStatusTimelineClock, formatPickupDetailLine } from "@/lib/pickup-display";
 import {
   vendorStatusLabelForScheduledPickup,
   orderSummaryExplanation,
   buildTimelineEvents,
-  formatTimestamp,
   refundDisplayMessage,
   customerStatusLabelForScheduledPickup,
 } from "./order-status-helpers";
@@ -433,7 +432,7 @@ export function OrderPageContent({
                   dateTime={evt.createdAt.toISOString()}
                   className="text-xs text-stone-500 shrink-0"
                 >
-                  {formatTimestamp(evt.createdAt)}
+                  {formatOrderStatusTimelineClock(evt.createdAt, order.resolvedPickupTimezone)}
                 </time>
                 <span className="text-sm text-stone-800">{evt.label}</span>
               </li>

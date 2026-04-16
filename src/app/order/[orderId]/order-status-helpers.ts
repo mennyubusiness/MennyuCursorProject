@@ -288,13 +288,6 @@ export function buildTimelineEvents(order: {
   return filtered;
 }
 
-export function formatTimestamp(d: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(d);
-}
-
 export function refundDisplayMessage(
   latestAttempt: { status: string; amountCents: number; createdAt: Date } | null | undefined
 ): { line: string; timelineLabel?: string } | null {

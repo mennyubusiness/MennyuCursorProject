@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatOrderStatusTimelineClock,
   formatPickupDetailLine,
   formatPickupSmsFragment,
   formatPickupSummaryScheduledLead,
@@ -39,6 +40,15 @@ describe("getDisplayPickupTime", () => {
     const r = getDisplayPickupTime(order("America/New_York", null, null));
     expect(r.mode).toBe("asap");
     expect(r.instant).toBeNull();
+  });
+});
+
+describe("formatOrderStatusTimelineClock", () => {
+  it("uses explicit IANA zone (same basis as pickup ETA line)", () => {
+    const d = new Date("2026-04-16T12:12:00.000Z");
+    const ny = formatOrderStatusTimelineClock(d, "America/New_York");
+    const chi = formatOrderStatusTimelineClock(d, "America/Chicago");
+    expect(ny).not.toBe(chi);
   });
 });
 

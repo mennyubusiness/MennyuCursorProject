@@ -101,3 +101,15 @@ export function formatPickupSummaryScheduledLead(order: OrderPickupDisplayInput)
   if (r.mode !== "scheduled" || !r.instant) return null;
   return `Your pickup is scheduled for ${formatLocalWhenDetail(r.instant, r.timeZone)}.`;
 }
+
+/**
+ * Timeline / “Recent updates” row times on the order status page.
+ * Uses the same IANA zone as pickup ETA ({@link formatPickupDetailLine}) so header and timeline agree.
+ */
+export function formatOrderStatusTimelineClock(d: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(d);
+}
