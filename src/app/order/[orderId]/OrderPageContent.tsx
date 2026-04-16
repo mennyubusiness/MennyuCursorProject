@@ -168,7 +168,12 @@ export function OrderPageContent({
   const explanation = orderSummaryExplanation(
     derivedStatus,
     order.vendorOrders,
-    order.requestedPickupAt
+    order.requestedPickupAt,
+    {
+      requestedPickupAt: order.requestedPickupAt,
+      deliverectEstimatedReadyAt: order.deliverectEstimatedReadyAt,
+      resolvedPickupTimezone: order.resolvedPickupTimezone,
+    }
   );
   const timelineEvents = buildTimelineEvents(order);
   const parentProgressSteps = buildParentOrderProgressSteps(
@@ -177,11 +182,11 @@ export function OrderPageContent({
     order.vendorOrders
   );
   const pickupCode = getPickupCode(order.id);
-  const pickupLine = formatPickupDetailLine(
-    order.requestedPickupAt,
-    order.resolvedPickupTimezone,
-    order.deliverectEstimatedReadyAt
-  );
+  const pickupLine = formatPickupDetailLine({
+    requestedPickupAt: order.requestedPickupAt,
+    deliverectEstimatedReadyAt: order.deliverectEstimatedReadyAt,
+    resolvedPickupTimezone: order.resolvedPickupTimezone,
+  });
   const isMultiVendor = order.vendorOrders.length > 1;
   const customerCanCancel = canCustomerCancelOrder(order);
   const isOrderCancelled = derivedStatus === "cancelled";

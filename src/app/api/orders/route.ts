@@ -81,7 +81,11 @@ export async function POST(request: NextRequest) {
       order.customerPhone,
       orderId,
       order.totalCents,
-      formatPickupSmsFragment(order.requestedPickupAt, tz)
+      formatPickupSmsFragment({
+        requestedPickupAt: order.requestedPickupAt,
+        deliverectEstimatedReadyAt: order.deliverectEstimatedReadyAt,
+        resolvedPickupTimezone: tz,
+      })
     );
 
     const final = await prisma.order.findUnique({

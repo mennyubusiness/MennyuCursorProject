@@ -904,7 +904,11 @@ export async function getOrdersByCustomerPhone(customerPhone: string): Promise<O
       status: o.status,
       podName: o.pod.name,
       vendorNames: [...new Set(o.vendorOrders.map((vo) => vo.vendor.name))],
-      pickupDisplayLine: formatPickupDetailLine(o.requestedPickupAt, tz, o.deliverectEstimatedReadyAt),
+      pickupDisplayLine: formatPickupDetailLine({
+        requestedPickupAt: o.requestedPickupAt,
+        deliverectEstimatedReadyAt: o.deliverectEstimatedReadyAt,
+        resolvedPickupTimezone: tz,
+      }),
     };
   });
 }

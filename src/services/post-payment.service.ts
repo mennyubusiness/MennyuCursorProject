@@ -82,7 +82,11 @@ export async function processSuccessfulPayment(params: {
         order.customerPhone,
         orderId,
         order.totalCents,
-        formatPickupSmsFragment(order.requestedPickupAt, tz)
+        formatPickupSmsFragment({
+          requestedPickupAt: order.requestedPickupAt,
+          deliverectEstimatedReadyAt: order.deliverectEstimatedReadyAt,
+          resolvedPickupTimezone: tz,
+        })
       );
     }
   }

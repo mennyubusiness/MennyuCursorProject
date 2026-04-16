@@ -10,6 +10,8 @@ import {
   maxParentFulfillmentStepRank,
   minParentFulfillmentStepRank,
 } from "./customer-order-progress";
+import { formatPickupSummaryScheduledLead } from "@/lib/pickup-display";
+import type { OrderPickupDisplayInput } from "@/lib/pickup-display";
 
 /**
  * Customer-facing vendor order chip: Deliverect / fulfillment progression.
@@ -113,7 +115,9 @@ function orderStageLineFromMinRank(minRank: number, multi: boolean): string {
 export function orderSummaryExplanation(
   derivedStatus: string,
   vendorOrders: Array<{ fulfillmentStatus: string; routingStatus: string }>,
-  requestedPickupAt?: unknown
+  requestedPickupAt?: unknown,
+  /** When set, scheduled-summary copy uses the same wall time as {@link formatPickupDetailLine}. */
+  pickupDisplay?: OrderPickupDisplayInput
 ): string {
   const multi = vendorOrders.length > 1;
   const minRank = minParentFulfillmentStepRank(vendorOrders);
@@ -155,7 +159,10 @@ export function orderSummaryExplanation(
     maxRank < 2;
 
   if (scheduledPreKitchen) {
-    return `Your pickup is scheduled. ${orderStageLineFromMinRank(minRank, multi)}`;
+    const scheduledLead =
+      pickupDisplay != null ? formatPickupSummaryScheduledLead(pickupDisplay) : null;
+    const first = scheduledLead ?? "Your pickup is scheduled.";
+    return `${first} ${orderStageLineFromMinRank(minRank, multi)}`;
   }
 
   if (
