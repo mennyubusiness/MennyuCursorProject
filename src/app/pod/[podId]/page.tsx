@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { RecentPodViewTracker } from "@/components/retention/RecentViewTracker";
 import { PodPageHero } from "@/components/pod/PodPageHero";
 import { PodVendorCard } from "@/components/pod/PodVendorCard";
+import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
 import { POD_QR_ENTRY_VALUE } from "@/lib/pod-ordering-url";
 import { prisma } from "@/lib/db";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
@@ -48,6 +49,9 @@ export default async function PodPage({
   const entryRaw = sp.entry;
   const entry = Array.isArray(entryRaw) ? entryRaw[0] : entryRaw;
   const isQrEntry = entry === POD_QR_ENTRY_VALUE;
+  const highlightVendorRaw = sp.highlightVendor;
+  const highlightVendor =
+    (Array.isArray(highlightVendorRaw) ? highlightVendorRaw[0] : highlightVendorRaw)?.trim() ?? null;
   const pod = await prisma.pod.findUnique({
     where: { id: podId },
     include: {
@@ -105,6 +109,8 @@ export default async function PodPage({
         vendorCount={pod.vendors.length}
       />
 
+      <ScrollPodVendorIntoView vendorId={highlightVendor} />
+
       {pod.vendors.length > 0 && (
         <div className="rounded-2xl border border-stone-200/80 bg-white/80 px-4 py-4 shadow-sm sm:px-5">
           <p className="text-center text-sm text-stone-700 sm:text-left">
@@ -141,22 +147,33 @@ export default async function PodPage({
           </div>
         ) : (
           <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {vendorRows.map(({ pv, availability }) => (
-              <li key={pv.vendor.id} className="flex min-h-0">
-                <PodVendorCard
-                  podId={podId}
-                  variant="grid"
-                  vendor={{
-                    id: pv.vendor.id,
-                    name: pv.vendor.name,
-                    description: pv.vendor.description,
-                    imageUrl: pv.vendor.imageUrl,
-                  }}
-                  isFeatured={pv.isFeatured}
-                  availability={availability}
-                />
-              </li>
-            ))}
+            {vendorRows.map(({ pv, availability }) => {
+              const isHighlighted = highlightVendor === pv.vendor.id;
+              return (
+                <li
+                  key={pv.vendor.id}
+                  id={`pod-vendor-${pv.vendor.id}`}
+                  className={`flex min-h-0 scroll-mt-28 rounded-2xl transition-shadow ${
+                    isHighlighted
+                      ? "ring-2 ring-mennyu-primary ring-offset-2 ring-offset-stone-50 shadow-lg"
+                      : ""
+                  }`}
+                >
+                  <PodVendorCard
+                    podId={podId}
+                    variant="grid"
+                    vendor={{
+                      id: pv.vendor.id,
+                      name: pv.vendor.name,
+                      description: pv.vendor.description,
+                      imageUrl: pv.vendor.imageUrl,
+                    }}
+                    isFeatured={pv.isFeatured}
+                    availability={availability}
+                  />
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

@@ -10,7 +10,7 @@ export default async function ExplorePage() {
     orderBy: { name: "asc" },
     include: {
       vendors: {
-        include: { vendor: { select: { name: true } } },
+        include: { vendor: { select: { id: true, name: true, description: true } } },
         where: { isActive: true },
         orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
       },

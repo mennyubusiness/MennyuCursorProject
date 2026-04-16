@@ -13,7 +13,7 @@ export type PodCardPod = {
   description: string | null;
   imageUrl: string | null;
   accentColor: string | null;
-  vendors: { vendor: { name: string } }[];
+  vendors: { vendor: { id: string; name: string; description: string | null } }[];
 };
 
 type PodCardProps = {
