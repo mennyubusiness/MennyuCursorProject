@@ -110,106 +110,122 @@ export function buildParentOrderProgressSteps(
     ];
   }
 
+  /** Fulfillment-driven ladder (parent matches furthest vendor line; rank 0 = all still Received). */
   if (
     d === "accepted" ||
     d === "preparing" ||
     d === "in_progress" ||
-    d === "partially_completed"
+    d === "partially_completed" ||
+    d === "paid" ||
+    d === "routing" ||
+    d === "routed_partial" ||
+    d === "routed"
   ) {
     const rank = maxParentFulfillmentStepRank(vendorOrders);
-    const received: ParentProgressStep = {
-      key: "received",
-      label: "Order received",
-      shortLabel: "Received",
-      state: "complete",
-    };
-    const confirmedComplete: ParentProgressStep = {
-      key: "confirm",
-      label: "Restaurant accepted order",
-      shortLabel: "Confirmed",
-      state: "complete",
-    };
-    const prepComplete: ParentProgressStep = {
-      key: "prep",
-      label: "Preparing",
-      shortLabel: "Preparing",
-      state: "complete",
-    };
-
-    // Only explicit POS acceptance (or higher) — not transport webhooks alone.
-    if (rank <= 1) {
-      return [
-        received,
-        {
-          key: "confirm",
-          label: "Restaurant confirmed your order",
-          shortLabel: "Confirmed",
-          state: "current",
-        },
-        {
-          key: "prep",
-          label: "Preparing your food",
-          shortLabel: "Preparing",
-          state: "upcoming",
-        },
-        { key: "ready", label: "Ready for pickup", shortLabel: "Ready", state: "upcoming" },
-        { key: "done", label: "Completed", shortLabel: "Done", state: "upcoming" },
-      ];
-    }
-    if (rank === 2) {
-      return [
-        received,
-        confirmedComplete,
-        {
-          key: "prep",
-          label: "Preparing your food",
-          shortLabel: "Preparing",
-          state: "current",
-        },
-        { key: "ready", label: "Ready for pickup", shortLabel: "Ready", state: "upcoming" },
-        { key: "done", label: "Completed", shortLabel: "Done", state: "upcoming" },
-      ];
-    }
-    // At least one vendor line is ready (rank ≥ 3).
-    return [
-      received,
-      confirmedComplete,
-      prepComplete,
-      {
-        key: "ready",
-        label: "Ready for pickup",
-        shortLabel: "Ready",
-        state: "current",
-      },
-      { key: "done", label: "Completed", shortLabel: "Done", state: "upcoming" },
-    ];
+    return buildParentProgressStepsFromFulfillmentRank(rank);
   }
 
-  if (d === "paid" || d === "routing" || d === "routed_partial" || d === "routed") {
+  return [
+    { key: "received", label: "Order received", shortLabel: "Received", state: "current" },
+    {
+      key: "confirm",
+      label: "Restaurant confirmed your order",
+      shortLabel: "Confirmed",
+      state: "upcoming",
+    },
+    { key: "prep", label: "Preparing your food", shortLabel: "Preparing", state: "upcoming" },
+    { key: "ready", label: "Ready for pickup", shortLabel: "Ready", state: "upcoming" },
+    { key: "done", label: "Completed", shortLabel: "Done", state: "upcoming" },
+  ];
+}
+
+/**
+ * Parent timeline from max vendor fulfillment rank only (not routing/transport alone).
+ * Rank 0 = all vendors still pending → Received is current (aligned with vendor strip "Received").
+ */
+function buildParentProgressStepsFromFulfillmentRank(rank: number): ParentProgressStep[] {
+  const received: ParentProgressStep = {
+    key: "received",
+    label: "Order received",
+    shortLabel: "Received",
+    state: "complete",
+  };
+  const confirmedComplete: ParentProgressStep = {
+    key: "confirm",
+    label: "Restaurant confirmed your order",
+    shortLabel: "Confirmed",
+    state: "complete",
+  };
+  const prepComplete: ParentProgressStep = {
+    key: "prep",
+    label: "Preparing your food",
+    shortLabel: "Preparing",
+    state: "complete",
+  };
+
+  if (rank === 0) {
     return [
-      { key: "received", label: "Order received", shortLabel: "Received", state: "complete" },
+      { key: "received", label: "Order received", shortLabel: "Received", state: "current" },
       {
         key: "confirm",
-        label: "Waiting for restaurant confirmation",
-        shortLabel: "Confirming",
-        state: "current",
+        label: "Restaurant confirmed your order",
+        shortLabel: "Confirmed",
+        state: "upcoming",
       },
-      { key: "prep", label: "Preparing", shortLabel: "Preparing", state: "upcoming" },
+      {
+        key: "prep",
+        label: "Preparing your food",
+        shortLabel: "Preparing",
+        state: "upcoming",
+      },
       { key: "ready", label: "Ready for pickup", shortLabel: "Ready", state: "upcoming" },
       { key: "done", label: "Completed", shortLabel: "Done", state: "upcoming" },
     ];
   }
-
+  if (rank === 1) {
+    return [
+      received,
+      {
+        key: "confirm",
+        label: "Restaurant confirmed your order",
+        shortLabel: "Confirmed",
+        state: "current",
+      },
+      {
+        key: "prep",
+        label: "Preparing your food",
+        shortLabel: "Preparing",
+        state: "upcoming",
+      },
+      { key: "ready", label: "Ready for pickup", shortLabel: "Ready", state: "upcoming" },
+      { key: "done", label: "Completed", shortLabel: "Done", state: "upcoming" },
+    ];
+  }
+  if (rank === 2) {
+    return [
+      received,
+      confirmedComplete,
+      {
+        key: "prep",
+        label: "Preparing your food",
+        shortLabel: "Preparing",
+        state: "current",
+      },
+      { key: "ready", label: "Ready for pickup", shortLabel: "Ready", state: "upcoming" },
+      { key: "done", label: "Completed", shortLabel: "Done", state: "upcoming" },
+    ];
+  }
+  // At least one vendor line is ready or completed (rank ≥ 3).
   return [
-    { key: "received", label: "Order received", shortLabel: "Received", state: "complete" },
+    received,
+    confirmedComplete,
+    prepComplete,
     {
-      key: "confirm",
-      label: "Waiting for restaurant confirmation",
-      shortLabel: "Confirming",
+      key: "ready",
+      label: "Ready for pickup",
+      shortLabel: "Ready",
       state: "current",
     },
-    { key: "prep", label: "Preparing", shortLabel: "Preparing", state: "upcoming" },
-    { key: "ready", label: "Ready for pickup", shortLabel: "Ready", state: "upcoming" },
     { key: "done", label: "Completed", shortLabel: "Done", state: "upcoming" },
   ];
 }
