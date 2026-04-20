@@ -10,7 +10,7 @@ export type ExploreVendorSearchHit = {
 
 /** Lightweight secondary row for explore search — not the full pod-page vendor card. */
 export function ExploreVendorResultRow({ hit }: { hit: ExploreVendorSearchHit }) {
-  const href = `/pod/${hit.podId}?highlightVendor=${encodeURIComponent(hit.vendorId)}`;
+  const menuHref = `/pod/${hit.podId}/vendor/${hit.vendorId}`;
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-stone-200/90 bg-white/90 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1">
@@ -23,10 +23,10 @@ export function ExploreVendorResultRow({ hit }: { hit: ExploreVendorSearchHit })
         </p>
       </div>
       <Link
-        href={href}
+        href={menuHref}
         className="inline-flex shrink-0 items-center justify-center rounded-lg bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-900 ring-1 ring-stone-200/80 transition hover:bg-mennyu-primary hover:text-black hover:ring-mennyu-primary"
       >
-        View pod
+        Start order →
       </Link>
     </div>
   );

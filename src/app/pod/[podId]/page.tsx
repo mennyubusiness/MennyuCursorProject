@@ -153,9 +153,9 @@ export default async function PodPage({
                 <li
                   key={pv.vendor.id}
                   id={`pod-vendor-${pv.vendor.id}`}
-                  className={`flex min-h-0 scroll-mt-28 rounded-2xl transition-shadow ${
+                  className={`min-h-0 w-full scroll-mt-28 ${
                     isHighlighted
-                      ? "ring-2 ring-mennyu-primary ring-offset-2 ring-offset-stone-50 shadow-lg"
+                      ? "rounded-2xl p-1 ring-2 ring-mennyu-primary ring-offset-2 ring-offset-stone-50 shadow-lg"
                       : ""
                   }`}
                 >

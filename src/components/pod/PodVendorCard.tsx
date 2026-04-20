@@ -74,7 +74,7 @@ export function PodVendorCard({ podId, variant, vendor, isFeatured, availability
       href={href}
       className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-md ring-1 ring-black/[0.04] transition duration-300 motion-reduce:transform-none ${
         grid
-          ? "hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-xl"
+          ? "w-full hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-xl"
           : "w-[min(11.5rem,42vw)] shrink-0 hover:-translate-y-0.5 hover:shadow-lg"
       } ${availability.unavailable ? "opacity-95" : ""}`}
       aria-label={`${vendor.name} — ${availability.statusLabel}. ${availability.unavailable ? "Browse menu." : "Start order."}`}
