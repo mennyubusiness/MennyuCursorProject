@@ -180,6 +180,35 @@ export async function executeVendorPayoutTransfer(
   }
 }
 
+/**
+ * Admin retry: failed → pending (clear error), then runs Stripe transfer again.
+ * Blocked rows cannot be retried here.
+ */
+export async function retryFailedVendorPayoutTransfer(
+  transferId: string,
+  opts?: { batchKey?: string }
+): Promise<ExecuteStripeTransferResult> {
+  const row = await prisma.vendorPayoutTransfer.findUnique({ where: { id: transferId } });
+  if (!row) {
+    return { outcome: "skipped", reason: "not_found" };
+  }
+  if (row.status !== VENDOR_PAYOUT_TRANSFER_STATUS.failed) {
+    return { outcome: "skipped", reason: `not_failed_status_${row.status}` };
+  }
+  if (row.destinationAccountId === BLOCKED_DESTINATION_SENTINEL) {
+    return { outcome: "skipped", reason: "blocked_destination" };
+  }
+  await prisma.vendorPayoutTransfer.update({
+    where: { id: transferId },
+    data: {
+      status: VENDOR_PAYOUT_TRANSFER_STATUS.pending,
+      failureMessage: null,
+      failedAt: null,
+    },
+  });
+  return executeVendorPayoutTransfer(transferId, opts);
+}
+
 export type PayoutTransferBatchSummary = {
   batchKey: string;
   examined: number;

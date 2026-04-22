@@ -365,6 +365,31 @@ export async function executeVendorPayoutTransferReversal(
   }
 }
 
+/**
+ * Admin retry: failed → pending (clear error), then runs Stripe reversal again.
+ */
+export async function retryFailedVendorPayoutTransferReversal(
+  reversalId: string,
+  opts?: { batchKey?: string }
+): Promise<ExecuteTransferReversalResult> {
+  const row = await prisma.vendorPayoutTransferReversal.findUnique({ where: { id: reversalId } });
+  if (!row) {
+    return { outcome: "skipped", reason: "not_found" };
+  }
+  if (row.status !== VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.failed) {
+    return { outcome: "skipped", reason: `not_failed_status_${row.status}` };
+  }
+  await prisma.vendorPayoutTransferReversal.update({
+    where: { id: reversalId },
+    data: {
+      status: VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.pending,
+      failureMessage: null,
+      failedAt: null,
+    },
+  });
+  return executeVendorPayoutTransferReversal(reversalId, opts);
+}
+
 export type TransferReversalBatchSummary = {
   batchKey: string;
   examined: number;
