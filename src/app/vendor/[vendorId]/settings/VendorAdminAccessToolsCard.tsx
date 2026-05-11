@@ -18,7 +18,7 @@ export function VendorAdminAccessToolsCard({
   return (
     <div className="space-y-4 rounded-xl border border-dashed border-stone-300 bg-stone-50/80 p-5 text-sm text-stone-600">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Mennyu admin · technical</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Open Order admin · technical</p>
         <h4 className="mt-1 text-base font-semibold text-stone-800">Access, onboarding &amp; automation</h4>
         <p className="mt-1 text-xs text-stone-500">
           For support and integrations. Routine restaurant staff use email sign-in and team membership — not these tools.

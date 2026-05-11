@@ -106,7 +106,7 @@ export default async function HomePage() {
       </section>
 
       <section className="rounded-2xl border border-stone-200/80 bg-gradient-to-b from-mennyu-muted/60 to-stone-50/90 p-8 text-center shadow-sm sm:p-10">
-        <h2 className="text-2xl font-bold tracking-tight text-stone-900">Run your pod on Mennyu</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-stone-900">Run your pod on Open Order</h2>
         <p className="mx-auto mt-3 max-w-lg text-stone-600">
           Bring your vendors together, streamline orders, and create a better customer experience.
         </p>

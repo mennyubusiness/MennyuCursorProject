@@ -101,7 +101,7 @@ export default async function AdminAnalyticsPage({
                 <p className="text-2xl font-semibold text-stone-900">
                   {formatMoney(summary.mennyuRevenueCents)}
                 </p>
-                <p className="text-sm text-stone-600">Mennyu service fee revenue</p>
+                <p className="text-sm text-stone-600">Open Order service fee revenue</p>
               </div>
               <div className="rounded-lg border border-stone-200 bg-white p-4">
                 <p className="text-2xl font-semibold text-stone-900">{summary.activeVendors}</p>

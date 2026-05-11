@@ -1,7 +1,12 @@
 /**
  * SMS notifications via Twilio. Primary channel for order updates.
  */
+import { env } from "@/lib/env";
 import { twilioClient, twilioPhoneNumber } from "@/lib/twilio";
+
+function publicOrderBaseUrl(): string {
+  return env.PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://mennyu.com";
+}
 
 export async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string }> {
   if (!twilioClient || !twilioPhoneNumber) {
@@ -33,7 +38,7 @@ export async function sendOrderConfirmation(
   const pickup = pickupFragment ? ` ${pickupFragment}.` : "";
   await sendSms(
     phone,
-    `Your Mennyu order is confirmed. Order #${orderId.slice(-8).toUpperCase()}.${pickup} Total $${total}. Track status: https://mennyu.com/order/${orderId}`
+    `Your order with Open Order is confirmed. Order #${orderId.slice(-8).toUpperCase()}.${pickup} Total $${total}. Track status: ${publicOrderBaseUrl()}/order/${orderId}`
   );
 }
 
@@ -44,6 +49,6 @@ export async function sendOrderStatusUpdate(
 ): Promise<void> {
   await sendSms(
     phone,
-    `Mennyu order #${orderId.slice(-8).toUpperCase()}: ${statusLabel}. Details: https://mennyu.com/order/${orderId}`
+    `Open Order #${orderId.slice(-8).toUpperCase()}: ${statusLabel}. Details: ${publicOrderBaseUrl()}/order/${orderId}`
   );
 }

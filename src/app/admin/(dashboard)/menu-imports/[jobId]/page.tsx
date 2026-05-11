@@ -171,7 +171,7 @@ export default async function AdminMenuImportJobPage({
 
       <section className="rounded-lg border border-stone-200 bg-white p-4">
         <h2 className="font-medium text-stone-900">What changed</h2>
-        <p className="mt-1 text-sm text-stone-600">Compared to your live Mennyu menu (same Deliverect-linked items).</p>
+        <p className="mt-1 text-sm text-stone-600">Compared to your live Open Order menu (same Deliverect-linked items).</p>
         <div className="mt-3">
           <MenuImportWhatChanged summary={publishSummary} summaryMode={publishSummaryMode} />
         </div>
@@ -187,7 +187,7 @@ export default async function AdminMenuImportJobPage({
 
       <section className="rounded-lg border border-stone-200 bg-white p-4">
         <h2 className="font-medium text-stone-900">Menu preview</h2>
-        <p className="mt-1 text-sm text-stone-600">How this draft looks in Mennyu (names, prices, modifiers).</p>
+        <p className="mt-1 text-sm text-stone-600">How this draft looks in Open Order (names, prices, modifiers).</p>
         <div className="mt-4">
           <MenuImportMenuPreview
             menu={menu}

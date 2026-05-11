@@ -327,8 +327,8 @@ async function applyDeliverectInboundStatus(
       processedAt: nowIso(),
       detail:
         inbound === "fallback"
-          ? "Deliverect API lookup: payload did not map to a Mennyu status (strict allowlist)."
-          : "Deliverect payload did not resolve to a mapped Mennyu status (strict allowlist). Raw codes/events are logged server-side.",
+          ? "Deliverect API lookup: payload did not map to an Open Order status (strict allowlist)."
+          : "Deliverect payload did not resolve to a mapped Open Order status (strict allowlist). Raw codes/events are logged server-side.",
       currentFulfillment: vo.fulfillmentStatus,
       currentRouting: vo.routingStatus,
       rawNumericCode: interpretation.rawNumericCode,
@@ -401,8 +401,8 @@ async function applyDeliverectInboundStatus(
       detail: backward
         ? `Ignored POS fulfillment regression vs current ${vo.fulfillmentStatus} (webhook proposed ${interpretedFulfillment}).`
         : inbound === "fallback"
-          ? "Deliverect API lookup: mapped status matches current Mennyu state (no row change)."
-          : "Mapped status matches current Mennyu state after reconciliation.",
+          ? "Deliverect API lookup: mapped status matches current Open Order state (no row change)."
+          : "Mapped status matches current Open Order state after reconciliation.",
       currentFulfillment: vo.fulfillmentStatus,
       currentRouting: vo.routingStatus,
       rawNumericCode: interpretation.rawNumericCode,

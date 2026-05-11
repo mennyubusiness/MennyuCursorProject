@@ -127,7 +127,7 @@ function categorizeWebhookEvent(row: {
     category = "match_failed";
     phase = "rejected_before_apply";
     label = "No matching VendorOrder";
-    summary = "Payload could not be linked to a Mennyu vendor order (channel / external id).";
+    summary = "Payload could not be linked to an Open Order vendor order (channel / external id).";
   } else if (!row.processed && row.errorMessage) {
     category = "apply_error";
     phase = "pipeline_processed";
@@ -192,11 +192,11 @@ function categorizeVendorOrderAudit(args: {
   if (outcome === "unmapped_status") {
     category = "unmapped_status";
     label = "Unmapped status recorded";
-    summary = `POS sent a status code/event with no Mennyu mapping (code ${a.rawNumericCode ?? "—"}). State unchanged; audit only.`;
+    summary = `POS sent a status code/event with no Open Order mapping (code ${a.rawNumericCode ?? "—"}). State unchanged; audit only.`;
   } else if (outcome === "noop_same_status") {
     category = "noop_same_status";
     label = "No-op (same status)";
-    summary = "Mapped status matched current Mennyu state after merge — no row change.";
+    summary = "Mapped status matched current Open Order state after merge — no row change.";
   } else if (outcome === "ignored_backward") {
     category = "ignored_backward";
     label = "Ignored backward";

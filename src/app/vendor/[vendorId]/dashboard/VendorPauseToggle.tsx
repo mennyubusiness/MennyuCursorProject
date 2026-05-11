@@ -51,11 +51,11 @@ export function VendorPauseToggle({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-medium text-stone-800">Mennyu orders</p>
+          <p className="font-medium text-stone-800">Open Order intake</p>
           <p className="text-xs text-stone-500">
             {paused
-              ? "New orders through Mennyu are blocked. In-progress orders still show here."
-              : "Customers can place orders for your menu via Mennyu."}
+              ? "New orders through Open Order are blocked. In-progress orders still show here."
+              : "Customers can place orders for your menu via Open Order."}
           </p>
         </div>
         <button

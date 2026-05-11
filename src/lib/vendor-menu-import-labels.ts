@@ -41,7 +41,7 @@ export function vendorMenuImportListBadge(job: VendorMenuImportListRow): {
       return { label: "Published automatically", tone: "auto" };
     }
     if (by.startsWith("admin:")) {
-      return { label: "Published by Mennyu admin", tone: "success" };
+      return { label: "Published by Open Order admin", tone: "success" };
     }
     return { label: "Published", tone: "success" };
   }
@@ -93,7 +93,7 @@ export function vendorMenuImportDetailPrimaryStatus(job: {
       return "Published automatically";
     }
     if (by.startsWith("admin:")) {
-      return "Published by Mennyu admin (support)";
+      return "Published by Open Order admin (support)";
     }
     if (by.startsWith("user:")) {
       return "Published from your account";
@@ -105,7 +105,7 @@ export function vendorMenuImportDetailPrimaryStatus(job: {
   }
   if (job.status === "awaiting_review") {
     if (blocking > 0) {
-      return "Blocked by issues — fix in Deliverect or ask Mennyu support";
+      return "Blocked by issues — fix in Deliverect or ask Open Order support";
     }
     return "Needs review — open Publish when ready";
   }

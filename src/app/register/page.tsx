@@ -16,7 +16,7 @@ export default async function RegisterPage() {
       <RegisterForm />
       <p className="text-center text-sm text-stone-500">
         <Link href="/" className="underline hover:text-stone-800">
-          Back to Mennyu
+          Back to Open Order
         </Link>
       </p>
     </div>

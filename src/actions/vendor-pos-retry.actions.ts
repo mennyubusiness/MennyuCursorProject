@@ -14,7 +14,7 @@ export type VendorPosRetryResult =
 
 /**
  * Re-runs exact matching for the latest stored channel-registration webhook that referenced this vendor’s
- * Mennyu Location ID but did not match. Does not bypass webhook idempotency for new deliveries — only reprocesses DB state.
+ * Open Order location ID but did not match. Does not bypass webhook idempotency for new deliveries — only reprocesses DB state.
  */
 export async function retryVendorDeliverectConnection(vendorId: string): Promise<VendorPosRetryResult> {
   const session = await auth();
@@ -30,7 +30,8 @@ export async function retryVendorDeliverectConnection(vendorId: string): Promise
   if (!webhookEventId) {
     return {
       ok: false,
-      error: "There’s nothing to retry right now. If Deliverect just activated, wait a moment or confirm your Mennyu Location ID is entered in Deliverect.",
+      error:
+        "There’s nothing to retry right now. If Deliverect just activated, wait a moment or confirm your Open Order location ID is entered in Deliverect.",
     };
   }
 
@@ -44,7 +45,7 @@ export async function retryVendorDeliverectConnection(vendorId: string): Promise
     return {
       ok: false,
       error:
-        "We still couldn’t match this activation. Double-check that your Mennyu Location ID is pasted exactly into Deliverect’s channel location field, then contact support if it continues.",
+        "We still couldn’t match this activation. Double-check that your Open Order location ID is pasted exactly into Deliverect’s channel location field, then contact support if it continues.",
     };
   }
 

@@ -1,43 +1,36 @@
 "use client";
 
 type Props = {
-  ordersToday: number;
   needsAttention: number;
-  inProgress: number;
+  preparing: number;
   ready: number;
+  completedToday: number;
 };
 
-export function VendorOrdersSummaryStrip({ ordersToday, needsAttention, inProgress, ready }: Props) {
-  return (
-    <div className="mb-6 grid grid-cols-2 gap-3 rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-4 shadow-sm sm:grid-cols-4 sm:gap-4">
-      <div className="rounded-xl border border-stone-100 bg-white/80 px-3 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">Orders today</p>
-        <p className="mt-1 text-2xl font-bold tabular-nums text-stone-900">{ordersToday}</p>
-      </div>
-      <div
-        className={`rounded-xl border px-3 py-3 ${
-          needsAttention > 0
-            ? "border-mennyu-primary/50 bg-mennyu-primary/10"
-            : "border-stone-100 bg-white/80"
+export function VendorOrdersSummaryStrip({ needsAttention, preparing, ready, completedToday }: Props) {
+  const cell = (label: string, value: number, highlight: boolean) => (
+    <div
+      className={`min-w-0 flex-1 rounded-lg px-3 py-3 sm:px-4 ${
+        highlight ? "bg-mennyu-primary/12 ring-1 ring-mennyu-primary/35" : "bg-stone-50/80"
+      }`}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">{label}</p>
+      <p
+        className={`mt-1 text-2xl font-semibold tabular-nums ${
+          highlight && value > 0 ? "text-stone-900" : "text-stone-800"
         }`}
       >
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">Needs action</p>
-        <p
-          className={`mt-1 text-2xl font-bold tabular-nums ${
-            needsAttention > 0 ? "text-stone-900" : "text-stone-400"
-          }`}
-        >
-          {needsAttention}
-        </p>
-      </div>
-      <div className="rounded-xl border border-stone-100 bg-white/80 px-3 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">In progress</p>
-        <p className="mt-1 text-2xl font-bold tabular-nums text-stone-900">{inProgress}</p>
-      </div>
-      <div className="rounded-xl border border-stone-100 bg-white/80 px-3 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">Ready</p>
-        <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-800">{ready}</p>
-      </div>
+        {value}
+      </p>
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+      {cell("Needs action", needsAttention, needsAttention > 0)}
+      {cell("Preparing", preparing, false)}
+      {cell("Ready", ready, false)}
+      {cell("Completed today", completedToday, false)}
     </div>
   );
 }

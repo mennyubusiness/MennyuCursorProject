@@ -68,7 +68,7 @@ export function VendorPosConnectionPanel(props: VendorPosConnectionPanelProps) {
           <div>
             <h3 className="text-base font-semibold text-stone-900">Kitchen POS connection</h3>
             <p className="mt-1 text-sm text-stone-600">
-              <span className="font-medium text-stone-800">{vendorName}</span> — Deliverect links Mennyu to your POS for
+              <span className="font-medium text-stone-800">{vendorName}</span> — Deliverect links Open Order to your POS for
               tickets and status.
             </p>
           </div>
@@ -79,7 +79,7 @@ export function VendorPosConnectionPanel(props: VendorPosConnectionPanelProps) {
               <dd className="font-medium text-stone-900">{label}</dd>
             </div>
             <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-stone-500">Mennyu Location ID</dt>
+              <dt className="text-xs font-medium uppercase tracking-wide text-stone-500">Open Order location ID</dt>
               <dd className="break-all font-mono text-xs text-stone-800" title="Paste into Deliverect as channelLocationId">
                 {vendorId}
               </dd>
@@ -119,7 +119,7 @@ export function VendorPosConnectionPanel(props: VendorPosConnectionPanelProps) {
             <div className="rounded-lg border border-amber-200 bg-white/80 px-3 py-2 text-sm text-amber-950">
               <p className="font-medium">We couldn’t match your last Deliverect activation</p>
               <p className="mt-1 text-xs text-amber-900/90">
-                Confirm the Mennyu Location ID above is entered exactly in Deliverect, then tap &quot;Check connection
+                Confirm the Open Order location ID above is entered exactly in Deliverect, then tap &quot;Check connection
                 again&quot;. If it still fails, contact support.
               </p>
               <VendorPosConnectionRetryButton vendorId={vendorId} />

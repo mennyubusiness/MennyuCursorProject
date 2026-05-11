@@ -32,7 +32,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "Forbidden: vendor membership, legacy token, or Mennyu admin authentication required.",
+          "Forbidden: vendor membership, legacy token, or Open Order admin authentication required.",
         code: "VENDOR_DASHBOARD_AUTH",
       },
       { status: 403 }

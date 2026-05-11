@@ -94,7 +94,7 @@ export default async function AdminVendorDeliverectMappingPage({
       </p>
       <h1 className="mt-2 text-xl font-semibold text-stone-900">Deliverect ID mapping</h1>
       <p className="mt-1 text-sm text-stone-600">
-        Attach Deliverect product and modifier IDs to existing Mennyu menu data for{" "}
+        Attach Deliverect product and modifier IDs to existing Open Order menu data for{" "}
         <strong>{vendor.name}</strong>. Clear a field and save to unset.
       </p>
 
@@ -104,7 +104,7 @@ export default async function AdminVendorDeliverectMappingPage({
             Deliverect auto-mapping (channel registration)
           </h2>
           <p className="mt-2 text-stone-600">
-            When Deliverect activates the channel, Mennyu can assign the channel link ID automatically. Use this panel
+            When Deliverect activates the channel, Open Order can assign the channel link ID automatically. Use this panel
             to see onboarding / last outcome; manual ID entry remains available if automatic matching fails.
           </p>
           <dl className="mt-3 grid gap-2 sm:grid-cols-2">

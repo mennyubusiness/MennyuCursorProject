@@ -32,7 +32,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "Forbidden: sign in with a user linked to this vendor, use a legacy dashboard token, or authenticate as Mennyu admin.",
+          "Forbidden: sign in with a user linked to this vendor, use a legacy dashboard token, or authenticate as Open Order admin.",
         code: "VENDOR_DASHBOARD_AUTH",
       },
       { status: 403 }

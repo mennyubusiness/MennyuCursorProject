@@ -20,7 +20,7 @@ export function VendorAccountSection({
           <span className="font-medium text-stone-900">{display ?? "your administrator account"}</span>.
         </p>
         <p className="mt-2 text-sm text-stone-500">
-          You are viewing this restaurant with Mennyu platform administrator access.
+          You are viewing this restaurant with Open Order platform administrator access.
         </p>
       </div>
     );
@@ -34,7 +34,7 @@ export function VendorAccountSection({
         <span className="font-medium text-stone-900">{display ?? "your team account"}</span>.
       </p>
       <p className="mt-2 text-sm text-stone-500">
-        Access to this dashboard is linked to your Mennyu account and restaurant membership.
+        Access to this dashboard is linked to your Open Order account and restaurant membership.
       </p>
     </div>
   );

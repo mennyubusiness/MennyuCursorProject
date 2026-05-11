@@ -37,10 +37,10 @@ function groupKey(vo: {
 
 const GROUP_LABELS: Record<GroupKey, string> = {
   new: "Needs action",
-  preparing: "In progress",
-  ready: "Ready for pickup",
+  preparing: "Preparing",
+  ready: "Ready",
   completed: "Completed",
-  cancelled_failed: "Cancelled / Failed",
+  cancelled_failed: "Cancelled / failed",
 };
 
 type VendorOrderFromApi = {
@@ -77,6 +77,19 @@ type VendorOrderFromApi = {
   deliverectRoutingDegraded?: boolean;
 };
 
+function completedTransitionTimeMs(vo: VendorOrderFromApi): number | null {
+  const hist = [...(vo.statusHistory ?? [])].reverse();
+  for (const h of hist) {
+    if (h.fulfillmentStatus === "completed" && h.createdAt) {
+      return new Date(h.createdAt).getTime();
+    }
+  }
+  if (vo.fulfillmentStatus === "completed") {
+    return new Date(vo.order.createdAt).getTime();
+  }
+  return null;
+}
+
 const POLL_INTERVAL_MS = 5000;
 
 const AGE_UPDATE_INTERVAL_MS = 60_000;
@@ -91,7 +104,7 @@ export function VendorDashboardLiveOrders({
   initialVendorOrders: VendorOrderFromApi[];
   /** Stable "now" from server for initial render so SSR and hydration match. */
   initialNowMs: number;
-  /** Pass from server (e.g. isRoutingRetryAvailable()) so POS vs Mennyu mode is correct. */
+  /** Pass from server (e.g. isRoutingRetryAvailable()) so POS vs Open Order mode is correct. */
   isDeliverectLive?: boolean;
 }) {
   const [vendorOrders, setVendorOrders] = useState<VendorOrderFromApi[]>(initialVendorOrders);
@@ -102,6 +115,8 @@ export function VendorDashboardLiveOrders({
   /** Periodic tick so highlight rings clear without full page refresh. */
   const [, setHighlightTick] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [showCancelledFailed, setShowCancelledFailed] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setHighlightTick((t) => t + 1), 3000);
@@ -184,132 +199,160 @@ export function VendorDashboardLiveOrders({
   const newOrderIdsForSound = grouped.new?.map((vo) => vo.id) ?? [];
   const needsActionCount = grouped.new?.length ?? 0;
   const preparingOnlyCount = grouped.preparing?.length ?? 0;
-  const inProgressCount = preparingOnlyCount + (grouped.ready?.length ?? 0);
   const readyCount = grouped.ready?.length ?? 0;
-  const completedCount = grouped.completed?.length ?? 0;
-
   const startOfTodayMs = (() => {
     const d = new Date(nowMs);
     d.setHours(0, 0, 0, 0);
     return d.getTime();
   })();
-  const ordersToday = vendorOrders.filter(
-    (vo) => new Date(vo.order.createdAt).getTime() >= startOfTodayMs
-  ).length;
+  const completedTodayCount = vendorOrders.filter((vo) => {
+    if (groupKey(vo) !== "completed") return false;
+    const t = completedTransitionTimeMs(vo);
+    return t != null && t >= startOfTodayMs;
+  }).length;
 
   return (
     <>
       <NewOrderSoundAlert newOrderIds={newOrderIdsForSound} />
-      {vendorOrders.length > 0 && (
+      <div className="mb-10">
         <VendorOrdersSummaryStrip
-          ordersToday={ordersToday}
           needsAttention={needsActionCount}
-          inProgress={inProgressCount}
+          preparing={preparingOnlyCount}
           ready={readyCount}
+          completedToday={completedTodayCount}
         />
-      )}
-      {vendorOrders.length > 0 && (
-        <p className="mb-4 text-sm text-stone-600">
-          <span className="font-medium text-stone-800">{needsActionCount}</span> need action
-          <span className="text-stone-400"> · </span>
-          <span className="font-medium text-stone-800">{preparingOnlyCount}</span> preparing
-          <span className="text-stone-400"> · </span>
-          <span className="font-medium text-stone-800">{readyCount}</span> ready
-          <span className="text-stone-400"> · </span>
-          <span className="text-stone-500">{completedCount} completed (shown)</span>
-        </p>
-      )}
+      </div>
       {vendorOrders.length === 0 ? (
         <p className="text-sm text-stone-500">No orders yet.</p>
       ) : (
-        order.map((key) => {
+        <div className="space-y-12">
+          {order.map((key) => {
           const list = grouped[key];
           if (!list || list.length === 0) return null;
           const isTerminalSection = key === "cancelled_failed";
+          const collapsible = key === "completed" || key === "cancelled_failed";
+          const expanded = collapsible
+            ? key === "completed"
+              ? showCompleted
+              : showCancelledFailed
+            : true;
+
+          const sectionBody = (
+            <div className="space-y-5">
+              {list.map((vo) => {
+                const operatingMode = getVendorOrderOperatingMode(
+                    vo,
+                  vo.statusHistory,
+                  isDeliverectLive
+                ) as VendorOrderOperatingMode;
+                const urgency = getVendorOrderUrgency(new Date(vo.order.createdAt), nowMs);
+                const readyWaitMinutes = getReadyWaitMinutes(
+                  vo.statusHistory?.map((h) => ({ ...h, createdAt: new Date(h.createdAt) })),
+                  nowMs
+                );
+                const readyWaitEscalation =
+                  readyWaitMinutes != null ? getReadyWaitEscalation(readyWaitMinutes) : "neutral";
+                const vendorOrderCount = vo.order._count?.vendorOrders ?? 1;
+                const pickupCode = getPickupCode(vo.order.id);
+                const siblingFirstReadyMinutesAgo = vo.siblingFirstReadyMinutesAgo ?? null;
+                const siblingBehindEscalation =
+                  siblingFirstReadyMinutesAgo != null && siblingFirstReadyMinutesAgo >= 0
+                    ? getBehindSiblingEscalation(siblingFirstReadyMinutesAgo)
+                    : "yellow";
+
+                return (
+                  <VendorOrderCard
+                    key={vo.id}
+                    vendorId={vendorId}
+                    isDeliverectLive={isDeliverectLive}
+                    deliverectRoutingDegraded={vo.deliverectRoutingDegraded === true}
+                    onStatusSuccess={onStatusSuccess}
+                    pickupCode={pickupCode}
+                    vendorOrder={{
+                      id: vo.id,
+                      orderId: vo.orderId,
+                      routingStatus: vo.routingStatus,
+                      fulfillmentStatus: vo.fulfillmentStatus,
+                      manuallyRecoveredAt: vo.manuallyRecoveredAt ?? undefined,
+                      statusHistory: vo.statusHistory?.map((h) => ({ source: h.source })) ?? undefined,
+                      totalCents: vo.totalCents,
+                      tipCents: vo.tipCents ?? 0,
+                      order: {
+                        id: vo.order.id,
+                        orderNotes: vo.order.orderNotes,
+                        customerPhone: vo.order.customerPhone,
+                        createdAt: vo.order.createdAt,
+                      },
+                      lineItems: vo.lineItems.map((line) => ({
+                        id: line.id,
+                        name: line.name,
+                        quantity: line.quantity,
+                        priceCents: line.priceCents,
+                        specialInstructions: line.specialInstructions,
+                        selections: line.selections.map((s) => ({
+                          nameSnapshot: s.nameSnapshot,
+                          quantity: s.quantity,
+                          modifierOption: s.modifierOption,
+                        })),
+                      })),
+                    }}
+                    operatingMode={operatingMode}
+                    urgencyLabel={urgency.label}
+                    urgencyLevel={urgency.level}
+                    ageText={urgency.ageText}
+                    readyWaitMinutes={readyWaitMinutes}
+                    readyWaitEscalation={readyWaitEscalation}
+                    vendorOrderCount={vendorOrderCount}
+                    isNew={(highlightExpireAtById[vo.id] ?? 0) > highlightNow}
+                    siblingFirstReadyMinutesAgo={siblingFirstReadyMinutesAgo}
+                    siblingBehindEscalation={siblingBehindEscalation}
+                  />
+                );
+              })}
+            </div>
+          );
+
+          if (collapsible) {
+            const open = expanded;
+            const setOpen = key === "completed" ? setShowCompleted : setShowCancelledFailed;
+            return (
+              <section key={key} className="border-t border-stone-200/60 pt-8">
+                <button
+                  type="button"
+                  onClick={() => setOpen(!open)}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg py-2 text-left transition hover:bg-stone-50/80"
+                >
+                  <h2
+                    className={`text-sm font-semibold tracking-tight ${
+                      isTerminalSection ? "text-stone-500" : "text-stone-800"
+                    }`}
+                  >
+                    {GROUP_LABELS[key]}
+                    <span className="ml-2 font-normal text-stone-500">({list.length})</span>
+                  </h2>
+                  <span className="shrink-0 text-xs font-medium text-mennyu-primary">
+                    {open ? "Hide" : "Show"}
+                  </span>
+                </button>
+                {open ? <div className="mt-4">{sectionBody}</div> : null}
+              </section>
+            );
+          }
+
           return (
             <section key={key}>
               <h2
-                className={`mb-3 text-xs font-semibold uppercase tracking-[0.14em] ${
-                  isTerminalSection ? "text-stone-400" : "text-stone-600"
+                className={`mb-4 text-sm font-semibold tracking-tight ${
+                  isTerminalSection ? "text-stone-500" : "text-stone-800"
                 }`}
               >
                 {GROUP_LABELS[key]}
               </h2>
-              <div className="space-y-4">
-                {list.map((vo) => {
-                  const operatingMode = getVendorOrderOperatingMode(
-                    vo,
-                    vo.statusHistory,
-                    isDeliverectLive
-                  ) as VendorOrderOperatingMode;
-                  const urgency = getVendorOrderUrgency(new Date(vo.order.createdAt), nowMs);
-                  const readyWaitMinutes = getReadyWaitMinutes(
-                    vo.statusHistory?.map((h) => ({ ...h, createdAt: new Date(h.createdAt) })),
-                    nowMs
-                  );
-                  const readyWaitEscalation =
-                    readyWaitMinutes != null ? getReadyWaitEscalation(readyWaitMinutes) : "neutral";
-                  const vendorOrderCount = vo.order._count?.vendorOrders ?? 1;
-                  const pickupCode = getPickupCode(vo.order.id);
-                  const siblingFirstReadyMinutesAgo = vo.siblingFirstReadyMinutesAgo ?? null;
-                  const siblingBehindEscalation =
-                    siblingFirstReadyMinutesAgo != null && siblingFirstReadyMinutesAgo >= 0
-                      ? getBehindSiblingEscalation(siblingFirstReadyMinutesAgo)
-                      : "yellow";
-
-                  return (
-                    <VendorOrderCard
-                      key={vo.id}
-                      vendorId={vendorId}
-                      isDeliverectLive={isDeliverectLive}
-                      deliverectRoutingDegraded={vo.deliverectRoutingDegraded === true}
-                      onStatusSuccess={onStatusSuccess}
-                      pickupCode={pickupCode}
-                      vendorOrder={{
-                        id: vo.id,
-                        orderId: vo.orderId,
-                        routingStatus: vo.routingStatus,
-                        fulfillmentStatus: vo.fulfillmentStatus,
-                        manuallyRecoveredAt: vo.manuallyRecoveredAt ?? undefined,
-                        statusHistory: vo.statusHistory?.map((h) => ({ source: h.source })) ?? undefined,
-                        totalCents: vo.totalCents,
-                        tipCents: vo.tipCents ?? 0,
-                        order: {
-                          id: vo.order.id,
-                          orderNotes: vo.order.orderNotes,
-                          customerPhone: vo.order.customerPhone,
-                          createdAt: vo.order.createdAt,
-                        },
-                        lineItems: vo.lineItems.map((line) => ({
-                          id: line.id,
-                          name: line.name,
-                          quantity: line.quantity,
-                          priceCents: line.priceCents,
-                          specialInstructions: line.specialInstructions,
-                          selections: line.selections.map((s) => ({
-                            nameSnapshot: s.nameSnapshot,
-                            quantity: s.quantity,
-                            modifierOption: s.modifierOption,
-                          })),
-                        })),
-                      }}
-                      operatingMode={operatingMode}
-                      urgencyLabel={urgency.label}
-                      urgencyLevel={urgency.level}
-                      ageText={urgency.ageText}
-                      readyWaitMinutes={readyWaitMinutes}
-                      readyWaitEscalation={readyWaitEscalation}
-                      vendorOrderCount={vendorOrderCount}
-                      isNew={(highlightExpireAtById[vo.id] ?? 0) > highlightNow}
-                      siblingFirstReadyMinutesAgo={siblingFirstReadyMinutesAgo}
-                      siblingBehindEscalation={siblingBehindEscalation}
-                    />
-                  );
-                })}
-              </div>
+              {sectionBody}
             </section>
           );
-        })
+        })}
+        </div>
       )}
     </>
   );

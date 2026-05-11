@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 
 type Props = {
-  /** Primary `Vendor.id` — stable Mennyu identifier for routing and support. */
+  /** Primary `Vendor.id` — stable Open Order identifier for routing and support. */
   mennyuLocationId: string;
   className?: string;
   /** Larger, higher-contrast block for guided POS onboarding (copy this into Deliverect as `channelLocationId`). */
@@ -11,7 +11,7 @@ type Props = {
 };
 
 /**
- * Copyable Mennyu Location ID — same label and styling everywhere (Settings + POS setup).
+ * Copyable Open Order location ID — same label and styling everywhere (Settings + POS setup).
  */
 export function MennyuLocationIdField({ mennyuLocationId, className = "", variant = "default" }: Props) {
   const [copied, setCopied] = useState(false);
@@ -34,7 +34,7 @@ export function MennyuLocationIdField({ mennyuLocationId, className = "", varian
   return (
     <div className={`${box} ${className}`}>
       <p className={variant === "emphasized" ? "text-base font-semibold text-stone-900" : "text-sm font-medium text-stone-900"}>
-        Mennyu Location ID
+        Open Order location ID
         {variant === "emphasized" ? (
           <span className="ml-2 text-sm font-normal text-stone-500">— paste this into Deliverect</span>
         ) : null}
@@ -49,7 +49,7 @@ export function MennyuLocationIdField({ mennyuLocationId, className = "", varian
         ) : (
           <>
             Use this when connecting your POS or contacting support. In Deliverect, set <strong>channelLocationId</strong>{" "}
-            (external location / merchant id) to this value so Mennyu can match channel registration webhooks automatically.
+            (external location / merchant id) to this value so Open Order can match channel registration webhooks automatically.
           </>
         )}
       </p>

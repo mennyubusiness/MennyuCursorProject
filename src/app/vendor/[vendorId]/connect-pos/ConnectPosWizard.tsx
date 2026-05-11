@@ -72,9 +72,9 @@ function ManualConnectionForm({
   return (
     <form onSubmit={(e) => void onSubmit(e)} className="mt-4 space-y-4">
       <p className="text-xs text-stone-500">
-        Admin or support use: the <strong>channel link ID</strong> is what Mennyu uses to send orders after Deliverect
+        Admin or support use: the <strong>channel link ID</strong> is what Open Order uses to send orders after Deliverect
         gives you a link. The optional <strong>Deliverect location ID</strong> is only extra metadata for some setups —
-        your Mennyu Location ID above is what you paste into Deliverect as <strong>channelLocationId</strong> during setup.
+        your Open Order location ID above is what you paste into Deliverect as <strong>channelLocationId</strong> during setup.
       </p>
       <label className="block text-sm">
         <span className="font-medium text-stone-800">POS system</span>
@@ -175,7 +175,7 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 p-5 shadow-sm">
           <h3 className="text-base font-semibold text-emerald-950">Your POS is connected</h3>
           <p className="mt-2 text-sm text-emerald-900/90 leading-relaxed">
-            Mennyu routes paid orders using your <strong>Deliverect channel link ID</strong>. You can review connection
+            Open Order routes paid orders using your <strong>Deliverect channel link ID</strong>. You can review connection
             details on the Orders page anytime.
           </p>
           <Link
@@ -230,8 +230,8 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
         <div className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
           <h3 className="text-base font-semibold text-stone-900">Connect your kitchen POS</h3>
           <p className="text-sm text-stone-600 leading-relaxed">
-            In four short steps you&apos;ll copy your Mennyu Location ID into Deliverect, finish activation there, and
-            Mennyu will attach the real channel link automatically — no need to hunt for technical IDs in the normal
+            In four short steps you&apos;ll copy your Open Order location ID into Deliverect, finish activation there, and
+            Open Order will attach the real channel link automatically — no need to hunt for technical IDs in the normal
             flow.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
@@ -277,11 +277,11 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
               <strong>external location ID</strong> (Deliverect calls this <code className="text-xs">channelLocationId</code>
               ).
             </li>
-            <li>Paste your <strong>Mennyu Location ID</strong> from the previous step — same value, exactly.</li>
+            <li>Paste your <strong>Open Order location ID</strong> from the previous step — same value, exactly.</li>
             <li>Save in Deliverect, then complete any remaining activation steps there.</li>
           </ol>
           <p className="text-xs text-stone-500">
-            After Deliverect activates the channel, it sends Mennyu a secure signal and we attach the routing ID for
+            After Deliverect activates the channel, it sends Open Order a secure signal and we attach the routing ID for
             orders automatically.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
@@ -301,7 +301,7 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
 
       {step === 3 && (
         <div className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h3 className="text-base font-semibold text-stone-900">Your Mennyu account details</h3>
+          <h3 className="text-base font-semibold text-stone-900">Your Open Order account details</h3>
           <p className="text-sm text-stone-600">
             We use your POS hub email as a backup match. Choose your POS brand so we can show the right guidance later.
           </p>
@@ -385,7 +385,7 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
         <div className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
           <h3 className="text-base font-semibold text-stone-900">We&apos;re connecting your account</h3>
           <p className="text-sm text-stone-600 leading-relaxed">
-            When Deliverect finishes activation, Mennyu receives a secure registration and attaches your{" "}
+            When Deliverect finishes activation, Open Order receives a secure registration and attaches your{" "}
             <strong>channel link ID</strong> (the ID that actually routes orders). You don&apos;t need to paste that ID
             yourself in the normal flow.
           </p>
@@ -396,7 +396,7 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
             </div>
           ) : null}
           <p className="text-xs text-stone-500">
-            You can leave this page. If something doesn&apos;t connect after a few minutes, confirm your Mennyu Location ID
+            You can leave this page. If something doesn&apos;t connect after a few minutes, confirm your Open Order location ID
             is entered exactly in Deliverect, then try &quot;Check connection again&quot; from Orders, or contact support.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">

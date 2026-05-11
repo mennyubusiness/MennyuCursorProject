@@ -10,11 +10,11 @@ import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 
 export type VendorOrderSourceLabel =
   | "POS / Deliverect synced"
-  | "Mennyu tracked order"
+  | "Open Order (tracked)"
   | "Routing pending"
   | "Routing failed"
   | "Recovered manually"
-  | "Mennyu fallback";
+  | "Open Order fallback";
 
 export interface VOForSourceLabel {
   routingStatus: string;
@@ -28,7 +28,7 @@ export interface StatusHistoryEntryForSource {
 /**
  * Returns the operational source/status label for a vendor order.
  * Used on vendor dashboard cards so vendors know whether POS is authoritative or fallback applies.
- * When Deliverect is not live (ROUTING_MODE !== "deliverect"), uses "Mennyu tracked order" instead of "POS / Deliverect synced".
+ * When Deliverect is not live (ROUTING_MODE !== "deliverect"), uses "Open Order (tracked)" instead of "POS / Deliverect synced".
  */
 export function getVendorOrderSourceLabel(
   vo: VOForSourceLabel,
@@ -42,11 +42,11 @@ export function getVendorOrderSourceLabel(
 
   // sent | confirmed → show "POS / Deliverect synced" only when integration is live
   if (vo.routingStatus === "sent" || vo.routingStatus === "confirmed") {
-    return isRoutingRetryAvailable() ? "POS / Deliverect synced" : "Mennyu tracked order";
+    return isRoutingRetryAvailable() ? "POS / Deliverect synced" : "Open Order (tracked)";
   }
 
   // Routing failed/pending but fulfillment moved (dashboard fallback, no admin recovery)
-  if (vo.fulfillmentStatus !== "pending") return "Mennyu fallback";
+  if (vo.fulfillmentStatus !== "pending") return "Open Order fallback";
 
   return "Routing pending";
 }

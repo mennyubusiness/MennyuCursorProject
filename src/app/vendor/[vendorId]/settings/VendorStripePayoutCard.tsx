@@ -76,7 +76,7 @@ export function VendorStripePayoutCard({
     <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       <h4 className="text-base font-semibold text-stone-900">Payouts</h4>
       <p className="mt-1 text-sm text-stone-500">
-        Connect a Stripe account so Mennyu can pay you for orders (test mode supported).
+        Connect a Stripe account so Open Order can pay you for orders (test mode supported).
       </p>
 
       {payoutNotice === "link_expired" && (
@@ -117,7 +117,7 @@ export function VendorStripePayoutCard({
             </p>
           </div>
         ) : (
-          <p className="text-sm text-stone-600">Connect your Stripe account to receive payouts from Mennyu.</p>
+          <p className="text-sm text-stone-600">Connect your Stripe account to receive payouts from Open Order.</p>
         )}
 
         {error && (

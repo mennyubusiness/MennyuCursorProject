@@ -3,6 +3,8 @@ import { validateDeliverectPayload } from "./payload-validation";
 import { mennyuVendorOrderToDeliverectPayload } from "./transform";
 import type { HydratedVendorOrder } from "./load";
 
+type HydratedLineItem = NonNullable<HydratedVendorOrder>["lineItems"][number];
+
 /** Minimal shape accepted by mennyuVendorOrderToDeliverectPayload (matches DB hydrate). */
 function minimalVendorOrder(overrides?: Partial<NonNullable<HydratedVendorOrder>>): NonNullable<HydratedVendorOrder> {
   return {
@@ -230,7 +232,6 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
   });
 
   it("multi-select from one variant-flagged group: flat modifiers only, no false subItems depth", () => {
-    const base = minimalVendorOrder();
     const ingGroup = {
       id: "mg-ingredients",
       name: "Ingredients",
@@ -252,32 +253,37 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
         modifierGroup: ingGroup,
       },
     });
+    /** Totals must match `vendorOrderItemSubtotalCents` (derived from total − tax − fee − tip) for payload validation. */
+    const saladLine = {
+      id: "line-multi-ing",
+      menuItemId: "mi-salad",
+      name: "Salad",
+      quantity: 1,
+      priceCents: 900,
+      specialInstructions: null,
+      menuItem: {
+        id: "mi-salad",
+        name: "Salad",
+        deliverectProductId: "prod-salad",
+        deliverectPlu: "SALAD-001",
+        deliverectVariantParentPlu: null,
+        deliverectVariantParentName: null,
+      },
+      selections: [
+        mkSel("o1", "ING-1", "Tomato"),
+        mkSel("o2", "ING-2", "Cucumber"),
+        mkSel("o3", "ING-3", "Feta"),
+        mkSel("o4", "ING-4", "Olives"),
+      ],
+    };
+    const vendorOrder = minimalVendorOrder({
+      subtotalCents: 900,
+      taxCents: 50,
+      totalCents: 950,
+      lineItems: [saladLine as HydratedLineItem],
+    });
     const payload = mennyuVendorOrderToDeliverectPayload({
-      vendorOrder: {
-        ...base,
-        lineItems: [
-          {
-            id: "line-multi-ing",
-            menuItemId: "mi-salad",
-            name: "Salad",
-            quantity: 1,
-            priceCents: 900,
-            specialInstructions: null,
-            menuItem: {
-              id: "mi-salad",
-              name: "Salad",
-              deliverectProductId: "prod-salad",
-              deliverectPlu: "SALAD-001",
-            },
-            selections: [
-              mkSel("o1", "ING-1", "Tomato"),
-              mkSel("o2", "ING-2", "Cucumber"),
-              mkSel("o3", "ING-3", "Feta"),
-              mkSel("o4", "ING-4", "Olives"),
-            ],
-          },
-        ],
-      } as NonNullable<HydratedVendorOrder>,
+      vendorOrder,
       channelLinkId: "ch-link-cert",
     });
 
@@ -286,32 +292,7 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     expect(item.modifiers).toHaveLength(4);
     expect(item.modifiers?.every((m) => m.plu.startsWith("ING-"))).toBe(true);
 
-    const vo = {
-      ...base,
-      lineItems: [
-        {
-          id: "line-multi-ing",
-          menuItemId: "mi-salad",
-          name: "Salad",
-          quantity: 1,
-          priceCents: 900,
-          specialInstructions: null,
-          menuItem: {
-            id: "mi-salad",
-            name: "Salad",
-            deliverectProductId: "prod-salad",
-            deliverectPlu: "SALAD-001",
-          },
-          selections: [
-            mkSel("o1", "ING-1", "Tomato"),
-            mkSel("o2", "ING-2", "Cucumber"),
-            mkSel("o3", "ING-3", "Feta"),
-            mkSel("o4", "ING-4", "Olives"),
-          ],
-        },
-      ],
-    } as NonNullable<HydratedVendorOrder>;
-    expect(validateDeliverectPayload(payload, vo).isValid).toBe(true);
+    expect(validateDeliverectPayload(payload, vendorOrder).isValid).toBe(true);
   });
 
   it("single-SKU shell (no variant parent PLU): variant-group steps use subItems; other modifiers stay on the line", () => {
@@ -473,7 +454,7 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     expect(v.errors).toHaveLength(0);
   });
 
-  it("payment.amount excludes Mennyu platform service fee — restaurant-facing total only", () => {
+  it("payment.amount excludes Open Order platform service fee — restaurant-facing total only", () => {
     const payload = mennyuVendorOrderToDeliverectPayload({
       vendorOrder: minimalVendorOrder({
         subtotalCents: 10_000,

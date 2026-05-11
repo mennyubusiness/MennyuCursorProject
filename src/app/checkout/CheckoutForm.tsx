@@ -11,7 +11,7 @@ interface CheckoutFormProps {
   totalCents: number;
   subtotalCents: number;
   serviceFeeCents: number;
-  /** Mennyu-computed pickup sales tax from pod rate (0 if none). */
+  /** Open Order–computed pickup sales tax from pod rate (0 if none). */
   taxCents: number;
   /** IANA timezone used for scheduled pickup (pod or default). */
   pickupTimezoneLabel: string;

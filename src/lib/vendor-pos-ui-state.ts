@@ -15,7 +15,7 @@ export type VendorPosUiState =
  *
  * - `connected`: `deliverectChannelLinkId` is the routing authority (always wins).
  * - `needs_attention`: integration error, channel conflict on vendor, or a stored channel-registration
- *   webhook that referenced this vendor’s Mennyu Location ID but did not match (ops / recovery).
+ *   webhook that referenced this vendor’s Open Order location ID but did not match (ops / recovery).
  * - `waiting_for_activation`: guided onboarding in progress, no channel link yet.
  * - `not_connected`: default when none of the above apply.
  */
@@ -69,10 +69,10 @@ export function vendorPosUiStateGuidance(state: VendorPosUiState, opts?: { hasUn
     case "connected":
       return "Orders can route to your kitchen POS through Deliverect using your channel link.";
     case "waiting_for_activation":
-      return "Finish setup in your POS hub. When Deliverect activates the channel, Mennyu will attach it automatically.";
+      return "Finish setup in your POS hub. When Deliverect activates the channel, Open Order will attach it automatically.";
     case "needs_attention":
       if (opts?.hasUnmatchedRegistration) {
-        return "We received an activation from Deliverect but could not match it to this restaurant. Confirm your Mennyu Location ID is entered exactly in Deliverect, then try “Check connection again”, or contact support.";
+        return "We received an activation from Deliverect but could not match it to this restaurant. Confirm your Open Order location ID is entered exactly in Deliverect, then try “Check connection again”, or contact support.";
       }
       return "Something blocked automatic linking. Check your setup or contact support — you can also use advanced manual IDs if an admin helps.";
     case "not_connected":

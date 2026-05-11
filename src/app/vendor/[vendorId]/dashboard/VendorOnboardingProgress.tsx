@@ -38,7 +38,7 @@ export function VendorOnboardingProgress({
         <li>
           <span className="font-medium text-stone-800">Payouts (Stripe)</span> —{" "}
           <span className="text-stone-500">set up when you&apos;re ready for deposits</span>
-          <span className="block text-xs text-stone-500">Mennyu will guide Stripe Connect here in a future update.</span>
+          <span className="block text-xs text-stone-500">Open Order will guide Stripe Connect here in a future update.</span>
         </li>
         <li className="text-stone-800">
           <span className="font-medium">POS connection</span> — {posLabel}
@@ -51,7 +51,14 @@ export function VendorOnboardingProgress({
               — optional until you want live kitchen routing.
             </>
           ) : (
-            <span className="text-stone-500"> — manage anytime from Orders.</span>
+            <>
+              {" "}
+              —{" "}
+              <Link href={`/vendor/${vendorId}/settings`} className="font-medium text-mennyu-primary hover:underline">
+                manage in Settings
+              </Link>
+              .
+            </>
           )}
         </li>
       </ol>

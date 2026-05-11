@@ -43,7 +43,7 @@ export default function AdminAccessDeniedPage() {
         <Link href={`/login?callbackUrl=${encodeURIComponent("/admin")}`} className="font-medium text-sky-800 underline">
           sign in with email
         </Link>{" "}
-        (Mennyu team access).
+        (Open Order team access).
       </p>
       <form onSubmit={handleSubmit} className="space-y-3">
         <input

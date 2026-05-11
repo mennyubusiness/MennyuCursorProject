@@ -1,4 +1,4 @@
-# Mennyu MVP
+# Open Order (MVP codebase)
 
 Multi-vendor food ordering platform for food cart pods. One cart, one payment, orders split and routed to vendors via Deliverect.
 

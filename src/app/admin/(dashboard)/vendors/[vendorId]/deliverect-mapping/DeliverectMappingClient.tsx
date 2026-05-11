@@ -82,7 +82,7 @@ export function DeliverectMappingClient({
           )}
         </p>
         <p className="mt-3 text-xs text-stone-500">
-          Unmapped rows are highlighted. Copy IDs from Deliverect sandbox/POS; Mennyu remains the menu
+          Unmapped rows are highlighted. Copy IDs from Deliverect sandbox/POS; Open Order remains the menu
           source of truth — only external IDs are stored here.
         </p>
         {!hasActivePosConnection ? (

@@ -21,7 +21,7 @@ export function AdminVendorPosDisconnect({ vendorId, vendorName, hasActivePosCon
       <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">
         <p className="font-medium text-stone-800">POS / Deliverect connection</p>
         <p className="mt-1">
-          No vendor-level Deliverect identifiers are set — already disconnected at the Mennyu integration layer.
+          No vendor-level Deliverect identifiers are set — already disconnected at the Open Order integration layer.
         </p>
       </div>
     );
@@ -32,7 +32,7 @@ export function AdminVendorPosDisconnect({ vendorId, vendorName, hasActivePosCon
       <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-950">Admin · Disconnect POS</h2>
       <p className="mt-2 text-sm text-amber-950/90">
         Clears <strong>Deliverect connection fields</strong> on <strong>{vendorName}</strong> so channel / location IDs
-        can be reused (e.g. testing). New orders will follow normal Mennyu routing without a live Deliverect channel
+        can be reused (e.g. testing). New orders will follow normal Open Order routing without a live Deliverect channel
         until you connect again.
       </p>
       <p className="mt-2 text-xs text-amber-900/80">

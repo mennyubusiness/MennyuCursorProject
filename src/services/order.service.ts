@@ -148,7 +148,11 @@ export async function validateCartForOrder(cart: {
           ? { code: "VENDOR_INACTIVE" as const, message: "A vendor in your cart is no longer active." }
           : vendorAvailability.status === "closed"
             ? { code: "VENDOR_CLOSED" as const, message: "A vendor in your cart is currently closed." }
-            : { code: "VENDOR_PAUSED_MENNYU" as const, message: "A vendor in your cart is not accepting Mennyu orders right now. Please remove their items or try again later." };
+            : {
+                code: "VENDOR_PAUSED_MENNYU" as const,
+                message:
+                  "A vendor in your cart is not accepting orders through Open Order right now. Please remove their items or try again later.",
+              };
       return { valid: false, code, message };
     }
     const vendorInPod = await prisma.podVendor.findUnique({

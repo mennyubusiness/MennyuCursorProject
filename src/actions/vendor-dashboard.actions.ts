@@ -103,7 +103,7 @@ export async function bindVendorDashboardSession(
   if (!v?.vendorDashboardToken?.trim()) {
     return {
       ok: false,
-      error: "No API access key is configured for this vendor yet. Ask your Mennyu administrator to generate one.",
+      error: "No API access key is configured for this vendor yet. Ask your Open Order administrator to generate one.",
     };
   }
   if (!timingSafeStringEqual(tokenPlain.trim(), v.vendorDashboardToken.trim())) {

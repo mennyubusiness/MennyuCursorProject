@@ -13,7 +13,7 @@ export function VendorAccessQueryMessages() {
   const copy: Record<string, { title: string; body: ReactNode; tone: "error" | "warn" }> = {
     invalid: {
       title: "Link invalid or expired",
-      body: "Ask your Mennyu administrator for a new secure link, or sign in with email if you have an account.",
+      body: "Ask your Open Order administrator for a new secure link, or sign in with email if you have an account.",
       tone: "error",
     },
     missing_token: {
@@ -28,7 +28,7 @@ export function VendorAccessQueryMessages() {
     },
     no_secret: {
       title: "This location isn’t fully set up yet",
-      body: "Your Mennyu administrator still needs to finish setup for this restaurant. Try again after they’ve completed onboarding.",
+      body: "Your Open Order administrator still needs to finish setup for this restaurant. Try again after they’ve completed onboarding.",
       tone: "warn",
     },
     needs_session: {
@@ -38,7 +38,7 @@ export function VendorAccessQueryMessages() {
           <Link href="/login" className="font-medium text-sky-800 underline">
             Sign in
           </Link>{" "}
-          with your restaurant team account, or contact your Mennyu administrator if you need access.
+          with your restaurant team account, or contact your Open Order administrator if you need access.
         </>
       ),
       tone: "warn",

@@ -5,7 +5,7 @@ import { useState } from "react";
 
 /**
  * Normalizes join code input: trim, strip spaces, uppercase (for future alphanumeric codes), keep digits.
- * Current Mennyu join codes are 6-digit numeric strings.
+ * Current Open Order join codes are 6-digit numeric strings.
  */
 export function normalizeGroupOrderJoinCodeInput(raw: string): string {
   const compact = raw.trim().replace(/\s+/g, "").toUpperCase();

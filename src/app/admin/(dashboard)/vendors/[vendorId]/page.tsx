@@ -112,7 +112,7 @@ export default async function AdminVendorDetailPage({
         <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-500">Operational settings</h2>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-stone-500">Mennyu intake</dt>
+            <dt className="text-stone-500">Open Order intake</dt>
             <dd className="font-medium text-stone-900">{vendor.mennyuOrdersPaused ? "Paused" : "Open"}</dd>
           </div>
           <div>

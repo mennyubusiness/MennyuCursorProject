@@ -11,7 +11,7 @@ export default function LoginPage() {
             href="/"
             className="text-2xl font-semibold tracking-tight text-black hover:text-mennyu-primary"
           >
-            Mennyu
+            Open Order
           </Link>
         </div>
         <Suspense fallback={<p className="text-center text-sm text-stone-500">Loading…</p>}>

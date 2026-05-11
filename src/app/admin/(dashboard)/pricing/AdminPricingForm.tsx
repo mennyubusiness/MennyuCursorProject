@@ -51,7 +51,7 @@ export function AdminPricingForm({ initial }: { initial: Initial }) {
             defaultValue={initial.customerServiceFeePercent}
             className="mt-1 w-full rounded border border-stone-200 px-2 py-1.5 text-stone-900"
           />
-          <p className="mt-1 text-xs text-stone-500">Mennyu revenue — charged to the customer on food subtotal.</p>
+          <p className="mt-1 text-xs text-stone-500">Open Order revenue — charged to the customer on food subtotal.</p>
         </label>
         <label className="block text-sm">
           <span className="font-medium text-stone-800">Service fee flat add-on (¢)</span>

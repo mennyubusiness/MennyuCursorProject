@@ -269,7 +269,7 @@ export function PodVendorRosterPanel({
               Remove from pod?
             </h2>
             <p className="mt-2 text-sm text-stone-600">
-              <strong>{removeModal.name}</strong> will be removed from this pod only. Their Mennyu vendor
+              <strong>{removeModal.name}</strong> will be removed from this pod only. Their Open Order vendor
               account, menu, and history stay intact. You can invite them again later.
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-2">

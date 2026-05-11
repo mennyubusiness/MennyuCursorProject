@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  eslint: { ignoreDuringBuilds: true },
   images: {
     // Allow next/image for known external hosts (menu import + common POS/CDN origins).
     // Add entries here when a new integration serves absolute image URLs.

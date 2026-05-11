@@ -57,7 +57,7 @@ export default async function VendorMenuImportsListPage({
         <h2 className="text-xl font-semibold text-stone-900">Menu updates</h2>
         <p className="mt-1 text-sm text-stone-600">
           When Deliverect sends a menu change, it appears here. Publish when you&apos;re ready for it to go live on
-          Mennyu.
+          Open Order.
         </p>
         {vendor.autoPublishMenus && (
           <p className="mt-2 rounded border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-950">

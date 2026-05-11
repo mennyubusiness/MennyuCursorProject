@@ -158,7 +158,7 @@ export default async function VendorMenuImportJobPage({
 
       <section className="rounded-lg border border-stone-200 bg-white p-4">
         <h2 className="font-medium text-stone-900">What changed</h2>
-        <p className="mt-1 text-sm text-stone-600">Compared to your current live Mennyu menu.</p>
+        <p className="mt-1 text-sm text-stone-600">Compared to your current live Open Order menu.</p>
         <div className="mt-3">
           <MenuImportWhatChanged summary={publishSummary} summaryMode={publishSummaryMode} />
         </div>

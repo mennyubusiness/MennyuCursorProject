@@ -1,5 +1,5 @@
 /**
- * Vendor-order operating mode for dashboard UI: what needs action and where to act (POS vs Mennyu).
+ * Vendor-order operating mode for dashboard UI: what needs action and where to act (POS vs Open Order).
  * Drives grouping, badges, and visibility of status controls.
  */
 import { isManuallyRecovered } from "@/lib/admin-manual-recovery";
@@ -38,7 +38,7 @@ export function getVendorOrderOperatingMode(
     return "needs_attention";
   }
 
-  // Fallback required: recovered by admin, or routing failed/pending but vendor progressed in Mennyu
+  // Fallback required: recovered by admin, or routing failed/pending but vendor progressed in Open Order
   if (recovered) return "fallback_required";
   if (
     (vo.routingStatus === "failed" || vo.routingStatus === "pending") &&
@@ -52,7 +52,7 @@ export function getVendorOrderOperatingMode(
     return "pos_synced";
   }
 
-  // Manual: sent/confirmed via manual path or Mennyu-tracked (no Deliverect)
+  // Manual: sent/confirmed via manual path or Open Order–tracked (no Deliverect)
   if (routingSentOrConfirmed) return "manual";
 
   // Pending routing: treat as needs_attention so vendor knows to wait or use fallback
@@ -73,19 +73,19 @@ export function getOperatingModeBadgeLabel(
     case "pos_synced":
       return "POS synced";
     case "manual":
-      return "Mennyu tracked";
+      return "Open Order (tracked)";
     case "fallback_required":
       if (vo && isManuallyRecovered(vo, statusHistory)) return "Recovered";
       return "Sync issue";
     case "needs_attention":
       return "Needs attention";
     default:
-      return "Mennyu tracked";
+      return "Open Order (tracked)";
   }
 }
 
 /**
- * Hint for action block: when to use POS vs Mennyu. null = use default (Mennyu controls primary).
+ * Hint for action block: when to use POS vs Open Order. null = use default (Open Order controls primary).
  */
 export function getOperatingModeActionHint(
   mode: VendorOrderOperatingMode,
@@ -101,19 +101,19 @@ export function getOperatingModeActionHint(
     case "pos_synced":
       return "Update status in your POS. Use buttons below only if POS is not syncing.";
     case "fallback_required":
-      return "Use Mennyu buttons below to update status (POS sync issue or recovered order).";
+      return "Use the buttons below to update status (POS sync issue or recovered order).";
     case "needs_attention":
       if (vo?.routingStatus === "failed") {
         return "Routing to your POS failed. Use Deny if you can’t fulfill, or contact support for recovery.";
       }
-      return "Confirm order in Mennyu or use fallback if you already received it.";
+      return "Confirm the order in Open Order or use fallback if you already received it.";
     case "manual":
     default:
       return null;
   }
 }
 
-/** Whether to show Mennyu status controls as primary (true) or as fallback/secondary (false). */
+/** Whether to show Open Order status controls as primary (true) or as fallback/secondary (false). */
 export function isMennyuControlsPrimary(mode: VendorOrderOperatingMode): boolean {
   return mode === "manual" || mode === "needs_attention" || mode === "fallback_required";
 }

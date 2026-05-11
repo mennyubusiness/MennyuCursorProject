@@ -18,7 +18,7 @@ export function AdminApiAuthHint({
   if (compact) {
     return (
       <p className={`text-xs text-amber-800 ${className}`}>
-        If this returns 403: sign in as a Mennyu platform admin, or configure{" "}
+        If this returns 403: sign in as an Open Order platform admin, or configure{" "}
         <code className="rounded bg-amber-100 px-0.5">ADMIN_SECRET</code> /{" "}
         <code className="rounded bg-amber-100 px-0.5">NEXT_PUBLIC_ADMIN_SECRET</code> for{" "}
         <code className="rounded bg-amber-100 px-0.5">?admin=</code>.
@@ -27,7 +27,7 @@ export function AdminApiAuthHint({
   }
   return (
     <p className={`text-xs text-amber-800 ${className}`}>
-      <strong>Production:</strong> If requests return 403, sign in with a Mennyu platform admin account in this browser,
+      <strong>Production:</strong> If requests return 403, sign in with an Open Order platform admin account in this browser,
       or ensure the server passes <code className="rounded bg-amber-100 px-0.5">ADMIN_SECRET</code> to this UI (or set{" "}
       <code className="rounded bg-amber-100 px-0.5">NEXT_PUBLIC_ADMIN_SECRET</code> at build) so calls can include{" "}
       <code className="rounded bg-amber-100 px-0.5">?admin=</code>.

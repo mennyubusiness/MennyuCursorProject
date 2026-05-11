@@ -52,7 +52,7 @@ export function RegisterForm() {
       className="mx-auto max-w-sm space-y-4 rounded-lg border border-stone-200 bg-white p-6 shadow-sm"
     >
       <div>
-        <h1 className="text-lg font-semibold text-stone-900">Create your Mennyu account</h1>
+        <h1 className="text-lg font-semibold text-stone-900">Create your Open Order account</h1>
         <p className="mt-1 text-sm text-stone-600">
           You’ll choose whether you’re ordering, running a restaurant, or managing a pod on the next step.
         </p>

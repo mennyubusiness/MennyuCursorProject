@@ -16,6 +16,7 @@ import { VendorDashboardAccessCard } from "./VendorDashboardAccessCard";
 import { VendorAccessQueryMessages } from "./VendorAccessMessages";
 import { MennyuLocationIdField } from "@/components/vendor/MennyuLocationIdField";
 import { VendorPosConnectionPanel } from "@/components/vendor/VendorPosConnectionPanel";
+import { VendorOnboardingProgress } from "../dashboard/VendorOnboardingProgress";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { VendorBrandProfileForm } from "./VendorBrandProfileForm";
 import { VendorStripePayoutCard } from "./VendorStripePayoutCard";
@@ -154,15 +155,23 @@ export default async function VendorSettingsPage({
       </section>
 
       {/* POS & routing — identifiers (not secrets) */}
-      <section className="space-y-4">
+      <section id="vendor-settings-pos" className="scroll-mt-4 space-y-4">
         <div>
           <h3 className="text-lg font-semibold text-stone-900">POS &amp; routing</h3>
           <p className="mt-1 text-sm text-stone-500">
-            Kitchen connection status, identifiers, and Deliverect setup. Your Mennyu Location ID is what you paste into
+            Kitchen connection status, identifiers, and Deliverect setup. Your Open Order location ID is what you paste into
             Deliverect as <strong>channelLocationId</strong>; the channel link ID is applied automatically when
             activation succeeds.
           </p>
         </div>
+        <VendorOnboardingProgress
+          vendorId={vendor.id}
+          posConnectionStatus={vendor.posConnectionStatus}
+          deliverectChannelLinkId={vendor.deliverectChannelLinkId}
+          pendingDeliverectConnectionKey={vendor.pendingDeliverectConnectionKey}
+          deliverectAutoMapLastOutcome={vendor.deliverectAutoMapLastOutcome}
+          hasUnmatchedChannelRegistration={hasUnmatchedChannelRegistration}
+        />
         <VendorPosConnectionPanel
           vendorId={vendor.id}
           vendorName={vendor.name}
@@ -178,10 +187,10 @@ export default async function VendorSettingsPage({
       </section>
 
       {/* Ordering & availability */}
-      <section className="space-y-4">
+      <section id="vendor-settings-ordering" className="scroll-mt-4 space-y-4">
         <div>
           <h3 className="text-lg font-semibold text-stone-900">Ordering &amp; availability</h3>
-          <p className="mt-1 text-sm text-stone-500">Stop or resume new Mennyu orders.</p>
+          <p className="mt-1 text-sm text-stone-500">Stop or resume new orders through Open Order.</p>
         </div>
         <VendorPauseToggle vendorId={vendor.id} initialPaused={vendor.mennyuOrdersPaused ?? false} embedded />
         <p className="text-xs text-stone-400">
@@ -209,7 +218,7 @@ export default async function VendorSettingsPage({
           <div>
             <h3 className="text-lg font-semibold text-stone-900">Kitchen POS (Deliverect)</h3>
             <p className="mt-1 text-sm text-stone-500">
-              Mapping health for orders sent to the kitchen. Contact Mennyu support if you see critical issues.
+              Mapping health for orders sent to the kitchen. Contact Open Order support if you see critical issues.
             </p>
           </div>
           <DeliverectMenuHealthPanel report={deliverectMenuIntegrity} title="Menu mapping health" />
@@ -226,7 +235,7 @@ export default async function VendorSettingsPage({
         <VendorRecentPodRequests recentRequests={recentRequestsForComponent} />
       </section>
 
-      <section className="space-y-3">
+      <section id="vendor-settings-payouts" className="scroll-mt-4 space-y-3">
         <h3 className="text-lg font-semibold text-stone-900">Payouts</h3>
         <VendorStripePayoutCard
           vendorId={vendor.id}

@@ -149,10 +149,10 @@ export function ChannelRegistrationsClient({ rows }: { rows: ChannelRegistration
       </div>
 
       <p className="text-xs text-stone-500">
-        Automatic matching uses email → correlation key → <strong>channelLocationId = Mennyu Location ID (Vendor.id)</strong>{" "}
+        Automatic matching uses email → correlation key → <strong>channelLocationId = Open Order location ID (Vendor.id)</strong>{" "}
         → Deliverect portal <strong>locationId</strong> = <code className="text-[11px]">Vendor.deliverectLocationId</code> →
         account id. If Deliverect sends only standard fields, configure <strong>channelLocationId</strong> in Deliverect to the
-        restaurant&apos;s Mennyu Location ID from the vendor Connect POS screen.
+        restaurant&apos;s Open Order location ID from the vendor Connect POS screen.
       </p>
       <p className="text-sm text-stone-600">
         <Link href="/admin/deliverect-webhook-incidents" className="text-stone-800 underline hover:text-stone-950">

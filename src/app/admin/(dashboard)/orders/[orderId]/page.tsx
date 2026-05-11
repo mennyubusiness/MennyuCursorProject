@@ -321,7 +321,7 @@ export default async function AdminOrderDetailPage({
                     <div className="mt-2 rounded border border-amber-200 bg-amber-50/50 p-2">
                       <p className="text-xs font-medium text-amber-800">Financial follow-up may be required</p>
                       <p className="mt-0.5 text-xs text-stone-600">
-                        This vendor order was cancelled. Refund or reconciliation may be needed outside Mennyu.
+                        This vendor order was cancelled. Refund or reconciliation may be needed outside Open Order.
                       </p>
                     </div>
                   );

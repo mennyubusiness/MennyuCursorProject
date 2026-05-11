@@ -53,7 +53,7 @@ export function RolePicker() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-stone-900">How will you use Mennyu?</h1>
+        <h1 className="text-xl font-semibold text-stone-900">How will you use Open Order?</h1>
         <p className="mt-1 text-sm text-stone-600">
           You can add other roles later as we expand accounts — pick what fits you now.
         </p>

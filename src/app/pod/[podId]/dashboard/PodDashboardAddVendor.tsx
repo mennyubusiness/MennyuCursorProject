@@ -72,7 +72,7 @@ export function PodDashboardAddVendor({
                 {(!v.isActive || v.mennyuOrdersPaused) && " — "}
                 {!v.isActive && "Inactive"}
                 {!v.isActive && v.mennyuOrdersPaused && ", "}
-                {v.mennyuOrdersPaused && "Mennyu paused"}
+                {v.mennyuOrdersPaused && "Open Order paused"}
               </option>
             ))}
           </select>

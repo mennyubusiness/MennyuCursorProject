@@ -64,7 +64,7 @@ export default async function AdminDeliverectChannelRegistrationsPage() {
       <h1 className="mt-2 text-xl font-semibold text-stone-900">Channel registration</h1>
       <p className="mt-1 max-w-3xl text-sm text-stone-600">
         Inbound registrations from Deliverect (register / active / inactive). Rows highlight likely review items when
-        Mennyu could not auto-map. Use <strong>Apply payload</strong> to attach a stored <code className="text-xs">channelLinkId</code>{" "}
+        Open Order could not auto-map. Use <strong>Apply payload</strong> to attach a stored <code className="text-xs">channelLinkId</code>{" "}
         to a vendor after you confirm the correct restaurant.
       </p>
 

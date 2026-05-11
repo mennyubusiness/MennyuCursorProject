@@ -11,7 +11,7 @@ import { resolveHeaderNavContext } from "@/lib/auth/header-nav-context";
 import { getActiveOrderByCustomerPhone } from "@/services/order.service";
 
 export const metadata: Metadata = {
-  title: "Mennyu – Multi-vendor food cart ordering",
+  title: "Open Order – Multi-vendor food cart ordering",
   description: "Order from multiple food cart vendors in one place. One cart, one payment.",
 };
 
@@ -42,7 +42,7 @@ export default async function RootLayout({
               href="/"
               className="text-xl font-semibold text-black transition-colors duration-200 hover:text-mennyu-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary"
             >
-              Mennyu
+              Open Order
             </Link>
             <SiteHeaderNav
               callbackPath={pathname || "/"}
@@ -60,7 +60,7 @@ export default async function RootLayout({
         </header>
         <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
         <footer className="border-t border-stone-200 py-6 text-center text-sm text-stone-500">
-          © Mennyu · mennyu.com
+          © Open Order Co. · mennyu.com
         </footer>
         </AuthSessionProvider>
       </body>

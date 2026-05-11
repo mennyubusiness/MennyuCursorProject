@@ -99,7 +99,7 @@ export function MenuImportPublishPanel({
       <h2 className="font-medium text-stone-900">Publish to live menu</h2>
       <p className="mt-1 text-sm text-stone-600">
         {isMinimal
-          ? "Applies this draft to your live Mennyu menu (items, modifiers, availability). "
+          ? "Applies this draft to your live Open Order menu (items, modifiers, availability). "
           : "Writes the draft snapshot to your live menu tables. "}
         {!isMinimal && publishUrlOverride
           ? "Confirm when you are ready. "

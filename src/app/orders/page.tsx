@@ -42,7 +42,7 @@ export default async function OrdersPage() {
         <header className="space-y-2">
           <h1 className="text-2xl font-semibold text-stone-900">Your orders</h1>
           <p className="text-sm text-stone-600">
-            This is where you view past orders. Mennyu matches them to the{" "}
+            This is where you view past orders. Open Order matches them to the{" "}
             <span className="font-medium text-stone-800">phone number</span> you used at checkout
             (not your email address yet).
           </p>

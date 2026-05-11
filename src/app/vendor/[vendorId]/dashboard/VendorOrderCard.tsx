@@ -45,7 +45,7 @@ type VendorOrderForCard = {
 };
 
 /**
- * Next action: Accept/Deny when POS/Mennyu has routed (sent/confirmed). Confirm only when not live Deliverect (e.g. mock) or as explicit fallback elsewhere.
+ * Next action: Accept/Deny when POS/Open Order has routed (sent/confirmed). Confirm only when not live Deliverect (e.g. mock) or as explicit fallback elsewhere.
  */
 function getNextAction(
   routingStatus: string,
@@ -162,11 +162,6 @@ export function VendorOrderCard({
     vendorOrder.fulfillmentStatus === "cancelled" ||
     (vendorOrder.routingStatus === "failed" && !recovered);
   const showUrgency = !isTerminal && !isCancelledOrFailed;
-  const orderTime = new Date(vendorOrder.order.createdAt).toLocaleString(undefined, {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
-
   const statusBadgeLabel = isCancelledOrFailed
     ? vendorOrder.fulfillmentStatus === "cancelled"
       ? "Cancelled"
@@ -213,6 +208,12 @@ export function VendorOrderCard({
 
   const totalItems = vendorOrder.lineItems.reduce((sum, l) => sum + l.quantity, 0);
 
+  const cardRingClass = isNew
+    ? "ring-2 ring-mennyu-primary/55 ring-offset-2"
+    : isCancelledOrFailed
+      ? "ring-1 ring-stone-200/80"
+      : "ring-1 ring-stone-200/70";
+
   const statusLineClass =
     urgencyLevel === "urgent"
       ? "text-red-800"
@@ -222,11 +223,11 @@ export function VendorOrderCard({
 
   return (
     <div
-      className={`rounded-xl border p-4 shadow-sm transition-shadow ${
-        isCancelledOrFailed ? "border-stone-200 bg-stone-50" : "border-stone-200/90 bg-white"
-      } ${isNew ? "ring-2 ring-mennyu-primary/55 ring-offset-2" : ""}`}
+      className={`rounded-xl p-4 transition-shadow ${
+        isCancelledOrFailed ? "bg-stone-50" : "bg-white"
+      } ${cardRingClass}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span
@@ -235,10 +236,6 @@ export function VendorOrderCard({
             >
               {pickupCode}
             </span>
-            <details className="text-xs text-stone-500">
-              <summary className="cursor-pointer select-none hover:text-stone-700">Reference</summary>
-              <p className="mt-1 font-mono text-stone-600">Order #{vendorOrder.order.id.slice(-8).toUpperCase()}</p>
-            </details>
           </div>
           <p className={`mt-2 text-sm font-medium ${statusLineClass}`}>
             {statusBadgeLabel}
@@ -263,9 +260,6 @@ export function VendorOrderCard({
               </p>
             )}
         </div>
-        <div className="shrink-0 text-right text-xs text-stone-500">
-          <p>{orderTime}</p>
-        </div>
       </div>
 
       {formatCustomerPhone(vendorOrder.order.customerPhone) && (
@@ -281,7 +275,7 @@ export function VendorOrderCard({
       )}
 
       {/* Line items: name × qty, modifiers, special instructions */}
-      <ul className="mt-3 space-y-2 border-t border-stone-100 pt-3 text-sm">
+      <ul className="mt-3 space-y-2 border-t border-stone-100/90 pt-3 text-sm">
         {vendorOrder.lineItems.map((line) => (
           <li key={line.id} className="flex flex-col gap-0.5">
             <div className="flex flex-wrap items-baseline gap-1">
@@ -307,7 +301,7 @@ export function VendorOrderCard({
         </p>
       )}
 
-      <div className="mt-3 space-y-1 border-t border-stone-100 pt-3 text-sm">
+      <div className="mt-3 space-y-1 border-t border-stone-100/90 pt-3 text-sm">
         <p className="font-medium text-stone-700">
           {totalItems} item{totalItems !== 1 ? "s" : ""} · Items{" "}
           <span className="tabular-nums">${(vendorOrder.totalCents / 100).toFixed(2)}</span>
@@ -324,7 +318,7 @@ export function VendorOrderCard({
 
       {/* Status actions: mode-aware (primary vs fallback, with hint) */}
       {(nextAction || canDeny || showManualConfirmFallback) && !isTerminal && (
-        <div className="mt-3 border-t border-stone-100 pt-3">
+        <div className="mt-3 border-t border-stone-100/90 pt-3">
           {actionHint && (
             <p className="mb-1.5 text-xs text-stone-600">
               {actionHint}
