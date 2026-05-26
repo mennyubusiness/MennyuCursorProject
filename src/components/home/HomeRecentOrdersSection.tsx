@@ -23,47 +23,38 @@ export async function HomeRecentOrdersSection({ customerPhone }: { customerPhone
   if (recent.length === 0) return null;
 
   return (
-    <section
-      className="rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-6 shadow-sm sm:p-8"
-      aria-labelledby="home-recent-orders-heading"
-    >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <section aria-labelledby="home-recent-orders-heading">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 id="home-recent-orders-heading" className="text-xl font-semibold tracking-tight text-stone-900">
+          <h2 id="home-recent-orders-heading" className="oo-section-title">
             Order again
           </h2>
-          <p className="mt-1 text-sm text-stone-600">
-            Your last completed orders — rebuild your cart when you&apos;re ready. Unavailable items stay
-            out of the cart.
+          <p className="mt-2 max-w-xl text-base text-zinc-600">
+            Your last completed orders — rebuild your cart when you&apos;re ready.
           </p>
         </div>
         <Link
           href="/orders"
-          className="text-sm font-semibold text-mennyu-primary underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary"
+          className="text-sm font-semibold text-brand underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
-          All orders
+          All orders →
         </Link>
       </div>
-      <ul className="mt-6 space-y-4">
+      <ul className="mt-8 grid gap-4 lg:grid-cols-3 lg:gap-6">
         {recent.map((o) => (
-          <li
-            key={o.id}
-            className="flex flex-col gap-4 rounded-xl border border-stone-200/80 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-          >
+          <li key={o.id} className="oo-card-hover flex flex-col gap-4 p-5">
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-stone-900">{o.podName}</p>
+              <p className="font-bold text-black">{o.podName}</p>
               {o.vendorNames.length > 0 && (
-                <p className="mt-0.5 truncate text-sm text-stone-600" title={vendorSummary(o.vendorNames)}>
+                <p className="mt-1 truncate text-sm text-zinc-600" title={vendorSummary(o.vendorNames)}>
                   {vendorSummary(o.vendorNames)}
                 </p>
               )}
-              <p className="mt-2 text-xs text-stone-500">
+              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-zinc-500">
                 {formatDate(o.createdAt)} · ${(o.totalCents / 100).toFixed(2)}
               </p>
             </div>
-            <div className="shrink-0 sm:pl-2">
-              <ReorderButton orderId={o.id} />
-            </div>
+            <ReorderButton orderId={o.id} />
           </li>
         ))}
       </ul>

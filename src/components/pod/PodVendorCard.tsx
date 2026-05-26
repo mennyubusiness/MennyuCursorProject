@@ -111,7 +111,7 @@ export function PodVendorCard({ podId, variant, vendor, isFeatured, availability
           <p className="mt-2 text-xs text-stone-500">You can still browse the menu.</p>
         )}
         <span
-          className={`mt-3 inline-flex w-fit items-center rounded-lg font-semibold text-mennyu-primary ring-1 ring-mennyu-primary/30 transition group-hover:bg-mennyu-primary group-hover:text-black group-hover:ring-mennyu-primary ${
+          className={`mt-3 inline-flex w-fit items-center rounded-lg font-semibold text-stone-900 ring-1 ring-stone-900/30 transition group-hover:bg-stone-900 group-hover:text-white group-hover:ring-stone-900 ${
             grid ? "px-3 py-1.5 text-sm" : "px-2.5 py-1 text-xs"
           }`}
         >

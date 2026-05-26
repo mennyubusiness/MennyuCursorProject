@@ -1,4 +1,5 @@
 import { AdminTopNav } from "@/components/admin/AdminTopNav";
+import { PageShell } from "@/components/layout/page-shell";
 
 /** Admin nav; gate is applied in (dashboard)/layout so access-denied page can render. */
 export default function AdminLayout({
@@ -7,13 +8,13 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-stone-100">
-      <header className="border-b border-stone-200 bg-white px-4 py-4">
-        <div className="mx-auto max-w-6xl">
+    <div className="min-h-screen bg-zinc-100">
+      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black">
+        <PageShell className="py-4">
           <AdminTopNav />
-        </div>
+        </PageShell>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-10">{children}</main>
+      <main className="oo-shell py-10 lg:py-12">{children}</main>
     </div>
   );
 }

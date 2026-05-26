@@ -149,13 +149,13 @@ export default async function CartPage({
           </div>
           <Link
             href="/explore"
-            className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-mennyu-primary px-6 py-3 font-semibold text-black shadow-sm transition duration-200 hover:bg-mennyu-secondary hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98]"
+            className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:bg-stone-800 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98]"
           >
             Browse pods
           </Link>
           <p className="mt-6 text-sm text-stone-500">
             Already ordered?{" "}
-            <Link href="/orders" className="font-medium text-mennyu-primary hover:underline">
+            <Link href="/orders" className="font-medium text-stone-900 hover:underline">
               View orders and order again
             </Link>
           </p>
@@ -186,13 +186,13 @@ export default async function CartPage({
           </div>
           <Link
             href="/explore"
-            className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-mennyu-primary px-6 py-3 font-semibold text-black shadow-sm transition duration-200 hover:bg-mennyu-secondary hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98]"
+            className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:bg-stone-800 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98]"
           >
             Browse pods
           </Link>
           <p className="mt-6 text-sm text-stone-500">
             Already ordered?{" "}
-            <Link href="/orders" className="font-medium text-mennyu-primary hover:underline">
+            <Link href="/orders" className="font-medium text-stone-900 hover:underline">
               View orders and order again
             </Link>
           </p>
@@ -433,7 +433,7 @@ export default async function CartPage({
             className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_1px_0_rgba(0,0,0,0.04),0_8px_24px_-8px_rgba(0,0,0,0.08)]"
             aria-labelledby={`vendor-${vendorId}-heading`}
           >
-            <div className="border-b border-stone-200/80 bg-gradient-to-r from-stone-50 to-mennyu-muted/40 px-4 py-4 sm:px-6">
+            <div className="border-b border-stone-200/80 bg-gradient-to-r from-stone-50 to-stone-50/40 px-4 py-4 sm:px-6">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">Vendor</p>
               <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
                 <h2 id={`vendor-${vendorId}-heading`} className="text-lg font-semibold text-stone-900">
@@ -441,7 +441,7 @@ export default async function CartPage({
                 </h2>
                 <Link
                   href={`/pod/${cart.podId}/vendor/${vendorId}`}
-                  className="text-sm font-semibold text-mennyu-primary underline-offset-4 transition hover:underline"
+                  className="text-sm font-semibold text-stone-900 underline-offset-4 transition hover:underline"
                 >
                   Add more from this vendor
                 </Link>
@@ -533,7 +533,7 @@ export default async function CartPage({
                         )}
                       </div>
                       <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end">
-                      <span className="text-lg font-semibold tabular-nums text-mennyu-primary">
+                      <span className="text-lg font-semibold tabular-nums text-stone-900">
                         ${((item.priceCents * item.quantity) / 100).toFixed(2)}
                       </span>
                       <CartItemActions
@@ -672,7 +672,7 @@ export default async function CartPage({
               ) : canCheckout ? (
                 <Link
                   href={`/checkout?cartId=${cart.id}`}
-                  className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-mennyu-primary px-8 py-3.5 text-center text-base font-bold text-black shadow-md transition duration-200 hover:bg-mennyu-secondary hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98] sm:min-w-[14rem] sm:w-auto"
+                  className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-900 px-8 py-3.5 text-center text-base font-bold text-white shadow-md transition duration-200 hover:bg-stone-800 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98] sm:min-w-[14rem] sm:w-auto"
                 >
                   Continue to checkout
                 </Link>

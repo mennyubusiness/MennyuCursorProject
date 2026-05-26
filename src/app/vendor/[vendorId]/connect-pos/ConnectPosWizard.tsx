@@ -217,13 +217,13 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
       )}
 
       <div className="flex flex-wrap gap-2 text-xs font-medium text-stone-500">
-        <span className={step >= 0 ? "text-mennyu-primary" : ""}>1 · Your ID</span>
+        <span className={step >= 0 ? "text-stone-900" : ""}>1 · Your ID</span>
         <span>→</span>
-        <span className={step >= 1 ? "text-mennyu-primary" : ""}>2 · Deliverect</span>
+        <span className={step >= 1 ? "text-stone-900" : ""}>2 · Deliverect</span>
         <span>→</span>
-        <span className={step >= 2 ? "text-mennyu-primary" : ""}>3 · Account</span>
+        <span className={step >= 2 ? "text-stone-900" : ""}>3 · Account</span>
         <span>→</span>
-        <span className={step >= 3 ? "text-mennyu-primary" : ""}>4 · Connecting</span>
+        <span className={step >= 3 ? "text-stone-900" : ""}>4 · Connecting</span>
       </div>
 
       {step === 0 && (

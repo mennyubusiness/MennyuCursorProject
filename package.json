@@ -5,7 +5,9 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "next dev",
+    "dev:clean": "node -e \"const {execSync}=require('child_process');const ps=process.env.SystemRoot+'/System32/WindowsPowerShell/v1.0/powershell.exe';console.log('[clean] removing .next and node_modules/.cache');execSync(`\\\"${ps}\\\" -NoProfile -ExecutionPolicy Bypass -Command \\\"Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Remove-Item -Recurse -Force node_modules/.cache -ErrorAction SilentlyContinue\\\"`,{stdio:'inherit'});\" && next dev",
     "build": "next build",
+    "build:clean": "node -e \"const {execSync}=require('child_process');const ps=process.env.SystemRoot+'/System32/WindowsPowerShell/v1.0/powershell.exe';console.log('[clean] removing .next');execSync(`\\\"${ps}\\\" -NoProfile -ExecutionPolicy Bypass -Command \\\"Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue\\\"`,{stdio:'inherit'});\" && next build",
     "start": "next start",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

@@ -116,7 +116,7 @@ export default async function PodPage({
           <p className="text-center text-sm text-stone-700 sm:text-left">
             <Link
               href={groupOrderHref}
-              className="font-semibold text-stone-900 underline decoration-stone-300 underline-offset-4 transition hover:bg-mennyu-primary hover:text-black hover:no-underline focus-visible:rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary"
+              className="font-semibold text-stone-900 underline decoration-stone-300 underline-offset-4 transition hover:bg-stone-100 hover:no-underline focus-visible:rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900"
             >
               Ordering with friends? Start a group order →
             </Link>
@@ -140,7 +140,7 @@ export default async function PodPage({
             <p className="mt-2 text-sm text-stone-500">Check back later or explore other pods.</p>
             <Link
               href="/explore"
-              className="mt-6 inline-flex rounded-xl bg-mennyu-primary px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition hover:bg-mennyu-secondary"
+              className="mt-6 inline-flex rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800"
             >
               Explore pods
             </Link>
@@ -155,7 +155,7 @@ export default async function PodPage({
                   id={`pod-vendor-${pv.vendor.id}`}
                   className={`min-h-0 w-full scroll-mt-28 ${
                     isHighlighted
-                      ? "rounded-2xl p-1 ring-2 ring-mennyu-primary ring-offset-2 ring-offset-stone-50 shadow-lg"
+                      ? "rounded-2xl p-1 ring-2 ring-stone-900 ring-offset-2 ring-offset-stone-50 shadow-lg"
                       : ""
                   }`}
                 >

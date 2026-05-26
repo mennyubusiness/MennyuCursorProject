@@ -13,14 +13,19 @@ export function ExplorePopularPods({ pods }: ExplorePopularPodsProps) {
   if (slice.length === 0) return null;
 
   return (
-    <section aria-labelledby="explore-popular-heading" className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
-        <h2 id="explore-popular-heading" className="text-lg font-semibold text-stone-900 sm:text-xl">
-          Popular right now
-        </h2>
-        <p className="hidden text-sm text-stone-500 sm:block">Swipe to explore</p>
+    <section aria-labelledby="explore-popular-heading">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 id="explore-popular-heading" className="text-2xl font-bold tracking-tight text-black sm:text-3xl">
+            Popular right now
+          </h2>
+          <p className="mt-1 text-sm text-zinc-600 sm:text-base">Curated picks across the network</p>
+        </div>
+        <p className="hidden text-xs font-semibold uppercase tracking-wider text-zinc-500 sm:block">
+          Scroll →
+        </p>
       </div>
-      <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 pt-1 [scrollbar-width:thin] sm:mx-0 sm:px-0">
+      <div className="-mx-4 mt-8 flex gap-5 overflow-x-auto px-4 pb-3 pt-1 [scrollbar-width:thin] sm:-mx-0 sm:px-0 lg:gap-6">
         {slice.map((pod) => (
           <PodCard key={pod.id} pod={pod} variant="compact" />
         ))}

@@ -12,6 +12,21 @@ function normalizeQuery(q: string): string {
   return q.trim().toLowerCase();
 }
 
+function ExploreEmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="oo-empty-state">
+      <p className="text-lg font-bold text-black">{title}</p>
+      <p className="mx-auto mt-2 max-w-md text-sm text-zinc-600">{description}</p>
+    </div>
+  );
+}
+
 export function ExplorePodList({ pods }: { pods: PodCardPod[] }) {
   const [query, setQuery] = useState("");
 
@@ -54,12 +69,15 @@ export function ExplorePodList({ pods }: { pods: PodCardPod[] }) {
 
   return (
     <div>
-      <div className="mb-6">
-        <label htmlFor="pod-search" className="sr-only">
+      <div className="mb-10">
+        <label htmlFor="pod-search" className="oo-label">
           Search pods or vendors
         </label>
-        <div className="relative max-w-lg">
-          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden>
+        <div className="relative mt-2 max-w-2xl">
+          <span
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400"
+            aria-hidden
+          >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path
                 strokeLinecap="round"
@@ -73,15 +91,15 @@ export function ExplorePodList({ pods }: { pods: PodCardPod[] }) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search pods or vendors..."
-            className="w-full rounded-xl border border-stone-300/90 bg-white py-3 pl-11 pr-4 text-stone-900 shadow-md placeholder:text-stone-400 transition focus:border-mennyu-primary focus:outline-none focus:ring-2 focus:ring-mennyu-primary/40"
+            placeholder="Search by pod or vendor name…"
+            className="oo-input !mt-0 py-3.5 pl-12 pr-4 text-base shadow-sm"
             aria-label="Search pods or vendors"
           />
         </div>
       </div>
 
       {!hasQuery && (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-8">
           {pods.map((pod) => (
             <PodCard key={pod.id} pod={pod} variant="full" />
           ))}
@@ -89,25 +107,23 @@ export function ExplorePodList({ pods }: { pods: PodCardPod[] }) {
       )}
 
       {hasQuery && showEmptySearch && (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-white/90 p-10 text-center shadow-inner">
-          <p className="font-medium text-stone-800">No results found</p>
-          <p className="mt-2 text-sm text-stone-600">
-            Try different words, or clear the search to browse all pods.
-          </p>
-        </div>
+        <ExploreEmptyState
+          title="No results found"
+          description="Try different words, or clear the search to browse all pods on the network."
+        />
       )}
 
       {hasQuery && !showEmptySearch && (
-        <div className="space-y-10">
+        <div className="space-y-14">
           {matchingPods.length > 0 && (
             <section aria-labelledby="explore-results-pods">
               <h3
                 id="explore-results-pods"
-                className="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-500"
+                className="mb-6 text-xs font-bold uppercase tracking-[0.15em] text-zinc-500"
               >
-                Pods
+                Pods · {matchingPods.length}
               </h3>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-8">
                 {matchingPods.map((pod) => (
                   <PodCard key={pod.id} pod={pod} variant="full" />
                 ))}
@@ -119,11 +135,11 @@ export function ExplorePodList({ pods }: { pods: PodCardPod[] }) {
             <section aria-labelledby="explore-results-vendors">
               <h3
                 id="explore-results-vendors"
-                className="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-500"
+                className="mb-6 text-xs font-bold uppercase tracking-[0.15em] text-zinc-500"
               >
-                Vendors
+                Vendors · {matchingVendors.length}
               </h3>
-              <ul className="space-y-3">
+              <ul className="grid gap-4 lg:grid-cols-2">
                 {matchingVendors.map((hit) => (
                   <li key={`${hit.podId}-${hit.vendorId}`}>
                     <ExploreVendorResultRow hit={hit} />
@@ -136,9 +152,10 @@ export function ExplorePodList({ pods }: { pods: PodCardPod[] }) {
       )}
 
       {!hasQuery && pods.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-white/90 p-10 text-center shadow-inner">
-          <p className="font-medium text-stone-800">No pods yet. Run the seed script to add sample data.</p>
-        </div>
+        <ExploreEmptyState
+          title="No pods on the network yet"
+          description="Run the seed script to add sample pods, or list your pod to go live."
+        />
       )}
     </div>
   );

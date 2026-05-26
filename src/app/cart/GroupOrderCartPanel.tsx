@@ -65,7 +65,7 @@ export async function GroupOrderCartPanel({
             Code: <span className="font-semibold">{goState.joinCode}</span>
           </p>
           <p className="mt-1 text-xs text-stone-600">
-            <Link href={joinUrl} className="text-mennyu-primary underline">
+            <Link href={joinUrl} className="text-stone-900 underline">
               Join link
             </Link>
             <span className="text-stone-400"> · </span>

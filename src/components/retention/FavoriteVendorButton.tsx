@@ -62,10 +62,10 @@ export function FavoriteVendorButton({
       title={label}
       aria-pressed={saved}
       aria-label={label}
-      className={`inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-full border px-2 text-sm transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 ${
+      className={`inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-full border px-2 text-sm transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 ${
         saved
           ? "border-rose-300/90 bg-rose-50 text-rose-700 shadow-sm"
-          : "border-stone-200/90 bg-white text-stone-500 shadow-sm hover:border-mennyu-primary/35 hover:text-stone-800"
+          : "border-stone-200/90 bg-white text-stone-500 shadow-sm hover:border-stone-900/35 hover:text-stone-800"
       } ${className}`}
     >
       <span className={`transition-transform duration-200 ${saved ? "scale-110" : ""}`} aria-hidden>

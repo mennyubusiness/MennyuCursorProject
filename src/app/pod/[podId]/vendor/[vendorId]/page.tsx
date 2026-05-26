@@ -87,7 +87,7 @@ function MenuItemRow({
           {item.description && (
             <p className="mt-1 text-sm text-stone-600">{item.description}</p>
           )}
-          <p className="mt-2 text-sm font-medium text-mennyu-primary">
+          <p className="mt-2 text-sm font-medium text-stone-900">
             ${(item.priceCents / 100).toFixed(2)}
           </p>
         </div>
@@ -219,7 +219,7 @@ export default async function VendorMenuPage({
         <div className="mt-10 rounded-xl border border-stone-200 bg-stone-50 p-8 text-center">
           <p className="text-stone-600">This vendor has no menu items available right now.</p>
           <p className="mt-1 text-sm text-stone-500">Check back later.</p>
-          <Link href={`/pod/${podId}`} className="mt-4 inline-block text-sm text-mennyu-primary hover:underline">
+          <Link href={`/pod/${podId}`} className="mt-4 inline-block text-sm text-stone-900 hover:underline">
             Back to {pod.name}
           </Link>
         </div>
@@ -234,7 +234,7 @@ export default async function VendorMenuPage({
                 <a
                   key={s.id}
                   href={`#${customerMenuCategoryDomId(s.id)}`}
-                  className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-sm hover:border-mennyu-primary/40 hover:text-mennyu-primary"
+                  className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-sm hover:border-stone-900/40 hover:text-stone-900"
                   style={
                     vendor.accentColor
                       ? { borderColor: vendor.accentColor }
@@ -287,7 +287,7 @@ export default async function VendorMenuPage({
         <div className="mt-10">
           <Link
             href="/cart"
-            className="inline-block rounded-lg bg-mennyu-primary px-4 py-2 font-medium text-black hover:bg-mennyu-secondary"
+            className="inline-block rounded-lg bg-stone-900 px-4 py-2 font-medium text-white hover:bg-stone-800"
           >
             View cart ({cart.items.length} items)
           </Link>

@@ -6,12 +6,12 @@ import { signOut, useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
+import { buttonClassName } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 
 type SiteHeaderNavProps = {
-  /** Path for login callback (usually current path from middleware). */
   callbackPath: string;
   customerPhone: string | null;
-  /** Server snapshot: user has a NextAuth session (vendor/admin). */
   hasServerSession: boolean;
   navMode: HeaderNavMode;
   dashboardHref: string | null;
@@ -29,6 +29,9 @@ function buildLoginHref(callbackPath: string): string {
   q.set("callbackUrl", safe);
   return `/login?${q.toString()}`;
 }
+
+const navLink =
+  "rounded-md px-2 py-1.5 text-sm font-medium text-zinc-300 transition-colors duration-200 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:text-[0.9375rem]";
 
 export function SiteHeaderNav({
   callbackPath,
@@ -85,44 +88,35 @@ export function SiteHeaderNav({
   }, [hasServerSession, router, status]);
 
   return (
-    <nav className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 text-sm sm:gap-x-6 sm:text-base">
+    <nav className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
       {isSignedIn && accountLabel && (
         <span
-          className="max-w-[8rem] shrink-0 truncate rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600"
+          className="mr-1 hidden max-w-[9rem] truncate rounded-full border border-zinc-700 bg-zinc-900/80 px-2.5 py-0.5 text-xs font-medium text-zinc-400 sm:inline"
           title="Signed-in account type"
         >
           {accountLabel}
         </span>
       )}
-      <Link
-        href="/explore"
-        className="rounded-md text-stone-600 transition-colors duration-200 hover:text-mennyu-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary"
-      >
-        Explore pods
+      <Link href="/explore" className={navLink}>
+        Explore
       </Link>
       {showDashboard && dashboardHref && (
-        <Link
-          href={dashboardHref}
-          className="font-medium text-mennyu-primary hover:underline"
-          title="Your restaurant or pod dashboard"
-        >
+        <Link href={dashboardHref} className={cn(navLink, "text-white")} title="Your dashboard">
           Dashboard
         </Link>
       )}
       {showCustomerOrdering && (
         <>
-          <Link
-            href="/orders"
-            className="rounded-md text-stone-600 transition-colors duration-200 hover:text-mennyu-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary"
-            title="Your orders — link your phone from checkout to see history"
-          >
+          <Link href="/orders" className={navLink} title="Your order history">
             Orders
           </Link>
           <Link
             href={activeOrderHref ?? cartHref}
-            className={`rounded-md text-stone-600 transition hover:text-mennyu-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary ${
-              cartPulse ? "animate-mennyu-cart-nudge motion-reduce:animate-none" : ""
-            }`}
+            className={cn(
+              buttonClassName({ variant: "primary", size: "sm" }),
+              "ml-1 shadow-[0_0_16px_rgba(212,16,16,0.25)]",
+              cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
+            )}
             title="Your cart"
           >
             Cart
@@ -132,8 +126,8 @@ export function SiteHeaderNav({
       {!isSignedIn && (
         <Link
           href={loginHref}
-          className="font-medium text-mennyu-primary hover:underline"
-          title="Email sign-in. New accounts can be created from the login page."
+          className={cn(navLink, "text-white")}
+          title="Sign in or create an account"
         >
           Sign in
         </Link>
@@ -143,13 +137,16 @@ export function SiteHeaderNav({
           type="button"
           disabled={signingOut}
           onClick={() => void handleSignOut()}
-          className="text-stone-600 hover:text-mennyu-primary disabled:opacity-50"
-          title="Clears saved phone for orders and signs out email if you used one"
+          className={cn(navLink, "disabled:opacity-50")}
+          title="Sign out"
         >
-          {signingOut ? "Signing out…" : "Sign out"}
+          {signingOut ? "…" : "Sign out"}
         </button>
       )}
-      <Link href="/admin" className="text-stone-500 hover:text-mennyu-primary">
+      <Link
+        href="/admin"
+        className="ml-1 hidden text-xs font-medium uppercase tracking-wider text-zinc-600 transition hover:text-zinc-400 sm:inline"
+      >
         Admin
       </Link>
     </nav>

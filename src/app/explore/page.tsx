@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { CustomerRetentionStrip } from "@/components/retention/CustomerRetentionStrip";
 import { ExploreHero } from "@/components/explore/ExploreHero";
 import { ExplorePopularPods } from "@/components/explore/ExplorePopularPods";
+import { PageSection, PageShell } from "@/components/layout/page-shell";
 import { ExplorePodList } from "./ExplorePodList";
 
 export default async function ExplorePage() {
@@ -29,16 +30,33 @@ export default async function ExplorePage() {
   const featuredNames = podCards.slice(0, 4).map((p) => p.name);
 
   return (
-    <div className="space-y-10 rounded-2xl border border-stone-300/50 bg-gradient-to-b from-stone-200/50 to-stone-100/90 px-4 py-8 shadow-inner sm:px-6 sm:py-10">
+    <div className="w-full">
       <ExploreHero featuredPodNames={featuredNames} />
-      <ExplorePopularPods pods={podCards} />
-      <CustomerRetentionStrip className="border-stone-300/80 bg-white shadow-md" heading="Continue browsing" />
-      <section className="space-y-5" aria-labelledby="all-pods-heading">
-        <h2 id="all-pods-heading" className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-          All pods
-        </h2>
-        <ExplorePodList pods={podCards} />
-      </section>
+
+      <PageSection className="!py-12 sm:!py-16">
+        <PageShell className="space-y-16 sm:space-y-20">
+          <ExplorePopularPods pods={podCards} />
+
+          <CustomerRetentionStrip
+            className="border-zinc-200 bg-white p-6 shadow-sm sm:p-8"
+            heading="Continue browsing"
+          />
+
+          <section className="space-y-8" aria-labelledby="all-pods-heading">
+            <div className="flex flex-col gap-3 border-b border-zinc-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 id="all-pods-heading" className="oo-section-title">
+                  All pods
+                </h2>
+                <p className="mt-2 text-base text-zinc-600">
+                  {podCards.length} active location{podCards.length === 1 ? "" : "s"} on the network
+                </p>
+              </div>
+            </div>
+            <ExplorePodList pods={podCards} />
+          </section>
+        </PageShell>
+      </PageSection>
     </div>
   );
 }

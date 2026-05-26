@@ -6,6 +6,7 @@ import { useState } from "react";
 import { isHttpsImageUrl } from "@/lib/remote-image-url";
 import { vendorInitials } from "@/lib/vendor-initials";
 import { FavoritePodButton } from "@/components/retention/FavoritePodButton";
+import { cn } from "@/lib/cn";
 
 export type PodCardPod = {
   id: string;
@@ -34,26 +35,26 @@ function PodCardMedia({
   const canTry = isHttpsImageUrl(imageUrl) && !loadFailed;
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-stone-200">
+    <div className="relative h-full w-full overflow-hidden bg-zinc-200">
       {canTry ? (
         <Image
           src={imageUrl!}
           alt={podName}
           fill
-          className="object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
+          className="object-cover transition duration-500 ease-out group-hover:scale-[1.05]"
           sizes={sizes}
           onError={() => setLoadFailed(true)}
         />
       ) : (
         <div
-          className="flex h-full w-full items-center justify-center bg-gradient-to-br from-stone-200 to-stone-300 text-3xl font-bold text-stone-500 sm:text-4xl"
+          className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-950 text-3xl font-black text-zinc-500 sm:text-4xl"
           aria-hidden
         >
           {vendorInitials(podName)}
         </div>
       )}
       <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 to-transparent opacity-80"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"
         aria-hidden
       />
     </div>
@@ -67,11 +68,12 @@ export function PodCard({ pod, variant = "full" }: PodCardProps) {
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border border-stone-200/90 bg-white ring-1 ring-black/[0.06] transition duration-300 motion-reduce:transform-none ${
+      className={cn(
+        "group relative overflow-hidden rounded-xl border border-zinc-200 bg-white transition duration-300 motion-reduce:transform-none",
         isCompact
-          ? "w-[min(17rem,72vw)] shrink-0 shadow-md hover:-translate-y-0.5 hover:shadow-xl"
-          : "shadow-lg hover:-translate-y-[2px] hover:shadow-2xl"
-      }`}
+          ? "w-[min(19rem,78vw)] shrink-0 shadow-md hover:-translate-y-1 hover:shadow-xl"
+          : "shadow-sm hover:-translate-y-1 hover:border-zinc-300 hover:shadow-lg"
+      )}
       style={
         pod.accentColor
           ? {
@@ -82,54 +84,69 @@ export function PodCard({ pod, variant = "full" }: PodCardProps) {
           : undefined
       }
     >
-      <Link href={`/pod/${pod.id}`} className="block outline-none transition active:scale-[0.99]">
-        <div className="relative aspect-video w-full overflow-hidden">
+      <Link href={`/pod/${pod.id}`} className="block outline-none">
+        <div
+          className={cn(
+            "relative w-full overflow-hidden",
+            isCompact ? "aspect-[4/3]" : "aspect-[16/10] sm:aspect-[5/3]"
+          )}
+        >
           <PodCardMedia
             imageUrl={pod.imageUrl}
             podName={pod.name}
-            sizes={isCompact ? "(max-width: 640px) 72vw, 272px" : "(max-width: 640px) 100vw, 380px"}
+            sizes={
+              isCompact
+                ? "(max-width: 640px) 78vw, 304px"
+                : "(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 400px"
+            }
           />
+          <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
+            <span className="oo-badge-live shadow-lg">{vendorCount} vendor{vendorCount !== 1 ? "s" : ""}</span>
+            {!isCompact && vendorCount > 0 && (
+              <span className="oo-badge border border-white/20 bg-white/10 text-white backdrop-blur-sm">
+                Open
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className={isCompact ? "p-3.5" : "p-5 sm:p-6"}>
+        <div className={isCompact ? "p-4" : "p-5 sm:p-6"}>
           <h2
-            className={`font-semibold leading-snug text-stone-900 transition group-hover:text-stone-950 ${
-              isCompact ? "line-clamp-2 text-sm" : "text-lg"
-            }`}
+            className={cn(
+              "font-bold leading-snug text-black transition group-hover:text-zinc-800",
+              isCompact ? "line-clamp-2 text-base" : "text-xl sm:text-2xl"
+            )}
           >
             {pod.name}
           </h2>
           {!isCompact && pod.description && (
-            <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-stone-600">
+            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-zinc-600 sm:text-base">
               {pod.description}
             </p>
           )}
-          <div
-            className={`mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 ${isCompact ? "text-xs" : "text-sm"}`}
-          >
-            <span className="inline-flex items-center rounded-full bg-mennyu-primary px-2.5 py-0.5 font-semibold text-black shadow-sm">
-              {vendorCount} vendor{vendorCount !== 1 ? "s" : ""}
-            </span>
-          </div>
           {!isCompact && featuredVendorName && (
-            <p className="mt-2 line-clamp-2 text-xs text-stone-500">
-              <span className="font-medium text-stone-600">Featuring</span> · {featuredVendorName}
-              {vendorCount > 1 ? ` + ${vendorCount - 1} more` : ""}
+            <p className="mt-3 line-clamp-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Featuring {featuredVendorName}
+              {vendorCount > 1 ? ` +${vendorCount - 1}` : ""}
             </p>
           )}
-          <p
-            className={`mt-4 inline-flex items-center rounded-lg font-semibold text-mennyu-primary ring-1 ring-mennyu-primary/35 transition group-hover:bg-mennyu-primary group-hover:text-black group-hover:ring-mennyu-primary ${
-              isCompact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm"
-            }`}
+          <span
+            className={cn(
+              "mt-4 inline-flex items-center font-semibold text-brand transition group-hover:underline",
+              isCompact ? "text-xs" : "text-sm"
+            )}
           >
             Start order →
-          </p>
+          </span>
         </div>
       </Link>
       <FavoritePodButton
         podId={pod.id}
         podName={pod.name}
-        className={`absolute right-2 top-2 z-20 shadow-md backdrop-blur-sm ${isCompact ? "scale-90" : ""}`}
+        className={cn(
+          "absolute right-2 top-2 z-20 shadow-lg backdrop-blur-sm",
+          isCompact ? "scale-90" : ""
+        )}
       />
     </div>
   );

@@ -44,11 +44,11 @@ export default async function DevOrderSimulatorPage({
       </div>
 
       <div>
-        <Link href="/explore" className="text-mennyu-primary hover:underline">
+        <Link href="/explore" className="text-stone-900 hover:underline">
           ← Explore
         </Link>
         <span className="mx-2">·</span>
-        <Link href={`/order/${orderId}`} className="text-mennyu-primary hover:underline">
+        <Link href={`/order/${orderId}`} className="text-stone-900 hover:underline">
           Customer order view
         </Link>
       </div>
@@ -87,7 +87,7 @@ export default async function DevOrderSimulatorPage({
           href={`/api/dev/orders/${orderId}/deliverect-payload`}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-2 inline-block text-sm text-mennyu-primary hover:underline"
+          className="mt-2 inline-block text-sm text-stone-900 hover:underline"
         >
           Open raw JSON in new tab →
         </a>

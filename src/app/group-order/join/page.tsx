@@ -17,7 +17,7 @@ export default async function GroupOrderJoinPage({
       <div className="mx-auto max-w-md px-4 py-12">
         <h1 className="text-xl font-semibold text-stone-900">Group order not found</h1>
         <p className="mt-2 text-sm text-stone-600">Ask the host for an updated code or link.</p>
-        <Link href="/explore" className="mt-6 inline-block text-mennyu-primary underline">
+        <Link href="/explore" className="mt-6 inline-block text-stone-900 underline">
           Explore pods
         </Link>
       </div>
@@ -69,7 +69,7 @@ export default async function GroupOrderJoinPage({
         </div>
         <button
           type="submit"
-          className="w-full rounded-xl bg-mennyu-primary py-3 text-sm font-semibold text-black hover:bg-mennyu-secondary"
+          className="w-full rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white hover:bg-stone-800"
         >
           Join &amp; continue
         </button>

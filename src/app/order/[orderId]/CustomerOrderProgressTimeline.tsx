@@ -5,9 +5,9 @@ import type { ParentProgressStep } from "./customer-order-progress";
 function circleClass(state: ParentProgressStep["state"]): string {
   switch (state) {
     case "complete":
-      return "border-mennyu-primary bg-mennyu-primary text-black";
+      return "border-stone-900 bg-stone-900 text-white";
     case "current":
-      return "border-mennyu-primary bg-white text-stone-900 shadow-sm ring-2 ring-mennyu-primary/35";
+      return "border-stone-900 bg-white text-stone-900 shadow-sm ring-2 ring-stone-900/35";
     case "danger":
       return "border-red-400 bg-red-50 text-red-800";
     case "skipped":
@@ -18,7 +18,7 @@ function circleClass(state: ParentProgressStep["state"]): string {
 }
 
 function lineClass(active: boolean): string {
-  return active ? "bg-mennyu-primary/60" : "bg-stone-200";
+  return active ? "bg-stone-900/60" : "bg-stone-200";
 }
 
 export function CustomerOrderProgressTimeline({ steps }: { steps: ParentProgressStep[] }) {

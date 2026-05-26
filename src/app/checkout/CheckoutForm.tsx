@@ -149,7 +149,7 @@ function PaymentStep({
         <button
           type="submit"
           disabled={!stripe || !elements || loading}
-          className="w-full rounded-xl bg-mennyu-primary py-4 text-base font-semibold text-black hover:bg-mennyu-secondary disabled:opacity-50 sm:py-3"
+          className="w-full rounded-xl bg-stone-900 py-4 text-base font-semibold text-white hover:bg-stone-800 disabled:opacity-50 sm:py-3"
         >
           {loading ? "Processing…" : "Pay and place order"}
         </button>
@@ -432,7 +432,7 @@ export function CheckoutForm({
         <p className="mt-1 text-sm text-stone-500">Pickup orders only. Times use {pickupTimezoneLabel}.</p>
         <fieldset className="mt-4 space-y-3">
           <legend className="sr-only">When to pick up</legend>
-          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-200 p-3 has-[:checked]:border-mennyu-primary has-[:checked]:bg-mennyu-muted">
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-200 p-3 has-[:checked]:border-stone-900 has-[:checked]:bg-stone-50">
             <input
               type="radio"
               name="pickupMode"
@@ -450,7 +450,7 @@ export function CheckoutForm({
               </span>
             </span>
           </label>
-          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-200 p-3 has-[:checked]:border-mennyu-primary has-[:checked]:bg-mennyu-muted">
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-200 p-3 has-[:checked]:border-stone-900 has-[:checked]:bg-stone-50">
             <input
               type="radio"
               name="pickupMode"
@@ -517,7 +517,7 @@ export function CheckoutForm({
                 onClick={() => selectPercentPreset(pct)}
                 className={`min-h-[44px] flex-1 rounded-lg border px-3 py-2 text-sm font-medium sm:flex-none sm:px-4 ${
                   selected
-                    ? "border-mennyu-primary bg-mennyu-muted text-stone-900"
+                    ? "border-stone-900 bg-stone-50 text-stone-900"
                     : "border-stone-300 text-stone-700 hover:bg-stone-50"
                 }`}
               >
@@ -531,7 +531,7 @@ export function CheckoutForm({
           <div
             className={`flex min-h-[44px] min-w-[7rem] flex-1 items-center rounded-lg border px-3 sm:flex-none ${
               isCustomTipSelected
-                ? "border-mennyu-primary bg-mennyu-muted"
+                ? "border-stone-900 bg-stone-50"
                 : "border-stone-300 bg-white"
             }`}
           >
@@ -604,7 +604,7 @@ export function CheckoutForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl bg-mennyu-primary py-4 text-base font-semibold text-black transition hover:bg-mennyu-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.99] disabled:opacity-50"
+        className="w-full rounded-xl bg-stone-900 py-4 text-base font-semibold text-white transition hover:bg-stone-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.99] disabled:opacity-50"
       >
         {loading ? "Preparing payment…" : "Continue to payment"}
       </button>

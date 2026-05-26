@@ -203,7 +203,7 @@ export function AddToCartButton({
           type="button"
           onClick={handleClickAdd}
           disabled={buttonDisabled}
-          className="rounded-xl border-2 border-mennyu-primary bg-white px-4 py-2.5 text-sm font-semibold text-black shadow-sm transition duration-200 hover:bg-mennyu-muted hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+          className="rounded-xl border-2 border-stone-900 bg-white px-4 py-2.5 text-sm font-semibold text-black shadow-sm transition duration-200 hover:bg-stone-50 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
         >
           {orderingDisabled ? "Unavailable" : loading ? "Adding…" : "Add to cart"}
         </button>

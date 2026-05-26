@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { AuthFormCard } from "@/components/auth/auth-shell";
+import { Button } from "@/components/ui/button";
 
 export default function AdminAccessDeniedPage() {
   const [secret, setSecret] = useState("");
@@ -33,36 +35,48 @@ export default function AdminAccessDeniedPage() {
   }
 
   return (
-    <div className="mx-auto max-w-sm space-y-4 rounded-lg border border-stone-200 bg-white p-6">
-      <h1 className="text-lg font-semibold text-stone-900">Admin access</h1>
-      <p className="text-sm text-stone-600">
-        Enter the admin secret to continue. (In development, access is automatic.)
-      </p>
-      <p className="text-sm text-stone-600">
-        If you have a platform admin account, you can also{" "}
-        <Link href={`/login?callbackUrl=${encodeURIComponent("/admin")}`} className="font-medium text-sky-800 underline">
-          sign in with email
-        </Link>{" "}
-        (Open Order team access).
-      </p>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          type="password"
-          value={secret}
-          onChange={(e) => setSecret(e.target.value)}
-          placeholder="Admin secret"
-          className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900"
-          disabled={loading}
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded bg-stone-800 py-2 text-white hover:bg-stone-900 disabled:opacity-50"
-        >
-          {loading ? "…" : "Continue"}
-        </button>
-      </form>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+    <div className="mx-auto max-w-md py-4">
+      <AuthFormCard>
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-black">Admin access</h1>
+          <p className="mt-2 text-sm text-zinc-600">
+            Enter the admin secret to continue. In development, access is automatic.
+          </p>
+          <p className="mt-3 text-sm text-zinc-600">
+            Platform admin?{" "}
+            <Link
+              href={`/login?callbackUrl=${encodeURIComponent("/admin")}`}
+              className="font-semibold text-brand underline-offset-4 hover:underline"
+            >
+              Sign in with email
+            </Link>
+          </p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="admin-secret" className="oo-label">
+              Admin secret
+            </label>
+            <input
+              id="admin-secret"
+              type="password"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              placeholder="••••••••"
+              className="oo-input"
+              disabled={loading}
+            />
+          </div>
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? "Verifying…" : "Continue"}
+          </Button>
+        </form>
+        {error && (
+          <p className="oo-form-error" role="alert">
+            {error}
+          </p>
+        )}
+      </AuthFormCard>
     </div>
   );
 }

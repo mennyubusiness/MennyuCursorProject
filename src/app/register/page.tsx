@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { RegisterForm } from "./RegisterForm";
 
 export default async function RegisterPage() {
@@ -12,13 +13,13 @@ export default async function RegisterPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 px-4 py-8">
+    <AuthShell>
       <RegisterForm />
-      <p className="text-center text-sm text-stone-500">
-        <Link href="/" className="underline hover:text-stone-800">
-          Back to Open Order
+      <p className="mt-8 text-center text-sm text-zinc-600">
+        <Link href="/" className="font-medium text-zinc-800 underline-offset-4 hover:text-black hover:underline">
+          ← Back to Open Order
         </Link>
       </p>
-    </div>
+    </AuthShell>
   );
 }

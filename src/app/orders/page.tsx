@@ -56,7 +56,7 @@ export default async function OrdersPage() {
         </header>
         <OrderHistoryPhoneForm />
         <p className="text-sm text-stone-500">
-          <Link href="/explore" className="text-mennyu-primary hover:underline">
+          <Link href="/explore" className="text-stone-900 hover:underline">
             ← Back to explore
           </Link>
         </p>
@@ -88,7 +88,7 @@ export default async function OrdersPage() {
         <div className="rounded-xl border border-stone-200 bg-stone-50 p-6 text-center">
           <p className="text-stone-600">No orders yet for this phone number.</p>
           <p className="mt-1 text-sm text-stone-500">Place an order from a pod to see it here.</p>
-          <Link href="/explore" className="mt-4 inline-block text-mennyu-primary hover:underline">
+          <Link href="/explore" className="mt-4 inline-block text-stone-900 hover:underline">
             Browse pods →
           </Link>
         </div>
@@ -129,7 +129,7 @@ export default async function OrdersPage() {
       )}
 
       <p className="text-sm text-stone-500">
-        <Link href="/explore" className="text-mennyu-primary hover:underline">
+        <Link href="/explore" className="text-stone-900 hover:underline">
           ← Back to explore
         </Link>
       </p>

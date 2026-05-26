@@ -23,7 +23,7 @@ export function CheckoutProgress({ activeStep }: { activeStep: 1 | 2 | 3 }) {
             <span
               className={
                 current
-                  ? "rounded-full bg-mennyu-primary/20 px-3 py-1 font-semibold text-stone-900"
+                  ? "rounded-full bg-stone-900/20 px-3 py-1 font-semibold text-stone-900"
                   : done
                     ? "text-stone-600"
                     : "text-stone-400"

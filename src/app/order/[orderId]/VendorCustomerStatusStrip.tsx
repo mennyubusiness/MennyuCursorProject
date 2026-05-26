@@ -38,9 +38,9 @@ export function VendorCustomerStatusStrip({ stage }: { stage: VendorStageKey }) 
               key={seg.key}
               className={`rounded-md px-0.5 py-1.5 text-center text-[9px] font-semibold leading-tight sm:px-1 sm:text-xs ${
                 complete
-                  ? "bg-mennyu-primary/90 text-black"
+                  ? "bg-stone-900/90 text-white"
                   : current
-                    ? "bg-white text-stone-900 shadow-sm ring-1 ring-mennyu-primary/40"
+                    ? "bg-white text-stone-900 shadow-sm ring-1 ring-stone-900/40"
                     : "text-stone-400"
               }`}
             >

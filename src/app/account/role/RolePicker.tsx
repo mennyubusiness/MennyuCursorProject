@@ -65,7 +65,7 @@ export function RolePicker() {
             type="button"
             disabled={loading !== null}
             onClick={() => void choose(opt.id)}
-            className="w-full rounded-lg border border-stone-200 bg-white p-4 text-left text-sm shadow-sm transition hover:border-mennyu-primary hover:bg-mennyu-primary/5 disabled:opacity-60"
+            className="w-full rounded-lg border border-stone-200 bg-white p-4 text-left text-sm shadow-sm transition hover:border-stone-900 hover:bg-stone-900/5 disabled:opacity-60"
           >
             <span className="font-semibold text-stone-900">{opt.title}</span>
             <span className="mt-1 block text-stone-600">{opt.body}</span>

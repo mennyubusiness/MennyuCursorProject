@@ -61,7 +61,7 @@ export function OrderPaymentConfirming({ orderId }: { orderId: string }) {
   return (
     <div className="mx-auto max-w-lg px-4 py-12 text-center">
       <div
-        className="mx-auto mb-6 h-10 w-10 animate-spin rounded-full border-2 border-stone-300 border-t-mennyu-primary"
+        className="mx-auto mb-6 h-10 w-10 animate-spin rounded-full border-2 border-stone-300 border-t-stone-900"
         aria-hidden
       />
       <h1 className="text-xl font-semibold text-stone-900">Confirming your payment</h1>

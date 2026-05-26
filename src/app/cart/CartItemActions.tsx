@@ -140,7 +140,7 @@ export function CartItemActions({
               }
             }}
             disabled={loading}
-            className="ml-2 text-sm text-mennyu-primary hover:underline"
+            className="ml-2 text-sm text-stone-900 hover:underline"
           >
             Edit
           </button>
@@ -190,7 +190,7 @@ export function CartItemActions({
               type="button"
               onClick={saveInstructions}
               disabled={loading}
-              className="rounded border border-mennyu-primary bg-mennyu-primary px-2 py-1 text-sm font-medium text-black hover:bg-mennyu-secondary disabled:opacity-50"
+              className="rounded border border-stone-900 bg-stone-900 px-2 py-1 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
             >
               Save
             </button>

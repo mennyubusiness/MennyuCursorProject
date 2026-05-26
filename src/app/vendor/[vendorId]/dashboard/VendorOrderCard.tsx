@@ -209,7 +209,7 @@ export function VendorOrderCard({
   const totalItems = vendorOrder.lineItems.reduce((sum, l) => sum + l.quantity, 0);
 
   const cardRingClass = isNew
-    ? "ring-2 ring-mennyu-primary/55 ring-offset-2"
+    ? "ring-2 ring-stone-900/55 ring-offset-2"
     : isCancelledOrFailed
       ? "ring-1 ring-stone-200/80"
       : "ring-1 ring-stone-200/70";
@@ -332,7 +332,7 @@ export function VendorOrderCard({
                 disabled={loading}
                 className={
                   isMennyuControlsPrimary(operatingMode)
-                    ? "rounded-lg border border-mennyu-primary bg-mennyu-primary px-3 py-2 text-sm font-semibold text-black shadow-sm transition hover:bg-mennyu-secondary disabled:opacity-50"
+                    ? "rounded-lg border border-stone-900 bg-stone-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-50"
                     : "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 shadow-sm hover:bg-stone-50 disabled:opacity-50"
                 }
               >

@@ -67,7 +67,7 @@ function ResumePaymentForm({ orderId, totalCents }: { orderId: string; totalCent
       <button
         type="submit"
         disabled={!stripe || !elements || loading}
-        className="w-full rounded-xl bg-mennyu-primary py-4 text-base font-semibold text-black hover:bg-mennyu-secondary disabled:opacity-50"
+        className="w-full rounded-xl bg-stone-900 py-4 text-base font-semibold text-white hover:bg-stone-800 disabled:opacity-50"
       >
         {loading ? "Processing…" : `Pay ${(totalCents / 100).toFixed(2)} USD`}
       </button>
@@ -133,7 +133,7 @@ function DevBypassResume({
         type="button"
         onClick={handleConfirm}
         disabled={loading}
-        className="w-full rounded-xl bg-mennyu-primary py-4 text-base font-semibold text-black hover:bg-mennyu-secondary disabled:opacity-50"
+        className="w-full rounded-xl bg-stone-900 py-4 text-base font-semibold text-white hover:bg-stone-800 disabled:opacity-50"
       >
         {loading ? "Confirming…" : "Complete test payment (dev)"}
       </button>

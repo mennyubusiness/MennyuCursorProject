@@ -63,7 +63,7 @@ export function PodDashboardAddVendor({
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
-            className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-mennyu-primary focus:outline-none focus:ring-1 focus:ring-mennyu-primary"
+            className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
           >
             <option value="">Select a vendor…</option>
             {eligibleVendors.map((v) => (

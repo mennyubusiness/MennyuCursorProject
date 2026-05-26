@@ -28,7 +28,7 @@ export function MennyuLocationIdField({ mennyuLocationId, className = "", varian
 
   const box =
     variant === "emphasized"
-      ? "rounded-xl border-2 border-mennyu-primary/30 bg-gradient-to-b from-white to-stone-50/90 p-5 shadow-sm ring-1 ring-stone-200/80"
+      ? "rounded-xl border-2 border-stone-900/30 bg-gradient-to-b from-white to-stone-50/90 p-5 shadow-sm ring-1 ring-stone-200/80"
       : "rounded-lg border border-stone-200 bg-stone-50/90 p-4";
 
   return (

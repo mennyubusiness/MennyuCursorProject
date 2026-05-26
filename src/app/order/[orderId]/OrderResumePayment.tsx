@@ -59,7 +59,7 @@ export async function OrderResumePayment({ orderId }: { orderId: string }) {
         </p>
         <Link
           href="/cart"
-          className="mt-6 inline-block rounded-lg bg-mennyu-primary px-4 py-2 text-sm font-semibold text-black hover:bg-mennyu-secondary"
+          className="mt-6 inline-block rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800"
         >
           Back to cart
         </Link>

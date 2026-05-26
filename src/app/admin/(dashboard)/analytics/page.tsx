@@ -28,7 +28,7 @@ function RangeLink({
       href={`/admin/analytics?range=${value}`}
       className={
         active
-          ? "rounded bg-[#FFBD59] px-3 py-1.5 text-sm font-medium text-black"
+          ? "rounded bg-stone-900 px-3 py-1.5 text-sm font-medium text-white"
           : "rounded border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
       }
     >

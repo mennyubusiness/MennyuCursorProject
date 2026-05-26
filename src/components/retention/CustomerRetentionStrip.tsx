@@ -101,7 +101,7 @@ export function CustomerRetentionStrip({
                 <li key={`${l.sub}-${l.href}`} className="shrink-0">
                   <Link
                     href={l.href}
-                    className="flex max-w-[16rem] items-center gap-2 rounded-full border border-stone-200/90 bg-stone-50/90 py-1 pl-1 pr-3 text-sm font-medium text-stone-800 shadow-sm transition hover:border-mennyu-primary/50 hover:bg-white hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.99]"
+                    className="flex max-w-[16rem] items-center gap-2 rounded-full border border-stone-200/90 bg-stone-50/90 py-1 pl-1 pr-3 text-sm font-medium text-stone-800 shadow-sm transition hover:border-stone-900/50 hover:bg-white hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.99]"
                   >
                     <ChipThumb label={l.label} />
                     <span className="min-w-0 flex-1 truncate">{l.label}</span>
@@ -122,7 +122,7 @@ export function CustomerRetentionStrip({
                 <li key={`fav-${l.href}`} className="shrink-0">
                   <Link
                     href={l.href}
-                    className="flex max-w-[16rem] items-center gap-2 rounded-full border border-rose-200/90 bg-rose-50/80 py-1 pl-1 pr-3 text-sm font-medium text-rose-950 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mennyu-primary active:scale-[0.99]"
+                    className="flex max-w-[16rem] items-center gap-2 rounded-full border border-rose-200/90 bg-rose-50/80 py-1 pl-1 pr-3 text-sm font-medium text-rose-950 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.99]"
                   >
                     <span
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-700 ring-2 ring-white shadow-sm"

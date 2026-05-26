@@ -141,7 +141,7 @@ function FailureText({ text }: { text: string | null }) {
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="mt-1 text-xs font-semibold text-mennyu-primary hover:underline"
+          className="mt-1 text-xs font-semibold text-stone-900 hover:underline"
         >
           {open ? "Show less" : "Show more"}
         </button>
@@ -518,7 +518,7 @@ export function PayoutTransfersDashboard({
                               <td className="px-3 py-2">
                                 <Link
                                   href={`/admin/orders/${t.vendorOrder.orderId}`}
-                                  className="font-mono text-xs text-mennyu-primary hover:underline"
+                                  className="font-mono text-xs text-stone-900 hover:underline"
                                 >
                                   {t.vendorOrder.orderId.slice(-10)}
                                 </Link>
@@ -541,7 +541,7 @@ export function PayoutTransfersDashboard({
                                   <div className="mt-1">
                                     <Link
                                       href={`/admin/vendors/${t.vendorId}`}
-                                      className="text-xs font-semibold text-mennyu-primary hover:underline"
+                                      className="text-xs font-semibold text-stone-900 hover:underline"
                                     >
                                       View vendor
                                     </Link>
@@ -636,7 +636,7 @@ export function PayoutTransfersDashboard({
                               <td className="px-3 py-2">
                                 <Link
                                   href={`/admin/orders/${r.orderId}`}
-                                  className="font-mono text-xs text-mennyu-primary hover:underline"
+                                  className="font-mono text-xs text-stone-900 hover:underline"
                                 >
                                   {r.orderId.slice(-10)}
                                 </Link>

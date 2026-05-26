@@ -6,6 +6,8 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { registerWithEmailPassword } from "@/actions/register.actions";
 import { ACCOUNT_ROLE_PATH } from "@/lib/auth/account-paths";
+import { AuthFormCard } from "@/components/auth/auth-shell";
+import { Button } from "@/components/ui/button";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -47,63 +49,64 @@ export function RegisterForm() {
   }
 
   return (
-    <form
-      onSubmit={(e) => void onSubmit(e)}
-      className="mx-auto max-w-sm space-y-4 rounded-lg border border-stone-200 bg-white p-6 shadow-sm"
-    >
+    <AuthFormCard>
       <div>
-        <h1 className="text-lg font-semibold text-stone-900">Create your Open Order account</h1>
-        <p className="mt-1 text-sm text-stone-600">
-          You’ll choose whether you’re ordering, running a restaurant, or managing a pod on the next step.
+        <h1 className="text-2xl font-black tracking-tight text-black">Create your account</h1>
+        <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+          You&apos;ll choose whether you&apos;re ordering, running a restaurant, or managing a pod on
+          the next step.
         </p>
       </div>
-      <label className="block text-sm">
-        <span className="font-medium text-stone-800">Name (optional)</span>
-        <input
-          name="name"
-          autoComplete="name"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
-        />
-      </label>
-      <label className="block text-sm">
-        <span className="font-medium text-stone-800">Email</span>
-        <input
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
-        />
-      </label>
-      <label className="block text-sm">
-        <span className="font-medium text-stone-800">Password (min 8 characters)</span>
-        <input
-          name="password"
-          type="password"
-          required
-          minLength={8}
-          autoComplete="new-password"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
-        />
-      </label>
-      {error ? (
-        <p className="text-sm text-red-700" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded-lg bg-stone-900 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {loading ? "Creating account…" : "Continue"}
-      </button>
-      <p className="text-center text-sm text-stone-600">
+      <form onSubmit={(e) => void onSubmit(e)} className="space-y-5">
+        <div>
+          <label htmlFor="register-name" className="oo-label">
+            Name <span className="font-normal text-zinc-500">(optional)</span>
+          </label>
+          <input id="register-name" name="name" autoComplete="name" className="oo-input" />
+        </div>
+        <div>
+          <label htmlFor="register-email" className="oo-label">
+            Email
+          </label>
+          <input
+            id="register-email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            className="oo-input"
+          />
+        </div>
+        <div>
+          <label htmlFor="register-password" className="oo-label">
+            Password
+          </label>
+          <input
+            id="register-password"
+            name="password"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            className="oo-input"
+          />
+          <p className="mt-1.5 text-xs text-zinc-500">Minimum 8 characters</p>
+        </div>
+        {error ? (
+          <p className="oo-form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? "Creating account…" : "Continue"}
+        </Button>
+      </form>
+      <p className="border-t border-zinc-100 pt-4 text-center text-sm text-zinc-600">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-mennyu-primary underline">
+        <Link href="/login" className="font-semibold text-brand underline-offset-4 hover:underline">
           Sign in
         </Link>
       </p>
-    </form>
+    </AuthFormCard>
   );
 }

@@ -45,7 +45,7 @@ export function VendorOnboardingProgress({
           {ui !== "connected" ? (
             <>
               {" "}
-              <Link href={`/vendor/${vendorId}/connect-pos`} className="font-medium text-mennyu-primary hover:underline">
+              <Link href={`/vendor/${vendorId}/connect-pos`} className="font-medium text-stone-900 hover:underline">
                 Set up POS connection
               </Link>{" "}
               — optional until you want live kitchen routing.
@@ -54,7 +54,7 @@ export function VendorOnboardingProgress({
             <>
               {" "}
               —{" "}
-              <Link href={`/vendor/${vendorId}/settings`} className="font-medium text-mennyu-primary hover:underline">
+              <Link href={`/vendor/${vendorId}/settings`} className="font-medium text-stone-900 hover:underline">
                 manage in Settings
               </Link>
               .

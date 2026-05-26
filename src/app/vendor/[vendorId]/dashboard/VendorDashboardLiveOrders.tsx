@@ -330,7 +330,7 @@ export function VendorDashboardLiveOrders({
                     {GROUP_LABELS[key]}
                     <span className="ml-2 font-normal text-stone-500">({list.length})</span>
                   </h2>
-                  <span className="shrink-0 text-xs font-medium text-mennyu-primary">
+                  <span className="shrink-0 text-xs font-medium text-stone-900">
                     {open ? "Hide" : "Show"}
                   </span>
                 </button>
