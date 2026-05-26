@@ -9,12 +9,12 @@ export default function AdminLayout({
 }) {
   return (
     <div className="min-h-screen bg-zinc-100">
-      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black">
-        <PageShell className="py-4">
+      <div className="border-b border-zinc-200 bg-white">
+        <PageShell className="py-3">
           <AdminTopNav />
         </PageShell>
-      </header>
-      <main className="oo-shell py-10 lg:py-12">{children}</main>
+      </div>
+      <div className="oo-shell py-10 lg:py-12">{children}</div>
     </div>
   );
 }

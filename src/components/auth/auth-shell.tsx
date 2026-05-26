@@ -1,5 +1,7 @@
-import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
+import { BRAND, BRAND_ALT } from "@/lib/brand-assets";
+import { OpenOrderLogo } from "@/components/brand/OpenOrderLogo";
 import { cn } from "@/lib/cn";
 
 type AuthShellProps = {
@@ -27,26 +29,30 @@ export function AuthShell({ children, title, subtitle, className }: AuthShellPro
           }}
           aria-hidden
         />
-        <div className="relative flex flex-1 flex-col justify-end p-10 xl:p-14">
-          <Link href="/" className="mb-auto inline-flex items-center gap-2.5 self-start">
-            <span
-              className="flex h-9 w-9 items-center justify-center rounded-md bg-brand text-sm font-black text-white"
-              aria-hidden
-            >
-              O
-            </span>
-            <span className="text-lg font-bold tracking-tight text-white">Open Order</span>
-          </Link>
-          <p className="mt-16 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
-            Commerce operating system
-          </p>
-          <h2 className="mt-4 max-w-md text-4xl font-black leading-[1.05] tracking-tight text-white xl:text-5xl">
-            One network.
-            <span className="block text-zinc-500">Every vendor. One cart.</span>
-          </h2>
-          <p className="mt-6 max-w-sm text-base leading-relaxed text-zinc-500">
-            Sign in to manage pods, run your kitchen, or pick up where you left off ordering.
-          </p>
+        <div className="relative flex flex-1 flex-col p-10 xl:p-14">
+          <OpenOrderLogo variant="header" className="self-start" />
+          <div className="my-auto flex flex-col items-center py-8">
+            <Image
+              src={BRAND.seal}
+              alt={BRAND_ALT.seal}
+              width={280}
+              height={280}
+              className="h-auto w-full max-w-[16rem] drop-shadow-2xl"
+              priority
+            />
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+              Commerce operating system
+            </p>
+            <h2 className="mt-4 max-w-md text-3xl font-black leading-[1.05] tracking-tight text-white xl:text-4xl">
+              One network.
+              <span className="block text-zinc-500">Every vendor. One cart.</span>
+            </h2>
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-zinc-500">
+              Sign in to manage pods, run your kitchen, or pick up where you left off ordering.
+            </p>
+          </div>
         </div>
         <div className="relative border-t border-zinc-800 px-10 py-6 text-xs text-zinc-600 xl:px-14">
           Multi-vendor pickup · Unified checkout
@@ -56,15 +62,7 @@ export function AuthShell({ children, title, subtitle, className }: AuthShellPro
       <div className="flex flex-1 flex-col justify-center bg-zinc-50 px-4 py-12 sm:px-8 lg:px-12 xl:px-16">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-8 lg:hidden">
-            <Link href="/" className="inline-flex items-center gap-2">
-              <span
-                className="flex h-8 w-8 items-center justify-center rounded-md bg-brand text-sm font-black text-white"
-                aria-hidden
-              >
-                O
-              </span>
-              <span className="text-lg font-bold text-black">Open Order</span>
-            </Link>
+            <OpenOrderLogo variant="header" />
           </div>
           {(title || subtitle) && (
             <div className="mb-8">
