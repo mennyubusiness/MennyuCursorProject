@@ -39,11 +39,13 @@ export default async function RootLayout({
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? "";
   const isAdmin = pathname.startsWith("/admin");
+  const isPodMarketplace = /^\/pod\/[^/]+$/.test(pathname);
   const isFullBleed =
     pathname === "/" ||
     pathname === "/explore" ||
     pathname === "/login" ||
-    pathname === "/register";
+    pathname === "/register" ||
+    isPodMarketplace;
   const hideFooter =
     pathname === "/login" || pathname === "/register" || isAdmin;
   const session = await auth();

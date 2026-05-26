@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { isHttpsImageUrl } from "@/lib/remote-image-url";
 import { vendorInitials } from "@/lib/vendor-initials";
+import { cn } from "@/lib/cn";
 
 export type PodVendorCardVendor = {
   id: string;
@@ -16,7 +17,6 @@ export type PodVendorCardVendor = {
 type AvailabilityLabel = {
   unavailable: boolean;
   statusLabel: string;
-  /** Show "You can still browse" hint */
   showBrowseHint: boolean;
 };
 
@@ -32,39 +32,49 @@ function VendorCardMedia({
   imageUrl,
   vendorName,
   sizes,
+  compact,
 }: {
   imageUrl: string | null;
   vendorName: string;
   sizes: string;
+  compact?: boolean;
 }) {
   const [loadFailed, setLoadFailed] = useState(false);
   const canTry = isHttpsImageUrl(imageUrl) && !loadFailed;
 
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden bg-stone-200">
+    <div
+      className={cn(
+        "relative w-full overflow-hidden bg-zinc-200",
+        compact ? "aspect-[16/9]" : "aspect-[16/9] sm:aspect-[5/3]"
+      )}
+    >
       {canTry ? (
         <Image
           src={imageUrl!}
           alt={vendorName}
           fill
-          className="object-cover transition duration-300 ease-out group-hover:scale-[1.03]"
+          className="object-cover transition duration-300 ease-out group-hover:scale-[1.02]"
           sizes={sizes}
           onError={() => setLoadFailed(true)}
         />
       ) : (
         <div
-          className="flex h-full w-full items-center justify-center bg-gradient-to-br from-stone-200 to-stone-300 text-2xl font-bold text-stone-500 sm:text-3xl"
+          className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-200 to-zinc-300 text-xl font-bold text-zinc-500"
           aria-hidden
         >
           {vendorInitials(vendorName)}
         </div>
       )}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" aria-hidden />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 to-transparent"
+        aria-hidden
+      />
     </div>
   );
 }
 
-/** Vendor grid / browse strip cards — equal visual weight; yellow only on CTA hover. */
+/** Vendor cards for pod marketplace grids and horizontal strips. */
 export function PodVendorCard({ podId, variant, vendor, isFeatured, availability }: PodVendorCardProps) {
   const href = `/pod/${podId}/vendor/${vendor.id}`;
   const grid = variant === "grid";
@@ -72,48 +82,67 @@ export function PodVendorCard({ podId, variant, vendor, isFeatured, availability
   return (
     <Link
       href={href}
-      className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-md ring-1 ring-black/[0.04] transition duration-300 motion-reduce:transform-none ${
-        grid
-          ? "w-full hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-xl"
-          : "w-[min(11.5rem,42vw)] shrink-0 hover:-translate-y-0.5 hover:shadow-lg"
-      } ${availability.unavailable ? "opacity-95" : ""}`}
+      className={cn(
+        "group flex h-full flex-col overflow-hidden oo-card-hover motion-reduce:hover:translate-y-0",
+        grid ? "w-full" : "w-[min(10.5rem,40vw)] shrink-0",
+        availability.unavailable && "opacity-90"
+      )}
       aria-label={`${vendor.name} — ${availability.statusLabel}. ${availability.unavailable ? "Browse menu." : "Start order."}`}
     >
       <VendorCardMedia
         imageUrl={vendor.imageUrl}
         vendorName={vendor.name}
-        sizes={grid ? "(max-width: 640px) 100vw, 360px" : "180px"}
+        sizes={
+          grid
+            ? "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 280px"
+            : "168px"
+        }
+        compact={grid}
       />
-      <div className={grid ? "flex flex-1 flex-col p-4 sm:p-5" : "flex flex-1 flex-col p-3"}>
-        <div className="flex flex-wrap items-center gap-1.5 gap-y-1">
-          <h3 className={`font-semibold text-stone-900 ${grid ? "text-lg" : "line-clamp-2 text-sm leading-snug"}`}>
+      <div className={cn("flex flex-1 flex-col", grid ? "p-3 sm:p-3.5" : "p-2.5")}>
+        <div className="flex flex-wrap items-center gap-1 gap-y-0.5">
+          <h3
+            className={cn(
+              "font-semibold text-black",
+              grid ? "line-clamp-1 text-sm leading-snug" : "line-clamp-2 text-xs leading-snug"
+            )}
+          >
             {vendor.name}
           </h3>
           {isFeatured && (
-            <span className="rounded-full border border-stone-300 bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-stone-500">
+            <span className="oo-badge border border-zinc-300 bg-white px-1.5 py-0 text-[9px] text-zinc-600">
               Featured
             </span>
           )}
+        </div>
+
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
           {!availability.unavailable ? (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900">
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
               Open
             </span>
           ) : (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">
               {availability.statusLabel}
             </span>
           )}
         </div>
+
         {grid && vendor.description && (
-          <p className="mt-2 line-clamp-3 flex-1 text-sm leading-relaxed text-stone-600">{vendor.description}</p>
+          <p className="mt-1.5 line-clamp-2 flex-1 text-xs leading-snug text-zinc-600">
+            {vendor.description}
+          </p>
         )}
         {availability.showBrowseHint && grid && (
-          <p className="mt-2 text-xs text-stone-500">You can still browse the menu.</p>
+          <p className="mt-1 text-[11px] text-zinc-500">Menu still browsable</p>
         )}
         <span
-          className={`mt-3 inline-flex w-fit items-center rounded-lg font-semibold text-stone-900 ring-1 ring-stone-900/30 transition group-hover:bg-stone-900 group-hover:text-white group-hover:ring-stone-900 ${
-            grid ? "px-3 py-1.5 text-sm" : "px-2.5 py-1 text-xs"
-          }`}
+          className={cn(
+            "mt-2.5 inline-flex w-fit items-center rounded-lg font-semibold transition duration-200",
+            "bg-zinc-900 px-2.5 py-1 text-xs text-white group-hover:bg-brand group-focus-visible:bg-brand",
+            grid ? "" : "px-2 py-0.5 text-[11px]"
+          )}
         >
           Start order →
         </span>

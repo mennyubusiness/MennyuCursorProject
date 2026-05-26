@@ -1,6 +1,8 @@
 import Image from "next/image";
 import { FavoritePodButton } from "@/components/retention/FavoritePodButton";
+import { PageShell } from "@/components/layout/page-shell";
 import { isHttpsImageUrl } from "@/lib/remote-image-url";
+import { cn } from "@/lib/cn";
 
 type PodPageHeroProps = {
   podId: string;
@@ -23,64 +25,100 @@ export function PodPageHero({
 }: PodPageHeroProps) {
   const hasImage = isHttpsImageUrl(imageUrl);
   const defaultTagline = "Mix vendors in one cart — one payment, one trip.";
+  const tagline = description?.trim() ?? defaultTagline;
 
-  const countLine =
+  const countLabel =
     vendorCount === 0
-      ? "No vendors listed yet"
-      : `${vendorCount} vendor${vendorCount === 1 ? "" : "s"} · One pickup`;
+      ? "No vendors yet"
+      : `${vendorCount} vendor${vendorCount === 1 ? "" : "s"}`;
 
   return (
-    <div className="relative isolate overflow-hidden rounded-2xl border border-stone-300/50 shadow-lg">
-      {hasImage ? (
-        <div className="absolute inset-0">
-          <Image
-            src={imageUrl!}
-            alt=""
-            fill
-            className="object-cover"
-            sizes="100vw"
-            priority
-          />
-        </div>
-      ) : (
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-stone-800 via-stone-700 to-stone-900"
-          aria-hidden
-        />
-      )}
-      <div
-        className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/25"
-        aria-hidden
-      />
-      {accentColor && (
-        <div
-          className="absolute inset-0 opacity-[0.12]"
-          style={{ background: `linear-gradient(135deg, ${accentColor} 0%, transparent 55%)` }}
-          aria-hidden
-        />
-      )}
-
-      <div className="relative flex min-h-[220px] flex-col justify-end px-5 py-8 sm:min-h-[240px] sm:px-8 sm:py-10">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-stone-300">Food pod</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">{name}</h1>
-            <p className="mt-3 max-w-2xl text-base leading-relaxed text-stone-200 sm:text-lg">
-              {description?.trim() ?? defaultTagline}
-            </p>
-            {address?.trim() && (
-              <p className="mt-2 max-w-2xl text-sm text-stone-400">{address}</p>
+    <header className="border-b border-zinc-200 bg-white">
+      <PageShell className="py-5 sm:py-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6 lg:gap-8">
+          <div
+            className={cn(
+              "relative aspect-[16/9] w-full shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 shadow-sm sm:aspect-[5/3] sm:w-56 lg:w-64",
+              accentColor && "ring-1 ring-inset ring-black/5"
             )}
-            <p className="mt-4 text-sm font-medium text-white/95">{countLine}</p>
+            style={
+              accentColor
+                ? { boxShadow: `inset 4px 0 0 0 ${accentColor}` }
+                : undefined
+            }
+          >
+            {hasImage ? (
+              <Image
+                src={imageUrl!}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 100vw, 256px"
+                priority
+              />
+            ) : (
+              <div
+                className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-700 to-zinc-900"
+                aria-hidden
+              />
+            )}
+            {accentColor && (
+              <div
+                className="pointer-events-none absolute inset-0 opacity-[0.14]"
+                style={{
+                  background: `linear-gradient(135deg, ${accentColor} 0%, transparent 60%)`,
+                }}
+                aria-hidden
+              />
+            )}
+            <div className="absolute bottom-2 left-2 flex flex-wrap gap-1.5">
+              <span className="oo-badge-live text-[10px] shadow-md">{countLabel}</span>
+            </div>
           </div>
-          <FavoritePodButton
-            podId={podId}
-            podName={name}
-            labeled
-            className="shrink-0 !border-white/40 !bg-black/35 !text-white shadow-md backdrop-blur-md hover:!bg-black/50"
-          />
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                  Food pod
+                </p>
+                <h1 className="mt-1 text-2xl font-bold tracking-tight text-black sm:text-3xl">
+                  {name}
+                </h1>
+              </div>
+              <FavoritePodButton
+                podId={podId}
+                podName={name}
+                labeled
+                className="shrink-0 !border-zinc-300 !bg-white !text-zinc-900 shadow-sm hover:!bg-zinc-50"
+              />
+            </div>
+
+            <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
+              {tagline}
+            </p>
+
+            {address?.trim() && (
+              <p className="mt-2 text-sm text-zinc-500">{address}</p>
+            )}
+
+            <ul className="mt-4 flex flex-wrap gap-2" aria-label="Pod details">
+              <li>
+                <span className="oo-badge-muted">{countLabel}</span>
+              </li>
+              <li>
+                <span className="oo-badge-muted">One pickup</span>
+              </li>
+              <li>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                  <span className="oo-live-dot" aria-hidden />
+                  Live
+                </span>
+              </li>
+            </ul>
+          </div>
         </div>
-      </div>
-    </div>
+      </PageShell>
+    </header>
   );
 }
