@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Mennyu brand palette – single source of truth for accent colors */
+/* Open Order brand palette – single source of truth for accent colors */
 :root {
   --mennyu-primary: #FFBD59;
   --mennyu-secondary: #E5A84D;

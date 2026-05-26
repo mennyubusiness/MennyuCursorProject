@@ -136,7 +136,7 @@ export async function addCartItem(
         ? "This vendor is no longer active."
         : vendorAvailability.status === "closed"
           ? "This vendor is currently closed."
-          : "This vendor is not accepting Mennyu orders right now. Try again later.";
+          : "This vendor is not accepting orders through Open Order right now. Try again later.";
     const code =
       vendorAvailability.status === "inactive"
         ? "VENDOR_INACTIVE"

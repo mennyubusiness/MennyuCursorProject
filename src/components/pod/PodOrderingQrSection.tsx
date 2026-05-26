@@ -69,7 +69,7 @@ export async function PodOrderingQrSection({
             <PodQrActions
               absoluteUrl={absoluteUrl}
               qrDataUrl={qrDataUrl}
-              downloadFileName={`mennyu-pod-${safeSlug}-qr.png`}
+              downloadFileName={`open-order-pod-${safeSlug}-qr.png`}
             />
           </div>
         </div>

@@ -60,7 +60,7 @@ export default async function RootLayout({
         </header>
         <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
         <footer className="border-t border-stone-200 py-6 text-center text-sm text-stone-500">
-          © Open Order Co. · mennyu.com
+          © Open Order Co.
         </footer>
         </AuthSessionProvider>
       </body>
