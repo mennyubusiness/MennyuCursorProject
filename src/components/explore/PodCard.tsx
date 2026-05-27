@@ -14,7 +14,20 @@ export type PodCardPod = {
   description: string | null;
   imageUrl: string | null;
   accentColor: string | null;
-  vendors: { vendor: { id: string; name: string; description: string | null } }[];
+  address?: string | null;
+  vendors: {
+    vendor: {
+      id: string;
+      name: string;
+      description: string | null;
+      cuisineCategory?: string | null;
+      locationSummary?: string | null;
+      imageUrl?: string | null;
+      menuCategoryNames?: string[];
+      isActive?: boolean;
+      mennyuOrdersPaused?: boolean;
+    };
+  }[];
 };
 
 type PodCardProps = {
@@ -71,7 +84,7 @@ export function PodCard({ pod, variant = "full" }: PodCardProps) {
       className={cn(
         "group relative overflow-hidden rounded-xl border border-oo-light-stone bg-oo-warm-white transition duration-300 motion-reduce:transform-none",
         isCompact
-          ? "w-[min(19rem,78vw)] shrink-0 shadow-md hover:-translate-y-1 hover:shadow-xl"
+          ? "w-full shadow-md hover:-translate-y-1 hover:shadow-xl"
           : "shadow-sm hover:-translate-y-1 hover:border-oo-stone-gray/30 hover:shadow-lg"
       )}
       style={

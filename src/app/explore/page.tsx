@@ -1,9 +1,18 @@
 import { prisma } from "@/lib/db";
-import { CustomerRetentionStrip } from "@/components/retention/CustomerRetentionStrip";
 import { ExploreHero } from "@/components/explore/ExploreHero";
-import { ExplorePopularPods } from "@/components/explore/ExplorePopularPods";
+import { ExploreDiscovery } from "@/components/explore/ExploreDiscovery";
 import { PageSection, PageShell } from "@/components/layout/page-shell";
-import { ExplorePodList } from "./ExplorePodList";
+import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { MenuVersionState } from "@prisma/client";
+
+function extractMenuCategoryNames(snapshot: unknown): string[] {
+  const parsed = mennyuCanonicalMenuSchema.safeParse(snapshot);
+  if (!parsed.success) return [];
+  const names = parsed.data.categories
+    .map((category) => category.name.trim())
+    .filter((name) => name.length > 0);
+  return Array.from(new Set(names));
+}
 
 export default async function ExplorePage() {
   const pods = await prisma.pod.findMany({
@@ -11,12 +20,53 @@ export default async function ExplorePage() {
     orderBy: { name: "asc" },
     include: {
       vendors: {
-        include: { vendor: { select: { id: true, name: true, description: true } } },
+        include: {
+          vendor: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              cuisineCategory: true,
+              locationSummary: true,
+              imageUrl: true,
+              isActive: true,
+              mennyuOrdersPaused: true,
+            },
+          },
+        },
         where: { isActive: true },
         orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
       },
     },
   });
+
+  const vendorIds = Array.from(
+    new Set(
+      pods.flatMap((pod) => pod.vendors.map((podVendor) => podVendor.vendor.id))
+    )
+  );
+
+  const latestPublishedMenus = vendorIds.length
+    ? await prisma.menuVersion.findMany({
+        where: {
+          vendorId: { in: vendorIds },
+          state: MenuVersionState.published,
+        },
+        select: {
+          vendorId: true,
+          canonicalSnapshot: true,
+          publishedAt: true,
+          updatedAt: true,
+        },
+        orderBy: [{ vendorId: "asc" }, { publishedAt: "desc" }, { updatedAt: "desc" }],
+      })
+    : [];
+
+  const vendorMenuCategoryMap = new Map<string, string[]>();
+  for (const row of latestPublishedMenus) {
+    if (vendorMenuCategoryMap.has(row.vendorId)) continue;
+    vendorMenuCategoryMap.set(row.vendorId, extractMenuCategoryNames(row.canonicalSnapshot));
+  }
 
   const podCards = pods.map((p) => ({
     id: p.id,
@@ -24,37 +74,25 @@ export default async function ExplorePage() {
     description: p.description,
     imageUrl: p.imageUrl,
     accentColor: p.accentColor,
-    vendors: p.vendors,
+    address: p.address,
+    vendors: p.vendors.map((podVendor) => ({
+      ...podVendor,
+      vendor: {
+        ...podVendor.vendor,
+        menuCategoryNames: vendorMenuCategoryMap.get(podVendor.vendor.id) ?? [],
+      },
+    })),
   }));
 
   const featuredNames = podCards.slice(0, 4).map((p) => p.name);
 
   return (
-    <div className="w-full">
+    <div className="w-full bg-oo-cream">
       <ExploreHero featuredPodNames={featuredNames} />
 
-      <PageSection className="!py-12 sm:!py-16">
-        <PageShell className="space-y-16 sm:space-y-20">
-          <ExplorePopularPods pods={podCards} />
-
-          <CustomerRetentionStrip
-            className="border-oo-light-stone bg-oo-warm-white p-6 shadow-sm sm:p-8"
-            heading="Continue browsing"
-          />
-
-          <section className="space-y-8" aria-labelledby="all-pods-heading">
-            <div className="flex flex-col gap-3 border-b border-zinc-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 id="all-pods-heading" className="oo-section-title">
-                  All pods
-                </h2>
-                <p className="mt-2 text-base text-zinc-600">
-                  {podCards.length} active location{podCards.length === 1 ? "" : "s"} on the network
-                </p>
-              </div>
-            </div>
-            <ExplorePodList pods={podCards} />
-          </section>
+      <PageSection className="!py-10 sm:!py-14">
+        <PageShell>
+          <ExploreDiscovery pods={podCards} />
         </PageShell>
       </PageSection>
     </div>
