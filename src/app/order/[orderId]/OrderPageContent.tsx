@@ -59,6 +59,10 @@ function normalizeOrderDates(order: NonNullable<OrderFromApi>): NonNullable<Orde
       ...r,
       createdAt: toDate(r.createdAt as string | Date),
     })),
+    orderRefunds: (order.orderRefunds ?? []).map((r) => ({
+      ...r,
+      createdAt: toDate(r.createdAt as string | Date),
+    })),
   } as NonNullable<OrderFromApi>;
 }
 
@@ -70,7 +74,7 @@ function orderStatusFingerprint(o: NonNullable<OrderFromApi>): string {
     .map((vo) => `${vo.id}:${vo.routingStatus}:${vo.fulfillmentStatus}`)
     .join("|");
   const hist = (o.statusHistory ?? []).length;
-  const refunds = (o.refundAttempts ?? []).length;
+  const refunds = (o.refundAttempts ?? []).length + (o.orderRefunds ?? []).length;
   const eta =
     o.deliverectEstimatedReadyAt != null
       ? toDate(o.deliverectEstimatedReadyAt as string | Date).toISOString()
@@ -189,8 +193,12 @@ export function OrderPageContent({
   const isMultiVendor = order.vendorOrders.length > 1;
   const customerCanCancel = canCustomerCancelOrder(order);
   const isOrderCancelled = derivedStatus === "cancelled";
-  const latestRefundAttempt = order.refundAttempts?.[0] ?? null;
-  const refundMessage = refundDisplayMessage(latestRefundAttempt);
+  const refundMessage = refundDisplayMessage({
+    refundAttempts: order.refundAttempts,
+    orderRefunds: order.orderRefunds,
+    totalCents: order.totalCents,
+    totalRefundedCents: order.totalRefundedCents,
+  });
   const readyCount = order.vendorOrders.filter((vo) => vo.fulfillmentStatus === "ready").length;
   const completedCount = order.vendorOrders.filter((vo) => vo.fulfillmentStatus === "completed").length;
 

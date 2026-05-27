@@ -12,7 +12,7 @@ import { canCustomerCancelVendorOrder } from "@/lib/cancel-eligibility";
 import { getRefundDecision } from "@/lib/refund-decision";
 import { applyVendorOrderTransition } from "@/services/order-status.service";
 import { notifyDeliverectOfCustomerCancellation } from "@/services/deliverect-customer-cancel.service";
-import { executeRefund } from "@/services/refund.service";
+import { runAutomaticRefundForDecision } from "@/lib/refund-route-helpers";
 import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
 
 export async function POST(
@@ -162,7 +162,15 @@ export async function POST(
   });
   await notifyDeliverectOfCustomerCancellation(vo.id);
 
-  let refundResult: { success: boolean; code?: string; message?: string; amountCents?: number } | undefined;
+  let refundResult:
+    | {
+        success: boolean;
+        code?: string;
+        message?: string;
+        amountCents?: number;
+        requiresAdminReview?: boolean;
+      }
+    | undefined;
   const orderForRefund = await prisma.order.findUnique({
     where: { id: orderId },
     select: {
@@ -181,11 +189,10 @@ export async function POST(
       vendorOrderId: vo.id,
       order: orderForRefund,
     });
-    if (decision.required && decision.canAutoRefund) {
-      const exec = await executeRefund(decision);
-      refundResult = exec.success
-        ? { success: true, amountCents: exec.amountCents }
-        : { success: false, code: exec.code, message: exec.message, amountCents: exec.amountCents };
+    if (decision.required) {
+      refundResult = await runAutomaticRefundForDecision(decision, {
+        customerVisibleNote: "Vendor portion cancelled — refund processing.",
+      });
     }
   }
 

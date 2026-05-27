@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 import { applyVendorOrderTransition } from "@/services/order-status.service";
 import { canVendorRejectVendorOrder } from "@/lib/cancel-eligibility";
 import { getRefundDecision } from "@/lib/refund-decision";
-import { executeRefund } from "@/services/refund.service";
+import { runAutomaticRefundForDecision } from "@/lib/refund-route-helpers";
 import type { VendorOrderTargetState } from "@/domain/vendor-order-transition";
 
 const VENDOR_DASHBOARD_SOURCE = "vendor_dashboard";
@@ -108,7 +108,15 @@ export async function POST(
     }
 
     if (result.success) {
-      let refundPayload: { refund?: { success: boolean; code?: string; message?: string; amountCents?: number } } = {};
+      let refundPayload: {
+        refund?: {
+          success: boolean;
+          code?: string;
+          message?: string;
+          amountCents?: number;
+          requiresAdminReview?: boolean;
+        };
+      } = {};
       if (targetState === "cancelled" && result.orderId) {
         const orderForRefund = await prisma.order.findUnique({
           where: { id: result.orderId },
@@ -128,18 +136,13 @@ export async function POST(
             vendorOrderId,
             order: orderForRefund,
           });
-          if (decision.required && decision.canAutoRefund) {
-            const exec = await executeRefund(decision);
-            refundPayload = {
-              refund: exec.success
-                ? { success: true, amountCents: exec.amountCents }
-                : {
-                    success: false,
-                    code: exec.code,
-                    message: exec.message,
-                    amountCents: exec.amountCents,
-                  },
-            };
+          if (decision.required) {
+            const apiRefund = await runAutomaticRefundForDecision(decision, {
+              customerVisibleNote: "This vendor could not fulfill your order — refund processing.",
+            });
+            if (apiRefund) {
+              refundPayload = { refund: apiRefund };
+            }
           }
         }
       }

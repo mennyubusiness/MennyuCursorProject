@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
 import {
   fetchAdminOrderDetail,
   type AdminOrderDetail,
 } from "@/lib/admin-order-detail-query";
+import {
+  AdminPaymentSummarySchemaError,
+  fetchAdminOrderPaymentSummary,
+} from "@/services/admin-order-payment-summary.service";
+import { AdminPaymentsRefundsPanel } from "./AdminPaymentsRefundsPanel";
 import { adminOperationalParentStatusLabel } from "@/domain/order-state";
 import { getExceptionType, getExceptionReason } from "@/lib/admin-exceptions";
 import { getAdminActionState } from "@/lib/admin-actions";
@@ -56,6 +62,21 @@ export default async function AdminOrderDetailPage({
   const loaded = await fetchAdminOrderDetail(orderId);
   if (!loaded) notFound();
   const adminOrder: AdminOrderDetail = loaded;
+
+  const session = await auth();
+  const canExecuteRefunds = Boolean(session?.user?.isPlatformAdmin);
+
+  let paymentSummary: Awaited<ReturnType<typeof fetchAdminOrderPaymentSummary>> = null;
+  let paymentSummaryError: string | null = null;
+  try {
+    paymentSummary = await fetchAdminOrderPaymentSummary(orderId);
+  } catch (e) {
+    if (e instanceof AdminPaymentSummarySchemaError) {
+      paymentSummaryError = e.message;
+    } else {
+      throw e;
+    }
+  }
 
   const routingAvailable = isRoutingRetryAvailable();
 
@@ -194,6 +215,25 @@ export default async function AdminOrderDetailPage({
           </Link>
         </p>
       </section>
+
+      {/* Payments & Refunds */}
+      {paymentSummaryError ? (
+        <section
+          className="rounded-lg border border-red-300 bg-red-50 p-4"
+          role="alert"
+        >
+          <h2 className="text-lg font-semibold text-red-950">Payments &amp; Refunds</h2>
+          <p className="mt-2 text-sm text-red-900">{paymentSummaryError}</p>
+          <p className="mt-2 text-xs text-red-800">
+            In development, apply pending Prisma migrations before using refund tooling.
+          </p>
+        </section>
+      ) : paymentSummary ? (
+        <AdminPaymentsRefundsPanel
+          summary={paymentSummary}
+          canExecuteRefunds={canExecuteRefunds}
+        />
+      ) : null}
 
       {/* 2. Primary actions */}
       {vendorContexts.some((c) => c.showActionsPanel) && (

@@ -12,6 +12,11 @@ import {
 } from "./customer-order-progress";
 import { formatPickupSummaryScheduledLead } from "@/lib/pickup-display";
 import type { OrderPickupDisplayInput } from "@/lib/pickup-display";
+import {
+  customerRefundDisplayMessage,
+  isPartialRefundDisplay,
+  pickLatestCustomerRefundDisplay,
+} from "@/lib/customer-refund-display";
 
 /**
  * Customer-facing vendor order chip: Deliverect / fulfillment progression.
@@ -241,6 +246,7 @@ export function buildTimelineEvents(order: {
     }>;
   }>;
   refundAttempts?: Array<{ status: string; amountCents: number; createdAt: Date }>;
+  orderRefunds?: Array<{ status: string; amountCents: number; createdAt: Date }>;
 }): TimelineEvent[] {
   const isMultiVendor = order.vendorOrders.length > 1;
   const raw: InternalTimelineEvent[] = [];
@@ -252,11 +258,21 @@ export function buildTimelineEvents(order: {
       type: "order",
     });
   }
-  const latestRefund = order.refundAttempts?.[0];
-  if (latestRefund?.status === "succeeded") {
+  const latestLedger = order.orderRefunds?.[0];
+  const latestAttempt = order.refundAttempts?.[0];
+  const refundForTimeline =
+    latestLedger &&
+    (latestLedger.status === "succeeded" ||
+      !latestAttempt ||
+      latestLedger.createdAt >= latestAttempt.createdAt)
+      ? latestLedger
+      : latestAttempt?.status === "succeeded"
+        ? latestAttempt
+        : latestLedger ?? latestAttempt;
+  if (refundForTimeline?.status === "succeeded") {
     raw.push({
-      createdAt: latestRefund.createdAt,
-      label: `Refund of $${(latestRefund.amountCents / 100).toFixed(2)} issued`,
+      createdAt: refundForTimeline.createdAt,
+      label: `Refund of $${(refundForTimeline.amountCents / 100).toFixed(2)} issued`,
       type: "order",
     });
   }
@@ -288,20 +304,30 @@ export function buildTimelineEvents(order: {
   return filtered;
 }
 
-export function refundDisplayMessage(
-  latestAttempt: { status: string; amountCents: number; createdAt: Date } | null | undefined
-): { line: string; timelineLabel?: string } | null {
-  if (!latestAttempt) return null;
-  const amountFormatted = `$${(latestAttempt.amountCents / 100).toFixed(2)}`;
-  if (latestAttempt.status === "succeeded") {
+export function refundDisplayMessage(order: {
+  refundAttempts?: Array<{ status: string; amountCents: number; createdAt: Date }>;
+  orderRefunds?: Array<{ status: string; amountCents: number; createdAt: Date }>;
+  totalCents?: number;
+  totalRefundedCents?: number;
+}): { line: string; timelineLabel?: string } | null {
+  const latest = pickLatestCustomerRefundDisplay(order);
+  const base = customerRefundDisplayMessage(latest);
+  if (!base) return null;
+
+  if (
+    order.totalCents != null &&
+    order.totalRefundedCents != null &&
+    isPartialRefundDisplay({
+      orderTotalCents: order.totalCents,
+      refundedCents: order.totalRefundedCents,
+    })
+  ) {
     return {
-      line: `Refunded. Refund of ${amountFormatted} issued.`,
-      timelineLabel: `Refund of ${amountFormatted} issued`,
+      ...base,
+      line: `${base.line} Partial refund applied to your order.`,
     };
   }
-  if (latestAttempt.status === "attempted") return { line: "Refund pending.", timelineLabel: undefined };
-  if (latestAttempt.status === "failed") return { line: "Refund issue — under review.", timelineLabel: undefined };
-  return null;
+  return base;
 }
 
 export function customerStatusLabel(

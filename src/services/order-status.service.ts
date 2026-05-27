@@ -805,6 +805,10 @@ async function getOrderWithUnifiedStatusImpl(orderId: string) {
       pod: true,
       statusHistory: { orderBy: { createdAt: "asc" } },
       refundAttempts: { orderBy: { createdAt: "desc" } },
+      orderRefunds: {
+        orderBy: { createdAt: "desc" },
+        select: { status: true, amountCents: true, createdAt: true },
+      },
     },
   });
   if (!order) return null;
@@ -829,6 +833,10 @@ export async function getCustomerOrderStatusPollSnapshot(orderId: string) {
       pod: true,
       statusHistory: { orderBy: { createdAt: "asc" } },
       refundAttempts: { orderBy: { createdAt: "desc" } },
+      orderRefunds: {
+        orderBy: { createdAt: "desc" },
+        select: { status: true, amountCents: true, createdAt: true },
+      },
     },
   });
   if (!order) return null;

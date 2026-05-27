@@ -1,6 +1,9 @@
 /**
  * Stripe Connect transfer reversals: prepare rows after platform refunds, execute reversals idempotently.
  *
+ * Money model: customer refunds hit the platform PaymentIntent; vendor payouts are separate manual
+ * transfers. Clawback from vendors requires reversing those transfers here — not automatic with refunds.
+ *
  * First pass (narrow, explicit):
  * - Only creates reversal intents when RefundAttempt represents a **full** refund for the scope:
  *   - vendor_order: amountCents === that VendorOrder.totalCents

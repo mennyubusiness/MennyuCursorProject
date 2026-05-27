@@ -615,6 +615,10 @@ model Order {
   idempotencyKey        String?              @unique
   status                OrderStatus
   stripePaymentIntentId String?
+  /// Denormalized sum of succeeded refunds (OrderRefund + legacy RefundAttempt). Updated on refund success.
+  totalRefundedCents    Int                  @default(0)
+  /// none | partial | full | pending — derived from totalRefundedCents vs payment.
+  paymentRefundStatus   String?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   orderNotes            String?
@@ -633,6 +637,7 @@ model Order {
   statusHistory         OrderStatusHistory[]
   payments              Payment[]
   refundAttempts        RefundAttempt[]
+  orderRefunds          OrderRefund[]
   vendorOrders          VendorOrder[]
   vendorPayoutTransferReversals VendorPayoutTransferReversal[]
 
@@ -650,6 +655,8 @@ model VendorOrder {
   taxCents                Int                         @default(0)
   serviceFeeCents         Int                         @default(0)
   totalCents              Int
+  /// Denormalized sum of succeeded refunds attributed to this vendor slice.
+  totalRefundedCents      Int                         @default(0)
   /// Mennyu pass-through processing recovery on vendor food subtotal (not a commission; not taken from tips).
   vendorProcessingFeeRecoveryCents Int              @default(0)
   /// Snapshot of vendor processing fee bps applied to this vendor’s food subtotal.
@@ -688,6 +695,7 @@ model VendorOrder {
   deliverectPayloadValidation Json?
   lineItems               OrderLineItem[]
   paymentAllocations      PaymentAllocation[]
+  orderRefunds            OrderRefund[]
   vendorPayoutTransfers   VendorPayoutTransfer[]
   vendorPayoutTransferReversals VendorPayoutTransferReversal[]
   order                   Order                       @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -739,6 +747,10 @@ model Payment {
   id                        String              @id @default(cuid())
   orderId                   String
   stripePaymentIntentId     String              @unique
+  /// Latest charge on the PaymentIntent at payment recording time.
+  stripeChargeId            String?
+  /// Balance transaction for the charge (for reconciliation).
+  stripeBalanceTransactionId String?
   amountCents               Int
   status                    PaymentStatus
   idempotencyKey            String?             @unique
@@ -748,6 +760,9 @@ model Payment {
   updatedAt                DateTime            @updatedAt
   order                    Order               @relation(fields: [orderId], references: [id])
   allocations              PaymentAllocation[]
+  orderRefunds             OrderRefund[]
+
+  @@index([stripeChargeId])
 }
 
 model RefundAttempt {
@@ -767,9 +782,48 @@ model RefundAttempt {
   dismissedAsLegacyAt DateTime?
   dismissedAsLegacyBy String?
   order               Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderRefund         OrderRefund?
   vendorPayoutTransferReversals VendorPayoutTransferReversal[]
 
   @@index([orderId])
+  @@index([orderId, status])
+}
+
+/// Authoritative refund ledger (Phase 1). Linked to RefundAttempt for legacy flows; reconciled via Stripe webhooks.
+model OrderRefund {
+  id                    String                 @id @default(cuid())
+  orderId               String
+  vendorOrderId         String?
+  paymentId             String?
+  refundAttemptId       String?                @unique
+  stripeRefundId        String?                @unique
+  stripePaymentIntentId String
+  stripeChargeId        String?
+  amountCents           Int
+  currency              String                 @default("usd")
+  reason                String
+  status                OrderRefundStatus
+  refundScope           OrderRefundScope
+  initiatedByUserId     String?
+  initiatedByRole       OrderRefundInitiatedByRole
+  idempotencyKey        String                 @unique
+  adminNote             String?
+  customerVisibleNote   String?
+  failureCode           String?
+  failureMessage        String?
+  stripeRawJson         Json?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  completedAt           DateTime?
+
+  order         Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorOrder   VendorOrder?   @relation(fields: [vendorOrderId], references: [id], onDelete: SetNull)
+  payment       Payment?       @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  refundAttempt RefundAttempt? @relation(fields: [refundAttemptId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([vendorOrderId])
+  @@index([stripePaymentIntentId])
   @@index([orderId, status])
 }
 
@@ -981,6 +1035,30 @@ enum PaymentStatus {
   processing
   succeeded
   canceled
+}
+
+enum OrderRefundStatus {
+  pending
+  succeeded
+  failed
+  canceled
+  requires_action
+}
+
+enum OrderRefundScope {
+  full_order
+  full_vendor_order
+  custom_vendor_partial
+  system_cancel
+  vendor_denial
+  legacy
+}
+
+enum OrderRefundInitiatedByRole {
+  admin
+  customer
+  vendor
+  system
 }
 
 enum VendorOrderStatusAuthority {

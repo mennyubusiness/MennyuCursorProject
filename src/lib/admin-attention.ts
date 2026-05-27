@@ -31,6 +31,7 @@ export type AdminAttentionReason =
   | "fulfillment_stuck"
   | "open_issue"
   | "refund_failed"
+  | "refund_review_required"
   | "manual_recovery_required"
   | "financial_resolution"
   | "unknown_attention_needed";
@@ -66,8 +67,19 @@ export interface AdminAttentionItem {
   issueId?: string | null;
   issueType?: string | null;
 
-  /** Direct link for admin queue rows (e.g. /admin/orders/{orderId}). */
+  /** Direct link for admin queue rows (e.g. /admin/orders/{orderId}#payments-refunds). */
   primaryEntityHref: string;
+
+  /** Refund queue metadata (failed ledger / review-required). */
+  refundAmountCents?: number;
+  refundScope?: string;
+  refundInitiatedBy?: string;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+  stripeRefundId?: string | null;
+  orderRefundId?: string | null;
+  refundAttemptId?: string | null;
+  retryMayBePossible?: boolean;
 
   order?: { id: string; customerPhone: string | null; pod?: { id: string; name: string } | null };
   vendor?: { name: string };
@@ -96,6 +108,11 @@ const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const TAKE_VO = 200;
 const TAKE_OPEN_ISSUE_ORDERS = 500;
 const TAKE_REFUND_FAILED = 100;
+const TAKE_ORDER_REFUND_ATTENTION = 100;
+
+function paymentsRefundsHref(orderId: string): string {
+  return `/admin/orders/${orderId}#payments-refunds`;
+}
 
 const VO_INCLUDE = {
   order: { select: { id: true, customerPhone: true, pod: { select: { id: true, name: true } } } },
@@ -126,6 +143,7 @@ function reasonToBucket(reason: AdminAttentionReason): AdminAttentionBucket {
     case "manual_recovery_required":
       return "recoverable";
     case "refund_failed":
+    case "refund_review_required":
     case "financial_resolution":
       return "financial_resolution";
     default:
@@ -148,6 +166,7 @@ function reasonToRecommendedAction(
     case "open_issue":
       return "resolve_issue";
     case "refund_failed":
+    case "refund_review_required":
       return "view_order";
     case "financial_resolution":
       return "view_order";
@@ -230,7 +249,9 @@ function reasonToLabel(
     case "refund_failed":
       return vo && "failureMessage" in vo && vo.failureMessage
         ? `Refund failed: ${vo.failureMessage.slice(0, 80)}`
-        : "Refund failed — needs manual resolution";
+        : "Refund failed — complete in Payments & Refunds";
+    case "refund_review_required":
+      return "Customer refund awaiting admin review — Payments & Refunds";
     case "manual_recovery_required":
       return "Manual recovery required";
     case "financial_resolution":
@@ -428,36 +449,151 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
   return items;
 }
 
-/** Build attention items from failed RefundAttempt rows (refund attempted but Stripe/precheck failed). Excludes attempts dismissed as legacy/test. */
-async function fetchFailedRefundAttentionItems(now: Date): Promise<AdminAttentionItem[]> {
+/** Failed OrderRefund ledger rows (Phase 1+). */
+async function fetchFailedOrderRefundAttentionItems(
+  now: Date,
+  excludeRefundAttemptIds: Set<string>
+): Promise<AdminAttentionItem[]> {
+  const failed = await prisma.orderRefund.findMany({
+    where: { status: "failed" },
+    include: {
+      order: { select: { id: true, customerPhone: true, pod: { select: { id: true, name: true } } } },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: TAKE_ORDER_REFUND_ATTENTION,
+  });
+
+  return failed
+    .filter((r) => !r.refundAttemptId || !excludeRefundAttemptIds.has(r.refundAttemptId))
+    .map((r) => {
+      const ageMinutes = ageMinutesUtil(r.updatedAt, now.getTime());
+      const reason: AdminAttentionReason = "refund_failed";
+      const retryMayBePossible =
+        r.failureCode === "STRIPE_REFUND_FAILED" || r.failureCode === "PRECHECK_FAILED";
+      return {
+        id: `order_refund:${r.id}`,
+        scope: (r.vendorOrderId ? "vendor_order" : "order") as AdminAttentionScope,
+        reason,
+        bucket: reasonToBucket(reason),
+        severity: ageMinutes > 60 ? "critical" : "high",
+        ageMinutes,
+        recommendedAction: reasonToRecommendedAction(reason),
+        reasonLabel: reasonToLabel(reason, {
+          failureMessage: r.failureMessage,
+        }),
+        currentStatus: `Refund failed (${r.refundScope})`,
+        orderId: r.orderId,
+        vendorOrderId: r.vendorOrderId,
+        primaryEntityHref: paymentsRefundsHref(r.orderId),
+        order: r.order
+          ? {
+              id: r.order.id,
+              customerPhone: r.order.customerPhone,
+              pod: r.order.pod ?? undefined,
+            }
+          : undefined,
+        refundAmountCents: r.amountCents,
+        refundScope: r.refundScope,
+        refundInitiatedBy: r.initiatedByRole,
+        failureCode: r.failureCode,
+        failureMessage: r.failureMessage,
+        stripeRefundId: r.stripeRefundId,
+        orderRefundId: r.id,
+        refundAttemptId: r.refundAttemptId,
+        retryMayBePossible,
+      };
+    });
+}
+
+/** Pending OrderRefund awaiting admin review (no Stripe attempt). */
+async function fetchRefundReviewRequiredAttentionItems(now: Date): Promise<AdminAttentionItem[]> {
+  const pending = await prisma.orderRefund.findMany({
+    where: {
+      status: "pending",
+      initiatedByRole: { not: "admin" },
+      stripeRefundId: null,
+      adminNote: { contains: "Awaiting platform admin review" },
+    },
+    include: {
+      order: { select: { id: true, customerPhone: true, pod: { select: { id: true, name: true } } } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: TAKE_ORDER_REFUND_ATTENTION,
+  });
+
+  return pending.map((r) => {
+    const ageMinutes = ageMinutesUtil(r.createdAt, now.getTime());
+    const reason: AdminAttentionReason = "refund_review_required";
+    return {
+      id: `order_refund_review:${r.id}`,
+      scope: (r.vendorOrderId ? "vendor_order" : "order") as AdminAttentionScope,
+      reason,
+      bucket: reasonToBucket(reason),
+      severity: ageMinutes > 120 ? "critical" : "high",
+      ageMinutes,
+      recommendedAction: reasonToRecommendedAction(reason),
+      reasonLabel: reasonToLabel(reason),
+      currentStatus: `Refund review (${r.refundScope})`,
+      orderId: r.orderId,
+      vendorOrderId: r.vendorOrderId,
+      primaryEntityHref: paymentsRefundsHref(r.orderId),
+      order: r.order
+        ? { id: r.order.id, customerPhone: r.order.customerPhone, pod: r.order.pod ?? undefined }
+        : undefined,
+      refundAmountCents: r.amountCents,
+      refundScope: r.refundScope,
+      refundInitiatedBy: r.initiatedByRole,
+      orderRefundId: r.id,
+      retryMayBePossible: true,
+    };
+  });
+}
+
+/** Failed RefundAttempt rows (legacy); skip when linked OrderRefund already failed. */
+async function fetchFailedRefundAttemptAttentionItems(now: Date): Promise<AdminAttentionItem[]> {
   const failed = await prisma.refundAttempt.findMany({
     where: { status: "failed", dismissedAsLegacyAt: null },
-    include: { order: { select: { id: true, customerPhone: true, pod: { select: { id: true, name: true } } } } },
+    include: {
+      order: { select: { id: true, customerPhone: true, pod: { select: { id: true, name: true } } } },
+      orderRefund: { select: { id: true, status: true } },
+    },
     orderBy: { updatedAt: "desc" },
     take: TAKE_REFUND_FAILED,
   });
 
-  return failed.map((ra) => {
-    const ageMinutes = ageMinutesUtil(ra.updatedAt, now.getTime());
-    const reason: AdminAttentionReason = "refund_failed";
-    return {
-      id: `refund_attempt:${ra.id}`,
-      scope: (ra.vendorOrderId ? "vendor_order" : "order") as AdminAttentionScope,
-      reason,
-      bucket: reasonToBucket(reason),
-      severity: ageMinutes > 60 ? "critical" : "high",
-      ageMinutes,
-      recommendedAction: reasonToRecommendedAction(reason),
-      reasonLabel: reasonToLabel(reason, ra),
-      currentStatus: "Refund failed",
-      orderId: ra.orderId,
-      vendorOrderId: ra.vendorOrderId,
-      primaryEntityHref: `/admin/orders/${ra.orderId}`,
-      order: ra.order
-        ? { id: ra.order.id, customerPhone: ra.order.customerPhone, pod: ra.order.pod ?? undefined }
-        : undefined,
-    };
-  });
+  return failed
+    .filter((ra) => !ra.orderRefund || ra.orderRefund.status === "failed")
+    .map((ra) => {
+      const ageMinutes = ageMinutesUtil(ra.updatedAt, now.getTime());
+      const reason: AdminAttentionReason = "refund_failed";
+      const retryMayBePossible =
+        ra.failureCode === "STRIPE_REFUND_FAILED" || ra.failureCode === "PRECHECK_FAILED";
+      return {
+        id: `refund_attempt:${ra.id}`,
+        scope: (ra.vendorOrderId ? "vendor_order" : "order") as AdminAttentionScope,
+        reason,
+        bucket: reasonToBucket(reason),
+        severity: ageMinutes > 60 ? "critical" : "high",
+        ageMinutes,
+        recommendedAction: reasonToRecommendedAction(reason),
+        reasonLabel: reasonToLabel(reason, ra),
+        currentStatus: "Refund failed (legacy attempt)",
+        orderId: ra.orderId,
+        vendorOrderId: ra.vendorOrderId,
+        primaryEntityHref: paymentsRefundsHref(ra.orderId),
+        order: ra.order
+          ? { id: ra.order.id, customerPhone: ra.order.customerPhone, pod: ra.order.pod ?? undefined }
+          : undefined,
+        refundAmountCents: ra.amountCents,
+        refundInitiatedBy: "legacy_attempt",
+        failureCode: ra.failureCode,
+        failureMessage: ra.failureMessage,
+        stripeRefundId: ra.stripeRefundId,
+        refundAttemptId: ra.id,
+        orderRefundId: ra.orderRefund?.id ?? null,
+        retryMayBePossible,
+      };
+    });
 }
 
 /**
@@ -468,10 +604,24 @@ async function fetchFailedRefundAttentionItems(now: Date): Promise<AdminAttentio
  */
 export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
   const now = new Date();
-  const [voItems, refundFailedItems] = await Promise.all([
+  const [voItems, refundAttemptFailedItems] = await Promise.all([
     fetchVendorOrderAttentionItems(now),
-    fetchFailedRefundAttentionItems(now),
+    fetchFailedRefundAttemptAttentionItems(now),
   ]);
+  const linkedAttemptIds = new Set(
+    refundAttemptFailedItems
+      .map((i) => i.refundAttemptId)
+      .filter((id): id is string => Boolean(id))
+  );
+  const [orderRefundFailedItems, refundReviewItems] = await Promise.all([
+    fetchFailedOrderRefundAttentionItems(now, linkedAttemptIds),
+    fetchRefundReviewRequiredAttentionItems(now),
+  ]);
+  const refundFailedItems = [
+    ...orderRefundFailedItems,
+    ...refundAttemptFailedItems,
+    ...refundReviewItems,
+  ];
   const orderIdsWithVoItems = new Set(voItems.map((i) => i.orderId));
 
   const openIssueOrderIds = await getOrderIdsWithOpenIssues();
@@ -538,8 +688,15 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
   const reconciliationStaleBefore = new Date(now.getTime() - DELIVERECT_RECONCILIATION_STALE_MS);
   const twoHoursAgo = new Date(now.getTime() - TWO_HOURS_MS);
 
-  const [failed, stuckPending, deliverectReconciliationOverdue, stuckSentConfirmed, openIssueOrderIds, refundFailed] =
-    await Promise.all([
+  const [
+    failed,
+    stuckPending,
+    deliverectReconciliationOverdue,
+    stuckSentConfirmed,
+    openIssueOrderIds,
+    refundFailed,
+    orderRefundAttention,
+  ] = await Promise.all([
     prisma.vendorOrder.findMany({
       where: {
         routingStatus: VendorRoutingStatus.failed,
@@ -583,12 +740,30 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
       select: { orderId: true },
       take: TAKE_REFUND_FAILED,
     }),
+    prisma.orderRefund.findMany({
+      where: {
+        OR: [
+          { status: "failed" },
+          {
+            status: "pending",
+            initiatedByRole: { not: "admin" },
+            stripeRefundId: null,
+            adminNote: { contains: "Awaiting platform admin review" },
+          },
+        ],
+      },
+      select: { orderId: true },
+      take: TAKE_ORDER_REFUND_ATTENTION,
+    }),
   ]);
 
   const voOrderIds = [...failed, ...stuckPending, ...deliverectReconciliationOverdue, ...stuckSentConfirmed].map(
     (v) => v.orderId
   );
-  const refundOrderIds = refundFailed.map((r) => r.orderId);
+  const refundOrderIds = [
+    ...refundFailed.map((r) => r.orderId),
+    ...orderRefundAttention.map((r) => r.orderId),
+  ];
   const orderIds = [...new Set([...voOrderIds, ...openIssueOrderIds, ...refundOrderIds])];
   return orderIds;
 }

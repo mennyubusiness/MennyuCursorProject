@@ -1,13 +1,31 @@
 /**
- * Refund execution: precheck eligibility then Stripe refund.
- * Uses refund decision layer; does not change decision rules.
- * Treats canAutoRefund as "eligible for automatic attempt," not guaranteed success.
- * Persists outcomes in RefundAttempt for idempotency and so failed refunds can feed Needs Attention.
+ * Refund execution: precheck eligibility then Stripe refund on the platform PaymentIntent.
+ *
+ * Open Order money model:
+ * - Customer pays the platform (standard PaymentIntent; not destination charges).
+ * - Vendor payouts are separate manual Connect transfers (PaymentAllocation.netVendorTransferCents).
+ * - Customer refund debits platform balance via stripe.refunds.create on the PI.
+ * - Vendor clawback uses VendorPayoutTransferReversal (separate manual batch; not automatic here).
+ * - Full-order / full-vendor refunds may prepare reversal rows when transfers were paid.
+ * - Partial refunds after payout may require platform absorption (see admin-refund Phase 2).
+ * - No application_fee on charges.
+ *
+ * Automatic cancel/denial flows should prefer processRefundDecision() in refund-execution.service.ts.
  */
 import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 import type { RefundDecision } from "@/lib/refund-decision";
 import { prepareTransferReversalsForRefundAttempt } from "@/services/vendor-payout-transfer-reversal.service";
+import { mapRefundDecisionToScope } from "@/domain/order-refund";
+import { mapRefundReasonToInitiatedByRole } from "@/lib/refund-initiated-by";
+import {
+  getRemainingOrderRefundableCents,
+  getRemainingVendorOrderRefundableCents,
+  linkOrderRefundToRefundAttempt,
+  markRefundFailed,
+  markRefundSucceeded,
+  recordPendingRefund,
+} from "@/services/refund-ledger.service";
 
 export type RefundResultSuccess = {
   success: true;
@@ -48,11 +66,12 @@ function isDevBypassPaymentIntent(piId: string | null): boolean {
 
 /**
  * Precheck: payment exists, PaymentIntent is captured, and requested amount
- * does not exceed remaining refundable amount.
+ * does not exceed remaining refundable amount (ledger + legacy RefundAttempt).
  */
 export async function precheckRefundEligibility(
   orderId: string,
-  amountCents: number
+  amountCents: number,
+  vendorOrderId?: string | null
 ): Promise<RefundPrecheckResult> {
   if (amountCents <= 0) {
     return { eligible: false, reason: "amount_must_be_positive" };
@@ -86,25 +105,20 @@ export async function precheckRefundEligibility(
     return { eligible: false, reason: "stripe_not_configured" };
   }
 
-  let amountReceived = 0;
-  let totalRefunded = 0;
   try {
     const pi = await stripe.paymentIntents.retrieve(piId);
     if (pi.status !== "succeeded") {
       return { eligible: false, reason: "payment_not_captured" };
-    }
-    amountReceived = pi.amount_received ?? 0;
-
-    const refunds = await stripe.refunds.list({ payment_intent: piId });
-    for (const r of refunds.data) {
-      if (r.status === "succeeded") totalRefunded += r.amount ?? 0;
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { eligible: false, reason: `stripe_retrieve_failed: ${msg}` };
   }
 
-  const remaining = amountReceived - totalRefunded;
+  const remaining = vendorOrderId
+    ? await getRemainingVendorOrderRefundableCents(vendorOrderId)
+    : await getRemainingOrderRefundableCents(orderId);
+
   if (remaining < amountCents) {
     return {
       eligible: false,
@@ -141,7 +155,10 @@ async function prepareTransferReversalsAfterSuccessfulRefund(refundAttemptId: st
  * runs precheck, creates Stripe refund, then persists outcome in RefundAttempt.
  * Returns normalized result; does not throw. Callers should not break order flow on failure.
  */
-export async function executeRefund(decision: RefundDecision): Promise<RefundResult> {
+export async function executeRefund(
+  decision: RefundDecision,
+  opts?: { customerVisibleNote?: string | null }
+): Promise<RefundResult> {
   if (!decision.required || decision.scope === "none") {
     return {
       success: false,
@@ -257,30 +274,12 @@ export async function executeRefund(decision: RefundDecision): Promise<RefundRes
     };
   }
 
-  const precheck = await precheckRefundEligibility(decision.orderId, amountCents);
-  if (!precheck.eligible) {
-    await prisma.refundAttempt.update({
-      where: { id: record.id },
-      data: {
-        status: "failed",
-        failureCode: "PRECHECK_FAILED",
-        failureMessage: precheck.reason,
-        updatedAt: new Date(),
-      },
-    });
-    return {
-      success: false,
-      code: "PRECHECK_FAILED",
-      message: precheck.reason,
-      amountCents,
-    };
-  }
-
   const order = await prisma.order.findUnique({
     where: { id: decision.orderId },
     select: { stripePaymentIntentId: true },
   });
   const piId = order?.stripePaymentIntentId;
+
   if (!piId || isDevBypassPaymentIntent(piId)) {
     await prisma.refundAttempt.update({
       where: { id: record.id },
@@ -317,6 +316,85 @@ export async function executeRefund(decision: RefundDecision): Promise<RefundRes
     };
   }
 
+  const precheck = await precheckRefundEligibility(
+    decision.orderId,
+    amountCents,
+    decision.vendorOrderId
+  );
+  if (!precheck.eligible) {
+    await prisma.refundAttempt.update({
+      where: { id: record.id },
+      data: {
+        status: "failed",
+        failureCode: "PRECHECK_FAILED",
+        failureMessage: precheck.reason,
+        updatedAt: new Date(),
+      },
+    });
+    return {
+      success: false,
+      code: "PRECHECK_FAILED",
+      message: precheck.reason,
+      amountCents,
+    };
+  }
+
+  const payment = await prisma.payment.findFirst({
+    where: { orderId: decision.orderId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, stripeChargeId: true },
+  });
+
+  let orderRefundId: string | undefined;
+  try {
+    const pending = await recordPendingRefund({
+      orderId: decision.orderId,
+      vendorOrderId: decision.vendorOrderId ?? null,
+      amountCents,
+      idempotencyKey,
+      reason: decision.reason,
+      refundScope: mapRefundDecisionToScope({
+        scope: decision.scope,
+        reason: decision.reason,
+      }),
+      initiatedByRole: mapRefundReasonToInitiatedByRole(decision.reason),
+      refundAttemptId: record.id,
+      stripePaymentIntentId: piId,
+      stripeChargeId: payment?.stripeChargeId ?? null,
+      paymentId: payment?.id ?? null,
+      customerVisibleNote: opts?.customerVisibleNote ?? null,
+    });
+    orderRefundId = pending.id;
+    await linkOrderRefundToRefundAttempt({ idempotencyKey, refundAttemptId: record.id });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("REFUND_EXCEEDS")) {
+      await prisma.refundAttempt.update({
+        where: { id: record.id },
+        data: {
+          status: "failed",
+          failureCode: "PRECHECK_FAILED",
+          failureMessage: msg,
+          updatedAt: new Date(),
+        },
+      });
+      if (orderRefundId) {
+        await markRefundFailed({
+          orderRefundId,
+          failureCode: "PRECHECK_FAILED",
+          failureMessage: msg,
+        });
+      }
+      return {
+        success: false,
+        code: "PRECHECK_FAILED",
+        message: msg,
+        amountCents,
+      };
+    }
+    throw e;
+  }
+
   try {
     const refund = await stripe.refunds.create({
       payment_intent: piId,
@@ -340,6 +418,13 @@ export async function executeRefund(decision: RefundDecision): Promise<RefundRes
       },
     });
 
+    if (orderRefundId) {
+      await markRefundSucceeded({
+        orderRefundId,
+        stripeRefundId: refund.id,
+      });
+    }
+
     await prepareTransferReversalsAfterSuccessfulRefund(record.id);
 
     return {
@@ -359,6 +444,114 @@ export async function executeRefund(decision: RefundDecision): Promise<RefundRes
         failureMessage: msg,
         updatedAt: new Date(),
       },
+    });
+    if (orderRefundId) {
+      await markRefundFailed({
+        orderRefundId,
+        failureCode: "STRIPE_REFUND_FAILED",
+        failureMessage: msg,
+      });
+    }
+    return {
+      success: false,
+      code: "STRIPE_REFUND_FAILED",
+      message: msg,
+      amountCents,
+    };
+  }
+}
+
+export type AdminStripeRefundParams = {
+  orderRefundId: string;
+  refundAttemptId: string;
+  orderId: string;
+  vendorOrderId?: string | null;
+  amountCents: number;
+  stripePaymentIntentId: string;
+  stripeIdempotencyKey: string;
+  metadata: Record<string, string>;
+};
+
+/**
+ * Stripe customer refund for an existing pending OrderRefund + RefundAttempt (admin flows).
+ */
+export async function executeStripeRefundForAdmin(
+  params: AdminStripeRefundParams
+): Promise<RefundResult> {
+  const { amountCents, stripePaymentIntentId: piId } = params;
+
+  if (!stripe || isDevBypassPaymentIntent(piId)) {
+    await prisma.refundAttempt.update({
+      where: { id: params.refundAttemptId },
+      data: {
+        status: "failed",
+        failureCode: "STRIPE_NOT_AVAILABLE",
+        failureMessage: "Stripe refund not available for this payment.",
+        updatedAt: new Date(),
+      },
+    });
+    await markRefundFailed({
+      orderRefundId: params.orderRefundId,
+      failureCode: "STRIPE_NOT_AVAILABLE",
+      failureMessage: "Stripe refund not available for this payment.",
+    });
+    return {
+      success: false,
+      code: "STRIPE_NOT_AVAILABLE",
+      message: "Stripe refund not available for this payment.",
+      amountCents,
+    };
+  }
+
+  try {
+    const refund = await stripe.refunds.create(
+      {
+        payment_intent: piId,
+        amount: amountCents,
+        reason: "requested_by_customer",
+        metadata: params.metadata,
+      },
+      { idempotencyKey: params.stripeIdempotencyKey }
+    );
+
+    await prisma.refundAttempt.update({
+      where: { id: params.refundAttemptId },
+      data: {
+        status: "succeeded",
+        stripeRefundId: refund.id,
+        failureCode: null,
+        failureMessage: null,
+        updatedAt: new Date(),
+      },
+    });
+
+    await markRefundSucceeded({
+      orderRefundId: params.orderRefundId,
+      stripeRefundId: refund.id,
+    });
+
+    return {
+      success: true,
+      refundAttemptId: params.refundAttemptId,
+      refundId: refund.id,
+      amountCents,
+      message: refund.status === "succeeded" ? undefined : `Refund status: ${refund.status}`,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await prisma.refundAttempt.update({
+      where: { id: params.refundAttemptId },
+      data: {
+        status: "failed",
+        failureCode: "STRIPE_REFUND_FAILED",
+        failureMessage: msg,
+        updatedAt: new Date(),
+      },
+    });
+    await markRefundFailed({
+      orderRefundId: params.orderRefundId,
+      failureCode: "STRIPE_REFUND_FAILED",
+      failureMessage: msg,
     });
     return {
       success: false,

@@ -14,6 +14,7 @@ import {
   fetchStripeProcessingFeeCents,
   isDevBypassStripePaymentIntentId,
 } from "@/services/stripe-processing-fee.service";
+import { fetchPaymentIntentChargeDetails } from "@/services/stripe-payment-charge-details.service";
 import {
   ensureVendorPayoutTransferRecordsForPayment,
   ensureVendorPayoutTransferRecordsForPaymentInTx,
@@ -142,7 +143,9 @@ export async function recordPaymentAndAllocations(
   if (!order) throw new Error("Order not found");
   if (order.status !== "pending_payment") return { created: false }; // already processed
 
-  const feeCents = await fetchStripeProcessingFeeCents(stripePaymentIntentId);
+  const chargeDetails = await fetchPaymentIntentChargeDetails(stripePaymentIntentId);
+  const feeCents =
+    chargeDetails?.feeCents ?? (await fetchStripeProcessingFeeCents(stripePaymentIntentId));
   const production = process.env.NODE_ENV === "production";
   if (
     production &&
@@ -188,6 +191,8 @@ export async function recordPaymentAndAllocations(
         status: "succeeded",
         idempotencyKey: key,
         stripeProcessingFeeCents: feeCents,
+        stripeChargeId: chargeDetails?.chargeId ?? null,
+        stripeBalanceTransactionId: chargeDetails?.balanceTransactionId ?? null,
       },
     });
     for (let i = 0; i < order.vendorOrders.length; i++) {

@@ -5,6 +5,11 @@ import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import { webhookIdempotencyKey } from "@/lib/idempotency";
 import { processSuccessfulPayment } from "@/services/post-payment.service";
+import {
+  handleChargeRefundedWebhook,
+  handleStripeRefundWebhookEvent,
+  handleTransferReversedWebhook,
+} from "@/services/stripe-refund-webhook.service";
 
 export async function POST(request: NextRequest) {
   if (!stripe || !env.STRIPE_WEBHOOK_SECRET) {
@@ -37,6 +42,62 @@ export async function POST(request: NextRequest) {
         payload: JSON.parse(body) as object,
       },
     });
+  }
+
+  const markProcessed = async (errorMessage?: string) => {
+    await prisma.webhookEvent.updateMany({
+      where: { idempotencyKey: idemKey },
+      data: {
+        processed: !errorMessage,
+        processedAt: errorMessage ? undefined : new Date(),
+        errorMessage: errorMessage ?? null,
+      },
+    });
+  };
+
+  if (
+    event.type === "refund.created" ||
+    event.type === "refund.updated"
+  ) {
+    const refund = event.data.object as Stripe.Refund;
+    try {
+      await handleStripeRefundWebhookEvent(refund, {
+        stripeRawJson: event.data.object as object,
+      });
+      await markProcessed();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await markProcessed(message);
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+    return NextResponse.json({ received: true });
+  }
+
+  if (event.type === "charge.refunded") {
+    const charge = event.data.object as Stripe.Charge;
+    try {
+      await handleChargeRefundedWebhook(charge, {
+        stripeRawJson: event.data.object as object,
+      });
+      await markProcessed();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await markProcessed(message);
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+    return NextResponse.json({ received: true });
+  }
+
+  if (event.type === "transfer.reversed") {
+    try {
+      await handleTransferReversedWebhook(event.data.object as Stripe.Transfer);
+      await markProcessed();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await markProcessed(message);
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+    return NextResponse.json({ received: true });
   }
 
   if (event.type === "payment_intent.succeeded") {

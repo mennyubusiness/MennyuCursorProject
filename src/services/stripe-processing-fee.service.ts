@@ -5,8 +5,7 @@
  *   supplementing these snapshots — do not mutate historical payment-time rows silently.
  * TODO(connect-transfers): Use PaymentAllocation.netVendorTransferCents when creating stripe.transfers.
  */
-import Stripe from "stripe";
-import { stripe } from "@/lib/stripe";
+import { fetchPaymentIntentChargeDetails } from "@/services/stripe-payment-charge-details.service";
 
 export function isDevBypassStripePaymentIntentId(paymentIntentId: string): boolean {
   return paymentIntentId.startsWith("dev_bypass_");
@@ -19,33 +18,8 @@ export function isDevBypassStripePaymentIntentId(paymentIntentId: string): boole
 export async function fetchStripeProcessingFeeCents(
   paymentIntentId: string
 ): Promise<number | null> {
-  if (isDevBypassStripePaymentIntentId(paymentIntentId)) {
-    return null;
-  }
-  if (!stripe) {
-    return null;
-  }
-
-  const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
-    expand: ["latest_charge.balance_transaction"],
-  });
-
-  const charge = pi.latest_charge;
-  if (!charge || typeof charge === "string") {
-    return null;
-  }
-
-  const btRaw = (charge as Stripe.Charge).balance_transaction;
-  if (btRaw == null) {
-    return null;
-  }
-
-  if (typeof btRaw === "string") {
-    const btx = await stripe.balanceTransactions.retrieve(btRaw);
-    return btx.fee;
-  }
-
-  return (btRaw as Stripe.BalanceTransaction).fee;
+  const details = await fetchPaymentIntentChargeDetails(paymentIntentId);
+  return details?.feeCents ?? null;
 }
 
 export {
