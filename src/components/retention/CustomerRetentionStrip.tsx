@@ -9,6 +9,7 @@ import {
   MENNYU_LOCAL_RETENTION_EVENT,
   type RecentViewEntry,
 } from "@/lib/customer-local-storage";
+import { cn } from "@/lib/cn";
 
 function hrefFor(entry: RecentViewEntry): string {
   return entry.kind === "pod" ? `/pod/${entry.id}` : `/pod/${entry.podId}/vendor/${entry.id}`;
@@ -18,11 +19,21 @@ function labelFor(entry: RecentViewEntry): string {
   return entry.kind === "pod" ? entry.name : `${entry.name}`;
 }
 
-function ChipThumb({ label }: { label: string }) {
+function ChipThumb({ label, favorite }: { label: string; favorite?: boolean }) {
+  if (favorite) {
+    return (
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-xs font-bold text-brand ring-1 ring-oo-light-stone"
+        aria-hidden
+      >
+        ♥
+      </span>
+    );
+  }
   const letter = label.trim().charAt(0).toUpperCase() || "?";
   return (
     <span
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-stone-200 to-stone-300 text-xs font-bold text-stone-700 ring-2 ring-white shadow-sm"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-oo-cream text-xs font-bold text-oo-charcoal ring-1 ring-oo-light-stone"
       aria-hidden
     >
       {letter}
@@ -30,15 +41,25 @@ function ChipThumb({ label }: { label: string }) {
   );
 }
 
+const chipLinkClass =
+  "group flex min-w-[10rem] max-w-[16rem] items-center gap-2.5 rounded-xl border border-oo-light-stone bg-oo-warm-white py-2 pl-2 pr-3 text-sm font-medium text-oo-charcoal shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand motion-reduce:hover:translate-y-0";
+
 type CustomerRetentionStripProps = {
-  /** Screen-reader / section heading */
   heading?: string;
+  helperText?: string;
   className?: string;
+  /** When true, render the panel shell even if there is no local data yet. */
+  showEmptyPlaceholder?: boolean;
+  /** Inside a parent card (e.g. homepage module); no outer border/shadow. */
+  embedded?: boolean;
 };
 
 export function CustomerRetentionStrip({
   heading = "Pick up where you left off",
+  helperText,
   className = "",
+  showEmptyPlaceholder = false,
+  embedded = false,
 }: CustomerRetentionStripProps) {
   const [recent, setRecent] = useState<RecentViewEntry[]>([]);
   const [favPods, setFavPods] = useState(() => getFavoritePods());
@@ -79,68 +100,91 @@ export function CustomerRetentionStrip({
     }));
   }, [recent]);
 
-  if (favoriteLinks.length === 0 && recentLinks.length === 0) return null;
+  const hasContent = favoriteLinks.length > 0 || recentLinks.length > 0;
+  if (!hasContent && !showEmptyPlaceholder) return null;
 
   return (
     <section
-      className={`rounded-2xl border border-stone-200/90 bg-white p-4 shadow-sm sm:p-5 ${className}`}
+      className={cn(
+        embedded
+          ? "min-w-0"
+          : "rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm sm:p-5",
+        className
+      )}
       aria-labelledby="retention-strip-heading"
     >
-      <h2 id="retention-strip-heading" className="text-base font-semibold text-stone-900 sm:text-lg">
+      <h2
+        id="retention-strip-heading"
+        className={cn(
+          "font-bold tracking-tight text-oo-charcoal",
+          embedded ? "text-xl sm:text-2xl" : "text-lg"
+        )}
+      >
         {heading}
       </h2>
+      {helperText ? <p className="mt-1 text-sm text-oo-stone-gray">{helperText}</p> : null}
 
-      <div className="mt-4 space-y-4">
-        {recentLinks.length > 0 && (
-          <div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">
-              Recently viewed
-            </h3>
-            <ul className="mt-2 flex gap-2 overflow-x-auto pb-1 pt-0.5 [scrollbar-width:thin]">
-              {recentLinks.map((l) => (
-                <li key={`${l.sub}-${l.href}`} className="shrink-0">
-                  <Link
-                    href={l.href}
-                    className="flex max-w-[16rem] items-center gap-2 rounded-full border border-stone-200/90 bg-stone-50/90 py-1 pl-1 pr-3 text-sm font-medium text-stone-800 shadow-sm transition hover:border-stone-900/50 hover:bg-white hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.99]"
-                  >
-                    <ChipThumb label={l.label} />
-                    <span className="min-w-0 flex-1 truncate">{l.label}</span>
-                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
-                      {l.sub}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {favoriteLinks.length > 0 && (
-          <div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Saved</h3>
-            <ul className="mt-2 flex gap-2 overflow-x-auto pb-1 pt-0.5 [scrollbar-width:thin]">
-              {favoriteLinks.map((l) => (
-                <li key={`fav-${l.href}`} className="shrink-0">
-                  <Link
-                    href={l.href}
-                    className="flex max-w-[16rem] items-center gap-2 rounded-full border border-rose-200/90 bg-rose-50/80 py-1 pl-1 pr-3 text-sm font-medium text-rose-950 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.99]"
-                  >
-                    <span
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-700 ring-2 ring-white shadow-sm"
-                      aria-hidden
-                    >
-                      ♥
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{l.label}</span>
-                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-rose-800/90">
-                      {l.sub}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
+      {!hasContent ? (
+        <p className="mt-4 text-sm leading-relaxed text-oo-stone-gray">
+          Your recent pods and vendors will show up here as you browse.{" "}
+          <Link href="/explore" className="font-semibold text-brand hover:text-[#EA580C] hover:underline">
+            Explore food pods
+          </Link>
+        </p>
+      ) : (
+        <div className="mt-4 space-y-4">
+          {recentLinks.length > 0 && (
+            <div>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-oo-stone-gray">
+                Recently viewed
+              </h3>
+              <ul className="mt-2 flex gap-2 overflow-x-auto pb-1 pt-0.5 [scrollbar-width:thin]">
+                {recentLinks.map((l) => (
+                  <li key={`${l.sub}-${l.href}`} className="shrink-0">
+                    <Link href={l.href} className={chipLinkClass}>
+                      <ChipThumb label={l.label} />
+                      <span className="min-w-0 flex-1 truncate">{l.label}</span>
+                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-oo-stone-gray">
+                        {l.sub}
+                      </span>
+                      <span
+                        className="shrink-0 text-oo-stone-gray transition group-hover:translate-x-0.5 group-hover:text-brand"
+                        aria-hidden
+                      >
+                        →
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {favoriteLinks.length > 0 && (
+            <div>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-oo-stone-gray">Saved</h3>
+              <ul className="mt-2 flex gap-2 overflow-x-auto pb-1 pt-0.5 [scrollbar-width:thin]">
+                {favoriteLinks.map((l) => (
+                  <li key={`fav-${l.href}`} className="shrink-0">
+                    <Link href={l.href} className={chipLinkClass}>
+                      <ChipThumb label={l.label} favorite />
+                      <span className="min-w-0 flex-1 truncate">{l.label}</span>
+                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-brand">
+                        {l.sub}
+                      </span>
+                      <span
+                        className="shrink-0 text-oo-stone-gray transition group-hover:translate-x-0.5 group-hover:text-brand"
+                        aria-hidden
+                      >
+                        →
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

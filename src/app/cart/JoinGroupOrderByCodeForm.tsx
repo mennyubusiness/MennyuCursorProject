@@ -76,7 +76,7 @@ export function JoinGroupOrderByCodeForm({ className = "", visible = true }: Pro
           type="submit"
           className={cn(buttonClassName({ size: "lg" }), "w-full sm:mt-7 sm:w-auto")}
         >
-          Continue
+          Join order
         </button>
       </form>
     </div>

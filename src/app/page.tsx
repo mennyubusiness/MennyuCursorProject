@@ -3,8 +3,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { HomeHero } from "@/components/home/HomeHero";
 import { HomeJoinGroupSection } from "@/components/home/HomeJoinGroupSection";
-import { HomeRecentOrdersSection } from "@/components/home/HomeRecentOrdersSection";
-import { CustomerRetentionStrip } from "@/components/retention/CustomerRetentionStrip";
 import { resolveCustomerPhoneForSession } from "@/lib/customer-phone-resolution";
 import { PageBand, PageSection, PageShell } from "@/components/layout/page-shell";
 import { ButtonLink } from "@/components/ui/button";
@@ -39,12 +37,7 @@ export default async function HomePage() {
     <div className="w-full">
       <HomeHero featuredPods={featuredPods} />
 
-      <HomeJoinGroupSection />
-
-      <PageShell className="space-y-16 pb-20 sm:space-y-20 sm:pb-28">
-        <HomeRecentOrdersSection customerPhone={customerPhone} />
-        <CustomerRetentionStrip />
-      </PageShell>
+      <HomeJoinGroupSection customerPhone={customerPhone} />
 
       <PageBand variant="dark">
         <PageSection className="!py-16 sm:!py-20">
