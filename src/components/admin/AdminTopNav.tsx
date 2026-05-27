@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/cn";
 
 type NavItem = { href: string; label: string };
 
@@ -35,11 +36,6 @@ function pathMatches(href: string, pathname: string) {
 function groupActive(items: NavItem[], pathname: string) {
   return items.some((i) => pathMatches(i.href, pathname));
 }
-
-const navBtnBase =
-  "flex items-center gap-0.5 rounded-md px-2 py-1.5 text-sm transition-colors";
-const navBtnActive = "font-semibold text-oo-warm-white";
-const navBtnIdle = "text-oo-cream/75 hover:bg-oo-warm-white/10 hover:text-oo-warm-white";
 
 function NavDropdown({
   id,
@@ -76,20 +72,20 @@ function NavDropdown({
     <div ref={ref} className="relative">
       <button
         type="button"
-        className={`${navBtnBase} ${active ? navBtnActive : navBtnIdle}`}
+        className={cn("oo-dash-titlebar-link", active && "is-group-active")}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpenId(open ? null : id)}
         onMouseEnter={() => setOpenId(id)}
       >
         {label}
-        <span className="text-oo-cream/50" aria-hidden>
+        <span className="oo-dash-titlebar-caret" aria-hidden>
           ▾
         </span>
       </button>
       {open && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 min-w-[200px] rounded-lg border border-oo-light-stone bg-oo-warm-white py-1 shadow-lg"
+          className="oo-dash-titlebar-menu"
           role="menu"
           onMouseLeave={() => setOpenId(null)}
         >
@@ -100,11 +96,7 @@ function NavDropdown({
                 key={item.href}
                 href={item.href}
                 role="menuitem"
-                className={`block px-3 py-2 text-sm ${
-                  itemActive
-                    ? "bg-brand-muted font-medium text-oo-charcoal"
-                    : "text-oo-charcoal hover:bg-oo-cream"
-                }`}
+                className={cn("oo-dash-titlebar-menu-link", itemActive && "is-active")}
                 onClick={close}
               >
                 {item.label}
@@ -127,9 +119,7 @@ export function AdminTopNav() {
     <nav className="flex flex-wrap items-center gap-x-1 gap-y-2" aria-label="Admin">
       <Link
         href="/admin"
-        className={`rounded-md px-2 py-1.5 text-sm ${
-          dashboardActive ? navBtnActive : navBtnIdle
-        }`}
+        className={cn("oo-dash-titlebar-link", dashboardActive && "is-active")}
       >
         Dashboard
       </Link>
