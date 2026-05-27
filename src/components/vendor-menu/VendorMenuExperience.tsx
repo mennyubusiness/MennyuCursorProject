@@ -17,6 +17,7 @@ type VendorMenuExperienceProps = {
   vendorName: string;
   vendorAccentColor: string | null;
   sections: CustomerVendorMenuCategorySection[];
+  variantChildCountByParentPlu: Map<string, number>;
   cart: Cart;
   cartId: string;
   vendorCartItems: CartItem[];
@@ -33,6 +34,7 @@ function MenuSectionGrid({
   orderingDisabled,
   vendorUsesDeliverect,
   vendorAccentColor,
+  variantChildCountByParentPlu,
   compactGrid,
 }: {
   section: CustomerVendorMenuCategorySection;
@@ -43,6 +45,7 @@ function MenuSectionGrid({
   orderingDisabled: boolean;
   vendorUsesDeliverect: boolean;
   vendorAccentColor: string | null;
+  variantChildCountByParentPlu: Map<string, number>;
   compactGrid?: boolean;
 }) {
   const sectionDomId = customerMenuCategoryDomId(section.id);
@@ -85,6 +88,11 @@ function MenuSectionGrid({
               vendorCartItems={vendorCartItems}
               orderingDisabled={orderingDisabled}
               vendorUsesDeliverect={vendorUsesDeliverect}
+              variantChildMenuItemCount={
+                item.deliverectPlu
+                  ? variantChildCountByParentPlu.get(item.deliverectPlu.trim()) ?? 0
+                  : 0
+              }
             />
           </li>
         ))}
@@ -100,6 +108,7 @@ export function VendorMenuExperience({
   vendorName,
   vendorAccentColor,
   sections,
+  variantChildCountByParentPlu,
   cart,
   cartId,
   vendorCartItems,
@@ -154,6 +163,7 @@ export function VendorMenuExperience({
                         orderingDisabled={orderingDisabled}
                         vendorUsesDeliverect={vendorUsesDeliverect}
                         vendorAccentColor={vendorAccentColor}
+                        variantChildCountByParentPlu={variantChildCountByParentPlu}
                         compactGrid
                       />
                     ))}
@@ -185,6 +195,7 @@ export function VendorMenuExperience({
                       orderingDisabled={orderingDisabled}
                       vendorUsesDeliverect={vendorUsesDeliverect}
                       vendorAccentColor={vendorAccentColor}
+                      variantChildCountByParentPlu={variantChildCountByParentPlu}
                     />
                   ))}
                 </div>

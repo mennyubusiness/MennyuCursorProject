@@ -2,6 +2,11 @@
  * Shared modifier config types and serialization for add-to-cart and cart-edit UI.
  * Only top-level groups are included; nested groups are under options.
  */
+import type { OpenOrderModifierGroupKind } from "@/domain/modifier-group-kind";
+import {
+  classifyMenuItemModifierLink,
+  classifyNestedModifierGroup,
+} from "@/lib/modifier-group-rules";
 
 export interface ModifierOptionForUI {
   id: string;
@@ -20,6 +25,7 @@ export interface NestedModifierGroupForUI {
   maxSelections: number;
   isRequired: boolean;
   isAvailable: boolean;
+  openOrderGroupKind: OpenOrderModifierGroupKind;
   /**
    * Deliverect “variant group” flag on a nested row. Does **not** add levels to the **root** `subItems`
    * chain (those serialize under modifiers); only root groups on the menu item do.
@@ -33,6 +39,7 @@ export interface ModifierGroupLinkForUI {
   minSelections: number;
   maxSelections: number;
   sortOrder: number;
+  openOrderGroupKind: OpenOrderModifierGroupKind;
   modifierGroup: {
     id: string;
     name: string;
@@ -51,12 +58,18 @@ export interface ModifierConfigForUI {
   menuItemName: string;
   priceCents: number;
   groups: ModifierGroupLinkForUI[];
+  /** Leaf MenuItem count for this product's PLU (variant family size). */
+  variantChildMenuItemCount?: number;
   /**
    * Server: parent shell has at least one Deliverect variant group (size). Drives modal leaf merge;
    * redundant with checking groups for deliverectIsVariantGroup but explicit for callers.
    */
   useLeafModifierMerge?: boolean;
 }
+
+export type SerializeModifierConfigOptions = {
+  variantChildMenuItemCount?: number;
+};
 
 type MenuItemWithModifiers = {
   id: string;
@@ -105,14 +118,21 @@ type MenuItemWithModifiers = {
   }>;
 };
 
-export function serializeModifierConfig(item: MenuItemWithModifiers): ModifierConfigForUI {
+export function serializeModifierConfig(
+  item: MenuItemWithModifiers,
+  opts?: SerializeModifierConfigOptions
+): ModifierConfigForUI {
+  const variantChildMenuItemCount = opts?.variantChildMenuItemCount ?? 0;
   const groups: ModifierGroupLinkForUI[] = item.modifierGroups
     .filter((link) => link.modifierGroup.parentModifierOptionId == null)
-    .map((link) => ({
+    .map((link) => {
+      const classification = classifyMenuItemModifierLink(link, variantChildMenuItemCount);
+      return {
       required: link.required,
       minSelections: link.minSelections,
       maxSelections: link.maxSelections,
       sortOrder: link.sortOrder,
+      openOrderGroupKind: classification.kind,
       modifierGroup: {
         id: link.modifierGroup.id,
         name: link.modifierGroup.name,
@@ -130,13 +150,16 @@ export function serializeModifierConfig(item: MenuItemWithModifiers): ModifierCo
             isDefault: opt.isDefault,
             isAvailable: opt.isAvailable,
             nestedModifierGroups: opt.nestedModifierGroups.map(
-              (ng): NestedModifierGroupForUI => ({
+              (ng): NestedModifierGroupForUI => {
+                const nestedClass = classifyNestedModifierGroup(ng, 0);
+                return {
                 id: ng.id,
                 name: ng.name,
                 minSelections: ng.minSelections,
                 maxSelections: ng.maxSelections,
                 isRequired: ng.isRequired,
                 isAvailable: ng.isAvailable,
+                openOrderGroupKind: nestedClass.kind,
                 deliverectIsVariantGroup: ng.deliverectIsVariantGroup ?? null,
                 options: ng.options.map((o) => ({
                   id: o.id,
@@ -146,14 +169,18 @@ export function serializeModifierConfig(item: MenuItemWithModifiers): ModifierCo
                   isDefault: o.isDefault,
                   isAvailable: o.isAvailable,
                 })),
-              })
+              };
+              }
             ),
           })
         ),
       },
-    }));
-  const useLeafModifierMerge = item.modifierGroups.some(
-    (l) => l.modifierGroup.deliverectIsVariantGroup === true
+    };
+    });
+  const useLeafModifierMerge = groups.some(
+    (g) =>
+      g.openOrderGroupKind === "REQUIRED_VARIANT_GROUP" ||
+      g.modifierGroup.deliverectIsVariantGroup === true
   );
 
   return {
@@ -161,6 +188,7 @@ export function serializeModifierConfig(item: MenuItemWithModifiers): ModifierCo
     menuItemName: item.name,
     priceCents: item.priceCents,
     groups,
+    variantChildMenuItemCount,
     useLeafModifierMerge,
   };
 }
@@ -188,7 +216,7 @@ export function mergeVariantParentAndLeafModifierConfig(
    * When flags are missing in the DB, the cart-edit flow may mark the correct group before merging.
    */
   const variantGroups = parentConfig.groups.filter(
-    (g) => g.modifierGroup.deliverectIsVariantGroup === true
+    (g) => g.openOrderGroupKind === "REQUIRED_VARIANT_GROUP"
   );
   const parentVariantModifierGroupIds = new Set(variantGroups.map((g) => g.modifierGroup.id));
   const leafExtras = leafConfig.groups.filter(

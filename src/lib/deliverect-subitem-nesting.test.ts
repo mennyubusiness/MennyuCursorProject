@@ -70,22 +70,24 @@ describe("deliverectSubItemsChainDepth", () => {
 
 describe("countSubItemsChainVariantSelections", () => {
   const g = (variant: boolean, parent: string | null, id: string, sortOrder = 0) => ({
-    modifierGroup: {
-      id,
-      sortOrder,
-      deliverectIsVariantGroup: variant,
-      parentModifierOptionId: parent,
+    modifierOption: {
+      modifierGroup: {
+        id,
+        sortOrder,
+        deliverectIsVariantGroup: variant,
+        parentModifierOptionId: parent,
+        minSelections: variant ? 1 : 0,
+        maxSelections: 1,
+        isRequired: variant,
+      },
     },
   });
 
   it("counts distinct top-level variant groups (chain steps), not raw selections", () => {
     expect(
       countSubItemsChainVariantSelections({
-        selections: [
-          { modifierOption: g(true, null, "mg-a", 0) },
-          { modifierOption: g(true, null, "mg-b", 1) },
-          { modifierOption: g(true, "opt-parent", "mg-nested", 2) },
-        ],
+        selections: [g(true, null, "mg-a", 0), g(true, null, "mg-b", 1), g(true, "opt-parent", "mg-nested", 2)],
+        variantChildMenuItemCount: 2,
       })
     ).toBe(2);
   });
@@ -94,11 +96,12 @@ describe("countSubItemsChainVariantSelections", () => {
     expect(
       countSubItemsChainVariantSelections({
         selections: [
-          { modifierOption: g(true, null, "mg-ing", 0) },
-          { modifierOption: g(true, null, "mg-ing", 0) },
-          { modifierOption: g(true, null, "mg-ing", 0) },
-          { modifierOption: g(true, null, "mg-ing", 0) },
+          g(true, null, "mg-ing", 0),
+          g(true, null, "mg-ing", 0),
+          g(true, null, "mg-ing", 0),
+          g(true, null, "mg-ing", 0),
         ],
+        variantChildMenuItemCount: 1,
       })
     ).toBe(0);
   });

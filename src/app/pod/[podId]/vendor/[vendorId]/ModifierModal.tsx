@@ -7,7 +7,11 @@ import { dispatchCartItemAdded } from "@/lib/cart-ui-feedback";
 import { getVariantMergedModifierConfigAction } from "@/actions/variant-modifier-config.actions";
 import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
 import { totalSelectedInGroup, totalSelectedInNested } from "@/lib/modifier-deliverect-variant-steps";
-import { formatModifierGroupShortNote } from "@/lib/modifier-group-display";
+import {
+  formatModifierGroupNoteFromClassification,
+  classifyMenuItemModifierLink,
+  classifyNestedModifierGroup,
+} from "@/lib/modifier-group-rules";
 
 const DEBUG_ADD_TO_CART_TRACE = false;
 
@@ -195,27 +199,35 @@ export function ModifierModal({
     return sum;
   }, [displayConfig, selections]);
 
+  const variantChildMenuItemCount = displayConfig.variantChildMenuItemCount ?? 0;
+
   const requiredSatisfied = useMemo(() => {
     for (const link of displayConfig.groups) {
-      if (!link.modifierGroup.isAvailable) continue;
+      const classification = classifyMenuItemModifierLink(link, variantChildMenuItemCount);
       const total = totalSelectedInGroup(link, selections);
-      if (link.required && total < link.minSelections) return false;
-      if (total > link.maxSelections) return false;
+      if (classification.blocksAddToCartWhenEmpty && total < classification.minSelections) {
+        return false;
+      }
+      if (total > classification.maxSelections) return false;
+      if (!classification.isAvailable && classification.required) return false;
     }
     for (const link of displayConfig.groups) {
       for (const opt of link.modifierGroup.options) {
         const qty = selections[opt.id] ?? 0;
         if (qty < 1) continue;
         for (const nested of opt.nestedModifierGroups ?? []) {
-          if (!nested.isAvailable) continue;
+          const nestedClass = classifyNestedModifierGroup(nested, 0);
           const nTotal = totalSelectedInNested(nested.options, selections);
-          if (nested.minSelections > 0 && nTotal < nested.minSelections) return false;
-          if (nTotal > nested.maxSelections) return false;
+          if (nestedClass.blocksAddToCartWhenEmpty && nTotal < nestedClass.minSelections) {
+            return false;
+          }
+          if (nTotal > nestedClass.maxSelections) return false;
+          if (!nestedClass.isAvailable && nestedClass.required) return false;
         }
       }
     }
     return true;
-  }, [displayConfig.groups, selections]);
+  }, [displayConfig.groups, selections, variantChildMenuItemCount]);
 
   async function submit() {
     if (!requiredSatisfied) {
@@ -281,6 +293,24 @@ export function ModifierModal({
         onSuccess();
         onClose();
       } else {
+        if (DEBUG_ADD_TO_CART_TRACE && result.code === "VARIANT_GROUP_REQUIRED") {
+          console.warn("[ModifierModal] VARIANT_GROUP_REQUIRED", {
+            menuItemId: displayConfig.menuItemId,
+            menuItemName: displayConfig.menuItemName,
+            selections: selectionsList,
+            groups: displayConfig.groups.map((link) => ({
+              id: link.modifierGroup.id,
+              name: link.modifierGroup.name,
+              openOrderGroupKind: link.openOrderGroupKind,
+              deliverectIsVariantGroup: link.modifierGroup.deliverectIsVariantGroup,
+              isAvailable: link.modifierGroup.isAvailable,
+              required: link.required,
+              minSelections: link.minSelections,
+              maxSelections: link.maxSelections,
+              selected: totalSelectedInGroup(link, selections),
+            })),
+          });
+        }
         setError({ message: result.error, code: result.code });
       }
     }
@@ -318,26 +348,39 @@ export function ModifierModal({
           </p>
 
           {displayConfig.groups
-            .filter((link) => link.modifierGroup.isAvailable)
+            .filter((link) => {
+              const c = classifyMenuItemModifierLink(link, variantChildMenuItemCount);
+              return link.modifierGroup.isAvailable || c.required;
+            })
             .map((link) => {
+              const classification = classifyMenuItemModifierLink(link, variantChildMenuItemCount);
               const total = totalSelectedInGroup(link, selections);
-              const minOk = total >= link.minSelections;
-              const maxOk = total <= link.maxSelections;
-              const requiredMissing = link.required && total < link.minSelections;
+              const requiredMissing =
+                classification.uiShowsAsRequired && total < classification.minSelections;
+              const unavailableRequired =
+                !link.modifierGroup.isAvailable && classification.required;
               return (
                 <fieldset key={link.modifierGroup.id} className="rounded-lg border border-stone-200 p-3">
                   <legend className="text-sm font-medium text-stone-900">
                     {link.modifierGroup.name}
+                    {classification.uiShowsAsRequired && (
+                      <span className="ml-1 text-red-600" aria-hidden>
+                        *
+                      </span>
+                    )}
                     <span className="ml-2 font-normal text-stone-500">
-                      {`(${formatModifierGroupShortNote({
-                        minSelections: link.minSelections,
-                        maxSelections: link.maxSelections,
-                      })})`}
+                      {`(${formatModifierGroupNoteFromClassification(classification)})`}
                     </span>
                   </legend>
+                  {unavailableRequired && (
+                    <p className="mb-2 text-xs text-amber-800" role="status">
+                      This required choice is temporarily unavailable. You cannot add this item until it
+                      returns.
+                    </p>
+                  )}
                   {requiredMissing && (
                     <p className="mb-2 text-xs text-red-600" role="alert">
-                      Please select at least {link.minSelections} option(s).
+                      Please select at least {classification.minSelections} option(s).
                     </p>
                   )}
                   <div className="mt-2 space-y-2">
@@ -469,18 +512,25 @@ function OptionRow({
       {quantity >= 1 && (option.nestedModifierGroups?.length ?? 0) > 0 && (
         <div className="ml-6 mt-2 space-y-2 border-l-2 border-stone-200 pl-3">
           {option.nestedModifierGroups!.map((nested) => {
+            const nestedClass = classifyNestedModifierGroup(nested, 0);
             const nTotal = totalSelectedInNested(nested.options, selections);
-            const nRequiredMissing = nested.minSelections > 0 && nTotal < nested.minSelections;
-            if (!nested.isAvailable) return null;
+            const nRequiredMissing =
+              nestedClass.uiShowsAsRequired && nTotal < nestedClass.minSelections;
+            if (!nested.isAvailable && !nestedClass.required) return null;
+            if (!nested.isAvailable && nestedClass.required) {
+              return (
+                <fieldset key={nested.id} className="rounded border border-amber-100 bg-amber-50/50 p-2">
+                  <legend className="text-xs font-medium text-stone-700">{nested.name}</legend>
+                  <p className="text-xs text-amber-800">Required choice unavailable.</p>
+                </fieldset>
+              );
+            }
             return (
               <fieldset key={nested.id} className="rounded border border-stone-100 p-2">
                 <legend className="text-xs font-medium text-stone-700">
                   {nested.name}
                   <span className="ml-1.5 font-normal text-stone-500">
-                    {`(${formatModifierGroupShortNote({
-                      minSelections: nested.minSelections,
-                      maxSelections: nested.maxSelections,
-                    })})`}
+                    {`(${formatModifierGroupNoteFromClassification(nestedClass)})`}
                   </span>
                 </legend>
                 {nRequiredMissing && (

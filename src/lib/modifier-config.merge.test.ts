@@ -12,6 +12,7 @@ function mkGroup(
     minSelections: 1,
     maxSelections: 1,
     sortOrder: opts.sortOrder ?? 0,
+    openOrderGroupKind: opts.variant ? "REQUIRED_VARIANT_GROUP" : "REQUIRED_MODIFIER_GROUP",
     modifierGroup: {
       id,
       name,

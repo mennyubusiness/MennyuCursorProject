@@ -11,6 +11,7 @@ import {
   type MennyuCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
 import { computeCustomerMenuBrowseExcludedProductIds } from "@/domain/menu-import/customer-menu-browse";
+import { variantChildCountByParentPluFromProducts } from "@/lib/deliverect-variant-child-count";
 import {
   computeOperationalProductPools,
   getOperationalMenuItemIdsForVendor,
@@ -52,6 +53,8 @@ export type CustomerVendorMenuCategorySection = {
 
 export type CustomerVendorMenuLoadResult = {
   sections: CustomerVendorMenuCategorySection[];
+  /** Parent shell PLU → variant leaf MenuItem count (for modifier group classification in UI). */
+  variantChildCountByParentPlu: Map<string, number>;
   /** How the menu was built (for debugging / future telemetry). */
   source: "published_canonical" | "fallback_active_with_deliverect_id";
 };
@@ -135,7 +138,11 @@ export async function loadCustomerVendorMenuSections(
       const menu = parsed.data;
       const productIds = [...new Set(menu.products.map((p) => p.deliverectId))];
       if (productIds.length === 0) {
-        return { sections: [], source: "published_canonical" };
+        return {
+          sections: [],
+          variantChildCountByParentPlu: variantChildCountByParentPluFromProducts(menu.products),
+          source: "published_canonical",
+        };
       }
 
       const rows = await prisma.menuItem.findMany({
@@ -160,7 +167,11 @@ export async function loadCustomerVendorMenuSections(
       }
 
       const sections = buildSectionsFromCanonical(menu, byProductId);
-      return { sections, source: "published_canonical" };
+      return {
+        sections,
+        variantChildCountByParentPlu: variantChildCountByParentPluFromProducts(menu.products),
+        source: "published_canonical",
+      };
     }
   }
 
@@ -188,6 +199,16 @@ export async function loadCustomerVendorMenuSections(
       !r.deliverectVariantParentPlu?.trim()
   );
 
+  const variantChildCountByParentPlu = new Map<string, number>();
+  for (const row of activeRows) {
+    const parentPlu = row.deliverectVariantParentPlu?.trim();
+    if (!parentPlu) continue;
+    variantChildCountByParentPlu.set(
+      parentPlu,
+      (variantChildCountByParentPlu.get(parentPlu) ?? 0) + 1
+    );
+  }
+
   return {
     sections:
       activeRows.length === 0
@@ -200,6 +221,7 @@ export async function loadCustomerVendorMenuSections(
               items: activeRows,
             },
           ],
+    variantChildCountByParentPlu,
     source: "fallback_active_with_deliverect_id",
   };
 }

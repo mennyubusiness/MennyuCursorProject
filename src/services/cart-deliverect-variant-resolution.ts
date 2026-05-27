@@ -3,10 +3,18 @@
  * selections (size) must map to a leaf MenuItem row (e.g. VAR-SMALL…) for cart/order lines.
  */
 import { cache } from "react";
+import { classifyMenuItemModifierLink } from "@/lib/modifier-group-rules";
 import { isTopLevelDeliverectVariantGroupModifierGroup } from "@/lib/deliverect-subitem-nesting";
+import {
+  buildModifierGroupValidationDebugRows,
+  logModifierValidationDebug,
+} from "@/lib/modifier-validation-debug";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { CartValidationError } from "@/services/cart-validation-error";
+
+/** Match cart.service / cart.actions — set true while debugging add-to-cart modifier issues. */
+const DEBUG_ADD_TO_CART_TRACE = false;
 
 export type CartItemSelectionInput = { modifierOptionId: string; quantity: number };
 
@@ -22,11 +30,89 @@ export const MENU_ITEM_VARIANT_RESOLUTION_INCLUDE = {
           sortOrder: true,
           deliverectIsVariantGroup: true,
           parentModifierOptionId: true,
+          isAvailable: true,
+          minSelections: true,
+          maxSelections: true,
+          isRequired: true,
+          options: { select: { id: true, isAvailable: true } },
         },
       },
     },
   },
 } satisfies Prisma.MenuItemInclude;
+
+function topLevelVariantGroupLinks(menuItem: MenuItemForVariantResolution) {
+  return menuItem.modifierGroups.filter((l) =>
+    isTopLevelDeliverectVariantGroupModifierGroup(l.modifierGroup)
+  );
+}
+
+function availableTopLevelVariantGroupLinks(menuItem: MenuItemForVariantResolution) {
+  return topLevelVariantGroupLinks(menuItem).filter((l) => l.modifierGroup.isAvailable);
+}
+
+async function variantChildMenuItemCountForMenuItem(
+  menuItem: MenuItemForVariantResolution
+): Promise<number> {
+  const parentPlu = menuItem.deliverectPlu?.trim();
+  if (!parentPlu) return 0;
+  return prisma.menuItem.count({
+    where: { vendorId: menuItem.vendorId, deliverectVariantParentPlu: parentPlu },
+  });
+}
+
+function linkRequiresVariantLeaf(
+  link: MenuItemForVariantResolution["modifierGroups"][number],
+  variantChildMenuItemCount: number
+): boolean {
+  return classifyMenuItemModifierLink(link, variantChildMenuItemCount)
+    .requiresDeliverectVariantLeafResolution;
+}
+
+function variantSelectionRequired(
+  links: MenuItemForVariantResolution["modifierGroups"],
+  variantChildMenuItemCount: number
+): boolean {
+  return links.some((l) => linkRequiresVariantLeaf(l, variantChildMenuItemCount));
+}
+
+function variantGroupRequiredMessage(
+  links: MenuItemForVariantResolution["modifierGroups"],
+  variantChildMenuItemCount: number
+): string {
+  const names = links
+    .filter((l) => linkRequiresVariantLeaf(l, variantChildMenuItemCount))
+    .map((l) => l.modifierGroup.name);
+  if (names.length === 1) {
+    return `Please select an option for ${names[0]}.`;
+  }
+  if (names.length > 1) {
+    return `Please select an option for: ${names.join(", ")}.`;
+  }
+  return "Please select a valid option for each required size or variation group.";
+}
+
+function logVariantResolutionFailure(
+  menuItem: MenuItemForVariantResolution,
+  selections: CartItemSelectionInput[] | null | undefined,
+  reason: string
+) {
+  if (!DEBUG_ADD_TO_CART_TRACE) return;
+  const selectionByOptionId = new Map(
+    (selections ?? [])
+      .filter((s) => s.quantity >= 1)
+      .map((s) => [s.modifierOptionId, s.quantity])
+  );
+  logModifierValidationDebug("deliverect_variant_resolution", {
+    menuItemId: menuItem.id,
+    menuItemName: menuItem.name,
+    deliverectPlu: menuItem.deliverectPlu,
+    deliverectVariantParentPlu: menuItem.deliverectVariantParentPlu,
+    selectionCount: selectionByOptionId.size,
+    groups: buildModifierGroupValidationDebugRows(menuItem.modifierGroups, selectionByOptionId),
+    extra: { reason },
+  });
+}
 
 export type MenuItemForVariantResolution = Prisma.MenuItemGetPayload<{
   include: typeof MENU_ITEM_VARIANT_RESOLUTION_INCLUDE;
@@ -145,16 +231,21 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
     menuItem = parent;
   }
 
-  const hasVariantGroupOnItem = menuItem.modifierGroups.some((l) =>
-    isTopLevelDeliverectVariantGroupModifierGroup(l.modifierGroup)
-  );
-  if (!hasVariantGroupOnItem) {
+  const variantLinks = availableTopLevelVariantGroupLinks(menuItem);
+  if (variantLinks.length === 0) {
     return { menuItem, selections, variantSelectionsPriceCents: 0 };
   }
 
+  const variantChildCount = await variantChildMenuItemCountForMenuItem(menuItem);
+  const mustPickVariant = variantSelectionRequired(variantLinks, variantChildCount);
+
   if (!selections?.length) {
+    if (!mustPickVariant) {
+      return { menuItem, selections, variantSelectionsPriceCents: 0 };
+    }
+    logVariantResolutionFailure(menuItem, selections, "no_selections");
     throw new CartValidationError(
-      "Please select a valid option for each required size or variation group.",
+      variantGroupRequiredMessage(variantLinks, variantChildCount),
       "VARIANT_GROUP_REQUIRED",
       { menuItemId: menuItem.id, menuItemName: menuItem.name }
     );
@@ -173,11 +264,7 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
   const byId = new Map(optionRows.map((o) => [o.id, o]));
 
   /** Only options under top-level variant groups on the parent shell (e.g. size). Nested groups use a different serialization path. */
-  const parentShellVariantGroupIds = new Set(
-    menuItem.modifierGroups
-      .filter((l) => isTopLevelDeliverectVariantGroupModifierGroup(l.modifierGroup))
-      .map((l) => l.modifierGroup.id)
-  );
+  const parentShellVariantGroupIds = new Set(variantLinks.map((l) => l.modifierGroup.id));
 
   const variantSelected: typeof optionRows = [];
   const nonVariantSelections: CartItemSelectionInput[] = [];
@@ -200,8 +287,12 @@ export async function resolveDeliverectVariantLeafForCartLine(args: {
   }
 
   if (variantSelected.length === 0) {
+    if (!mustPickVariant) {
+      return { menuItem, selections, variantSelectionsPriceCents: 0 };
+    }
+    logVariantResolutionFailure(menuItem, selections, "no_variant_group_selection");
     throw new CartValidationError(
-      "Please select a valid option for each required size or variation group.",
+      variantGroupRequiredMessage(variantLinks, variantChildCount),
       "VARIANT_GROUP_REQUIRED",
       { menuItemId: menuItem.id, menuItemName: menuItem.name }
     );

@@ -16,6 +16,7 @@ import { env } from "@/lib/env";
 import { submitOrder, type DeliverectSubmitResult } from "@/integrations/deliverect/client";
 import { getVendorOrderForDeliverect } from "@/integrations/deliverect/load";
 import { mennyuVendorOrderToDeliverectPayload } from "@/integrations/deliverect/transform";
+import { loadVariantChildCountByParentPluForVendor } from "@/lib/deliverect-variant-child-count";
 import type { DeliverectOrderRequest } from "@/integrations/deliverect/payloads";
 import {
   buildDeliverectPayloadValidationSnapshot,
@@ -166,9 +167,14 @@ export async function submitVendorOrderToDeliverect(
     };
   }
 
+  const variantChildCountByParentPlu = await loadVariantChildCountByParentPluForVendor(
+    vendorOrder.vendorId,
+    prisma
+  );
   const payload = mennyuVendorOrderToDeliverectPayload({
     vendorOrder,
     channelLinkId,
+    variantChildCountByParentPlu,
     locationId: vendorOrder.vendor.deliverectLocationId ?? undefined,
     customerPhone,
     customerEmail,

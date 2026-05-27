@@ -22,6 +22,14 @@ export const mennyuCanonicalModifierOptionSchema = z.object({
   nestedGroupDeliverectIds: z.array(z.string().min(1)),
 });
 
+export const openOrderModifierGroupKindSchema = z.enum([
+  "REQUIRED_VARIANT_GROUP",
+  "OPTIONAL_VARIANT_OR_MODIFIER_GROUP",
+  "REQUIRED_MODIFIER_GROUP",
+  "LIMITED_OPTIONAL_MODIFIER_GROUP",
+  "FREE_CHOICE_MODIFIER_GROUP",
+]);
+
 export const mennyuCanonicalModifierGroupSchema = z.object({
   deliverectId: z.string().min(1),
   name: z.string().min(1),
@@ -63,6 +71,8 @@ export const mennyuCanonicalProductSchema = z.object({
   imageUrl: z.string().nullable().optional(),
   basketMaxQuantity: z.number().int().positive().nullable().optional(),
   modifierGroupDeliverectIds: z.array(z.string().min(1)),
+  /** Per-product classification (variant child count is product-specific). */
+  modifierGroupKinds: z.record(z.string().min(1), openOrderModifierGroupKindSchema).optional(),
 });
 
 export const mennyuCanonicalMenuSchema = z

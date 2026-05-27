@@ -205,6 +205,9 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
                     sortOrder: 0,
                     parentModifierOptionId: null,
                     deliverectIsVariantGroup: true,
+                    minSelections: 1,
+                    maxSelections: 1,
+                    isRequired: true,
                   },
                 },
               },
@@ -213,6 +216,7 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
         ],
       } as NonNullable<HydratedVendorOrder>,
       channelLinkId: "ch-link-cert",
+      variantChildCountByParentPlu: new Map([["PARENT-PIZZA", 2]]),
     });
 
     const item = payload.items[0]!;
@@ -295,7 +299,7 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
     expect(validateDeliverectPayload(payload, vendorOrder).isValid).toBe(true);
   });
 
-  it("single-SKU shell (no variant parent PLU): variant-group steps use subItems; other modifiers stay on the line", () => {
+  it("single-SKU shell (no variant parent PLU): required size without leaf rows uses flat modifiers; toppings stay on the line", () => {
     const base = minimalVendorOrder();
     const payload = mennyuVendorOrderToDeliverectPayload({
       vendorOrder: {
@@ -332,6 +336,9 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
                     sortOrder: 0,
                     parentModifierOptionId: null,
                     deliverectIsVariantGroup: true,
+                    minSelections: 1,
+                    maxSelections: 1,
+                    isRequired: true,
                   },
                 },
               },
@@ -360,17 +367,17 @@ describe("mennyuVendorOrderToDeliverectPayload (ASAP / pickup certification)", (
         ],
       } as NonNullable<HydratedVendorOrder>,
       channelLinkId: "ch-link-cert",
+      variantChildCountByParentPlu: new Map([["BYO-PIZZA", 0]]),
     });
 
     const item = payload.items[0]!;
     expect(item.plu).toBe("BYO-PIZZA");
-    // Shell = effective unit − variant surcharges − flat modifier surcharges (avoid double-count with subItems + modifiers).
+    // Shell = effective unit − flat modifier surcharges (size + topping; no subItems when no variant leaf rows).
     expect(item.price).toBe(1000);
     expect(item.externalProductId).toBe("prod-byo");
-    expect(item.subItems).toHaveLength(1);
-    expect(item.subItems![0]!.plu).toBe("SIZE-MED");
-    expect(item.modifiers).toHaveLength(1);
-    expect(item.modifiers![0]!.plu).toBe("TOP-CHEESE");
+    expect(item.subItems).toBeUndefined();
+    expect(item.modifiers).toHaveLength(2);
+    expect(item.modifiers!.map((m) => m.plu).sort()).toEqual(["SIZE-MED", "TOP-CHEESE"]);
   });
 
   it("built payload passes pre-submit validation when line has flat modifiers (no double-count)", () => {

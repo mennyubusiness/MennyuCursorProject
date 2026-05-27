@@ -1,3 +1,5 @@
+import { classifyOpenOrderModifierGroup } from "@/domain/modifier-group-kind";
+
 /**
  * Deliverect **nested `subItems` depth** for channel orders (API hard limit, historically MAX 3).
  *
@@ -34,6 +36,7 @@ export function isTopLevelDeliverectVariantGroupModifierGroup(group: {
  * {@link partitionTopLevelVariantSelectionsForDeliverectChain} / `transform.ts`.
  */
 export type LineSelectionsForDeliverectVariantChain = {
+  variantChildMenuItemCount?: number;
   selections: Array<{
     modifierOption: {
       modifierGroup: {
@@ -42,10 +45,29 @@ export type LineSelectionsForDeliverectVariantChain = {
         name?: string;
         deliverectIsVariantGroup: boolean | null;
         parentModifierOptionId: string | null;
+        minSelections?: number;
+        maxSelections?: number;
+        isRequired?: boolean;
       };
     };
   }>;
 };
+
+export function selectionUsesDeliverectSubItemsChain(
+  sel: LineSelectionsForDeliverectVariantChain["selections"][number],
+  variantChildMenuItemCount: number
+): boolean {
+  const g = sel.modifierOption.modifierGroup;
+  if (!isTopLevelDeliverectVariantGroupModifierGroup(g)) return false;
+  return classifyOpenOrderModifierGroup({
+    deliverectIsVariantGroup: true,
+    minSelections: g.minSelections ?? 0,
+    maxSelections: g.maxSelections ?? 2_147_483_647,
+    required: g.isRequired === true || (g.minSelections ?? 0) > 0,
+    isAvailable: true,
+    variantChildMenuItemCount,
+  }).usesDeliverectSubItemsChain;
+}
 
 /** Compact JSON-safe detail when subItems chain validation fails (logs / support). */
 export function deliverectSubitemsChainValidationDetail(
@@ -103,14 +125,18 @@ export function deliverectSubitemsChainValidationDetail(
  */
 export function partitionTopLevelVariantSelectionsForDeliverectChain<
   S extends LineSelectionsForDeliverectVariantChain["selections"][number],
->(line: { selections: readonly S[] }): {
+>(line: {
+  selections: readonly S[];
+  variantChildMenuItemCount?: number;
+}): {
   /** One entry per distinct variant group that has exactly one selected option on this line (chain depth). */
   chainSelections: S[];
   /** Multi-select from the same variant-flagged group — serialize as `modifiers`, not nested `subItems`. */
   demotedToFlatModifierSelections: S[];
 } {
+  const variantChildCount = line.variantChildMenuItemCount ?? 0;
   const variantSels = line.selections.filter((s) =>
-    isTopLevelDeliverectVariantGroupModifierGroup(s.modifierOption.modifierGroup)
+    selectionUsesDeliverectSubItemsChain(s, variantChildCount)
   );
   const byGroup = new Map<string, S[]>();
   for (const s of variantSels) {

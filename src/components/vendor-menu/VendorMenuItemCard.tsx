@@ -13,6 +13,7 @@ type VendorMenuItemCardProps = {
   vendorCartItems: CartItem[];
   orderingDisabled: boolean;
   vendorUsesDeliverect: boolean;
+  variantChildMenuItemCount?: number;
 };
 
 export function VendorMenuItemCard({
@@ -23,6 +24,7 @@ export function VendorMenuItemCard({
   vendorCartItems,
   orderingDisabled,
   vendorUsesDeliverect,
+  variantChildMenuItemCount = 0,
 }: VendorMenuItemCardProps) {
   const itemUnavailable = orderingDisabled || !item.isAvailable;
 
@@ -62,7 +64,11 @@ export function VendorMenuItemCard({
             podId={podId}
             vendorId={vendorId}
             vendorCartItems={vendorCartItems}
-            modifierConfig={item.modifierGroups?.length ? serializeModifierConfig(item) : undefined}
+            modifierConfig={
+              item.modifierGroups?.length
+                ? serializeModifierConfig(item, { variantChildMenuItemCount })
+                : undefined
+            }
             orderingDisabled={itemUnavailable}
             vendorUsesDeliverect={vendorUsesDeliverect}
             menuItemDeliverectVariantParentPlu={item.deliverectVariantParentPlu}

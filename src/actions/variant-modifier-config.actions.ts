@@ -2,6 +2,11 @@
 
 import type { ModifierConfigForUI } from "@/lib/modifier-config";
 import { serializeModifierConfig, mergeVariantParentAndLeafModifierConfig } from "@/lib/modifier-config";
+import { prisma } from "@/lib/db";
+import {
+  loadVariantChildCountByParentPluForVendor,
+  variantChildMenuItemCountForPlu,
+} from "@/lib/deliverect-variant-child-count";
 import {
   loadMenuItemForVariantResolution,
   resolveDeliverectVariantLeafForCartLine,
@@ -30,11 +35,18 @@ export async function getVariantMergedModifierConfigAction(
   const parentFull = await loadMenuItemForSerializeConfig(parentMenuItemId);
   if (!parentFull) return null;
 
-  const hasVariantGroup = parentSlim.modifierGroups.some(
-    (l) => l.modifierGroup.deliverectIsVariantGroup === true
+  const variantCounts = await loadVariantChildCountByParentPluForVendor(parentFull.vendorId, prisma);
+  const variantChildMenuItemCount = variantChildMenuItemCountForPlu(
+    variantCounts,
+    parentFull.deliverectPlu
   );
-  if (!hasVariantGroup) {
-    return { config: serializeModifierConfig(parentFull) };
+  const parentConfigBase = serializeModifierConfig(parentFull, { variantChildMenuItemCount });
+
+  const hasRequiredVariantGroup = parentConfigBase.groups.some(
+    (g) => g.openOrderGroupKind === "REQUIRED_VARIANT_GROUP"
+  );
+  if (!hasRequiredVariantGroup) {
+    return { config: parentConfigBase };
   }
 
   try {
@@ -44,17 +56,19 @@ export async function getVariantMergedModifierConfigAction(
     });
     const leafFull = await loadMenuItemForSerializeConfig(leafSlim.id);
     if (!leafFull) {
-      return { config: serializeModifierConfig(parentFull) };
+      return { config: parentConfigBase };
     }
-    const parentConfig = serializeModifierConfig(parentFull);
-    const leafConfig = serializeModifierConfig(leafFull);
+    const parentConfig = parentConfigBase;
+    const leafConfig = serializeModifierConfig(leafFull, {
+      variantChildMenuItemCount: 0,
+    });
     const config = mergeVariantParentAndLeafModifierConfig(parentConfig, leafConfig, {
       menuItemName: leafFull.name,
     });
     return { config };
   } catch (e) {
     if (e instanceof CartValidationError) {
-      return { config: serializeModifierConfig(parentFull) };
+      return { config: parentConfigBase };
     }
     throw e;
   }

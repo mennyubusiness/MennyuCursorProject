@@ -16,7 +16,6 @@ import type {
 } from "./payloads";
 import type { HydratedVendorOrder } from "./load";
 import {
-  isTopLevelDeliverectVariantGroupModifierGroup,
   partitionTopLevelVariantSelectionsForDeliverectChain,
 } from "@/lib/deliverect-subitem-nesting";
 import {
@@ -27,6 +26,11 @@ import {
 export interface TransformInput {
   /** Fully loaded VendorOrder from getVendorOrderForDeliverect. */
   vendorOrder: NonNullable<HydratedVendorOrder>;
+  /**
+   * Parent PLU → variant leaf MenuItem count (for modifier group classification in payload).
+   * When omitted, optional variant-flagged groups serialize as flat modifiers.
+   */
+  variantChildCountByParentPlu?: Map<string, number>;
   channelLinkId: string;
   /** External store/location ID. Populate from Vendor.deliverectLocationId when available. */
   locationId?: string;
@@ -102,27 +106,29 @@ function buildModifiersForLine(selections: Selection[]): DeliverectModifier[] | 
   return topLevel.map((m) => attachNested(m));
 }
 
-/** Variant group on the main product line — drives `nestVariantGroupSelections` / subItems depth. */
-function selectionIsTopLevelDeliverectVariantGroup(sel: Selection): boolean {
-  return isTopLevelDeliverectVariantGroupModifierGroup(sel.modifierOption.modifierGroup);
-}
-
 /** Per-selection surcharge (cents) toward `line.priceCents`, matching cart `computeEffectiveUnitPriceCents`. */
 function selectionUnitExtraCents(sel: Selection): number {
   return Math.round(sel.priceCentsSnapshot) * sel.quantity;
 }
 
-function variantGroupUnitExtraCents(line: LineItem): number {
-  return line.selections
-    .filter(selectionIsTopLevelDeliverectVariantGroup)
-    .reduce((s, sel) => s + selectionUnitExtraCents(sel), 0);
+function variantChildCountForLine(
+  line: LineItem,
+  variantChildCountByParentPlu: Map<string, number>
+): number {
+  const shellPlu =
+    line.menuItem?.deliverectVariantParentPlu?.trim() ?? line.menuItem?.deliverectPlu?.trim();
+  if (!shellPlu) return 0;
+  return variantChildCountByParentPlu.get(shellPlu) ?? 0;
 }
 
-/** Modifiers not in the top-level variant chain (flat + nested under options). */
-function nonVariantModifierUnitExtraCents(line: LineItem): number {
-  return line.selections
-    .filter((s) => !selectionIsTopLevelDeliverectVariantGroup(s))
-    .reduce((s, sel) => s + selectionUnitExtraCents(sel), 0);
+function partitionLineVariantSelections(
+  line: LineItem,
+  variantChildCountByParentPlu: Map<string, number>
+) {
+  return partitionTopLevelVariantSelectionsForDeliverectChain({
+    selections: line.selections,
+    variantChildMenuItemCount: variantChildCountForLine(line, variantChildCountByParentPlu),
+  });
 }
 
 /**
@@ -134,11 +140,17 @@ function nonVariantModifierUnitExtraCents(line: LineItem): number {
  *
  * @see {@link computeEffectiveUnitPriceCents}
  */
-function deliverectShellUnitPriceCents(line: LineItem): number {
-  return Math.max(
-    0,
-    Math.round(line.priceCents) - variantGroupUnitExtraCents(line) - nonVariantModifierUnitExtraCents(line)
-  );
+function deliverectShellUnitPriceCents(
+  line: LineItem,
+  variantChildCountByParentPlu: Map<string, number>
+): number {
+  const { chainSelections } = partitionLineVariantSelections(line, variantChildCountByParentPlu);
+  const chainIds = new Set(chainSelections.map((s) => s.modifierOptionId));
+  const chainExtra = chainSelections.reduce((s, sel) => s + selectionUnitExtraCents(sel), 0);
+  const flatExtra = line.selections
+    .filter((s) => !chainIds.has(s.modifierOptionId))
+    .reduce((s, sel) => s + selectionUnitExtraCents(sel), 0);
+  return Math.max(0, Math.round(line.priceCents) - chainExtra - flatExtra);
 }
 
 /** One Deliverect variant step (size / nested variation) — never use `modifiers` for these. */
@@ -184,7 +196,10 @@ function nestVariantGroupSelections(sels: Selection[]): DeliverectOrderSubLine {
  * Top-level Deliverect variant groups (`deliverectIsVariantGroup` on the main item) emit nested
  * `subItems` via {@link nestVariantGroupSelections}; other selections use flat `modifiers`.
  */
-function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
+function lineItemToDeliverectItem(
+  line: LineItem,
+  variantChildCountByParentPlu: Map<string, number>
+): DeliverectOrderItem {
   const variationPlu = line.menuItem?.deliverectPlu?.trim();
   if (!variationPlu) {
     const label = line.menuItem?.name ?? line.name;
@@ -193,9 +208,10 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
   const itemNote = line.specialInstructions?.trim();
 
   const { chainSelections: variantGroupSels, demotedToFlatModifierSelections: demotedVariantAsModifiers } =
-    partitionTopLevelVariantSelectionsForDeliverectChain({ selections: line.selections });
+    partitionLineVariantSelections(line, variantChildCountByParentPlu);
+  const chainIds = new Set(variantGroupSels.map((s) => s.modifierOptionId));
   const modifierSels = [
-    ...line.selections.filter((s) => !selectionIsTopLevelDeliverectVariantGroup(s)),
+    ...line.selections.filter((s) => !chainIds.has(s.modifierOptionId)),
     ...demotedVariantAsModifiers,
   ];
   const modifierOnly = buildModifiersForLine(modifierSels);
@@ -209,7 +225,7 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
       plu: variationPlu,
       name: line.name,
       quantity: line.quantity,
-      price: deliverectShellUnitPriceCents(line),
+      price: deliverectShellUnitPriceCents(line, variantChildCountByParentPlu),
       ...(itemNote ? { remarks: itemNote } : {}),
       ...(leafExternalId ? { externalProductId: leafExternalId } : {}),
     };
@@ -239,7 +255,7 @@ function lineItemToDeliverectItem(line: LineItem): DeliverectOrderItem {
     ...(externalProductId ? { externalProductId } : {}),
     name: line.name,
     quantity: line.quantity,
-    price: deliverectShellUnitPriceCents(line),
+    price: deliverectShellUnitPriceCents(line, variantChildCountByParentPlu),
     ...(itemNote ? { remark: itemNote, remarks: itemNote } : {}),
   };
   if (variantGroupSels.length > 0) {
@@ -273,7 +289,10 @@ function toDeliverectPickupTimeIso(d: Date): string {
  */
 export function mennyuVendorOrderToDeliverectPayload(input: TransformInput): DeliverectOrderRequest {
   const { vendorOrder } = input;
-  const items: DeliverectOrderItem[] = vendorOrder.lineItems.map(lineItemToDeliverectItem);
+  const variantChildCountByParentPlu = input.variantChildCountByParentPlu ?? new Map<string, number>();
+  const items: DeliverectOrderItem[] = vendorOrder.lineItems.map((line) =>
+    lineItemToDeliverectItem(line, variantChildCountByParentPlu)
+  );
 
   const prepMin = input.preparationTimeMinutes ?? 15;
   /** Customer scheduled pickup from checkout; null means ASAP. */

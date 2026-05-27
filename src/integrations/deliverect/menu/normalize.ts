@@ -25,6 +25,7 @@
  * No database or network I/O.
  */
 
+import { attachModifierGroupKindsToCanonicalMenu } from "@/domain/canonical-menu-group-kinds";
 import type { DeliverectMenuImportMeta } from "@/domain/menu-import/canonical.schema";
 import { env } from "@/lib/env";
 import type {
@@ -118,7 +119,7 @@ export function normalizeDeliverectMenuToCanonical(
     return { menu: null, issues };
   }
 
-  const menu: MennyuCanonicalMenu = {
+  const menuBase: MennyuCanonicalMenu = {
     schemaVersion: 1,
     vendorId: input.vendorId,
     deliverect: input.deliverect,
@@ -128,6 +129,8 @@ export function normalizeDeliverectMenuToCanonical(
       .sort((a, b) => a.sortOrder - b.sortOrder),
     products: products.sort((a, b) => a.sortOrder - b.sortOrder),
   };
+
+  const menu = attachModifierGroupKindsToCanonicalMenu(menuBase);
 
   return { menu, issues };
 }

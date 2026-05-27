@@ -50,7 +50,7 @@ export default async function VendorMenuPage({
   const vendor = pv?.vendor;
   if (!pod || !vendor) notFound();
 
-  const [{ sections }, cart] = await Promise.all([
+  const [{ sections, variantChildCountByParentPlu }, cart] = await Promise.all([
     loadCustomerVendorMenuSections(vendorId),
     getOrCreateCartAction(podId),
   ]);
@@ -93,6 +93,7 @@ export default async function VendorMenuPage({
           vendorName={vendor.name}
           vendorAccentColor={vendor.accentColor}
           sections={sections}
+          variantChildCountByParentPlu={variantChildCountByParentPlu}
           cart={cart}
           cartId={cart.id}
           vendorCartItems={vendorCartItems}
