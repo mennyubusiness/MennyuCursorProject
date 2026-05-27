@@ -4,7 +4,6 @@ import { PageShell } from "@/components/layout/page-shell";
 import { VendorMenuCategoryNav } from "@/components/vendor-menu/VendorMenuCategoryNav";
 import { VendorMenuItemCard } from "@/components/vendor-menu/VendorMenuItemCard";
 import { VendorMenuMobileCartBar } from "@/components/vendor-menu/VendorMenuMobileCartBar";
-import { VendorMenuSideCart } from "@/components/vendor-menu/VendorMenuSideCart";
 import { partitionMenuSections } from "@/lib/vendor-menu-spotlight";
 import { customerMenuCategoryDomId } from "@/lib/vendor-menu-category-id";
 import type { CustomerVendorMenuCategorySection } from "@/services/vendor-customer-menu.service";
@@ -72,8 +71,8 @@ function MenuSectionGrid({
         className={cn(
           "grid gap-3",
           compactGrid
-            ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-2"
-            : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2"
+            ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+            : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
         )}
       >
         {section.items.map((item) => (
@@ -125,7 +124,7 @@ export function VendorMenuExperience({
               extraAnchors={extraAnchors}
             />
 
-            <div className="min-w-0 flex-1 space-y-8 pb-24 xl:pb-8">
+            <div className="min-w-0 flex-1 space-y-8 pb-24 lg:pb-8">
               {spotlightSections.length > 0 && (
                 <section
                   id="pod-menu-spotlight"
@@ -191,13 +190,6 @@ export function VendorMenuExperience({
                 </div>
               )}
             </div>
-
-            <VendorMenuSideCart
-              cart={cart}
-              podId={podId}
-              podName={podName}
-              currentVendorName={vendorName}
-            />
           </div>
         </PageShell>
       </div>

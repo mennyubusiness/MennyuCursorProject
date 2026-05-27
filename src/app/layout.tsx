@@ -13,6 +13,8 @@ import { getActiveOrderByCustomerPhone } from "@/services/order.service";
 import { cn } from "@/lib/cn";
 import { OpenOrderLogo } from "@/components/brand/OpenOrderLogo";
 import { getPublicSiteOriginFromEnv } from "@/lib/public-site-url";
+import { CustomerQuickCartShell } from "@/components/cart/CustomerQuickCartShell";
+import { isQuickCartEnabledForPath } from "@/lib/quick-cart-enabled";
 
 export const metadata: Metadata = {
   metadataBase: new URL(getPublicSiteOriginFromEnv()),
@@ -56,6 +58,7 @@ export default async function RootLayout({
   const headerNav = await resolveHeaderNavContext(session?.user?.id ?? null, customerPhone);
   const activeOrder =
     !isAdmin && customerPhone ? await getActiveOrderCached(customerPhone) : null;
+  const quickCartEnabled = isQuickCartEnabledForPath(pathname);
 
   return (
     <html lang="en">
@@ -66,6 +69,7 @@ export default async function RootLayout({
         )}
       >
         <AuthSessionProvider session={session}>
+          <CustomerQuickCartShell enabled={quickCartEnabled}>
           <header className="sticky top-0 z-50 border-b border-zinc-800/80 bg-black/95 backdrop-blur-md">
             <PageShell className="flex h-16 items-center justify-between gap-4 sm:h-[4.25rem]">
               <OpenOrderLogo variant="header" priority />
@@ -90,6 +94,7 @@ export default async function RootLayout({
             {children}
           </main>
           {!hideFooter && <SiteFooter />}
+          </CustomerQuickCartShell>
         </AuthSessionProvider>
       </body>
     </html>

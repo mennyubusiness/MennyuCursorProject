@@ -1,5 +1,13 @@
+import { cn } from "@/lib/cn";
+
 /** Shared checkout step indicator (Review → Details → Payment). */
-export function CheckoutProgress({ activeStep }: { activeStep: 1 | 2 | 3 }) {
+export function CheckoutProgress({
+  activeStep,
+  className,
+}: {
+  activeStep: 1 | 2 | 3;
+  className?: string;
+}) {
   const steps = [
     { step: 1 as const, label: "Review" },
     { step: 2 as const, label: "Details" },
@@ -8,7 +16,10 @@ export function CheckoutProgress({ activeStep }: { activeStep: 1 | 2 | 3 }) {
   return (
     <nav
       aria-label="Checkout progress"
-      className="mb-8 flex flex-wrap items-center gap-2 text-sm text-stone-500"
+      className={cn(
+        "mb-8 flex flex-wrap items-center gap-2 text-sm text-stone-500",
+        className
+      )}
     >
       {steps.map((s, i) => {
         const done = activeStep > s.step;

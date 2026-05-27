@@ -47,7 +47,7 @@ export function JoinGroupOrderByCodeForm({ className = "", visible = true }: Pro
       <form onSubmit={onSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <div className="flex-1">
           <label htmlFor="group-order-join-code" className="block text-sm font-semibold text-black">
-            6-digit code
+            6-digit group order code
           </label>
           <input
             id="group-order-join-code"

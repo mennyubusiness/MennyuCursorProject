@@ -364,7 +364,7 @@ export default async function CartPage({
   return (
     <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
       <GroupOrderCartPoll enabled={pollGroupCart} cartId={pollGroupCart ? cart.id : null} />
-      <CheckoutProgress activeStep={1} />
+      <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
       <JoinGroupOrderByCodeForm visible={!goState.active} className="mb-4" />
       <GroupOrderCartPanel
         cartId={cart.id}

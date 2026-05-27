@@ -143,7 +143,7 @@ export default async function CheckoutPage({
 
   return (
     <div className="mx-auto max-w-2xl">
-      <CheckoutProgress activeStep={2} />
+      <CheckoutProgress activeStep={2} className="pt-3 sm:pt-4" />
       <div className="mb-2">
         <Link
           href={groupSession ? "/cart?groupUnlock=1" : "/cart"}

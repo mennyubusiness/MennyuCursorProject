@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
 import { buttonClassName } from "@/components/ui/button";
+import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
 import { cn } from "@/lib/cn";
 
 type SiteHeaderNavProps = {
@@ -45,6 +46,7 @@ export function SiteHeaderNav({
 }: SiteHeaderNavProps) {
   const router = useRouter();
   const { status } = useSession();
+  const quickCart = useQuickCartOptional();
   const [signingOut, setSigningOut] = useState(false);
   const [cartPulse, setCartPulse] = useState(false);
 
@@ -110,17 +112,42 @@ export function SiteHeaderNav({
           <Link href="/orders" className={navLink} title="Your order history">
             Orders
           </Link>
-          <Link
-            href={activeOrderHref ?? cartHref}
-            className={cn(
-              buttonClassName({ variant: "primary", size: "sm" }),
-              "ml-1 shadow-[0_0_16px_rgba(212,16,16,0.25)]",
-              cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
-            )}
-            title="Your cart"
-          >
-            Cart
-          </Link>
+          {quickCart?.enabled ? (
+            <button
+              type="button"
+              onClick={quickCart.openCart}
+              className={cn(
+                buttonClassName({ variant: "primary", size: "sm" }),
+                "relative ml-1 shadow-[0_0_16px_rgba(212,16,16,0.25)]",
+                cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
+              )}
+              title="Open your cart"
+              aria-label={
+                quickCart.itemCount > 0
+                  ? `Open cart, ${quickCart.itemCount} items`
+                  : "Open cart"
+              }
+            >
+              Cart
+              {quickCart.itemCount > 0 && (
+                <span className="ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none">
+                  {quickCart.itemCount > 99 ? "99+" : quickCart.itemCount}
+                </span>
+              )}
+            </button>
+          ) : (
+            <Link
+              href={activeOrderHref ?? cartHref}
+              className={cn(
+                buttonClassName({ variant: "primary", size: "sm" }),
+                "ml-1 shadow-[0_0_16px_rgba(212,16,16,0.25)]",
+                cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
+              )}
+              title="Your cart"
+            >
+              Cart
+            </Link>
+          )}
         </>
       )}
       {!isSignedIn && (
