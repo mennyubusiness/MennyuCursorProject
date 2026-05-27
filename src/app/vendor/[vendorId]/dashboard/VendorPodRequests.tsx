@@ -66,14 +66,14 @@ export function VendorPodRequests({
   return (
     <section className="space-y-3">
       <div>
-        <h3 className="text-lg font-semibold text-stone-900">Pod invitations</h3>
-        <p className="mt-1 text-sm text-stone-500">
+        <h3 className="text-lg font-semibold text-oo-charcoal">Pod invitations</h3>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Accept or decline join requests. Your menu appears on the pod when you accept.
         </p>
       </div>
-      <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
+      <div className="rounded-lg border border-oo-light-stone bg-oo-cream/50 p-4">
       {requests.length === 0 ? (
-        <p className="text-sm text-stone-500">None pending.</p>
+        <p className="text-sm text-oo-stone-gray">None pending.</p>
       ) : (
         <>
       {error && (
@@ -90,25 +90,25 @@ export function VendorPodRequests({
           return (
             <li
               key={r.id}
-              className="rounded-lg border border-stone-200 bg-white p-4"
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="font-medium text-stone-900">{r.podName}</p>
-                  <p className="mt-0.5 text-xs text-stone-500">
+                  <p className="font-medium text-oo-charcoal">{r.podName}</p>
+                  <p className="mt-0.5 text-xs text-oo-stone-gray">
                     Requested {new Date(r.createdAt).toLocaleString(undefined, {
                       dateStyle: "medium",
                       timeStyle: "short",
                     })}
                   </p>
                   {currentPod ? (
-                    <p className="mt-1 text-xs text-stone-600">
+                    <p className="mt-1 text-xs text-oo-stone-gray">
                       {isCurrentPod
                         ? "You are already in this pod."
                         : `Currently in ${currentPod.name}. ${movingCopy}`}
                     </p>
                   ) : (
-                    <p className="mt-1 text-xs text-stone-600">
+                    <p className="mt-1 text-xs text-oo-stone-gray">
                       Currently unassigned. {movingCopy}
                     </p>
                   )}
@@ -118,7 +118,7 @@ export function VendorPodRequests({
                     type="button"
                     onClick={() => handleAccept(r.id)}
                     disabled={actingId !== null}
-                    className="rounded bg-stone-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-900 disabled:opacity-50"
+                    className="rounded bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
                   >
                     {actingId === r.id ? "…" : "Accept"}
                   </button>
@@ -126,7 +126,7 @@ export function VendorPodRequests({
                     type="button"
                     onClick={() => handleDecline(r.id)}
                     disabled={actingId !== null}
-                    className="rounded border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                    className="rounded border border-oo-light-stone px-3 py-1.5 text-sm text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
                   >
                     Decline
                   </button>

@@ -164,8 +164,8 @@ export default async function PodPage({
           <section id="pod-group-order" className="scroll-mt-36">
           <PageShell className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:py-5">
             <div>
-              <p className="text-sm font-semibold text-black">Ordering with friends?</p>
-              <p className="mt-0.5 text-sm text-zinc-600">
+              <p className="text-sm font-semibold text-oo-charcoal">Ordering with friends?</p>
+              <p className="mt-0.5 text-sm text-oo-stone-gray">
                 Start a group order — everyone adds to one shared cart.
               </p>
             </div>
@@ -182,8 +182,8 @@ export default async function PodPage({
           {pod.vendors.length === 0 ? (
             <section id="pod-vendors" className="scroll-mt-36">
               <div className="oo-empty-state">
-                <p className="font-medium text-zinc-900">No vendors in this pod right now</p>
-                <p className="mt-2 text-sm text-zinc-600">Check back later or explore other pods.</p>
+                <p className="font-medium text-oo-charcoal">No vendors in this pod right now</p>
+                <p className="mt-2 text-sm text-oo-stone-gray">Check back later or explore other pods.</p>
                 <ButtonLink href="/explore" variant="secondary" size="sm" className="mt-6">
                   Explore pods
                 </ButtonLink>
@@ -200,11 +200,11 @@ export default async function PodPage({
                   <header className="mb-4">
                     <h2
                       id="pod-featured-heading"
-                      className="text-lg font-bold tracking-tight text-black sm:text-xl"
+                      className="text-lg font-bold tracking-tight text-oo-charcoal sm:text-xl"
                     >
                       Featured vendors
                     </h2>
-                    <p className="mt-1 text-sm text-zinc-600">
+                    <p className="mt-1 text-sm text-oo-stone-gray">
                       Popular picks at this pod — same shared cart for every kitchen.
                     </p>
                   </header>
@@ -228,7 +228,7 @@ export default async function PodPage({
                   >
                     {hasFeaturedSection ? "All vendors" : "Vendors"}
                   </h2>
-                  <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+                  <p className="mt-1 max-w-2xl text-sm text-oo-stone-gray">
                     Open any kitchen for its menu — pickup timing may vary across vendors.
                   </p>
                 </header>
@@ -245,21 +245,21 @@ export default async function PodPage({
             <section
               id="pod-info"
               aria-labelledby="pod-info-heading"
-              className="scroll-mt-36 border-t border-zinc-200 pt-8 sm:pt-10"
+              className="scroll-mt-36 border-t border-oo-light-stone pt-8 sm:pt-10"
             >
-              <h2 id="pod-info-heading" className="text-lg font-bold tracking-tight text-black">
+              <h2 id="pod-info-heading" className="text-lg font-bold tracking-tight text-oo-charcoal">
                 About this pod
               </h2>
               <dl className="mt-4 space-y-3 text-sm">
                 {pod.address?.trim() && (
                   <div>
-                    <dt className="font-semibold text-zinc-900">Location</dt>
-                    <dd className="mt-0.5 text-zinc-600">{pod.address}</dd>
+                    <dt className="font-semibold text-oo-charcoal">Location</dt>
+                    <dd className="mt-0.5 text-oo-stone-gray">{pod.address}</dd>
                   </div>
                 )}
                 <div>
-                  <dt className="font-semibold text-zinc-900">Pickup</dt>
-                  <dd className="mt-0.5 text-zinc-600">
+                  <dt className="font-semibold text-oo-charcoal">Pickup</dt>
+                  <dd className="mt-0.5 text-oo-stone-gray">
                     Order from multiple vendors in one cart — pay once, pick up at this pod.
                   </dd>
                 </div>

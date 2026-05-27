@@ -79,7 +79,7 @@ const URGENCY_INLINE_CLASS: Record<VendorUrgencyLevel, string> = {
 };
 
 const READY_WAIT_CLASS: Record<ReadyWaitEscalation, string> = {
-  neutral: "text-stone-600",
+  neutral: "text-oo-stone-gray",
   yellow: "text-amber-800 font-medium",
   red: "text-red-700 font-medium",
 };
@@ -219,19 +219,19 @@ export function VendorOrderCard({
       ? "text-red-800"
       : urgencyLevel === "aging"
         ? "text-amber-900"
-        : "text-stone-800";
+        : "text-oo-charcoal";
 
   return (
     <div
       className={`rounded-xl p-4 transition-shadow ${
-        isCancelledOrFailed ? "bg-stone-50" : "bg-white"
+        isCancelledOrFailed ? "bg-oo-cream" : "bg-oo-warm-white"
       } ${cardRingClass}`}
     >
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className="rounded bg-stone-800 px-2.5 py-1 font-mono text-sm font-semibold text-white"
+              className="rounded bg-brand px-2.5 py-1 font-mono text-sm font-semibold text-white"
               title="Pickup code for the customer"
             >
               {pickupCode}
@@ -241,11 +241,11 @@ export function VendorOrderCard({
             {statusBadgeLabel}
             {showUrgency && (
               <>
-                <span className="font-normal text-stone-400"> · </span>
+                <span className="font-normal text-oo-stone-gray"> · </span>
                 <span className={URGENCY_INLINE_CLASS[urgencyLevel]}>{urgencyLabel}</span>
               </>
             )}
-            <span className="font-normal text-stone-500"> · {ageText}</span>
+            <span className="font-normal text-oo-stone-gray"> · {ageText}</span>
           </p>
           {vendorOrder.fulfillmentStatus === "ready" && readyWaitMinutes !== null && (
             <p className={`mt-0.5 text-xs ${READY_WAIT_CLASS[readyWaitEscalation]}`}>
@@ -263,27 +263,27 @@ export function VendorOrderCard({
       </div>
 
       {formatCustomerPhone(vendorOrder.order.customerPhone) && (
-        <p className="mt-1 text-xs text-stone-600">
-          <span className="font-medium text-stone-700">Customer:</span>{" "}
+        <p className="mt-1 text-xs text-oo-stone-gray">
+          <span className="font-medium text-oo-charcoal">Customer:</span>{" "}
           {formatCustomerPhone(vendorOrder.order.customerPhone)}
         </p>
       )}
 
       {/* Multi-vendor context: generic only; do not show other vendor names */}
       {vendorOrderCount > 1 && (
-        <p className="mt-1 text-xs text-stone-500">Part of a combined order</p>
+        <p className="mt-1 text-xs text-oo-stone-gray">Part of a combined order</p>
       )}
 
       {/* Line items: name × qty, modifiers, special instructions */}
-      <ul className="mt-3 space-y-2 border-t border-stone-100/90 pt-3 text-sm">
+      <ul className="mt-3 space-y-2 border-t border-oo-light-stone/90 pt-3 text-sm">
         {vendorOrder.lineItems.map((line) => (
           <li key={line.id} className="flex flex-col gap-0.5">
             <div className="flex flex-wrap items-baseline gap-1">
-              <span className="font-medium text-stone-800">
+              <span className="font-medium text-oo-charcoal">
                 {line.name} × {line.quantity}
               </span>
               {line.selections.length > 0 && (
-                <span className="text-stone-600">
+                <span className="text-oo-stone-gray">
                   — {line.selections.map((s) => `${s.nameSnapshot}${s.quantity > 1 ? ` ×${s.quantity}` : ""}`).join(", ")}
                 </span>
               )}
@@ -296,19 +296,19 @@ export function VendorOrderCard({
       </ul>
 
       {vendorOrder.order.orderNotes && (
-        <p className="mt-2 text-xs text-stone-600">
+        <p className="mt-2 text-xs text-oo-stone-gray">
           <span className="font-medium">Order note:</span> {vendorOrder.order.orderNotes}
         </p>
       )}
 
-      <div className="mt-3 space-y-1 border-t border-stone-100/90 pt-3 text-sm">
-        <p className="font-medium text-stone-700">
+      <div className="mt-3 space-y-1 border-t border-oo-light-stone/90 pt-3 text-sm">
+        <p className="font-medium text-oo-charcoal">
           {totalItems} item{totalItems !== 1 ? "s" : ""} · Items{" "}
           <span className="tabular-nums">${(vendorOrder.totalCents / 100).toFixed(2)}</span>
           {" · Tip "}
           <span
             className={
-              vendorOrder.tipCents > 0 ? "tabular-nums text-emerald-800" : "tabular-nums text-stone-500"
+              vendorOrder.tipCents > 0 ? "tabular-nums text-emerald-800" : "tabular-nums text-oo-stone-gray"
             }
           >
             ${(vendorOrder.tipCents / 100).toFixed(2)}
@@ -318,9 +318,9 @@ export function VendorOrderCard({
 
       {/* Status actions: mode-aware (primary vs fallback, with hint) */}
       {(nextAction || canDeny || showManualConfirmFallback) && !isTerminal && (
-        <div className="mt-3 border-t border-stone-100/90 pt-3">
+        <div className="mt-3 border-t border-oo-light-stone/90 pt-3">
           {actionHint && (
-            <p className="mb-1.5 text-xs text-stone-600">
+            <p className="mb-1.5 text-xs text-oo-stone-gray">
               {actionHint}
             </p>
           )}
@@ -332,8 +332,8 @@ export function VendorOrderCard({
                 disabled={loading}
                 className={
                   isMennyuControlsPrimary(operatingMode)
-                    ? "rounded-lg border border-stone-900 bg-stone-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-50"
-                    : "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 shadow-sm hover:bg-stone-50 disabled:opacity-50"
+                    ? "rounded-lg border border-brand bg-brand px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-hover disabled:opacity-50"
+                    : "rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm font-medium text-oo-charcoal shadow-sm hover:bg-oo-cream disabled:opacity-50"
                 }
               >
                 {loading ? "…" : nextAction.label}

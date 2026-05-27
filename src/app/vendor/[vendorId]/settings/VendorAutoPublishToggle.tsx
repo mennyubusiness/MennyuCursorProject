@@ -35,12 +35,12 @@ export function VendorAutoPublishToggle({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-stone-600">
+      <p className="text-sm text-oo-stone-gray">
         <strong>Off (recommended):</strong> review menu imports before they go live.{" "}
         <strong>On:</strong> Deliverect webhook imports can publish automatically when checks pass.
       </p>
-      <details className="text-sm text-stone-500">
-        <summary className="cursor-pointer select-none text-stone-600 hover:text-stone-800">
+      <details className="text-sm text-oo-stone-gray">
+        <summary className="cursor-pointer select-none text-oo-stone-gray hover:text-oo-charcoal">
           More detail
         </summary>
         <p className="mt-2 pl-0 text-xs leading-relaxed">
@@ -54,7 +54,7 @@ export function VendorAutoPublishToggle({
           onClick={() => void toggle()}
           disabled={loading}
           className={`rounded-lg px-4 py-2 text-sm font-medium ${
-            on ? "bg-emerald-600 text-white hover:bg-emerald-700" : "border border-stone-300 bg-white text-stone-800"
+            on ? "bg-emerald-600 text-white hover:bg-emerald-700" : "border border-oo-light-stone bg-oo-warm-white text-oo-charcoal"
           } disabled:opacity-50`}
         >
           {loading ? "Saving…" : on ? "Auto-publish on" : "Auto-publish off"}

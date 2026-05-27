@@ -81,7 +81,7 @@ export default async function AdminVendorDeliverectMappingPage({
 
   return (
     <div>
-      <p className="text-sm text-stone-500">
+      <p className="text-sm text-oo-stone-gray">
         <Link href="/admin/vendors" className="hover:underline">
           Vendors
         </Link>
@@ -90,51 +90,51 @@ export default async function AdminVendorDeliverectMappingPage({
           {vendor.name}
         </Link>
         <span className="mx-1">/</span>
-        <span className="text-stone-800">POS &amp; Deliverect</span>
+        <span className="text-oo-charcoal">POS &amp; Deliverect</span>
       </p>
-      <h1 className="mt-2 text-xl font-semibold text-stone-900">Deliverect ID mapping</h1>
-      <p className="mt-1 text-sm text-stone-600">
+      <h1 className="mt-2 text-xl font-semibold text-oo-charcoal">Deliverect ID mapping</h1>
+      <p className="mt-1 text-sm text-oo-stone-gray">
         Attach Deliverect product and modifier IDs to existing Open Order menu data for{" "}
         <strong>{vendor.name}</strong>. Clear a field and save to unset.
       </p>
 
       <div className="mt-5 space-y-4">
-        <section className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-700">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+        <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 text-sm text-oo-charcoal">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
             Deliverect auto-mapping (channel registration)
           </h2>
-          <p className="mt-2 text-stone-600">
+          <p className="mt-2 text-oo-stone-gray">
             When Deliverect activates the channel, Open Order can assign the channel link ID automatically. Use this panel
             to see onboarding / last outcome; manual ID entry remains available if automatic matching fails.
           </p>
           <dl className="mt-3 grid gap-2 sm:grid-cols-2">
             <div>
-              <dt className="text-xs font-medium text-stone-500">POS connection status</dt>
-              <dd className="mt-0.5 font-medium text-stone-900">{vendor.posConnectionStatus}</dd>
+              <dt className="text-xs font-medium text-oo-stone-gray">POS connection status</dt>
+              <dd className="mt-0.5 font-medium text-oo-charcoal">{vendor.posConnectionStatus}</dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-stone-500">Pending connection key</dt>
-              <dd className="mt-0.5 break-all font-mono text-xs text-stone-800">
+              <dt className="text-xs font-medium text-oo-stone-gray">Pending connection key</dt>
+              <dd className="mt-0.5 break-all font-mono text-xs text-oo-charcoal">
                 {vendor.pendingDeliverectConnectionKey ?? "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-stone-500">Last auto-map outcome</dt>
-              <dd className="mt-0.5 font-mono text-xs text-stone-800">
+              <dt className="text-xs font-medium text-oo-stone-gray">Last auto-map outcome</dt>
+              <dd className="mt-0.5 font-mono text-xs text-oo-charcoal">
                 {vendor.deliverectAutoMapLastOutcome ?? "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-stone-500">Last auto-map at</dt>
-              <dd className="mt-0.5 font-mono text-xs text-stone-800">
+              <dt className="text-xs font-medium text-oo-stone-gray">Last auto-map at</dt>
+              <dd className="mt-0.5 font-mono text-xs text-oo-charcoal">
                 {vendor.deliverectAutoMapLastAt
                   ? vendor.deliverectAutoMapLastAt.toISOString()
                   : "—"}
               </dd>
             </div>
             <div className="sm:col-span-2">
-              <dt className="text-xs font-medium text-stone-500">Last auto-map detail</dt>
-              <dd className="mt-0.5 break-words font-mono text-xs text-stone-800">
+              <dt className="text-xs font-medium text-oo-stone-gray">Last auto-map detail</dt>
+              <dd className="mt-0.5 break-words font-mono text-xs text-oo-charcoal">
                 {vendor.deliverectAutoMapLastDetail ?? "—"}
               </dd>
             </div>

@@ -38,17 +38,17 @@ export default async function AdminPricingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-stone-900">Pricing</h1>
-        <p className="mt-1 text-sm text-stone-500">
+        <h1 className="text-xl font-semibold text-oo-charcoal">Pricing</h1>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Global checkout rates. Changes apply to <strong>new orders only</strong>; existing orders keep
           their snapshots.
         </p>
       </div>
 
-      <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-stone-900">Active configuration</h2>
+      <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-oo-charcoal">Active configuration</h2>
         {active ? (
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-oo-stone-gray">
             Effective {active.effectiveAt.toISOString().slice(0, 19)}Z · id <code className="text-[11px]">{active.id}</code>
           </p>
         ) : (
@@ -59,23 +59,23 @@ export default async function AdminPricingPage() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
-        <h2 className="text-sm font-semibold text-stone-900">Recent versions</h2>
-        <ul className="mt-2 space-y-2 text-xs text-stone-700">
+      <section className="rounded-lg border border-oo-light-stone bg-oo-cream/50 p-4">
+        <h2 className="text-sm font-semibold text-oo-charcoal">Recent versions</h2>
+        <ul className="mt-2 space-y-2 text-xs text-oo-charcoal">
           {history.map((h) => (
             <li
               key={h.id}
-              className="flex flex-wrap items-baseline justify-between gap-2 rounded border border-stone-100 bg-white px-2 py-1.5"
+              className="flex flex-wrap items-baseline justify-between gap-2 rounded border border-oo-light-stone bg-oo-warm-white px-2 py-1.5"
             >
               <span>
                 {h.isActive ? (
                   <span className="font-medium text-emerald-800">active</span>
                 ) : (
-                  <span className="text-stone-400">inactive</span>
+                  <span className="text-oo-stone-gray">inactive</span>
                 )}{" "}
                 · CS {bpsToPercentNumber(h.customerServiceFeeBps)}% · vendor {bpsToPercentNumber(h.vendorProcessingFeeBps)}%
               </span>
-              <span className="text-stone-500">{h.effectiveAt.toISOString().slice(0, 19)}Z</span>
+              <span className="text-oo-stone-gray">{h.effectiveAt.toISOString().slice(0, 19)}Z</span>
             </li>
           ))}
         </ul>

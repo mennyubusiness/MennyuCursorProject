@@ -28,8 +28,8 @@ function RangeLink({
       href={`/admin/analytics?range=${value}`}
       className={
         active
-          ? "rounded bg-stone-900 px-3 py-1.5 text-sm font-medium text-white"
-          : "rounded border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
+          ? "rounded bg-brand px-3 py-1.5 text-sm font-medium text-white"
+          : "rounded border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-sm text-oo-charcoal hover:bg-oo-cream"
       }
     >
       {label}
@@ -57,14 +57,14 @@ export default async function AdminAnalyticsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-stone-900">Analytics</h1>
-        <p className="mt-1 text-sm text-stone-500">
+        <h1 className="text-xl font-semibold text-oo-charcoal">Analytics</h1>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Platform-wide order and operations overview
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
+        <span className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
           Date range
         </span>
         <RangeLink current={range} value="today" label="Today" />
@@ -73,96 +73,96 @@ export default async function AdminAnalyticsPage({
       </div>
 
       {!hasAnyData && summary.totalOrders === 0 ? (
-        <div className="rounded-xl border border-stone-200 bg-stone-50/50 px-6 py-10 text-center">
-          <p className="font-medium text-stone-700">No analytics available for this range yet</p>
-          <p className="mt-1 text-sm text-stone-500">
+        <div className="rounded-xl border border-oo-light-stone bg-oo-cream/50 px-6 py-10 text-center">
+          <p className="font-medium text-oo-charcoal">No analytics available for this range yet</p>
+          <p className="mt-1 text-sm text-oo-stone-gray">
             Orders and operations in the selected period will appear here.
           </p>
         </div>
       ) : (
         <>
           {/* Summary cards */}
-          <section className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">
+          <section className="rounded-lg border border-oo-light-stone bg-oo-cream/50 p-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
               Summary
             </h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-              <div className="rounded-lg border border-stone-200 bg-white p-4">
-                <p className="text-2xl font-semibold text-stone-900">{summary.totalOrders}</p>
-                <p className="text-sm text-stone-600">Total orders</p>
+              <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+                <p className="text-2xl font-semibold text-oo-charcoal">{summary.totalOrders}</p>
+                <p className="text-sm text-oo-stone-gray">Total orders</p>
               </div>
-              <div className="rounded-lg border border-stone-200 bg-white p-4">
-                <p className="text-2xl font-semibold text-stone-900">
+              <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+                <p className="text-2xl font-semibold text-oo-charcoal">
                   {formatMoney(summary.grossSalesCents)}
                 </p>
-                <p className="text-sm text-stone-600">Gross sales</p>
+                <p className="text-sm text-oo-stone-gray">Gross sales</p>
               </div>
-              <div className="rounded-lg border border-stone-200 bg-white p-4">
-                <p className="text-2xl font-semibold text-stone-900">
+              <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+                <p className="text-2xl font-semibold text-oo-charcoal">
                   {formatMoney(summary.mennyuRevenueCents)}
                 </p>
-                <p className="text-sm text-stone-600">Open Order service fee revenue</p>
+                <p className="text-sm text-oo-stone-gray">Open Order service fee revenue</p>
               </div>
-              <div className="rounded-lg border border-stone-200 bg-white p-4">
-                <p className="text-2xl font-semibold text-stone-900">{summary.activeVendors}</p>
-                <p className="text-sm text-stone-600">Active vendors</p>
+              <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+                <p className="text-2xl font-semibold text-oo-charcoal">{summary.activeVendors}</p>
+                <p className="text-sm text-oo-stone-gray">Active vendors</p>
               </div>
-              <div className="rounded-lg border border-stone-200 bg-white p-4">
-                <p className="text-2xl font-semibold text-stone-900">{summary.activePods}</p>
-                <p className="text-sm text-stone-600">Active pods</p>
+              <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+                <p className="text-2xl font-semibold text-oo-charcoal">{summary.activePods}</p>
+                <p className="text-sm text-oo-stone-gray">Active pods</p>
               </div>
-              <div className="rounded-lg border border-stone-200 bg-white p-4">
-                <p className="text-2xl font-semibold text-stone-900">
+              <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+                <p className="text-2xl font-semibold text-oo-charcoal">
                   {formatMoney(summary.averageOrderValueCents)}
                 </p>
-                <p className="text-sm text-stone-600">Avg order value</p>
+                <p className="text-sm text-oo-stone-gray">Avg order value</p>
               </div>
             </div>
-            <div className="mt-4 rounded-lg border border-stone-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            <div className="mt-4 rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
                 Revenue breakdown
               </p>
               <div className="mt-2 grid gap-3 sm:grid-cols-3">
                 <div>
-                  <p className="text-lg font-medium text-stone-900">
+                  <p className="text-lg font-medium text-oo-charcoal">
                     {formatMoney(summary.serviceFeeRevenueCents)}
                   </p>
-                  <p className="text-xs text-stone-600">Customer service fee (configurable)</p>
+                  <p className="text-xs text-oo-stone-gray">Customer service fee (configurable)</p>
                 </div>
                 <div>
-                  <p className="text-lg font-medium text-stone-900">
+                  <p className="text-lg font-medium text-oo-charcoal">
                     {formatMoney(summary.vendorProcessingRecoveryTotalCents)}
                   </p>
-                  <p className="text-xs text-stone-600">
+                  <p className="text-xs text-oo-stone-gray">
                     Vendor processing recovery (food subtotal; tips not reduced)
                   </p>
                 </div>
                 <div>
-                  <p className="text-lg font-medium text-stone-900">
+                  <p className="text-lg font-medium text-oo-charcoal">
                     {formatMoney(summary.revenuePerOrderCents)}
                   </p>
-                  <p className="text-xs text-stone-600">Revenue per order</p>
+                  <p className="text-xs text-oo-stone-gray">Revenue per order</p>
                 </div>
               </div>
             </div>
           </section>
 
           {/* Volume trends */}
-          <section className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">
+          <section className="rounded-lg border border-oo-light-stone bg-oo-cream/50 p-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
               Order volume
             </h2>
             {trends.length === 0 ? (
-              <p className="mt-3 text-sm text-stone-500">No order data in this range.</p>
+              <p className="mt-3 text-sm text-oo-stone-gray">No order data in this range.</p>
             ) : (
               <ul className="mt-3 space-y-2">
                 {trends.map((day) => (
                   <li
                     key={day.date}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded border border-stone-100 bg-white px-3 py-2 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm"
                   >
-                    <span className="font-medium text-stone-700">{day.label}</span>
-                    <span className="text-stone-600">
+                    <span className="font-medium text-oo-charcoal">{day.label}</span>
+                    <span className="text-oo-stone-gray">
                       {day.orderCount} orders · {formatMoney(day.grossSalesCents)}
                     </span>
                   </li>
@@ -173,21 +173,21 @@ export default async function AdminAnalyticsPage({
 
           {/* Top lists */}
           <div className="grid gap-4 lg:grid-cols-3">
-            <section className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">
+            <section className="rounded-lg border border-oo-light-stone bg-oo-cream/50 p-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
                 Top vendors
               </h2>
               {topVendors.length === 0 ? (
-                <p className="mt-3 text-sm text-stone-500">No vendor orders in this range.</p>
+                <p className="mt-3 text-sm text-oo-stone-gray">No vendor orders in this range.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {topVendors.slice(0, 5).map((v) => (
                     <li
                       key={v.vendorId}
-                      className="flex justify-between gap-2 rounded border border-stone-100 bg-white px-3 py-2 text-sm"
+                      className="flex justify-between gap-2 rounded border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm"
                     >
-                      <span className="truncate text-stone-800">{v.vendorName}</span>
-                      <span className="shrink-0 font-medium tabular-nums text-stone-700">
+                      <span className="truncate text-oo-charcoal">{v.vendorName}</span>
+                      <span className="shrink-0 font-medium tabular-nums text-oo-charcoal">
                         {v.orderCount} orders
                         {v.revenueCents > 0 && ` · ${formatMoney(v.revenueCents)}`}
                       </span>
@@ -196,21 +196,21 @@ export default async function AdminAnalyticsPage({
                 </ul>
               )}
             </section>
-            <section className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">
+            <section className="rounded-lg border border-oo-light-stone bg-oo-cream/50 p-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
                 Top pods
               </h2>
               {topPods.length === 0 ? (
-                <p className="mt-3 text-sm text-stone-500">No orders in this range.</p>
+                <p className="mt-3 text-sm text-oo-stone-gray">No orders in this range.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {topPods.slice(0, 5).map((p) => (
                     <li
                       key={p.podId}
-                      className="flex justify-between gap-2 rounded border border-stone-100 bg-white px-3 py-2 text-sm"
+                      className="flex justify-between gap-2 rounded border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm"
                     >
-                      <span className="truncate text-stone-800">{p.podName}</span>
-                      <span className="shrink-0 font-medium tabular-nums text-stone-700">
+                      <span className="truncate text-oo-charcoal">{p.podName}</span>
+                      <span className="shrink-0 font-medium tabular-nums text-oo-charcoal">
                         {p.orderCount} orders
                       </span>
                     </li>
@@ -218,21 +218,21 @@ export default async function AdminAnalyticsPage({
                 </ul>
               )}
             </section>
-            <section className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">
+            <section className="rounded-lg border border-oo-light-stone bg-oo-cream/50 p-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
                 Top items
               </h2>
               {topItems.length === 0 ? (
-                <p className="mt-3 text-sm text-stone-500">No line items in this range.</p>
+                <p className="mt-3 text-sm text-oo-stone-gray">No line items in this range.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {topItems.slice(0, 5).map((item, i) => (
                     <li
                       key={`${item.name}-${i}`}
-                      className="flex justify-between gap-2 rounded border border-stone-100 bg-white px-3 py-2 text-sm"
+                      className="flex justify-between gap-2 rounded border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm"
                     >
-                      <span className="truncate text-stone-800">{item.name}</span>
-                      <span className="shrink-0 font-medium tabular-nums text-stone-700">
+                      <span className="truncate text-oo-charcoal">{item.name}</span>
+                      <span className="shrink-0 font-medium tabular-nums text-oo-charcoal">
                         {item.quantity}
                       </span>
                     </li>
@@ -243,47 +243,47 @@ export default async function AdminAnalyticsPage({
           </div>
 
           {/* Operations health */}
-          <section className="rounded-lg border border-stone-200 bg-stone-50/50 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">
+          <section className="rounded-lg border border-oo-light-stone bg-oo-cream/50 p-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
               Operations health
             </h2>
-            <p className="mt-1 text-xs text-stone-500">
+            <p className="mt-1 text-xs text-oo-stone-gray">
               Reliability and operational indicators for the selected range (except open issues).
             </p>
             <ul className="mt-4 space-y-2">
-              <li className="flex justify-between rounded border border-stone-100 bg-white px-3 py-2 text-sm">
-                <span className="text-stone-700">Routing failures</span>
-                <span className="font-medium tabular-nums text-stone-900">
+              <li className="flex justify-between rounded border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm">
+                <span className="text-oo-charcoal">Routing failures</span>
+                <span className="font-medium tabular-nums text-oo-charcoal">
                   {health.routingFailures}
                 </span>
               </li>
-              <li className="flex justify-between rounded border border-stone-100 bg-white px-3 py-2 text-sm">
-                <span className="text-stone-700">Manual recoveries</span>
-                <span className="font-medium tabular-nums text-stone-900">
+              <li className="flex justify-between rounded border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm">
+                <span className="text-oo-charcoal">Manual recoveries</span>
+                <span className="font-medium tabular-nums text-oo-charcoal">
                   {health.manualRecoveries}
                 </span>
               </li>
-              <li className="flex justify-between rounded border border-stone-100 bg-white px-3 py-2 text-sm">
-                <span className="text-stone-700">Cancelled vendor orders</span>
-                <span className="font-medium tabular-nums text-stone-900">
+              <li className="flex justify-between rounded border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm">
+                <span className="text-oo-charcoal">Cancelled vendor orders</span>
+                <span className="font-medium tabular-nums text-oo-charcoal">
                   {health.cancelledVendorOrders}
                 </span>
               </li>
-              <li className="flex justify-between rounded border border-stone-100 bg-white px-3 py-2 text-sm">
-                <span className="text-stone-700">Open order issues</span>
-                <span className="font-medium tabular-nums text-stone-900">
+              <li className="flex justify-between rounded border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm">
+                <span className="text-oo-charcoal">Open order issues</span>
+                <span className="font-medium tabular-nums text-oo-charcoal">
                   {health.openOrderIssues}
                 </span>
               </li>
-              <li className="flex justify-between rounded border border-stone-100 bg-white px-3 py-2 text-sm">
-                <span className="text-stone-700">Open vendor order issues</span>
-                <span className="font-medium tabular-nums text-stone-900">
+              <li className="flex justify-between rounded border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm">
+                <span className="text-oo-charcoal">Open vendor order issues</span>
+                <span className="font-medium tabular-nums text-oo-charcoal">
                   {health.openVendorOrderIssues}
                 </span>
               </li>
-              <li className="flex justify-between rounded border border-stone-100 bg-white px-3 py-2 text-sm">
-                <span className="text-stone-700">Completion rate</span>
-                <span className="font-medium tabular-nums text-stone-900">
+              <li className="flex justify-between rounded border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm">
+                <span className="text-oo-charcoal">Completion rate</span>
+                <span className="font-medium tabular-nums text-oo-charcoal">
                   {health.completionRatePercent}%
                 </span>
               </li>

@@ -4,11 +4,11 @@ import { PageShell } from "@/components/layout/page-shell";
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-zinc-800 bg-black text-zinc-400">
+    <footer className="border-t border-oo-light-stone/15 bg-oo-charcoal text-oo-stone-gray">
       <PageShell className="flex flex-col gap-8 py-12 sm:flex-row sm:items-end sm:justify-between sm:py-14">
         <div className="flex flex-col gap-4">
           <OpenOrderLogo variant="header" />
-          <p className="max-w-sm text-sm leading-relaxed text-zinc-500">
+          <p className="max-w-sm text-sm leading-relaxed text-oo-stone-gray">
             Multi-vendor food cart ordering — one cart, one payment, one pickup.
           </p>
         </div>
@@ -16,17 +16,17 @@ export function SiteFooter() {
           className="flex flex-wrap gap-x-8 gap-y-3 text-sm font-medium"
           aria-label="Footer"
         >
-          <Link href="/explore" className="transition hover:text-white">
+          <Link href="/explore" className="transition hover:text-oo-warm-white">
             Explore pods
           </Link>
-          <Link href="/register" className="transition hover:text-white">
+          <Link href="/register" className="transition hover:text-oo-warm-white">
             List your pod
           </Link>
-          <Link href="/login" className="transition hover:text-white">
+          <Link href="/login" className="transition hover:text-oo-warm-white">
             Sign in
           </Link>
         </nav>
-        <p className="text-xs text-zinc-600 sm:text-right">
+        <p className="text-xs text-oo-stone-gray/80 sm:text-right">
           © {new Date().getFullYear()} Open Order Co.
         </p>
       </PageShell>

@@ -21,7 +21,7 @@ function ExploreEmptyState({
 }) {
   return (
     <div className="oo-empty-state">
-      <p className="text-lg font-bold text-black">{title}</p>
+      <p className="text-lg font-bold text-oo-charcoal">{title}</p>
       <p className="mx-auto mt-2 max-w-md text-sm text-zinc-600">{description}</p>
     </div>
   );
@@ -119,7 +119,7 @@ export function ExplorePodList({ pods }: { pods: PodCardPod[] }) {
             <section aria-labelledby="explore-results-pods">
               <h3
                 id="explore-results-pods"
-                className="mb-6 text-xs font-bold uppercase tracking-[0.15em] text-zinc-500"
+                className="mb-6 text-xs font-bold uppercase tracking-[0.15em] text-oo-stone-gray"
               >
                 Pods · {matchingPods.length}
               </h3>
@@ -135,7 +135,7 @@ export function ExplorePodList({ pods }: { pods: PodCardPod[] }) {
             <section aria-labelledby="explore-results-vendors">
               <h3
                 id="explore-results-vendors"
-                className="mb-6 text-xs font-bold uppercase tracking-[0.15em] text-zinc-500"
+                className="mb-6 text-xs font-bold uppercase tracking-[0.15em] text-oo-stone-gray"
               >
                 Vendors · {matchingVendors.length}
               </h3>

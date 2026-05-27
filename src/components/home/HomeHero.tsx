@@ -1,11 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PodLogo } from "@/components/images/PodLogo";
 import { ButtonLink } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
 import { cn } from "@/lib/cn";
+import { HOME_MARKET_IMAGE } from "@/lib/home-assets";
 
 export type HomeHeroFeaturedPod = {
   id: string;
@@ -45,31 +47,46 @@ export function HomeHero({ featuredPods }: { featuredPods: HomeHeroFeaturedPod[]
   const active = slides[index]!;
 
   return (
-    <section className="relative isolate w-full overflow-hidden border-b border-zinc-800 bg-black text-white">
+    <section className="relative isolate w-full overflow-hidden border-b border-oo-charcoal/30 bg-oo-charcoal text-oo-warm-white">
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 w-full sm:w-[58%] lg:w-1/2"
+        aria-hidden
+      >
+        <Image
+          src={HOME_MARKET_IMAGE}
+          alt=""
+          fill
+          className="object-cover object-center opacity-[0.28] sm:opacity-[0.32]"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 58vw, 50vw"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-oo-charcoal from-5% via-oo-charcoal/85 via-40% to-oo-charcoal/55" />
+        <div className="absolute inset-0 bg-oo-charcoal/45" />
+      </div>
+
       <div
         className="pointer-events-none absolute inset-0 opacity-40"
         style={{
           backgroundImage:
-            "linear-gradient(105deg, transparent 0%, rgba(212,16,16,0.08) 45%, transparent 70%), radial-gradient(ellipse 80% 50% at 100% 0%, rgba(212,16,16,0.15), transparent 50%)",
+            "linear-gradient(105deg, transparent 0%, rgba(249,115,22,0.08) 45%, transparent 70%), radial-gradient(ellipse 80% 50% at 100% 0%, rgba(249,115,22,0.14), transparent 50%)",
         }}
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(0,0,0,0.4)_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(31,31,28,0.45)_100%)]"
         aria-hidden
       />
 
-      <PageShell className="relative grid min-h-[min(88vh,52rem)] gap-12 py-16 sm:py-20 lg:grid-cols-[1.15fr_minmax(0,22rem)] lg:items-end lg:gap-16 lg:py-24 xl:grid-cols-[1.2fr_minmax(0,26rem)]">
+      <PageShell className="relative z-10 grid min-h-[min(88vh,52rem)] gap-12 py-16 sm:py-20 lg:grid-cols-[1.15fr_minmax(0,22rem)] lg:items-end lg:gap-16 lg:py-24 xl:grid-cols-[1.2fr_minmax(0,26rem)]">
         <div className="flex flex-col justify-end animate-oo-fade-up motion-reduce:animate-none">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-oo-cream/50">
             <span className="oo-live-dot" aria-hidden />
             Live ordering network
           </p>
-          <h1 className="oo-display mt-6 text-5xl leading-[0.95] text-white sm:text-6xl md:text-7xl lg:text-8xl">
+          <h1 className="oo-display mt-6 text-5xl leading-[0.95] text-oo-warm-white sm:text-6xl md:text-7xl lg:text-8xl">
             Order everywhere.
-            <span className="mt-1 block text-zinc-500">Pay once.</span>
+            <span className="mt-1 block text-oo-cream/55">Pay once.</span>
           </h1>
-          <p className="mt-8 max-w-xl text-lg leading-relaxed text-zinc-400 sm:text-xl">
+          <p className="mt-8 max-w-xl text-lg leading-relaxed text-oo-cream/70 sm:text-xl">
             Multi-vendor food pods on one cart, one checkout, one pickup — built for speed at scale.
           </p>
           <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -80,7 +97,7 @@ export function HomeHero({ featuredPods }: { featuredPods: HomeHeroFeaturedPod[]
               href="/register"
               variant="secondary"
               size="lg"
-              className="w-full border-zinc-600 text-white hover:border-white hover:bg-white hover:text-black sm:w-auto"
+              className="w-full border-oo-cream/40 text-oo-warm-white hover:border-oo-warm-white hover:bg-oo-warm-white hover:text-oo-charcoal sm:w-auto"
             >
               Run a pod
             </ButtonLink>
@@ -89,41 +106,41 @@ export function HomeHero({ featuredPods }: { featuredPods: HomeHeroFeaturedPod[]
 
         <div
           className={cn(
-            "flex flex-col justify-between rounded-xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl backdrop-blur-sm",
+            "flex flex-col justify-between rounded-xl border border-oo-light-stone/15 bg-oo-charcoal/90 p-6 shadow-2xl backdrop-blur-sm",
             "animate-oo-fade-up motion-reduce:animate-none [animation-delay:120ms]"
           )}
         >
           <div key={active.id} className="animate-mennyu-fade-in motion-reduce:animate-none">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-oo-cream/50">
               Featured pod
             </p>
             <div className="mt-4 flex gap-4">
               <PodLogo
                 imageUrl={active.imageUrl}
                 podName={active.name}
-                className="h-14 w-14 shrink-0 rounded-lg ring-1 ring-zinc-700"
+                className="h-14 w-14 shrink-0 rounded-lg ring-1 ring-oo-light-stone/25"
                 sizes="56px"
               />
               <div className="min-w-0">
-                <p className="truncate text-xl font-bold tracking-tight text-white">{active.name}</p>
+                <p className="truncate text-xl font-bold tracking-tight text-oo-warm-white">{active.name}</p>
                 {active.vendorCount > 0 && (
-                  <p className="mt-1 text-sm font-medium text-zinc-400">
+                  <p className="mt-1 text-sm font-medium text-oo-cream/65">
                     {active.vendorCount} vendor{active.vendorCount !== 1 ? "s" : ""} · One pickup
                   </p>
                 )}
               </div>
             </div>
             {active.description && (
-              <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-zinc-500">
+              <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-oo-cream/55">
                 {active.description}
               </p>
             )}
           </div>
           {featuredPods.length > 0 && (
-            <div className="mt-8 flex items-center justify-between gap-3 border-t border-zinc-800 pt-5">
+            <div className="mt-8 flex items-center justify-between gap-3 border-t border-oo-light-stone/15 pt-5">
               <Link
                 href={`/pod/${active.id}`}
-                className="text-sm font-semibold text-white underline-offset-4 transition hover:text-brand hover:underline"
+                className="text-sm font-semibold text-oo-warm-white underline-offset-4 transition hover:text-brand hover:underline"
               >
                 View pod →
               </Link>
@@ -138,7 +155,7 @@ export function HomeHero({ featuredPods }: { featuredPods: HomeHeroFeaturedPod[]
                       onClick={() => setIndex(i)}
                       className={cn(
                         "h-1.5 rounded-full transition-all duration-300",
-                        i === index ? "w-8 bg-brand" : "w-2 bg-zinc-700 hover:bg-zinc-500"
+                        i === index ? "w-8 bg-brand" : "w-2 bg-oo-light-stone/30 hover:bg-oo-cream/50"
                       )}
                       aria-label={`Show featured pod ${i + 1}`}
                     />

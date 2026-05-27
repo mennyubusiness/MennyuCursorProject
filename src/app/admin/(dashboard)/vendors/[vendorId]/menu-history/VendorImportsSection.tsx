@@ -75,14 +75,14 @@ export async function VendorImportsSection({
       )}
 
       <div>
-        <h2 className="text-lg font-semibold text-stone-900">Deliverect imports</h2>
-        <p className="mt-1 text-sm text-stone-600">
+        <h2 className="text-lg font-semibold text-oo-charcoal">Deliverect imports</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Import runs for this vendor. Open a row to view changes, publish, or discard — same as before.
         </p>
 
-        <div className="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+        <div className="mt-4 overflow-hidden rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm">
           <table className="min-w-full text-sm">
-            <thead className="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium uppercase tracking-wide text-stone-500">
+            <thead className="border-b border-oo-light-stone bg-oo-cream text-left text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
               <tr>
                 <th className="px-4 py-3">Updated</th>
                 <th className="px-4 py-3">Status</th>
@@ -90,10 +90,10 @@ export async function VendorImportsSection({
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-oo-light-stone">
               {jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-stone-500">
+                  <td colSpan={4} className="px-4 py-10 text-center text-oo-stone-gray">
                     No import jobs yet for this vendor.
                   </td>
                 </tr>
@@ -124,10 +124,10 @@ export async function VendorImportsSection({
                   )}
                   {previousJobs.length > 0 && (
                     <>
-                      <tr className="bg-stone-100/90">
+                      <tr className="bg-oo-cream/90">
                         <td
                           colSpan={4}
-                          className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-stone-600"
+                          className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray"
                         >
                           Previous imports
                         </td>
@@ -195,14 +195,14 @@ function ImportJobRow({
 
   return (
     <tr
-      className={`hover:bg-stone-50/80 ${
+      className={`hover:bg-oo-cream/80 ${
         isLatestActionable && isAwaitingReview ? "bg-emerald-50/50" : ""
       }`}
     >
-      <td className="whitespace-nowrap px-4 py-3 text-stone-700">
+      <td className="whitespace-nowrap px-4 py-3 text-oo-charcoal">
         {formatDate(j.completedAt ?? j.startedAt)}
         {j.id === latestRunId && (
-          <span className="ml-2 rounded bg-stone-200 px-1.5 py-0.5 text-[10px] font-medium text-stone-700">
+          <span className="ml-2 rounded bg-stone-200 px-1.5 py-0.5 text-[10px] font-medium text-oo-charcoal">
             Latest run
           </span>
         )}
@@ -215,9 +215,9 @@ function ImportJobRow({
           </span>
         )}
       </td>
-      <td className="max-w-md px-4 py-3 text-stone-600">
+      <td className="max-w-md px-4 py-3 text-oo-stone-gray">
         <span className="line-clamp-2">{summary}</span>
-        <span className="mt-0.5 block text-xs text-stone-500">{menuImportFriendlySource(j.source)}</span>
+        <span className="mt-0.5 block text-xs text-oo-stone-gray">{menuImportFriendlySource(j.source)}</span>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
         <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-3">

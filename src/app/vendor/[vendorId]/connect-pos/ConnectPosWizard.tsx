@@ -71,17 +71,17 @@ function ManualConnectionForm({
 
   return (
     <form onSubmit={(e) => void onSubmit(e)} className="mt-4 space-y-4">
-      <p className="text-xs text-stone-500">
+      <p className="text-xs text-oo-stone-gray">
         Admin or support use: the <strong>channel link ID</strong> is what Open Order uses to send orders after Deliverect
         gives you a link. The optional <strong>Deliverect location ID</strong> is only extra metadata for some setups —
         your Open Order location ID above is what you paste into Deliverect as <strong>channelLocationId</strong> during setup.
       </p>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">POS system</span>
+        <span className="font-medium text-oo-charcoal">POS system</span>
         <select
           value={posProvider}
           onChange={(e) => setPosProvider(e.target.value)}
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+          className="mt-1 w-full rounded border border-oo-light-stone px-3 py-2 text-sm"
         >
           <option value="">Select…</option>
           {POS_BRANDS.map((b) => (
@@ -92,31 +92,31 @@ function ManualConnectionForm({
         </select>
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Deliverect channel link ID</span>
+        <span className="font-medium text-oo-charcoal">Deliverect channel link ID</span>
         <input
           value={channelLinkId}
           onChange={(e) => setChannelLinkId(e.target.value)}
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 font-mono text-sm"
+          className="mt-1 w-full rounded border border-oo-light-stone px-3 py-2 font-mono text-sm"
           placeholder="After activation — usually applied automatically"
           autoComplete="off"
         />
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Deliverect location ID (optional)</span>
+        <span className="font-medium text-oo-charcoal">Deliverect location ID (optional)</span>
         <input
           value={locationId}
           onChange={(e) => setLocationId(e.target.value)}
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 font-mono text-sm"
+          className="mt-1 w-full rounded border border-oo-light-stone px-3 py-2 font-mono text-sm"
           autoComplete="off"
         />
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">POS hub account email (optional)</span>
+        <span className="font-medium text-oo-charcoal">POS hub account email (optional)</span>
         <input
           type="email"
           value={accountEmail}
           onChange={(e) => setAccountEmail(e.target.value)}
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+          className="mt-1 w-full rounded border border-oo-light-stone px-3 py-2 text-sm"
           autoComplete="email"
         />
       </label>
@@ -128,7 +128,7 @@ function ManualConnectionForm({
       <button
         type="submit"
         disabled={loading}
-        className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
         {loading ? "Saving…" : "Save"}
       </button>
@@ -185,11 +185,11 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
             Back to orders
           </Link>
         </div>
-        <details className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <summary className="cursor-pointer text-sm font-medium text-stone-800">
+        <details className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
+          <summary className="cursor-pointer text-sm font-medium text-oo-charcoal">
             Advanced · manual IDs (support / recovery)
           </summary>
-          <p className="mt-2 text-xs text-stone-500">
+          <p className="mt-2 text-xs text-oo-stone-gray">
             Rare cases only. Channel link ID is the live routing key; Deliverect location ID is optional metadata.
           </p>
           <MennyuLocationIdField mennyuLocationId={vendor.id} className="mt-4" />
@@ -216,20 +216,20 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 text-xs font-medium text-stone-500">
-        <span className={step >= 0 ? "text-stone-900" : ""}>1 · Your ID</span>
+      <div className="flex flex-wrap gap-2 text-xs font-medium text-oo-stone-gray">
+        <span className={step >= 0 ? "text-oo-charcoal" : ""}>1 · Your ID</span>
         <span>→</span>
-        <span className={step >= 1 ? "text-stone-900" : ""}>2 · Deliverect</span>
+        <span className={step >= 1 ? "text-oo-charcoal" : ""}>2 · Deliverect</span>
         <span>→</span>
-        <span className={step >= 2 ? "text-stone-900" : ""}>3 · Account</span>
+        <span className={step >= 2 ? "text-oo-charcoal" : ""}>3 · Account</span>
         <span>→</span>
-        <span className={step >= 3 ? "text-stone-900" : ""}>4 · Connecting</span>
+        <span className={step >= 3 ? "text-oo-charcoal" : ""}>4 · Connecting</span>
       </div>
 
       {step === 0 && (
-        <div className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h3 className="text-base font-semibold text-stone-900">Connect your kitchen POS</h3>
-          <p className="text-sm text-stone-600 leading-relaxed">
+        <div className="space-y-4 rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
+          <h3 className="text-base font-semibold text-oo-charcoal">Connect your kitchen POS</h3>
+          <p className="text-sm text-oo-stone-gray leading-relaxed">
             In four short steps you&apos;ll copy your Open Order location ID into Deliverect, finish activation there, and
             Open Order will attach the real channel link automatically — no need to hunt for technical IDs in the normal
             flow.
@@ -237,12 +237,12 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
           <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="button"
-              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white"
               onClick={() => setStep(1)}
             >
               Start
             </button>
-            <Link href={ordersHref} className="rounded-lg px-4 py-2 text-sm text-stone-600 hover:text-stone-900">
+            <Link href={ordersHref} className="rounded-lg px-4 py-2 text-sm text-oo-stone-gray hover:text-oo-charcoal">
               Skip for now
             </Link>
           </div>
@@ -255,12 +255,12 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white"
               onClick={() => setStep(2)}
             >
               I’ve copied it
             </button>
-            <button type="button" className="text-sm text-stone-600 hover:text-stone-900" onClick={() => setStep(0)}>
+            <button type="button" className="text-sm text-oo-stone-gray hover:text-oo-charcoal" onClick={() => setStep(0)}>
               Back
             </button>
           </div>
@@ -268,9 +268,9 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
       )}
 
       {step === 2 && (
-        <div className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h3 className="text-base font-semibold text-stone-900">Paste into Deliverect</h3>
-          <ol className="list-decimal space-y-3 pl-5 text-sm text-stone-600 leading-relaxed">
+        <div className="space-y-4 rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
+          <h3 className="text-base font-semibold text-oo-charcoal">Paste into Deliverect</h3>
+          <ol className="list-decimal space-y-3 pl-5 text-sm text-oo-stone-gray leading-relaxed">
             <li>Open your Deliverect / POS hub flow where you add or edit the channel for this restaurant.</li>
             <li>
               Find the field for <strong>channel location ID</strong>, <strong>merchant ID</strong>, or{" "}
@@ -280,19 +280,19 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
             <li>Paste your <strong>Open Order location ID</strong> from the previous step — same value, exactly.</li>
             <li>Save in Deliverect, then complete any remaining activation steps there.</li>
           </ol>
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-oo-stone-gray">
             After Deliverect activates the channel, it sends Open Order a secure signal and we attach the routing ID for
             orders automatically.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="button"
-              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white"
               onClick={() => setStep(3)}
             >
               Continue
             </button>
-            <button type="button" className="text-sm text-stone-600 hover:text-stone-900" onClick={() => setStep(1)}>
+            <button type="button" className="text-sm text-oo-stone-gray hover:text-oo-charcoal" onClick={() => setStep(1)}>
               Back
             </button>
           </div>
@@ -300,17 +300,17 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
       )}
 
       {step === 3 && (
-        <div className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h3 className="text-base font-semibold text-stone-900">Your Open Order account details</h3>
-          <p className="text-sm text-stone-600">
+        <div className="space-y-4 rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
+          <h3 className="text-base font-semibold text-oo-charcoal">Your Open Order account details</h3>
+          <p className="text-sm text-oo-stone-gray">
             We use your POS hub email as a backup match. Choose your POS brand so we can show the right guidance later.
           </p>
           <label className="block text-sm">
-            <span className="font-medium text-stone-800">POS system</span>
+            <span className="font-medium text-oo-charcoal">POS system</span>
             <select
               value={posProvider}
               onChange={(e) => setPosProvider(e.target.value)}
-              className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-oo-light-stone px-3 py-2 text-sm"
             >
               <option value="">Select…</option>
               {POS_BRANDS.map((b) => (
@@ -321,12 +321,12 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
             </select>
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-stone-800">Email you use for your POS hub</span>
+            <span className="font-medium text-oo-charcoal">Email you use for your POS hub</span>
             <input
               type="email"
               value={accountEmail}
               onChange={(e) => setAccountEmail(e.target.value)}
-              className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-oo-light-stone px-3 py-2 text-sm"
               placeholder="you@restaurant.com"
               autoComplete="email"
               required
@@ -341,7 +341,7 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
             <button
               type="button"
               disabled={loading}
-              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               onClick={() => {
                 setError(null);
                 setLoading(true);
@@ -367,48 +367,48 @@ export function ConnectPosWizard({ vendor }: { vendor: VendorFields }) {
             >
               {loading ? "Saving…" : "I’ve finished in Deliverect — connect my account"}
             </button>
-            <button type="button" className="text-sm text-stone-600 hover:text-stone-900" onClick={() => setStep(2)}>
+            <button type="button" className="text-sm text-oo-stone-gray hover:text-oo-charcoal" onClick={() => setStep(2)}>
               Back
             </button>
-            <Link href={ordersHref} className="text-sm text-stone-500 hover:text-stone-800">
+            <Link href={ordersHref} className="text-sm text-oo-stone-gray hover:text-oo-charcoal">
               Skip for now
             </Link>
           </div>
-          <details className="rounded-lg border border-stone-100 bg-stone-50/80 p-3 text-sm">
-            <summary className="cursor-pointer font-medium text-stone-700">Advanced · enter channel link ID manually</summary>
+          <details className="rounded-lg border border-oo-light-stone bg-oo-cream/80 p-3 text-sm">
+            <summary className="cursor-pointer font-medium text-oo-charcoal">Advanced · enter channel link ID manually</summary>
             <ManualConnectionForm vendor={vendor} />
           </details>
         </div>
       )}
 
       {step === WAITING_STEP && (
-        <div className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h3 className="text-base font-semibold text-stone-900">We&apos;re connecting your account</h3>
-          <p className="text-sm text-stone-600 leading-relaxed">
+        <div className="space-y-4 rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
+          <h3 className="text-base font-semibold text-oo-charcoal">We&apos;re connecting your account</h3>
+          <p className="text-sm text-oo-stone-gray leading-relaxed">
             When Deliverect finishes activation, Open Order receives a secure registration and attaches your{" "}
             <strong>channel link ID</strong> (the ID that actually routes orders). You don&apos;t need to paste that ID
             yourself in the normal flow.
           </p>
           {displayPendingKey ? (
-            <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
-              <p className="text-xs font-medium text-stone-600">Support reference</p>
-              <p className="mt-1 break-all font-mono text-xs text-stone-900">{displayPendingKey}</p>
+            <div className="rounded-lg border border-oo-light-stone bg-oo-cream p-3">
+              <p className="text-xs font-medium text-oo-stone-gray">Support reference</p>
+              <p className="mt-1 break-all font-mono text-xs text-oo-charcoal">{displayPendingKey}</p>
             </div>
           ) : null}
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-oo-stone-gray">
             You can leave this page. If something doesn&apos;t connect after a few minutes, confirm your Open Order location ID
             is entered exactly in Deliverect, then try &quot;Check connection again&quot; from Orders, or contact support.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
-            <Link href={ordersHref} className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white">
+            <Link href={ordersHref} className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white">
               Return to orders
             </Link>
-            <button type="button" className="text-sm text-stone-600 hover:text-stone-900" onClick={() => setStep(3)}>
+            <button type="button" className="text-sm text-oo-stone-gray hover:text-oo-charcoal" onClick={() => setStep(3)}>
               Edit account details
             </button>
           </div>
-          <details className="rounded-lg border border-stone-100 bg-stone-50/80 p-3 text-sm">
-            <summary className="cursor-pointer font-medium text-stone-700">Advanced · manual connection IDs</summary>
+          <details className="rounded-lg border border-oo-light-stone bg-oo-cream/80 p-3 text-sm">
+            <summary className="cursor-pointer font-medium text-oo-charcoal">Advanced · manual connection IDs</summary>
             <MennyuLocationIdField mennyuLocationId={vendor.id} className="mt-3" />
             <ManualConnectionForm vendor={vendor} onSaved={() => router.refresh()} />
           </details>

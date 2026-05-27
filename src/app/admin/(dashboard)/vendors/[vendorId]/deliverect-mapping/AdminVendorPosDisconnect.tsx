@@ -18,8 +18,8 @@ export function AdminVendorPosDisconnect({ vendorId, vendorName, hasActivePosCon
 
   if (!hasActivePosConnection) {
     return (
-      <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">
-        <p className="font-medium text-stone-800">POS / Deliverect connection</p>
+      <div className="rounded-lg border border-oo-light-stone bg-oo-cream p-4 text-sm text-oo-stone-gray">
+        <p className="font-medium text-oo-charcoal">POS / Deliverect connection</p>
         <p className="mt-1">
           No vendor-level Deliverect identifiers are set — already disconnected at the Open Order integration layer.
         </p>
@@ -54,7 +54,7 @@ export function AdminVendorPosDisconnect({ vendorId, vendorName, hasActivePosCon
             setError(null);
             setConfirmOpen(true);
           }}
-          className="mt-4 rounded-lg border border-amber-700 bg-white px-4 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+          className="mt-4 rounded-lg border border-amber-700 bg-oo-warm-white px-4 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50"
         >
           Disconnect Deliverect / POS…
         </button>
@@ -89,7 +89,7 @@ export function AdminVendorPosDisconnect({ vendorId, vendorName, hasActivePosCon
               type="button"
               disabled={pending}
               onClick={() => setConfirmOpen(false)}
-              className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm text-stone-800 hover:bg-stone-50"
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-2 text-sm text-oo-charcoal hover:bg-oo-cream"
             >
               Cancel
             </button>

@@ -15,7 +15,7 @@ function formatUsdFromCents(cents: number): string {
 function VendorMenuItemReadOnly({ item }: { item: CustomerVendorMenuItem }) {
   return (
     <div
-      className={`flex gap-3 rounded-lg border border-stone-200 bg-white p-3 ${!item.isAvailable ? "opacity-80" : ""}`}
+      className={`flex gap-3 rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 ${!item.isAvailable ? "opacity-80" : ""}`}
     >
       <MenuItemImage
         imageUrl={item.imageUrl}
@@ -24,13 +24,13 @@ function VendorMenuItemReadOnly({ item }: { item: CustomerVendorMenuItem }) {
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-medium text-stone-900">{item.name}</h3>
-          <span className="shrink-0 text-sm font-medium text-stone-800">{formatUsdFromCents(item.priceCents)}</span>
+          <h3 className="font-medium text-oo-charcoal">{item.name}</h3>
+          <span className="shrink-0 text-sm font-medium text-oo-charcoal">{formatUsdFromCents(item.priceCents)}</span>
         </div>
         {item.description ? (
-          <p className="mt-1 line-clamp-3 text-sm text-stone-600">{item.description}</p>
+          <p className="mt-1 line-clamp-3 text-sm text-oo-stone-gray">{item.description}</p>
         ) : null}
-        <p className="mt-2 text-xs text-stone-500">
+        <p className="mt-2 text-xs text-oo-stone-gray">
           {item.isAvailable ? (
             <span className="text-emerald-800">Available</span>
           ) : (
@@ -60,13 +60,13 @@ export default async function VendorCurrentMenuPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-stone-900">Current menu</h2>
-          <p className="mt-0.5 text-sm text-stone-500">{vendor.name}</p>
-          <p className="mt-1 text-sm text-stone-600">
+          <h2 className="text-lg font-semibold text-oo-charcoal">Current menu</h2>
+          <p className="mt-0.5 text-sm text-oo-stone-gray">{vendor.name}</p>
+          <p className="mt-1 text-sm text-oo-stone-gray">
             What customers see right now — published categories, items, and availability.
           </p>
-          <details className="mt-2 text-xs text-stone-500">
-            <summary className="cursor-pointer select-none hover:text-stone-700">Menu source</summary>
+          <details className="mt-2 text-xs text-oo-stone-gray">
+            <summary className="cursor-pointer select-none hover:text-oo-charcoal">Menu source</summary>
             <p className="mt-1 pl-1">
               {source === "published_canonical"
                 ? "Latest published menu snapshot"
@@ -76,14 +76,14 @@ export default async function VendorCurrentMenuPage({
         </div>
         <Link
           href={`/vendor/${vendorId}/menu-imports`}
-          className="inline-flex shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-800 shadow-sm transition-colors hover:bg-stone-50"
+          className="inline-flex shrink-0 items-center justify-center rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-2 text-sm font-medium text-oo-charcoal shadow-sm transition-colors hover:bg-oo-cream"
         >
           View import history
         </Link>
       </div>
 
       {sections.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-center text-sm text-stone-600">
+        <div className="rounded-lg border border-dashed border-oo-light-stone bg-oo-cream px-4 py-8 text-center text-sm text-oo-stone-gray">
           No active menu items yet. When your menu is imported and published, it will appear here. Use{" "}
           <Link href={`/vendor/${vendorId}/menu-imports`} className="font-medium text-sky-800 underline">
             import history
@@ -94,7 +94,7 @@ export default async function VendorCurrentMenuPage({
         <div className="space-y-8">
           {sections.map((section) => (
             <section key={section.id} id={customerMenuCategoryDomId(section.id)} className="scroll-mt-4">
-              <h3 className="mb-3 text-base font-semibold text-stone-900">{section.name}</h3>
+              <h3 className="mb-3 text-base font-semibold text-oo-charcoal">{section.name}</h3>
               <ul className="space-y-2">
                 {section.items.map((item) => (
                   <li key={item.id}>

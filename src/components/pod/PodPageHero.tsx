@@ -33,7 +33,7 @@ export function PodPageHero({
       : `${vendorCount} vendor${vendorCount === 1 ? "" : "s"}`;
 
   return (
-    <header className="border-b border-zinc-200 bg-white">
+    <header className="border-b border-oo-light-stone bg-oo-warm-white">
       <PageShell className="py-5 sm:py-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6 lg:gap-8">
           <div
@@ -79,10 +79,10 @@ export function PodPageHero({
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-oo-stone-gray">
                   Food pod
                 </p>
-                <h1 className="mt-1 text-2xl font-bold tracking-tight text-black sm:text-3xl">
+                <h1 className="mt-1 text-2xl font-bold tracking-tight text-oo-charcoal sm:text-3xl">
                   {name}
                 </h1>
               </div>
@@ -90,16 +90,16 @@ export function PodPageHero({
                 podId={podId}
                 podName={name}
                 labeled
-                className="shrink-0 !border-zinc-300 !bg-white !text-zinc-900 shadow-sm hover:!bg-zinc-50"
+                className="shrink-0 !border-oo-light-stone !bg-oo-warm-white !text-oo-charcoal shadow-sm hover:!bg-oo-cream"
               />
             </div>
 
-            <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
+            <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-oo-stone-gray sm:text-base">
               {tagline}
             </p>
 
             {address?.trim() && (
-              <p className="mt-2 text-sm text-zinc-500">{address}</p>
+              <p className="mt-2 text-sm text-oo-stone-gray">{address}</p>
             )}
 
             <ul className="mt-4 flex flex-wrap gap-2" aria-label="Pod details">
@@ -110,7 +110,7 @@ export function PodPageHero({
                 <span className="oo-badge-muted">One pickup</span>
               </li>
               <li>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-oo-charcoal px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-oo-warm-white">
                   <span className="oo-live-dot" aria-hidden />
                   Live
                 </span>

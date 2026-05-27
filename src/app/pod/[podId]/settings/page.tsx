@@ -30,23 +30,23 @@ export default async function PodSettingsPage({
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
       <div>
-        <h1 className="text-xl font-semibold text-stone-900">Settings</h1>
-        <p className="mt-1 text-sm text-stone-600">
+        <h1 className="text-xl font-semibold text-oo-charcoal">Settings</h1>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           How this pod looks to customers. Manage vendor order and featured flags on{" "}
-          <Link href={`/pod/${pod.id}/dashboard`} className="font-medium text-stone-900 underline">
+          <Link href={`/pod/${pod.id}/dashboard`} className="font-medium text-oo-charcoal underline">
             Overview
           </Link>
           .
         </p>
       </div>
 
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Brand / profile</h2>
-        <p className="mt-1 text-sm text-stone-600">
+      <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">Brand / profile</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Name, description, logo, and accent on the public pod page.
         </p>
-        <p className="mt-2 text-xs text-stone-500">
-          URL slug: <span className="font-mono text-stone-700">{pod.slug}</span> (not editable here)
+        <p className="mt-2 text-xs text-oo-stone-gray">
+          URL slug: <span className="font-mono text-oo-charcoal">{pod.slug}</span> (not editable here)
         </p>
         <div className="mt-4">
           <PodBrandProfileForm

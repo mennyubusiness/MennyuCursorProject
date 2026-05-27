@@ -57,13 +57,13 @@ function SortableRosterRow({
     <li
       ref={setNodeRef}
       style={style}
-      className={`flex flex-wrap items-start gap-3 border-b border-stone-100 bg-white px-3 py-3 last:border-0 sm:flex-nowrap ${
+      className={`flex flex-wrap items-start gap-3 border-b border-oo-light-stone bg-oo-warm-white px-3 py-3 last:border-0 sm:flex-nowrap ${
         isDragging ? "shadow-md ring-1 ring-stone-200" : ""
       }`}
     >
       <button
         type="button"
-        className="mt-1 cursor-grab touch-none rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 active:cursor-grabbing"
+        className="mt-1 cursor-grab touch-none rounded p-1 text-oo-stone-gray hover:bg-oo-cream hover:text-oo-charcoal active:cursor-grabbing"
         aria-label={`Move ${row.name}`}
         disabled={disabled}
         {...attributes}
@@ -81,7 +81,7 @@ function SortableRosterRow({
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-stone-900">{row.name}</span>
+          <span className="font-medium text-oo-charcoal">{row.name}</span>
           {row.isFeatured && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
               Featured
@@ -89,11 +89,11 @@ function SortableRosterRow({
           )}
         </div>
         {row.description ? (
-          <p className="mt-0.5 line-clamp-2 text-sm text-stone-600">{row.description}</p>
+          <p className="mt-0.5 line-clamp-2 text-sm text-oo-stone-gray">{row.description}</p>
         ) : (
-          <p className="mt-0.5 text-sm text-stone-400">No description</p>
+          <p className="mt-0.5 text-sm text-oo-stone-gray">No description</p>
         )}
-        <div className="mt-1 text-xs text-stone-500">
+        <div className="mt-1 text-xs text-oo-stone-gray">
           {!row.isActive || row.mennyuOrdersPaused ? (
             <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-900">Paused</span>
           ) : (
@@ -102,24 +102,24 @@ function SortableRosterRow({
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-700">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-oo-charcoal">
           <input
             type="checkbox"
             checked={row.isFeatured}
             disabled={disabled}
             onChange={(e) => onToggleFeatured(row.vendorId, e.target.checked)}
-            className="rounded border-stone-300"
+            className="rounded border-oo-light-stone"
           />
           Featured
         </label>
         <details className="relative">
-          <summary className="list-none cursor-pointer rounded border border-stone-200 bg-white px-2 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50 [&::-webkit-details-marker]:hidden">
+          <summary className="list-none cursor-pointer rounded border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm font-medium text-oo-charcoal hover:bg-oo-cream [&::-webkit-details-marker]:hidden">
             More
           </summary>
-          <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-stone-200 bg-white py-1 shadow-lg">
+          <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-oo-light-stone bg-oo-warm-white py-1 shadow-lg">
             <Link
               href={`/pod/${podId}/vendor/${row.vendorId}`}
-              className="block px-3 py-2 text-sm text-stone-800 hover:bg-stone-50"
+              className="block px-3 py-2 text-sm text-oo-charcoal hover:bg-oo-cream"
             >
               View vendor page
             </Link>
@@ -225,7 +225,7 @@ export function PodVendorRosterPanel({
 
   if (rows.length === 0) {
     return (
-      <p className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-500">
+      <p className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 text-sm text-oo-stone-gray">
         No vendors in this pod yet. Invite vendors below.
       </p>
     );
@@ -234,10 +234,10 @@ export function PodVendorRosterPanel({
   return (
     <div className="space-y-2">
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-      {saving && <p className="text-xs text-stone-500">Saving order…</p>}
+      {saving && <p className="text-xs text-oo-stone-gray">Saving order…</p>}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={rows.map((r) => r.vendorId)} strategy={verticalListSortingStrategy}>
-          <ul className="rounded-lg border border-stone-200 bg-white">
+          <ul className="rounded-lg border border-oo-light-stone bg-oo-warm-white">
             {rows.map((row) => (
               <SortableRosterRow
                 key={row.vendorId}
@@ -262,13 +262,13 @@ export function PodVendorRosterPanel({
             role="dialog"
             aria-modal="true"
             aria-labelledby={modalTitleId}
-            className="max-w-md rounded-xl border border-stone-200 bg-white p-6 shadow-xl"
+            className="max-w-md rounded-xl border border-oo-light-stone bg-oo-warm-white p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id={modalTitleId} className="text-lg font-semibold text-stone-900">
+            <h2 id={modalTitleId} className="text-lg font-semibold text-oo-charcoal">
               Remove from pod?
             </h2>
-            <p className="mt-2 text-sm text-stone-600">
+            <p className="mt-2 text-sm text-oo-stone-gray">
               <strong>{removeModal.name}</strong> will be removed from this pod only. Their Open Order vendor
               account, menu, and history stay intact. You can invite them again later.
             </p>
@@ -277,7 +277,7 @@ export function PodVendorRosterPanel({
                 type="button"
                 disabled={removing}
                 onClick={() => setRemoveModal(null)}
-                className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+                className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-2 text-sm font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
               >
                 Cancel
               </button>

@@ -67,11 +67,11 @@ export function VendorMenuCategoryNav({
           : "block w-full rounded-lg px-3 py-2 text-left text-sm",
         activeId === id
           ? compact
-            ? "border-zinc-900 bg-zinc-900 text-white"
-            : "bg-zinc-100 text-black"
+            ? "border-brand bg-brand text-white"
+            : "bg-brand-muted text-oo-charcoal"
           : compact
-            ? "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400 hover:text-black"
-            : "text-zinc-600 hover:bg-zinc-50 hover:text-black"
+            ? "border-oo-light-stone bg-oo-warm-white text-oo-charcoal hover:border-oo-stone-gray/50"
+            : "text-oo-stone-gray hover:bg-oo-cream hover:text-oo-charcoal"
       ),
     [activeId]
   );
@@ -89,7 +89,7 @@ export function VendorMenuCategoryNav({
         )}
         aria-label="Menu categories"
       >
-        <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+        <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-oo-stone-gray">
           Menu
         </p>
         <ul className="space-y-0.5">
@@ -113,7 +113,7 @@ export function VendorMenuCategoryNav({
 
       <div
         className={cn(
-          "sticky z-30 -mx-4 border-b border-zinc-200 bg-white/95 px-4 py-2 backdrop-blur-md supports-[backdrop-filter]:bg-white/85 lg:hidden",
+          "sticky z-30 -mx-4 border-b border-oo-light-stone bg-oo-warm-white/95 px-4 py-2 backdrop-blur-md supports-[backdrop-filter]:bg-oo-warm-white/85 lg:hidden",
           "top-16 sm:top-[4.25rem]"
         )}
       >

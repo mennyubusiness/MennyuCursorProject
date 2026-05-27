@@ -69,10 +69,10 @@ export function PodCard({ pod, variant = "full" }: PodCardProps) {
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-xl border border-zinc-200 bg-white transition duration-300 motion-reduce:transform-none",
+        "group relative overflow-hidden rounded-xl border border-oo-light-stone bg-oo-warm-white transition duration-300 motion-reduce:transform-none",
         isCompact
           ? "w-[min(19rem,78vw)] shrink-0 shadow-md hover:-translate-y-1 hover:shadow-xl"
-          : "shadow-sm hover:-translate-y-1 hover:border-zinc-300 hover:shadow-lg"
+          : "shadow-sm hover:-translate-y-1 hover:border-oo-stone-gray/30 hover:shadow-lg"
       )}
       style={
         pod.accentColor
@@ -113,19 +113,19 @@ export function PodCard({ pod, variant = "full" }: PodCardProps) {
         <div className={isCompact ? "p-4" : "p-5 sm:p-6"}>
           <h2
             className={cn(
-              "font-bold leading-snug text-black transition group-hover:text-zinc-800",
+              "font-bold leading-snug text-oo-charcoal transition group-hover:text-oo-stone-gray",
               isCompact ? "line-clamp-2 text-base" : "text-xl sm:text-2xl"
             )}
           >
             {pod.name}
           </h2>
           {!isCompact && pod.description && (
-            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-zinc-600 sm:text-base">
+            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-oo-stone-gray sm:text-base">
               {pod.description}
             </p>
           )}
           {!isCompact && featuredVendorName && (
-            <p className="mt-3 line-clamp-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <p className="mt-3 line-clamp-1 text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
               Featuring {featuredVendorName}
               {vendorCount > 1 ? ` +${vendorCount - 1}` : ""}
             </p>

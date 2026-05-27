@@ -23,8 +23,8 @@ export default async function VendorAnalyticsPage({
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold text-stone-900">Analytics</h2>
-        <p className="mt-1 text-sm text-stone-600">
+        <h2 className="text-xl font-semibold text-oo-charcoal">Analytics</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Orders and revenue by period, plus top items.
         </p>
       </div>
@@ -32,9 +32,9 @@ export default async function VendorAnalyticsPage({
       {hasAnyData ? (
         <VendorAnalyticsSection data={analytics} />
       ) : (
-        <div className="rounded-xl border border-stone-200 bg-stone-50/50 px-6 py-10 text-center">
-          <p className="font-medium text-stone-700">No analytics yet</p>
-          <p className="mt-1 text-sm text-stone-500">
+        <div className="rounded-xl border border-oo-light-stone bg-oo-cream/50 px-6 py-10 text-center">
+          <p className="font-medium text-oo-charcoal">No analytics yet</p>
+          <p className="mt-1 text-sm text-oo-stone-gray">
             Completed orders will show up here (today, last 7 days, top items).
           </p>
         </div>

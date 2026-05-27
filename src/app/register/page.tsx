@@ -15,8 +15,8 @@ export default async function RegisterPage() {
   return (
     <AuthShell>
       <RegisterForm />
-      <p className="mt-8 text-center text-sm text-zinc-600">
-        <Link href="/" className="font-medium text-zinc-800 underline-offset-4 hover:text-black hover:underline">
+      <p className="mt-8 text-center text-sm text-oo-stone-gray">
+        <Link href="/" className="font-medium text-oo-charcoal underline-offset-4 hover:underline">
           ← Back to Open Order
         </Link>
       </p>

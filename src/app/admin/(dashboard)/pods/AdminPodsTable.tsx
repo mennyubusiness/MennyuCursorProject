@@ -40,7 +40,7 @@ function StatusPill({ isActive }: { isActive: boolean }) {
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-600">
+    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-oo-stone-gray">
       <span className="h-2 w-2 rounded-full bg-stone-400" aria-hidden />
       Paused
     </span>
@@ -75,18 +75,18 @@ export function AdminPodsTable({ rows }: { rows: AdminPodListRow[] }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search pods…"
-            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+            className="w-full rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm text-oo-charcoal placeholder:text-oo-stone-gray focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
           />
         </div>
         <div>
-          <label htmlFor="pod-status-filter" className="mb-1 block text-xs font-medium text-stone-500">
+          <label htmlFor="pod-status-filter" className="mb-1 block text-xs font-medium text-oo-stone-gray">
             Status
           </label>
           <select
             id="pod-status-filter"
             value={status}
             onChange={(e) => setStatus(e.target.value as "all" | "active" | "paused")}
-            className="rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm text-stone-800"
+            className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-2 text-sm text-oo-charcoal"
           >
             <option value="all">All</option>
             <option value="active">Active</option>
@@ -95,15 +95,15 @@ export function AdminPodsTable({ rows }: { rows: AdminPodListRow[] }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm">
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-stone-200 bg-stone-50 text-left">
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">Pod</th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">Status</th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">Vendors</th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">Activity</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-oo-light-stone bg-oo-cream text-left">
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Pod</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Status</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Vendors</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Activity</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
                 Actions
               </th>
             </tr>
@@ -111,7 +111,7 @@ export function AdminPodsTable({ rows }: { rows: AdminPodListRow[] }) {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-stone-600">
+                <td colSpan={5} className="px-4 py-12 text-center text-oo-stone-gray">
                   No pods match your filters.
                 </td>
               </tr>
@@ -128,46 +128,46 @@ export function AdminPodsTable({ rows }: { rows: AdminPodListRow[] }) {
                     }
                   }}
                   onClick={() => router.push(`/admin/pods/${p.id}`)}
-                  className="cursor-pointer border-b border-stone-100 transition-colors last:border-b-0 hover:bg-stone-50/90"
+                  className="cursor-pointer border-b border-oo-light-stone transition-colors last:border-b-0 hover:bg-oo-cream/90"
                 >
                   <td className="px-4 py-4 align-top">
-                    <span className="font-medium text-stone-900">{p.name}</span>
+                    <span className="font-medium text-oo-charcoal">{p.name}</span>
                   </td>
                   <td className="px-4 py-4 align-top">
                     <StatusPill isActive={p.isActive} />
                   </td>
-                  <td className="px-4 py-4 align-top text-stone-800">
+                  <td className="px-4 py-4 align-top text-oo-charcoal">
                     {p.vendorCount === 0 ? (
-                      <span className="text-stone-500">0 vendors</span>
+                      <span className="text-oo-stone-gray">0 vendors</span>
                     ) : (
                       <span
                         title={p.vendorNamesForTooltip}
                         className="inline-flex cursor-help items-baseline gap-1 border-b border-dotted border-stone-400"
                       >
                         <span className="font-medium tabular-nums">{p.vendorCount}</span>
-                        <span className="text-stone-600">vendor{p.vendorCount === 1 ? "" : "s"}</span>
+                        <span className="text-oo-stone-gray">vendor{p.vendorCount === 1 ? "" : "s"}</span>
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-4 align-top text-stone-700">
+                  <td className="px-4 py-4 align-top text-oo-charcoal">
                     <div className="text-sm">
                       <span className="font-medium tabular-nums">{p.ordersToday}</span>
-                      <span className="text-stone-500"> today</span>
+                      <span className="text-oo-stone-gray"> today</span>
                     </div>
-                    <p className="mt-0.5 text-xs text-stone-500">Last order: {formatLastOrder(p.lastOrderAtIso)}</p>
+                    <p className="mt-0.5 text-xs text-oo-stone-gray">Last order: {formatLastOrder(p.lastOrderAtIso)}</p>
                   </td>
                   <td className="px-4 py-4 align-top text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <Link
                         href={`/admin/pods/${p.id}`}
-                        className="rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-800"
+                        className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-hover"
                         onClick={(e) => e.stopPropagation()}
                       >
                         Manage
                       </Link>
                       <Link
                         href={`/admin/pods/${p.id}/qr`}
-                        className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 hover:bg-stone-50"
+                        className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-medium text-oo-charcoal hover:bg-oo-cream"
                         onClick={(e) => e.stopPropagation()}
                       >
                         QR

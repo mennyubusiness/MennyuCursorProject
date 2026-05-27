@@ -37,25 +37,25 @@ export default async function AdminDashboardPage() {
   return (
     <div className="space-y-12">
       <header className="max-w-2xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-stone-900">Dashboard</h1>
-        <p className="mt-2 text-sm leading-relaxed text-stone-600">
+        <h1 className="text-2xl font-semibold tracking-tight text-oo-charcoal">Dashboard</h1>
+        <p className="mt-2 text-sm leading-relaxed text-oo-stone-gray">
           Jump to the area you need — detailed metrics and debugging tools live under Operations and Settings.
         </p>
       </header>
 
       <section className="space-y-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500">Quick actions</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-oo-stone-gray">Quick actions</h2>
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {quickActions.map((a) => (
             <li key={a.href}>
               <Link
                 href={a.href}
-                className="flex min-h-[4.5rem] flex-col justify-between rounded-xl border border-stone-200 bg-white p-4 shadow-sm transition-colors hover:border-stone-300 hover:bg-stone-50/80"
+                className="flex min-h-[4.5rem] flex-col justify-between rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm transition-colors hover:border-oo-light-stone hover:bg-oo-cream/80"
               >
-                <span className="font-medium text-stone-900">{a.label}</span>
-                <span className="mt-1 flex items-center justify-between text-xs text-stone-500">
+                <span className="font-medium text-oo-charcoal">{a.label}</span>
+                <span className="mt-1 flex items-center justify-between text-xs text-oo-stone-gray">
                   {a.hint}
-                  <span aria-hidden className="text-stone-400">
+                  <span aria-hidden className="text-oo-stone-gray">
                     →
                   </span>
                 </span>
@@ -83,31 +83,31 @@ export default async function AdminDashboardPage() {
       )}
 
       <section className="space-y-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500">Today</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-oo-stone-gray">Today</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <Link
             href="/admin/orders?today=1"
-            className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition-colors hover:border-stone-300 hover:bg-stone-50/80"
+            className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm transition-colors hover:border-oo-light-stone hover:bg-oo-cream/80"
           >
-            <p className="text-sm text-stone-600">Orders today</p>
-            <p className="mt-2 text-3xl font-semibold tabular-nums text-stone-900">{ordersToday}</p>
-            <p className="mt-3 text-xs text-stone-400">Tap to filter the orders list by today</p>
+            <p className="text-sm text-oo-stone-gray">Orders today</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums text-oo-charcoal">{ordersToday}</p>
+            <p className="mt-3 text-xs text-oo-stone-gray">Tap to filter the orders list by today</p>
           </Link>
           <Link
             href="/admin/exceptions"
-            className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition-colors hover:border-stone-300 hover:bg-stone-50/80"
+            className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm transition-colors hover:border-oo-light-stone hover:bg-oo-cream/80"
           >
-            <p className="text-sm text-stone-600">Issues</p>
-            <p className="mt-2 text-3xl font-semibold tabular-nums text-stone-900">{issuesCount}</p>
-            <p className="mt-3 text-xs text-stone-400">Failed routing + stuck pending</p>
+            <p className="text-sm text-oo-stone-gray">Issues</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums text-oo-charcoal">{issuesCount}</p>
+            <p className="mt-3 text-xs text-oo-stone-gray">Failed routing + stuck pending</p>
           </Link>
           <Link
             href="/admin/vendors"
-            className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition-colors hover:border-stone-300 hover:bg-stone-50/80"
+            className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm transition-colors hover:border-oo-light-stone hover:bg-oo-cream/80"
           >
-            <p className="text-sm text-stone-600">Active vendors</p>
-            <p className="mt-2 text-3xl font-semibold tabular-nums text-stone-900">{activeVendors}</p>
-            <p className="mt-3 text-xs text-stone-400">Marketplace</p>
+            <p className="text-sm text-oo-stone-gray">Active vendors</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums text-oo-charcoal">{activeVendors}</p>
+            <p className="mt-3 text-xs text-oo-stone-gray">Marketplace</p>
           </Link>
         </div>
       </section>

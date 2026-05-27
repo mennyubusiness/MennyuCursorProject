@@ -94,9 +94,9 @@ export function VendorMenuHistoryClient({
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-stone-900">Published snapshots</h2>
-      <p className="text-sm text-stone-600">
-        Version history for <span className="font-medium text-stone-900">{vendorName}</span>. Rollback publishes a new
+      <h2 className="text-lg font-semibold text-oo-charcoal">Published snapshots</h2>
+      <p className="text-sm text-oo-stone-gray">
+        Version history for <span className="font-medium text-oo-charcoal">{vendorName}</span>. Rollback publishes a new
         snapshot from an older version (live tables updated; audit trail kept).
       </p>
 
@@ -115,9 +115,9 @@ export function VendorMenuHistoryClient({
         </p>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+          <thead className="border-b border-oo-light-stone bg-oo-cream text-left text-xs uppercase tracking-wide text-oo-stone-gray">
             <tr>
               <th className="px-3 py-2 font-medium">Published</th>
               <th className="px-3 py-2 font-medium">State</th>
@@ -127,10 +127,10 @@ export function VendorMenuHistoryClient({
               <th className="px-3 py-2 font-medium text-right">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-stone-100">
+          <tbody className="divide-y divide-oo-light-stone">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-stone-500">
+                <td colSpan={6} className="px-3 py-8 text-center text-oo-stone-gray">
                   No published or archived menu versions yet.
                 </td>
               </tr>
@@ -140,7 +140,7 @@ export function VendorMenuHistoryClient({
                 const canRollback = r.state === "archived" && r.summary != null;
                 return (
                   <tr key={r.id} className={isCurrent ? "bg-emerald-50/50" : undefined}>
-                    <td className="whitespace-nowrap px-3 py-2 text-stone-800">
+                    <td className="whitespace-nowrap px-3 py-2 text-oo-charcoal">
                       {formatWhen(r.publishedAtIso)}
                       {isCurrent && (
                         <span className="ml-2 rounded bg-emerald-200 px-1.5 py-0.5 text-xs font-medium text-emerald-900">
@@ -148,11 +148,11 @@ export function VendorMenuHistoryClient({
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs text-stone-700">{r.state}</td>
-                    <td className="max-w-[8rem] truncate px-3 py-2 text-xs text-stone-600">
+                    <td className="px-3 py-2 font-mono text-xs text-oo-charcoal">{r.state}</td>
+                    <td className="max-w-[8rem] truncate px-3 py-2 text-xs text-oo-stone-gray">
                       {r.publishedBy ?? "—"}
                     </td>
-                    <td className="px-3 py-2 text-xs text-stone-700">
+                    <td className="px-3 py-2 text-xs text-oo-charcoal">
                       {r.summary ? (
                         <span>
                           {r.summary.products} prod · {r.summary.categories} cat · {r.summary.modifierGroups} grp ·{" "}
@@ -166,12 +166,12 @@ export function VendorMenuHistoryClient({
                         "—"
                       )}
                     </td>
-                    <td className="px-3 py-2 font-mono text-[10px] text-stone-500">
+                    <td className="px-3 py-2 font-mono text-[10px] text-oo-stone-gray">
                       <div className="max-w-[14rem] truncate" title={r.id}>
                         {r.id}
                       </div>
                       {r.restoredFromMenuVersionId && (
-                        <div className="text-stone-400" title={r.restoredFromMenuVersionId}>
+                        <div className="text-oo-stone-gray" title={r.restoredFromMenuVersionId}>
                           ← {r.restoredFromMenuVersionId.slice(0, 8)}…
                         </div>
                       )}
@@ -190,7 +190,7 @@ export function VendorMenuHistoryClient({
                           Roll back to this
                         </button>
                       ) : (
-                        <span className="text-xs text-stone-400">—</span>
+                        <span className="text-xs text-oo-stone-gray">—</span>
                       )}
                     </td>
                   </tr>
@@ -210,17 +210,17 @@ export function VendorMenuHistoryClient({
           <h2 id="rollback-confirm-title" className="text-sm font-semibold text-red-950">
             Confirm rollback
           </h2>
-          <p className="mt-2 text-sm text-stone-800">
+          <p className="mt-2 text-sm text-oo-charcoal">
             Live menu will match this archived snapshot ({formatWhen(confirmRow.publishedAtIso)}). The current published
             version will be archived and a <strong>new</strong> published row will be created (audit trail preserved).
           </p>
           {confirmRow.summary && (
-            <p className="mt-2 text-sm text-stone-700">
+            <p className="mt-2 text-sm text-oo-charcoal">
               Snapshot counts: {confirmRow.summary.products} products, {confirmRow.summary.categories} categories,{" "}
               {confirmRow.summary.modifierGroups} modifier groups, {confirmRow.summary.modifierOptions} options.
             </p>
           )}
-          <p className="mt-1 font-mono text-xs text-stone-600">Source id: {confirmRow.id}</p>
+          <p className="mt-1 font-mono text-xs text-oo-stone-gray">Source id: {confirmRow.id}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -234,7 +234,7 @@ export function VendorMenuHistoryClient({
               type="button"
               disabled={loading}
               onClick={() => setConfirmId(null)}
-              className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-800"
+              className="rounded-md border border-oo-light-stone bg-oo-warm-white px-4 py-2 text-sm font-medium text-oo-charcoal"
             >
               Cancel
             </button>

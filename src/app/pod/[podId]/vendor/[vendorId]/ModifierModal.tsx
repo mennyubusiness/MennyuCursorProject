@@ -288,17 +288,17 @@ export function ModifierModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-oo-charcoal/50 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modifier-modal-title"
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-oo-warm-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-200 bg-white px-4 py-3">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-oo-light-stone bg-oo-warm-white px-4 py-3">
           <h2 id="modifier-modal-title" className="text-lg font-semibold text-stone-900">
             {displayConfig.menuItemName}
           </h2>

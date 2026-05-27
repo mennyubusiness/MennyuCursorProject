@@ -53,8 +53,8 @@ export default async function AdminPodsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-stone-900">Pods</h1>
-      <p className="mt-1 max-w-2xl text-sm text-stone-600">
+      <h1 className="text-xl font-semibold text-oo-charcoal">Pods</h1>
+      <p className="mt-1 max-w-2xl text-sm text-oo-stone-gray">
         Directory of kiosk locations. Open a row or <strong>Manage</strong> for vendors, QR, and pod tools.
       </p>
 

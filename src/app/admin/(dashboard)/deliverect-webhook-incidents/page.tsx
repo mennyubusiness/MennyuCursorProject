@@ -44,9 +44,9 @@ function rowTone(r: DeliverectWebhookIncidentRow): string {
     return "border-amber-200 bg-amber-50/40";
   }
   if (r.category === "applied_successfully" || r.category === "noop_same_status") {
-    return "border-stone-100 bg-stone-50/40 opacity-90";
+    return "border-oo-light-stone bg-oo-cream/40 opacity-90";
   }
-  return "border-stone-200 bg-white";
+  return "border-oo-light-stone bg-oo-warm-white";
 }
 
 export default async function DeliverectWebhookIncidentsPage({
@@ -89,18 +89,18 @@ export default async function DeliverectWebhookIncidentsPage({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-stone-500">
+        <p className="text-sm text-oo-stone-gray">
           <Link href="/admin" className="hover:underline">
             Dashboard
           </Link>
           <span className="mx-1">/</span>
-          <span className="text-stone-800">POS sync</span>
+          <span className="text-oo-charcoal">POS sync</span>
         </p>
-        <h1 className="mt-2 text-xl font-semibold text-stone-900">POS sync</h1>
-        <p className="mt-1 text-sm text-stone-600">
+        <h1 className="mt-2 text-xl font-semibold text-oo-charcoal">POS sync</h1>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Webhook pipeline, Deliverect reconciliation, and incident history. Technical detail: events come from{" "}
-          <code className="rounded bg-stone-100 px-1 text-xs">WebhookEvent</code> and{" "}
-          <code className="rounded bg-stone-100 px-1 text-xs">deliverectWebhookLastApply</code>; duplicate deliveries do
+          <code className="rounded bg-oo-cream px-1 text-xs">WebhookEvent</code> and{" "}
+          <code className="rounded bg-oo-cream px-1 text-xs">deliverectWebhookLastApply</code>; duplicate deliveries do
           not create a second row (<span className="font-mono text-xs">duplicate_ignored</span>).
         </p>
       </div>
@@ -108,30 +108,30 @@ export default async function DeliverectWebhookIncidentsPage({
       <AdminDeliverectTriageSection />
 
       <section
-        className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
+        className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm"
         aria-label="Snapshot summary"
       >
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-500">Snapshot ({range})</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Snapshot ({range})</h2>
         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
           <div>
-            <dt className="text-stone-500">Verification failed</dt>
-            <dd className="font-semibold text-stone-900">{summary.verificationFailed}</dd>
+            <dt className="text-oo-stone-gray">Verification failed</dt>
+            <dd className="font-semibold text-oo-charcoal">{summary.verificationFailed}</dd>
           </div>
           <div>
-            <dt className="text-stone-500">Match failed</dt>
-            <dd className="font-semibold text-stone-900">{summary.matchFailed}</dd>
+            <dt className="text-oo-stone-gray">Match failed</dt>
+            <dd className="font-semibold text-oo-charcoal">{summary.matchFailed}</dd>
           </div>
           <div>
-            <dt className="text-stone-500">Apply errors</dt>
-            <dd className="font-semibold text-stone-900">{summary.applyErrors}</dd>
+            <dt className="text-oo-stone-gray">Apply errors</dt>
+            <dd className="font-semibold text-oo-charcoal">{summary.applyErrors}</dd>
           </div>
           <div>
-            <dt className="text-stone-500">Unmapped status</dt>
-            <dd className="font-semibold text-stone-900">{summary.unmappedStatus}</dd>
+            <dt className="text-oo-stone-gray">Unmapped status</dt>
+            <dd className="font-semibold text-oo-charcoal">{summary.unmappedStatus}</dd>
           </div>
           <div>
-            <dt className="text-stone-500">Late (after overdue)</dt>
-            <dd className="font-semibold text-stone-900">{summary.lateWebhook}</dd>
+            <dt className="text-oo-stone-gray">Late (after overdue)</dt>
+            <dd className="font-semibold text-oo-charcoal">{summary.lateWebhook}</dd>
           </div>
         </dl>
       </section>
@@ -140,7 +140,7 @@ export default async function DeliverectWebhookIncidentsPage({
 
       <ul className="space-y-2">
         {incidents.length === 0 ? (
-          <li className="rounded-lg border border-stone-200 bg-white px-4 py-8 text-center text-sm text-stone-500">
+          <li className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-8 text-center text-sm text-oo-stone-gray">
             No incidents in this window with current filters.
           </li>
         ) : (
@@ -150,30 +150,30 @@ export default async function DeliverectWebhookIncidentsPage({
               className={`rounded-lg border px-3 py-2.5 text-sm ${rowTone(r)}`}
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="font-medium text-stone-900">{r.label}</span>
-                <time className="text-xs text-stone-500" dateTime={r.timestamp.toISOString()}>
+                <span className="font-medium text-oo-charcoal">{r.label}</span>
+                <time className="text-xs text-oo-stone-gray" dateTime={r.timestamp.toISOString()}>
                   {new Intl.DateTimeFormat("en-US", {
                     dateStyle: "short",
                     timeStyle: "medium",
                   }).format(r.timestamp)}
                 </time>
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-stone-700">{r.summary}</p>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-stone-600">
+              <p className="mt-1 text-xs leading-relaxed text-oo-charcoal">{r.summary}</p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-oo-stone-gray">
                 <span>
-                  <span className="text-stone-400">Source:</span> {r.source.replace(/_/g, " ")}
+                  <span className="text-oo-stone-gray">Source:</span> {r.source.replace(/_/g, " ")}
                 </span>
                 <span>
-                  <span className="text-stone-400">Phase:</span> {r.phase.replace(/_/g, " ")}
+                  <span className="text-oo-stone-gray">Phase:</span> {r.phase.replace(/_/g, " ")}
                 </span>
                 {r.applySource ? (
                   <span>
-                    <span className="text-stone-400">Apply source:</span> {r.applySource}
+                    <span className="text-oo-stone-gray">Apply source:</span> {r.applySource}
                   </span>
                 ) : null}
                 {r.vendorOrderId ? (
                   <span className="font-mono">
-                    VO <span className="text-stone-800">{r.vendorOrderId}</span>
+                    VO <span className="text-oo-charcoal">{r.vendorOrderId}</span>
                   </span>
                 ) : null}
                 {r.orderId ? (
@@ -186,7 +186,7 @@ export default async function DeliverectWebhookIncidentsPage({
                 ) : null}
                 {r.vendorName ? (
                   <span>
-                    <span className="text-stone-400">Vendor:</span> {r.vendorName}
+                    <span className="text-oo-stone-gray">Vendor:</span> {r.vendorName}
                   </span>
                 ) : null}
                 {r.vendorId ? (
@@ -203,7 +203,7 @@ export default async function DeliverectWebhookIncidentsPage({
                   </span>
                 ) : null}
                 {r.idempotencyKey ? (
-                  <span className="max-w-[180px] truncate font-mono text-[10px] text-stone-500" title={r.idempotencyKey}>
+                  <span className="max-w-[180px] truncate font-mono text-[10px] text-oo-stone-gray" title={r.idempotencyKey}>
                     idem {r.idempotencyKey.slice(0, 36)}…
                   </span>
                 ) : null}
@@ -240,16 +240,16 @@ function FilterBar({
   buildHref: (patch: Record<string, string | undefined>) => string;
 }) {
   return (
-    <form method="get" className="flex flex-wrap items-end gap-4 rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+    <form method="get" className="flex flex-wrap items-end gap-4 rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
       <div>
-        <span className="block text-xs font-medium text-stone-600">Quick range</span>
+        <span className="block text-xs font-medium text-oo-stone-gray">Quick range</span>
         <div className="mt-1 flex flex-wrap gap-1">
           {(["24h", "48h", "7d"] as const).map((r) => (
             <Link
               key={r}
               href={buildHref({ range: r })}
               className={`rounded border px-2 py-1 text-xs ${
-                range === r ? "border-stone-800 bg-stone-800 text-white" : "border-stone-200 bg-stone-50 text-stone-700"
+                range === r ? "border-brand bg-brand text-white" : "border-oo-light-stone bg-oo-cream text-oo-charcoal"
               }`}
             >
               {r}
@@ -258,14 +258,14 @@ function FilterBar({
         </div>
       </div>
       <div>
-        <label htmlFor="cat" className="block text-xs font-medium text-stone-600">
+        <label htmlFor="cat" className="block text-xs font-medium text-oo-stone-gray">
           Incident type
         </label>
         <select
           id="cat"
           name="category"
           defaultValue={category}
-          className="mt-1 block min-w-[200px] rounded border border-stone-300 bg-white px-2 py-1.5 text-sm"
+          className="mt-1 block min-w-[200px] rounded border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm"
         >
           {CATEGORY_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -277,12 +277,12 @@ function FilterBar({
       <div className="flex items-center gap-2 pt-5">
         <input type="hidden" name="range" value={range} />
         <input type="checkbox" name="routine" value="1" id="routine" defaultChecked={includeRoutine} />
-        <label htmlFor="routine" className="text-sm text-stone-700">
+        <label htmlFor="routine" className="text-sm text-oo-charcoal">
           Include routine (success + no-op)
         </label>
       </div>
       <div>
-        <label htmlFor="q" className="block text-xs font-medium text-stone-600">
+        <label htmlFor="q" className="block text-xs font-medium text-oo-stone-gray">
           Search VO / order / event id
         </label>
         <input
@@ -291,16 +291,16 @@ function FilterBar({
           type="search"
           defaultValue={q}
           placeholder="cuid fragment…"
-          className="mt-1 block w-56 rounded border border-stone-300 px-2 py-1.5 text-sm"
+          className="mt-1 block w-56 rounded border border-oo-light-stone px-2 py-1.5 text-sm"
         />
       </div>
       <button
         type="submit"
-        className="rounded border border-stone-300 bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-800 hover:bg-stone-200"
+        className="rounded border border-oo-light-stone bg-oo-cream px-3 py-1.5 text-sm font-medium text-oo-charcoal hover:bg-stone-200"
       >
         Apply
       </button>
-      <Link href="/admin/deliverect-webhook-incidents" className="text-sm text-stone-600 hover:underline">
+      <Link href="/admin/deliverect-webhook-incidents" className="text-sm text-oo-stone-gray hover:underline">
         Reset
       </Link>
     </form>

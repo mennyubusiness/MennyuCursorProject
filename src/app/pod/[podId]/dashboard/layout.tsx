@@ -35,11 +35,11 @@ export default async function PodDashboardLayout({
   if (!pod) notFound();
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto max-w-2xl px-4 pt-4 pb-2">
-          <h1 className="text-xl font-semibold text-stone-900">Pod</h1>
-          <p className="mt-1 text-sm text-stone-500">{pod.name}</p>
+    <div className="oo-dash">
+      <header className="oo-dash-titlebar">
+        <div className="mx-auto max-w-2xl px-4 pb-2 pt-4">
+          <h1 className="oo-dash-titlebar-heading">Pod</h1>
+          <p className="oo-dash-titlebar-sub">{pod.name}</p>
         </div>
         <PodAreaNav />
       </header>

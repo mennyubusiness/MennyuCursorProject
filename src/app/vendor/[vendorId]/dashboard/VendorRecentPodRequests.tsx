@@ -24,19 +24,19 @@ export function VendorRecentPodRequests({
   }
 
   return (
-    <details className="rounded-lg border border-stone-100 bg-stone-50/40">
-      <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-stone-700 hover:bg-stone-50/80">
+    <details className="rounded-lg border border-oo-light-stone bg-oo-cream/40">
+      <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-oo-charcoal hover:bg-oo-cream/80">
         Recent pod activity ({recentRequests.length})
       </summary>
-      <ul className="space-y-2 border-t border-stone-100 px-4 py-3">
+      <ul className="space-y-2 border-t border-oo-light-stone px-4 py-3">
         {recentRequests.map((r) => (
           <li
             key={r.id}
-            className="flex flex-wrap items-center justify-between gap-2 text-sm text-stone-700"
+            className="flex flex-wrap items-center justify-between gap-2 text-sm text-oo-charcoal"
           >
             <span>
               <span className="font-medium">{r.podName}</span>
-              <span className="ml-2 text-stone-500">
+              <span className="ml-2 text-oo-stone-gray">
                 {statusLabel(r.status)}
                 {r.respondedAt && (
                   <span className="ml-1">
@@ -49,7 +49,7 @@ export function VendorRecentPodRequests({
                 )}
               </span>
             </span>
-            <span className="text-xs text-stone-400">
+            <span className="text-xs text-oo-stone-gray">
               {new Date(r.createdAt).toLocaleDateString(undefined, { dateStyle: "short" })}
             </span>
           </li>

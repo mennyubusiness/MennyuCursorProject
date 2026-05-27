@@ -17,7 +17,7 @@ export function CheckoutProgress({
     <nav
       aria-label="Checkout progress"
       className={cn(
-        "mb-8 flex flex-wrap items-center gap-2 text-sm text-stone-500",
+        "mb-8 flex flex-wrap items-center gap-2 text-sm text-oo-stone-gray",
         className
       )}
     >
@@ -27,17 +27,17 @@ export function CheckoutProgress({
         return (
           <span key={s.step} className="flex items-center gap-2">
             {i > 0 && (
-              <span className="text-stone-300" aria-hidden>
+              <span className="text-oo-light-stone" aria-hidden>
                 →
               </span>
             )}
             <span
               className={
                 current
-                  ? "rounded-full bg-stone-900/20 px-3 py-1 font-semibold text-stone-900"
+                  ? "rounded-full bg-brand-muted px-3 py-1 font-semibold text-oo-charcoal"
                   : done
-                    ? "text-stone-600"
-                    : "text-stone-400"
+                    ? "text-oo-stone-gray"
+                    : "text-oo-stone-gray/60"
               }
             >
               {done ? "✓ " : ""}

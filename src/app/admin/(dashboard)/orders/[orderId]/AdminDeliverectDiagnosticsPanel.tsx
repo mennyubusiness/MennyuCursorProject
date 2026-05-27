@@ -65,8 +65,8 @@ function DeliverectPayloadValidationBlock({ raw }: { raw: unknown }) {
             >
               <span className="text-red-700">{e.severity}</span> ·{" "}
               <span className="text-red-800">{e.type}</span>
-              <div className="mt-0.5 text-stone-800">{e.message}</div>
-              <div className="mt-0.5 text-stone-500">{e.path}</div>
+              <div className="mt-0.5 text-oo-charcoal">{e.message}</div>
+              <div className="mt-0.5 text-oo-stone-gray">{e.path}</div>
             </li>
           ))}
         </ul>
@@ -120,15 +120,15 @@ export function AdminDeliverectDiagnosticsPanel({ vo }: { vo: VoRow }) {
       : "Not stored";
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-stone-50/60 p-3 text-sm text-stone-800">
+    <div className="rounded-lg border border-oo-light-stone bg-oo-cream/60 p-3 text-sm text-oo-charcoal">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h4 className="font-semibold text-stone-900">Deliverect</h4>
-        <span className="text-xs text-stone-500">{life.routingProviderLabel}</span>
+        <h4 className="font-semibold text-oo-charcoal">Deliverect</h4>
+        <span className="text-xs text-oo-stone-gray">{life.routingProviderLabel}</span>
       </div>
       <p className="mt-1.5 text-xs">
         <Link
           href={`/admin/vendors/${vo.vendorId}/deliverect-mapping`}
-          className="font-medium text-stone-700 underline hover:text-stone-900"
+          className="font-medium text-oo-charcoal underline hover:text-oo-charcoal"
         >
           Menu mapping & integrity →
         </Link>
@@ -141,23 +141,23 @@ export function AdminDeliverectDiagnosticsPanel({ vo }: { vo: VoRow }) {
               ? "border-amber-200 bg-amber-50/90 text-amber-950"
               : guidance.severity === "success"
                 ? "border-emerald-200 bg-emerald-50/90 text-emerald-950"
-                : "border-stone-200 bg-white text-stone-800"
+                : "border-oo-light-stone bg-oo-warm-white text-oo-charcoal"
         }`}
       >
         <p className="font-semibold leading-snug">Next step</p>
         <p className="mt-0.5 font-medium">{guidance.recommendedAction}</p>
         <p className="mt-1 text-[11px] leading-relaxed opacity-95">{guidance.stateSummary}</p>
-        <p className="mt-1 text-[10px] uppercase tracking-wide text-stone-600">
+        <p className="mt-1 text-[10px] uppercase tracking-wide text-oo-stone-gray">
           {guidance.manualRecoveryBlocksAuto ? "Manual recovery blocks auto fallback · " : ""}
           {guidance.automaticFallbackAttempted
             ? "Automatic re-check attempted"
             : "Automatic re-check not in this episode"}
         </p>
       </div>
-      <p className="mt-2 text-xs font-medium text-stone-700">{life.phaseTitle}</p>
-      <p className="mt-0.5 text-xs text-stone-600">{life.phaseDetail}</p>
+      <p className="mt-2 text-xs font-medium text-oo-charcoal">{life.phaseTitle}</p>
+      <p className="mt-0.5 text-xs text-oo-stone-gray">{life.phaseDetail}</p>
       {life.operatorHints.length > 0 && (
-        <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs text-stone-600">
+        <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs text-oo-stone-gray">
           {life.operatorHints.map((h, i) => (
             <li key={i}>{h}</li>
           ))}
@@ -166,60 +166,60 @@ export function AdminDeliverectDiagnosticsPanel({ vo }: { vo: VoRow }) {
 
       <dl className="mt-3 grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
         <div>
-          <dt className="text-stone-500">Channel link</dt>
-          <dd className="font-mono text-[11px] text-stone-800">
+          <dt className="text-oo-stone-gray">Channel link</dt>
+          <dd className="font-mono text-[11px] text-oo-charcoal">
             {vo.deliverectChannelLinkId?.trim() || vo.vendor.deliverectChannelLinkId?.trim() || "—"}
           </dd>
         </div>
         <div>
-          <dt className="text-stone-500">Routing / fulfillment</dt>
+          <dt className="text-oo-stone-gray">Routing / fulfillment</dt>
           <dd>
             {vo.routingStatus} · {vo.fulfillmentStatus}
           </dd>
         </div>
         <div>
-          <dt className="text-stone-500">Authority / last source</dt>
+          <dt className="text-oo-stone-gray">Authority / last source</dt>
           <dd>
             {vo.statusAuthority ?? "—"} · {vo.lastStatusSource ?? "—"}
           </dd>
         </div>
         <div>
-          <dt className="text-stone-500">Deliverect order id</dt>
+          <dt className="text-oo-stone-gray">Deliverect order id</dt>
           <dd className="break-all font-mono text-[11px]">{vo.deliverectOrderId ?? "—"}</dd>
         </div>
         <div>
-          <dt className="text-stone-500">Submitted at</dt>
+          <dt className="text-oo-stone-gray">Submitted at</dt>
           <dd>{formatWhen(vo.deliverectSubmittedAt)}</dd>
         </div>
         <div>
-          <dt className="text-stone-500">Minutes since submit</dt>
+          <dt className="text-oo-stone-gray">Minutes since submit</dt>
           <dd>{minsSubmit != null ? `${minsSubmit} min` : "—"}</dd>
         </div>
         <div>
-          <dt className="text-stone-500">External id at submit</dt>
+          <dt className="text-oo-stone-gray">External id at submit</dt>
           <dd>{externalIdNote}</dd>
         </div>
         <div>
-          <dt className="text-stone-500">Awaiting reco / overdue</dt>
+          <dt className="text-oo-stone-gray">Awaiting reco / overdue</dt>
           <dd>
             {life.awaitingReconciliation ? "Yes" : "No"} · {life.overdueReconciliation ? "Overdue" : "Not overdue"} (
             threshold {DELIVERECT_RECONCILIATION_STALE_MINUTES} min)
           </dd>
         </div>
         <div>
-          <dt className="text-stone-500">Last external status</dt>
+          <dt className="text-oo-stone-gray">Last external status</dt>
           <dd>{vo.lastExternalStatus ?? "—"}</dd>
         </div>
         <div>
-          <dt className="text-stone-500">Last external at</dt>
+          <dt className="text-oo-stone-gray">Last external at</dt>
           <dd>{formatWhen(vo.lastExternalStatusAt)}</dd>
         </div>
         <div>
-          <dt className="text-stone-500">Reconciled late</dt>
+          <dt className="text-oo-stone-gray">Reconciled late</dt>
           <dd>{life.reconciledLate ? "Yes (first signal after threshold from submit)" : "No"}</dd>
         </div>
         <div>
-          <dt className="text-stone-500">Auto re-check</dt>
+          <dt className="text-oo-stone-gray">Auto re-check</dt>
           <dd>
             {vo.deliverectAutoRecheckAttemptedAt
               ? `${formatWhen(vo.deliverectAutoRecheckAttemptedAt)} · ${vo.deliverectAutoRecheckResult ?? "—"}`
@@ -227,39 +227,39 @@ export function AdminDeliverectDiagnosticsPanel({ vo }: { vo: VoRow }) {
           </dd>
         </div>
         <div>
-          <dt className="text-stone-500">Manual recovery</dt>
+          <dt className="text-oo-stone-gray">Manual recovery</dt>
           <dd>{vo.manuallyRecoveredAt ? formatWhen(vo.manuallyRecoveredAt) : "—"}</dd>
         </div>
         <div className="sm:col-span-2">
-          <dt className="text-stone-500">Last Deliverect error</dt>
+          <dt className="text-oo-stone-gray">Last Deliverect error</dt>
           <dd className="break-words text-amber-900">{vo.deliverectLastError ?? "—"}</dd>
         </div>
       </dl>
 
       <DeliverectPayloadValidationBlock raw={vo.deliverectPayloadValidation} />
 
-      <div className="mt-3 space-y-2 border-t border-stone-200 pt-2">
+      <div className="mt-3 space-y-2 border-t border-oo-light-stone pt-2">
         <details className="group">
-          <summary className="cursor-pointer text-xs font-medium text-stone-600 hover:text-stone-900">
+          <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
             Raw: last Deliverect HTTP response
           </summary>
-          <pre className="mt-1 max-h-48 overflow-auto rounded border border-stone-200 bg-white p-2 text-[10px] leading-snug text-stone-700">
+          <pre className="mt-1 max-h-48 overflow-auto rounded border border-oo-light-stone bg-oo-warm-white p-2 text-[10px] leading-snug text-oo-charcoal">
             {jsonBlock(vo.lastDeliverectResponse, 8000)}
           </pre>
         </details>
         <details className="group">
-          <summary className="cursor-pointer text-xs font-medium text-stone-600 hover:text-stone-900">
+          <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
             Raw: last webhook apply audit
           </summary>
-          <pre className="mt-1 max-h-48 overflow-auto rounded border border-stone-200 bg-white p-2 text-[10px] leading-snug text-stone-700">
+          <pre className="mt-1 max-h-48 overflow-auto rounded border border-oo-light-stone bg-oo-warm-white p-2 text-[10px] leading-snug text-oo-charcoal">
             {jsonBlock(vo.deliverectWebhookLastApply, 8000)}
           </pre>
         </details>
         <details className="group">
-          <summary className="cursor-pointer text-xs font-medium text-stone-600 hover:text-stone-900">
+          <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
             Raw: last webhook payload (verbose)
           </summary>
-          <pre className="mt-1 max-h-48 overflow-auto rounded border border-stone-200 bg-white p-2 text-[10px] leading-snug text-stone-700">
+          <pre className="mt-1 max-h-48 overflow-auto rounded border border-oo-light-stone bg-oo-warm-white p-2 text-[10px] leading-snug text-oo-charcoal">
             {jsonBlock(vo.lastWebhookPayload, 6000)}
           </pre>
         </details>

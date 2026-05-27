@@ -12,12 +12,13 @@ const variants: Record<ButtonVariant, string> = {
   primary:
     "bg-brand text-white shadow-sm hover:bg-brand-hover focus-visible:outline-brand",
   secondary:
-    "border-2 border-black bg-transparent text-black hover:bg-black hover:text-white focus-visible:outline-black",
+    "border-2 border-oo-charcoal bg-transparent text-oo-charcoal hover:bg-oo-charcoal hover:text-oo-warm-white focus-visible:outline-oo-charcoal",
   outline:
-    "border border-zinc-300 bg-white text-black hover:border-zinc-900 hover:bg-zinc-50 focus-visible:outline-zinc-900",
-  ghost: "text-zinc-700 hover:bg-zinc-100 hover:text-black focus-visible:outline-zinc-900",
+    "border border-oo-light-stone bg-oo-warm-white text-oo-charcoal hover:border-oo-stone-gray hover:bg-oo-cream focus-visible:outline-oo-charcoal",
+  ghost:
+    "text-oo-stone-gray hover:bg-oo-light-stone/50 hover:text-oo-charcoal focus-visible:outline-oo-charcoal",
   "ghost-light":
-    "text-zinc-300 hover:bg-white/10 hover:text-white focus-visible:outline-white",
+    "text-oo-cream/80 hover:bg-oo-warm-white/10 hover:text-oo-warm-white focus-visible:outline-oo-warm-white",
 };
 
 const sizes: Record<ButtonSize, string> = {

@@ -140,11 +140,11 @@ export default async function VendorOrdersPage({
 
   return (
     <div className="space-y-8 pb-8">
-      <header className="flex flex-col gap-4 border-b border-stone-200/70 pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <header className="flex flex-col gap-4 border-b border-oo-light-stone/70 pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-stone-900">Orders</h1>
-          <p className="mt-1 text-sm text-stone-600">Live queue — newest actions first</p>
-          <p className="mt-3 text-sm text-stone-600">{posSyncLine}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-oo-charcoal">Orders</h1>
+          <p className="mt-1 text-sm text-oo-stone-gray">Live queue — newest actions first</p>
+          <p className="mt-3 text-sm text-oo-stone-gray">{posSyncLine}</p>
         </div>
         <VendorOrdersSystemStatusStrip
           vendorId={vendor.id}

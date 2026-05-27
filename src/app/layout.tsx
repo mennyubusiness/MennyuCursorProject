@@ -65,12 +65,12 @@ export default async function RootLayout({
       <body
         className={cn(
           "flex min-h-screen flex-col antialiased",
-          isAdmin ? "bg-zinc-100 text-zinc-950" : "bg-zinc-50 text-zinc-950"
+          isAdmin ? "bg-oo-cream text-oo-charcoal" : "bg-oo-cream text-oo-charcoal"
         )}
       >
         <AuthSessionProvider session={session}>
           <CustomerQuickCartShell enabled={quickCartEnabled}>
-          <header className="sticky top-0 z-50 border-b border-zinc-800/80 bg-black/95 backdrop-blur-md">
+          <header className="sticky top-0 z-50 border-b border-oo-light-stone/20 bg-oo-charcoal/95 backdrop-blur-md">
             <PageShell className="flex h-16 items-center justify-between gap-4 sm:h-[4.25rem]">
               <OpenOrderLogo variant="header" priority />
               <SiteHeaderNav

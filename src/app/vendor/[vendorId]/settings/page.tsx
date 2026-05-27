@@ -126,8 +126,8 @@ export default async function VendorSettingsPage({
   return (
     <div className="space-y-10">
       <header>
-        <h2 className="text-xl font-semibold text-stone-900">Settings</h2>
-        <p className="mt-1 text-sm text-stone-500">Brand, menu, ordering, and pod membership.</p>
+        <h2 className="text-xl font-semibold text-oo-charcoal">Settings</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">Brand, menu, ordering, and pod membership.</p>
       </header>
 
       <Suspense fallback={null}>
@@ -137,13 +137,13 @@ export default async function VendorSettingsPage({
       {/* Brand / profile */}
       <section className="space-y-4">
         <div>
-          <h3 className="text-lg font-semibold text-stone-900">Brand &amp; profile</h3>
-          <p className="mt-1 text-sm text-stone-500">Name, logo, and colors on the pod and customer menu.</p>
-          <p className="mt-1 text-xs text-stone-400">
-            URL slug: <span className="font-mono text-stone-600">{vendor.slug}</span> (fixed)
+          <h3 className="text-lg font-semibold text-oo-charcoal">Brand &amp; profile</h3>
+          <p className="mt-1 text-sm text-oo-stone-gray">Name, logo, and colors on the pod and customer menu.</p>
+          <p className="mt-1 text-xs text-oo-stone-gray">
+            URL slug: <span className="font-mono text-oo-stone-gray">{vendor.slug}</span> (fixed)
           </p>
         </div>
-        <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
           <VendorBrandProfileForm
             vendorId={vendor.id}
             initialName={vendor.name}
@@ -157,8 +157,8 @@ export default async function VendorSettingsPage({
       {/* POS & routing — identifiers (not secrets) */}
       <section id="vendor-settings-pos" className="scroll-mt-4 space-y-4">
         <div>
-          <h3 className="text-lg font-semibold text-stone-900">POS &amp; routing</h3>
-          <p className="mt-1 text-sm text-stone-500">
+          <h3 className="text-lg font-semibold text-oo-charcoal">POS &amp; routing</h3>
+          <p className="mt-1 text-sm text-oo-stone-gray">
             Kitchen connection status, identifiers, and Deliverect setup. Your Open Order location ID is what you paste into
             Deliverect as <strong>channelLocationId</strong>; the channel link ID is applied automatically when
             activation succeeds.
@@ -189,13 +189,13 @@ export default async function VendorSettingsPage({
       {/* Ordering & availability */}
       <section id="vendor-settings-ordering" className="scroll-mt-4 space-y-4">
         <div>
-          <h3 className="text-lg font-semibold text-stone-900">Ordering &amp; availability</h3>
-          <p className="mt-1 text-sm text-stone-500">Stop or resume new orders through Open Order.</p>
+          <h3 className="text-lg font-semibold text-oo-charcoal">Ordering &amp; availability</h3>
+          <p className="mt-1 text-sm text-oo-stone-gray">Stop or resume new orders through Open Order.</p>
         </div>
         <VendorPauseToggle vendorId={vendor.id} initialPaused={vendor.mennyuOrdersPaused ?? false} embedded />
-        <p className="text-xs text-stone-400">
+        <p className="text-xs text-oo-stone-gray">
           You can also pause from{" "}
-          <Link href={`/vendor/${vendorId}/orders`} className="text-stone-600 underline hover:text-stone-800">
+          <Link href={`/vendor/${vendorId}/orders`} className="text-oo-stone-gray underline hover:text-oo-charcoal">
             Orders
           </Link>
           .
@@ -205,10 +205,10 @@ export default async function VendorSettingsPage({
       {/* Menu publishing */}
       <section className="space-y-4">
         <div>
-          <h3 className="text-lg font-semibold text-stone-900">Menu publishing</h3>
-          <p className="mt-1 text-sm text-stone-500">How Deliverect menu updates go live.</p>
+          <h3 className="text-lg font-semibold text-oo-charcoal">Menu publishing</h3>
+          <p className="mt-1 text-sm text-oo-stone-gray">How Deliverect menu updates go live.</p>
         </div>
-        <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
           <VendorAutoPublishToggle vendorId={vendor.id} initialAutoPublishMenus={vendor.autoPublishMenus ?? false} />
         </div>
       </section>
@@ -216,8 +216,8 @@ export default async function VendorSettingsPage({
       {deliverectMenuIntegrity && (
         <section className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-stone-900">Kitchen POS (Deliverect)</h3>
-            <p className="mt-1 text-sm text-stone-500">
+            <h3 className="text-lg font-semibold text-oo-charcoal">Kitchen POS (Deliverect)</h3>
+            <p className="mt-1 text-sm text-oo-stone-gray">
               Mapping health for orders sent to the kitchen. Contact Open Order support if you see critical issues.
             </p>
           </div>
@@ -236,7 +236,7 @@ export default async function VendorSettingsPage({
       </section>
 
       <section id="vendor-settings-payouts" className="scroll-mt-4 space-y-3">
-        <h3 className="text-lg font-semibold text-stone-900">Payouts</h3>
+        <h3 className="text-lg font-semibold text-oo-charcoal">Payouts</h3>
         <VendorStripePayoutCard
           vendorId={vendor.id}
           stripeConnectConfigured={Boolean(env.STRIPE_SECRET_KEY)}
@@ -250,7 +250,7 @@ export default async function VendorSettingsPage({
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold text-stone-900">Account</h3>
+        <h3 className="text-lg font-semibold text-oo-charcoal">Account</h3>
         <VendorDashboardAccessCard
           vendorId={vendor.id}
           hasDashboardSecret={hasToken}

@@ -36,10 +36,10 @@ export default async function VendorAreaLayout({
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto max-w-2xl px-4 pt-4 pb-2">
-          <h1 className="text-xl font-semibold text-stone-900">{vendor.name}</h1>
+    <div className="oo-dash">
+      <header className="oo-dash-titlebar">
+        <div className="mx-auto max-w-2xl px-4 pb-2 pt-4">
+          <h1 className="oo-dash-titlebar-heading">{vendor.name}</h1>
         </div>
         <VendorAreaNav vendorId={vendor.id} />
       </header>

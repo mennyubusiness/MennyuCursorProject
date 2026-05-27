@@ -8,12 +8,12 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-zinc-100">
-      <div className="border-b border-zinc-200 bg-white">
+    <div className="oo-dash">
+      <header className="oo-dash-titlebar">
         <PageShell className="py-3">
           <AdminTopNav />
         </PageShell>
-      </div>
+      </header>
       <div className="oo-shell py-10 lg:py-12">{children}</div>
     </div>
   );

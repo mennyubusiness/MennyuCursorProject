@@ -11,13 +11,13 @@ export function VendorOrdersSummaryStrip({ needsAttention, preparing, ready, com
   const cell = (label: string, value: number, highlight: boolean) => (
     <div
       className={`min-w-0 flex-1 rounded-lg px-3 py-3 sm:px-4 ${
-        highlight ? "bg-stone-900/12 ring-1 ring-stone-900/35" : "bg-stone-50/80"
+        highlight ? "bg-brand-muted ring-1 ring-brand/35" : "bg-oo-cream/80"
       }`}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-oo-stone-gray">{label}</p>
       <p
         className={`mt-1 text-2xl font-semibold tabular-nums ${
-          highlight && value > 0 ? "text-stone-900" : "text-stone-800"
+          highlight && value > 0 ? "text-oo-charcoal" : "text-oo-charcoal"
         }`}
       >
         {value}

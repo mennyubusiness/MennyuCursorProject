@@ -36,6 +36,11 @@ function groupActive(items: NavItem[], pathname: string) {
   return items.some((i) => pathMatches(i.href, pathname));
 }
 
+const navBtnBase =
+  "flex items-center gap-0.5 rounded-md px-2 py-1.5 text-sm transition-colors";
+const navBtnActive = "font-semibold text-oo-warm-white";
+const navBtnIdle = "text-oo-cream/75 hover:bg-oo-warm-white/10 hover:text-oo-warm-white";
+
 function NavDropdown({
   id,
   label,
@@ -71,22 +76,20 @@ function NavDropdown({
     <div ref={ref} className="relative">
       <button
         type="button"
-        className={`flex items-center gap-0.5 rounded-md px-2 py-1.5 text-sm transition-colors ${
-          active ? "font-semibold text-stone-900" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"
-        }`}
+        className={`${navBtnBase} ${active ? navBtnActive : navBtnIdle}`}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpenId(open ? null : id)}
         onMouseEnter={() => setOpenId(id)}
       >
         {label}
-        <span className="text-stone-400" aria-hidden>
+        <span className="text-oo-cream/50" aria-hidden>
           ▾
         </span>
       </button>
       {open && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 min-w-[200px] rounded-lg border border-stone-200 bg-white py-1 shadow-lg"
+          className="absolute left-0 top-full z-50 mt-1 min-w-[200px] rounded-lg border border-oo-light-stone bg-oo-warm-white py-1 shadow-lg"
           role="menu"
           onMouseLeave={() => setOpenId(null)}
         >
@@ -98,7 +101,9 @@ function NavDropdown({
                 href={item.href}
                 role="menuitem"
                 className={`block px-3 py-2 text-sm ${
-                  itemActive ? "bg-stone-100 font-medium text-stone-900" : "text-stone-700 hover:bg-stone-50"
+                  itemActive
+                    ? "bg-brand-muted font-medium text-oo-charcoal"
+                    : "text-oo-charcoal hover:bg-oo-cream"
                 }`}
                 onClick={close}
               >
@@ -123,7 +128,7 @@ export function AdminTopNav() {
       <Link
         href="/admin"
         className={`rounded-md px-2 py-1.5 text-sm ${
-          dashboardActive ? "font-semibold text-stone-900" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+          dashboardActive ? navBtnActive : navBtnIdle
         }`}
       >
         Dashboard

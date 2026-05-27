@@ -57,10 +57,10 @@ export function VendorMenuHero({
   const accent = vendorAccentColor ?? podAccentColor;
 
   return (
-    <header className="border-b border-zinc-200 bg-white">
+    <header className="border-b border-oo-light-stone bg-oo-warm-white">
       <PageShell className="py-4 sm:py-5">
         <nav
-          className="mb-4 text-xs text-zinc-500"
+          className="mb-4 text-xs text-oo-stone-gray"
           aria-label="Breadcrumb"
           style={accent ? { borderBottomColor: accent } : undefined}
         >
@@ -68,16 +68,16 @@ export function VendorMenuHero({
             <li>
               <Link
                 href={`/pod/${podId}`}
-                className="font-semibold text-zinc-700 transition hover:text-black"
+                className="font-semibold text-oo-charcoal transition hover:text-brand"
                 style={podAccentColor ? { color: podAccentColor } : undefined}
               >
                 {podName}
               </Link>
             </li>
-            <li aria-hidden className="text-zinc-300">
+            <li aria-hidden className="text-oo-light-stone">
               /
             </li>
-            <li className="font-medium text-zinc-900">{vendorName}</li>
+            <li className="font-medium text-oo-charcoal">{vendorName}</li>
           </ol>
         </nav>
 
@@ -85,20 +85,20 @@ export function VendorMenuHero({
           <VendorLogo
             imageUrl={vendorImageUrl}
             vendorName={vendorName}
-            className="h-16 w-16 shrink-0 rounded-xl border border-zinc-200 sm:h-20 sm:w-20"
+            className="h-16 w-16 shrink-0 rounded-xl border border-oo-light-stone sm:h-20 sm:w-20"
             sizes="80px"
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
-                <h1 className="text-xl font-bold tracking-tight text-black sm:text-2xl">
+                <h1 className="text-xl font-bold tracking-tight text-oo-charcoal sm:text-2xl">
                   {vendorName}
                 </h1>
-                <p className="mt-1 text-sm text-zinc-600">
+                <p className="mt-1 text-sm text-oo-stone-gray">
                   at{" "}
                   <Link
                     href={`/pod/${podId}`}
-                    className="font-semibold text-zinc-800 underline decoration-zinc-300 underline-offset-2 hover:text-black"
+                    className="font-semibold text-oo-charcoal underline decoration-oo-light-stone underline-offset-2 hover:text-brand"
                   >
                     {podName}
                   </Link>
@@ -107,19 +107,19 @@ export function VendorMenuHero({
               <FavoriteVendorButton vendorId={vendorId} podId={podId} vendorName={vendorName} />
             </div>
 
-            <ul className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-600">
+            <ul className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-oo-stone-gray">
               <li>
                 <VendorStatusBadge status={availabilityStatus} />
               </li>
               {cuisineCategory?.trim() && (
-                <li className="text-zinc-500">{cuisineCategory.trim()}</li>
+                <li className="text-oo-stone-gray">{cuisineCategory.trim()}</li>
               )}
-              <li className="text-zinc-500">Pickup at pod</li>
-              <li className="text-zinc-500">Shared multi-vendor cart</li>
+              <li className="text-oo-stone-gray">Pickup at pod</li>
+              <li className="text-oo-stone-gray">Shared multi-vendor cart</li>
             </ul>
 
             {vendorDescription?.trim() && (
-              <p className="mt-2 line-clamp-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
+              <p className="mt-2 line-clamp-2 max-w-2xl text-sm leading-relaxed text-oo-stone-gray">
                 {vendorDescription.trim()}
               </p>
             )}

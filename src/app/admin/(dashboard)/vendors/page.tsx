@@ -55,8 +55,8 @@ export default async function AdminVendorsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-stone-900">Vendors</h1>
-      <p className="mt-1 max-w-2xl text-sm text-stone-600">
+      <h1 className="text-xl font-semibold text-oo-charcoal">Vendors</h1>
+      <p className="mt-1 max-w-2xl text-sm text-oo-stone-gray">
         Browse and filter vendors. Open a row or choose <strong>Manage</strong> for menu history, POS mapping, and
         vendor tools.
       </p>

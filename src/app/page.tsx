@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { HomeHero } from "@/components/home/HomeHero";
-import { JoinGroupOrderByCodeForm } from "@/app/cart/JoinGroupOrderByCodeForm";
+import { HomeJoinGroupSection } from "@/components/home/HomeJoinGroupSection";
 import { HomeRecentOrdersSection } from "@/components/home/HomeRecentOrdersSection";
 import { CustomerRetentionStrip } from "@/components/retention/CustomerRetentionStrip";
 import { resolveCustomerPhoneForSession } from "@/lib/customer-phone-resolution";
@@ -39,21 +39,7 @@ export default async function HomePage() {
     <div className="w-full">
       <HomeHero featuredPods={featuredPods} />
 
-      <PageSection className="!py-12 sm:!py-16">
-        <PageShell>
-          <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-start lg:gap-16">
-            <div>
-              <h2 className="oo-section-title">Join a group order</h2>
-              <p className="mt-3 max-w-md text-base leading-relaxed text-zinc-600">
-                Have a 6-digit code? Enter it to add items to a shared cart with friends.
-              </p>
-            </div>
-            <div className="oo-card p-6 sm:p-8">
-              <JoinGroupOrderByCodeForm />
-            </div>
-          </div>
-        </PageShell>
-      </PageSection>
+      <HomeJoinGroupSection />
 
       <PageShell className="space-y-16 pb-20 sm:space-y-20 sm:pb-28">
         <HomeRecentOrdersSection customerPhone={customerPhone} />
@@ -68,7 +54,7 @@ export default async function HomePage() {
                 <h2 className="text-4xl font-black tracking-tight text-white sm:text-5xl">
                   How it works
                 </h2>
-                <p className="mt-4 max-w-md text-lg text-zinc-500">
+                <p className="mt-4 max-w-md text-lg text-oo-cream/55">
                   Three steps from browse to pickup — no friction, no duplicate payments.
                 </p>
               </div>
@@ -97,7 +83,7 @@ export default async function HomePage() {
                     <span className="text-2xl font-black tabular-nums text-brand">{item.step}</span>
                     <div>
                       <h3 className="text-lg font-bold text-white">{item.title}</h3>
-                      <p className="mt-2 text-sm leading-relaxed text-zinc-500 sm:text-base">
+                      <p className="mt-2 text-sm leading-relaxed text-oo-cream/55 sm:text-base">
                         {item.body}
                       </p>
                     </div>
@@ -114,7 +100,7 @@ export default async function HomePage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="oo-section-title">Built for the whole pod</h2>
-              <p className="mt-3 max-w-2xl text-lg text-zinc-600">
+              <p className="mt-3 max-w-2xl text-lg text-oo-stone-gray">
                 Customers, vendors, and pod operators — one platform, one operational layer.
               </p>
             </div>
@@ -135,8 +121,8 @@ export default async function HomePage() {
               },
             ].map((card) => (
               <article key={card.title} className="oo-card-hover p-8">
-                <h3 className="text-xl font-bold tracking-tight text-black">{card.title}</h3>
-                <p className="mt-4 text-sm leading-relaxed text-zinc-600 sm:text-base">{card.body}</p>
+                <h3 className="text-xl font-bold tracking-tight text-oo-charcoal">{card.title}</h3>
+                <p className="mt-4 text-sm leading-relaxed text-oo-stone-gray sm:text-base">{card.body}</p>
               </article>
             ))}
           </div>
@@ -147,10 +133,10 @@ export default async function HomePage() {
         <PageSection className="!py-16 sm:!py-20">
           <PageShell className="flex flex-col items-start gap-8 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-2xl">
-              <h2 className="text-4xl font-black tracking-tight text-black sm:text-5xl">
+              <h2 className="text-4xl font-black tracking-tight text-oo-charcoal sm:text-5xl">
                 Run your pod on Open Order
               </h2>
-              <p className="mt-4 text-lg text-zinc-600">
+              <p className="mt-4 text-lg text-oo-stone-gray">
                 Bring vendors together, streamline orders, and deliver a premium pickup experience.
               </p>
             </div>

@@ -48,9 +48,9 @@ export function PodDashboardPendingRequests({
   }
 
   return (
-    <section className="rounded-xl border border-stone-200 bg-stone-50/80 p-4">
-      <h2 className="text-base font-semibold text-stone-900">Awaiting vendor response</h2>
-      <p className="mt-1 text-sm text-stone-600">
+    <section className="rounded-xl border border-oo-light-stone bg-oo-cream/80 p-4">
+      <h2 className="text-base font-semibold text-oo-charcoal">Awaiting vendor response</h2>
+      <p className="mt-1 text-sm text-oo-stone-gray">
         These invitations are waiting for the vendor to accept or decline. Only they can complete or
         reject the request. You can cancel a pending invitation if you sent it by mistake or no longer
         want them to join.
@@ -60,7 +60,7 @@ export function PodDashboardPendingRequests({
         {requests.map((r) => (
           <li
             key={r.id}
-            className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
+            className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
               <VendorLogo
@@ -70,8 +70,8 @@ export function PodDashboardPendingRequests({
                 sizes="56px"
               />
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-stone-900">{r.vendorName}</p>
-                <p className="mt-0.5 text-xs text-stone-500">
+                <p className="font-semibold text-oo-charcoal">{r.vendorName}</p>
+                <p className="mt-0.5 text-xs text-oo-stone-gray">
                   Invitation sent{" "}
                   {new Date(r.createdAt).toLocaleString(undefined, {
                     dateStyle: "short",
@@ -80,37 +80,37 @@ export function PodDashboardPendingRequests({
                 </p>
                 {r.vendorDescription ? (
                   <p
-                    className={`mt-2 text-sm text-stone-600 ${
+                    className={`mt-2 text-sm text-oo-stone-gray ${
                       expandedId !== r.id && r.vendorDescription.length > 160 ? "line-clamp-3" : ""
                     }`}
                   >
                     {r.vendorDescription}
                   </p>
                 ) : (
-                  <p className="mt-2 text-sm text-stone-400">No description</p>
+                  <p className="mt-2 text-sm text-oo-stone-gray">No description</p>
                 )}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     disabled={actingId !== null}
                     onClick={() => void postCancelInvitation(r.id)}
-                    className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+                    className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-sm font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
                   >
                     {actingId === r.id ? "…" : "Cancel invitation"}
                   </button>
                   {r.vendorDescription && r.vendorDescription.length > 160 && (
                     <button
                       type="button"
-                      className="text-sm text-stone-600 underline hover:text-stone-900"
+                      className="text-sm text-oo-stone-gray underline hover:text-oo-charcoal"
                       onClick={() => setExpandedId((id) => (id === r.id ? null : r.id))}
                     >
                       {expandedId === r.id ? "Show less" : "Read full description"}
                     </button>
                   )}
                 </div>
-                <p className="mt-3 text-xs text-stone-400">
+                <p className="mt-3 text-xs text-oo-stone-gray">
                   After they join, customers can open their menu from your pod; use{" "}
-                  <span className="text-stone-600">More → View vendor page</span> on the roster.
+                  <span className="text-oo-stone-gray">More → View vendor page</span> on the roster.
                 </p>
               </div>
             </div>

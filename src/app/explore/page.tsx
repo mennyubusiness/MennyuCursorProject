@@ -38,7 +38,7 @@ export default async function ExplorePage() {
           <ExplorePopularPods pods={podCards} />
 
           <CustomerRetentionStrip
-            className="border-zinc-200 bg-white p-6 shadow-sm sm:p-8"
+            className="border-oo-light-stone bg-oo-warm-white p-6 shadow-sm sm:p-8"
             heading="Continue browsing"
           />
 

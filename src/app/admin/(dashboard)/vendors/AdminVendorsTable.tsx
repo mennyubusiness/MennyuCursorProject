@@ -42,7 +42,7 @@ function StatusPill({ isActive }: { isActive: boolean }) {
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-600">
+    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-oo-stone-gray">
       <span className="h-2 w-2 rounded-full bg-stone-400" aria-hidden />
       Paused
     </span>
@@ -93,19 +93,19 @@ export function AdminVendorsTable({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search vendors…"
-            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+            className="w-full rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm text-oo-charcoal placeholder:text-oo-stone-gray focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
           />
         </div>
         <div className="flex flex-wrap gap-3">
           <div>
-            <label htmlFor="pod-filter" className="mb-1 block text-xs font-medium text-stone-500">
+            <label htmlFor="pod-filter" className="mb-1 block text-xs font-medium text-oo-stone-gray">
               Pod
             </label>
             <select
               id="pod-filter"
               value={podId}
               onChange={(e) => setPodId(e.target.value)}
-              className="rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm text-stone-800"
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-2 text-sm text-oo-charcoal"
             >
               <option value="">All pods</option>
               <option value={POD_NONE}>No pod</option>
@@ -117,14 +117,14 @@ export function AdminVendorsTable({
             </select>
           </div>
           <div>
-            <label htmlFor="status-filter" className="mb-1 block text-xs font-medium text-stone-500">
+            <label htmlFor="status-filter" className="mb-1 block text-xs font-medium text-oo-stone-gray">
               Status
             </label>
             <select
               id="status-filter"
               value={status}
               onChange={(e) => setStatus(e.target.value as "all" | "active" | "paused")}
-              className="rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm text-stone-800"
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-2 text-sm text-oo-charcoal"
             >
               <option value="all">All</option>
               <option value="active">Active</option>
@@ -134,16 +134,16 @@ export function AdminVendorsTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm">
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-stone-200 bg-stone-50 text-left">
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">Name</th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">Status</th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">Pod</th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">Orders</th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">Last active</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-oo-light-stone bg-oo-cream text-left">
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Name</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Status</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Pod</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Orders</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Last active</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
                 Actions
               </th>
             </tr>
@@ -151,7 +151,7 @@ export function AdminVendorsTable({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-stone-600">
+                <td colSpan={6} className="px-4 py-12 text-center text-oo-stone-gray">
                   No vendors match your filters.
                 </td>
               </tr>
@@ -168,18 +168,18 @@ export function AdminVendorsTable({
                     }
                   }}
                   onClick={() => router.push(`/admin/vendors/${v.id}`)}
-                  className="cursor-pointer border-b border-stone-100 transition-colors last:border-b-0 hover:bg-stone-50/90"
+                  className="cursor-pointer border-b border-oo-light-stone transition-colors last:border-b-0 hover:bg-oo-cream/90"
                 >
                   <td className="px-4 py-4 align-top">
-                    <span className="font-medium text-stone-900">{v.name}</span>
-                    <p className="mt-0.5 font-mono text-xs text-stone-500">{v.slug}</p>
+                    <span className="font-medium text-oo-charcoal">{v.name}</span>
+                    <p className="mt-0.5 font-mono text-xs text-oo-stone-gray">{v.slug}</p>
                   </td>
                   <td className="px-4 py-4 align-top">
                     <StatusPill isActive={v.isActive} />
                   </td>
-                  <td className="px-4 py-4 align-top text-stone-700" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-4 align-top text-oo-charcoal" onClick={(e) => e.stopPropagation()}>
                     {v.pods.length === 0 ? (
-                      <span className="text-stone-400">—</span>
+                      <span className="text-oo-stone-gray">—</span>
                     ) : (
                       <span className="flex flex-col gap-1">
                         {v.pods.map((p) => (
@@ -195,18 +195,18 @@ export function AdminVendorsTable({
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-4 align-top tabular-nums text-stone-800">
+                  <td className="px-4 py-4 align-top tabular-nums text-oo-charcoal">
                     <span className="font-medium">{v.ordersAllTime.toLocaleString()}</span>
-                    <p className="mt-0.5 text-xs text-stone-500">All time · {v.ordersLast30Days.toLocaleString()} last 30d</p>
+                    <p className="mt-0.5 text-xs text-oo-stone-gray">All time · {v.ordersLast30Days.toLocaleString()} last 30d</p>
                   </td>
-                  <td className="px-4 py-4 align-top text-stone-600" title={v.lastActiveAtIso ?? undefined}>
+                  <td className="px-4 py-4 align-top text-oo-stone-gray" title={v.lastActiveAtIso ?? undefined}>
                     {formatLastActive(v.lastActiveAtIso)}
                   </td>
                   <td className="px-4 py-4 align-top text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <Link
                         href={`/admin/vendors/${v.id}`}
-                        className="rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-800"
+                        className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-hover"
                         onClick={(e) => e.stopPropagation()}
                       >
                         Manage

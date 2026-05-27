@@ -63,7 +63,7 @@ export function PodDashboardAddVendor({
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
-            className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
+            className="w-full rounded border border-oo-light-stone px-3 py-2 text-oo-charcoal focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
           >
             <option value="">Select a vendor…</option>
             {eligibleVendors.map((v) => (
@@ -81,7 +81,7 @@ export function PodDashboardAddVendor({
           type="button"
           onClick={handleRequest}
           disabled={!selectedId || loading}
-          className="rounded bg-stone-800 px-4 py-2 text-sm font-medium text-white hover:bg-stone-900 disabled:opacity-50"
+          className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
         >
           {loading ? "…" : "Request vendor to join"}
         </button>

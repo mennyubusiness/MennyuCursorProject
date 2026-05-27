@@ -223,7 +223,7 @@ export function VendorDashboardLiveOrders({
         />
       </div>
       {vendorOrders.length === 0 ? (
-        <p className="text-sm text-stone-500">No orders yet.</p>
+        <p className="text-sm text-oo-stone-gray">No orders yet.</p>
       ) : (
         <div className="space-y-12">
           {order.map((key) => {
@@ -316,21 +316,21 @@ export function VendorDashboardLiveOrders({
             const open = expanded;
             const setOpen = key === "completed" ? setShowCompleted : setShowCancelledFailed;
             return (
-              <section key={key} className="border-t border-stone-200/60 pt-8">
+              <section key={key} className="border-t border-oo-light-stone/60 pt-8">
                 <button
                   type="button"
                   onClick={() => setOpen(!open)}
-                  className="flex w-full items-center justify-between gap-3 rounded-lg py-2 text-left transition hover:bg-stone-50/80"
+                  className="flex w-full items-center justify-between gap-3 rounded-lg py-2 text-left transition hover:bg-oo-cream/80"
                 >
                   <h2
                     className={`text-sm font-semibold tracking-tight ${
-                      isTerminalSection ? "text-stone-500" : "text-stone-800"
+                      isTerminalSection ? "text-oo-stone-gray" : "text-oo-charcoal"
                     }`}
                   >
                     {GROUP_LABELS[key]}
-                    <span className="ml-2 font-normal text-stone-500">({list.length})</span>
+                    <span className="ml-2 font-normal text-oo-stone-gray">({list.length})</span>
                   </h2>
-                  <span className="shrink-0 text-xs font-medium text-stone-900">
+                  <span className="shrink-0 text-xs font-medium text-oo-charcoal">
                     {open ? "Hide" : "Show"}
                   </span>
                 </button>
@@ -343,7 +343,7 @@ export function VendorDashboardLiveOrders({
             <section key={key}>
               <h2
                 className={`mb-4 text-sm font-semibold tracking-tight ${
-                  isTerminalSection ? "text-stone-500" : "text-stone-800"
+                  isTerminalSection ? "text-oo-stone-gray" : "text-oo-charcoal"
                 }`}
               >
                 {GROUP_LABELS[key]}

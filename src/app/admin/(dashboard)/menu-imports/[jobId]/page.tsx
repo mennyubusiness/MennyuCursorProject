@@ -146,13 +146,13 @@ export default async function AdminMenuImportJobPage({
         <div>
           <Link
             href={`/admin/vendors/${job.vendorId}/menu-history#vendor-imports`}
-            className="text-sm text-stone-600 hover:underline"
+            className="text-sm text-oo-stone-gray hover:underline"
           >
             ← Menu management
           </Link>
-          <h1 className="mt-2 text-xl font-semibold text-stone-900">{job.vendor.name}</h1>
-          <p className="mt-1 text-sm text-stone-700">{headlineStatus}</p>
-          <p className="mt-0.5 text-sm text-stone-500">
+          <h1 className="mt-2 text-xl font-semibold text-oo-charcoal">{job.vendor.name}</h1>
+          <p className="mt-1 text-sm text-oo-charcoal">{headlineStatus}</p>
+          <p className="mt-0.5 text-sm text-oo-stone-gray">
             Updated {formatDate(job.completedAt ?? job.startedAt)} · {menuImportFriendlySource(job.source)}
           </p>
         </div>
@@ -169,25 +169,25 @@ export default async function AdminMenuImportJobPage({
 
       <MenuParityAuditBanner audit={menuParity} />
 
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="font-medium text-stone-900">What changed</h2>
-        <p className="mt-1 text-sm text-stone-600">Compared to your live Open Order menu (same Deliverect-linked items).</p>
+      <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+        <h2 className="font-medium text-oo-charcoal">What changed</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">Compared to your live Open Order menu (same Deliverect-linked items).</p>
         <div className="mt-3">
           <MenuImportWhatChanged summary={publishSummary} summaryMode={publishSummaryMode} />
         </div>
       </section>
 
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="font-medium text-stone-900">Issues</h2>
-        <p className="mt-1 text-sm text-stone-600">Anything that blocks publishing or needs your attention.</p>
+      <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+        <h2 className="font-medium text-oo-charcoal">Issues</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">Anything that blocks publishing or needs your attention.</p>
         <div className="mt-3">
           <MenuImportIssuesList issues={issues} showTechnicalMeta={false} />
         </div>
       </section>
 
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="font-medium text-stone-900">Menu preview</h2>
-        <p className="mt-1 text-sm text-stone-600">How this draft looks in Open Order (names, prices, modifiers).</p>
+      <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+        <h2 className="font-medium text-oo-charcoal">Menu preview</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">How this draft looks in Open Order (names, prices, modifiers).</p>
         <div className="mt-4">
           <MenuImportMenuPreview
             menu={menu}
@@ -198,8 +198,8 @@ export default async function AdminMenuImportJobPage({
         </div>
       </section>
 
-      <div className="space-y-4 rounded-lg border border-stone-200 bg-stone-50 p-4">
-        <p className="text-sm font-medium text-stone-900">Actions</p>
+      <div className="space-y-4 rounded-lg border border-oo-light-stone bg-oo-cream p-4">
+        <p className="text-sm font-medium text-oo-charcoal">Actions</p>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className="min-w-0 flex-1">
             <MenuImportPublishPanel
@@ -222,7 +222,7 @@ export default async function AdminMenuImportJobPage({
             />
           </div>
         </div>
-        <p className="text-sm text-stone-600">
+        <p className="text-sm text-oo-stone-gray">
           <Link
             href={`/admin/vendors/${job.vendorId}/menu-history#vendor-imports`}
             className="font-medium text-sky-800 hover:underline"
@@ -232,11 +232,11 @@ export default async function AdminMenuImportJobPage({
         </p>
       </div>
 
-      <details className="rounded-lg border border-stone-200 bg-white">
-        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-stone-800">
+      <details className="rounded-lg border border-oo-light-stone bg-oo-warm-white">
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-oo-charcoal">
           Detailed technical diff
         </summary>
-        <div className="border-t border-stone-100 p-4">
+        <div className="border-t border-oo-light-stone p-4">
           <AdminMenuImportDiffView
             hasDraftMenu={!!menu}
             publishedRow={

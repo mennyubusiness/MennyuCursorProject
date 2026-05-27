@@ -17,7 +17,7 @@ type OpenOrderLogoProps = {
   priority?: boolean;
 };
 
-const HEADER_LOGO_SIZE = { width: 36, height: 36 };
+const HEADER_LOGO_SIZE = { width: 56, height: 56 };
 
 export function OpenOrderLogo({
   variant = "header",
@@ -33,7 +33,7 @@ export function OpenOrderLogo({
           alt={BRAND_ALT.mark}
           width={HEADER_LOGO_SIZE.width}
           height={HEADER_LOGO_SIZE.height}
-          className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
+          className="h-12 w-12 shrink-0 object-contain sm:h-14 sm:w-14"
           priority={priority}
         />
       );
@@ -68,7 +68,7 @@ export function OpenOrderLogo({
     <Link
       href={href}
       className={cn(
-        "inline-flex shrink-0 items-center transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+        "inline-flex shrink-0 items-center transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white",
         className
       )}
       aria-label={BRAND_ALT.mark}

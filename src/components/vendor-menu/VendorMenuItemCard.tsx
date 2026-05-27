@@ -33,7 +33,7 @@ export function VendorMenuItemCard({
         !item.isAvailable && "opacity-80"
       )}
     >
-      <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
+      <div className="relative aspect-[16/9] w-full overflow-hidden bg-oo-cream">
         <div className="absolute inset-0">
           <MenuItemImage
             imageUrl={item.imageUrl}
@@ -49,7 +49,7 @@ export function VendorMenuItemCard({
         />
 
         {!item.isAvailable && (
-          <span className="absolute left-2 top-2 z-10 rounded-md bg-black/75 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+          <span className="absolute left-2 top-2 z-10 rounded-md bg-oo-charcoal/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-oo-warm-white">
             Unavailable
           </span>
         )}
@@ -72,11 +72,11 @@ export function VendorMenuItemCard({
       </div>
 
       <div className="flex flex-1 flex-col p-2.5 sm:p-3">
-        <h3 className="line-clamp-1 text-sm font-semibold text-black">{item.name}</h3>
+        <h3 className="line-clamp-1 text-sm font-semibold text-oo-charcoal">{item.name}</h3>
         {item.description && (
           <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-zinc-600">{item.description}</p>
         )}
-        <p className="mt-1.5 text-sm font-bold tabular-nums text-black">
+        <p className="mt-1.5 text-sm font-bold tabular-nums text-oo-charcoal">
           ${(item.priceCents / 100).toFixed(2)}
         </p>
       </div>

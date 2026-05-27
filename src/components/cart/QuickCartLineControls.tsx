@@ -39,24 +39,24 @@ export function QuickCartLineControls({
   }
 
   return (
-    <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-200 bg-zinc-50">
+    <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-oo-light-stone bg-oo-cream">
       <button
         type="button"
         disabled={loading}
         onClick={() => void setQty(quantity - 1)}
-        className="flex h-7 w-7 items-center justify-center rounded-l-md text-sm font-medium text-zinc-800 hover:bg-zinc-200 disabled:opacity-40"
+        className="flex h-7 w-7 items-center justify-center rounded-l-md text-sm font-medium text-oo-charcoal hover:bg-oo-light-stone disabled:opacity-40"
         aria-label="Decrease quantity"
       >
         −
       </button>
-      <span className="min-w-[1.25rem] text-center text-xs font-semibold tabular-nums text-zinc-900">
+      <span className="min-w-[1.25rem] text-center text-xs font-semibold tabular-nums text-oo-charcoal">
         {quantity}
       </span>
       <button
         type="button"
         disabled={loading}
         onClick={() => void setQty(quantity + 1)}
-        className="flex h-7 w-7 items-center justify-center rounded-r-md text-sm font-medium text-zinc-800 hover:bg-zinc-200 disabled:opacity-40"
+        className="flex h-7 w-7 items-center justify-center rounded-r-md text-sm font-medium text-oo-charcoal hover:bg-oo-light-stone disabled:opacity-40"
         aria-label="Increase quantity"
       >
         +

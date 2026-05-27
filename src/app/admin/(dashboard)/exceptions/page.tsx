@@ -16,8 +16,8 @@ export default async function AdminExceptionsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-stone-900">Issues</h1>
-      <p className="mt-1 max-w-2xl text-sm text-stone-600">
+      <h1 className="text-xl font-semibold text-oo-charcoal">Issues</h1>
+      <p className="mt-1 max-w-2xl text-sm text-oo-stone-gray">
         Active queue for routing, fulfillment, refunds, and tracked issues. Resolve on the order page for full controls;
         use filters to narrow the list.
       </p>

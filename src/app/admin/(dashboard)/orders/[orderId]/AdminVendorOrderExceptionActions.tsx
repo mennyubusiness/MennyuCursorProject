@@ -110,7 +110,7 @@ export function AdminVendorOrderExceptionActions({
           </button>
         )}
         {!routingAvailable && (exceptionType === "routing_failed" || exceptionType === "routing_stuck") && (
-          <span className="text-xs text-stone-500">Retry unavailable (mock mode)</span>
+          <span className="text-xs text-oo-stone-gray">Retry unavailable (mock mode)</span>
         )}
         {canManualRecovery && (
           <button
@@ -124,7 +124,7 @@ export function AdminVendorOrderExceptionActions({
           </button>
         )}
         {alreadyManuallyRecovered && (
-          <span className="text-xs text-stone-500">Manually recovered</span>
+          <span className="text-xs text-oo-stone-gray">Manually recovered</span>
         )}
         {canCancel && (
           <button
@@ -132,14 +132,14 @@ export function AdminVendorOrderExceptionActions({
             title="Use when this vendor portion cannot be fulfilled."
             onClick={handleCancel}
             disabled={busy}
-            className="rounded border border-red-300 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+            className="rounded border border-red-300 bg-oo-warm-white px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
           >
             {loading === "cancel" ? "…" : "Cancel VO"}
           </button>
         )}
       </div>
       {message && (
-        <p className={`text-xs ${message.error ? "text-red-600" : "text-stone-600"}`}>
+        <p className={`text-xs ${message.error ? "text-red-600" : "text-oo-stone-gray"}`}>
           {message.text}
         </p>
       )}

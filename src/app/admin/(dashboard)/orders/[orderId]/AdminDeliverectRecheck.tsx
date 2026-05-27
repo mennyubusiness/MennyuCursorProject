@@ -55,12 +55,12 @@ export function AdminDeliverectRecheck({
         title="Fetches order state from Deliverect API (same mapping as webhooks). Use when webhooks are delayed."
         onClick={handleRecheck}
         disabled={loading}
-        className="w-fit rounded border border-stone-300 bg-white px-2 py-1 text-xs text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+        className="w-fit rounded border border-oo-light-stone bg-oo-warm-white px-2 py-1 text-xs text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
       >
         {loading ? "…" : "Re-check Deliverect"}
       </button>
       {message && (
-        <p className={`text-xs ${message.error ? "text-amber-800" : "text-stone-600"}`}>{message.text}</p>
+        <p className={`text-xs ${message.error ? "text-amber-800" : "text-oo-stone-gray"}`}>{message.text}</p>
       )}
     </div>
   );

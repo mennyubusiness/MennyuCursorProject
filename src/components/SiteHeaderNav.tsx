@@ -32,7 +32,7 @@ function buildLoginHref(callbackPath: string): string {
 }
 
 const navLink =
-  "rounded-md px-2 py-1.5 text-sm font-medium text-zinc-300 transition-colors duration-200 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:text-[0.9375rem]";
+  "rounded-md px-2 py-1.5 text-sm font-medium text-oo-cream/75 transition-colors duration-200 hover:bg-oo-warm-white/10 hover:text-oo-warm-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white sm:text-[0.9375rem]";
 
 export function SiteHeaderNav({
   callbackPath,
@@ -93,7 +93,7 @@ export function SiteHeaderNav({
     <nav className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
       {isSignedIn && accountLabel && (
         <span
-          className="mr-1 hidden max-w-[9rem] truncate rounded-full border border-zinc-700 bg-zinc-900/80 px-2.5 py-0.5 text-xs font-medium text-zinc-400 sm:inline"
+          className="mr-1 hidden max-w-[9rem] truncate rounded-full border border-oo-light-stone/25 bg-oo-charcoal px-2.5 py-0.5 text-xs font-medium text-oo-cream/60 sm:inline"
           title="Signed-in account type"
         >
           {accountLabel}
@@ -103,7 +103,7 @@ export function SiteHeaderNav({
         Explore
       </Link>
       {showDashboard && dashboardHref && (
-        <Link href={dashboardHref} className={cn(navLink, "text-white")} title="Your dashboard">
+        <Link href={dashboardHref} className={cn(navLink, "text-oo-warm-white")} title="Your dashboard">
           Dashboard
         </Link>
       )}
@@ -118,7 +118,7 @@ export function SiteHeaderNav({
               onClick={quickCart.openCart}
               className={cn(
                 buttonClassName({ variant: "primary", size: "sm" }),
-                "relative ml-1 shadow-[0_0_16px_rgba(212,16,16,0.25)]",
+                "relative ml-1 shadow-[0_0_16px_rgba(249,115,22,0.35)]",
                 cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
               )}
               title="Open your cart"
@@ -140,7 +140,7 @@ export function SiteHeaderNav({
               href={activeOrderHref ?? cartHref}
               className={cn(
                 buttonClassName({ variant: "primary", size: "sm" }),
-                "ml-1 shadow-[0_0_16px_rgba(212,16,16,0.25)]",
+                "ml-1 shadow-[0_0_16px_rgba(249,115,22,0.35)]",
                 cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
               )}
               title="Your cart"
@@ -153,7 +153,7 @@ export function SiteHeaderNav({
       {!isSignedIn && (
         <Link
           href={loginHref}
-          className={cn(navLink, "text-white")}
+          className={cn(navLink, "text-oo-warm-white")}
           title="Sign in or create an account"
         >
           Sign in
@@ -172,7 +172,7 @@ export function SiteHeaderNav({
       )}
       <Link
         href="/admin"
-        className="ml-1 hidden text-xs font-medium uppercase tracking-wider text-zinc-600 transition hover:text-zinc-400 sm:inline"
+        className="ml-1 hidden text-xs font-medium uppercase tracking-wider text-oo-cream/40 transition hover:text-oo-cream/70 sm:inline"
       >
         Admin
       </Link>

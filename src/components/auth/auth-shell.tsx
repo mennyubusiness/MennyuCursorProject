@@ -20,12 +20,12 @@ export function AuthShell({ children, title, subtitle, className }: AuthShellPro
         className
       )}
     >
-      <div className="relative hidden overflow-hidden border-r border-zinc-800 bg-black lg:flex lg:w-[min(44%,32rem)] lg:flex-col lg:justify-between xl:w-[42%]">
+      <div className="relative hidden overflow-hidden border-r border-oo-light-stone/15 bg-oo-charcoal lg:flex lg:w-[min(44%,32rem)] lg:flex-col lg:justify-between xl:w-[42%]">
         <div
           className="pointer-events-none absolute inset-0 opacity-60"
           style={{
             backgroundImage:
-              "linear-gradient(160deg, rgba(212,16,16,0.2) 0%, transparent 45%), radial-gradient(ellipse 80% 60% at 100% 0%, rgba(255,255,255,0.06), transparent)",
+              "linear-gradient(160deg, rgba(249,115,22,0.18) 0%, transparent 45%), radial-gradient(ellipse 80% 60% at 100% 0%, rgba(255,253,248,0.06), transparent)",
           }}
           aria-hidden
         />
@@ -42,32 +42,34 @@ export function AuthShell({ children, title, subtitle, className }: AuthShellPro
             />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-oo-cream/50">
               Commerce operating system
             </p>
-            <h2 className="mt-4 max-w-md text-3xl font-black leading-[1.05] tracking-tight text-white xl:text-4xl">
+            <h2 className="mt-4 max-w-md text-3xl font-black leading-[1.05] tracking-tight text-oo-warm-white xl:text-4xl">
               One network.
-              <span className="block text-zinc-500">Every vendor. One cart.</span>
+              <span className="block text-oo-cream/55">Every vendor. One cart.</span>
             </h2>
-            <p className="mt-4 max-w-sm text-sm leading-relaxed text-zinc-500">
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-oo-cream/55">
               Sign in to manage pods, run your kitchen, or pick up where you left off ordering.
             </p>
           </div>
         </div>
-        <div className="relative border-t border-zinc-800 px-10 py-6 text-xs text-zinc-600 xl:px-14">
+        <div className="relative border-t border-oo-light-stone/15 px-10 py-6 text-xs text-oo-stone-gray xl:px-14">
           Multi-vendor pickup · Unified checkout
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col justify-center bg-zinc-50 px-4 py-12 sm:px-8 lg:px-12 xl:px-16">
+      <div className="flex flex-1 flex-col justify-center bg-oo-cream px-4 py-12 sm:px-8 lg:px-12 xl:px-16">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-8 lg:hidden">
             <OpenOrderLogo variant="header" />
           </div>
           {(title || subtitle) && (
             <div className="mb-8">
-              {title && <h1 className="text-3xl font-black tracking-tight text-black">{title}</h1>}
-              {subtitle && <p className="mt-2 text-base text-zinc-600">{subtitle}</p>}
+              {title && (
+                <h1 className="text-3xl font-black tracking-tight text-oo-charcoal">{title}</h1>
+              )}
+              {subtitle && <p className="mt-2 text-base text-oo-stone-gray">{subtitle}</p>}
             </div>
           )}
           {children}
@@ -87,7 +89,7 @@ export function AuthFormCard({
   return (
     <div
       className={cn(
-        "oo-card space-y-6 border-zinc-200 p-6 shadow-md sm:p-8",
+        "oo-card space-y-6 border-oo-light-stone p-6 shadow-md sm:p-8",
         className
       )}
     >

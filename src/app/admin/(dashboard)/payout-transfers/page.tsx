@@ -84,8 +84,8 @@ export default async function AdminPayoutTransfersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-stone-900">Payout transfers</h1>
-        <p className="mt-1 text-sm text-stone-600">
+        <h1 className="text-2xl font-semibold text-oo-charcoal">Payout transfers</h1>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Stripe Connect transfer execution and reversals. Use filters and retries for safe testing and debugging.
         </p>
       </div>

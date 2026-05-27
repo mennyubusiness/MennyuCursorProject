@@ -14,6 +14,18 @@ const config: Config = {
           hover: "var(--oo-brand-hover)",
           muted: "var(--oo-brand-muted)",
         },
+        oo: {
+          charcoal: "var(--oo-charcoal)",
+          cream: "var(--oo-cream)",
+          "warm-white": "var(--oo-warm-white)",
+          "light-stone": "var(--oo-light-stone)",
+          "stone-gray": "var(--oo-stone-gray)",
+        },
+        status: {
+          success: "var(--oo-status-success)",
+          warning: "var(--oo-status-warning)",
+          error: "var(--oo-status-error)",
+        },
         mennyu: {
           primary: "var(--mennyu-primary)",
           secondary: "var(--mennyu-secondary)",

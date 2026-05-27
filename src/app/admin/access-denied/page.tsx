@@ -38,11 +38,11 @@ export default function AdminAccessDeniedPage() {
     <div className="mx-auto max-w-md py-4">
       <AuthFormCard>
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-black">Admin access</h1>
-          <p className="mt-2 text-sm text-zinc-600">
+          <h1 className="text-2xl font-black tracking-tight text-oo-charcoal">Admin access</h1>
+          <p className="mt-2 text-sm text-oo-stone-gray">
             Enter the admin secret to continue. In development, access is automatic.
           </p>
-          <p className="mt-3 text-sm text-zinc-600">
+          <p className="mt-3 text-sm text-oo-stone-gray">
             Platform admin?{" "}
             <Link
               href={`/login?callbackUrl=${encodeURIComponent("/admin")}`}

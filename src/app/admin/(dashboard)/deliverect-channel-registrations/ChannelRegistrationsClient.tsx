@@ -39,23 +39,23 @@ export function ChannelRegistrationsClient({ rows }: { rows: ChannelRegistration
         </p>
       ) : null}
 
-      <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-oo-light-stone bg-oo-warm-white">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50">
+          <thead className="border-b border-oo-light-stone bg-oo-cream">
             <tr>
-              <th className="px-3 py-2 text-left font-medium text-stone-700">Time (UTC)</th>
-              <th className="px-3 py-2 text-left font-medium text-stone-700">channelLinkId</th>
-              <th className="px-3 py-2 text-left font-medium text-stone-700">channelLocationId</th>
-              <th className="px-3 py-2 text-left font-medium text-stone-700">locationId</th>
-              <th className="px-3 py-2 text-left font-medium text-stone-700">Outcome</th>
-              <th className="px-3 py-2 text-left font-medium text-stone-700">Retry match</th>
-              <th className="px-3 py-2 text-left font-medium text-stone-700">Attach to vendor</th>
+              <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Time (UTC)</th>
+              <th className="px-3 py-2 text-left font-medium text-oo-charcoal">channelLinkId</th>
+              <th className="px-3 py-2 text-left font-medium text-oo-charcoal">channelLocationId</th>
+              <th className="px-3 py-2 text-left font-medium text-oo-charcoal">locationId</th>
+              <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Outcome</th>
+              <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Retry match</th>
+              <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Attach to vendor</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-stone-500">
+                <td colSpan={7} className="px-3 py-6 text-oo-stone-gray">
                   No channel registration webhooks recorded yet.
                 </td>
               </tr>
@@ -68,19 +68,19 @@ export function ChannelRegistrationsClient({ rows }: { rows: ChannelRegistration
                   Boolean(r.errorMessage) &&
                   (r.errorMessage?.startsWith("no_match") || r.errorMessage?.startsWith("ambiguous:"));
                 return (
-                  <tr key={r.id} className={`border-b border-stone-100 ${needsReview ? "bg-amber-50/50" : ""}`}>
-                    <td className="px-3 py-2 align-top font-mono text-xs text-stone-700">{r.createdAtIso}</td>
+                  <tr key={r.id} className={`border-b border-oo-light-stone ${needsReview ? "bg-amber-50/50" : ""}`}>
+                    <td className="px-3 py-2 align-top font-mono text-xs text-oo-charcoal">{r.createdAtIso}</td>
                     <td className="px-3 py-2 align-top font-mono text-xs break-all">{r.channelLinkId ?? "—"}</td>
                     <td className="px-3 py-2 align-top font-mono text-xs break-all">{r.channelLocationId ?? "—"}</td>
                     <td className="px-3 py-2 align-top font-mono text-xs break-all">{r.locationId ?? "—"}</td>
-                    <td className="px-3 py-2 align-top text-xs text-stone-600">
+                    <td className="px-3 py-2 align-top text-xs text-oo-stone-gray">
                       <span className="font-medium">{r.processed ? "processed" : "pending"}</span>
                       {r.errorMessage ? (
-                        <span className="mt-1 block text-stone-500" title={r.errorMessage}>
+                        <span className="mt-1 block text-oo-stone-gray" title={r.errorMessage}>
                           {r.errorMessage.length > 120 ? `${r.errorMessage.slice(0, 120)}…` : r.errorMessage}
                         </span>
                       ) : null}
-                      <span className="mt-1 block text-[10px] text-stone-400">keys: {r.payloadKeys.join(", ") || "—"}</span>
+                      <span className="mt-1 block text-[10px] text-oo-stone-gray">keys: {r.payloadKeys.join(", ") || "—"}</span>
                     </td>
                     <td className="px-3 py-2 align-top">
                       {canRetry ? (
@@ -113,7 +113,7 @@ export function ChannelRegistrationsClient({ rows }: { rows: ChannelRegistration
                           Retry match
                         </button>
                       ) : (
-                        <span className="text-xs text-stone-400">—</span>
+                        <span className="text-xs text-oo-stone-gray">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2 align-top">
@@ -137,7 +137,7 @@ export function ChannelRegistrationsClient({ rows }: { rows: ChannelRegistration
                           }}
                         />
                       ) : (
-                        <span className="text-xs text-stone-400">No channelLinkId in payload</span>
+                        <span className="text-xs text-oo-stone-gray">No channelLinkId in payload</span>
                       )}
                     </td>
                   </tr>
@@ -148,14 +148,14 @@ export function ChannelRegistrationsClient({ rows }: { rows: ChannelRegistration
         </table>
       </div>
 
-      <p className="text-xs text-stone-500">
+      <p className="text-xs text-oo-stone-gray">
         Automatic matching uses email → correlation key → <strong>channelLocationId = Open Order location ID (Vendor.id)</strong>{" "}
         → Deliverect portal <strong>locationId</strong> = <code className="text-[11px]">Vendor.deliverectLocationId</code> →
         account id. If Deliverect sends only standard fields, configure <strong>channelLocationId</strong> in Deliverect to the
         restaurant&apos;s Open Order location ID from the vendor Connect POS screen.
       </p>
-      <p className="text-sm text-stone-600">
-        <Link href="/admin/deliverect-webhook-incidents" className="text-stone-800 underline hover:text-stone-950">
+      <p className="text-sm text-oo-stone-gray">
+        <Link href="/admin/deliverect-webhook-incidents" className="text-oo-charcoal underline hover:text-stone-950">
           Order-status webhook incidents
         </Link>
       </p>
@@ -177,14 +177,14 @@ function AttachForm({
         value={vendorId}
         onChange={(e) => setVendorId(e.target.value)}
         placeholder="Vendor id (cuid)"
-        className="w-full min-w-[140px] rounded border border-stone-300 px-2 py-1 font-mono text-xs"
+        className="w-full min-w-[140px] rounded border border-oo-light-stone px-2 py-1 font-mono text-xs"
         disabled={disabled}
         autoComplete="off"
       />
       <button
         type="button"
         disabled={disabled || !vendorId.trim()}
-        className="rounded border border-stone-400 bg-white px-2 py-1 text-xs font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+        className="rounded border border-stone-400 bg-oo-warm-white px-2 py-1 text-xs font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
         onClick={() => onSubmit(vendorId.trim())}
       >
         Apply payload

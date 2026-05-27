@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function VendorOrdersLoading() {
   return (
     <div className="space-y-8">
-      <div className="border-b border-stone-200 pb-6">
+      <div className="border-b border-oo-light-stone pb-6">
         <Skeleton className="h-9 w-40" />
         <Skeleton className="mt-3 h-4 max-w-md" />
       </div>

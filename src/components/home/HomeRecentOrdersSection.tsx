@@ -44,7 +44,7 @@ export async function HomeRecentOrdersSection({ customerPhone }: { customerPhone
         {recent.map((o) => (
           <li key={o.id} className="oo-card-hover flex flex-col gap-4 p-5">
             <div className="min-w-0 flex-1">
-              <p className="font-bold text-black">{o.podName}</p>
+              <p className="font-bold text-oo-charcoal">{o.podName}</p>
               {o.vendorNames.length > 0 && (
                 <p className="mt-1 truncate text-sm text-zinc-600" title={vendorSummary(o.vendorNames)}>
                   {vendorSummary(o.vendorNames)}

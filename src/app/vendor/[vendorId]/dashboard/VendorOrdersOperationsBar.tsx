@@ -56,24 +56,24 @@ export function VendorOrdersOperationsBar({
   const inner = (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 space-y-1 text-sm">
-        <p className="font-medium text-stone-900">
+        <p className="font-medium text-oo-charcoal">
           {storeLabel}
-          <span className="font-normal text-stone-400"> · </span>
+          <span className="font-normal text-oo-stone-gray"> · </span>
           {orderIntakeLabel}
         </p>
         {layout === "default" && (
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-oo-stone-gray">
             {paused
               ? "New orders through Open Order are blocked. In-progress orders still appear below."
               : "Customers can order from your published menu on Open Order."}
           </p>
         )}
         {layout === "compact" && (
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-oo-stone-gray">
             Pause or resume from here, or use{" "}
             <Link
               href={`/vendor/${vendorId}/settings#vendor-settings-ordering`}
-              className="underline hover:text-stone-700"
+              className="underline hover:text-oo-charcoal"
             >
               Settings
             </Link>
@@ -88,7 +88,7 @@ export function VendorOrdersOperationsBar({
         className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
           paused
             ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
-            : "bg-stone-800 text-white hover:bg-stone-900"
+            : "bg-brand text-white hover:bg-brand-hover"
         }`}
       >
         {loading ? "…" : paused ? "Resume Open Order intake" : "Pause Open Order intake"}
@@ -106,7 +106,7 @@ export function VendorOrdersOperationsBar({
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
       {inner}
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
     </div>

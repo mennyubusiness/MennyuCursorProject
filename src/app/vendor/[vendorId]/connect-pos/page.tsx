@@ -44,13 +44,13 @@ export default async function VendorConnectPosPage({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-stone-500">
-          <Link href={`/vendor/${vendorId}/orders`} className="hover:text-stone-800">
+        <p className="text-sm text-oo-stone-gray">
+          <Link href={`/vendor/${vendorId}/orders`} className="hover:text-oo-charcoal">
             ← Orders
           </Link>
         </p>
-        <h2 className="mt-2 text-xl font-semibold text-stone-900">Connect your POS</h2>
-        <p className="mt-1 text-sm text-stone-600">{vendor.name}</p>
+        <h2 className="mt-2 text-xl font-semibold text-oo-charcoal">Connect your POS</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">{vendor.name}</p>
       </div>
       <ConnectPosWizard vendor={{ ...vendor, hasUnmatchedChannelRegistration }} />
     </div>

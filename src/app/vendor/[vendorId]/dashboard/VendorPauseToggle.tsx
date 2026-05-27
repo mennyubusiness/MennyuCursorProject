@@ -45,14 +45,14 @@ export function VendorPauseToggle({
     <div
       className={
         embedded
-          ? "rounded-lg bg-stone-50/80 p-4"
-          : "rounded-lg border border-stone-200 bg-stone-50 p-4"
+          ? "rounded-lg bg-oo-cream/80 p-4"
+          : "rounded-lg border border-oo-light-stone bg-oo-cream p-4"
       }
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-medium text-stone-800">Open Order intake</p>
-          <p className="text-xs text-stone-500">
+          <p className="font-medium text-oo-charcoal">Open Order intake</p>
+          <p className="text-xs text-oo-stone-gray">
             {paused
               ? "New orders through Open Order are blocked. In-progress orders still show here."
               : "Customers can place orders for your menu via Open Order."}
@@ -65,7 +65,7 @@ export function VendorPauseToggle({
           className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
             paused
               ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
-              : "bg-stone-800 text-white hover:bg-stone-900"
+              : "bg-brand text-white hover:bg-brand-hover"
           }`}
         >
           {loading ? "…" : paused ? "Resume" : "Pause"}

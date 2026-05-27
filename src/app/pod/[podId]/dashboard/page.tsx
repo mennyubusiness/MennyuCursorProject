@@ -74,21 +74,21 @@ export default async function PodDashboardPage({
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
       <div>
-        <h1 className="text-xl font-semibold text-stone-900">Overview</h1>
-        <p className="mt-1 text-sm text-stone-600">
+        <h1 className="text-xl font-semibold text-oo-charcoal">Overview</h1>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Invite vendors, track responses, and curate your roster — order and featured flags update the
           public pod page.
         </p>
       </div>
 
       <section>
-        <h2 className="mb-3 font-medium text-stone-800">Request vendor to join</h2>
-        <p className="mb-2 text-sm text-stone-600">
+        <h2 className="mb-3 font-medium text-oo-charcoal">Request vendor to join</h2>
+        <p className="mb-2 text-sm text-oo-stone-gray">
           We&apos;ll notify the vendor. They choose whether to accept or decline. If they&apos;re already
           in another pod, accepting your invitation moves them here.
         </p>
         {vendorsNotInPod.length === 0 ? (
-          <p className="text-sm text-stone-500">All vendors are already in this pod or have pending requests.</p>
+          <p className="text-sm text-oo-stone-gray">All vendors are already in this pod or have pending requests.</p>
         ) : (
           <PodDashboardAddVendor
             podId={pod.id}
@@ -106,8 +106,8 @@ export default async function PodDashboardPage({
       <PodDashboardPendingRequests podId={pod.id} requests={pendingForUi} />
 
       <section>
-        <h2 className="mb-3 text-base font-semibold text-stone-900">Vendor roster</h2>
-        <p className="mb-3 text-sm text-stone-600">
+        <h2 className="mb-3 text-base font-semibold text-oo-charcoal">Vendor roster</h2>
+        <p className="mb-3 text-sm text-oo-stone-gray">
           Drag to reorder. Featured shows a badge only — it does not change sort order.
         </p>
         <PodVendorRosterPanel podId={pod.id} initialRows={rosterRows} />

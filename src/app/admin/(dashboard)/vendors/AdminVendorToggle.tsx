@@ -32,8 +32,8 @@ export function AdminVendorToggle({
 
   const cls =
     variant === "compact"
-      ? "rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
-      : "rounded border border-stone-300 px-2 py-1 text-xs hover:bg-stone-100 disabled:opacity-50";
+      ? "rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+      : "rounded border border-oo-light-stone px-2 py-1 text-xs hover:bg-oo-cream disabled:opacity-50";
 
   return (
     <button type="button" onClick={handleToggle} disabled={loading} className={cls}>

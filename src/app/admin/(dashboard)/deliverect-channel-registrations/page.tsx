@@ -54,15 +54,15 @@ export default async function AdminDeliverectChannelRegistrationsPage() {
 
   return (
     <div>
-      <p className="text-sm text-stone-500">
+      <p className="text-sm text-oo-stone-gray">
         <Link href="/admin" className="hover:underline">
           Dashboard
         </Link>
         <span className="mx-1">/</span>
-        <span className="text-stone-800">Channel registration</span>
+        <span className="text-oo-charcoal">Channel registration</span>
       </p>
-      <h1 className="mt-2 text-xl font-semibold text-stone-900">Channel registration</h1>
-      <p className="mt-1 max-w-3xl text-sm text-stone-600">
+      <h1 className="mt-2 text-xl font-semibold text-oo-charcoal">Channel registration</h1>
+      <p className="mt-1 max-w-3xl text-sm text-oo-stone-gray">
         Inbound registrations from Deliverect (register / active / inactive). Rows highlight likely review items when
         Open Order could not auto-map. Use <strong>Apply payload</strong> to attach a stored <code className="text-xs">channelLinkId</code>{" "}
         to a vendor after you confirm the correct restaurant.

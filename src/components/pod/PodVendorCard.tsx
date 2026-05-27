@@ -103,14 +103,14 @@ export function PodVendorCard({ podId, variant, vendor, isFeatured, availability
         <div className="flex flex-wrap items-center gap-1 gap-y-0.5">
           <h3
             className={cn(
-              "font-semibold text-black",
+              "font-semibold text-oo-charcoal",
               grid ? "line-clamp-1 text-sm leading-snug" : "line-clamp-2 text-xs leading-snug"
             )}
           >
             {vendor.name}
           </h3>
           {isFeatured && (
-            <span className="oo-badge border border-zinc-300 bg-white px-1.5 py-0 text-[9px] text-zinc-600">
+            <span className="oo-badge border border-oo-light-stone bg-oo-warm-white px-1.5 py-0 text-[9px] text-oo-stone-gray">
               Featured
             </span>
           )}
@@ -130,17 +130,17 @@ export function PodVendorCard({ podId, variant, vendor, isFeatured, availability
         </div>
 
         {grid && vendor.description && (
-          <p className="mt-1.5 line-clamp-2 flex-1 text-xs leading-snug text-zinc-600">
+          <p className="mt-1.5 line-clamp-2 flex-1 text-xs leading-snug text-oo-stone-gray">
             {vendor.description}
           </p>
         )}
         {availability.showBrowseHint && grid && (
-          <p className="mt-1 text-[11px] text-zinc-500">Menu still browsable</p>
+          <p className="mt-1 text-[11px] text-oo-stone-gray">Menu still browsable</p>
         )}
         <span
           className={cn(
             "mt-2.5 inline-flex w-fit items-center rounded-lg font-semibold transition duration-200",
-            "bg-zinc-900 px-2.5 py-1 text-xs text-white group-hover:bg-brand group-focus-visible:bg-brand",
+            "bg-oo-charcoal px-2.5 py-1 text-xs text-oo-warm-white group-hover:bg-brand group-focus-visible:bg-brand",
             grid ? "" : "px-2 py-0.5 text-[11px]"
           )}
         >

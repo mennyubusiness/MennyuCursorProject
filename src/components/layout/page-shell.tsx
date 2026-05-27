@@ -55,9 +55,9 @@ export function PageBand({
     <div
       className={cn(
         "w-full border-y",
-        variant === "dark" && "border-zinc-800 bg-black text-white",
-        variant === "muted" && "border-zinc-200 bg-zinc-100 text-zinc-950",
-        variant === "light" && "border-zinc-200 bg-white text-zinc-950",
+        variant === "dark" && "border-oo-charcoal/20 bg-oo-charcoal text-oo-warm-white",
+        variant === "muted" && "border-oo-light-stone bg-oo-cream text-oo-charcoal",
+        variant === "light" && "border-oo-light-stone bg-oo-warm-white text-oo-charcoal",
         className
       )}
     >

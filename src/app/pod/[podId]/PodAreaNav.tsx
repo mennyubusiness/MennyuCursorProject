@@ -17,7 +17,7 @@ export function PodAreaNav() {
   const base = `/pod/${podId}`;
 
   return (
-    <nav className="border-b border-stone-200 bg-white" aria-label="Pod area">
+    <nav className="oo-dash-nav" aria-label="Pod area">
       <div className="mx-auto flex max-w-2xl gap-1 px-4 py-2">
         {NAV_LINKS.map(({ href, label }) => {
           const path = `${base}/${href}`;
@@ -26,11 +26,7 @@ export function PodAreaNav() {
             <Link
               key={href}
               href={path}
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-stone-100 text-stone-900"
-                  : "text-stone-600 hover:bg-stone-50 hover:text-stone-800"
-              }`}
+              className={isActive ? "oo-dash-nav-link-active" : "oo-dash-nav-link"}
             >
               {label}
             </Link>

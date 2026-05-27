@@ -108,20 +108,20 @@ export function MenuImportDiscardDraftButton({
             onClick={() => !loading && setOpen(false)}
           >
             <div
-              className="max-w-md rounded-lg border border-stone-200 bg-white p-4 shadow-lg"
+              className="max-w-md rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 shadow-lg"
               role="dialog"
               aria-labelledby="discard-draft-title"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 id="discard-draft-title" className="text-sm font-semibold text-stone-900">
+              <h2 id="discard-draft-title" className="text-sm font-semibold text-oo-charcoal">
                 Discard draft MenuVersion?
               </h2>
-              <p className="mt-2 text-sm text-stone-700">
+              <p className="mt-2 text-sm text-oo-charcoal">
                 This deletes the draft snapshot row only. The import job stays for audit (issues + raw JSON). The job
                 will be marked <span className="font-mono">cancelled</span> and unlinked from this draft.
               </p>
               {draftVersionId && (
-                <p className="mt-2 font-mono text-xs text-stone-600">
+                <p className="mt-2 font-mono text-xs text-oo-stone-gray">
                   Draft id: {draftVersionId}
                 </p>
               )}
@@ -142,7 +142,7 @@ export function MenuImportDiscardDraftButton({
                   type="button"
                   disabled={loading}
                   onClick={() => setOpen(false)}
-                  className="rounded border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-800"
+                  className="rounded border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-sm text-oo-charcoal"
                 >
                   Cancel
                 </button>
@@ -163,14 +163,14 @@ export function MenuImportDiscardDraftButton({
   }
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white p-4">
-      <h2 className="font-medium text-stone-900">Discard draft</h2>
-      <p className="mt-1 text-sm text-stone-600">
-        Remove this draft <code className="rounded bg-stone-100 px-0.5">MenuVersion</code> from review. Does not delete
+    <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+      <h2 className="font-medium text-oo-charcoal">Discard draft</h2>
+      <p className="mt-1 text-sm text-oo-stone-gray">
+        Remove this draft <code className="rounded bg-oo-cream px-0.5">MenuVersion</code> from review. Does not delete
         the import job, validation issues, or raw Deliverect payload. Does not change live menu tables.
       </p>
       {!canDiscard && discardReasons.length > 0 && (
-        <ul className="mt-2 list-inside list-disc text-sm text-stone-600">
+        <ul className="mt-2 list-inside list-disc text-sm text-oo-stone-gray">
           {discardReasons.map((r) => (
             <li key={r}>{r}</li>
           ))}
@@ -211,12 +211,12 @@ export function MenuImportDiscardDraftButton({
           <h3 id="discard-draft-panel-title" className="text-sm font-semibold text-red-950">
             Confirm discard
           </h3>
-          <p className="mt-2 text-sm text-stone-800">
+          <p className="mt-2 text-sm text-oo-charcoal">
             The draft canonical snapshot will be deleted. Job <span className="font-mono">{jobId}</span> will show{" "}
             <span className="font-mono">cancelled</span> and no linked draft.
           </p>
           {draftVersionId && (
-            <p className="mt-2 font-mono text-xs text-stone-600">MenuVersion id: {draftVersionId}</p>
+            <p className="mt-2 font-mono text-xs text-oo-stone-gray">MenuVersion id: {draftVersionId}</p>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
             <button
@@ -231,7 +231,7 @@ export function MenuImportDiscardDraftButton({
               type="button"
               disabled={loading}
               onClick={() => setOpen(false)}
-              className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-800"
+              className="rounded-md border border-oo-light-stone bg-oo-warm-white px-4 py-2 text-sm font-medium text-oo-charcoal"
             >
               Cancel
             </button>

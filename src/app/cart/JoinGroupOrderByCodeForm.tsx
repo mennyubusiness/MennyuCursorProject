@@ -46,7 +46,7 @@ export function JoinGroupOrderByCodeForm({ className = "", visible = true }: Pro
     <div className={cn("text-left", className)}>
       <form onSubmit={onSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <div className="flex-1">
-          <label htmlFor="group-order-join-code" className="block text-sm font-semibold text-black">
+          <label htmlFor="group-order-join-code" className="oo-label">
             6-digit group order code
           </label>
           <input
@@ -62,12 +62,12 @@ export function JoinGroupOrderByCodeForm({ className = "", visible = true }: Pro
               if (error) setError(null);
             }}
             placeholder="000000"
-            className="mt-2 min-h-12 w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 font-mono text-lg tracking-[0.35em] text-black placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 sm:max-w-xs"
+            className="oo-input min-h-12 font-mono text-lg tracking-[0.35em] sm:max-w-xs"
             aria-invalid={Boolean(error)}
             aria-describedby={error ? "group-order-join-code-error" : undefined}
           />
           {error ? (
-            <p id="group-order-join-code-error" className="mt-2 text-sm text-brand" role="alert">
+            <p id="group-order-join-code-error" className="oo-form-error mt-2" role="alert">
               {error}
             </p>
           ) : null}

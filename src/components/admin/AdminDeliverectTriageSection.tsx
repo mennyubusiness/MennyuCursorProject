@@ -73,38 +73,38 @@ export async function AdminDeliverectTriageSection() {
   const recoLateCount = Number(deliverectRecoLate24h[0]?.c ?? BigInt(0));
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-stone-900">Deliverect triage (last {RECENT_HOURS}h)</h2>
-      <p className="mt-1 text-xs text-stone-500">
+    <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-oo-charcoal">Deliverect triage (last {RECENT_HOURS}h)</h2>
+      <p className="mt-1 text-xs text-oo-stone-gray">
         Snapshot counts — same reconciliation window ({DELIVERECT_RECONCILIATION_STALE_MINUTES} min) as ops tooling.
       </p>
       <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded border border-stone-100 bg-stone-50/80 px-3 py-2">
-          <dt className="text-stone-500">Awaiting POS (in window)</dt>
-          <dd className="text-base font-semibold text-stone-900">{deliverectAwaitingPos}</dd>
+        <div className="rounded border border-oo-light-stone bg-oo-cream/80 px-3 py-2">
+          <dt className="text-oo-stone-gray">Awaiting POS (in window)</dt>
+          <dd className="text-base font-semibold text-oo-charcoal">{deliverectAwaitingPos}</dd>
         </div>
-        <div className="rounded border border-stone-100 bg-stone-50/80 px-3 py-2">
-          <dt className="text-stone-500">Reconciliation overdue</dt>
+        <div className="rounded border border-oo-light-stone bg-oo-cream/80 px-3 py-2">
+          <dt className="text-oo-stone-gray">Reconciliation overdue</dt>
           <dd className="text-base font-semibold text-amber-900">{deliverectRecoOverdue}</dd>
         </div>
-        <div className="rounded border border-stone-100 bg-stone-50/80 px-3 py-2">
-          <dt className="text-stone-500">Auto re-check · no match</dt>
-          <dd className="text-base font-semibold text-stone-900">{deliverectAutoNoMatch24h}</dd>
+        <div className="rounded border border-oo-light-stone bg-oo-cream/80 px-3 py-2">
+          <dt className="text-oo-stone-gray">Auto re-check · no match</dt>
+          <dd className="text-base font-semibold text-oo-charcoal">{deliverectAutoNoMatch24h}</dd>
         </div>
-        <div className="rounded border border-stone-100 bg-stone-50/80 px-3 py-2">
-          <dt className="text-stone-500">Auto re-check · ambiguous</dt>
-          <dd className="text-base font-semibold text-stone-900">{deliverectAutoAmbiguous24h}</dd>
+        <div className="rounded border border-oo-light-stone bg-oo-cream/80 px-3 py-2">
+          <dt className="text-oo-stone-gray">Auto re-check · ambiguous</dt>
+          <dd className="text-base font-semibold text-oo-charcoal">{deliverectAutoAmbiguous24h}</dd>
         </div>
-        <div className="rounded border border-stone-100 bg-stone-50/80 px-3 py-2">
-          <dt className="text-stone-500">Reconciled late (first signal)</dt>
-          <dd className="text-base font-semibold text-stone-900">{recoLateCount}</dd>
+        <div className="rounded border border-oo-light-stone bg-oo-cream/80 px-3 py-2">
+          <dt className="text-oo-stone-gray">Reconciled late (first signal)</dt>
+          <dd className="text-base font-semibold text-oo-charcoal">{recoLateCount}</dd>
         </div>
-        <div className="rounded border border-stone-100 bg-stone-50/80 px-3 py-2">
-          <dt className="text-stone-500">Manual recovery recorded</dt>
-          <dd className="text-base font-semibold text-stone-900">{deliverectManualRecovery24h}</dd>
+        <div className="rounded border border-oo-light-stone bg-oo-cream/80 px-3 py-2">
+          <dt className="text-oo-stone-gray">Manual recovery recorded</dt>
+          <dd className="text-base font-semibold text-oo-charcoal">{deliverectManualRecovery24h}</dd>
         </div>
       </dl>
-      <p className="mt-3 text-[10px] text-stone-400">
+      <p className="mt-3 text-[10px] text-oo-stone-gray">
         “Reconciled late” = first external status at or after the overdue threshold from submit, updated in the last{" "}
         {RECENT_HOURS}h.
       </p>

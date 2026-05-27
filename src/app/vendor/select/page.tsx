@@ -25,24 +25,24 @@ export default async function VendorSelectPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 py-10">
-      <h1 className="text-xl font-semibold text-stone-900">Choose a restaurant</h1>
-      <p className="mt-1 text-sm text-stone-600">
+      <h1 className="text-xl font-semibold text-oo-charcoal">Choose a restaurant</h1>
+      <p className="mt-1 text-sm text-oo-stone-gray">
         Your account is linked to more than one vendor. Pick where you want to go.
       </p>
-      <ul className="mt-6 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+      <ul className="mt-6 divide-y divide-oo-light-stone rounded-lg border border-oo-light-stone bg-oo-warm-white">
         {rows.map((r) => (
           <li key={r.vendorId}>
             <Link
               href={`/vendor/${r.vendorId}`}
-              className="flex flex-col gap-0.5 px-4 py-3 text-sm hover:bg-stone-50"
+              className="flex flex-col gap-0.5 px-4 py-3 text-sm hover:bg-oo-cream"
             >
-              <span className="font-medium text-stone-900">{r.vendor.name}</span>
-              <span className="text-xs text-stone-500">{r.vendor.slug}</span>
+              <span className="font-medium text-oo-charcoal">{r.vendor.name}</span>
+              <span className="text-xs text-oo-stone-gray">{r.vendor.slug}</span>
             </Link>
           </li>
         ))}
       </ul>
-      <p className="mt-6 text-center text-sm text-stone-500">
+      <p className="mt-6 text-center text-sm text-oo-stone-gray">
         <Link href="/login" className="text-sky-800 underline hover:text-sky-900">
           Back to sign in
         </Link>

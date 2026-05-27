@@ -52,15 +52,15 @@ function statusBadgeClass(status: string): string {
   if (b === "paid") return "bg-emerald-100 text-emerald-900 ring-emerald-200";
   if (b === "failed") return "bg-red-100 text-red-900 ring-red-200";
   if (b === "blocked") return "bg-amber-100 text-amber-950 ring-amber-200";
-  return "bg-stone-100 text-stone-800 ring-stone-200";
+  return "bg-oo-cream text-oo-charcoal ring-stone-200";
 }
 
 /** Reversal statuses: pending | submitted | reversed | failed | not_needed */
 function reversalStatusBadgeClass(status: string): string {
   if (status === "reversed") return "bg-emerald-100 text-emerald-900 ring-emerald-200";
   if (status === "failed") return "bg-red-100 text-red-900 ring-red-200";
-  if (status === "not_needed") return "bg-stone-100 text-stone-600 ring-stone-200";
-  return "bg-stone-100 text-stone-800 ring-stone-200";
+  if (status === "not_needed") return "bg-oo-cream text-oo-stone-gray ring-stone-200";
+  return "bg-oo-cream text-oo-charcoal ring-stone-200";
 }
 
 function reversalMatchesPayoutStatusFilter(
@@ -130,18 +130,18 @@ function inDateRange(iso: string, preset: DatePreset): boolean {
 
 function FailureText({ text }: { text: string | null }) {
   const [open, setOpen] = useState(false);
-  if (!text?.trim()) return <span className="text-stone-400">—</span>;
+  if (!text?.trim()) return <span className="text-oo-stone-gray">—</span>;
   const t = text.trim();
   const short = t.length > 140;
   const shown = short && !open ? `${t.slice(0, 140)}…` : t;
   return (
     <div className="max-w-xs">
-      <p className="whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-stone-700">{shown}</p>
+      <p className="whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-oo-charcoal">{shown}</p>
       {short && (
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="mt-1 text-xs font-semibold text-stone-900 hover:underline"
+          className="mt-1 text-xs font-semibold text-oo-charcoal hover:underline"
         >
           {open ? "Show less" : "Show more"}
         </button>
@@ -349,14 +349,14 @@ export function PayoutTransfersDashboard({
 
   return (
     <div className="space-y-8">
-      <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={actionLocked}
               onClick={() => void runPayoutBatch()}
-              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-stone-800 disabled:opacity-50"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-hover disabled:opacity-50"
             >
               {batchBusy === "payout" ? "Running…" : "Run payout batch"}
             </button>
@@ -364,18 +364,18 @@ export function PayoutTransfersDashboard({
               type="button"
               disabled={actionLocked}
               onClick={() => void runReversalBatch()}
-              className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-900 shadow-sm hover:bg-stone-50 disabled:opacity-50"
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-2 text-sm font-semibold text-oo-charcoal shadow-sm hover:bg-oo-cream disabled:opacity-50"
             >
               {batchBusy === "reversal" ? "Running…" : "Run reversal batch"}
             </button>
           </div>
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+            <label className="flex flex-col gap-1 text-xs font-medium text-oo-stone-gray">
               Status
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900"
+                className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm text-oo-charcoal"
               >
                 <option value="all">All</option>
                 <option value="pending">Pending / submitted</option>
@@ -384,19 +384,19 @@ export function PayoutTransfersDashboard({
                 <option value="blocked">Blocked</option>
               </select>
             </label>
-            <label className="flex min-w-[12rem] flex-col gap-1 text-xs font-medium text-stone-600">
+            <label className="flex min-w-[12rem] flex-col gap-1 text-xs font-medium text-oo-stone-gray">
               Vendor
               <input
                 type="search"
                 value={vendorSearch}
                 onChange={(e) => setVendorSearch(e.target.value)}
                 placeholder="Filter list…"
-                className="mb-1 rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm text-stone-900"
+                className="mb-1 rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-1 text-sm text-oo-charcoal"
               />
               <select
                 value={vendorId}
                 onChange={(e) => setVendorId(e.target.value)}
-                className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900"
+                className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm text-oo-charcoal"
               >
                 <option value="">All vendors</option>
                 {vendorsFiltered.map((v) => (
@@ -406,26 +406,26 @@ export function PayoutTransfersDashboard({
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+            <label className="flex flex-col gap-1 text-xs font-medium text-oo-stone-gray">
               Date range
               <select
                 value={datePreset}
                 onChange={(e) => setDatePreset(e.target.value as DatePreset)}
-                className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900"
+                className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm text-oo-charcoal"
               >
                 <option value="all">All</option>
                 <option value="today">Today (UTC)</option>
                 <option value="7d">Last 7 days</option>
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+            <label className="flex flex-col gap-1 text-xs font-medium text-oo-stone-gray">
               Batch key (optional)
               <input
                 type="text"
                 value={batchKey}
                 onChange={(e) => setBatchKey(e.target.value)}
                 placeholder="UTC date or label"
-                className="w-40 rounded-lg border border-stone-300 px-2 py-1.5 font-mono text-xs text-stone-900"
+                className="w-40 rounded-lg border border-oo-light-stone px-2 py-1.5 font-mono text-xs text-oo-charcoal"
               />
             </label>
           </div>
@@ -438,33 +438,33 @@ export function PayoutTransfersDashboard({
         {batchMsg && <p className="mt-3 text-sm text-emerald-800">{batchMsg}</p>}
       </div>
 
-      <div className="grid gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4 sm:grid-cols-4">
+      <div className="grid gap-3 rounded-xl border border-oo-light-stone bg-oo-cream p-4 sm:grid-cols-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Pending (filtered)</p>
-          <p className="mt-1 text-lg font-semibold text-stone-900">{formatMoney(summary.pendingCents, "usd")}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Pending (filtered)</p>
+          <p className="mt-1 text-lg font-semibold text-oo-charcoal">{formatMoney(summary.pendingCents, "usd")}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Paid (filtered)</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Paid (filtered)</p>
           <p className="mt-1 text-lg font-semibold text-emerald-900">{formatMoney(summary.paidCents, "usd")}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Failed rows</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Failed rows</p>
           <p className="mt-1 text-lg font-semibold text-red-800">{summary.failed}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Blocked rows</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Blocked rows</p>
           <p className="mt-1 text-lg font-semibold text-amber-900">{summary.blocked}</p>
         </div>
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-stone-900">Payout transfers</h2>
-        <p className="text-sm text-stone-600">
+        <h2 className="text-lg font-semibold text-oo-charcoal">Payout transfers</h2>
+        <p className="text-sm text-oo-stone-gray">
           Stripe Connect transfers from allocations. Retries reset failed rows to pending then call Stripe (idempotent
           keys).
         </p>
         {transferGroups.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-stone-300 bg-white p-8 text-center text-stone-500">
+          <p className="rounded-lg border border-dashed border-oo-light-stone bg-oo-warm-white p-8 text-center text-oo-stone-gray">
             No transfers match filters.
           </p>
         ) : (
@@ -472,21 +472,21 @@ export function PayoutTransfersDashboard({
             const open = isGroupOpen(gKey, expandedGroups);
             const total = rows.reduce((s, r) => s + r.amountCents, 0);
             return (
-              <div key={gKey} className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+              <div key={gKey} className="overflow-hidden rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm">
                 <button
                   type="button"
                   onClick={() => toggleGroup(gKey, setExpandedGroups)}
-                  className="flex w-full items-center justify-between gap-3 border-b border-stone-100 bg-stone-50 px-4 py-3 text-left text-sm font-semibold text-stone-900 hover:bg-stone-100"
+                  className="flex w-full items-center justify-between gap-3 border-b border-oo-light-stone bg-oo-cream px-4 py-3 text-left text-sm font-semibold text-oo-charcoal hover:bg-oo-cream"
                 >
                   <span>{groupTitle(gKey)}</span>
-                  <span className="text-xs font-normal text-stone-600">
+                  <span className="text-xs font-normal text-oo-stone-gray">
                     {rows.length} transfer{rows.length !== 1 ? "s" : ""} · {formatMoney(total, rows[0]?.currency ?? "usd")}
                   </span>
                 </button>
                 {open && (
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-left text-sm">
-                      <thead className="border-b border-stone-200 bg-white text-xs font-medium uppercase text-stone-500">
+                      <thead className="border-b border-oo-light-stone bg-oo-warm-white text-xs font-medium uppercase text-oo-stone-gray">
                         <tr>
                           <th className="px-3 py-2">Vendor</th>
                           <th className="px-3 py-2">Order</th>
@@ -499,7 +499,7 @@ export function PayoutTransfersDashboard({
                           <th className="px-3 py-2">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-stone-100">
+                      <tbody className="divide-y divide-oo-light-stone">
                         {rows.map((t) => {
                           const bucket = statusFilterBucket(t.status);
                           const reason =
@@ -514,11 +514,11 @@ export function PayoutTransfersDashboard({
                               key={t.id}
                               className={failedRow ? "bg-red-50/50" : bucket === "blocked" ? "bg-amber-50/40" : ""}
                             >
-                              <td className="px-3 py-2 font-medium text-stone-900">{t.vendor.name}</td>
+                              <td className="px-3 py-2 font-medium text-oo-charcoal">{t.vendor.name}</td>
                               <td className="px-3 py-2">
                                 <Link
                                   href={`/admin/orders/${t.vendorOrder.orderId}`}
-                                  className="font-mono text-xs text-stone-900 hover:underline"
+                                  className="font-mono text-xs text-oo-charcoal hover:underline"
                                 >
                                   {t.vendorOrder.orderId.slice(-10)}
                                 </Link>
@@ -531,17 +531,17 @@ export function PayoutTransfersDashboard({
                                   {t.status}
                                 </span>
                               </td>
-                              <td className="px-3 py-2 text-xs text-stone-700">
+                              <td className="px-3 py-2 text-xs text-oo-charcoal">
                                 {reason ? (
                                   <span className="font-mono">{reason}</span>
                                 ) : (
-                                  <span className="text-stone-400">—</span>
+                                  <span className="text-oo-stone-gray">—</span>
                                 )}
                                 {bucket === "blocked" && (
                                   <div className="mt-1">
                                     <Link
                                       href={`/admin/vendors/${t.vendorId}`}
-                                      className="text-xs font-semibold text-stone-900 hover:underline"
+                                      className="text-xs font-semibold text-oo-charcoal hover:underline"
                                     >
                                       View vendor
                                     </Link>
@@ -551,10 +551,10 @@ export function PayoutTransfersDashboard({
                               <td className="max-w-[140px] truncate px-3 py-2 font-mono text-xs" title={t.destinationAccountId}>
                                 {shortenDestination(t.destinationAccountId)}
                               </td>
-                              <td className="whitespace-nowrap px-3 py-2 text-xs text-stone-600">
+                              <td className="whitespace-nowrap px-3 py-2 text-xs text-oo-stone-gray">
                                 <div>{t.createdAt.slice(0, 19).replace("T", " ")}Z</div>
                                 {t.submittedAt && (
-                                  <div className="text-stone-500">sub: {t.submittedAt.slice(0, 19).replace("T", " ")}Z</div>
+                                  <div className="text-oo-stone-gray">sub: {t.submittedAt.slice(0, 19).replace("T", " ")}Z</div>
                                 )}
                               </td>
                               <td className="max-w-[120px] truncate px-3 py-2 font-mono text-xs" title={t.stripeTransferId ?? ""}>
@@ -566,14 +566,14 @@ export function PayoutTransfersDashboard({
                                     type="button"
                                     disabled={retryPayoutId !== null}
                                     onClick={() => void retryTransfer(t.id)}
-                                    className="rounded-md bg-stone-900 px-2 py-1 text-xs font-semibold text-white hover:bg-stone-800 disabled:opacity-50"
+                                    className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
                                   >
                                     {retryPayoutId === t.id ? "Retrying…" : "Retry payout"}
                                   </button>
                                 )}
-                                {bucket === "paid" && <span className="text-xs text-stone-400">—</span>}
+                                {bucket === "paid" && <span className="text-xs text-oo-stone-gray">—</span>}
                                 {(bucket === "pending" || bucket === "blocked") && (
-                                  <span className="text-xs text-stone-400">—</span>
+                                  <span className="text-xs text-oo-stone-gray">—</span>
                                 )}
                               </td>
                             </tr>
@@ -590,10 +590,10 @@ export function PayoutTransfersDashboard({
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-stone-900">Transfer reversals</h2>
-        <p className="text-sm text-stone-600">Stripe transfer reversals after platform refunds.</p>
+        <h2 className="text-lg font-semibold text-oo-charcoal">Transfer reversals</h2>
+        <p className="text-sm text-oo-stone-gray">Stripe transfer reversals after platform refunds.</p>
         {reversalGroups.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-stone-300 bg-white p-8 text-center text-stone-500">
+          <p className="rounded-lg border border-dashed border-oo-light-stone bg-oo-warm-white p-8 text-center text-oo-stone-gray">
             No reversals match filters.
           </p>
         ) : (
@@ -601,21 +601,21 @@ export function PayoutTransfersDashboard({
             const open = isGroupOpen(gKey, expandedRevGroups);
             const total = rows.reduce((s, r) => s + r.amountCents, 0);
             return (
-              <div key={gKey} className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+              <div key={gKey} className="overflow-hidden rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm">
                 <button
                   type="button"
                   onClick={() => toggleGroup(gKey, setExpandedRevGroups)}
-                  className="flex w-full items-center justify-between gap-3 border-b border-stone-100 bg-stone-50 px-4 py-3 text-left text-sm font-semibold text-stone-900 hover:bg-stone-100"
+                  className="flex w-full items-center justify-between gap-3 border-b border-oo-light-stone bg-oo-cream px-4 py-3 text-left text-sm font-semibold text-oo-charcoal hover:bg-oo-cream"
                 >
                   <span>{groupTitle(gKey)}</span>
-                  <span className="text-xs font-normal text-stone-600">
+                  <span className="text-xs font-normal text-oo-stone-gray">
                     {rows.length} reversal{rows.length !== 1 ? "s" : ""} · {formatMoney(total, rows[0]?.currency ?? "usd")}
                   </span>
                 </button>
                 {open && (
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-left text-sm">
-                      <thead className="border-b border-stone-200 bg-white text-xs font-medium uppercase text-stone-500">
+                      <thead className="border-b border-oo-light-stone bg-oo-warm-white text-xs font-medium uppercase text-oo-stone-gray">
                         <tr>
                           <th className="px-3 py-2">Vendor</th>
                           <th className="px-3 py-2">Order</th>
@@ -627,16 +627,16 @@ export function PayoutTransfersDashboard({
                           <th className="px-3 py-2">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-stone-100">
+                      <tbody className="divide-y divide-oo-light-stone">
                         {rows.map((r) => {
                           const failed = r.status === "failed";
                           return (
                             <tr key={r.id} className={failed ? "bg-red-50/50" : ""}>
-                              <td className="px-3 py-2 font-medium text-stone-900">{r.vendor.name}</td>
+                              <td className="px-3 py-2 font-medium text-oo-charcoal">{r.vendor.name}</td>
                               <td className="px-3 py-2">
                                 <Link
                                   href={`/admin/orders/${r.orderId}`}
-                                  className="font-mono text-xs text-stone-900 hover:underline"
+                                  className="font-mono text-xs text-oo-charcoal hover:underline"
                                 >
                                   {r.orderId.slice(-10)}
                                 </Link>
@@ -655,7 +655,7 @@ export function PayoutTransfersDashboard({
                               <td className="px-3 py-2">
                                 <FailureText text={r.failureMessage} />
                               </td>
-                              <td className="whitespace-nowrap px-3 py-2 text-xs text-stone-600">
+                              <td className="whitespace-nowrap px-3 py-2 text-xs text-oo-stone-gray">
                                 {r.createdAt.slice(0, 19).replace("T", " ")}Z
                               </td>
                               <td className="px-3 py-2">
@@ -664,12 +664,12 @@ export function PayoutTransfersDashboard({
                                     type="button"
                                     disabled={retryReversalId !== null}
                                     onClick={() => void retryReversal(r.id)}
-                                    className="rounded-md bg-stone-900 px-2 py-1 text-xs font-semibold text-white hover:bg-stone-800 disabled:opacity-50"
+                                    className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
                                   >
                                     {retryReversalId === r.id ? "Retrying…" : "Retry reversal"}
                                   </button>
                                 ) : (
-                                  <span className="text-xs text-stone-400">—</span>
+                                  <span className="text-xs text-oo-stone-gray">—</span>
                                 )}
                               </td>
                             </tr>

@@ -41,12 +41,12 @@ export function VendorDashboardTokenForm({ vendorId }: { vendorId: string }) {
         value={keyValue}
         onChange={(e) => setKeyValue(e.target.value)}
         placeholder="Paste API access key"
-        className="w-full rounded border border-stone-300 px-3 py-2 font-mono text-sm"
+        className="w-full rounded border border-oo-light-stone px-3 py-2 font-mono text-sm"
       />
       <button
         type="submit"
         disabled={loading || !keyValue.trim()}
-        className="rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
       >
         {loading ? "Saving…" : "Bind session in this browser"}
       </button>

@@ -55,7 +55,7 @@ export function VendorBrandProfileForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label htmlFor="brand-name" className="block text-sm font-medium text-stone-800">
+        <label htmlFor="brand-name" className="block text-sm font-medium text-oo-charcoal">
           Business name
         </label>
         <input
@@ -65,24 +65,24 @@ export function VendorBrandProfileForm({
           onChange={(e) => setName(e.target.value)}
           maxLength={200}
           required
-          className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+          className="mt-1 w-full rounded-md border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm text-oo-charcoal shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
         />
       </div>
 
       <div>
-        <label htmlFor="brand-description" className="block text-sm font-medium text-stone-800">
+        <label htmlFor="brand-description" className="block text-sm font-medium text-oo-charcoal">
           Description
         </label>
-        <p className="mt-0.5 text-xs text-stone-500">Optional. Shown on the pod and your menu.</p>
+        <p className="mt-0.5 text-xs text-oo-stone-gray">Optional. Shown on the pod and your menu.</p>
         <textarea
           id="brand-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={2000}
           rows={4}
-          className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+          className="mt-1 w-full rounded-md border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm text-oo-charcoal shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
         />
-        <p className="mt-0.5 text-right text-xs text-stone-400">{description.length} / 2000</p>
+        <p className="mt-0.5 text-right text-xs text-oo-stone-gray">{description.length} / 2000</p>
       </div>
 
       <BrandLogoUploadField
@@ -93,8 +93,8 @@ export function VendorBrandProfileForm({
         onChange={setImageUrl}
       />
 
-      <div className="rounded-md border border-stone-200 bg-stone-50/80 p-3">
-        <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-stone-800">
+      <div className="rounded-md border border-oo-light-stone bg-oo-cream/80 p-3">
+        <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-oo-charcoal">
           <input
             type="checkbox"
             checked={useAccent}
@@ -104,18 +104,18 @@ export function VendorBrandProfileForm({
                 setAccentHex(initialAccentColor ?? DEFAULT_PICKER_FALLBACK);
               }
             }}
-            className="rounded border-stone-300"
+            className="rounded border-oo-light-stone"
           />
           Use custom accent color
         </label>
-        <p className="mt-1 text-xs text-stone-500">Highlights on your pod card and menu.</p>
+        <p className="mt-1 text-xs text-oo-stone-gray">Highlights on your pod card and menu.</p>
         {useAccent && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <input
               type="color"
               value={/^#[0-9a-fA-F]{6}$/.test(accentHex) ? accentHex : DEFAULT_PICKER_FALLBACK}
               onChange={(e) => syncColorPickerToHex(e.target.value)}
-              className="h-10 w-14 cursor-pointer rounded border border-stone-300 bg-white"
+              className="h-10 w-14 cursor-pointer rounded border border-oo-light-stone bg-oo-warm-white"
               aria-label="Pick accent color"
             />
             <input
@@ -123,7 +123,7 @@ export function VendorBrandProfileForm({
               value={accentHex}
               onChange={(e) => setAccentHex(e.target.value)}
               placeholder="#2563eb"
-              className="w-36 rounded-md border border-stone-300 bg-white px-2 py-2 font-mono text-sm text-stone-900"
+              className="w-36 rounded-md border border-oo-light-stone bg-oo-warm-white px-2 py-2 font-mono text-sm text-oo-charcoal"
               aria-label="Accent color hex"
             />
           </div>
@@ -134,7 +134,7 @@ export function VendorBrandProfileForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
         >
           {pending ? "Saving…" : "Save brand"}
         </button>

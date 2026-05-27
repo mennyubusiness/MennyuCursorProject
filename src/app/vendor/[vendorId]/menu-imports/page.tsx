@@ -54,8 +54,8 @@ export default async function VendorMenuImportsListPage({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-stone-900">Menu updates</h2>
-        <p className="mt-1 text-sm text-stone-600">
+        <h2 className="text-xl font-semibold text-oo-charcoal">Menu updates</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           When Deliverect sends a menu change, it appears here. Publish when you&apos;re ready for it to go live on
           Open Order.
         </p>
@@ -66,9 +66,9 @@ export default async function VendorMenuImportsListPage({
         )}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-oo-light-stone bg-oo-warm-white">
         <table className="min-w-full text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium uppercase tracking-wide text-stone-500">
+          <thead className="border-b border-oo-light-stone bg-oo-cream text-left text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
             <tr>
               <th className="px-4 py-2">Updated</th>
               <th className="px-4 py-2">Status</th>
@@ -76,10 +76,10 @@ export default async function VendorMenuImportsListPage({
               <th className="px-4 py-2 text-right"> </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-stone-100">
+          <tbody className="divide-y divide-oo-light-stone">
             {jobs.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-stone-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-oo-stone-gray">
                   No updates yet.
                 </td>
               </tr>
@@ -103,17 +103,17 @@ export default async function VendorMenuImportsListPage({
                 return (
                   <tr
                     key={j.id}
-                    className={`hover:bg-stone-50 ${isActionableHighlight ? "bg-emerald-50/60" : ""}`}
+                    className={`hover:bg-oo-cream ${isActionableHighlight ? "bg-emerald-50/60" : ""}`}
                   >
-                    <td className="whitespace-nowrap px-4 py-3 text-stone-700">
+                    <td className="whitespace-nowrap px-4 py-3 text-oo-charcoal">
                       {formatDate(j.completedAt ?? j.startedAt)}
                     </td>
                     <td className="px-4 py-3">
                       <span className={vendorMenuImportListBadgeClass(badge.tone)}>{badge.label}</span>
                     </td>
-                    <td className="max-w-md px-4 py-3 text-stone-600">
+                    <td className="max-w-md px-4 py-3 text-oo-stone-gray">
                       <span className="line-clamp-2">{summary}</span>
-                      <span className="mt-0.5 block text-xs text-stone-500">
+                      <span className="mt-0.5 block text-xs text-oo-stone-gray">
                         {menuImportFriendlySource(j.source)}
                       </span>
                     </td>

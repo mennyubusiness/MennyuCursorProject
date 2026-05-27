@@ -42,13 +42,13 @@ export function AdminVendorOrderTransition({
   }
 
   return (
-    <div className="rounded-md border border-stone-200 bg-stone-50/80 p-2">
-      <p className="text-xs font-medium text-stone-600">Fulfillment transition</p>
+    <div className="rounded-md border border-oo-light-stone bg-oo-cream/80 p-2">
+      <p className="text-xs font-medium text-oo-stone-gray">Fulfillment transition</p>
       <div className="mt-1 flex flex-wrap items-center gap-2">
         <select
           value={target}
           onChange={(e) => setTarget(e.target.value)}
-          className="rounded border border-stone-300 bg-white px-2 py-1 text-sm"
+          className="rounded border border-oo-light-stone bg-oo-warm-white px-2 py-1 text-sm"
         >
           {allowedTargets.map((t) => (
             <option key={t} value={t}>
@@ -60,13 +60,13 @@ export function AdminVendorOrderTransition({
           type="button"
           onClick={handleApply}
           disabled={loading}
-          className="rounded bg-stone-700 px-2 py-1 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+          className="rounded bg-stone-700 px-2 py-1 text-sm text-white hover:bg-brand-hover disabled:opacity-50"
         >
           {loading ? "…" : "Apply"}
         </button>
       </div>
       {message && (
-        <span className={`mt-1 block text-xs ${message.error ? "text-red-600" : "text-stone-600"}`}>
+        <span className={`mt-1 block text-xs ${message.error ? "text-red-600" : "text-oo-stone-gray"}`}>
           {message.text}
         </span>
       )}

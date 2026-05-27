@@ -204,19 +204,19 @@ export function IssuesWorkbench({
 
   return (
     <div className="mt-8 space-y-6">
-      <div className="flex flex-wrap gap-2 border-b border-stone-200 pb-1">
+      <div className="flex flex-wrap gap-2 border-b border-oo-light-stone pb-1">
         <button
           type="button"
           onClick={() => setTab("active")}
           className={`rounded-t-md px-4 py-2 text-sm font-medium transition-colors ${
             tab === "active"
-              ? "border border-b-0 border-stone-200 bg-white text-stone-900"
-              : "text-stone-600 hover:text-stone-900"
+              ? "border border-b-0 border-oo-light-stone bg-oo-warm-white text-oo-charcoal"
+              : "text-oo-stone-gray hover:text-oo-charcoal"
           }`}
         >
           Active issues
           {activeItems.length > 0 && (
-            <span className="ml-2 rounded-full bg-stone-200 px-2 py-0.5 text-xs tabular-nums text-stone-800">
+            <span className="ml-2 rounded-full bg-stone-200 px-2 py-0.5 text-xs tabular-nums text-oo-charcoal">
               {activeItems.length}
             </span>
           )}
@@ -229,18 +229,18 @@ export function IssuesWorkbench({
           }}
           className={`rounded-t-md px-4 py-2 text-sm font-medium transition-colors ${
             tab === "resolved"
-              ? "border border-b-0 border-stone-200 bg-white text-stone-900"
-              : "text-stone-600 hover:text-stone-900"
+              ? "border border-b-0 border-oo-light-stone bg-oo-warm-white text-oo-charcoal"
+              : "text-oo-stone-gray hover:text-oo-charcoal"
           }`}
         >
           Resolved
-          <span className="ml-2 rounded-full bg-stone-200 px-2 py-0.5 text-xs tabular-nums text-stone-800">
+          <span className="ml-2 rounded-full bg-stone-200 px-2 py-0.5 text-xs tabular-nums text-oo-charcoal">
             {resolvedHistory.length}
           </span>
         </button>
       </div>
 
-      <div className="rounded-xl border border-stone-200 bg-stone-50/50 p-4">
+      <div className="rounded-xl border border-oo-light-stone bg-oo-cream/50 p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 flex-1">
             <label htmlFor="issue-search" className="sr-only">
@@ -255,20 +255,20 @@ export function IssuesWorkbench({
                 setResolvedPage(0);
               }}
               placeholder="Search by order ID, vendor, or pod…"
-              className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+              className="w-full rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm text-oo-charcoal placeholder:text-oo-stone-gray focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
             />
           </div>
           {tab === "active" && (
             <div className="flex flex-wrap gap-3">
               <div>
-                <label htmlFor="pod-filter" className="mb-1 block text-xs font-medium text-stone-500">
+                <label htmlFor="pod-filter" className="mb-1 block text-xs font-medium text-oo-stone-gray">
                   Pod
                 </label>
                 <select
                   id="pod-filter"
                   value={podId}
                   onChange={(e) => setPodId(e.target.value)}
-                  className="rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm text-stone-800"
+                  className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-2 text-sm text-oo-charcoal"
                 >
                   <option value="">All pods</option>
                   {pods.map((p) => (
@@ -279,14 +279,14 @@ export function IssuesWorkbench({
                 </select>
               </div>
               <div>
-                <label htmlFor="status-filter" className="mb-1 block text-xs font-medium text-stone-500">
+                <label htmlFor="status-filter" className="mb-1 block text-xs font-medium text-oo-stone-gray">
                   Type
                 </label>
                 <select
                   id="status-filter"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as AdminAttentionReason | "all")}
-                  className="rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm text-stone-800"
+                  className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-2 text-sm text-oo-charcoal"
                 >
                   {STATUS_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -296,14 +296,14 @@ export function IssuesWorkbench({
                 </select>
               </div>
               <div>
-                <label htmlFor="time-filter" className="mb-1 block text-xs font-medium text-stone-500">
+                <label htmlFor="time-filter" className="mb-1 block text-xs font-medium text-oo-stone-gray">
                   Time
                 </label>
                 <select
                   id="time-filter"
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value as (typeof TIME_OPTIONS)[number]["value"])}
-                  className="rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm text-stone-800"
+                  className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-2 text-sm text-oo-charcoal"
                 >
                   <option value="1h">Last 1h</option>
                   <option value="24h">Last 24h</option>
@@ -318,17 +318,17 @@ export function IssuesWorkbench({
       {tab === "active" && (
         <>
           {filteredActive.length === 0 ? (
-            <div className="rounded-xl border border-stone-200 bg-white px-6 py-12 text-center">
-              <p className="text-sm font-medium text-stone-700">
+            <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white px-6 py-12 text-center">
+              <p className="text-sm font-medium text-oo-charcoal">
                 {activeItems.length === 0 ? "No active issues" : "No issues match your filters"}
               </p>
-              <p className="mt-1 text-sm text-stone-500">
+              <p className="mt-1 text-sm text-oo-stone-gray">
                 {activeItems.length === 0
                   ? "When something breaks routing or fulfillment, it will show up here."
                   : "Try clearing search or widening the time range."}
               </p>
               {activeItems.length === 0 && (
-                <Link href="/admin/orders" className="mt-4 inline-block text-sm font-medium text-stone-700 underline">
+                <Link href="/admin/orders" className="mt-4 inline-block text-sm font-medium text-oo-charcoal underline">
                   Browse orders
                 </Link>
               )}
@@ -347,50 +347,50 @@ export function IssuesWorkbench({
                 return (
                   <li
                     key={item.id}
-                    className={`overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm ${borderClass(item.severity)}`}
+                    className={`overflow-hidden rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm ${borderClass(item.severity)}`}
                   >
                     <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                           <Link
                             href={`/admin/orders/${item.orderId}`}
-                            className="font-mono text-sm font-semibold text-stone-900 hover:underline"
+                            className="font-mono text-sm font-semibold text-oo-charcoal hover:underline"
                           >
                             #{item.orderId.slice(-8).toUpperCase()}
                           </Link>
                           {item.order?.pod?.name && (
-                            <span className="text-sm text-stone-600">{item.order.pod.name}</span>
+                            <span className="text-sm text-oo-stone-gray">{item.order.pod.name}</span>
                           )}
-                          <span className="text-sm text-stone-400" title={`~${item.ageMinutes} min since reference`}>
+                          <span className="text-sm text-oo-stone-gray" title={`~${item.ageMinutes} min since reference`}>
                             {formatRelativeFromAgeMinutes(item.ageMinutes)}
                           </span>
                         </div>
-                        <h2 className="text-base font-semibold text-stone-900">{issueTitle(item.reason)}</h2>
-                        <p className="text-sm leading-snug text-stone-600">{oneLine(item.reasonLabel)}</p>
+                        <h2 className="text-base font-semibold text-oo-charcoal">{issueTitle(item.reason)}</h2>
+                        <p className="text-sm leading-snug text-oo-stone-gray">{oneLine(item.reasonLabel)}</p>
                         {item.vendor?.name && (
-                          <p className="text-xs text-stone-500">{item.vendor.name}</p>
+                          <p className="text-xs text-oo-stone-gray">{item.vendor.name}</p>
                         )}
                         {item.deliverectGuidance || item.deliverectDiagnostic ? (
                           <details className="text-sm">
-                            <summary className="cursor-pointer text-stone-500 hover:text-stone-700">
+                            <summary className="cursor-pointer text-oo-stone-gray hover:text-oo-charcoal">
                               POS / routing details
                             </summary>
                             {item.deliverectGuidance && (
-                              <div className="mt-2 rounded-md border border-stone-100 bg-stone-50 px-3 py-2 text-stone-800">
+                              <div className="mt-2 rounded-md border border-oo-light-stone bg-oo-cream px-3 py-2 text-oo-charcoal">
                                 <p className="font-medium">{item.deliverectGuidance.recommendedAction}</p>
-                                <p className="mt-1 text-xs text-stone-600">{item.deliverectGuidance.stateSummary}</p>
+                                <p className="mt-1 text-xs text-oo-stone-gray">{item.deliverectGuidance.stateSummary}</p>
                               </div>
                             )}
                             {item.deliverectDiagnostic && (
-                              <p className="mt-2 text-xs text-stone-600">{item.deliverectDiagnostic}</p>
+                              <p className="mt-2 text-xs text-oo-stone-gray">{item.deliverectDiagnostic}</p>
                             )}
                           </details>
                         ) : null}
                       </div>
-                      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-stone-100 pt-3 sm:border-t-0 sm:pt-0">
+                      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-oo-light-stone pt-3 sm:border-t-0 sm:pt-0">
                         <Link
                           href={`/admin/orders/${item.orderId}`}
-                          className="rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-stone-800"
+                          className="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-hover"
                         >
                           View order
                         </Link>
@@ -399,7 +399,7 @@ export function IssuesWorkbench({
                             type="button"
                             disabled={busyId !== null}
                             onClick={() => handleRetryRouting(item.vendorOrderId!)}
-                            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+                            className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
                           >
                             {busyId === `retry:${item.vendorOrderId}` ? "…" : "Retry routing"}
                           </button>
@@ -437,27 +437,27 @@ export function IssuesWorkbench({
       {tab === "resolved" && (
         <div className="space-y-4">
           {resolvedPaged.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-stone-200 bg-stone-50/80 px-4 py-8 text-center text-sm text-stone-600">
+            <p className="rounded-lg border border-dashed border-oo-light-stone bg-oo-cream/80 px-4 py-8 text-center text-sm text-oo-stone-gray">
               {resolvedHistory.length === 0
                 ? "No resolved issue records yet (tracked issues appear here after you resolve them on an order)."
                 : "No results for this search."}
             </p>
           ) : (
-            <ul className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white">
+            <ul className="divide-y divide-oo-light-stone rounded-lg border border-oo-light-stone bg-oo-warm-white">
               {resolvedPaged.map((r) => (
                 <li key={`${r.kind}:${r.id}`} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 text-sm">
                   <div className="min-w-0">
-                    <p className="font-medium text-stone-800">{humanizeIssueType(r.type)}</p>
-                    <p className="mt-0.5 text-xs text-stone-500">
-                      <span className="font-mono text-stone-700">#{r.orderId.slice(-8).toUpperCase()}</span>
+                    <p className="font-medium text-oo-charcoal">{humanizeIssueType(r.type)}</p>
+                    <p className="mt-0.5 text-xs text-oo-stone-gray">
+                      <span className="font-mono text-oo-charcoal">#{r.orderId.slice(-8).toUpperCase()}</span>
                       {r.podName && <> · {r.podName}</>}
                       {r.vendorName && <> · {r.vendorName}</>}
                     </p>
-                    {r.notes && <p className="mt-1 line-clamp-1 text-xs text-stone-500">{r.notes}</p>}
+                    {r.notes && <p className="mt-1 line-clamp-1 text-xs text-oo-stone-gray">{r.notes}</p>}
                   </div>
-                  <div className="flex flex-shrink-0 flex-col items-end gap-1 text-xs text-stone-500">
+                  <div className="flex flex-shrink-0 flex-col items-end gap-1 text-xs text-oo-stone-gray">
                     <span>Resolved {formatResolvedAgo(r.resolvedAt)}</span>
-                    <Link href={`/admin/orders/${r.orderId}`} className="font-medium text-stone-700 underline">
+                    <Link href={`/admin/orders/${r.orderId}`} className="font-medium text-oo-charcoal underline">
                       View order
                     </Link>
                   </div>
@@ -466,12 +466,12 @@ export function IssuesWorkbench({
             </ul>
           )}
           {resolvedTotalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 text-sm text-stone-600">
+            <div className="flex items-center justify-center gap-3 text-sm text-oo-stone-gray">
               <button
                 type="button"
                 disabled={resolvedPage <= 0}
                 onClick={() => setResolvedPage((p) => Math.max(0, p - 1))}
-                className="rounded border border-stone-300 bg-white px-3 py-1 disabled:opacity-40"
+                className="rounded border border-oo-light-stone bg-oo-warm-white px-3 py-1 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -482,7 +482,7 @@ export function IssuesWorkbench({
                 type="button"
                 disabled={resolvedPage >= resolvedTotalPages - 1}
                 onClick={() => setResolvedPage((p) => Math.min(resolvedTotalPages - 1, p + 1))}
-                className="rounded border border-stone-300 bg-white px-3 py-1 disabled:opacity-40"
+                className="rounded border border-oo-light-stone bg-oo-warm-white px-3 py-1 disabled:opacity-40"
               >
                 Next
               </button>

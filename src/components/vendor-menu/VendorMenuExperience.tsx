@@ -55,7 +55,7 @@ function MenuSectionGrid({
     >
       <h2
         id={`heading-${sectionDomId}`}
-        className="mb-3 text-base font-bold tracking-tight text-black sm:text-lg"
+        className="mb-3 text-base font-bold tracking-tight text-oo-charcoal sm:text-lg"
         style={vendorAccentColor ? { borderLeftColor: vendorAccentColor } : undefined}
       >
         <span
@@ -115,7 +115,7 @@ export function VendorMenuExperience({
 
   return (
     <VendorMenuModifierProvider>
-      <div className="border-b border-zinc-200 bg-zinc-50/80">
+      <div className="border-b border-oo-light-stone bg-oo-cream/80">
         <PageShell className="py-6 sm:py-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
             <VendorMenuCategoryNav
@@ -134,11 +134,11 @@ export function VendorMenuExperience({
                   <header className="mb-3">
                     <h2
                       id="pod-menu-spotlight-heading"
-                      className="text-base font-bold tracking-tight text-black sm:text-lg"
+                      className="text-base font-bold tracking-tight text-oo-charcoal sm:text-lg"
                     >
                       Popular at {vendorName}
                     </h2>
-                    <p className="mt-0.5 text-sm text-zinc-600">
+                    <p className="mt-0.5 text-sm text-oo-stone-gray">
                       Highlights from this kitchen — still part of your shared pod cart.
                     </p>
                   </header>
@@ -163,11 +163,11 @@ export function VendorMenuExperience({
 
               {mainSections.length === 0 && spotlightSections.length === 0 ? (
                 <div className="oo-empty-state">
-                  <p className="font-medium text-zinc-900">No menu items available right now</p>
-                  <p className="mt-2 text-sm text-zinc-600">Check back later.</p>
+                  <p className="font-medium text-oo-charcoal">No menu items available right now</p>
+                  <p className="mt-2 text-sm text-oo-stone-gray">Check back later.</p>
                   <Link
                     href={`/pod/${podId}`}
-                    className="mt-4 inline-block text-sm font-semibold text-black hover:underline"
+                    className="mt-4 inline-block text-sm font-semibold text-oo-charcoal hover:underline"
                   >
                     Back to {podName}
                   </Link>

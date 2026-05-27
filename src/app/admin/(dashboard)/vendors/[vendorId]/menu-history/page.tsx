@@ -39,7 +39,7 @@ export default async function AdminVendorMenuHistoryPage({
   return (
     <div className="space-y-10">
       <div>
-        <p className="text-sm text-stone-500">
+        <p className="text-sm text-oo-stone-gray">
           <Link href="/admin/vendors" className="hover:underline">
             Vendors
           </Link>
@@ -48,10 +48,10 @@ export default async function AdminVendorMenuHistoryPage({
             {vendor.name}
           </Link>
           <span className="mx-1">/</span>
-          <span className="text-stone-800">Menu</span>
+          <span className="text-oo-charcoal">Menu</span>
         </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900">Menu management</h1>
-        <p className="mt-2 max-w-2xl text-sm text-stone-600">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-oo-charcoal">Menu management</h1>
+        <p className="mt-2 max-w-2xl text-sm text-oo-stone-gray">
           Deliverect imports, draft review, and published menu snapshots for <strong>{vendor.name}</strong>.
         </p>
       </div>

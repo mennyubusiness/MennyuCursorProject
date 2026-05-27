@@ -57,36 +57,36 @@ export function DeliverectMappingClient({
 
   return (
     <div className="space-y-8">
-      <div className="rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+      <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
           Deliverect mapping coverage
         </h2>
-        <p className="mt-2 text-sm text-stone-700">
+        <p className="mt-2 text-sm text-oo-charcoal">
           <strong>{stats.missingProductId}</strong> of {stats.totalMenuItems} menu items missing{" "}
-          <code className="rounded bg-stone-100 px-1 text-xs">deliverectProductId</code>
+          <code className="rounded bg-oo-cream px-1 text-xs">deliverectProductId</code>
           {stats.totalMenuItems > 0 && (
-            <span className="text-stone-500">
+            <span className="text-oo-stone-gray">
               {" "}
               ({Math.round((1 - stats.missingProductId / stats.totalMenuItems) * 100)}% mapped)
             </span>
           )}
         </p>
-        <p className="mt-1 text-sm text-stone-700">
+        <p className="mt-1 text-sm text-oo-charcoal">
           <strong>{stats.missingModifierId}</strong> of {stats.totalModifierOptions} modifier options
-          missing <code className="rounded bg-stone-100 px-1 text-xs">deliverectModifierId</code>
+          missing <code className="rounded bg-oo-cream px-1 text-xs">deliverectModifierId</code>
           {stats.totalModifierOptions > 0 && (
-            <span className="text-stone-500">
+            <span className="text-oo-stone-gray">
               {" "}
               ({Math.round((1 - stats.missingModifierId / stats.totalModifierOptions) * 100)}% mapped)
             </span>
           )}
         </p>
-        <p className="mt-3 text-xs text-stone-500">
+        <p className="mt-3 text-xs text-oo-stone-gray">
           Unmapped rows are highlighted. Copy IDs from Deliverect sandbox/POS; Open Order remains the menu
           source of truth — only external IDs are stored here.
         </p>
         {!hasActivePosConnection ? (
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-oo-stone-gray">
             No vendor-level Deliverect channel is active — new orders won&apos;t submit to Deliverect until identifiers
             are set again. Menu PLU mappings below are unchanged.
           </p>
@@ -95,7 +95,7 @@ export function DeliverectMappingClient({
             Channel link ID is missing — set it before relying on live Deliverect routing.
           </p>
         ) : (
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-oo-stone-gray">
             Vendor-level channel link is set. Use mapping tables below for menu payloads.
           </p>
         )}
@@ -111,24 +111,24 @@ export function DeliverectMappingClient({
       )}
 
       <section>
-        <h2 className="text-lg font-semibold text-stone-900">Menu items → Deliverect product ID</h2>
-        <p className="mt-1 text-sm text-stone-600">
+        <h2 className="text-lg font-semibold text-oo-charcoal">Menu items → Deliverect product ID</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Maps to <code className="text-xs">MenuItem.deliverectProductId</code> (used in order payload).
         </p>
-        <div className="mt-3 overflow-x-auto rounded-lg border border-stone-200 bg-white">
+        <div className="mt-3 overflow-x-auto rounded-lg border border-oo-light-stone bg-oo-warm-white">
           <table className="w-full min-w-[520px] text-sm">
-            <thead className="border-b border-stone-200 bg-stone-50">
+            <thead className="border-b border-oo-light-stone bg-oo-cream">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-stone-700">Item</th>
-                <th className="px-3 py-2 text-left font-medium text-stone-700">Price</th>
-                <th className="px-3 py-2 text-left font-medium text-stone-700">Deliverect product ID</th>
+                <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Item</th>
+                <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Price</th>
+                <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Deliverect product ID</th>
                 <th className="px-3 py-2 w-24" />
               </tr>
             </thead>
             <tbody>
               {menuItems.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-4 text-stone-500">
+                  <td colSpan={4} className="px-3 py-4 text-oo-stone-gray">
                     No menu items for this vendor.
                   </td>
                 </tr>
@@ -154,26 +154,26 @@ export function DeliverectMappingClient({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-stone-900">Modifier options → Deliverect modifier ID</h2>
-        <p className="mt-1 text-sm text-stone-600">
+        <h2 className="text-lg font-semibold text-oo-charcoal">Modifier options → Deliverect modifier ID</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           Maps to <code className="text-xs">ModifierOption.deliverectModifierId</code> (per selection in
           payload).
         </p>
-        <div className="mt-3 overflow-x-auto rounded-lg border border-stone-200 bg-white">
+        <div className="mt-3 overflow-x-auto rounded-lg border border-oo-light-stone bg-oo-warm-white">
           <table className="w-full min-w-[600px] text-sm">
-            <thead className="border-b border-stone-200 bg-stone-50">
+            <thead className="border-b border-oo-light-stone bg-oo-cream">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-stone-700">Group</th>
-                <th className="px-3 py-2 text-left font-medium text-stone-700">Option</th>
-                <th className="px-3 py-2 text-left font-medium text-stone-700">Price</th>
-                <th className="px-3 py-2 text-left font-medium text-stone-700">Deliverect modifier ID</th>
+                <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Group</th>
+                <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Option</th>
+                <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Price</th>
+                <th className="px-3 py-2 text-left font-medium text-oo-charcoal">Deliverect modifier ID</th>
                 <th className="px-3 py-2 w-24" />
               </tr>
             </thead>
             <tbody>
               {options.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-4 text-stone-500">
+                  <td colSpan={5} className="px-3 py-4 text-oo-stone-gray">
                     No modifier options for this vendor.
                   </td>
                 </tr>
@@ -198,8 +198,8 @@ export function DeliverectMappingClient({
         </div>
       </section>
 
-      <p className="text-sm text-stone-500">
-        <Link href="/admin/vendors" className="text-stone-700 hover:underline">
+      <p className="text-sm text-oo-stone-gray">
+        <Link href="/admin/vendors" className="text-oo-charcoal hover:underline">
           ← Back to vendors
         </Link>
       </p>
@@ -226,16 +226,16 @@ function MenuItemRowEditor({
   const missing = !item.deliverectProductId?.trim();
 
   return (
-    <tr className={`border-b border-stone-100 ${missing ? "bg-amber-50/60" : ""}`}>
-      <td className="px-3 py-2 font-medium text-stone-900">{item.name}</td>
-      <td className="px-3 py-2 text-stone-600">${(item.priceCents / 100).toFixed(2)}</td>
+    <tr className={`border-b border-oo-light-stone ${missing ? "bg-amber-50/60" : ""}`}>
+      <td className="px-3 py-2 font-medium text-oo-charcoal">{item.name}</td>
+      <td className="px-3 py-2 text-oo-stone-gray">${(item.priceCents / 100).toFixed(2)}</td>
       <td className="px-3 py-2">
         <input
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="e.g. PLU or Deliverect product _id"
-          className="w-full min-w-[200px] rounded border border-stone-300 px-2 py-1 font-mono text-xs"
+          className="w-full min-w-[200px] rounded border border-oo-light-stone px-2 py-1 font-mono text-xs"
           disabled={pending}
         />
       </td>
@@ -253,7 +253,7 @@ function MenuItemRowEditor({
               }
             });
           }}
-          className="rounded bg-stone-800 px-2 py-1 text-xs font-medium text-white hover:bg-stone-700 disabled:opacity-50"
+          className="rounded bg-brand px-2 py-1 text-xs font-medium text-white hover:bg-stone-700 disabled:opacity-50"
         >
           Save
         </button>
@@ -281,17 +281,17 @@ function ModifierRowEditor({
   const missing = !row.deliverectModifierId?.trim();
 
   return (
-    <tr className={`border-b border-stone-100 ${missing ? "bg-amber-50/60" : ""}`}>
-      <td className="px-3 py-2 text-stone-700">{row.groupName}</td>
-      <td className="px-3 py-2 font-medium text-stone-900">{row.name}</td>
-      <td className="px-3 py-2 text-stone-600">${(row.priceCents / 100).toFixed(2)}</td>
+    <tr className={`border-b border-oo-light-stone ${missing ? "bg-amber-50/60" : ""}`}>
+      <td className="px-3 py-2 text-oo-charcoal">{row.groupName}</td>
+      <td className="px-3 py-2 font-medium text-oo-charcoal">{row.name}</td>
+      <td className="px-3 py-2 text-oo-stone-gray">${(row.priceCents / 100).toFixed(2)}</td>
       <td className="px-3 py-2">
         <input
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="e.g. modifier PLU / _id"
-          className="w-full min-w-[200px] rounded border border-stone-300 px-2 py-1 font-mono text-xs"
+          className="w-full min-w-[200px] rounded border border-oo-light-stone px-2 py-1 font-mono text-xs"
           disabled={pending}
         />
       </td>
@@ -309,7 +309,7 @@ function ModifierRowEditor({
               }
             });
           }}
-          className="rounded bg-stone-800 px-2 py-1 text-xs font-medium text-white hover:bg-stone-700 disabled:opacity-50"
+          className="rounded bg-brand px-2 py-1 text-xs font-medium text-white hover:bg-stone-700 disabled:opacity-50"
         >
           Save
         </button>

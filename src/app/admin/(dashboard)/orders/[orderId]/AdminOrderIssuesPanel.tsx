@@ -87,25 +87,25 @@ export function AdminOrderIssuesPanel({
 
   return (
     <section className="rounded-lg border border-amber-200/80 bg-amber-50/40 p-4">
-      <h2 className="text-lg font-semibold text-stone-900">Issues &amp; notes</h2>
-      <p className="mt-1 text-sm text-stone-600">
+      <h2 className="text-lg font-semibold text-oo-charcoal">Issues &amp; notes</h2>
+      <p className="mt-1 text-sm text-oo-stone-gray">
         Open issues and your shared resolution log for this order.
       </p>
 
       {all.length === 0 ? (
-        <p className="mt-4 text-sm text-stone-600">No issues recorded for this order.</p>
+        <p className="mt-4 text-sm text-oo-stone-gray">No issues recorded for this order.</p>
       ) : (
         <ul className="mt-4 space-y-3">
           {all.map((issue) => (
             <li
               key={issue.id}
-              className="rounded-lg border border-stone-200 bg-white p-3 text-sm shadow-sm"
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 text-sm shadow-sm"
             >
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="font-semibold capitalize text-stone-900">
+                <span className="font-semibold capitalize text-oo-charcoal">
                   {humanizeType(issue.type)}
                 </span>
-                <span className="text-xs text-stone-500">
+                <span className="text-xs text-oo-stone-gray">
                   {"vendorName" in issue ? issue.vendorName : "Order-wide"}
                 </span>
                 <span
@@ -114,24 +114,24 @@ export function AdminOrderIssuesPanel({
                       ? "bg-red-100 text-red-800"
                       : issue.severity === "MEDIUM"
                         ? "bg-amber-100 text-amber-800"
-                        : "bg-stone-200 text-stone-700"
+                        : "bg-stone-200 text-oo-charcoal"
                   }`}
                 >
                   {issue.severity}
                 </span>
                 <span
                   className={
-                    issue.status === "RESOLVED" ? "text-xs text-stone-500" : "text-xs font-medium text-stone-800"
+                    issue.status === "RESOLVED" ? "text-xs text-oo-stone-gray" : "text-xs font-medium text-oo-charcoal"
                   }
                 >
                   {issue.status}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-stone-500">
+              <p className="mt-1 text-xs text-oo-stone-gray">
                 {formatDate(new Date(issue.createdAt))}
                 {issue.resolvedAt && ` · Resolved ${formatDate(new Date(issue.resolvedAt))}`}
               </p>
-              <p className="mt-2 text-stone-700">
+              <p className="mt-2 text-oo-charcoal">
                 {issue.notes?.trim() || `${humanizeType(issue.type)} — ${issue.status.toLowerCase()}`}
               </p>
               {issue.status === "OPEN" && (
@@ -140,7 +140,7 @@ export function AdminOrderIssuesPanel({
                     type="button"
                     onClick={() => handleResolve(issue.kind, issue.id)}
                     disabled={resolvingId === issue.id}
-                    className="rounded-md bg-stone-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-900 disabled:opacity-50"
+                    className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-hover disabled:opacity-50"
                   >
                     {resolvingId === issue.id ? "…" : "Mark issue resolved"}
                   </button>
@@ -152,15 +152,15 @@ export function AdminOrderIssuesPanel({
       )}
 
       <div className="mt-6 border-t border-amber-200/80 pt-4">
-        <label htmlFor="admin-resolution-notes" className="block text-sm font-medium text-stone-800">
+        <label htmlFor="admin-resolution-notes" className="block text-sm font-medium text-oo-charcoal">
           Resolution notes
         </label>
-        <p className="mt-0.5 text-xs text-stone-500">
+        <p className="mt-0.5 text-xs text-oo-stone-gray">
           One place for how this order was handled; visible to admins on refresh.
         </p>
         <textarea
           id="admin-resolution-notes"
-          className="mt-2 w-full min-h-[100px] rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+          className="mt-2 w-full min-h-[100px] rounded-md border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm text-oo-charcoal shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
           value={resolutionNotes}
           onChange={(e) => setResolutionNotes(e.target.value)}
           placeholder="What went wrong, what you did, follow-ups…"
@@ -170,11 +170,11 @@ export function AdminOrderIssuesPanel({
             type="button"
             onClick={() => void handleSaveResolutionNotes()}
             disabled={savingNotes}
-            className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+            className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
           >
             {savingNotes ? "Saving…" : "Save notes"}
           </button>
-          {notesMessage && <span className="text-sm text-stone-600">{notesMessage}</span>}
+          {notesMessage && <span className="text-sm text-oo-stone-gray">{notesMessage}</span>}
         </div>
       </div>
     </section>

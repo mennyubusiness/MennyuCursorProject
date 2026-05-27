@@ -40,7 +40,7 @@ export function AdminPricingForm({ initial }: { initial: Initial }) {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
-          <span className="font-medium text-stone-800">Customer service fee (%)</span>
+          <span className="font-medium text-oo-charcoal">Customer service fee (%)</span>
           <input
             name="customerServiceFeePercent"
             type="number"
@@ -49,12 +49,12 @@ export function AdminPricingForm({ initial }: { initial: Initial }) {
             max={100}
             required
             defaultValue={initial.customerServiceFeePercent}
-            className="mt-1 w-full rounded border border-stone-200 px-2 py-1.5 text-stone-900"
+            className="mt-1 w-full rounded border border-oo-light-stone px-2 py-1.5 text-oo-charcoal"
           />
-          <p className="mt-1 text-xs text-stone-500">Open Order revenue — charged to the customer on food subtotal.</p>
+          <p className="mt-1 text-xs text-oo-stone-gray">Open Order revenue — charged to the customer on food subtotal.</p>
         </label>
         <label className="block text-sm">
-          <span className="font-medium text-stone-800">Service fee flat add-on (¢)</span>
+          <span className="font-medium text-oo-charcoal">Service fee flat add-on (¢)</span>
           <input
             name="customerServiceFeeFlatCents"
             type="number"
@@ -62,11 +62,11 @@ export function AdminPricingForm({ initial }: { initial: Initial }) {
             min={0}
             required
             defaultValue={initial.customerServiceFeeFlatCents}
-            className="mt-1 w-full rounded border border-stone-200 px-2 py-1.5 text-stone-900"
+            className="mt-1 w-full rounded border border-oo-light-stone px-2 py-1.5 text-oo-charcoal"
           />
         </label>
         <label className="block text-sm">
-          <span className="font-medium text-stone-800">Vendor processing recovery (%)</span>
+          <span className="font-medium text-oo-charcoal">Vendor processing recovery (%)</span>
           <input
             name="vendorProcessingFeePercent"
             type="number"
@@ -75,14 +75,14 @@ export function AdminPricingForm({ initial }: { initial: Initial }) {
             max={100}
             required
             defaultValue={initial.vendorProcessingFeePercent}
-            className="mt-1 w-full rounded border border-stone-200 px-2 py-1.5 text-stone-900"
+            className="mt-1 w-full rounded border border-oo-light-stone px-2 py-1.5 text-oo-charcoal"
           />
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-oo-stone-gray">
             Pass-through on vendor food subtotal only — not assessed on tips.
           </p>
         </label>
         <label className="block text-sm">
-          <span className="font-medium text-stone-800">Vendor recovery flat (¢)</span>
+          <span className="font-medium text-oo-charcoal">Vendor recovery flat (¢)</span>
           <input
             name="vendorProcessingFeeFlatCents"
             type="number"
@@ -90,16 +90,16 @@ export function AdminPricingForm({ initial }: { initial: Initial }) {
             min={0}
             required
             defaultValue={initial.vendorProcessingFeeFlatCents}
-            className="mt-1 w-full rounded border border-stone-200 px-2 py-1.5 text-stone-900"
+            className="mt-1 w-full rounded border border-oo-light-stone px-2 py-1.5 text-oo-charcoal"
           />
         </label>
       </div>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Notes (optional)</span>
+        <span className="font-medium text-oo-charcoal">Notes (optional)</span>
         <textarea
           name="notes"
           rows={2}
-          className="mt-1 w-full rounded border border-stone-200 px-2 py-1.5 text-stone-900"
+          className="mt-1 w-full rounded border border-oo-light-stone px-2 py-1.5 text-oo-charcoal"
           placeholder="Reason for change, ticket link, etc."
         />
       </label>
@@ -107,7 +107,7 @@ export function AdminPricingForm({ initial }: { initial: Initial }) {
       <button
         type="submit"
         disabled={pending}
-        className="rounded bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-60"
+        className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-60"
       >
         {pending ? "Saving…" : "Save new active config"}
       </button>

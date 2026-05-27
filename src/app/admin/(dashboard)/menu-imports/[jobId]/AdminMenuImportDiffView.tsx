@@ -12,8 +12,8 @@ function formatWhen(d: Date | null | undefined): string {
 function DiffList({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mt-4">
-      <h3 className="text-sm font-medium text-stone-800">{title}</h3>
-      <div className="mt-2 text-sm text-stone-700">{children}</div>
+      <h3 className="text-sm font-medium text-oo-charcoal">{title}</h3>
+      <div className="mt-2 text-sm text-oo-charcoal">{children}</div>
     </div>
   );
 }
@@ -31,9 +31,9 @@ export function AdminMenuImportDiffView({
 }) {
   if (!hasDraftMenu) {
     return (
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="font-medium text-stone-900">Draft vs published</h2>
-        <p className="mt-2 text-sm text-stone-600">
+      <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+        <h2 className="font-medium text-oo-charcoal">Draft vs published</h2>
+        <p className="mt-2 text-sm text-oo-stone-gray">
           Parse the draft canonical menu above to see what would change on publish.
         </p>
       </section>
@@ -74,9 +74,9 @@ export function AdminMenuImportDiffView({
     0;
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white p-4">
-      <h2 className="font-medium text-stone-900">Draft vs published</h2>
-      <p className="mt-1 text-sm text-stone-600">
+    <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+      <h2 className="font-medium text-oo-charcoal">Draft vs published</h2>
+      <p className="mt-1 text-sm text-oo-stone-gray">
         Comparison uses Deliverect ids in canonical snapshots only (not live `MenuItem` rows).
       </p>
 
@@ -86,13 +86,13 @@ export function AdminMenuImportDiffView({
           vendor. Everything in the draft would be created on first publish.
         </div>
       ) : (
-        <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800">
+        <div className="mt-3 rounded-md border border-oo-light-stone bg-oo-cream px-3 py-2 text-sm text-oo-charcoal">
           Compared to published version{" "}
           <span className="font-mono text-xs">{diff.publishedVersionId}</span>
           {publishedRow?.publishedAt && (
             <>
               {" "}
-              · <span className="text-stone-600">{formatWhen(publishedRow.publishedAt)}</span>
+              · <span className="text-oo-stone-gray">{formatWhen(publishedRow.publishedAt)}</span>
             </>
           )}
         </div>
@@ -116,16 +116,16 @@ export function AdminMenuImportDiffView({
         ].map(([label, n]) => (
           <div
             key={label}
-            className="flex items-center justify-between rounded border border-stone-100 bg-stone-50/80 px-3 py-2 text-sm"
+            className="flex items-center justify-between rounded border border-oo-light-stone bg-oo-cream/80 px-3 py-2 text-sm"
           >
-            <span className="text-stone-600">{label}</span>
-            <span className="font-mono font-medium text-stone-900">{n}</span>
+            <span className="text-oo-stone-gray">{label}</span>
+            <span className="font-mono font-medium text-oo-charcoal">{n}</span>
           </div>
         ))}
       </div>
 
       {!diff.isFirstPublish && !hasAnyChange && (
-        <p className="mt-4 text-sm text-stone-600">
+        <p className="mt-4 text-sm text-oo-stone-gray">
           No differences detected vs published canonical snapshot (Deliverect id–based).
         </p>
       )}
@@ -136,19 +136,19 @@ export function AdminMenuImportDiffView({
             {diff.addedCategories.map((c) => (
               <li key={`add-c-${c.deliverectId}`} className="text-emerald-800">
                 <span className="font-medium">+</span> {c.name}{" "}
-                <span className="font-mono text-xs text-stone-500">({c.deliverectId})</span>
+                <span className="font-mono text-xs text-oo-stone-gray">({c.deliverectId})</span>
               </li>
             ))}
             {diff.removedCategories.map((c) => (
               <li key={`rm-c-${c.deliverectId}`} className="text-red-800">
                 <span className="font-medium">−</span> {c.name}{" "}
-                <span className="font-mono text-xs text-stone-500">({c.deliverectId})</span>
+                <span className="font-mono text-xs text-oo-stone-gray">({c.deliverectId})</span>
               </li>
             ))}
             {diff.changedCategories.map((c) => (
               <li key={`ch-c-${c.deliverectId}`} className="text-amber-900">
                 <span className="font-medium">~</span> {c.name}{" "}
-                <span className="font-mono text-xs text-stone-500">({c.deliverectId})</span> — {c.details}
+                <span className="font-mono text-xs text-oo-stone-gray">({c.deliverectId})</span> — {c.details}
               </li>
             ))}
           </ul>
@@ -161,13 +161,13 @@ export function AdminMenuImportDiffView({
             {diff.addedProducts.map((p) => (
               <li key={`add-p-${p.deliverectId}`} className="text-emerald-800">
                 <span className="font-medium">+</span> {p.name} {formatCents(p.priceCents)}{" "}
-                <span className="font-mono text-xs text-stone-500">({p.deliverectId})</span>
+                <span className="font-mono text-xs text-oo-stone-gray">({p.deliverectId})</span>
               </li>
             ))}
             {diff.removedProducts.map((p) => (
               <li key={`rm-p-${p.deliverectId}`} className="text-red-800">
                 <span className="font-medium">−</span> {p.name} {formatCents(p.priceCents)}{" "}
-                <span className="font-mono text-xs text-stone-500">({p.deliverectId})</span>
+                <span className="font-mono text-xs text-oo-stone-gray">({p.deliverectId})</span>
               </li>
             ))}
           </ul>
@@ -179,9 +179,9 @@ export function AdminMenuImportDiffView({
           <ul className="space-y-2">
             {diff.changedPrices.map((p) => (
               <li key={`price-${p.deliverectId}`}>
-                <span className="font-medium text-stone-900">{p.name}</span>{" "}
-                <span className="font-mono text-xs text-stone-500">({p.deliverectId})</span>
-                <div className="text-stone-700">
+                <span className="font-medium text-oo-charcoal">{p.name}</span>{" "}
+                <span className="font-mono text-xs text-oo-stone-gray">({p.deliverectId})</span>
+                <div className="text-oo-charcoal">
                   {formatCents(p.oldCents)} → {formatCents(p.newCents)}
                 </div>
               </li>
@@ -195,9 +195,9 @@ export function AdminMenuImportDiffView({
           <ul className="space-y-2">
             {diff.changedProductsOther.map((p) => (
               <li key={`pf-${p.deliverectId}`}>
-                <span className="font-medium text-stone-900">{p.name}</span>{" "}
-                <span className="font-mono text-xs text-stone-500">({p.deliverectId})</span>
-                <div className="text-stone-600">{p.details}</div>
+                <span className="font-medium text-oo-charcoal">{p.name}</span>{" "}
+                <span className="font-mono text-xs text-oo-stone-gray">({p.deliverectId})</span>
+                <div className="text-oo-stone-gray">{p.details}</div>
               </li>
             ))}
           </ul>
@@ -252,7 +252,7 @@ export function AdminMenuImportDiffView({
                 <span className="font-mono text-xs">
                   ({o.optionId} / {o.groupId})
                 </span>
-                <div className="text-stone-700">{o.details}</div>
+                <div className="text-oo-charcoal">{o.details}</div>
               </li>
             ))}
           </ul>
