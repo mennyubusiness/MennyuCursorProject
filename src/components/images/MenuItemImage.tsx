@@ -10,9 +10,15 @@ type MenuItemImageProps = {
   imageUrl: string | null | undefined;
   itemName: string;
   className?: string;
+  sizes?: string;
 };
 
-export function MenuItemImage({ imageUrl, itemName, className = DEFAULT_BOX }: MenuItemImageProps) {
+export function MenuItemImage({
+  imageUrl,
+  itemName,
+  className = DEFAULT_BOX,
+  sizes = "(max-width: 640px) 56px, 64px",
+}: MenuItemImageProps) {
   const [loadFailed, setLoadFailed] = useState(false);
   const canTryImage = isHttpsImageUrl(imageUrl) && !loadFailed;
 
@@ -26,7 +32,7 @@ export function MenuItemImage({ imageUrl, itemName, className = DEFAULT_BOX }: M
           alt={itemName}
           fill
           className="object-cover"
-          sizes="(max-width: 640px) 56px, 64px"
+          sizes={sizes}
           onError={() => setLoadFailed(true)}
         />
       ) : (

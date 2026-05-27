@@ -204,7 +204,4 @@ export async function loadCustomerVendorMenuSections(
   };
 }
 
-/** HTML-safe fragment id for category anchors. */
-export function customerMenuCategoryDomId(sectionId: string): string {
-  return `menu-cat-${sectionId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
-}
+export { customerMenuCategoryDomId } from "@/lib/vendor-menu-category-id";
