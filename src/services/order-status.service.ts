@@ -809,6 +809,19 @@ async function getOrderWithUnifiedStatusImpl(orderId: string) {
         orderBy: { createdAt: "desc" },
         select: { status: true, amountCents: true, createdAt: true },
       },
+      issues: {
+        where: { submittedByRole: "customer" },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          vendorOrderId: true,
+          orderLineItemId: true,
+          customerMessage: true,
+          createdAt: true,
+        },
+      },
     },
   });
   if (!order) return null;
@@ -836,6 +849,19 @@ export async function getCustomerOrderStatusPollSnapshot(orderId: string) {
       orderRefunds: {
         orderBy: { createdAt: "desc" },
         select: { status: true, amountCents: true, createdAt: true },
+      },
+      issues: {
+        where: { submittedByRole: "customer" },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          vendorOrderId: true,
+          orderLineItemId: true,
+          customerMessage: true,
+          createdAt: true,
+        },
       },
     },
   });

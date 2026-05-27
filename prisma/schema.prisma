@@ -694,8 +694,10 @@ model VendorOrder {
   /// Pre-submit Deliverect payload validation snapshot (structured errors); cleared after successful submission.
   deliverectPayloadValidation Json?
   lineItems               OrderLineItem[]
+  supportIssues           OrderIssue[]
   paymentAllocations      PaymentAllocation[]
   orderRefunds            OrderRefund[]
+  refundLineItems         RefundLineItem[]
   vendorPayoutTransfers   VendorPayoutTransfer[]
   vendorPayoutTransferReversals VendorPayoutTransferReversal[]
   order                   Order                       @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -723,8 +725,32 @@ model OrderLineItem {
   vendorOrder         VendorOrder              @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
   groupOrderParticipant GroupOrderParticipant? @relation(fields: [groupOrderParticipantId], references: [id], onDelete: SetNull)
   selections          OrderLineItemSelection[]
+  supportIssues       OrderIssue[]
+  refundLineItems     RefundLineItem[]
 
   @@index([groupOrderParticipantId])
+}
+
+model RefundLineItem {
+  id                     String      @id @default(cuid())
+  orderRefundId          String
+  orderLineItemId        String
+  vendorOrderId          String
+  quantityRefunded       Int?
+  subtotalRefundedCents  Int
+  taxRefundedCents       Int         @default(0)
+  tipRefundedCents       Int         @default(0)
+  serviceFeeRefundedCents Int        @default(0)
+  amountCents            Int
+  createdAt              DateTime    @default(now())
+
+  orderRefund   OrderRefund   @relation(fields: [orderRefundId], references: [id], onDelete: Cascade)
+  orderLineItem OrderLineItem @relation(fields: [orderLineItemId], references: [id], onDelete: Cascade)
+  vendorOrder   VendorOrder   @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+
+  @@index([orderRefundId])
+  @@index([orderLineItemId])
+  @@index([vendorOrderId])
 }
 
 model OrderLineItemSelection {
@@ -820,6 +846,8 @@ model OrderRefund {
   vendorOrder   VendorOrder?   @relation(fields: [vendorOrderId], references: [id], onDelete: SetNull)
   payment       Payment?       @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   refundAttempt RefundAttempt? @relation(fields: [refundAttemptId], references: [id], onDelete: SetNull)
+  linkedSupportIssues OrderIssue[]
+  refundLineItems     RefundLineItem[]
 
   @@index([orderId])
   @@index([vendorOrderId])
@@ -950,18 +978,38 @@ model VendorOrderStatusHistory {
 model OrderIssue {
   id         String    @id @default(cuid())
   orderId    String
+  vendorOrderId String?
+  orderLineItemId String?
+  submittedByUserId String?
+  /// customer | vendor | admin | system
+  submittedByRole String?
   type       String
   severity   String
+  /// low | normal | high (customer support); legacy rows may be null
+  priority   String?
   status     String
+  /// Legacy internal notes; prefer internalNote for new rows
   notes      String?
+  customerMessage String?
+  internalNote String?
+  requestedRefundAmountCents Int?
+  linkedOrderRefundId String?
   createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   resolvedAt DateTime?
   createdBy  String?
   resolvedBy String?
+  resolvedByUserId String?
   order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorOrder VendorOrder? @relation(fields: [vendorOrderId], references: [id], onDelete: SetNull)
+  orderLineItem OrderLineItem? @relation(fields: [orderLineItemId], references: [id], onDelete: SetNull)
+  linkedOrderRefund OrderRefund? @relation(fields: [linkedOrderRefundId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([orderId, status])
+  @@index([vendorOrderId])
+  @@index([orderLineItemId])
+  @@index([linkedOrderRefundId])
 }
 
 model VendorOrderIssue {
@@ -1049,6 +1097,7 @@ enum OrderRefundScope {
   full_order
   full_vendor_order
   custom_vendor_partial
+  line_item_refund
   system_cancel
   vendor_denial
   legacy

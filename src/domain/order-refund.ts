@@ -5,11 +5,13 @@ import type { OrderRefundScope, OrderRefundStatus } from "@prisma/client";
 
 export const ORDER_REFUND_SUCCEEDED_STATUS: OrderRefundStatus = "succeeded";
 
-const LEDGER_COMMITTED_STATUSES: OrderRefundStatus[] = [
+export const COMMITTED_ORDER_REFUND_STATUSES: OrderRefundStatus[] = [
   "succeeded",
   "pending",
   "requires_action",
 ];
+
+const LEDGER_COMMITTED_STATUSES = COMMITTED_ORDER_REFUND_STATUSES;
 
 export const PAYMENT_REFUND_STATUS = {
   none: "none",

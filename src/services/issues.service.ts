@@ -3,9 +3,10 @@
  * Operational issues only; does not change order lifecycle or status.
  */
 import { prisma } from "@/lib/db";
+import { ACTIVE_ORDER_ISSUE_STATUSES } from "@/domain/order-support-issue";
 
 export type IssueSeverity = "LOW" | "MEDIUM" | "HIGH";
-export type IssueStatus = "OPEN" | "RESOLVED";
+export type IssueStatus = "OPEN" | "RESOLVED" | "open" | "reviewing" | "resolved" | "dismissed";
 
 export type OrderIssueType =
   | "routing_failure"
@@ -37,6 +38,7 @@ export async function createOrderIssue(
       type,
       severity,
       status: "OPEN",
+      submittedByRole: "system",
       notes: options?.notes ?? null,
       createdBy: options?.createdBy ?? null,
     },
@@ -63,14 +65,15 @@ export async function createVendorOrderIssue(
 
 export async function resolveOrderIssue(
   issueId: string,
-  options?: { resolvedBy?: string }
+  options?: { resolvedBy?: string; resolvedByUserId?: string }
 ) {
   return prisma.orderIssue.update({
     where: { id: issueId },
     data: {
-      status: "RESOLVED",
+      status: "resolved",
       resolvedAt: new Date(),
       resolvedBy: options?.resolvedBy ?? null,
+      resolvedByUserId: options?.resolvedByUserId ?? null,
     },
   });
 }
@@ -124,7 +127,7 @@ export async function updateVendorOrderIssueNotes(issueId: string, notes: string
 export async function getOrderIdsWithOpenIssues(): Promise<string[]> {
   const [orderIssues, voIssues] = await Promise.all([
     prisma.orderIssue.findMany({
-      where: { status: "OPEN" },
+      where: { status: { in: [...ACTIVE_ORDER_ISSUE_STATUSES] } },
       select: { orderId: true },
     }),
     prisma.vendorOrderIssue.findMany({

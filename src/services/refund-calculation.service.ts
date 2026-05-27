@@ -12,6 +12,10 @@ import {
   getRemainingVendorOrderRefundableCents,
 } from "@/services/refund-ledger.service";
 import {
+  computeLineItemRefundComponents,
+  getCommittedRefundedQuantityForLineItem,
+} from "@/services/refund-line-item.service";
+import {
   getVendorTransferReversalAmountCents,
 } from "@/services/vendor-payout-transfer-reversal.service";
 import { VENDOR_PAYOUT_TRANSFER_STATUS } from "@/services/vendor-payout-transfer.service";
@@ -69,16 +73,48 @@ export type AssertRefundAllowedInput = {
   scope: AdminRefundScopeKey;
   orderId: string;
   vendorOrderId?: string | null;
+  orderLineItemId?: string | null;
+  quantity?: number | null;
   amountCents?: number | null;
   reason: string;
   adminNote?: string | null;
   platformAbsorbsRefund?: boolean;
+  includeTax?: boolean;
+  includeTip?: boolean;
+  includeServiceFee?: boolean;
+  linkedIssueHasCustomerMessage?: boolean;
 };
 
 export type RefundExecutionPlan = RefundCalculationPreview & {
   stripePaymentIntentId: string | null;
   paymentId: string | null;
   stripeChargeId: string | null;
+  lineItem?: {
+    orderLineItemId: string;
+    itemName: string;
+    purchasedQuantity: number;
+    alreadyRefundedQuantity: number;
+    refundableQuantity: number;
+    requestedQuantity: number;
+    quantityRefunded: number;
+    subtotalRefundedCents: number;
+    taxRefundedCents: number;
+    tipRefundedCents: number;
+    serviceFeeRefundedCents: number;
+  };
+};
+
+export type LineItemRefundPreview = RefundCalculationPreview & {
+  orderLineItemId: string;
+  itemName: string;
+  purchasedQuantity: number;
+  alreadyRefundedQuantity: number;
+  refundableQuantity: number;
+  requestedQuantity: number;
+  subtotalRefundedCents: number;
+  taxRefundedCents: number;
+  tipRefundedCents: number;
+  serviceFeeRefundedCents: number;
 };
 
 async function loadOrderFinancialContext(orderId: string) {
@@ -143,6 +179,8 @@ function scopeToOrderRefundScope(scope: AdminRefundScopeKey): OrderRefundScope {
       return "full_vendor_order";
     case "custom_vendor_partial":
       return "custom_vendor_partial";
+    case "line_item_refund":
+      return "line_item_refund";
   }
 }
 
@@ -453,6 +491,13 @@ export function assertRefundIsAllowed(
   if (input.scope === "custom_vendor_partial" && !input.adminNote?.trim()) {
     reasons.push("admin_note_required_for_custom_partial");
   }
+  if (
+    input.scope === "line_item_refund" &&
+    !input.adminNote?.trim() &&
+    !input.linkedIssueHasCustomerMessage
+  ) {
+    reasons.push("admin_note_required_for_line_item_refund");
+  }
   if (preview.platformWouldAbsorbRefund && !input.adminNote?.trim()) {
     reasons.push("admin_note_required_when_platform_absorbs");
   }
@@ -463,10 +508,162 @@ export function assertRefundIsAllowed(
   return { allowed: true };
 }
 
+export async function previewLineItemRefund(
+  orderId: string,
+  vendorOrderId: string,
+  orderLineItemId: string,
+  quantity: number,
+  options?: {
+    includeTax?: boolean;
+    includeTip?: boolean;
+    includeServiceFee?: boolean;
+    platformAbsorbsRefund?: boolean;
+    adminNote?: string | null;
+    reason?: string;
+    linkedIssueHasCustomerMessage?: boolean;
+  }
+): Promise<LineItemRefundPreview | null> {
+  const includeTax = options?.includeTax !== false;
+  const includeTip = options?.includeTip === true;
+  const includeServiceFee = options?.includeServiceFee === true;
+  const platformAbsorbsRefund = options?.platformAbsorbsRefund === true;
+
+  const line = await prisma.orderLineItem.findUnique({
+    where: { id: orderLineItemId },
+    select: {
+      id: true,
+      name: true,
+      quantity: true,
+      priceCents: true,
+      vendorOrderId: true,
+      vendorOrder: {
+        select: {
+          id: true,
+          orderId: true,
+          subtotalCents: true,
+          taxCents: true,
+          tipCents: true,
+          serviceFeeCents: true,
+        },
+      },
+    },
+  });
+  if (!line || line.vendorOrder.orderId !== orderId) return null;
+  if (line.vendorOrderId !== vendorOrderId) return null;
+
+  const purchasedQuantity = line.quantity;
+  const alreadyRefundedQuantity = await getCommittedRefundedQuantityForLineItem(orderLineItemId);
+  const refundableQuantity = Math.max(0, purchasedQuantity - alreadyRefundedQuantity);
+
+  const components = computeLineItemRefundComponents({
+    priceCents: line.priceCents,
+    purchasedQuantity,
+    refundQuantity: quantity,
+    vendorSubtotalCents: line.vendorOrder.subtotalCents,
+    vendorTaxCents: line.vendorOrder.taxCents,
+    vendorTipCents: line.vendorOrder.tipCents,
+    vendorServiceFeeCents: line.vendorOrder.serviceFeeCents,
+    includeTax,
+    includeTip,
+    includeServiceFee,
+  });
+
+  const base = await buildPreviewBase({
+    scope: "line_item_refund",
+    orderId,
+    vendorOrderId,
+    amountCents: components.amountCents,
+    reason: options?.reason,
+    platformAbsorbsRefund,
+    adminNote: options?.adminNote,
+  });
+  if (!base) return null;
+
+  const blockingReasons = [...base.blockingReasons];
+
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    blockingReasons.push("quantity_must_be_positive_integer");
+  }
+  if (quantity > refundableQuantity) {
+    blockingReasons.push(
+      `quantity_exceeds_refundable: refundable=${refundableQuantity}, requested=${quantity}`
+    );
+  }
+  if (components.amountCents <= 0) {
+    blockingReasons.push("line_item_refund_amount_must_be_positive");
+  }
+
+  const paidOrSubmitted = base.vendorPayoutTransfers.some(
+    (t) => t.transferStatus === "paid" || t.transferStatus === "submitted"
+  );
+  if (paidOrSubmitted && !platformAbsorbsRefund) {
+    blockingReasons.push(
+      "vendor_transfer_already_sent: set platformAbsorbsRefund=true with admin note to refund customer while platform bears cost"
+    );
+  }
+
+  if (
+    !options?.adminNote?.trim() &&
+    !options?.linkedIssueHasCustomerMessage
+  ) {
+    blockingReasons.push("admin_note_required_for_line_item_refund");
+  }
+
+  const transferReversalRequired = false;
+  const transferReversalPossible = false;
+  const estimatedTransferReversalAmountCents = 0;
+  const platformWouldAbsorbRefund =
+    platformAbsorbsRefund && paidOrSubmitted;
+  const platformAbsorptionPermanent = platformWouldAbsorbRefund;
+
+  if (platformWouldAbsorbRefund && !options?.adminNote?.trim()) {
+    blockingReasons.push("admin_note_required_when_platform_absorbs");
+  }
+
+  const idempotencyKey = buildAdminRefundIdempotencyKey({
+    scope: "line_item_refund",
+    orderId,
+    vendorOrderId,
+    orderLineItemId,
+    quantity,
+    amountCents: components.amountCents,
+  });
+
+  const warnings = [
+    ...base.warnings,
+    "line_item_refund: transfer reversal rows are not prepared for item-level refunds",
+  ];
+
+  return {
+    ...base,
+    orderLineItemId,
+    itemName: line.name,
+    purchasedQuantity,
+    alreadyRefundedQuantity,
+    refundableQuantity,
+    requestedQuantity: quantity,
+    subtotalRefundedCents: components.subtotalRefundedCents,
+    taxRefundedCents: components.taxRefundedCents,
+    tipRefundedCents: components.tipRefundedCents,
+    serviceFeeRefundedCents: components.serviceFeeRefundedCents,
+    customerRefundAmountCents: components.amountCents,
+    transferReversalRequired,
+    transferReversalPossible,
+    estimatedTransferReversalAmountCents,
+    platformWouldAbsorbRefund,
+    platformAbsorptionPermanent,
+    blockingReasons: [...new Set(blockingReasons)],
+    warnings,
+    idempotencyKey,
+  };
+}
+
 export async function buildRefundExecutionPlan(
   input: AssertRefundAllowedInput
 ): Promise<RefundExecutionPlan | null> {
   let preview: RefundCalculationPreview | null;
+  let lineItemMeta: RefundExecutionPlan["lineItem"];
+
   switch (input.scope) {
     case "full_order":
       preview = await previewFullOrderRefund(input.orderId, { reason: input.reason });
@@ -490,6 +687,43 @@ export async function buildRefundExecutionPlan(
         }
       );
       break;
+    case "line_item_refund": {
+      if (!input.vendorOrderId || !input.orderLineItemId || input.quantity == null) {
+        return null;
+      }
+      const linePreview = await previewLineItemRefund(
+        input.orderId,
+        input.vendorOrderId,
+        input.orderLineItemId,
+        input.quantity,
+        {
+          includeTax: input.includeTax,
+          includeTip: input.includeTip,
+          includeServiceFee: input.includeServiceFee,
+          platformAbsorbsRefund: input.platformAbsorbsRefund,
+          adminNote: input.adminNote,
+          reason: input.reason,
+          linkedIssueHasCustomerMessage: input.linkedIssueHasCustomerMessage,
+        }
+      );
+      preview = linePreview;
+      if (linePreview) {
+        lineItemMeta = {
+          orderLineItemId: linePreview.orderLineItemId,
+          itemName: linePreview.itemName,
+          purchasedQuantity: linePreview.purchasedQuantity,
+          alreadyRefundedQuantity: linePreview.alreadyRefundedQuantity,
+          refundableQuantity: linePreview.refundableQuantity,
+          requestedQuantity: linePreview.requestedQuantity,
+          quantityRefunded: linePreview.requestedQuantity,
+          subtotalRefundedCents: linePreview.subtotalRefundedCents,
+          taxRefundedCents: linePreview.taxRefundedCents,
+          tipRefundedCents: linePreview.tipRefundedCents,
+          serviceFeeRefundedCents: linePreview.serviceFeeRefundedCents,
+        };
+      }
+      break;
+    }
   }
   if (!preview) return null;
 
@@ -501,6 +735,7 @@ export async function buildRefundExecutionPlan(
       stripePaymentIntentId: null,
       paymentId: null,
       stripeChargeId: null,
+      lineItem: lineItemMeta,
     };
   }
 
@@ -514,5 +749,6 @@ export async function buildRefundExecutionPlan(
       payment?.stripePaymentIntentId ?? order?.stripePaymentIntentId ?? null,
     paymentId: payment?.id ?? null,
     stripeChargeId: payment?.stripeChargeId ?? null,
+    lineItem: lineItemMeta,
   };
 }

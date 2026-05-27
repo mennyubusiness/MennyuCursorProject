@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { parseAdminRefundRequestBody } from "@/lib/admin-refund-request";
 import { resolvePlatformAdminUserIdForRefund } from "@/lib/admin-refund-api-auth";
+import { toAdminRefundPreviewPayload } from "@/lib/admin-refund-preview-map";
 import { previewAdminRefund } from "@/services/admin-refund.service";
 
 export const dynamic = "force-dynamic";
@@ -36,15 +37,21 @@ export async function POST(
     scope: parsed.data.scope,
     orderId,
     vendorOrderId: parsed.data.vendorOrderId,
+    orderLineItemId: parsed.data.orderLineItemId,
+    quantity: parsed.data.quantity,
     amountCents: parsed.data.amountCents,
     reason: parsed.data.reason,
     adminNote: parsed.data.adminNote,
     platformAbsorbsRefund: parsed.data.platformAbsorbsRefund ?? false,
+    includeTax: parsed.data.includeTax ?? undefined,
+    includeTip: parsed.data.includeTip ?? undefined,
+    includeServiceFee: parsed.data.includeServiceFee ?? undefined,
+    linkedOrderIssueId: parsed.data.linkedOrderIssueId,
   });
 
   if (!preview) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ preview });
+  return NextResponse.json({ preview: toAdminRefundPreviewPayload(preview) });
 }

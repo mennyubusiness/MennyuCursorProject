@@ -9,7 +9,7 @@ import {
   AdminPaymentSummarySchemaError,
   fetchAdminOrderPaymentSummary,
 } from "@/services/admin-order-payment-summary.service";
-import { AdminPaymentsRefundsPanel } from "./AdminPaymentsRefundsPanel";
+import { AdminOrderIssuesRefundsBridge } from "./AdminOrderIssuesRefundsBridge";
 import { adminOperationalParentStatusLabel } from "@/domain/order-state";
 import { getExceptionType, getExceptionReason } from "@/lib/admin-exceptions";
 import { getAdminActionState } from "@/lib/admin-actions";
@@ -18,7 +18,6 @@ import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import { buildAdminOrderTimeline } from "@/lib/admin-order-timeline";
 import { AdminVendorOrderExceptionActions } from "./AdminVendorOrderExceptionActions";
 import { AdminVendorOrderTransition } from "./AdminVendorOrderTransition";
-import { AdminOrderIssuesPanel } from "./AdminOrderIssuesPanel";
 import { AdminDeliverectRecheck } from "./AdminDeliverectRecheck";
 import { AdminDeliverectDiagnosticsPanel } from "./AdminDeliverectDiagnosticsPanel";
 import { getDeliverectAdminCompactBadges } from "@/lib/deliverect-admin-lifecycle";
@@ -216,25 +215,6 @@ export default async function AdminOrderDetailPage({
         </p>
       </section>
 
-      {/* Payments & Refunds */}
-      {paymentSummaryError ? (
-        <section
-          className="rounded-lg border border-red-300 bg-red-50 p-4"
-          role="alert"
-        >
-          <h2 className="text-lg font-semibold text-red-950">Payments &amp; Refunds</h2>
-          <p className="mt-2 text-sm text-red-900">{paymentSummaryError}</p>
-          <p className="mt-2 text-xs text-red-800">
-            In development, apply pending Prisma migrations before using refund tooling.
-          </p>
-        </section>
-      ) : paymentSummary ? (
-        <AdminPaymentsRefundsPanel
-          summary={paymentSummary}
-          canExecuteRefunds={canExecuteRefunds}
-        />
-      ) : null}
-
       {/* 2. Primary actions */}
       {vendorContexts.some((c) => c.showActionsPanel) && (
         <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
@@ -287,32 +267,63 @@ export default async function AdminOrderDetailPage({
         </section>
       )}
 
-      {/* 3. Issues & notes */}
-      <AdminOrderIssuesPanel
-        orderId={adminOrder.id}
-        initialResolutionNotes={adminOrder.adminResolutionNotes ?? null}
-        orderIssues={adminOrder.issues.map((i) => ({
-          id: i.id,
-          type: i.type,
-          severity: i.severity,
-          status: i.status,
-          notes: i.notes,
-          createdAt: i.createdAt.toISOString(),
-          resolvedAt: i.resolvedAt?.toISOString() ?? null,
-        }))}
-        vendorOrderIssues={adminOrder.vendorOrders.flatMap((vo) =>
-          vo.issues.map((i) => ({
-            id: i.id,
-            vendorOrderId: vo.id,
-            vendorName: vo.vendor.name,
-            type: i.type,
-            severity: i.severity,
-            status: i.status,
-            notes: i.notes,
-            createdAt: i.createdAt.toISOString(),
-            resolvedAt: i.resolvedAt?.toISOString() ?? null,
-          }))
-        )}
+      {/* Payments, refunds, and customer issues */}
+      <AdminOrderIssuesRefundsBridge
+        paymentSummary={paymentSummary}
+        paymentSummaryError={paymentSummaryError}
+        canExecuteRefunds={canExecuteRefunds}
+        issuesPanel={{
+          orderId: adminOrder.id,
+          initialResolutionNotes: adminOrder.adminResolutionNotes ?? null,
+          customerSupportIssues: adminOrder.issues
+            .filter((i) => i.submittedByRole === "customer")
+            .map((i) => ({
+              id: i.id,
+              issueType: i.type,
+              status: i.status,
+              priority: i.priority,
+              vendorOrderId: i.vendorOrderId,
+              vendorName: i.vendorOrder?.vendor.name ?? null,
+              orderLineItemId: i.orderLineItemId,
+              lineItemName: i.orderLineItem?.name ?? null,
+              customerMessage: i.customerMessage,
+              internalNote: i.internalNote ?? i.notes,
+              linkedOrderRefundId: i.linkedOrderRefundId,
+              linkedRefundStatus: i.linkedOrderRefund?.status ?? null,
+              linkedRefundAmountCents: i.linkedOrderRefund?.amountCents ?? null,
+              createdAt: i.createdAt.toISOString(),
+              updatedAt: i.updatedAt.toISOString(),
+              resolvedAt: i.resolvedAt?.toISOString() ?? null,
+            })),
+          systemOrderIssues: adminOrder.issues
+            .filter((i) => i.submittedByRole !== "customer")
+            .map((i) => ({
+              id: i.id,
+              type: i.type,
+              severity: i.severity,
+              status: i.status,
+              notes: i.notes,
+              createdAt: i.createdAt.toISOString(),
+              resolvedAt: i.resolvedAt?.toISOString() ?? null,
+            })),
+          vendorOrderIssues: adminOrder.vendorOrders.flatMap((vo) =>
+            vo.issues.map((i) => ({
+              id: i.id,
+              vendorOrderId: vo.id,
+              vendorName: vo.vendor.name,
+              type: i.type,
+              severity: i.severity,
+              status: i.status,
+              notes: i.notes,
+              createdAt: i.createdAt.toISOString(),
+              resolvedAt: i.resolvedAt?.toISOString() ?? null,
+            }))
+          ),
+          orderRefundOptions: adminOrder.orderRefunds.map((r) => ({
+            id: r.id,
+            label: `${r.refundScope} · $${(r.amountCents / 100).toFixed(2)} · ${r.status}`,
+          })),
+        }}
       />
 
       {/* 4. Vendor order slices */}

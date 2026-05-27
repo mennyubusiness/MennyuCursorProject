@@ -34,4 +34,16 @@ export type AdminRefundPreviewPayload = {
   warnings: string[];
   blockingReasons: string[];
   idempotencyKey: string;
+  lineItem?: {
+    orderLineItemId: string;
+    itemName: string;
+    purchasedQuantity: number;
+    alreadyRefundedQuantity: number;
+    refundableQuantity: number;
+    requestedQuantity: number;
+    subtotalRefundedCents: number;
+    taxRefundedCents: number;
+    tipRefundedCents: number;
+    serviceFeeRefundedCents: number;
+  };
 };

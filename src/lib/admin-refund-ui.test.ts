@@ -18,5 +18,6 @@ describe("admin-refund-ui", () => {
   it("refundScopeLabel maps scopes", () => {
     expect(refundScopeLabel("full_order")).toBe("Full order");
     expect(refundScopeLabel("custom_vendor_partial")).toContain("partial");
+    expect(refundScopeLabel("line_item_refund")).toBe("Line item");
   });
 });

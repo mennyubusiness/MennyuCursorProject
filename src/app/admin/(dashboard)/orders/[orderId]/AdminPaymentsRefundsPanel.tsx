@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { AdminRefundScopeKey } from "@/lib/admin-refund-idempotency";
@@ -17,6 +17,7 @@ import type {
   AdminOrderPaymentSummaryRefund,
 } from "@/services/admin-order-payment-summary.service";
 import type { AdminRefundPreviewPayload } from "@/lib/admin-refund-preview.types";
+import type { LinkedIssueRefundContext } from "@/lib/admin-order-issue-refund-link";
 
 type ModalKind = AdminRefundScopeKey | null;
 
@@ -105,6 +106,66 @@ function PreviewBlock({ preview }: { preview: AdminRefundPreviewPayload }) {
         </div>
       )}
 
+      {preview.lineItem && (
+        <div className="border-t border-oo-light-stone pt-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
+            Line item
+          </p>
+          <dl className="mt-1 grid gap-1 text-xs">
+            <div className="flex justify-between gap-4">
+              <dt className="text-oo-stone-gray">Item</dt>
+              <dd className="font-medium">{preview.lineItem.itemName}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-oo-stone-gray">Purchased qty</dt>
+              <dd className="tabular-nums">{preview.lineItem.purchasedQuantity}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-oo-stone-gray">Already refunded qty</dt>
+              <dd className="tabular-nums">{preview.lineItem.alreadyRefundedQuantity}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-oo-stone-gray">Refundable qty</dt>
+              <dd className="tabular-nums">{preview.lineItem.refundableQuantity}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-oo-stone-gray">Requested qty</dt>
+              <dd className="tabular-nums">{preview.lineItem.requestedQuantity}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-oo-stone-gray">Subtotal</dt>
+              <dd className="tabular-nums">
+                {formatAdminMoney(preview.lineItem.subtotalRefundedCents)}
+              </dd>
+            </div>
+            {preview.lineItem.taxRefundedCents > 0 && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-oo-stone-gray">Tax</dt>
+                <dd className="tabular-nums">
+                  {formatAdminMoney(preview.lineItem.taxRefundedCents)}
+                </dd>
+              </div>
+            )}
+            {preview.lineItem.tipRefundedCents > 0 && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-oo-stone-gray">Tip</dt>
+                <dd className="tabular-nums">
+                  {formatAdminMoney(preview.lineItem.tipRefundedCents)}
+                </dd>
+              </div>
+            )}
+            {preview.lineItem.serviceFeeRefundedCents > 0 && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-oo-stone-gray">Service fee</dt>
+                <dd className="tabular-nums">
+                  {formatAdminMoney(preview.lineItem.serviceFeeRefundedCents)}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      )}
+
       {preview.blockingReasons.length > 0 && (
         <div className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-950">
           <p className="font-semibold">Cannot proceed</p>
@@ -119,17 +180,45 @@ function PreviewBlock({ preview }: { preview: AdminRefundPreviewPayload }) {
   );
 }
 
+function LinkedIssueBanner({ linkedIssue }: { linkedIssue: LinkedIssueRefundContext }) {
+  return (
+    <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/80 p-3 text-sm text-blue-950">
+      <p className="font-medium">Linked issue: {linkedIssue.issueTypeLabel}</p>
+      {linkedIssue.customerMessage && (
+        <p className="mt-1 text-xs">
+          Customer: &ldquo;{linkedIssue.customerMessage.slice(0, 200)}
+          {linkedIssue.customerMessage.length > 200 ? "…" : ""}&rdquo;
+        </p>
+      )}
+      {(linkedIssue.vendorName || linkedIssue.lineItemName) && (
+        <p className="mt-1 text-xs text-blue-900/80">
+          {linkedIssue.vendorName && <span>Vendor: {linkedIssue.vendorName}</span>}
+          {linkedIssue.vendorName && linkedIssue.lineItemName && " · "}
+          {linkedIssue.lineItemName && <span>Item: {linkedIssue.lineItemName}</span>}
+        </p>
+      )}
+      <p className="mt-1 text-xs text-blue-800/90">
+        A successful refund will link to this issue. The issue stays open until you resolve it.
+      </p>
+    </div>
+  );
+}
+
 function RefundModal({
   orderId,
   kind,
   summary,
   initialVendorOrderId,
+  initialOrderLineItemId,
+  linkedIssue,
   onClose,
 }: {
   orderId: string;
   kind: AdminRefundScopeKey;
   summary: AdminOrderPaymentSummary;
   initialVendorOrderId?: string;
+  initialOrderLineItemId?: string;
+  linkedIssue?: LinkedIssueRefundContext | null;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -137,6 +226,16 @@ function RefundModal({
   const [adminNote, setAdminNote] = useState("");
   const [customerVisibleNote, setCustomerVisibleNote] = useState("");
   const [vendorOrderId, setVendorOrderId] = useState(initialVendorOrderId ?? summary.vendorOrders[0]?.id ?? "");
+  const [orderLineItemId, setOrderLineItemId] = useState(
+    initialOrderLineItemId ??
+      summary.vendorOrders.find((v) => v.id === (initialVendorOrderId ?? summary.vendorOrders[0]?.id))
+        ?.lineItems[0]?.id ??
+      ""
+  );
+  const [quantity, setQuantity] = useState(1);
+  const [includeTax, setIncludeTax] = useState(true);
+  const [includeTip, setIncludeTip] = useState(false);
+  const [includeServiceFee, setIncludeServiceFee] = useState(false);
   const [amountDollars, setAmountDollars] = useState("");
   const [platformAbsorbsRefund, setPlatformAbsorbsRefund] = useState(false);
   const [preview, setPreview] = useState<AdminRefundPreviewPayload | null>(null);
@@ -147,6 +246,13 @@ function RefundModal({
   const [executeSuccess, setExecuteSuccess] = useState<string | null>(null);
 
   const selectedVo = summary.vendorOrders.find((v) => v.id === vendorOrderId);
+  const selectedLineItem = selectedVo?.lineItems.find((li) => li.id === orderLineItemId);
+  const lineItemTransferRisk =
+    selectedVo?.transferStatus === "paid" || selectedVo?.transferStatus === "submitted";
+  const adminNoteRequired =
+    kind === "custom_vendor_partial" ||
+    platformAbsorbsRefund ||
+    (kind === "line_item_refund" && !linkedIssue?.customerMessage?.trim());
 
   const amountCents = useMemo(() => {
     if (kind === "full_order") return summary.order.remainingRefundableCents;
@@ -162,6 +268,9 @@ function RefundModal({
       adminNote: adminNote.trim() || null,
       customerVisibleNote: customerVisibleNote.trim() || null,
     };
+    if (linkedIssue?.issueId) {
+      body.linkedOrderIssueId = linkedIssue.issueId;
+    }
     if (kind !== "full_order") {
       body.vendorOrderId = vendorOrderId;
     }
@@ -169,8 +278,30 @@ function RefundModal({
       body.amountCents = amountCents;
       body.platformAbsorbsRefund = platformAbsorbsRefund;
     }
+    if (kind === "line_item_refund") {
+      body.orderLineItemId = orderLineItemId;
+      body.quantity = quantity;
+      body.includeTax = includeTax;
+      body.includeTip = includeTip;
+      body.includeServiceFee = includeServiceFee;
+      body.platformAbsorbsRefund = platformAbsorbsRefund;
+    }
     return body;
-  }, [kind, reason, adminNote, customerVisibleNote, vendorOrderId, amountCents, platformAbsorbsRefund]);
+  }, [
+    kind,
+    reason,
+    adminNote,
+    customerVisibleNote,
+    vendorOrderId,
+    orderLineItemId,
+    quantity,
+    includeTax,
+    includeTip,
+    includeServiceFee,
+    amountCents,
+    platformAbsorbsRefund,
+    linkedIssue?.issueId,
+  ]);
 
   async function runPreview() {
     setPreviewError(null);
@@ -267,7 +398,12 @@ function RefundModal({
       (kind === "custom_vendor_partial" &&
         vendorOrderId &&
         adminNote.trim().length > 0 &&
-        amountCents > 0));
+        amountCents > 0) ||
+      (kind === "line_item_refund" &&
+        vendorOrderId &&
+        orderLineItemId &&
+        quantity > 0 &&
+        (!adminNoteRequired || adminNote.trim().length > 0)));
 
   const confirmDisabled =
     !preview ||
@@ -302,6 +438,8 @@ function RefundModal({
           reversal, if needed, is a separate manual workflow.
         </p>
 
+        {linkedIssue && <LinkedIssueBanner linkedIssue={linkedIssue} />}
+
         {kind !== "full_order" && (
           <label className="mt-4 block text-sm">
             <span className="font-medium text-oo-charcoal">Vendor order</span>
@@ -312,7 +450,7 @@ function RefundModal({
                 setVendorOrderId(e.target.value);
                 setPreview(null);
               }}
-              disabled={Boolean(initialVendorOrderId)}
+              disabled={Boolean(initialVendorOrderId && kind !== "line_item_refund")}
             >
               {summary.vendorOrders.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -321,6 +459,101 @@ function RefundModal({
               ))}
             </select>
           </label>
+        )}
+
+        {kind === "line_item_refund" && selectedVo && (
+          <>
+            <label className="mt-3 block text-sm">
+              <span className="font-medium text-oo-charcoal">Line item</span>
+              <select
+                className="mt-1 w-full rounded border border-oo-light-stone bg-white px-2 py-1.5 text-sm"
+                value={orderLineItemId}
+                onChange={(e) => {
+                  setOrderLineItemId(e.target.value);
+                  setPreview(null);
+                }}
+                disabled={Boolean(initialOrderLineItemId)}
+              >
+                {selectedVo.lineItems.map((li) => (
+                  <option key={li.id} value={li.id}>
+                    {li.name} × {li.quantity} @ {formatAdminMoney(li.priceCents)} each
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="mt-3 block text-sm">
+              <span className="font-medium text-oo-charcoal">Quantity to refund</span>
+              <input
+                type="number"
+                min={1}
+                max={selectedLineItem?.quantity ?? 99}
+                step={1}
+                className="mt-1 w-full rounded border border-oo-light-stone px-2 py-1.5 text-sm tabular-nums"
+                value={quantity}
+                onChange={(e) => {
+                  setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1));
+                  setPreview(null);
+                }}
+              />
+            </label>
+            <div className="mt-3 space-y-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeTax}
+                  onChange={(e) => {
+                    setIncludeTax(e.target.checked);
+                    setPreview(null);
+                  }}
+                />
+                Include proportional tax
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeTip}
+                  onChange={(e) => {
+                    setIncludeTip(e.target.checked);
+                    setPreview(null);
+                  }}
+                />
+                Include proportional tip
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeServiceFee}
+                  onChange={(e) => {
+                    setIncludeServiceFee(e.target.checked);
+                    setPreview(null);
+                  }}
+                />
+                Include proportional service fee
+              </label>
+            </div>
+            {(lineItemTransferRisk || preview?.platformWouldAbsorbRefund) && (
+              <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950">
+                <p className="font-medium">
+                  Vendor transfer is {selectedVo.transferStatus}. Line-item refunds do not prepare
+                  transfer reversals.
+                </p>
+                <label className="mt-2 flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={platformAbsorbsRefund}
+                    onChange={(e) => {
+                      setPlatformAbsorbsRefund(e.target.checked);
+                      setPreview(null);
+                    }}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Open Order will bear this refund (platformAbsorbsRefund). Admin note is required.
+                  </span>
+                </label>
+              </div>
+            )}
+          </>
         )}
 
         {kind === "custom_vendor_partial" && selectedVo && (
@@ -384,9 +617,7 @@ function RefundModal({
         <label className="mt-3 block text-sm">
           <span className="font-medium text-oo-charcoal">
             Admin note
-            {kind === "custom_vendor_partial" || platformAbsorbsRefund
-              ? " (required)"
-              : " (optional)"}
+            {adminNoteRequired ? " (required)" : " (optional)"}
           </span>
           <textarea
             className="mt-1 w-full rounded border border-oo-light-stone px-2 py-1.5 text-sm"
@@ -552,14 +783,31 @@ function RefundsTable({ rows }: { rows: AdminOrderPaymentSummaryRefund[] }) {
 export function AdminPaymentsRefundsPanel({
   summary,
   canExecuteRefunds,
+  linkedIssue,
+  openRefundModal,
+  onRefundModalClosed,
 }: {
   summary: AdminOrderPaymentSummary;
   canExecuteRefunds: boolean;
+  linkedIssue?: LinkedIssueRefundContext | null;
+  openRefundModal?: {
+    kind: AdminRefundScopeKey;
+    vendorOrderId?: string;
+    orderLineItemId?: string;
+  } | null;
+  onRefundModalClosed?: () => void;
 }) {
   const [modal, setModal] = useState<{
     kind: AdminRefundScopeKey;
     vendorOrderId?: string;
+    orderLineItemId?: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (openRefundModal) {
+      setModal(openRefundModal);
+    }
+  }, [openRefundModal]);
 
   const payment = summary.payment;
   const hasRemaining = summary.order.remainingRefundableCents > 0;
@@ -613,6 +861,13 @@ export function AdminPaymentsRefundsPanel({
               onClick={() => setModal({ kind: "custom_vendor_partial" })}
             >
               Refund custom amount
+            </button>
+            <button
+              type="button"
+              className="rounded border border-oo-light-stone bg-white px-3 py-1.5 text-sm font-medium hover:bg-oo-cream/80"
+              onClick={() => setModal({ kind: "line_item_refund" })}
+            >
+              Refund item
             </button>
           </div>
         )}
@@ -756,6 +1011,32 @@ export function AdminPaymentsRefundsPanel({
                         </button>
                       </div>
                     )}
+                    {v.lineItems.length > 0 && (
+                      <ul className="mt-2 space-y-0.5 text-xs text-oo-stone-gray">
+                        {v.lineItems.map((li) => (
+                          <li key={li.id} className="flex flex-wrap items-center gap-1">
+                            <span>
+                              {li.name} × {li.quantity}
+                            </span>
+                            {canExecuteRefunds && v.remainingRefundableCents > 0 && (
+                              <button
+                                type="button"
+                                className="underline hover:text-oo-charcoal"
+                                onClick={() =>
+                                  setModal({
+                                    kind: "line_item_refund",
+                                    vendorOrderId: v.id,
+                                    orderLineItemId: li.id,
+                                  })
+                                }
+                              >
+                                Refund item
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </td>
                   <td className="px-2 py-2 text-xs">{v.fulfillmentStatus}</td>
                   <td className="px-2 py-2 tabular-nums">{formatAdminMoney(v.totalCents)}</td>
@@ -823,7 +1104,12 @@ export function AdminPaymentsRefundsPanel({
           kind={modal.kind}
           summary={summary}
           initialVendorOrderId={modal.vendorOrderId}
-          onClose={() => setModal(null)}
+          initialOrderLineItemId={modal.orderLineItemId}
+          linkedIssue={linkedIssue}
+          onClose={() => {
+            setModal(null);
+            onRefundModalClosed?.();
+          }}
         />
       )}
     </section>

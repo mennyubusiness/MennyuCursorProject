@@ -17,6 +17,10 @@ import {
   type DeliverectActionSeverity,
 } from "@/lib/deliverect-admin-lifecycle";
 import { getExceptionUrgency } from "@/lib/admin-urgency";
+import {
+  ACTIVE_ORDER_ISSUE_STATUSES,
+  customerSupportIssueTypeLabel,
+} from "@/domain/order-support-issue";
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
 import { ageMinutes as ageMinutesUtil } from "@/lib/date-utils";
 
@@ -30,6 +34,7 @@ export type AdminAttentionReason =
   | "deliverect_reconciliation_overdue"
   | "fulfillment_stuck"
   | "open_issue"
+  | "customer_reported_issue"
   | "refund_failed"
   | "refund_review_required"
   | "manual_recovery_required"
@@ -66,6 +71,7 @@ export interface AdminAttentionItem {
   vendorOrderId?: string | null;
   issueId?: string | null;
   issueType?: string | null;
+  issueCustomerMessage?: string | null;
 
   /** Direct link for admin queue rows (e.g. /admin/orders/{orderId}#payments-refunds). */
   primaryEntityHref: string;
@@ -112,6 +118,10 @@ const TAKE_ORDER_REFUND_ATTENTION = 100;
 
 function paymentsRefundsHref(orderId: string): string {
   return `/admin/orders/${orderId}#payments-refunds`;
+}
+
+function orderIssuesHref(orderId: string): string {
+  return `/admin/orders/${orderId}#order-issues`;
 }
 
 const VO_INCLUDE = {
@@ -164,6 +174,7 @@ function reasonToRecommendedAction(
     case "fulfillment_stuck":
       return "view_order";
     case "open_issue":
+    case "customer_reported_issue":
       return "resolve_issue";
     case "refund_failed":
     case "refund_review_required":
@@ -246,6 +257,10 @@ function reasonToLabel(
       return "Fulfillment in early state for too long";
     case "open_issue":
       return "Order or vendor order has an open issue";
+    case "customer_reported_issue":
+      return vo && "failureMessage" in vo
+        ? String(vo.failureMessage).slice(0, 80)
+        : "Customer reported an order issue";
     case "refund_failed":
       return vo && "failureMessage" in vo && vo.failureMessage
         ? `Refund failed: ${vo.failureMessage.slice(0, 80)}`
@@ -449,6 +464,51 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
   return items;
 }
 
+/** Customer-reported OrderIssue rows (open / reviewing). */
+async function fetchCustomerReportedIssueAttentionItems(
+  now: Date
+): Promise<AdminAttentionItem[]> {
+  const rows = await prisma.orderIssue.findMany({
+    where: {
+      submittedByRole: "customer",
+      status: { in: [...ACTIVE_ORDER_ISSUE_STATUSES] },
+    },
+    orderBy: { createdAt: "asc" },
+    take: TAKE_ORDER_REFUND_ATTENTION,
+    include: {
+      order: { select: { id: true, customerPhone: true, pod: { select: { id: true, name: true } } } },
+      vendorOrder: { select: { vendor: { select: { name: true } } } },
+    },
+  });
+
+  return rows.map((r) => {
+    const ageMinutes = ageMinutesUtil(r.createdAt, now.getTime());
+    const reason: AdminAttentionReason = "customer_reported_issue";
+    const vendorLabel = r.vendorOrder?.vendor.name;
+    return {
+      id: `customer_issue:${r.id}`,
+      scope: (r.vendorOrderId ? "vendor_order" : "order") as AdminAttentionScope,
+      reason,
+      bucket: reasonToBucket(reason),
+      severity: r.priority === "high" ? "high" : ageMinutes > 120 ? "high" : "medium",
+      ageMinutes,
+      recommendedAction: reasonToRecommendedAction(reason),
+      reasonLabel: `${customerSupportIssueTypeLabel(r.type)}${vendorLabel ? ` · ${vendorLabel}` : ""}`,
+      currentStatus: `Issue ${r.status}`,
+      orderId: r.orderId,
+      vendorOrderId: r.vendorOrderId,
+      issueId: r.id,
+      issueType: r.type,
+      issueCustomerMessage: r.customerMessage,
+      primaryEntityHref: orderIssuesHref(r.orderId),
+      order: r.order
+        ? { id: r.order.id, customerPhone: r.order.customerPhone, pod: r.order.pod ?? undefined }
+        : undefined,
+      vendor: r.vendorOrder?.vendor ? { name: r.vendorOrder.vendor.name } : undefined,
+    };
+  });
+}
+
 /** Failed OrderRefund ledger rows (Phase 1+). */
 async function fetchFailedOrderRefundAttentionItems(
   now: Date,
@@ -604,9 +664,10 @@ async function fetchFailedRefundAttemptAttentionItems(now: Date): Promise<AdminA
  */
 export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
   const now = new Date();
-  const [voItems, refundAttemptFailedItems] = await Promise.all([
+  const [voItems, refundAttemptFailedItems, customerIssueItems] = await Promise.all([
     fetchVendorOrderAttentionItems(now),
     fetchFailedRefundAttemptAttentionItems(now),
+    fetchCustomerReportedIssueAttentionItems(now),
   ]);
   const linkedAttemptIds = new Set(
     refundAttemptFailedItems
@@ -636,7 +697,11 @@ export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
         select: { id: true, customerPhone: true, createdAt: true, pod: { select: { id: true, name: true } } },
       }),
       prisma.orderIssue.findMany({
-        where: { orderId: { in: limitedOrderIds }, status: "OPEN" },
+        where: {
+          orderId: { in: limitedOrderIds },
+          status: { in: [...ACTIVE_ORDER_ISSUE_STATUSES] },
+          submittedByRole: { not: "customer" },
+        },
         select: { id: true, orderId: true },
         orderBy: { createdAt: "asc" },
       }),
@@ -672,7 +737,7 @@ export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
     });
   }
 
-  const all = [...voItems, ...orderLevelItems, ...refundFailedItems];
+  const all = [...voItems, ...orderLevelItems, ...refundFailedItems, ...customerIssueItems];
   /** Newest / most recent queue entries first (smaller age = order created more recently). */
   return all.sort((a, b) => a.ageMinutes - b.ageMinutes);
 }
@@ -696,6 +761,7 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
     openIssueOrderIds,
     refundFailed,
     orderRefundAttention,
+    customerIssueAttention,
   ] = await Promise.all([
     prisma.vendorOrder.findMany({
       where: {
@@ -755,6 +821,14 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
       select: { orderId: true },
       take: TAKE_ORDER_REFUND_ATTENTION,
     }),
+    prisma.orderIssue.findMany({
+      where: {
+        submittedByRole: "customer",
+        status: { in: [...ACTIVE_ORDER_ISSUE_STATUSES] },
+      },
+      select: { orderId: true },
+      take: TAKE_ORDER_REFUND_ATTENTION,
+    }),
   ]);
 
   const voOrderIds = [...failed, ...stuckPending, ...deliverectReconciliationOverdue, ...stuckSentConfirmed].map(
@@ -763,6 +837,7 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
   const refundOrderIds = [
     ...refundFailed.map((r) => r.orderId),
     ...orderRefundAttention.map((r) => r.orderId),
+    ...customerIssueAttention.map((r) => r.orderId),
   ];
   const orderIds = [...new Set([...voOrderIds, ...openIssueOrderIds, ...refundOrderIds])];
   return orderIds;

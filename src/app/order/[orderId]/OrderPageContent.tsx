@@ -22,6 +22,7 @@ import { buildParentOrderProgressSteps, getVendorCustomerStage } from "./custome
 import { CustomerOrderProgressTimeline } from "./CustomerOrderProgressTimeline";
 import { VendorCustomerStatusStrip } from "./VendorCustomerStatusStrip";
 import { mergeCustomerOrderPollPatch } from "./merge-customer-order-poll";
+import { OrderHelpSection } from "./OrderHelpSection";
 
 /** Order as returned by status API / server (dates may be ISO strings after JSON). */
 type OrderFromApi = Awaited<ReturnType<typeof getOrderStatusAction>>;
@@ -423,6 +424,18 @@ export function OrderPageContent({
           }
         />
       )}
+
+      <OrderHelpSection
+        orderId={orderId}
+        vendorOrders={order.vendorOrders.map((vo) => ({
+          id: vo.id,
+          vendorName: vo.vendor.name,
+          lineItems: (vo.lineItems ?? []).map((line) => ({
+            id: line.id,
+            name: line.name,
+          })),
+        }))}
+      />
 
       {timelineEvents.length > 0 && (
         <section className="mt-8" aria-label="Order updates">

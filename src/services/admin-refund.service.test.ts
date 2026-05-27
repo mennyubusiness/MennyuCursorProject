@@ -14,11 +14,15 @@ const mockStripeRefund = vi.fn();
 const mockPrepareReversals = vi.fn();
 const mockGetRemainingOrder = vi.fn();
 const mockGetRemainingVendor = vi.fn();
+const mockOrderIssueFindFirst = vi.fn();
+const mockRefundLineItemCreate = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     user: { findUnique: (...args: unknown[]) => mockUserFindUnique(...args) },
     orderRefund: { findUnique: (...args: unknown[]) => mockOrderRefundFindUnique(...args) },
+    orderIssue: { findFirst: (...args: unknown[]) => mockOrderIssueFindFirst(...args) },
+    refundLineItem: { create: (...args: unknown[]) => mockRefundLineItemCreate(...args) },
     refundAttempt: {
       findUnique: (...args: unknown[]) => mockRefundAttemptFindUnique(...args),
       create: (...args: unknown[]) => mockRefundAttemptCreate(...args),
@@ -49,12 +53,22 @@ vi.mock("@/services/vendor-payout-transfer-reversal.service", () => ({
     mockPrepareReversals(...args),
 }));
 
+const mockValidateLinkedIssue = vi.fn();
+const mockLinkIssueToRefund = vi.fn();
+
+vi.mock("@/services/order-support-issue.service", () => ({
+  validateLinkedOrderIssueForAdminRefund: (...args: unknown[]) =>
+    mockValidateLinkedIssue(...args),
+  linkSupportIssueToOrderRefund: (...args: unknown[]) => mockLinkIssueToRefund(...args),
+}));
+
 import {
   AdminRefundError,
   assertAdminCanExecuteRefund,
   executeAdminCustomVendorOrderRefund,
   executeAdminFullOrderRefund,
   executeAdminFullVendorOrderRefund,
+  executeAdminLineItemRefund,
 } from "./admin-refund.service";
 
 const basePlan = {
@@ -82,6 +96,11 @@ const basePlan = {
 describe("admin-refund.service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockValidateLinkedIssue.mockResolvedValue({
+      ok: true,
+      issue: { id: "iss_1", orderId: "ord_1", vendorOrderId: null, orderLineItemId: null },
+    });
+    mockLinkIssueToRefund.mockResolvedValue(undefined);
     mockUserFindUnique.mockResolvedValue({ isPlatformAdmin: true });
     mockOrderRefundFindUnique.mockResolvedValue(null);
     mockRefundAttemptFindUnique.mockResolvedValue(null);
@@ -104,6 +123,8 @@ describe("admin-refund.service", () => {
     mockAssertAllowed.mockReturnValue({ allowed: true });
     mockGetRemainingOrder.mockResolvedValue(2000);
     mockGetRemainingVendor.mockResolvedValue(1200);
+    mockOrderIssueFindFirst.mockResolvedValue(null);
+    mockRefundLineItemCreate.mockResolvedValue({ id: "rli_1" });
   });
 
   it("rejects non-admin users in production path", async () => {
@@ -213,6 +234,129 @@ describe("admin-refund.service", () => {
       platformAbsorbsRefund: true,
     });
     expect(mockPrepareReversals).not.toHaveBeenCalled();
+  });
+
+  it("rejects linkedOrderIssueId from another order", async () => {
+    mockValidateLinkedIssue.mockResolvedValue({
+      ok: false,
+      code: "ISSUE_NOT_FOUND",
+      message: "Linked issue not found on this order.",
+    });
+    await expect(
+      executeAdminFullOrderRefund({
+        orderId: "ord_1",
+        adminUserId: "admin_1",
+        reason: "test",
+        linkedOrderIssueId: "iss_bad",
+      })
+    ).rejects.toMatchObject({ code: "ISSUE_NOT_FOUND" });
+  });
+
+  it("links OrderIssue after successful admin refund", async () => {
+    await executeAdminFullOrderRefund({
+      orderId: "ord_1",
+      adminUserId: "admin_1",
+      reason: "test",
+      linkedOrderIssueId: "iss_1",
+    });
+    expect(mockLinkIssueToRefund).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: "ord_1",
+        orderRefundId: "or_1",
+        issueId: "iss_1",
+        requireRefundSucceeded: true,
+      })
+    );
+  });
+
+  it("does not link OrderIssue when Stripe refund fails", async () => {
+    mockStripeRefund.mockResolvedValue({
+      success: false,
+      code: "STRIPE_REFUND_FAILED",
+      message: "fail",
+      amountCents: 2000,
+    });
+    await executeAdminFullOrderRefund({
+      orderId: "ord_1",
+      adminUserId: "admin_1",
+      reason: "test",
+      linkedOrderIssueId: "iss_1",
+    });
+    expect(mockLinkIssueToRefund).not.toHaveBeenCalled();
+  });
+
+  it("line item refund creates RefundLineItem and Stripe metadata", async () => {
+    mockBuildPlan.mockResolvedValue({
+      ...basePlan,
+      refundScope: "line_item_refund",
+      vendorOrderId: "vo_1",
+      customerRefundAmountCents: 550,
+      idempotencyKey: "admin:line_item_refund:ord_1:vo_1:li_1:1:550",
+      lineItem: {
+        orderLineItemId: "li_1",
+        itemName: "Burger",
+        purchasedQuantity: 2,
+        alreadyRefundedQuantity: 0,
+        refundableQuantity: 2,
+        requestedQuantity: 1,
+        quantityRefunded: 1,
+        subtotalRefundedCents: 500,
+        taxRefundedCents: 50,
+        tipRefundedCents: 0,
+        serviceFeeRefundedCents: 0,
+      },
+    });
+    const result = await executeAdminLineItemRefund({
+      orderId: "ord_1",
+      vendorOrderId: "vo_1",
+      orderLineItemId: "li_1",
+      quantity: 1,
+      adminUserId: "admin_1",
+      reason: "wrong item",
+      adminNote: "confirmed with vendor",
+    });
+    expect(result.success).toBe(true);
+    expect(mockRecordPending).toHaveBeenCalledWith(
+      expect.objectContaining({ refundScope: "line_item_refund", amountCents: 550 })
+    );
+    expect(mockRefundLineItemCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          orderLineItemId: "li_1",
+          quantityRefunded: 1,
+          amountCents: 550,
+        }),
+      })
+    );
+    expect(mockStripeRefund).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          refundScope: "line_item_refund",
+          orderLineItemId: "li_1",
+        }),
+      })
+    );
+    expect(mockPrepareReversals).not.toHaveBeenCalled();
+  });
+
+  it("line item linked issue mismatch is rejected", async () => {
+    mockValidateLinkedIssue.mockResolvedValue({
+      ok: false,
+      code: "ISSUE_LINE_ITEM_MISMATCH",
+      message: "This issue is scoped to a specific line item.",
+    });
+    await expect(
+      executeAdminLineItemRefund({
+        orderId: "ord_1",
+        vendorOrderId: "vo_1",
+        orderLineItemId: "li_other",
+        quantity: 1,
+        adminUserId: "admin_1",
+        reason: "test",
+        adminNote: "note",
+        linkedOrderIssueId: "iss_1",
+      })
+    ).rejects.toMatchObject({ code: "ISSUE_LINE_ITEM_MISMATCH" });
   });
 
   it("blocks execution when plan has blocking reasons", async () => {

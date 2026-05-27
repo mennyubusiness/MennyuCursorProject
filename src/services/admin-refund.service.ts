@@ -28,6 +28,10 @@ import {
   type RefundResult,
 } from "@/services/refund.service";
 import { prepareTransferReversalsForRefundAttempt } from "@/services/vendor-payout-transfer-reversal.service";
+import {
+  linkSupportIssueToOrderRefund,
+  validateLinkedOrderIssueForAdminRefund,
+} from "@/services/order-support-issue.service";
 
 export class AdminRefundError extends Error {
   constructor(
@@ -46,6 +50,8 @@ export type AdminRefundBaseInput = {
   reason: string;
   adminNote?: string | null;
   customerVisibleNote?: string | null;
+  /** When set, links OrderRefund to this customer OrderIssue after successful Stripe refund. */
+  linkedOrderIssueId?: string | null;
 };
 
 export type AdminRefundResult = {
@@ -82,23 +88,52 @@ export async function assertAdminCanExecuteRefund(adminUserId: string): Promise<
 type ExecuteAdminRefundInternalInput = AdminRefundBaseInput & {
   scope: AdminRefundScopeKey;
   vendorOrderId?: string | null;
+  orderLineItemId?: string | null;
+  quantity?: number;
   amountCents?: number;
   platformAbsorbsRefund?: boolean;
+  includeTax?: boolean;
+  includeTip?: boolean;
+  includeServiceFee?: boolean;
+  linkedOrderIssueId?: string | null;
 };
+
+async function linkedIssueHasCustomerMessage(
+  orderId: string,
+  linkedOrderIssueId: string | null | undefined
+): Promise<boolean> {
+  if (!linkedOrderIssueId?.trim()) return false;
+  const issue = await prisma.orderIssue.findFirst({
+    where: { id: linkedOrderIssueId.trim(), orderId },
+    select: { customerMessage: true },
+  });
+  return Boolean(issue?.customerMessage?.trim());
+}
 
 async function executeAdminRefundInternal(
   input: ExecuteAdminRefundInternalInput
 ): Promise<AdminRefundResult> {
   await assertAdminCanExecuteRefund(input.adminUserId);
 
+  const issueHasCustomerMessage = await linkedIssueHasCustomerMessage(
+    input.orderId,
+    input.linkedOrderIssueId
+  );
+
   const plan = await buildRefundExecutionPlan({
     scope: input.scope,
     orderId: input.orderId,
     vendorOrderId: input.vendorOrderId ?? null,
+    orderLineItemId: input.orderLineItemId ?? null,
+    quantity: input.quantity ?? null,
     amountCents: input.amountCents ?? null,
     reason: input.reason,
     adminNote: input.adminNote,
     platformAbsorbsRefund: input.platformAbsorbsRefund,
+    includeTax: input.includeTax,
+    includeTip: input.includeTip,
+    includeServiceFee: input.includeServiceFee,
+    linkedIssueHasCustomerMessage: issueHasCustomerMessage,
   });
 
   if (!plan) {
@@ -109,10 +144,16 @@ async function executeAdminRefundInternal(
     scope: input.scope,
     orderId: input.orderId,
     vendorOrderId: input.vendorOrderId ?? null,
+    orderLineItemId: input.orderLineItemId ?? null,
+    quantity: input.quantity ?? null,
     amountCents: input.amountCents ?? null,
     reason: input.reason,
     adminNote: input.adminNote,
     platformAbsorbsRefund: input.platformAbsorbsRefund,
+    includeTax: input.includeTax,
+    includeTip: input.includeTip,
+    includeServiceFee: input.includeServiceFee,
+    linkedIssueHasCustomerMessage: issueHasCustomerMessage,
   });
 
   if (!allowed.allowed) {
@@ -127,15 +168,39 @@ async function executeAdminRefundInternal(
     throw new AdminRefundError("NO_PAYMENT_INTENT", "Order has no payment intent.");
   }
 
+  const linkedOrderIssueId = input.linkedOrderIssueId?.trim() || null;
+  if (linkedOrderIssueId) {
+    const issueCheck = await validateLinkedOrderIssueForAdminRefund({
+      orderId: input.orderId,
+      linkedOrderIssueId,
+      refundScope: input.scope,
+      refundVendorOrderId: input.vendorOrderId ?? plan.vendorOrderId ?? null,
+      refundOrderLineItemId: input.orderLineItemId ?? plan.lineItem?.orderLineItemId ?? null,
+    });
+    if (!issueCheck.ok) {
+      throw new AdminRefundError(issueCheck.code, issueCheck.message);
+    }
+  }
+
   return runAdminRefundExecution({
     plan,
     adminUserId: input.adminUserId,
     reason: input.reason.trim(),
     adminNote: input.adminNote?.trim() || null,
     customerVisibleNote: input.customerVisibleNote?.trim() || null,
+    linkedOrderIssueId,
     skipTransferReversal: Boolean(
-      input.platformAbsorbsRefund && input.scope === "custom_vendor_partial"
+      input.scope === "line_item_refund" ||
+        (input.platformAbsorbsRefund && input.scope === "custom_vendor_partial")
     ),
+    refundLineItem: plan.lineItem
+      ? {
+          ...plan.lineItem,
+          vendorOrderId: plan.vendorOrderId!,
+          amountCents: plan.customerRefundAmountCents,
+        }
+      : undefined,
+    linkedOrderIssueIdForMetadata: linkedOrderIssueId,
   });
 }
 
@@ -145,7 +210,19 @@ async function runAdminRefundExecution(args: {
   reason: string;
   adminNote: string | null;
   customerVisibleNote: string | null;
+  linkedOrderIssueId?: string | null;
+  linkedOrderIssueIdForMetadata?: string | null;
   skipTransferReversal: boolean;
+  refundLineItem?: {
+    orderLineItemId: string;
+    vendorOrderId: string;
+    quantityRefunded: number;
+    subtotalRefundedCents: number;
+    taxRefundedCents: number;
+    tipRefundedCents: number;
+    serviceFeeRefundedCents: number;
+    amountCents: number;
+  };
 }): Promise<AdminRefundResult> {
   const { plan } = args;
   const amountCents = plan.customerRefundAmountCents;
@@ -255,6 +332,22 @@ async function runAdminRefundExecution(args: {
 
   const orderRefundId = pending.id;
 
+  if (args.refundLineItem) {
+    await prisma.refundLineItem.create({
+      data: {
+        orderRefundId,
+        orderLineItemId: args.refundLineItem.orderLineItemId,
+        vendorOrderId: args.refundLineItem.vendorOrderId,
+        quantityRefunded: args.refundLineItem.quantityRefunded,
+        subtotalRefundedCents: args.refundLineItem.subtotalRefundedCents,
+        taxRefundedCents: args.refundLineItem.taxRefundedCents,
+        tipRefundedCents: args.refundLineItem.tipRefundedCents,
+        serviceFeeRefundedCents: args.refundLineItem.serviceFeeRefundedCents,
+        amountCents: args.refundLineItem.amountCents,
+      },
+    });
+  }
+
   const stripeResult = await executeStripeRefundForAdmin({
     orderRefundId,
     refundAttemptId,
@@ -266,9 +359,11 @@ async function runAdminRefundExecution(args: {
     metadata: buildAdminStripeMetadata({
       orderId: plan.orderId,
       vendorOrderId: plan.vendorOrderId,
+      orderLineItemId: args.refundLineItem?.orderLineItemId ?? null,
       orderRefundId,
       refundScope: plan.refundScope,
       reason: args.reason,
+      linkedOrderIssueId: args.linkedOrderIssueIdForMetadata ?? null,
     }),
   });
 
@@ -297,6 +392,15 @@ async function runAdminRefundExecution(args: {
     };
   }
 
+  if (args.linkedOrderIssueId) {
+    await linkSupportIssueToOrderRefund({
+      orderId: plan.orderId,
+      orderRefundId,
+      issueId: args.linkedOrderIssueId,
+      requireRefundSucceeded: true,
+    });
+  }
+
   return {
     success: true,
     message:
@@ -322,9 +426,11 @@ async function runAdminRefundExecution(args: {
 function buildAdminStripeMetadata(input: {
   orderId: string;
   vendorOrderId: string | null;
+  orderLineItemId?: string | null;
   orderRefundId: string;
   refundScope: OrderRefundScope;
   reason: string;
+  linkedOrderIssueId?: string | null;
 }): Record<string, string> {
   return {
     orderId: input.orderId,
@@ -333,6 +439,8 @@ function buildAdminStripeMetadata(input: {
     reason: input.reason,
     initiatedByRole: "admin",
     ...(input.vendorOrderId ? { vendorOrderId: input.vendorOrderId } : {}),
+    ...(input.orderLineItemId ? { orderLineItemId: input.orderLineItemId } : {}),
+    ...(input.linkedOrderIssueId ? { linkedOrderIssueId: input.linkedOrderIssueId } : {}),
   };
 }
 
@@ -396,23 +504,60 @@ export async function executeAdminCustomVendorOrderRefund(
   });
 }
 
+export async function executeAdminLineItemRefund(
+  input: AdminRefundBaseInput & {
+    vendorOrderId: string;
+    orderLineItemId: string;
+    quantity: number;
+    includeTax?: boolean;
+    includeTip?: boolean;
+    includeServiceFee?: boolean;
+    platformAbsorbsRefund?: boolean;
+  }
+): Promise<AdminRefundResult> {
+  return executeAdminRefundInternal({
+    ...input,
+    scope: "line_item_refund",
+    includeTax: input.includeTax,
+    includeTip: input.includeTip,
+    includeServiceFee: input.includeServiceFee,
+    platformAbsorbsRefund: input.platformAbsorbsRefund ?? false,
+  });
+}
+
 export async function previewAdminRefund(input: {
   scope: AdminRefundScopeKey;
   orderId: string;
   vendorOrderId?: string | null;
+  orderLineItemId?: string | null;
+  quantity?: number | null;
   amountCents?: number | null;
   reason: string;
   adminNote?: string | null;
   platformAbsorbsRefund?: boolean;
+  includeTax?: boolean;
+  includeTip?: boolean;
+  includeServiceFee?: boolean;
+  linkedOrderIssueId?: string | null;
 }) {
+  const issueHasCustomerMessage = await linkedIssueHasCustomerMessage(
+    input.orderId,
+    input.linkedOrderIssueId
+  );
   return buildRefundExecutionPlan({
     scope: input.scope,
     orderId: input.orderId,
     vendorOrderId: input.vendorOrderId ?? null,
+    orderLineItemId: input.orderLineItemId ?? null,
+    quantity: input.quantity ?? null,
     amountCents: input.amountCents ?? null,
     reason: input.reason,
     adminNote: input.adminNote,
     platformAbsorbsRefund: input.platformAbsorbsRefund,
+    includeTax: input.includeTax,
+    includeTip: input.includeTip,
+    includeServiceFee: input.includeServiceFee,
+    linkedIssueHasCustomerMessage: issueHasCustomerMessage,
   });
 }
 

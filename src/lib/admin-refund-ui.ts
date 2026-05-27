@@ -32,6 +32,8 @@ export function refundScopeLabel(scope: string): string {
       return "Full vendor order";
     case "custom_vendor_partial":
       return "Custom partial (vendor)";
+    case "line_item_refund":
+      return "Line item";
     case "system_cancel":
       return "System cancel";
     case "vendor_denial":
@@ -59,6 +61,8 @@ export function refundModalTitle(scope: AdminRefundScopeKey): string {
       return "Refund vendor order";
     case "custom_vendor_partial":
       return "Refund custom amount";
+    case "line_item_refund":
+      return "Refund line item";
   }
 }
 

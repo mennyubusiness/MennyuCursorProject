@@ -131,10 +131,18 @@ export type AdminOrderPaymentSummaryPayment = {
   createdAt: string;
 };
 
+export type AdminOrderPaymentSummaryLineItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  priceCents: number;
+};
+
 export type AdminOrderPaymentSummaryVendorOrder = {
   id: string;
   vendorId: string;
   vendorName: string;
+  lineItems: AdminOrderPaymentSummaryLineItem[];
   routingStatus: string;
   fulfillmentStatus: string;
   subtotalCents: number;
@@ -273,6 +281,10 @@ export async function fetchAdminOrderPaymentSummary(
             totalCents: true,
             totalRefundedCents: true,
             vendor: { select: { name: true } },
+            lineItems: {
+              orderBy: { createdAt: "asc" },
+              select: { id: true, name: true, quantity: true, priceCents: true },
+            },
           },
         },
         orderRefunds: {
@@ -373,6 +385,12 @@ export async function fetchAdminOrderPaymentSummary(
           id: vo.id,
           vendorId: vo.vendorId,
           vendorName: vo.vendor.name,
+          lineItems: vo.lineItems.map((li) => ({
+            id: li.id,
+            name: li.name,
+            quantity: li.quantity,
+            priceCents: li.priceCents,
+          })),
           routingStatus: vo.routingStatus,
           fulfillmentStatus: vo.fulfillmentStatus,
           subtotalCents: vo.subtotalCents,

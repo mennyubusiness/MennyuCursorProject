@@ -6,6 +6,7 @@ import {
   executeAdminCustomVendorOrderRefund,
   executeAdminFullOrderRefund,
   executeAdminFullVendorOrderRefund,
+  executeAdminLineItemRefund,
 } from "@/services/admin-refund.service";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,7 @@ export async function POST(
     reason: parsed.data.reason,
     adminNote: parsed.data.adminNote,
     customerVisibleNote: parsed.data.customerVisibleNote,
+    linkedOrderIssueId: parsed.data.linkedOrderIssueId,
   };
 
   try {
@@ -62,6 +64,18 @@ export async function POST(
           ...base,
           vendorOrderId: parsed.data.vendorOrderId!,
           amountCents: parsed.data.amountCents!,
+          platformAbsorbsRefund: parsed.data.platformAbsorbsRefund ?? false,
+        });
+        break;
+      case "line_item_refund":
+        result = await executeAdminLineItemRefund({
+          ...base,
+          vendorOrderId: parsed.data.vendorOrderId!,
+          orderLineItemId: parsed.data.orderLineItemId!,
+          quantity: parsed.data.quantity!,
+          includeTax: parsed.data.includeTax ?? undefined,
+          includeTip: parsed.data.includeTip ?? undefined,
+          includeServiceFee: parsed.data.includeServiceFee ?? undefined,
           platformAbsorbsRefund: parsed.data.platformAbsorbsRefund ?? false,
         });
         break;
