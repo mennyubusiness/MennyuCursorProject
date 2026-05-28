@@ -758,6 +758,33 @@ export const CART_DISPLAY_SESSION_CART_INCLUDE = {
   pod: true,
 } satisfies Prisma.CartInclude;
 
+/**
+ * /checkout SSR: line names + pricing only — no modifier graph or full menuItem rows.
+ * Authoritative cart validation runs on POST /api/checkout via createOrderFromCart.
+ */
+export const CHECKOUT_SUMMARY_CART_INCLUDE = {
+  items: {
+    include: {
+      menuItem: {
+        select: {
+          name: true,
+          deliverectPlu: true,
+          deliverectVariantParentPlu: true,
+        },
+      },
+      vendor: { select: { id: true, name: true } },
+    },
+  },
+  pod: {
+    select: {
+      id: true,
+      name: true,
+      pickupSalesTaxBps: true,
+      pickupTimezone: true,
+    },
+  },
+} satisfies Prisma.CartInclude;
+
 export async function discardStaleCheckoutCartsForSession(sessionId: string): Promise<void> {
   const carts = await prisma.cart.findMany({
     where: { sessionId, items: { some: {} } },

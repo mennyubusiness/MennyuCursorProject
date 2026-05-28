@@ -527,18 +527,150 @@ export async function variantSelectionsPriceCentsForLeafCartLine(
   return o?.priceCents ?? 0;
 }
 
+const SHELL_BASE_KEY_SEP = "\u001e";
+
+/** Map key for parent-shell lookups — parent shell PLU is the variant-family id on leaf rows. */
+export function shellBasePriceKey(vendorId: string, parentPlu: string): string {
+  return `${vendorId}${SHELL_BASE_KEY_SEP}${parentPlu.trim()}`;
+}
+
+/** Map key for variant leaf display-name lookups (vendor + parent PLU + leaf PLU). */
+export function variantLeafDisplayKey(
+  vendorId: string,
+  deliverectVariantParentPlu: string | null | undefined,
+  deliverectLeafPlu: string | null | undefined
+): string | null {
+  const parentPlu = deliverectVariantParentPlu?.trim();
+  const leafPlu = deliverectLeafPlu?.trim();
+  if (!parentPlu || !leafPlu) return null;
+  return `${vendorId}${SHELL_BASE_KEY_SEP}${parentPlu}${SHELL_BASE_KEY_SEP}${leafPlu}`;
+}
+
+/**
+ * Batch-resolve customer-facing size/variation labels for variant leaf cart lines (checkout/cart SSR).
+ * Replaces N sequential `findVariantModifierOptionForLeaf` chains with two queries (parents + options).
+ */
+export async function getVariantOptionDisplayNamesForLeafLines(
+  lines: Array<{
+    vendorId: string;
+    deliverectVariantParentPlu?: string | null;
+    deliverectPlu?: string | null;
+  }>
+): Promise<Map<string, string>> {
+  const leafKeys = new Set<string>();
+  const parentKeys = new Set<string>();
+  for (const line of lines) {
+    const key = variantLeafDisplayKey(
+      line.vendorId,
+      line.deliverectVariantParentPlu,
+      line.deliverectPlu
+    );
+    if (!key) continue;
+    leafKeys.add(key);
+    const parentPlu = line.deliverectVariantParentPlu?.trim();
+    if (parentPlu) parentKeys.add(shellBasePriceKey(line.vendorId, parentPlu));
+  }
+  if (leafKeys.size === 0) return new Map();
+
+  const orParentClause = [...parentKeys].map((k) => {
+    const sep = k.indexOf(SHELL_BASE_KEY_SEP);
+    const vendorId = k.slice(0, sep);
+    const plu = k.slice(sep + SHELL_BASE_KEY_SEP.length);
+    return { vendorId, deliverectPlu: plu, deliverectVariantParentPlu: null };
+  });
+  const parents = await prisma.menuItem.findMany({
+    where: { OR: orParentClause },
+    select: {
+      id: true,
+      vendorId: true,
+      deliverectPlu: true,
+      modifierGroups: {
+        include: {
+          modifierGroup: {
+            select: {
+              id: true,
+              deliverectIsVariantGroup: true,
+              parentModifierOptionId: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  const parentByShellKey = new Map(
+    parents.map((p) => [shellBasePriceKey(p.vendorId, p.deliverectPlu ?? ""), p])
+  );
+
+  const orOptConditions: Prisma.ModifierOptionWhereInput[] = [];
+  for (const key of leafKeys) {
+    const sep1 = key.indexOf(SHELL_BASE_KEY_SEP);
+    const sep2 = key.indexOf(SHELL_BASE_KEY_SEP, sep1 + 1);
+    const vendorId = key.slice(0, sep1);
+    const parentPlu = key.slice(sep1 + SHELL_BASE_KEY_SEP.length, sep2);
+    const leafPlu = key.slice(sep2 + SHELL_BASE_KEY_SEP.length);
+    const parent = parentByShellKey.get(shellBasePriceKey(vendorId, parentPlu));
+    if (!parent) continue;
+    const variantGroupIds = parent.modifierGroups
+      .filter((l) => isTopLevelDeliverectVariantGroupModifierGroup(l.modifierGroup))
+      .map((l) => l.modifierGroup.id);
+    if (variantGroupIds.length > 0) {
+      orOptConditions.push({
+        deliverectModifierPlu: leafPlu,
+        modifierGroupId: { in: variantGroupIds },
+        modifierGroup: { menuItems: { some: { menuItemId: parent.id } } },
+      });
+    } else {
+      orOptConditions.push({
+        deliverectModifierPlu: leafPlu,
+        modifierGroup: {
+          deliverectIsVariantGroup: true,
+          menuItems: { some: { menuItemId: parent.id } },
+        },
+      });
+    }
+  }
+  if (orOptConditions.length === 0) return new Map();
+
+  const options = await prisma.modifierOption.findMany({
+    where: { OR: orOptConditions },
+    select: {
+      name: true,
+      deliverectModifierPlu: true,
+      modifierGroup: { select: { menuItems: { select: { menuItemId: true } } } },
+    },
+  });
+
+  const result = new Map<string, string>();
+  for (const key of leafKeys) {
+    const sep1 = key.indexOf(SHELL_BASE_KEY_SEP);
+    const sep2 = key.indexOf(SHELL_BASE_KEY_SEP, sep1 + 1);
+    const vendorId = key.slice(0, sep1);
+    const parentPlu = key.slice(sep1 + SHELL_BASE_KEY_SEP.length, sep2);
+    const leafPlu = key.slice(sep2 + SHELL_BASE_KEY_SEP.length);
+    const parent = parentByShellKey.get(shellBasePriceKey(vendorId, parentPlu));
+    if (!parent) continue;
+    const match = options.find(
+      (o) =>
+        o.deliverectModifierPlu === leafPlu &&
+        o.modifierGroup.menuItems.some((mi) => mi.menuItemId === parent.id)
+    );
+    if (match) result.set(key, match.name);
+  }
+  return result;
+}
+
 /** Customer-facing label for the selected size/variation (e.g. "Medium") for cart/checkout display. */
 async function getVariantOptionDisplayNameForLeafImpl(
   vendorId: string,
   deliverectVariantParentPlu: string | null,
   deliverectLeafPlu: string | null
 ): Promise<string | null> {
-  const o = await findVariantModifierOptionForLeaf({
-    vendorId,
-    deliverectPlu: deliverectLeafPlu,
-    deliverectVariantParentPlu: deliverectVariantParentPlu,
-  });
-  return o?.name ?? null;
+  const key = variantLeafDisplayKey(vendorId, deliverectVariantParentPlu, deliverectLeafPlu);
+  if (!key) return null;
+  const names = await getVariantOptionDisplayNamesForLeafLines([
+    { vendorId, deliverectVariantParentPlu, deliverectPlu: deliverectLeafPlu },
+  ]);
+  return names.get(key) ?? null;
 }
 
 /**
@@ -601,13 +733,6 @@ export async function findDeliverectProductVariantGroupIdForLeaf(
   if (parentOnly) return parentOnly.modifierGroupId;
 
   return candidates[0]?.modifierGroupId ?? null;
-}
-
-const SHELL_BASE_KEY_SEP = "\u001e";
-
-/** Map key for parent-shell lookups — parent shell PLU is the variant-family id on leaf rows. */
-export function shellBasePriceKey(vendorId: string, parentPlu: string): string {
-  return `${vendorId}${SHELL_BASE_KEY_SEP}${parentPlu.trim()}`;
 }
 
 export type ParentShellCartInfo = {

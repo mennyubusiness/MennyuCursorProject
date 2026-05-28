@@ -4,15 +4,17 @@ import { auth } from "@/auth";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 import { prisma } from "@/lib/db";
 import { lockGroupOrderSessionForCheckout } from "@/services/group-order.service";
+import { CHECKOUT_SUMMARY_CART_INCLUDE } from "@/services/cart.service";
 import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutProgress } from "./CheckoutProgress";
 import { computeOrderPricing } from "@/domain/fees";
 import { getActivePricingRatesSnapshot } from "@/services/pricing-config.service";
-import { getCheckoutDefaultScheduledPickup, validateCartForOrder } from "@/services/order.service";
+import { getCheckoutDefaultScheduledPickup } from "@/services/order.service";
 import {
   getParentShellInfoByVendorParentPlu,
-  getVariantOptionDisplayNameForLeaf,
+  getVariantOptionDisplayNamesForLeafLines,
   shellBasePriceKey,
+  variantLeafDisplayKey,
 } from "@/services/cart-deliverect-variant-resolution";
 
 export default async function CheckoutPage({
@@ -20,92 +22,62 @@ export default async function CheckoutPage({
 }: {
   searchParams: Promise<{ cartId?: string }>;
 }) {
+  const loadStarted = process.env.NODE_ENV === "development" ? Date.now() : 0;
   const { cartId } = await searchParams;
   if (!cartId) redirect("/cart");
 
-  const sessionId = (await getMennyuSessionIdForRequest()) ?? "";
-  const cart = await prisma.cart.findUnique({
-    where: { id: cartId },
-    include: {
-      items: {
-        include: {
-          menuItem: true,
-          vendor: true,
-          selections: { include: { modifierOption: true } },
-        },
-      },
-      pod: true,
-    },
-  });
+  const [sessionId, cart, authSession] = await Promise.all([
+    getMennyuSessionIdForRequest(),
+    prisma.cart.findUnique({
+      where: { id: cartId },
+      include: CHECKOUT_SUMMARY_CART_INCLUDE,
+    }),
+    auth(),
+  ]);
   if (!cart || cart.items.length === 0) redirect("/cart");
 
   const groupSession = await prisma.groupOrderSession.findUnique({
     where: { cartId: cart.id },
     select: { id: true, hostUserId: true, status: true },
   });
-  const authSession = await auth();
   if (groupSession) {
     if (authSession?.user?.id !== groupSession.hostUserId) {
       redirect("/cart?error=group_checkout_host_only");
     }
     await lockGroupOrderSessionForCheckout(cart.id, groupSession.hostUserId);
-  } else if (cart.sessionId !== sessionId) {
+  } else if (cart.sessionId !== (sessionId ?? "")) {
     redirect("/cart");
   }
 
-  const validation = await validateCartForOrder({
-    podId: cart.podId,
-    items: cart.items.map((i) => ({
-      id: i.id,
-      menuItemId: i.menuItemId,
-      vendorId: i.vendorId,
-      quantity: i.quantity,
-      priceCents: i.priceCents,
-      menuItem: {
-        priceCents: i.menuItem.priceCents,
-        isAvailable: i.menuItem.isAvailable,
-        name: i.menuItem.name,
-        basketMaxQuantity: i.menuItem.basketMaxQuantity ?? null,
-        deliverectProductId: i.menuItem.deliverectProductId ?? null,
-        deliverectPlu: i.menuItem.deliverectPlu ?? null,
-        deliverectVariantParentPlu: i.menuItem.deliverectVariantParentPlu ?? null,
-      },
-      vendor: {
-        isActive: i.vendor.isActive,
-        mennyuOrdersPaused: i.vendor.mennyuOrdersPaused ?? undefined,
-        posOpen: undefined,
-        deliverectChannelLinkId: i.vendor.deliverectChannelLinkId ?? null,
-      },
-      selections: i.selections?.map((s) => ({
-        modifierOptionId: s.modifierOptionId,
-        quantity: s.quantity,
-        modifierOption: { priceCents: s.modifierOption.priceCents },
-      })),
-    })),
-  });
-  if (!validation.valid) {
-    redirect(`/cart?error=${encodeURIComponent(validation.code)}`);
-  }
+  const [parentShellByVendorParentPlu, variantDisplayNames, { rates }] = await Promise.all([
+    getParentShellInfoByVendorParentPlu(cart.items),
+    getVariantOptionDisplayNamesForLeafLines(
+      cart.items.map((item) => ({
+        vendorId: item.vendorId,
+        deliverectVariantParentPlu: item.menuItem.deliverectVariantParentPlu,
+        deliverectPlu: item.menuItem.deliverectPlu,
+      }))
+    ),
+    getActivePricingRatesSnapshot(),
+  ]);
 
-  const parentShellByVendorParentPlu = await getParentShellInfoByVendorParentPlu(cart.items);
   const checkoutLineNameByItemId = new Map<string, string>();
-  await Promise.all(
-    cart.items.map(async (item) => {
-      const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
-      if (!pplu) {
-        checkoutLineNameByItemId.set(item.id, item.menuItem.name);
-        return;
-      }
-      const parent = parentShellByVendorParentPlu.get(shellBasePriceKey(item.vendorId, pplu));
-      const size = await getVariantOptionDisplayNameForLeaf(
-        item.vendorId,
-        item.menuItem.deliverectVariantParentPlu,
-        item.menuItem.deliverectPlu
-      );
-      const base = parent?.name ?? item.menuItem.name;
-      checkoutLineNameByItemId.set(item.id, size ? `${base} · ${size}` : base);
-    })
-  );
+  for (const item of cart.items) {
+    const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
+    if (!pplu) {
+      checkoutLineNameByItemId.set(item.id, item.menuItem.name);
+      continue;
+    }
+    const parent = parentShellByVendorParentPlu.get(shellBasePriceKey(item.vendorId, pplu));
+    const leafKey = variantLeafDisplayKey(
+      item.vendorId,
+      item.menuItem.deliverectVariantParentPlu,
+      item.menuItem.deliverectPlu
+    );
+    const size = leafKey ? variantDisplayNames.get(leafKey) : undefined;
+    const base = parent?.name ?? item.menuItem.name;
+    checkoutLineNameByItemId.set(item.id, size ? `${base} · ${size}` : base);
+  }
 
   const byVendor = new Map<
     string,
@@ -128,7 +100,6 @@ export default async function CheckoutPage({
   const vendorSubtotalsCents = Array.from(byVendor.values()).map((g) =>
     g.lines.reduce((a, l) => a + l.cents, 0)
   );
-  const { rates } = await getActivePricingRatesSnapshot();
   const totals = computeOrderPricing(
     {
       vendorSubtotalsCents,
@@ -140,6 +111,14 @@ export default async function CheckoutPage({
   const serviceFeePercentLabel = `${(rates.customerServiceFeeBps / 100).toFixed(2)}%`;
   const vendorCount = byVendor.size;
   const scheduledDefaults = getCheckoutDefaultScheduledPickup(cart.pod);
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[checkout-load]", {
+      cartId: cart.id,
+      itemCount: cart.items.length,
+      ms: Date.now() - loadStarted,
+    });
+  }
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -220,7 +199,8 @@ export default async function CheckoutPage({
 
       <p className="mt-4 text-sm text-stone-500">
         Add your contact info and tip below, then pay securely. Your order is placed and sent to
-        vendors only after payment succeeds.
+        vendors only after payment succeeds. Item availability is confirmed when you continue to
+        payment.
       </p>
 
       <CheckoutForm
