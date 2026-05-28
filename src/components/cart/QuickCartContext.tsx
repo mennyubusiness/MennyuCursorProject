@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import type { Cart } from "@/domain/types";
 import {
   CART_CLEARED_EVENT,
@@ -17,6 +18,7 @@ import {
   dispatchCartUpdated,
   emptyCartSnapshot,
   shouldQuickCartApplyCartSnapshot,
+  shouldApplyCartFetchResult,
   cartClearAppliesToContext,
   type CartClearedDetail,
   type CartUpdatedDetail,
@@ -45,11 +47,13 @@ export function QuickCartProvider({
   children: ReactNode;
   enabled?: boolean;
 }) {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(false);
   const cartRef = useRef<Cart | null>(null);
   const snapshotGenerationRef = useRef(0);
+  const activePodRef = useRef<string | null>(null);
 
   cartRef.current = cart;
 
@@ -72,25 +76,58 @@ export function QuickCartProvider({
       return;
     }
     const generationAtStart = snapshotGenerationRef.current;
+    const podAtStart = podId;
     setLoading(true);
     try {
       const res = await fetch(`/api/cart?podId=${encodeURIComponent(podId)}`, {
         credentials: "same-origin",
       });
-      if (generationAtStart !== snapshotGenerationRef.current) return;
+      if (
+        !shouldApplyCartFetchResult({
+          generationAtStart,
+          currentGeneration: snapshotGenerationRef.current,
+          podAtStart,
+          currentPodId: getCurrentPodIdFromClient(),
+        })
+      ) {
+        return;
+      }
       if (!res.ok) {
         setCart(null);
         return;
       }
       const data = (await res.json()) as Cart;
-      if (generationAtStart !== snapshotGenerationRef.current) return;
+      if (
+        !shouldApplyCartFetchResult({
+          generationAtStart,
+          currentGeneration: snapshotGenerationRef.current,
+          podAtStart,
+          currentPodId: getCurrentPodIdFromClient(),
+        })
+      ) {
+        return;
+      }
       setCart(data);
     } catch {
-      if (generationAtStart === snapshotGenerationRef.current) {
+      if (
+        shouldApplyCartFetchResult({
+          generationAtStart,
+          currentGeneration: snapshotGenerationRef.current,
+          podAtStart,
+          currentPodId: getCurrentPodIdFromClient(),
+        })
+      ) {
         setCart(null);
       }
     } finally {
-      if (generationAtStart === snapshotGenerationRef.current) {
+      if (
+        shouldApplyCartFetchResult({
+          generationAtStart,
+          currentGeneration: snapshotGenerationRef.current,
+          podAtStart,
+          currentPodId: getCurrentPodIdFromClient(),
+        })
+      ) {
         setLoading(false);
       }
     }
@@ -110,8 +147,15 @@ export function QuickCartProvider({
 
   useEffect(() => {
     if (!enabled) return;
+    const podId = getCurrentPodIdFromClient();
+    const prevPod = activePodRef.current;
+    if (prevPod && podId && prevPod !== podId) {
+      snapshotGenerationRef.current += 1;
+      setCart(null);
+    }
+    activePodRef.current = podId;
     void refreshCart();
-  }, [enabled, refreshCart]);
+  }, [enabled, pathname, refreshCart]);
 
   useEffect(() => {
     if (!enabled) return;

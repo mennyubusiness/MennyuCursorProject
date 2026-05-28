@@ -58,8 +58,8 @@ export function shouldApplyCartSnapshot(
 }
 
 /**
- * Quick Cart listener: accept same-pod snapshots even when local cartId is stale
- * (e.g. after checkout clear + navigation before refreshCart realigns).
+ * Quick Cart listener: route pod is authoritative; stale local cart from another pod
+ * must not block current-pod snapshots.
  */
 export function shouldQuickCartApplyCartSnapshot(
   detail: CartUpdatedDetail | undefined,
@@ -74,7 +74,15 @@ export function shouldQuickCartApplyCartSnapshot(
     return false;
   }
 
+  if (currentPodId && incoming?.podId === currentPodId) {
+    return true;
+  }
+
   if (!localCart?.id || !localCart.podId) return true;
+
+  if (currentPodId && localCart.podId !== currentPodId) {
+    return false;
+  }
 
   if (incoming?.podId && incoming.podId === localCart.podId) return true;
 
@@ -82,6 +90,24 @@ export function shouldQuickCartApplyCartSnapshot(
     cartId: localCart.id,
     podId: localCart.podId,
   });
+}
+
+/** Ignore stale GET /api/cart responses after pod change or newer snapshot apply. */
+export function shouldApplyCartFetchResult(params: {
+  generationAtStart: number;
+  currentGeneration: number;
+  podAtStart: string | null;
+  currentPodId: string | null;
+}): boolean {
+  if (params.generationAtStart !== params.currentGeneration) return false;
+  if (
+    params.podAtStart &&
+    params.currentPodId &&
+    params.podAtStart !== params.currentPodId
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /** Ensure mutation/optimistic snapshots carry id + podId for scope guards. */

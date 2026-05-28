@@ -24,6 +24,7 @@ import {
   ensureCartSnapshotScalars,
   markPendingClientCartClear,
   PENDING_CART_CLEAR_STORAGE_KEY,
+  shouldApplyCartFetchResult,
   shouldApplyCartSnapshot,
   shouldQuickCartApplyCartSnapshot,
 } from "@/lib/cart-client-sync";
@@ -97,6 +98,32 @@ describe("cart-client-sync", () => {
     ).toBe(true);
   });
 
+  it("shouldQuickCartApplyCartSnapshot accepts Pod B snapshot when local empty Pod A cart and route is Pod B", () => {
+    const local = cart({ id: "cart_a", podId: "pod_a", items: [] });
+    const incoming = cart({
+      id: "cart_b",
+      podId: "pod_b",
+      items: [{ id: "li_1", quantity: 1 } as never],
+    });
+    expect(
+      shouldQuickCartApplyCartSnapshot(
+        { cart: incoming, source: "vendor-menu" },
+        local,
+        "pod_b"
+      )
+    ).toBe(true);
+  });
+
+  it("shouldQuickCartApplyCartSnapshot rejects Pod B snapshot while route scope is Pod A", () => {
+    expect(
+      shouldQuickCartApplyCartSnapshot(
+        { cart: cart({ podId: "pod_b", id: "cart_b" }), source: "vendor-menu" },
+        cart({ podId: "pod_a" }),
+        "pod_a"
+      )
+    ).toBe(false);
+  });
+
   it("shouldQuickCartApplyCartSnapshot rejects cross-pod snapshots", () => {
     expect(
       shouldQuickCartApplyCartSnapshot(
@@ -121,6 +148,39 @@ describe("cart-client-sync", () => {
     const partial = { ...cart(), podId: "" as string };
     const fixed = ensureCartSnapshotScalars(partial, { podId: "pod_a" });
     expect(fixed.podId).toBe("pod_a");
+  });
+
+  it("shouldApplyCartFetchResult rejects stale fetch after generation bump", () => {
+    expect(
+      shouldApplyCartFetchResult({
+        generationAtStart: 1,
+        currentGeneration: 2,
+        podAtStart: "pod_a",
+        currentPodId: "pod_a",
+      })
+    ).toBe(false);
+  });
+
+  it("shouldApplyCartFetchResult rejects fetch started for previous pod", () => {
+    expect(
+      shouldApplyCartFetchResult({
+        generationAtStart: 1,
+        currentGeneration: 1,
+        podAtStart: "pod_a",
+        currentPodId: "pod_b",
+      })
+    ).toBe(false);
+  });
+
+  it("shouldApplyCartFetchResult accepts matching generation and pod", () => {
+    expect(
+      shouldApplyCartFetchResult({
+        generationAtStart: 3,
+        currentGeneration: 3,
+        podAtStart: "pod_b",
+        currentPodId: "pod_b",
+      })
+    ).toBe(true);
   });
 
   it("shouldApplyCartSnapshot applies cart-page snapshots to other listeners", () => {

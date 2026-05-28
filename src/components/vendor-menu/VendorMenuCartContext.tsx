@@ -89,8 +89,8 @@ export function VendorMenuCartProvider({
   const syncedInitialRef = useRef(false);
   const modifierAddInFlightRef = useRef(false);
   const snapshotContext = useMemo(
-    () => ({ cartId: initialCart.id, podId: initialCart.podId }),
-    [initialCart.id, initialCart.podId]
+    () => ({ cartId: cart.id, podId: cart.podId }),
+    [cart.id, cart.podId]
   );
 
   useEffect(() => {
