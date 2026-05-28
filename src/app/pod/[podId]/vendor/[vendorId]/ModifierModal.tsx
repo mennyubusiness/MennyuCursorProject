@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { ModifierConfigForUI, ModifierOptionForUI } from "./modifier-config";
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
 import { dispatchCartUpdated } from "@/lib/cart-client-sync";
 import { useVendorMenuCartOptional } from "@/components/vendor-menu/VendorMenuCartContext";
-import { optimisticPendingModifierLine } from "@/lib/cart-optimistic";
 import type { Cart, CartItemSelection } from "@/domain/types";
+import { restoreCartFocus } from "@/lib/cart-focus";
 import { getVariantMergedModifierConfigAction } from "@/actions/variant-modifier-config.actions";
 import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
 import { totalSelectedInGroup, totalSelectedInNested } from "@/lib/modifier-deliverect-variant-steps";
@@ -66,6 +66,7 @@ export function ModifierModal({
   vendorUsesDeliverect: _vendorUsesDeliverect = false,
   /** From `MenuItem.deliverectVariantParentPlu` — leaf rows use parent shell for variant merge. */
   menuItemDeliverectVariantParentPlu,
+  returnFocusMenuItemId,
 }: {
   config: ModifierConfigForUI;
   cartId: string;
@@ -73,6 +74,7 @@ export function ModifierModal({
   vendorId?: string;
   onClose: () => void;
   onSuccess: () => void;
+  returnFocusMenuItemId?: string;
   cartItemId?: string;
   quantity?: number;
   initialSelections?: Array<{ modifierOptionId: string; quantity: number }>;
@@ -82,6 +84,7 @@ export function ModifierModal({
 }) {
   const vendorMenuCart = useVendorMenuCartOptional();
   const isEditMode = !!cartItemId;
+  const addSubmitLockRef = useRef(false);
 
   const commitServerCart = useCallback(
     (next: Cart) => {
@@ -277,22 +280,46 @@ export function ModifierModal({
       }
       return;
     }
+
+    if (!isEditMode) {
+      if (addSubmitLockRef.current) return;
+      addSubmitLockRef.current = true;
+      if (!vendorMenuCart || !vendorId) {
+        addSubmitLockRef.current = false;
+        setError({ message: "Cart is not available. Refresh and try again." });
+        return;
+      }
+      vendorMenuCart.clearCartMutationError();
+      onSuccess();
+      if (returnFocusMenuItemId) {
+        restoreCartFocus(returnFocusMenuItemId);
+      }
+      const vendorName =
+        vendorMenuCart.cart.groups.find((g) => g.vendorId === vendorId)?.vendorName ?? "Vendor";
+      vendorMenuCart.runModifierAddInBackground({
+        optimistic: {
+          menuItemId: displayConfig.menuItemId,
+          vendorId,
+          vendorName,
+          menuItemName: displayConfig.menuItemName,
+          unitPriceCents: displayConfig.priceCents,
+          selections: selectionPreview,
+        },
+        add: () =>
+          addToCartAction(
+            cartId,
+            displayConfig.menuItemId,
+            1,
+            specialInstructions.trim() || null,
+            selectionsList
+          ),
+      });
+      return;
+    }
+
     setLoading(true);
     setError(null);
     const cartSnapshot = vendorMenuCart?.cart ?? null;
-    if (vendorMenuCart && !isEditMode && cartSnapshot && vendorId) {
-      const vendorName =
-        cartSnapshot.groups.find((g) => g.vendorId === vendorId)?.vendorName ?? "Vendor";
-      const optimistic = optimisticPendingModifierLine(cartSnapshot, {
-        menuItemId: displayConfig.menuItemId,
-        vendorId,
-        vendorName,
-        menuItemName: displayConfig.menuItemName,
-        unitPriceCents: displayConfig.priceCents,
-        selections: selectionPreview,
-      });
-      vendorMenuCart.applyServerCart(optimistic);
-    }
     if (isEditMode && cartItemId) {
       if (DEBUG_ADD_TO_CART_TRACE) {
         console.log("[ModifierModal] submit → updateCartItemAction", {
@@ -319,56 +346,6 @@ export function ModifierModal({
         onClose();
       } else if (result && !result.success) {
         if (cartSnapshot) commitServerCart(cartSnapshot);
-        setError({ message: result.error, code: result.code });
-      }
-    } else {
-      if (DEBUG_ADD_TO_CART_TRACE) {
-        console.log("[ModifierModal] submit → addToCartAction", {
-          cartId,
-          menuItemId: displayConfig.menuItemId,
-          podId,
-          vendorId,
-        });
-      }
-      const result = await addToCartAction(
-        cartId,
-        displayConfig.menuItemId,
-        1,
-        specialInstructions.trim() || null,
-        selectionsList
-      );
-      setLoading(false);
-      if (DEBUG_ADD_TO_CART_TRACE) {
-        console.log("[ModifierModal] addToCartAction returned", {
-          success: result.success,
-          error: "error" in result ? result.error : undefined,
-          code: "code" in result ? result.code : undefined,
-        });
-      }
-      if (result.success) {
-        commitServerCart(result.cart);
-        onSuccess();
-        onClose();
-      } else {
-        if (cartSnapshot) commitServerCart(cartSnapshot);
-        if (DEBUG_ADD_TO_CART_TRACE && result.code === "VARIANT_GROUP_REQUIRED") {
-          console.warn("[ModifierModal] VARIANT_GROUP_REQUIRED", {
-            menuItemId: displayConfig.menuItemId,
-            menuItemName: displayConfig.menuItemName,
-            selections: selectionsList,
-            groups: displayConfig.groups.map((link) => ({
-              id: link.modifierGroup.id,
-              name: link.modifierGroup.name,
-              openOrderGroupKind: link.openOrderGroupKind,
-              deliverectIsVariantGroup: link.modifierGroup.deliverectIsVariantGroup,
-              isAvailable: link.modifierGroup.isAvailable,
-              required: link.required,
-              minSelections: link.minSelections,
-              maxSelections: link.maxSelections,
-              selected: totalSelectedInGroup(link, selections),
-            })),
-          });
-        }
         setError({ message: result.error, code: result.code });
       }
     }
@@ -495,10 +472,10 @@ export function ModifierModal({
               <button
                 type="button"
                 onClick={submit}
-                disabled={loading || !requiredSatisfied}
+                disabled={(isEditMode && loading) || !requiredSatisfied}
                 className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
               >
-                {loading ? (isEditMode ? "Saving…" : "Adding…") : isEditMode ? "Save changes" : "Add to cart"}
+                {isEditMode && loading ? "Saving…" : isEditMode ? "Save changes" : "Add to cart"}
               </button>
             </div>
           </div>

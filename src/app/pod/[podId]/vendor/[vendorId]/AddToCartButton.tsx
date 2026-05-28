@@ -171,6 +171,7 @@ export function AddToCartButton({
         vendorId,
         vendorUsesDeliverect,
         menuItemDeliverectVariantParentPlu,
+        returnFocusMenuItemId: menuItemId,
       });
       setError(null);
     } else {
@@ -187,6 +188,7 @@ export function AddToCartButton({
       vendorId,
       vendorUsesDeliverect,
       menuItemDeliverectVariantParentPlu,
+      returnFocusMenuItemId: menuItemId,
     });
     setError(null);
   }
@@ -221,6 +223,7 @@ export function AddToCartButton({
       {showInitialAdd ? (
         <button
           type="button"
+          data-cart-focus-menu-item={menuItemId}
           onClick={handleClickAdd}
           disabled={buttonDisabled}
           className={
@@ -246,6 +249,7 @@ export function AddToCartButton({
           {hasModifiers && modifierConfig && (
             <button
               type="button"
+              data-cart-focus-menu-item={menuItemId}
               onClick={openCustomizeAnother}
               disabled={orderingDisabled}
               className="shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold text-white/95 underline decoration-white/50 underline-offset-2 transition hover:text-white hover:decoration-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -310,6 +314,7 @@ export function AddToCartButton({
           {hasModifiers && modifierConfig && (
             <button
               type="button"
+              data-cart-focus-menu-item={menuItemId}
               onClick={openCustomizeAnother}
               disabled={orderingDisabled}
               className={

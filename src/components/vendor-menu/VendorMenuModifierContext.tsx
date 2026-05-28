@@ -20,6 +20,8 @@ export type VendorMenuModifierSession = {
   vendorId: string;
   vendorUsesDeliverect: boolean;
   menuItemDeliverectVariantParentPlu?: string | null;
+  /** Menu item id to restore focus after modal closes (add flow). */
+  returnFocusMenuItemId?: string;
 };
 
 type VendorMenuModifierContextValue = {
@@ -81,6 +83,7 @@ export function VendorMenuModifierProvider({ children }: { children: ReactNode }
             onSuccess={closeModifier}
             vendorUsesDeliverect={session.vendorUsesDeliverect}
             menuItemDeliverectVariantParentPlu={session.menuItemDeliverectVariantParentPlu}
+            returnFocusMenuItemId={session.returnFocusMenuItemId}
           />,
           document.body
         )

@@ -10,15 +10,35 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Cart, CartItem } from "@/domain/types";
+import type { Cart, CartItem, CartItemSelection } from "@/domain/types";
 import { dispatchCartUpdated } from "@/lib/cart-client-sync";
-import { optimisticSimpleAdd, type OptimisticSimpleAddParams } from "@/lib/cart-optimistic";
+import {
+  optimisticPendingModifierLine,
+  optimisticSimpleAdd,
+  type OptimisticSimpleAddParams,
+} from "@/lib/cart-optimistic";
+
+export type CartMutationError = {
+  message: string;
+  code?: string;
+};
+
+export type ModifierAddOptimisticParams = {
+  menuItemId: string;
+  vendorId: string;
+  vendorName: string;
+  menuItemName: string;
+  unitPriceCents: number;
+  selections: CartItemSelection[];
+};
 
 type VendorMenuCartContextValue = {
   cart: Cart;
   cartId: string;
   vendorId: string;
   vendorCartItems: CartItem[];
+  cartMutationError: CartMutationError | null;
+  clearCartMutationError: () => void;
   applyServerCart: (cart: Cart) => void;
   /** Optimistic simple add; runs server action; rolls back on failure. */
   runSimpleAddToCart: (
@@ -33,6 +53,14 @@ type VendorMenuCartContextValue = {
     | { success: false; error: string; code?: string }
   >;
   applyServerCartFromMutation: (cart: Cart) => void;
+  /** Close modal first, then optimistic add + server action in background. */
+  runModifierAddInBackground: (params: {
+    optimistic: ModifierAddOptimisticParams;
+    add: () => Promise<
+      | { success: true; cart: Cart }
+      | { success: false; error: string; code?: string }
+    >;
+  }) => void;
 };
 
 const VendorMenuCartContext = createContext<VendorMenuCartContextValue | null>(null);
@@ -47,7 +75,9 @@ export function VendorMenuCartProvider({
   vendorId: string;
 }) {
   const [cart, setCart] = useState<Cart>(initialCart);
+  const [cartMutationError, setCartMutationError] = useState<CartMutationError | null>(null);
   const syncedInitialRef = useRef(false);
+  const modifierAddInFlightRef = useRef(false);
 
   useEffect(() => {
     if (syncedInitialRef.current) return;
@@ -66,6 +96,59 @@ export function VendorMenuCartProvider({
   }, []);
 
   const applyServerCartFromMutation = applyServerCart;
+
+  const clearCartMutationError = useCallback(() => {
+    setCartMutationError(null);
+  }, []);
+
+  const reportCartMutationError = useCallback((error: CartMutationError) => {
+    setCartMutationError(error);
+  }, []);
+
+  const runModifierAddInBackground = useCallback(
+    ({
+      optimistic,
+      add,
+    }: {
+      optimistic: ModifierAddOptimisticParams;
+      add: () => Promise<
+        | { success: true; cart: Cart }
+        | { success: false; error: string; code?: string }
+      >;
+    }) => {
+      if (modifierAddInFlightRef.current) return;
+      modifierAddInFlightRef.current = true;
+
+      const snapshot = cart;
+      const optimisticCart = optimisticPendingModifierLine(snapshot, optimistic);
+      setCart(optimisticCart);
+      dispatchCartUpdated({ cart: optimisticCart });
+
+      void (async () => {
+        try {
+          const result = await add();
+          if (result.success) {
+            setCartMutationError(null);
+            setCart(result.cart);
+            dispatchCartUpdated({ cart: result.cart });
+          } else {
+            setCart(snapshot);
+            dispatchCartUpdated({ cart: snapshot });
+            reportCartMutationError({ message: result.error, code: result.code });
+          }
+        } catch (e) {
+          setCart(snapshot);
+          dispatchCartUpdated({ cart: snapshot });
+          reportCartMutationError({
+            message: e instanceof Error ? e.message : "Could not add to cart",
+          });
+        } finally {
+          modifierAddInFlightRef.current = false;
+        }
+      })();
+    },
+    [cart, reportCartMutationError]
+  );
 
   const runSimpleAddToCart = useCallback(
     async ({
@@ -86,6 +169,7 @@ export function VendorMenuCartProvider({
 
       const result = await add();
       if (result.success) {
+        setCartMutationError(null);
         setCart(result.cart);
         dispatchCartUpdated({ cart: result.cart });
         return result;
@@ -93,9 +177,10 @@ export function VendorMenuCartProvider({
 
       setCart(snapshot);
       dispatchCartUpdated({ cart: snapshot });
+      reportCartMutationError({ message: result.error, code: result.code });
       return result;
     },
-    [cart]
+    [cart, reportCartMutationError]
   );
 
   const value = useMemo(
@@ -104,11 +189,24 @@ export function VendorMenuCartProvider({
       cartId: cart.id,
       vendorId,
       vendorCartItems,
+      cartMutationError,
+      clearCartMutationError,
       applyServerCart,
       runSimpleAddToCart,
       applyServerCartFromMutation,
+      runModifierAddInBackground,
     }),
-    [cart, vendorId, vendorCartItems, applyServerCart, runSimpleAddToCart, applyServerCartFromMutation]
+    [
+      cart,
+      vendorId,
+      vendorCartItems,
+      cartMutationError,
+      clearCartMutationError,
+      applyServerCart,
+      runSimpleAddToCart,
+      applyServerCartFromMutation,
+      runModifierAddInBackground,
+    ]
   );
 
   return (

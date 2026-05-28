@@ -11,6 +11,7 @@ import { customerMenuCategoryDomId } from "@/lib/vendor-menu-category-id";
 import type { CustomerVendorMenuCategorySection } from "@/services/vendor-customer-menu.service";
 import { cn } from "@/lib/cn";
 import { useVendorMenuCart } from "@/components/vendor-menu/VendorMenuCartContext";
+import { VendorMenuCartMutationBanner } from "@/components/vendor-menu/VendorMenuCartMutationBanner";
 
 export type VendorMenuExperienceClientProps = {
   podId: string;
@@ -120,6 +121,7 @@ export function VendorMenuExperienceClient({
 
   return (
     <VendorMenuModifierProvider>
+      <VendorMenuCartMutationBanner />
       <div className="border-b border-oo-light-stone bg-oo-cream/80">
         <PageShell className="py-6 sm:py-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
