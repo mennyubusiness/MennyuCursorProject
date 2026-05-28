@@ -21,9 +21,11 @@ import {
   cartSnapshotAppliesToContext,
   consumePendingClientCartClear,
   emptyCartSnapshot,
+  ensureCartSnapshotScalars,
   markPendingClientCartClear,
   PENDING_CART_CLEAR_STORAGE_KEY,
   shouldApplyCartSnapshot,
+  shouldQuickCartApplyCartSnapshot,
 } from "@/lib/cart-client-sync";
 
 function cart(overrides: Partial<Cart> = {}): Cart {
@@ -81,6 +83,44 @@ describe("cart-client-sync", () => {
         ctx
       )
     ).toBe(false);
+  });
+
+  it("shouldQuickCartApplyCartSnapshot accepts same-pod vendor-menu when local cartId is stale", () => {
+    const local = cart({ id: "cart_stale", podId: "pod_a" });
+    const incoming = cart({ id: "cart_current", podId: "pod_a", items: [{ id: "li_1" } as never] });
+    expect(
+      shouldQuickCartApplyCartSnapshot(
+        { cart: incoming, source: "vendor-menu" },
+        local,
+        "pod_a"
+      )
+    ).toBe(true);
+  });
+
+  it("shouldQuickCartApplyCartSnapshot rejects cross-pod snapshots", () => {
+    expect(
+      shouldQuickCartApplyCartSnapshot(
+        { cart: cart({ podId: "pod_b" }), source: "vendor-menu" },
+        cart(),
+        "pod_a"
+      )
+    ).toBe(false);
+  });
+
+  it("shouldQuickCartApplyCartSnapshot ignores quick-cart source", () => {
+    expect(
+      shouldQuickCartApplyCartSnapshot(
+        { cart: cart(), source: "quick-cart" },
+        null,
+        "pod_a"
+      )
+    ).toBe(false);
+  });
+
+  it("ensureCartSnapshotScalars fills missing podId from fallback", () => {
+    const partial = { ...cart(), podId: "" as string };
+    const fixed = ensureCartSnapshotScalars(partial, { podId: "pod_a" });
+    expect(fixed.podId).toBe("pod_a");
   });
 
   it("shouldApplyCartSnapshot applies cart-page snapshots to other listeners", () => {

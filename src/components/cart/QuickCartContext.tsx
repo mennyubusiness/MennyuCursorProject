@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -15,7 +16,7 @@ import {
   CART_UPDATED_EVENT,
   dispatchCartUpdated,
   emptyCartSnapshot,
-  shouldApplyCartSnapshot,
+  shouldQuickCartApplyCartSnapshot,
   cartClearAppliesToContext,
   type CartClearedDetail,
   type CartUpdatedDetail,
@@ -47,6 +48,10 @@ export function QuickCartProvider({
   const [isOpen, setIsOpen] = useState(false);
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(false);
+  const cartRef = useRef<Cart | null>(null);
+  const snapshotGenerationRef = useRef(0);
+
+  cartRef.current = cart;
 
   const itemCount = useMemo(
     () => cart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0,
@@ -54,6 +59,7 @@ export function QuickCartProvider({
   );
 
   const applyCartSnapshot = useCallback((next: Cart | null) => {
+    snapshotGenerationRef.current += 1;
     setCart(next);
     setLoading(false);
   }, []);
@@ -65,21 +71,28 @@ export function QuickCartProvider({
       setCart(null);
       return;
     }
+    const generationAtStart = snapshotGenerationRef.current;
     setLoading(true);
     try {
       const res = await fetch(`/api/cart?podId=${encodeURIComponent(podId)}`, {
         credentials: "same-origin",
       });
+      if (generationAtStart !== snapshotGenerationRef.current) return;
       if (!res.ok) {
         setCart(null);
         return;
       }
       const data = (await res.json()) as Cart;
+      if (generationAtStart !== snapshotGenerationRef.current) return;
       setCart(data);
     } catch {
-      setCart(null);
+      if (generationAtStart === snapshotGenerationRef.current) {
+        setCart(null);
+      }
     } finally {
-      setLoading(false);
+      if (generationAtStart === snapshotGenerationRef.current) {
+        setLoading(false);
+      }
     }
   }, [enabled]);
 
@@ -105,22 +118,15 @@ export function QuickCartProvider({
     const onCartUpdated = (event: Event) => {
       const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
       if (detail?.cart !== undefined) {
-        if (detail.source === "quick-cart") return;
-
-        const currentPodId = getCurrentPodIdFromClient();
-        if (detail.cart && currentPodId && detail.cart.podId !== currentPodId) return;
-
-        if (cart?.id && cart.podId) {
-          if (
-            !shouldApplyCartSnapshot(detail, "quick-cart", {
-              cartId: cart.id,
-              podId: cart.podId,
-            })
-          ) {
-            return;
-          }
+        if (
+          !shouldQuickCartApplyCartSnapshot(
+            detail,
+            cartRef.current,
+            getCurrentPodIdFromClient()
+          )
+        ) {
+          return;
         }
-
         applyCartSnapshot(detail.cart);
         return;
       }
@@ -130,9 +136,10 @@ export function QuickCartProvider({
     };
     const onCartCleared = (event: Event) => {
       const detail = (event as CustomEvent<CartClearedDetail>).detail;
-      const currentPodId = getCurrentPodIdFromClient() ?? cart?.podId ?? "";
+      const local = cartRef.current;
+      const currentPodId = getCurrentPodIdFromClient() ?? local?.podId ?? "";
       const ctx = {
-        cartId: cart?.id ?? detail?.cartId ?? "",
+        cartId: local?.id ?? detail?.cartId ?? "",
         podId: currentPodId || detail?.podId || "",
       };
       if (!detail || !ctx.podId || !cartClearAppliesToContext(detail, ctx)) return;
@@ -141,7 +148,7 @@ export function QuickCartProvider({
         emptyCartSnapshot({
           id: detail.cartId,
           podId: detail.podId,
-          sessionId: cart?.sessionId,
+          sessionId: local?.sessionId,
         });
       applyCartSnapshot(empty);
     };
@@ -151,7 +158,7 @@ export function QuickCartProvider({
       window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated);
       window.removeEventListener(CART_CLEARED_EVENT, onCartCleared);
     };
-  }, [enabled, applyCartSnapshot, refreshCart, cart?.id, cart?.podId, cart?.sessionId]);
+  }, [enabled, applyCartSnapshot, refreshCart]);
 
   useEffect(() => {
     if (!isOpen) return;

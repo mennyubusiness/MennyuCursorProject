@@ -16,6 +16,7 @@ import {
   CART_UPDATED_EVENT,
   dispatchCartUpdated,
   emptyCartSnapshot,
+  ensureCartSnapshotScalars,
   shouldApplyCartSnapshot,
   cartClearAppliesToContext,
   type CartClearedDetail,
@@ -129,10 +130,18 @@ export function VendorMenuCartProvider({
     [cart.items, vendorId]
   );
 
-  const applyServerCart = useCallback((next: Cart) => {
-    setCart(next);
-    dispatchCartUpdated({ cart: next, source: "vendor-menu" });
-  }, []);
+  const applyServerCart = useCallback(
+    (next: Cart) => {
+      const normalized = ensureCartSnapshotScalars(next, {
+        id: cart.id,
+        podId: cart.podId,
+        sessionId: cart.sessionId,
+      });
+      setCart(normalized);
+      dispatchCartUpdated({ cart: normalized, source: "vendor-menu" });
+    },
+    [cart.id, cart.podId, cart.sessionId]
+  );
 
   const applyServerCartFromMutation = applyServerCart;
 
@@ -159,7 +168,10 @@ export function VendorMenuCartProvider({
       modifierAddInFlightRef.current = true;
 
       const snapshot = cart;
-      const optimisticCart = optimisticPendingModifierLine(snapshot, optimistic);
+      const optimisticCart = ensureCartSnapshotScalars(
+        optimisticPendingModifierLine(snapshot, optimistic),
+        { id: cart.id, podId: cart.podId, sessionId: cart.sessionId }
+      );
       setCart(optimisticCart);
       dispatchCartUpdated({ cart: optimisticCart, source: "vendor-menu" });
 
@@ -200,7 +212,14 @@ export function VendorMenuCartProvider({
       >;
     }) => {
       const snapshot = cart;
-      const optimistic = optimisticSimpleAdd(snapshot, optimisticParams);
+      const optimisticRaw = optimisticSimpleAdd(snapshot, optimisticParams);
+      const optimistic = optimisticRaw
+        ? ensureCartSnapshotScalars(optimisticRaw, {
+            id: cart.id,
+            podId: cart.podId,
+            sessionId: cart.sessionId,
+          })
+        : null;
       if (optimistic) {
         setCart(optimistic);
         dispatchCartUpdated({ cart: optimistic, source: "vendor-menu" });

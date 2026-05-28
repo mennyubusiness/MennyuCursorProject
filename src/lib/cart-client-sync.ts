@@ -57,6 +57,46 @@ export function shouldApplyCartSnapshot(
   return cartSnapshotAppliesToContext(detail.cart, ctx);
 }
 
+/**
+ * Quick Cart listener: accept same-pod snapshots even when local cartId is stale
+ * (e.g. after checkout clear + navigation before refreshCart realigns).
+ */
+export function shouldQuickCartApplyCartSnapshot(
+  detail: CartUpdatedDetail | undefined,
+  localCart: Cart | null,
+  currentPodId: string | null
+): boolean {
+  if (!detail || detail.cart === undefined) return false;
+  if (detail.source === "quick-cart") return false;
+
+  const incoming = detail.cart;
+  if (incoming && currentPodId && incoming.podId && incoming.podId !== currentPodId) {
+    return false;
+  }
+
+  if (!localCart?.id || !localCart.podId) return true;
+
+  if (incoming?.podId && incoming.podId === localCart.podId) return true;
+
+  return cartSnapshotAppliesToContext(incoming, {
+    cartId: localCart.id,
+    podId: localCart.podId,
+  });
+}
+
+/** Ensure mutation/optimistic snapshots carry id + podId for scope guards. */
+export function ensureCartSnapshotScalars(
+  cart: Cart,
+  fallback?: Partial<Pick<Cart, "id" | "podId" | "sessionId">>
+): Cart {
+  return {
+    ...cart,
+    id: cart.id || fallback?.id || cart.id,
+    podId: cart.podId || fallback?.podId || cart.podId,
+    sessionId: cart.sessionId || fallback?.sessionId || cart.sessionId,
+  };
+}
+
 /** True when a cart-clear event targets this cart/pod context. */
 export function cartClearAppliesToContext(
   detail: CartClearedDetail | undefined,
@@ -106,8 +146,10 @@ export function consumePendingClientCartClear(orderId: string): PendingCartClear
 /** Push cart snapshot to Quick Cart, vendor menu, and header badge without GET /api/cart. */
 export function dispatchCartUpdated(detail: CartUpdatedDetail): void {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent<CartUpdatedDetail>(CART_UPDATED_EVENT, { detail }));
-  if (detail.cart) {
+  const normalized =
+    detail.cart != null ? { ...detail, cart: ensureCartSnapshotScalars(detail.cart) } : detail;
+  window.dispatchEvent(new CustomEvent<CartUpdatedDetail>(CART_UPDATED_EVENT, { detail: normalized }));
+  if (normalized.cart) {
     window.dispatchEvent(new CustomEvent("mennyu:cart-added"));
   }
 }
