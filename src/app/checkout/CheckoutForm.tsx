@@ -4,10 +4,15 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import {
+  clearCartOnServerAndNotifyClient,
+  rememberCheckoutCartForClientClear,
+} from "@/lib/cart-checkout-client";
 import { CheckoutProgress } from "./CheckoutProgress";
 
 interface CheckoutFormProps {
   cartId: string;
+  podId: string;
   totalCents: number;
   subtotalCents: number;
   serviceFeeCents: number;
@@ -36,6 +41,7 @@ function PaymentStep({
   orderId,
   clientSecret,
   cartId,
+  podId,
   totalWithTip,
   subtotalCents,
   serviceFeeCents,
@@ -47,6 +53,7 @@ function PaymentStep({
   orderId: string;
   clientSecret: string;
   cartId: string;
+  podId: string;
   totalWithTip: number;
   subtotalCents: number;
   serviceFeeCents: number;
@@ -87,11 +94,7 @@ function PaymentStep({
         setLoading(false);
         return;
       }
-      await fetch("/api/cart/clear", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cartId }),
-      });
+      await clearCartOnServerAndNotifyClient({ cartId, podId, orderId });
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -165,6 +168,7 @@ function PaymentStep({
 
 export function CheckoutForm({
   cartId,
+  podId,
   totalCents,
   subtotalCents,
   serviceFeeCents,
@@ -317,6 +321,8 @@ export function CheckoutForm({
         return;
       }
 
+      rememberCheckoutCartForClientClear({ cartId, podId, orderId });
+
       if (clientSecret === "dev_bypass") {
         const orderRes = await fetch("/api/orders", {
           method: "POST",
@@ -341,11 +347,7 @@ export function CheckoutForm({
           setError(orderData.error ?? "Order confirmation failed");
           return;
         }
-        await fetch("/api/cart/clear", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cartId }),
-        });
+        await clearCartOnServerAndNotifyClient({ cartId, podId, orderId });
         router.push(`/order/${orderId}`);
         return;
       }
@@ -373,6 +375,7 @@ export function CheckoutForm({
           orderId={paymentData.orderId}
           clientSecret={paymentData.clientSecret}
           cartId={cartId}
+          podId={podId}
           totalWithTip={totalWithTip}
           subtotalCents={subtotalCents}
           serviceFeeCents={serviceFeeCents}

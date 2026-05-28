@@ -11,7 +11,16 @@ import {
   type ReactNode,
 } from "react";
 import type { Cart, CartItem, CartItemSelection } from "@/domain/types";
-import { dispatchCartUpdated } from "@/lib/cart-client-sync";
+import {
+  CART_CLEARED_EVENT,
+  CART_UPDATED_EVENT,
+  dispatchCartUpdated,
+  emptyCartSnapshot,
+  shouldApplyCartSnapshot,
+  cartClearAppliesToContext,
+  type CartClearedDetail,
+  type CartUpdatedDetail,
+} from "@/lib/cart-client-sync";
 import {
   optimisticPendingModifierLine,
   optimisticSimpleAdd,
@@ -78,12 +87,42 @@ export function VendorMenuCartProvider({
   const [cartMutationError, setCartMutationError] = useState<CartMutationError | null>(null);
   const syncedInitialRef = useRef(false);
   const modifierAddInFlightRef = useRef(false);
+  const snapshotContext = useMemo(
+    () => ({ cartId: initialCart.id, podId: initialCart.podId }),
+    [initialCart.id, initialCart.podId]
+  );
 
   useEffect(() => {
     if (syncedInitialRef.current) return;
     syncedInitialRef.current = true;
-    dispatchCartUpdated({ cart: initialCart });
+    dispatchCartUpdated({ cart: initialCart, source: "vendor-menu" });
   }, [initialCart]);
+
+  useEffect(() => {
+    const onCartUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
+      if (!shouldApplyCartSnapshot(detail, "vendor-menu", snapshotContext)) return;
+      setCart(detail!.cart!);
+    };
+    const onCartCleared = (event: Event) => {
+      const detail = (event as CustomEvent<CartClearedDetail>).detail;
+      if (!cartClearAppliesToContext(detail, snapshotContext)) return;
+      const empty =
+        detail!.cart ??
+        emptyCartSnapshot({
+          id: snapshotContext.cartId,
+          podId: snapshotContext.podId,
+          sessionId: cart.sessionId,
+        });
+      setCart(empty);
+    };
+    window.addEventListener(CART_UPDATED_EVENT, onCartUpdated);
+    window.addEventListener(CART_CLEARED_EVENT, onCartCleared);
+    return () => {
+      window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated);
+      window.removeEventListener(CART_CLEARED_EVENT, onCartCleared);
+    };
+  }, [snapshotContext, cart.sessionId]);
 
   const vendorCartItems = useMemo(
     () => cart.items.filter((i) => i.vendorId === vendorId),
@@ -92,7 +131,7 @@ export function VendorMenuCartProvider({
 
   const applyServerCart = useCallback((next: Cart) => {
     setCart(next);
-    dispatchCartUpdated({ cart: next });
+    dispatchCartUpdated({ cart: next, source: "vendor-menu" });
   }, []);
 
   const applyServerCartFromMutation = applyServerCart;
@@ -130,15 +169,15 @@ export function VendorMenuCartProvider({
           if (result.success) {
             setCartMutationError(null);
             setCart(result.cart);
-            dispatchCartUpdated({ cart: result.cart });
+            dispatchCartUpdated({ cart: result.cart, source: "vendor-menu" });
           } else {
             setCart(snapshot);
-            dispatchCartUpdated({ cart: snapshot });
+            dispatchCartUpdated({ cart: snapshot, source: "vendor-menu" });
             reportCartMutationError({ message: result.error, code: result.code });
           }
         } catch (e) {
           setCart(snapshot);
-          dispatchCartUpdated({ cart: snapshot });
+          dispatchCartUpdated({ cart: snapshot, source: "vendor-menu" });
           reportCartMutationError({
             message: e instanceof Error ? e.message : "Could not add to cart",
           });
@@ -164,19 +203,19 @@ export function VendorMenuCartProvider({
       const optimistic = optimisticSimpleAdd(snapshot, optimisticParams);
       if (optimistic) {
         setCart(optimistic);
-        dispatchCartUpdated({ cart: optimistic });
+        dispatchCartUpdated({ cart: optimistic, source: "vendor-menu" });
       }
 
       const result = await add();
       if (result.success) {
         setCartMutationError(null);
         setCart(result.cart);
-        dispatchCartUpdated({ cart: result.cart });
+        dispatchCartUpdated({ cart: result.cart, source: "vendor-menu" });
         return result;
       }
 
       setCart(snapshot);
-      dispatchCartUpdated({ cart: snapshot });
+      dispatchCartUpdated({ cart: snapshot, source: "vendor-menu" });
       reportCartMutationError({ message: result.error, code: result.code });
       return result;
     },

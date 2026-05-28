@@ -91,7 +91,7 @@ export function ModifierModal({
       if (vendorMenuCart) {
         vendorMenuCart.applyServerCart(next);
       } else {
-        dispatchCartUpdated({ cart: next });
+        dispatchCartUpdated({ cart: next, source: "vendor-menu" });
       }
     },
     [vendorMenuCart]

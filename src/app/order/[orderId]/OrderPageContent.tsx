@@ -23,6 +23,7 @@ import { CustomerOrderProgressTimeline } from "./CustomerOrderProgressTimeline";
 import { VendorCustomerStatusStrip } from "./VendorCustomerStatusStrip";
 import { mergeCustomerOrderPollPatch } from "./merge-customer-order-poll";
 import { OrderHelpSection } from "./OrderHelpSection";
+import { OrderPostCheckoutCartSync } from "./OrderPostCheckoutCartSync";
 
 /** Order as returned by status API / server (dates may be ISO strings after JSON). */
 type OrderFromApi = Awaited<ReturnType<typeof getOrderStatusAction>>;
@@ -206,6 +207,11 @@ export function OrderPageContent({
   return (
     <div className="max-w-2xl">
       <SetCustomerPhoneFromOrder customerPhone={order.customerPhone} />
+      <OrderPostCheckoutCartSync
+        orderId={orderId}
+        podId={order.podId}
+        orderStatus={order.status}
+      />
       {from === "cart" && (
         <p className="rounded-lg border border-stone-200 bg-stone-100 px-4 py-2 text-sm text-stone-700">
           You already have an active order. Here&apos;s your order status.

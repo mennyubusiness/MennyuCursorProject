@@ -10,7 +10,16 @@ import {
   type ReactNode,
 } from "react";
 import type { Cart } from "@/domain/types";
-import { CART_UPDATED_EVENT, dispatchCartUpdated, type CartUpdatedDetail } from "@/lib/cart-client-sync";
+import {
+  CART_CLEARED_EVENT,
+  CART_UPDATED_EVENT,
+  dispatchCartUpdated,
+  emptyCartSnapshot,
+  shouldApplyCartSnapshot,
+  cartClearAppliesToContext,
+  type CartClearedDetail,
+  type CartUpdatedDetail,
+} from "@/lib/cart-client-sync";
 import { getCurrentPodIdFromClient } from "@/lib/quick-cart-pod";
 
 type QuickCartContextValue = {
@@ -96,6 +105,22 @@ export function QuickCartProvider({
     const onCartUpdated = (event: Event) => {
       const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
       if (detail?.cart !== undefined) {
+        if (detail.source === "quick-cart") return;
+
+        const currentPodId = getCurrentPodIdFromClient();
+        if (detail.cart && currentPodId && detail.cart.podId !== currentPodId) return;
+
+        if (cart?.id && cart.podId) {
+          if (
+            !shouldApplyCartSnapshot(detail, "quick-cart", {
+              cartId: cart.id,
+              podId: cart.podId,
+            })
+          ) {
+            return;
+          }
+        }
+
         applyCartSnapshot(detail.cart);
         return;
       }
@@ -103,9 +128,30 @@ export function QuickCartProvider({
         void refreshCart();
       }
     };
+    const onCartCleared = (event: Event) => {
+      const detail = (event as CustomEvent<CartClearedDetail>).detail;
+      const currentPodId = getCurrentPodIdFromClient() ?? cart?.podId ?? "";
+      const ctx = {
+        cartId: cart?.id ?? detail?.cartId ?? "",
+        podId: currentPodId || detail?.podId || "",
+      };
+      if (!detail || !ctx.podId || !cartClearAppliesToContext(detail, ctx)) return;
+      const empty =
+        detail.cart ??
+        emptyCartSnapshot({
+          id: detail.cartId,
+          podId: detail.podId,
+          sessionId: cart?.sessionId,
+        });
+      applyCartSnapshot(empty);
+    };
     window.addEventListener(CART_UPDATED_EVENT, onCartUpdated);
-    return () => window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated);
-  }, [enabled, applyCartSnapshot, refreshCart]);
+    window.addEventListener(CART_CLEARED_EVENT, onCartCleared);
+    return () => {
+      window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated);
+      window.removeEventListener(CART_CLEARED_EVENT, onCartCleared);
+    };
+  }, [enabled, applyCartSnapshot, refreshCart, cart?.id, cart?.podId, cart?.sessionId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -164,6 +210,6 @@ export function useQuickCartOptional(): QuickCartContextValue | null {
 
 /** After server cart mutations from drawer controls. */
 export function notifyQuickCartUpdated(cart: Cart | null) {
-  dispatchCartUpdated({ cart });
+  dispatchCartUpdated({ cart, source: "quick-cart" });
   return cart;
 }

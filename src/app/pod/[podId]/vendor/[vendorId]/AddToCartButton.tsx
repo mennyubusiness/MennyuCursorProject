@@ -7,7 +7,6 @@ import { useVendorMenuModifier } from "@/components/vendor-menu/VendorMenuModifi
 import { useVendorMenuCart } from "@/components/vendor-menu/VendorMenuCartContext";
 import type { Cart, CartItem } from "@/domain/types";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
-import { dispatchCartUpdated } from "@/lib/cart-client-sync";
 
 function CartLineQtyControls({
   cartId,
@@ -39,7 +38,6 @@ function CartLineQtyControls({
       }
     } catch {
       applyServerCart(before);
-      dispatchCartUpdated({ cart: before });
     } finally {
       setLoading(false);
     }

@@ -225,6 +225,7 @@ export default async function CheckoutPage({
 
       <CheckoutForm
         cartId={cart.id}
+        podId={cart.podId}
         totalCents={totals.totalCents}
         subtotalCents={totals.subtotalCents}
         serviceFeeCents={totals.serviceFeeCents}
