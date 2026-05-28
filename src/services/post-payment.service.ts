@@ -8,10 +8,8 @@ import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
 import { recordPaymentAndAllocations } from "@/services/payment.service";
 import { setOrderStatus } from "@/services/order.service";
 import { submitVendorOrder } from "@/services/routing.service";
-import { sendOrderConfirmation } from "@/services/sms.service";
+import { sendOrderReceivedMilestone } from "@/services/customer-order-notification.service";
 import { deriveParentStatusFromVendorOrders } from "@/services/order-status.service";
-import { formatPickupSmsFragment } from "@/lib/pickup-display";
-import { resolvePickupTimezone } from "@/lib/pickup-scheduling";
 
 /**
  * Run full post-payment flow: record payment (or skip if already recorded), set status,
@@ -77,17 +75,7 @@ export async function processSuccessfulPayment(params: {
     await setOrderStatus(orderId, parentStatus, "system");
 
     if (paymentCreated) {
-      const tz = resolvePickupTimezone(order.pod);
-      await sendOrderConfirmation(
-        order.customerPhone,
-        orderId,
-        order.totalCents,
-        formatPickupSmsFragment({
-          requestedPickupAt: order.requestedPickupAt,
-          deliverectEstimatedReadyAt: order.deliverectEstimatedReadyAt,
-          resolvedPickupTimezone: tz,
-        })
-      );
+      await sendOrderReceivedMilestone(orderId, order.customerPhone);
     }
   }
 

@@ -83,6 +83,15 @@ describe("cart-client-sync", () => {
     ).toBe(false);
   });
 
+  it("shouldApplyCartSnapshot applies cart-page snapshots to other listeners", () => {
+    expect(
+      shouldApplyCartSnapshot({ cart: cart(), source: "cart-page" }, "quick-cart", ctx)
+    ).toBe(true);
+    expect(
+      shouldApplyCartSnapshot({ cart: cart(), source: "cart-page" }, "vendor-menu", ctx)
+    ).toBe(true);
+  });
+
   it("cartClearAppliesToContext matches pod and cartId when present", () => {
     expect(
       cartClearAppliesToContext({ cartId: "cart_1", podId: "pod_a" }, ctx)

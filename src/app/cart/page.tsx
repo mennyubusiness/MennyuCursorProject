@@ -11,15 +11,29 @@ import {
 } from "@/services/cart.service";
 import { getActiveOrderByCustomerPhone, validateCartItemsForDisplay, getCartValidationMessage } from "@/services/order.service";
 import type { CartForValidation } from "@/services/order.service";
+import type { Cart } from "@/domain/types";
 import { MenuItemImage } from "@/components/images/MenuItemImage";
 import { loadCartEditModifierPayloadsForCartPage } from "@/services/cart-edit-modal-payload.service";
 import { cartPagePerfMark, cartPagePerfNow, CART_PAGE_PERF_LOG } from "@/lib/cart-page-perf";
 import {
   getParentShellInfoByVendorParentPlu,
-  getVariantOptionDisplayNameForLeaf,
+  getVariantOptionDisplayNamesForLeafLines,
   shellBasePriceKey,
+  variantLeafDisplayKey,
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartItemActions } from "./CartItemActions";
+import {
+  CartPageLiveCheckoutGate,
+  CartPageLiveEmptyNotice,
+  CartPageLiveFoodSubtotal,
+  CartPageLiveLineGate,
+  CartPageLiveLineTotal,
+  CartPageLiveQuantity,
+  CartPageLiveVendorLineCountLabel,
+  CartPageLiveVendorSection,
+  CartPageLiveVendorSubtotal,
+  CartPageMutationProvider,
+} from "./CartPageMutationSync";
 import { CheckoutProgress } from "../checkout/CheckoutProgress";
 import { GROUP_ORDER_JOIN_TOKEN_COOKIE } from "@/lib/group-order-cookies";
 import {
@@ -223,6 +237,34 @@ export default async function CartPage({
   const totalCents = Array.from(byVendor.values()).reduce((a, v) => a + v.subtotalCents, 0);
   const vendorCount = byVendor.size;
 
+  const initialCartSnapshot: Cart = {
+    id: cart.id,
+    podId: cart.podId,
+    sessionId: cart.sessionId ?? "",
+    items: cart.items.map((i) => ({
+      id: i.id,
+      menuItemId: i.menuItemId,
+      vendorId: i.vendorId,
+      quantity: i.quantity,
+      priceCents: i.priceCents,
+      specialInstructions: i.specialInstructions,
+    })),
+    groups: Array.from(byVendor.entries()).map(([vendorId, g]) => ({
+      vendorId,
+      vendorName: g.name,
+      items: g.items.map((i) => ({
+        id: i.id,
+        menuItemId: i.menuItemId,
+        vendorId: i.vendorId,
+        quantity: i.quantity,
+        priceCents: i.priceCents,
+        specialInstructions: i.specialInstructions,
+      })),
+      subtotalCents: g.subtotalCents,
+    })),
+    subtotalCents: totalCents,
+  };
+
   const tEdit = cartPagePerfNow();
   const cartEditModifierByItemId = await loadCartEditModifierPayloadsForCartPage(
     cart.items.map((item) => ({
@@ -245,23 +287,28 @@ export default async function CartPage({
   cartPagePerfMark("parent_shell_batch", tShell);
 
   const tVar = cartPagePerfNow();
-  const variantSizeLabelByCartItemId = new Map<string, string | null>();
-  await Promise.all(
-    cart.items.map(async (item) => {
-      const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
-      if (!pplu) {
-        variantSizeLabelByCartItemId.set(item.id, null);
-        return;
-      }
-      const label = await getVariantOptionDisplayNameForLeaf(
-        item.vendorId,
-        item.menuItem.deliverectVariantParentPlu,
-        item.menuItem.deliverectPlu
-      );
-      variantSizeLabelByCartItemId.set(item.id, label);
-    })
+  const variantDisplayNames = await getVariantOptionDisplayNamesForLeafLines(
+    cart.items.map((item) => ({
+      vendorId: item.vendorId,
+      deliverectVariantParentPlu: item.menuItem.deliverectVariantParentPlu,
+      deliverectPlu: item.menuItem.deliverectPlu,
+    }))
   );
-  cartPagePerfMark("variant_size_labels_parallel", tVar);
+  const variantSizeLabelByCartItemId = new Map<string, string | null>();
+  for (const item of cart.items) {
+    const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
+    if (!pplu) {
+      variantSizeLabelByCartItemId.set(item.id, null);
+      continue;
+    }
+    const leafKey = variantLeafDisplayKey(
+      item.vendorId,
+      item.menuItem.deliverectVariantParentPlu,
+      item.menuItem.deliverectPlu
+    );
+    variantSizeLabelByCartItemId.set(item.id, leafKey ? (variantDisplayNames.get(leafKey) ?? null) : null);
+  }
+  cartPagePerfMark("variant_size_labels_batch", tVar);
 
   const tVal = cartPagePerfNow();
   const cartForValidation: CartForValidation = {
@@ -426,10 +473,17 @@ export default async function CartPage({
         </p>
       )}
 
+      <CartPageMutationProvider
+        cartId={cart.id}
+        podId={cart.podId}
+        initialCart={initialCartSnapshot}
+      >
+      <CartPageLiveEmptyNotice />
+
       <div className="mt-10 space-y-10">
         {Array.from(byVendor.entries()).map(([vendorId, group]) => (
+          <CartPageLiveVendorSection key={vendorId} vendorId={vendorId}>
           <section
-            key={vendorId}
             className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_1px_0_rgba(0,0,0,0.04),0_8px_24px_-8px_rgba(0,0,0,0.08)]"
             aria-labelledby={`vendor-${vendorId}-heading`}
           >
@@ -447,7 +501,7 @@ export default async function CartPage({
                 </Link>
               </div>
               <p className="mt-1 text-xs text-stone-500">
-                {group.items.length} line{group.items.length !== 1 ? "s" : ""} in this group
+                <CartPageLiveVendorLineCountLabel vendorId={vendorId} fallback={group.items.length} />
               </p>
             </div>
             <ul className="divide-y divide-stone-100/90">
@@ -499,8 +553,8 @@ export default async function CartPage({
                     .filter((m) => Boolean(m.label)) ?? []),
                 ];
                 return (
+                  <CartPageLiveLineGate key={item.id} cartItemId={item.id}>
                   <li
-                    key={item.id}
                     className={`flex gap-3 px-4 py-4 sm:px-5 ${itemError ? "bg-amber-50/50" : ""}`}
                   >
                     <MenuItemImage imageUrl={lineImageUrl} itemName={lineTitle} />
@@ -508,7 +562,9 @@ export default async function CartPage({
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-stone-900">
                           {lineTitle}
-                          <span className="ml-2 font-normal text-stone-500">× {item.quantity}</span>
+                          <span className="ml-2 font-normal text-stone-500">
+                            × <CartPageLiveQuantity cartItemId={item.id} fallback={item.quantity} />
+                          </span>
                         </p>
                         {modLines.length > 0 && (
                           <ul className="mt-2 space-y-0.5 text-sm text-stone-600">
@@ -534,7 +590,10 @@ export default async function CartPage({
                       </div>
                       <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end">
                       <span className="text-lg font-semibold tabular-nums text-stone-900">
-                        ${((item.priceCents * item.quantity) / 100).toFixed(2)}
+                        <CartPageLiveLineTotal
+                          cartItemId={item.id}
+                          fallbackCents={item.priceCents * item.quantity}
+                        />
                       </span>
                       <CartItemActions
                         cartId={cart.id}
@@ -561,16 +620,18 @@ export default async function CartPage({
                     </div>
                     </div>
                   </li>
+                  </CartPageLiveLineGate>
                 );
               })}
             </ul>
             <div className="border-t border-stone-100 bg-stone-50/80 px-4 py-3 text-right text-sm text-stone-600 sm:px-5">
               <span className="text-stone-500">Subtotal for {group.name}</span>{" "}
               <span className="font-semibold text-stone-900 tabular-nums">
-                ${(group.subtotalCents / 100).toFixed(2)}
+                <CartPageLiveVendorSubtotal vendorId={vendorId} fallbackCents={group.subtotalCents} />
               </span>
             </div>
           </section>
+          </CartPageLiveVendorSection>
         ))}
       </div>
 
@@ -587,7 +648,7 @@ export default async function CartPage({
             <div className="flex items-baseline justify-between gap-4 border-b border-stone-100 pb-3">
               <dt className="text-base text-stone-700">Food subtotal</dt>
               <dd className="text-xl font-bold tabular-nums text-stone-900">
-                ${(totalCents / 100).toFixed(2)}
+                <CartPageLiveFoodSubtotal fallbackCents={totalCents} />
               </dd>
             </div>
             <div className="flex flex-wrap gap-x-2 text-xs leading-relaxed text-stone-500">
@@ -613,6 +674,7 @@ export default async function CartPage({
       )}
 
       {/* Sticky checkout strip on small screens; flows inline from md+ */}
+      <CartPageLiveCheckoutGate>
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200/90 bg-white/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.1)] backdrop-blur-md supports-[backdrop-filter]:bg-white/90 sm:static sm:z-auto sm:mt-10 sm:border-0 sm:bg-transparent sm:p-0 sm:pb-0 sm:shadow-none sm:backdrop-blur-none">
         <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <Link
@@ -638,7 +700,7 @@ export default async function CartPage({
                     Food subtotal
                   </span>
                   <span className="text-lg font-bold tabular-nums text-stone-900">
-                    ${(totalCents / 100).toFixed(2)}
+                    <CartPageLiveFoodSubtotal fallbackCents={totalCents} />
                   </span>
                 </>
               )}
@@ -691,6 +753,8 @@ export default async function CartPage({
           ← Back to pod
         </Link>
       </div>
+      </CartPageLiveCheckoutGate>
+      </CartPageMutationProvider>
     </div>
   );
 }

@@ -29,12 +29,18 @@ Transactional SMS for order confirmation and status updates (future: issue notif
 
 ## Current wired events
 
-- `order_confirmation` — after payment is first recorded (`processSuccessfulPayment` / idempotent post-payment flow).
-- `order_status_{status}` — when parent order status changes (except dev simulator source).
-- `order_ready_for_pickup` — when parent status becomes `ready` (includes pickup code).
+- `milestone_order_received` — after payment is first recorded (`processSuccessfulPayment`).
+- `milestone_vendor_ready` — per vendor when ready in a multi-vendor order (not the final pickup).
+- `milestone_final_vendor_ready` — last active vendor ready, or single-vendor ready (includes pickup code).
+- `milestone_vendor_cancelled` — one vendor cancelled while the order continues.
+- `milestone_order_cancelled` — whole parent order cancelled.
+- `milestone_order_issue` — template + idempotency ready; wire when customer issue SMS is enabled.
+
+Legacy parent-status SMS (`order_status_*`, `order_confirmation`) is bypassed in favor of milestones.
 
 ## Code entry points
 
+- `src/services/customer-order-notification.service.ts` — milestone templates + evaluator
 - `src/services/sms.service.ts` — `sendTransactionalSms`
 - `src/lib/twilio.ts` — Twilio client
 - `src/lib/phone.ts` — US E.164 normalization

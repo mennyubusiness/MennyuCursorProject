@@ -161,7 +161,7 @@ export function VendorMenuCartProvider({
       const snapshot = cart;
       const optimisticCart = optimisticPendingModifierLine(snapshot, optimistic);
       setCart(optimisticCart);
-      dispatchCartUpdated({ cart: optimisticCart });
+      dispatchCartUpdated({ cart: optimisticCart, source: "vendor-menu" });
 
       void (async () => {
         try {

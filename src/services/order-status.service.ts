@@ -38,13 +38,9 @@ import {
   applyVendorOrderStatusWithMeta,
   legacySourceToStatusSource,
 } from "@/services/vendor-order-status-instrumentation";
-import { sendOrderStatusUpdate } from "./sms.service";
 import { resolvePickupTimezone } from "@/lib/pickup-scheduling";
 import { DELIVERECT_RECONCILIATION_STALE_MINUTES } from "@/lib/admin-exceptions";
 import { logDeliverectOrderWebhook } from "@/integrations/deliverect/deliverect-webhook-structured-log";
-
-/** Source tag for dev simulator; SMS is skipped when source is this value. */
-const DEV_SIMULATOR_SOURCE = "dev_simulator";
 
 /**
  * Derive parent order status from vendor orders using effective child state (recovery-normalized).
@@ -635,7 +631,7 @@ const VENDOR_DASHBOARD_POS_BLOCK_MESSAGE =
 /**
  * Apply a single state transition for a vendor order (shared by dev simulator and vendor dashboard).
  * Validates transition, updates VendorOrder, appends history, recomputes parent order status.
- * When source !== "dev_simulator", customer SMS is sent on parent status change.
+ * Customer milestone SMS is evaluated in applyVendorOrderStatusWithMeta after parent recompute.
  */
 export async function applyVendorOrderTransition(
   vendorOrderId: string,
@@ -774,9 +770,6 @@ export async function recomputeAndPersistParentStatus(
           createdBy: "system",
         });
       }
-    }
-    if (source !== DEV_SIMULATOR_SOURCE) {
-      await sendOrderStatusUpdate(order.customerPhone, orderId, newStatus);
     }
   }
   return newStatus;

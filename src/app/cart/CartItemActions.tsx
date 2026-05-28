@@ -1,11 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { updateCartItemAction, removeFromCartAction } from "@/actions/cart.actions";
-import { dispatchCartItemAdded } from "@/lib/cart-ui-feedback";
+import { dispatchCartUpdated } from "@/lib/cart-client-sync";
+import type { Cart } from "@/domain/types";
 import { ModifierModal } from "@/components/ModifierModal";
 import type { ModifierConfigForUI } from "@/lib/modifier-config";
+import { CartPageLiveQuantity } from "./CartPageMutationSync";
+
+function publishCartPageMutation(cart: Cart | null | undefined): void {
+  if (!cart) return;
+  dispatchCartUpdated({ cart, source: "cart-page" });
+}
 
 /**
  * Cart item quantity, special instructions, remove, and (for configurable items) modifier edit.
@@ -35,7 +41,6 @@ export function CartItemActions({
   interactionDisabled?: boolean;
   interactionDisabledReason?: string | null;
 }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -55,20 +60,14 @@ export function CartItemActions({
     );
   }
 
-  async function refresh() {
-    router.refresh();
-  }
-
   async function updateQuantity(q: number) {
     setError(null);
     setLoading(true);
     try {
       const result = await updateCartItemAction(cartId, cartItemId, q, specialInstructions ?? null);
       if (result?.success) {
-        dispatchCartItemAdded();
-        await refresh();
-      }
-      else if (result && !result.success) setError(result.error);
+        publishCartPageMutation(result.cart);
+      } else if (result && !result.success) setError(result.error);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
     } finally {
@@ -84,7 +83,7 @@ export function CartItemActions({
       const result = await updateCartItemAction(cartId, cartItemId, quantity, value);
       if (result?.success) {
         setEditing(false);
-        await refresh();
+        publishCartPageMutation(result.cart);
       } else if (result && !result.success) setError(result.error);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
@@ -97,9 +96,8 @@ export function CartItemActions({
     setError(null);
     setLoading(true);
     try {
-      await removeFromCartAction(cartId, cartItemId);
-      dispatchCartItemAdded();
-      await refresh();
+      const cart = await removeFromCartAction(cartId, cartItemId);
+      publishCartPageMutation(cart);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Remove failed");
     } finally {
@@ -118,7 +116,9 @@ export function CartItemActions({
         >
           −
         </button>
-        <span className="w-6 text-center text-sm">{quantity}</span>
+        <span className="w-6 text-center text-sm">
+          <CartPageLiveQuantity cartItemId={cartItemId} fallback={quantity} />
+        </span>
         <button
           type="button"
           onClick={() => updateQuantity(quantity + 1)}
@@ -162,11 +162,10 @@ export function CartItemActions({
           quantity={quantity}
           initialSelections={initialSelections}
           initialSpecialInstructions={specialInstructions}
+          cartUpdateSource="cart-page"
           onClose={() => setModifierModalOpen(false)}
           onSuccess={() => {
             setModifierModalOpen(false);
-            dispatchCartItemAdded();
-            refresh();
           }}
           vendorUsesDeliverect={vendorUsesDeliverect}
           menuItemDeliverectVariantParentPlu={menuItemDeliverectVariantParentPlu}

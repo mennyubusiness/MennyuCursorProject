@@ -3,7 +3,10 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { ModifierConfigForUI, ModifierOptionForUI } from "./modifier-config";
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
-import { dispatchCartUpdated } from "@/lib/cart-client-sync";
+import {
+  dispatchCartUpdated,
+  type CartUpdateSource,
+} from "@/lib/cart-client-sync";
 import { useVendorMenuCartOptional } from "@/components/vendor-menu/VendorMenuCartContext";
 import type { Cart, CartItemSelection } from "@/domain/types";
 import { restoreCartFocus } from "@/lib/cart-focus";
@@ -67,6 +70,7 @@ export function ModifierModal({
   /** From `MenuItem.deliverectVariantParentPlu` — leaf rows use parent shell for variant merge. */
   menuItemDeliverectVariantParentPlu,
   returnFocusMenuItemId,
+  cartUpdateSource = "vendor-menu",
 }: {
   config: ModifierConfigForUI;
   cartId: string;
@@ -81,6 +85,7 @@ export function ModifierModal({
   initialSpecialInstructions?: string | null;
   vendorUsesDeliverect?: boolean;
   menuItemDeliverectVariantParentPlu?: string | null;
+  cartUpdateSource?: CartUpdateSource;
 }) {
   const vendorMenuCart = useVendorMenuCartOptional();
   const isEditMode = !!cartItemId;
@@ -91,10 +96,10 @@ export function ModifierModal({
       if (vendorMenuCart) {
         vendorMenuCart.applyServerCart(next);
       } else {
-        dispatchCartUpdated({ cart: next, source: "vendor-menu" });
+        dispatchCartUpdated({ cart: next, source: cartUpdateSource });
       }
     },
-    [vendorMenuCart]
+    [vendorMenuCart, cartUpdateSource]
   );
 
   /** Prefer server flag; fallback to scanning groups (older serialized configs). */

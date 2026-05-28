@@ -121,10 +121,21 @@ export async function applyVendorOrderStatusWithMeta(
 
   const { recomputeAndPersistParentStatus } = await import("@/services/order-status.service");
   // Circular import: TS may infer `void` on the lazy import; runtime return is ParentOrderStatus.
-  return (await recomputeAndPersistParentStatus(
+  const parentStatus = (await recomputeAndPersistParentStatus(
     params.orderId,
     recomputeParentSource
   )) as ParentOrderStatus;
+
+  const { evaluateCustomerOrderMilestones } = await import(
+    "@/services/customer-order-notification.service"
+  );
+  await evaluateCustomerOrderMilestones({
+    orderId: params.orderId,
+    vendorOrderId: params.vendorOrderId,
+    source: recomputeParentSource,
+  });
+
+  return parentStatus;
 }
 
 /** Map legacy history source strings to Prisma VendorOrderStatusSource. */

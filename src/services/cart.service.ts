@@ -32,7 +32,7 @@ export type { ResolvedGroupCartActor } from "@/services/group-order.service";
 const DEBUG_ADD_TO_CART_TRACE = true;
 
 /** TEMP: set false to silence stale-checkout unlink trace logs */
-const DEBUG_DISCARD_STALE_CHECKOUT = true;
+const DEBUG_DISCARD_STALE_CHECKOUT = process.env.NODE_ENV === "development";
 
 /**
  * Completed / in-flight orders (anything except unpaid `pending_payment` or retryable `failed`) may
