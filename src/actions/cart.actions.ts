@@ -6,6 +6,8 @@ import { cookies } from "next/headers";
 import {
   getOrCreateCart,
   getCartById,
+  getOrCreateCartForVendorMenuPage,
+  getCartByIdForMutation,
   addCartItem,
   updateCartItem,
   removeCartItem,
@@ -20,6 +22,18 @@ import { resolveGroupOrderActorForCartMutation } from "@/actions/group-order-con
 
 /** TEMP: set false to silence add-to-cart trace logs */
 const DEBUG_ADD_TO_CART_TRACE = true;
+
+export async function getOrCreateCartForVendorMenuAction(podId: string) {
+  const store = await cookies();
+  const join = store.get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null;
+  const sharedCartId = await resolveSharedGroupCartIdForPod(podId, join);
+  if (sharedCartId) {
+    const cart = await getCartByIdForMutation(sharedCartId);
+    if (cart) return cart;
+  }
+  const sessionId = await getOrCreateMennyuSessionIdForCart();
+  return getOrCreateCartForVendorMenuPage(podId, sessionId);
+}
 
 export async function getOrCreateCartAction(podId: string) {
   const store = await cookies();

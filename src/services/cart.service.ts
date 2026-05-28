@@ -143,6 +143,27 @@ export const CART_MUTATION_CART_INCLUDE = {
   },
 } satisfies Prisma.CartInclude;
 
+export async function getOrCreateCartForVendorMenuPage(
+  podId: string,
+  sessionId: string
+): Promise<Cart> {
+  let cart = await prisma.cart.findUnique({
+    where: { podId_sessionId: { podId, sessionId } },
+    include: CART_MUTATION_CART_INCLUDE,
+  });
+
+  if (!cart) {
+    cart = await prisma.cart.create({
+      data: { podId, sessionId },
+      include: CART_MUTATION_CART_INCLUDE,
+    });
+  }
+
+  await unlinkCompletedCheckoutOrdersFromCart(cart.id);
+
+  return toCartWithGroups(cart);
+}
+
 export async function getCartByIdForMutation(cartId: string): Promise<Cart | null> {
   const cart = await prisma.cart.findUnique({
     where: { id: cartId },

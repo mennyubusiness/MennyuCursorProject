@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import { RecentVendorViewTracker } from "@/components/retention/RecentViewTracker";
 import { VendorMenuExperience } from "@/components/vendor-menu/VendorMenuExperience";
 import { VendorMenuHero } from "@/components/vendor-menu/VendorMenuHero";
-import { getOrCreateCartAction } from "@/actions/cart.actions";
+import { getOrCreateCartForVendorMenuAction } from "@/actions/cart.actions";
 import { prisma } from "@/lib/db";
 import { getVendorAvailabilityStatus, type VendorAvailabilityStatus } from "@/lib/vendor-availability";
 import { loadCustomerVendorMenuSections } from "@/services/vendor-customer-menu.service";
+
+const DEBUG_VENDOR_MENU_PAGE = process.env.NODE_ENV === "development";
 
 function availabilityBannerCopy(status: VendorAvailabilityStatus): string | null {
   if (status === "open") return null;
@@ -20,6 +22,8 @@ export default async function VendorMenuPage({
   params: Promise<{ podId: string; vendorId: string }>;
 }) {
   const { podId, vendorId } = await params;
+  const pageStarted = DEBUG_VENDOR_MENU_PAGE ? Date.now() : 0;
+
   const pod = await prisma.pod.findUnique({
     where: { id: podId },
     select: {
@@ -50,10 +54,25 @@ export default async function VendorMenuPage({
   const vendor = pv?.vendor;
   if (!pod || !vendor) notFound();
 
+  const menuStarted = DEBUG_VENDOR_MENU_PAGE ? Date.now() : 0;
+  const cartStarted = DEBUG_VENDOR_MENU_PAGE ? Date.now() : 0;
+
   const [{ sections, variantChildCountByParentPlu }, cart] = await Promise.all([
     loadCustomerVendorMenuSections(vendorId),
-    getOrCreateCartAction(podId),
+    getOrCreateCartForVendorMenuAction(podId),
   ]);
+
+  if (DEBUG_VENDOR_MENU_PAGE) {
+    console.info("[vendor-menu-page] load timing", {
+      vendorId,
+      podId,
+      menuMs: Date.now() - menuStarted,
+      cartMs: Date.now() - cartStarted,
+      totalMs: Date.now() - pageStarted,
+      sectionCount: sections.length,
+      cartItemCount: cart.items.length,
+    });
+  }
 
   const availabilityStatus = getVendorAvailabilityStatus(vendor);
   const unavailable = availabilityStatus !== "open";
