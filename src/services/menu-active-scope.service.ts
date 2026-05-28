@@ -11,6 +11,9 @@
  */
 import "server-only";
 
+import { unstable_cache } from "next/cache";
+import { revalidateTag } from "next/cache";
+import { requestCache } from "@/lib/request-cache";
 import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
@@ -27,6 +30,15 @@ export type ActiveDeliverectSets = {
   modifierGroupDeliverectIds: Set<string>;
   pluByProductDeliverectId: Map<string, string | null | undefined>;
 };
+
+export function operationalMenuCacheTag(vendorId: string): string {
+  return `operational-menu:${vendorId}`;
+}
+
+/** Invalidate cached operational menu/modifier ids after menu publish or admin menu changes. */
+export function revalidateOperationalMenuCacheForVendor(vendorId: string): void {
+  revalidateTag(operationalMenuCacheTag(vendorId));
+}
 
 export function buildActiveDeliverectSets(menu: MennyuCanonicalMenu): ActiveDeliverectSets {
   const productDeliverectIds = new Set(menu.products.map((p) => p.deliverectId));
@@ -120,28 +132,36 @@ export function pickOperationalMenuItemWinners(
   return { winnerIds, duplicateProductWarnings };
 }
 
-async function loadPublishedMenu(vendorId: string): Promise<MennyuCanonicalMenu | null> {
+type PublishedMenuMeta = {
+  menu: MennyuCanonicalMenu | null;
+  menuVersionId: string | null;
+};
+
+async function loadPublishedMenuMeta(vendorId: string): Promise<PublishedMenuMeta> {
   const published = await prisma.menuVersion.findFirst({
     where: { vendorId, state: MenuVersionState.published },
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-    select: { canonicalSnapshot: true },
+    select: { id: true, canonicalSnapshot: true },
   });
-  if (!published?.canonicalSnapshot) return null;
+  if (!published?.canonicalSnapshot) {
+    return { menu: null, menuVersionId: null };
+  }
   const parsed = mennyuCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
-  return parsed.success ? parsed.data : null;
+  return {
+    menu: parsed.success ? parsed.data : null,
+    menuVersionId: published.id,
+  };
 }
 
-/**
- * MenuItem row ids that are operationally active for this vendor (see module doc).
- */
-export async function getOperationalMenuItemIdsForVendor(vendorId: string): Promise<Set<string>> {
-  const menu = await loadPublishedMenu(vendorId);
+async function computeOperationalMenuItemIdsUncached(vendorId: string): Promise<string[]> {
+  const { menu, menuVersionId } = await loadPublishedMenuMeta(vendorId);
   if (!menu) {
-    return fallbackWinnersNoPublishedMenu(vendorId);
+    const set = await fallbackWinnersNoPublishedMenu(vendorId);
+    return [...set];
   }
 
   const productIds = [...new Set(menu.products.map((p) => p.deliverectId))];
-  if (productIds.length === 0) return new Set();
+  if (productIds.length === 0) return [];
 
   const rows = await prisma.menuItem.findMany({
     where: { vendorId, deliverectProductId: { in: productIds } },
@@ -149,8 +169,36 @@ export async function getOperationalMenuItemIdsForVendor(vendorId: string): Prom
   });
 
   const { winnerIds } = pickOperationalMenuItemWinners(menu, rows, { vendorId });
-  return winnerIds;
+  return [...winnerIds];
 }
+
+function cachedOperationalMenuItemIdsForPublishedMenu(
+  vendorId: string,
+  menuVersionId: string
+): Promise<string[]> {
+  return unstable_cache(
+    async () => computeOperationalMenuItemIdsUncached(vendorId),
+    ["operational-menu-item-ids", vendorId, menuVersionId],
+    { tags: [operationalMenuCacheTag(vendorId)] }
+  )();
+}
+
+async function resolveOperationalMenuItemIds(vendorId: string): Promise<Set<string>> {
+  const { menuVersionId } = await loadPublishedMenuMeta(vendorId);
+  if (!menuVersionId) {
+    return fallbackWinnersNoPublishedMenu(vendorId);
+  }
+  const ids = await cachedOperationalMenuItemIdsForPublishedMenu(vendorId, menuVersionId);
+  return new Set(ids);
+}
+
+/**
+ * MenuItem row ids that are operationally active for this vendor (see module doc).
+ * Request-deduped; cross-request cache keyed by vendor + published menu version.
+ */
+export const getOperationalMenuItemIdsForVendor = requestCache(
+  async (vendorId: string): Promise<Set<string>> => resolveOperationalMenuItemIds(vendorId)
+);
 
 /** When no published snapshot exists, use latest row per deliverectProductId (legacy). */
 async function fallbackWinnersNoPublishedMenu(vendorId: string): Promise<Set<string>> {
@@ -185,22 +233,18 @@ export async function isMenuItemIdOperational(vendorId: string, menuItemId: stri
   return winners.has(menuItemId);
 }
 
-/**
- * ModifierOption PK ids that are operational: canonical (group, option) pair resolved to DB rows,
- * winner = latest `updatedAt` per (modifierGroupId, deliverectModifierId).
- */
-export async function getOperationalModifierOptionIdsForVendor(vendorId: string): Promise<Set<string>> {
-  const menu = await loadPublishedMenu(vendorId);
+async function computeOperationalModifierOptionIdsUncached(vendorId: string): Promise<string[]> {
+  const { menu } = await loadPublishedMenuMeta(vendorId);
   if (!menu) {
     const opts = await prisma.modifierOption.findMany({
       where: { modifierGroup: { vendorId } },
       select: { id: true },
     });
-    return new Set(opts.map((o) => o.id));
+    return opts.map((o) => o.id);
   }
 
   const groupIds = [...menu.modifierGroupDefinitions.map((g) => g.deliverectId)];
-  if (groupIds.length === 0) return new Set();
+  if (groupIds.length === 0) return [];
 
   const dbGroups = await prisma.modifierGroup.findMany({
     where: { vendorId, deliverectModifierGroupId: { in: groupIds } },
@@ -208,7 +252,6 @@ export async function getOperationalModifierOptionIdsForVendor(vendorId: string)
   });
   const groupByDeliverect = new Map(dbGroups.map((g) => [g.deliverectModifierGroupId!, g.id]));
 
-  const defByGid = new Map(menu.modifierGroupDefinitions.map((g) => [g.deliverectId, g]));
   const ids = new Set<string>();
 
   for (const gdef of menu.modifierGroupDefinitions) {
@@ -233,8 +276,37 @@ export async function getOperationalModifierOptionIdsForVendor(vendorId: string)
     }
   }
 
-  return ids;
+  return [...ids];
 }
+
+function cachedOperationalModifierOptionIdsForPublishedMenu(
+  vendorId: string,
+  menuVersionId: string
+): Promise<string[]> {
+  return unstable_cache(
+    async () => computeOperationalModifierOptionIdsUncached(vendorId),
+    ["operational-modifier-option-ids", vendorId, menuVersionId],
+    { tags: [operationalMenuCacheTag(vendorId)] }
+  )();
+}
+
+async function resolveOperationalModifierOptionIds(vendorId: string): Promise<Set<string>> {
+  const { menuVersionId } = await loadPublishedMenuMeta(vendorId);
+  if (!menuVersionId) {
+    const ids = await computeOperationalModifierOptionIdsUncached(vendorId);
+    return new Set(ids);
+  }
+  const ids = await cachedOperationalModifierOptionIdsForPublishedMenu(vendorId, menuVersionId);
+  return new Set(ids);
+}
+
+/**
+ * ModifierOption PK ids that are operational: canonical (group, option) pair resolved to DB rows,
+ * winner = latest `updatedAt` per (modifierGroupId, deliverectModifierId).
+ */
+export const getOperationalModifierOptionIdsForVendor = requestCache(
+  async (vendorId: string): Promise<Set<string>> => resolveOperationalModifierOptionIds(vendorId)
+);
 
 export async function isModifierOptionIdOperational(vendorId: string, modifierOptionId: string): Promise<boolean> {
   const set = await getOperationalModifierOptionIdsForVendor(vendorId);

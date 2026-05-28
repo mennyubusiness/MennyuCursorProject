@@ -5,6 +5,7 @@
  */
 import "server-only";
 import type { MenuImportSource } from "@prisma/client";
+import { revalidateOperationalMenuCacheForVendor } from "@/services/menu-active-scope.service";
 
 export type MenuImportPublishedPayload = {
   jobId: string;
@@ -15,6 +16,7 @@ export type MenuImportPublishedPayload = {
 };
 
 export async function onMenuImportPublishedToLive(payload: MenuImportPublishedPayload): Promise<void> {
+  revalidateOperationalMenuCacheForVendor(payload.vendorId);
   // V1: explicit no-op; wire Deliverect callback URL when contract is fixed.
   if (process.env.NODE_ENV !== "production") {
     // eslint-disable-next-line no-console -- intentional audit trail in dev

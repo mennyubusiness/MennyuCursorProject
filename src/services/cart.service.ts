@@ -11,7 +11,7 @@ import { validateCartItemModifiers } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
 import { selectCartForSessionAndPod } from "@/lib/cart-selection";
 import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
-import { isMenuItemIdOperational } from "@/services/menu-active-scope.service";
+import { getOperationalMenuItemIdsForVendor } from "@/services/menu-active-scope.service";
 import { normalizedConfigurationKey } from "@/lib/cart-line-identity";
 import {
   augmentSelectionsWithImplicitVariantFromLeaf,
@@ -91,6 +91,90 @@ export async function getOrCreateCart(podId: string, sessionId: string): Promise
 
 export type CartItemSelectionInput = { modifierOptionId: string; quantity: number };
 
+function throwIfMenuItemNotOperational(
+  operational: Set<string>,
+  menuItemId: string,
+  name: string,
+  extra?: { cartItemId?: string }
+): void {
+  if (operational.has(menuItemId)) return;
+  throw new CartValidationError(`${name} is not on the current menu.`, "ITEM_NOT_IN_CURRENT_MENU", {
+    menuItemId,
+    menuItemName: name,
+    ...extra,
+  });
+}
+
+async function requireOperationalMenuItem(
+  operationalByVendor: Map<string, Set<string>>,
+  vendorId: string,
+  menuItemId: string,
+  name: string,
+  extra?: { cartItemId?: string }
+): Promise<Set<string>> {
+  let operational = operationalByVendor.get(vendorId);
+  if (!operational) {
+    operational = await getOperationalMenuItemIdsForVendor(vendorId);
+    operationalByVendor.set(vendorId, operational);
+  }
+  throwIfMenuItemNotOperational(operational, menuItemId, name, extra);
+  return operational;
+}
+
+/** Lean cart graph for mutation responses (Quick Cart / vendor menu client state). */
+export const CART_MUTATION_CART_INCLUDE = {
+  items: {
+    include: {
+      menuItem: {
+        select: {
+          id: true,
+          name: true,
+          deliverectPlu: true,
+          deliverectVariantParentPlu: true,
+        },
+      },
+      vendor: { select: { name: true } },
+      selections: {
+        include: {
+          modifierOption: { select: { name: true, priceCents: true } },
+        },
+      },
+    },
+  },
+} satisfies Prisma.CartInclude;
+
+export async function getCartByIdForMutation(cartId: string): Promise<Cart | null> {
+  const cart = await prisma.cart.findUnique({
+    where: { id: cartId },
+    include: CART_MUTATION_CART_INCLUDE,
+  });
+  return cart ? toCartWithGroups(cart) : null;
+}
+
+async function getCartByIdForMutationOrThrow(cartId: string): Promise<Cart> {
+  const cart = await getCartByIdForMutation(cartId);
+  if (!cart) throw new Error("Cart not found");
+  return cart;
+}
+
+function findMatchingCartLine<
+  T extends {
+    id: string;
+    specialInstructions: string | null;
+    selections: Array<{ modifierOptionId: string; quantity: number }>;
+  },
+>(candidates: T[], incomingKey: string): T | null {
+  return (
+    candidates.find((c) => {
+      const key = normalizedConfigurationKey(
+        c.specialInstructions,
+        c.selections.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity }))
+      );
+      return key === incomingKey;
+    }) ?? null
+  );
+}
+
 export async function addCartItem(
   cartId: string,
   menuItemId: string,
@@ -117,12 +201,13 @@ export async function addCartItem(
       name: menuItemInitial.name,
     });
   }
-  if (!(await isMenuItemIdOperational(menuItemInitial.vendorId, menuItemInitial.id))) {
-    throw new CartValidationError(`${menuItemInitial.name} is not on the current menu.`, "ITEM_NOT_IN_CURRENT_MENU", {
-      menuItemId: menuItemInitial.id,
-      menuItemName: menuItemInitial.name,
-    });
-  }
+  const operationalByVendor = new Map<string, Set<string>>();
+  await requireOperationalMenuItem(
+    operationalByVendor,
+    menuItemInitial.vendorId,
+    menuItemInitial.id,
+    menuItemInitial.name
+  );
   if (!menuItemInitial.isAvailable) {
     throw new CartValidationError(`${menuItemInitial.name} is no longer available.`, "ITEM_UNAVAILABLE", {
       menuItemId: menuItemInitial.id,
@@ -175,11 +260,15 @@ export async function addCartItem(
   const shellBase = await shellBasePriceCentsForMenuItem(menuItemInitial);
   const baseUnitCents = shellBase + variantSelectionsPriceCents;
 
-  if (!(await isMenuItemIdOperational(menuItemResolved.vendorId, menuItemResolved.id))) {
-    throw new CartValidationError(
-      `${menuItemResolved.name} is not on the current menu.`,
-      "ITEM_NOT_IN_CURRENT_MENU",
-      { menuItemId: menuItemResolved.id, menuItemName: menuItemResolved.name }
+  if (
+    menuItemResolved.id !== menuItemInitial.id ||
+    menuItemResolved.vendorId !== menuItemInitial.vendorId
+  ) {
+    await requireOperationalMenuItem(
+      operationalByVendor,
+      menuItemResolved.vendorId,
+      menuItemResolved.id,
+      menuItemResolved.name
     );
   }
   if (!menuItemResolved.isAvailable) {
@@ -268,14 +357,7 @@ export async function addCartItem(
     where: { cartId, menuItemId: resolvedMenuItemId },
     include: { selections: true },
   });
-  const previewMatch =
-    previewCandidates.find((c) => {
-      const key = normalizedConfigurationKey(
-        c.specialInstructions,
-        c.selections.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity }))
-      );
-      return key === incomingKey;
-    }) ?? null;
+  const previewMatch = findMatchingCartLine(previewCandidates, incomingKey);
 
   if (previewMatch) {
     await enforceGroupOrderCartMutation(cartId, groupOrderActor ?? null, {
@@ -296,28 +378,14 @@ export async function addCartItem(
     });
   }
 
-  /** All CartItem / CartItemSelection writes in one transaction (no implicit rollback otherwise — each await used to commit separately). */
-  let writePath: "update" | "create";
-  let primaryCartItemId: string;
-
   await prisma.$transaction(async (tx) => {
     const candidates = await tx.cartItem.findMany({
       where: { cartId, menuItemId: resolvedMenuItemId },
       include: { selections: true },
     });
-
-    const row =
-      candidates.find((c) => {
-        const key = normalizedConfigurationKey(
-          c.specialInstructions,
-          c.selections.map((s) => ({ modifierOptionId: s.modifierOptionId, quantity: s.quantity }))
-        );
-        return key === incomingKey;
-      }) ?? null;
+    const row = findMatchingCartLine(candidates, incomingKey);
 
     if (row) {
-      writePath = "update";
-      primaryCartItemId = row.id;
       if (DEBUG_ADD_TO_CART_TRACE) {
         console.log("[addCartItem] tx path=update", { cartItemId: row.id });
       }
@@ -339,7 +407,6 @@ export async function addCartItem(
         }
       }
     } else {
-      writePath = "create";
       const created = await tx.cartItem.create({
         data: {
           cartId,
@@ -351,7 +418,6 @@ export async function addCartItem(
           groupOrderParticipantId: groupOrderActor?.participantId ?? null,
         },
       });
-      primaryCartItemId = created.id;
       if (DEBUG_ADD_TO_CART_TRACE) {
         console.log("[addCartItem] tx path=create", { cartItemId: created.id });
       }
@@ -364,36 +430,13 @@ export async function addCartItem(
         }
       }
     }
-
-    const verifyInTx = await tx.cartItem.findMany({
-      where: { cartId },
-      select: { id: true },
-    });
-    if (DEBUG_ADD_TO_CART_TRACE) {
-      console.log("[addCartItem] verify inside transaction (before commit)", {
-        cartId,
-        count: verifyInTx.length,
-        ids: verifyInTx.map((r) => r.id),
-        primaryCartItemId,
-        writePath,
-      });
-    }
   });
 
   if (DEBUG_ADD_TO_CART_TRACE) {
-    const verifyAfterCommit = await prisma.cartItem.findMany({
-      where: { cartId },
-      select: { id: true },
-    });
-    console.log("[addCartItem] verify after transaction (committed)", {
-      cartId,
-      count: verifyAfterCommit.length,
-      ids: verifyAfterCommit.map((r) => r.id),
-    });
-    console.log("[addCartItem] write complete, loading cart via getCartById (itemCount will be from this query)");
+    console.log("[addCartItem] write complete, loading cart via getCartByIdForMutation");
   }
 
-  return getCartByIdOrThrow(cartId);
+  return getCartByIdForMutationOrThrow(cartId);
 }
 
 export async function updateCartItem(
@@ -410,7 +453,7 @@ export async function updateCartItem(
       cartItemId,
     });
     await prisma.cartItem.deleteMany({ where: { id: cartItemId, cartId } });
-    return getCartByIdOrThrow(cartId);
+    return getCartByIdForMutationOrThrow(cartId);
   }
   const existingItem = await prisma.cartItem.findFirst({
     where: { id: cartItemId, cartId },
@@ -419,39 +462,37 @@ export async function updateCartItem(
       selections: { include: { modifierOption: true } },
     },
   });
-  if (!existingItem) return getCartByIdOrThrow(cartId);
+  if (!existingItem) return getCartByIdForMutationOrThrow(cartId);
 
   await enforceGroupOrderCartMutation(cartId, groupOrderActor ?? null, {
     kind: "mutate",
     cartItemId,
   });
 
-  if (!(await isMenuItemIdOperational(existingItem.menuItem.vendorId, existingItem.menuItemId))) {
-    throw new CartValidationError(
-      `${existingItem.menuItem.name} is not on the current menu.`,
-      "ITEM_NOT_IN_CURRENT_MENU",
-      {
-        cartItemId,
-        menuItemId: existingItem.menuItemId,
-        menuItemName: existingItem.menuItem.name,
-      }
-    );
-  }
+  const operationalByVendor = new Map<string, Set<string>>();
+  await requireOperationalMenuItem(
+    operationalByVendor,
+    existingItem.menuItem.vendorId,
+    existingItem.menuItemId,
+    existingItem.menuItem.name,
+    { cartItemId }
+  );
 
   if (selections != null) {
     const menuItemInitial = await loadMenuItemForVariantResolution(existingItem.menuItemId);
     if (!menuItemInitial) {
       throw new CartValidationError("Menu item not found.", "ITEM_NOT_FOUND", { cartItemId });
     }
-    if (!(await isMenuItemIdOperational(menuItemInitial.vendorId, menuItemInitial.id))) {
-      throw new CartValidationError(
-        `${menuItemInitial.name} is not on the current menu.`,
-        "ITEM_NOT_IN_CURRENT_MENU",
-        {
-          cartItemId,
-          menuItemId: menuItemInitial.id,
-          menuItemName: menuItemInitial.name,
-        }
+    if (
+      menuItemInitial.id !== existingItem.menuItemId ||
+      menuItemInitial.vendorId !== existingItem.menuItem.vendorId
+    ) {
+      await requireOperationalMenuItem(
+        operationalByVendor,
+        menuItemInitial.vendorId,
+        menuItemInitial.id,
+        menuItemInitial.name,
+        { cartItemId }
       );
     }
     if (!menuItemInitial.isAvailable) {
@@ -477,15 +518,16 @@ export async function updateCartItem(
     const shellBase = await shellBasePriceCentsForMenuItem(menuItemInitial);
     const baseUnitCents = shellBase + variantSelectionsPriceCents;
 
-    if (!(await isMenuItemIdOperational(menuItemResolved.vendorId, menuItemResolved.id))) {
-      throw new CartValidationError(
-        `${menuItemResolved.name} is not on the current menu.`,
-        "ITEM_NOT_IN_CURRENT_MENU",
-        {
-          cartItemId,
-          menuItemId: menuItemResolved.id,
-          menuItemName: menuItemResolved.name,
-        }
+    if (
+      menuItemResolved.id !== menuItemInitial.id ||
+      menuItemResolved.vendorId !== menuItemInitial.vendorId
+    ) {
+      await requireOperationalMenuItem(
+        operationalByVendor,
+        menuItemResolved.vendorId,
+        menuItemResolved.id,
+        menuItemResolved.name,
+        { cartItemId }
       );
     }
     if (!menuItemResolved.isAvailable) {
@@ -554,7 +596,7 @@ export async function updateCartItem(
         ...(specialInstructions !== undefined ? { specialInstructions: specialInstructions === "" ? null : specialInstructions } : {}),
       },
     });
-    return getCartByIdOrThrow(cartId);
+    return getCartByIdForMutationOrThrow(cartId);
   }
 
   // Quantity / notes-only updates must still enforce current menu + modifier availability (re-publish / snooze).
@@ -607,7 +649,7 @@ export async function updateCartItem(
     where: { id: cartItemId, cartId },
     data,
   });
-  return getCartByIdOrThrow(cartId);
+  return getCartByIdForMutationOrThrow(cartId);
 }
 
 export async function removeCartItem(
@@ -620,7 +662,7 @@ export async function removeCartItem(
     cartItemId,
   });
   await prisma.cartItem.deleteMany({ where: { id: cartItemId, cartId } });
-  return getCartByIdOrThrow(cartId);
+  return getCartByIdForMutationOrThrow(cartId);
 }
 
 /**
@@ -797,14 +839,6 @@ export async function getCartById(cartId: string): Promise<Cart | null> {
   });
   return cart ? toCartWithGroups(cart) : null;
 }
-
-/** Like getCartById but throws if cart not found. Use when caller contract is Promise<Cart>. */
-async function getCartByIdOrThrow(cartId: string): Promise<Cart> {
-  const cart = await getCartById(cartId);
-  if (!cart) throw new Error("Cart not found");
-  return cart;
-}
-
 function toCartWithGroups(
   cart: {
     id: string;
