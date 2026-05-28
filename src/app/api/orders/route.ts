@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
-import { recordPaymentAndAllocations } from "@/services/payment.service";
-import { setOrderStatus } from "@/services/order.service";
-import { submitVendorOrder } from "@/services/routing.service";
-import { sendOrderConfirmation } from "@/services/sms.service";
-import { buildIdempotencyKey } from "@/lib/idempotency";
-import { deriveParentStatusFromVendorOrders } from "@/services/order-status.service";
-import { formatPickupSmsFragment } from "@/lib/pickup-display";
-import { resolvePickupTimezone } from "@/lib/pickup-scheduling";
+import { processSuccessfulPayment } from "@/services/post-payment.service";
 
 const bodySchema = z.object({
   orderId: z.string(),
@@ -18,8 +11,9 @@ const bodySchema = z.object({
 });
 
 /**
- * Called after Stripe payment succeeds (e.g. from Stripe webhook or client).
- * Idempotent: record payment, update order to paid, route each vendor order to Deliverect, send SMS.
+ * Called after Stripe payment succeeds (e.g. dev bypass or resume-payment client flows).
+ * Delegates to processSuccessfulPayment (same as Stripe webhook): idempotent payment,
+ * routing, and confirmation SMS only when payment is first recorded.
  * Accepts dev_bypass_* paymentIntentId in development for testing without Stripe.
  */
 export async function POST(request: NextRequest) {
@@ -31,7 +25,6 @@ export async function POST(request: NextRequest) {
     }
     const { orderId, paymentIntentId, idempotencyKey } = parsed.data;
 
-    const key = buildIdempotencyKey("order_confirm", idempotencyKey);
     const existing = await prisma.order.findFirst({
       where: { id: orderId, status: { not: "pending_payment" } },
     });
@@ -40,60 +33,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ orderId: existing.id, status: existing.status });
     }
 
-    await recordPaymentAndAllocations(orderId, paymentIntentId, idempotencyKey);
-    await setOrderStatus(orderId, "paid", "system");
-    await setOrderStatus(orderId, "routing", "system");
-
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: { vendorOrders: true, pod: true },
-    });
-    if (!order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    }
-
-    for (const vo of order.vendorOrders) {
-      await submitVendorOrder(vo.id, {
-        customerPhone: order.customerPhone,
-        customerEmail: order.customerEmail ?? null,
-        preparationTimeMinutes: 15,
-      });
-    }
-
-    const updatedOrder = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        vendorOrders: {
-          select: {
-            routingStatus: true,
-            fulfillmentStatus: true,
-            statusHistory: { select: { source: true } },
-          },
-        },
-      },
-    });
-    const parentStatus = deriveParentStatusFromVendorOrders(
-      updatedOrder?.vendorOrders ?? []
-    );
-    await setOrderStatus(orderId, parentStatus, "system");
-    const tz = resolvePickupTimezone(order.pod);
-    await sendOrderConfirmation(
-      order.customerPhone,
-      orderId,
-      order.totalCents,
-      formatPickupSmsFragment({
-        requestedPickupAt: order.requestedPickupAt,
-        deliverectEstimatedReadyAt: order.deliverectEstimatedReadyAt,
-        resolvedPickupTimezone: tz,
-      })
-    );
+    await processSuccessfulPayment({ orderId, paymentIntentId, idempotencyKey });
 
     const final = await prisma.order.findUnique({
       where: { id: orderId },
       select: { id: true, status: true },
     });
-    await clearCheckoutSourceCartForOrder(orderId);
-    return NextResponse.json({ orderId: final!.id, status: final!.status });
+    if (!final) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+    return NextResponse.json({ orderId: final.id, status: final.status });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Order confirmation failed";
     return NextResponse.json({ error: message }, { status: 500 });

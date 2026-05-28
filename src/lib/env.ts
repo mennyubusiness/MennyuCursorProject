@@ -14,7 +14,18 @@ const envSchema = z.object({
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
+  /** E.164 sender, e.g. +15551234567 (preferred name). */
+  TWILIO_FROM_PHONE_NUMBER: z.string().optional(),
+  /** Legacy alias for TWILIO_FROM_PHONE_NUMBER. */
   TWILIO_PHONE_NUMBER: z.string().optional(),
+  /** When set, sends via Messaging Service instead of From number. */
+  TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
+  /** Master switch for outbound SMS. Default: off in dev, on in production. */
+  SMS_ENABLED: z.enum(["true", "false"]).optional(),
+  /** When true, log/record SMS but do not call Twilio. Default: on outside production. */
+  SMS_DRY_RUN: z.enum(["true", "false"]).optional(),
+  /** When true, write SmsMessageLog only (no Twilio). */
+  SMS_LOG_ONLY: z.enum(["true", "false"]).optional(),
   DELIVERECT_API_URL: z.string().url().optional(),
   /** Channel name for order API path (case-sensitive). e.g. staging path: /{channelName}/order/{channelLinkId} */
   DELIVERECT_CHANNEL_NAME: z.string().optional(),

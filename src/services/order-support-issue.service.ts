@@ -212,6 +212,9 @@ export type AdminSupportIssueRow = {
   linkedOrderRefundId: string | null;
   linkedRefundStatus: string | null;
   linkedRefundAmountCents: number | null;
+  vendorResponse: string | null;
+  vendorRespondedAt: string | null;
+  vendorIssueStatus: string | null;
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
@@ -245,6 +248,9 @@ export async function listAdminSupportIssuesForOrder(orderId: string): Promise<A
     linkedOrderRefundId: r.linkedOrderRefundId,
     linkedRefundStatus: r.linkedOrderRefund?.status ?? null,
     linkedRefundAmountCents: r.linkedOrderRefund?.amountCents ?? null,
+    vendorResponse: r.vendorResponse,
+    vendorRespondedAt: r.vendorRespondedAt?.toISOString() ?? null,
+    vendorIssueStatus: r.vendorIssueStatus,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
     resolvedAt: r.resolvedAt?.toISOString() ?? null,

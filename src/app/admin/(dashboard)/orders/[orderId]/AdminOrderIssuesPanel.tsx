@@ -7,6 +7,7 @@ import {
   customerSupportIssueTypeLabel,
   isActiveOrderIssueStatus,
 } from "@/domain/order-support-issue";
+import { vendorIssueStatusLabel } from "@/domain/vendor-order-issue";
 
 type SystemIssueRow = {
   id: string;
@@ -32,6 +33,9 @@ type CustomerSupportIssueRow = {
   linkedOrderRefundId: string | null;
   linkedRefundStatus: string | null;
   linkedRefundAmountCents: number | null;
+  vendorResponse: string | null;
+  vendorRespondedAt: string | null;
+  vendorIssueStatus: string | null;
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
@@ -200,6 +204,18 @@ export function AdminOrderIssuesPanel({
                       <span className="text-xs font-medium text-oo-stone-gray">Customer: </span>
                       {issue.customerMessage}
                     </p>
+                  )}
+                  {(issue.vendorResponse || issue.vendorIssueStatus) && (
+                    <div className="mt-2 rounded border border-blue-200 bg-blue-50/70 px-2 py-1.5 text-xs text-blue-950">
+                      <p className="font-medium">
+                        Vendor: {vendorIssueStatusLabel(issue.vendorIssueStatus)}
+                        {issue.vendorRespondedAt &&
+                          ` · ${formatDate(new Date(issue.vendorRespondedAt))}`}
+                      </p>
+                      {issue.vendorResponse && (
+                        <p className="mt-1 whitespace-pre-wrap">{issue.vendorResponse}</p>
+                      )}
+                    </div>
                   )}
                   {issue.linkedOrderRefundId && (
                     <p className="mt-2 text-xs text-oo-stone-gray">

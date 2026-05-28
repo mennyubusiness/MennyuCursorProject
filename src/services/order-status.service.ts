@@ -776,7 +776,7 @@ export async function recomputeAndPersistParentStatus(
       }
     }
     if (source !== DEV_SIMULATOR_SOURCE) {
-      await sendOrderStatusUpdate(order.customerPhone, orderId, parentStatusLabel(newStatus));
+      await sendOrderStatusUpdate(order.customerPhone, orderId, newStatus);
     }
   }
   return newStatus;

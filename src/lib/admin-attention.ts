@@ -72,6 +72,8 @@ export interface AdminAttentionItem {
   issueId?: string | null;
   issueType?: string | null;
   issueCustomerMessage?: string | null;
+  /** Set when vendor has left a response on a customer issue. */
+  vendorResponded?: boolean;
 
   /** Direct link for admin queue rows (e.g. /admin/orders/{orderId}#payments-refunds). */
   primaryEntityHref: string;
@@ -500,6 +502,7 @@ async function fetchCustomerReportedIssueAttentionItems(
       issueId: r.id,
       issueType: r.type,
       issueCustomerMessage: r.customerMessage,
+      vendorResponded: Boolean(r.vendorResponse?.trim()),
       primaryEntityHref: orderIssuesHref(r.orderId),
       order: r.order
         ? { id: r.order.id, customerPhone: r.order.customerPhone, pod: r.order.pod ?? undefined }

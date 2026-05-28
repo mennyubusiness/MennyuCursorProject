@@ -28,7 +28,7 @@ import {
 const baseDecision: RefundDecision = {
   required: true,
   scope: "full_order",
-  reason: "customer_cancel_full",
+  reason: "customer_cancel",
   orderId: "ord_1",
   vendorOrderId: null,
   amountCents: 1500,

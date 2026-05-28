@@ -638,6 +638,7 @@ model Order {
   payments              Payment[]
   refundAttempts        RefundAttempt[]
   orderRefunds          OrderRefund[]
+  smsMessageLogs        SmsMessageLog[]
   vendorOrders          VendorOrder[]
   vendorPayoutTransferReversals VendorPayoutTransferReversal[]
 
@@ -698,6 +699,7 @@ model VendorOrder {
   paymentAllocations      PaymentAllocation[]
   orderRefunds            OrderRefund[]
   refundLineItems         RefundLineItem[]
+  smsMessageLogs          SmsMessageLog[]
   vendorPayoutTransfers   VendorPayoutTransfer[]
   vendorPayoutTransferReversals VendorPayoutTransferReversal[]
   order                   Order                       @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -994,6 +996,12 @@ model OrderIssue {
   internalNote String?
   requestedRefundAmountCents Int?
   linkedOrderRefundId String?
+  /// Vendor-facing response to customer (not shown to customer yet).
+  vendorResponse String?
+  vendorRespondedAt DateTime?
+  vendorRespondedByUserId String?
+  /// unreviewed | acknowledged | vendor_reviewed | resolution_requested
+  vendorIssueStatus String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   resolvedAt DateTime?
@@ -1010,6 +1018,33 @@ model OrderIssue {
   @@index([vendorOrderId])
   @@index([orderLineItemId])
   @@index([linkedOrderRefundId])
+  @@index([vendorIssueStatus])
+}
+
+/// Audit log for outbound transactional SMS (Twilio).
+model SmsMessageLog {
+  id                String    @id @default(cuid())
+  orderId           String?
+  vendorOrderId     String?
+  toMasked          String
+  toLast4           String?
+  eventType         String
+  bodyPreview       String
+  provider          String    @default("twilio")
+  providerMessageId String?
+  status            String
+  failureMessage    String?
+  idempotencyKey    String?   @unique
+  createdAt         DateTime  @default(now())
+  sentAt            DateTime?
+
+  order       Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  vendorOrder VendorOrder? @relation(fields: [vendorOrderId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([vendorOrderId])
+  @@index([eventType])
+  @@index([status])
 }
 
 model VendorOrderIssue {
