@@ -3,7 +3,10 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import type { ModifierConfigForUI, ModifierOptionForUI } from "./modifier-config";
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
-import { dispatchCartItemAdded } from "@/lib/cart-ui-feedback";
+import { dispatchCartUpdated } from "@/lib/cart-client-sync";
+import { useVendorMenuCartOptional } from "@/components/vendor-menu/VendorMenuCartContext";
+import { optimisticPendingModifierLine } from "@/lib/cart-optimistic";
+import type { Cart, CartItemSelection } from "@/domain/types";
 import { getVariantMergedModifierConfigAction } from "@/actions/variant-modifier-config.actions";
 import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
 import { totalSelectedInGroup, totalSelectedInNested } from "@/lib/modifier-deliverect-variant-steps";
@@ -77,7 +80,19 @@ export function ModifierModal({
   vendorUsesDeliverect?: boolean;
   menuItemDeliverectVariantParentPlu?: string | null;
 }) {
+  const vendorMenuCart = useVendorMenuCartOptional();
   const isEditMode = !!cartItemId;
+
+  const commitServerCart = useCallback(
+    (next: Cart) => {
+      if (vendorMenuCart) {
+        vendorMenuCart.applyServerCart(next);
+      } else {
+        dispatchCartUpdated({ cart: next });
+      }
+    },
+    [vendorMenuCart]
+  );
 
   /** Prefer server flag; fallback to scanning groups (older serialized configs). */
   const isVariantFamily = useMemo(
@@ -131,6 +146,32 @@ export function ModifierModal({
     }
     return list;
   }, [selections]);
+
+  const selectionPreview = useMemo((): CartItemSelection[] => {
+    const optionById = new Map<string, { name: string; priceCents: number }>();
+    for (const link of displayConfig.groups) {
+      for (const opt of link.modifierGroup.options) {
+        optionById.set(opt.id, { name: opt.name, priceCents: opt.priceCents });
+        for (const ng of opt.nestedModifierGroups ?? []) {
+          for (const n of ng.options) {
+            optionById.set(n.id, { name: n.name, priceCents: n.priceCents });
+          }
+        }
+      }
+    }
+    return selectionsList
+      .map((s) => {
+        const opt = optionById.get(s.modifierOptionId);
+        if (!opt) return null;
+        return {
+          modifierOptionId: s.modifierOptionId,
+          modifierOptionName: opt.name,
+          priceCents: opt.priceCents,
+          quantity: s.quantity,
+        };
+      })
+      .filter((s): s is CartItemSelection => s != null);
+  }, [displayConfig.groups, selectionsList]);
 
   useEffect(() => {
     if (!isVariantFamily || isEditMode) return;
@@ -238,6 +279,20 @@ export function ModifierModal({
     }
     setLoading(true);
     setError(null);
+    const cartSnapshot = vendorMenuCart?.cart ?? null;
+    if (vendorMenuCart && !isEditMode && cartSnapshot && vendorId) {
+      const vendorName =
+        cartSnapshot.groups.find((g) => g.vendorId === vendorId)?.vendorName ?? "Vendor";
+      const optimistic = optimisticPendingModifierLine(cartSnapshot, {
+        menuItemId: displayConfig.menuItemId,
+        vendorId,
+        vendorName,
+        menuItemName: displayConfig.menuItemName,
+        unitPriceCents: displayConfig.priceCents,
+        selections: selectionPreview,
+      });
+      vendorMenuCart.applyServerCart(optimistic);
+    }
     if (isEditMode && cartItemId) {
       if (DEBUG_ADD_TO_CART_TRACE) {
         console.log("[ModifierModal] submit → updateCartItemAction", {
@@ -259,9 +314,11 @@ export function ModifierModal({
         console.log("[ModifierModal] updateCartItemAction returned", { success: result?.success, error: result && !result.success ? result.error : undefined });
       }
       if (result?.success) {
+        commitServerCart(result.cart);
         onSuccess();
         onClose();
       } else if (result && !result.success) {
+        if (cartSnapshot) commitServerCart(cartSnapshot);
         setError({ message: result.error, code: result.code });
       }
     } else {
@@ -289,10 +346,11 @@ export function ModifierModal({
         });
       }
       if (result.success) {
-        dispatchCartItemAdded();
+        commitServerCart(result.cart);
         onSuccess();
         onClose();
       } else {
+        if (cartSnapshot) commitServerCart(cartSnapshot);
         if (DEBUG_ADD_TO_CART_TRACE && result.code === "VARIANT_GROUP_REQUIRED") {
           console.warn("[ModifierModal] VARIANT_GROUP_REQUIRED", {
             menuItemId: displayConfig.menuItemId,

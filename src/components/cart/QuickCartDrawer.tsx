@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useQuickCart } from "@/components/cart/QuickCartContext";
 import { QuickCartLineControls } from "@/components/cart/QuickCartLineControls";
 import { ButtonLink } from "@/components/ui/button";
@@ -11,8 +10,7 @@ import { shortCartLineLabel } from "@/lib/cart-line-identity";
 import { cn } from "@/lib/cn";
 
 export function QuickCartDrawer() {
-  const { enabled, isOpen, closeCart, cart, loading, setCart, refreshCart } = useQuickCart();
-  const router = useRouter();
+  const { enabled, isOpen, closeCart, cart, loading, applyCartSnapshot, refreshCart } = useQuickCart();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -117,11 +115,8 @@ export function QuickCartDrawer() {
                           cartItemId={line.id}
                           quantity={line.quantity}
                           onUpdated={async (next) => {
-                            if (next) setCart(next);
-                            else {
-                              await refreshCart();
-                              router.refresh();
-                            }
+                            if (next) applyCartSnapshot(next);
+                            else await refreshCart();
                           }}
                         />
                       </li>

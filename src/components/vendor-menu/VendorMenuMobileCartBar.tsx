@@ -1,21 +1,21 @@
 "use client";
 
 import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
-import type { Cart } from "@/domain/types";
+import { useVendorMenuCartOptional } from "@/components/vendor-menu/VendorMenuCartContext";
 import { cn } from "@/lib/cn";
 
 type VendorMenuMobileCartBarProps = {
-  cart: Cart;
   className?: string;
 };
 
 /** Mobile shortcut to open the global quick cart (replaces local full-width cart link). */
-export function VendorMenuMobileCartBar({ cart, className }: VendorMenuMobileCartBarProps) {
+export function VendorMenuMobileCartBar({ className }: VendorMenuMobileCartBarProps) {
   const quickCart = useQuickCartOptional();
-  const displayCart = quickCart?.cart ?? cart;
-  const itemCount = displayCart.items.reduce((n, i) => n + i.quantity, 0);
+  const vendorMenuCart = useVendorMenuCartOptional();
+  const displayCart = quickCart?.cart ?? vendorMenuCart?.cart ?? null;
+  const itemCount = displayCart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0;
 
-  if (itemCount === 0) return null;
+  if (!displayCart || itemCount === 0) return null;
 
   const openCart = () => {
     if (quickCart?.enabled) {

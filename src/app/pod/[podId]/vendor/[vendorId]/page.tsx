@@ -58,8 +58,6 @@ export default async function VendorMenuPage({
   const availabilityStatus = getVendorAvailabilityStatus(vendor);
   const unavailable = availabilityStatus !== "open";
   const bannerLine = availabilityBannerCopy(availabilityStatus);
-  const vendorCartItems = cart.items.filter((i) => i.vendorId === vendorId);
-
   return (
     <div className="w-full min-h-0">
       <RecentVendorViewTracker vendorId={vendorId} podId={podId} vendorName={vendor.name} />
@@ -95,8 +93,6 @@ export default async function VendorMenuPage({
           sections={sections}
           variantChildCountByParentPlu={variantChildCountByParentPlu}
           cart={cart}
-          cartId={cart.id}
-          vendorCartItems={vendorCartItems}
           orderingDisabled={unavailable}
           vendorUsesDeliverect={Boolean(vendor.deliverectChannelLinkId?.trim())}
         />

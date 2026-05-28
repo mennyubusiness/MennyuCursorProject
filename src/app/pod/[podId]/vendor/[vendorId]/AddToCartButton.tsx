@@ -1,16 +1,13 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
-import { dispatchCartItemAdded } from "@/lib/cart-ui-feedback";
 import type { ModifierConfigForUI } from "./modifier-config";
 import { useVendorMenuModifier } from "@/components/vendor-menu/VendorMenuModifierContext";
-import type { CartItem } from "@/domain/types";
+import { useVendorMenuCart } from "@/components/vendor-menu/VendorMenuCartContext";
+import type { Cart, CartItem } from "@/domain/types";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
-
-/** TEMP: set false to silence add-to-cart trace logs */
-const DEBUG_ADD_TO_CART_TRACE = true;
+import { dispatchCartUpdated } from "@/lib/cart-client-sync";
 
 function CartLineQtyControls({
   cartId,
@@ -23,20 +20,26 @@ function CartLineQtyControls({
   cartId: string;
   line: CartItem;
   orderingDisabled: boolean;
-  onUpdated: () => void;
+  onUpdated: (cart: Cart) => void;
   compact?: boolean;
   overlay?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
+  const { cart: snapshot, applyServerCart } = useVendorMenuCart();
 
   async function setQty(next: number) {
     if (orderingDisabled) return;
     setLoading(true);
+    const before = snapshot;
     try {
       const result = await updateCartItemAction(cartId, line.id, next, undefined, undefined);
       if (result?.success) {
-        onUpdated();
+        applyServerCart(result.cart);
+        onUpdated(result.cart);
       }
+    } catch {
+      applyServerCart(before);
+      dispatchCartUpdated({ cart: before });
     } finally {
       setLoading(false);
     }
@@ -93,8 +96,9 @@ export function AddToCartButton({
   modifierConfig,
   podId,
   vendorId,
-  /** Cart lines for this vendor — used to match configured lines for qty controls. */
-  vendorCartItems,
+  vendorName,
+  menuItemName,
+  unitPriceCents,
   /** True when vendor is closed/paused or this menu item is snoozed / unavailable. */
   orderingDisabled = false,
   vendorUsesDeliverect = false,
@@ -107,7 +111,9 @@ export function AddToCartButton({
   modifierConfig?: ModifierConfigForUI;
   podId: string;
   vendorId: string;
-  vendorCartItems: CartItem[];
+  vendorName: string;
+  menuItemName: string;
+  unitPriceCents: number;
   orderingDisabled?: boolean;
   vendorUsesDeliverect?: boolean;
   menuItemDeliverectVariantParentPlu?: string | null;
@@ -115,8 +121,8 @@ export function AddToCartButton({
 }) {
   const isCardOverlay = displayMode === "card-overlay";
   const isCard = displayMode === "card" || isCardOverlay;
-  const router = useRouter();
   const { openModifier } = useVendorMenuModifier();
+  const { vendorCartItems, runSimpleAddToCart } = useVendorMenuCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -132,50 +138,23 @@ export function AddToCartButton({
     });
   }, [vendorCartItems, menuItemId, shellDeliverectPlu]);
 
-  useEffect(() => {
-    if (!DEBUG_ADD_TO_CART_TRACE) return;
-    console.log("[AddToCartButton] mount/props", {
-      menuItemId,
-      vendorId,
-      podId,
-      cartId: cartId || "(empty)",
-      orderingDisabled,
-      buttonDisabled,
-      hasModifiers,
-      linesForThisItem: linesForThisItem.length,
-    });
-  }, [menuItemId, vendorId, podId, cartId, orderingDisabled, buttonDisabled, hasModifiers, linesForThisItem.length]);
-
   async function addDirect() {
-    if (DEBUG_ADD_TO_CART_TRACE) {
-      console.log("[AddToCartButton] addDirect → calling addToCartAction", {
-        menuItemId,
-        vendorId,
-        podId,
-        cartId,
-      });
-    }
     setLoading(true);
     setError(null);
     try {
-      const result = await addToCartAction(cartId, menuItemId, 1);
-      if (DEBUG_ADD_TO_CART_TRACE) {
-        console.log("[AddToCartButton] addToCartAction returned", {
-          success: result.success,
-          error: "error" in result ? result.error : undefined,
-          code: "code" in result ? result.code : undefined,
-        });
-      }
-      if (result.success) {
-        dispatchCartItemAdded();
-        router.refresh();
-      } else {
+      const result = await runSimpleAddToCart({
+        menuItemId,
+        vendorId,
+        vendorName,
+        menuItemName,
+        unitPriceCents,
+        shellDeliverectPlu,
+        add: () => addToCartAction(cartId, menuItemId, 1),
+      });
+      if (!result.success) {
         setError(result.error);
       }
     } catch (e) {
-      if (DEBUG_ADD_TO_CART_TRACE) {
-        console.error("[AddToCartButton] addDirect threw", e);
-      }
       setError(e instanceof Error ? e.message : "Could not add to cart");
     } finally {
       setLoading(false);
@@ -183,21 +162,8 @@ export function AddToCartButton({
   }
 
   function handleClickAdd() {
-    if (DEBUG_ADD_TO_CART_TRACE) {
-      console.log("[AddToCartButton] clicked", {
-        menuItemId,
-        vendorId,
-        podId,
-        cartId: cartId || "(empty)",
-        orderingDisabled,
-        hasModifiers,
-      });
-    }
     if (orderingDisabled) return;
     if (hasModifiers && modifierConfig) {
-      if (DEBUG_ADD_TO_CART_TRACE) {
-        console.log("[AddToCartButton] opening modifier modal");
-      }
       openModifier({
         modifierConfig,
         cartId,
@@ -302,7 +268,7 @@ export function AddToCartButton({
                 cartId={cartId}
                 line={line}
                 orderingDisabled={orderingDisabled}
-                onUpdated={() => router.refresh()}
+                onUpdated={() => {}}
                 compact={isCard}
                 overlay
               />
@@ -336,7 +302,7 @@ export function AddToCartButton({
                 cartId={cartId}
                 line={line}
                 orderingDisabled={orderingDisabled}
-                onUpdated={() => router.refresh()}
+                onUpdated={() => {}}
                 compact={isCard}
               />
             </div>

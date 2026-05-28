@@ -70,7 +70,6 @@ export async function addToCartAction(
       });
     }
     revalidatePath("/cart");
-    revalidatePath(`/pod/${cart.podId}`, "layout");
     return { success: true, cart };
   } catch (e) {
     if (e instanceof CartValidationError) {
@@ -114,7 +113,6 @@ export async function updateCartItemAction(
     );
     if (cart) {
       revalidatePath("/cart");
-      revalidatePath(`/pod/${cart.podId}`, "layout");
       return { success: true, cart };
     }
     return null;
@@ -137,7 +135,6 @@ export async function removeFromCartAction(cartId: string, cartItemId: string) {
   await removeCartItem(cartId, cartItemId, actor);
   if (cart) {
     revalidatePath("/cart");
-    revalidatePath(`/pod/${cart.podId}`, "layout");
   }
   return getCartById(cartId);
 }

@@ -7,8 +7,9 @@ import { VendorMenuMobileCartBar } from "@/components/vendor-menu/VendorMenuMobi
 import { partitionMenuSections } from "@/lib/vendor-menu-spotlight";
 import { customerMenuCategoryDomId } from "@/lib/vendor-menu-category-id";
 import type { CustomerVendorMenuCategorySection } from "@/services/vendor-customer-menu.service";
-import type { Cart, CartItem } from "@/domain/types";
+import type { Cart } from "@/domain/types";
 import { cn } from "@/lib/cn";
+import { VendorMenuCartProvider, useVendorMenuCart } from "@/components/vendor-menu/VendorMenuCartContext";
 
 type VendorMenuExperienceProps = {
   podId: string;
@@ -19,8 +20,6 @@ type VendorMenuExperienceProps = {
   sections: CustomerVendorMenuCategorySection[];
   variantChildCountByParentPlu: Map<string, number>;
   cart: Cart;
-  cartId: string;
-  vendorCartItems: CartItem[];
   orderingDisabled: boolean;
   vendorUsesDeliverect: boolean;
 };
@@ -29,8 +28,7 @@ function MenuSectionGrid({
   section,
   podId,
   vendorId,
-  cartId,
-  vendorCartItems,
+  vendorName,
   orderingDisabled,
   vendorUsesDeliverect,
   vendorAccentColor,
@@ -40,14 +38,14 @@ function MenuSectionGrid({
   section: CustomerVendorMenuCategorySection;
   podId: string;
   vendorId: string;
-  cartId: string;
-  vendorCartItems: CartItem[];
+  vendorName: string;
   orderingDisabled: boolean;
   vendorUsesDeliverect: boolean;
   vendorAccentColor: string | null;
   variantChildCountByParentPlu: Map<string, number>;
   compactGrid?: boolean;
 }) {
+  const { cartId } = useVendorMenuCart();
   const sectionDomId = customerMenuCategoryDomId(section.id);
 
   return (
@@ -85,7 +83,7 @@ function MenuSectionGrid({
               cartId={cartId}
               podId={podId}
               vendorId={vendorId}
-              vendorCartItems={vendorCartItems}
+              vendorName={vendorName}
               orderingDisabled={orderingDisabled}
               vendorUsesDeliverect={vendorUsesDeliverect}
               variantChildMenuItemCount={
@@ -110,8 +108,6 @@ export function VendorMenuExperience({
   sections,
   variantChildCountByParentPlu,
   cart,
-  cartId,
-  vendorCartItems,
   orderingDisabled,
   vendorUsesDeliverect,
 }: VendorMenuExperienceProps) {
@@ -122,6 +118,53 @@ export function VendorMenuExperience({
       ? [{ id: "pod-menu-spotlight", label: "Popular" }]
       : [];
 
+  return (
+    <VendorMenuCartProvider initialCart={cart} vendorId={vendorId}>
+      <VendorMenuExperienceInner
+        podId={podId}
+        podName={podName}
+        vendorId={vendorId}
+        vendorName={vendorName}
+        vendorAccentColor={vendorAccentColor}
+        variantChildCountByParentPlu={variantChildCountByParentPlu}
+        spotlightSections={spotlightSections}
+        mainSections={mainSections}
+        navSections={navSections}
+        extraAnchors={extraAnchors}
+        orderingDisabled={orderingDisabled}
+        vendorUsesDeliverect={vendorUsesDeliverect}
+      />
+    </VendorMenuCartProvider>
+  );
+}
+
+function VendorMenuExperienceInner({
+  podId,
+  podName,
+  vendorId,
+  vendorName,
+  vendorAccentColor,
+  spotlightSections,
+  mainSections,
+  navSections,
+  extraAnchors,
+  orderingDisabled,
+  vendorUsesDeliverect,
+  variantChildCountByParentPlu,
+}: {
+  podId: string;
+  podName: string;
+  vendorId: string;
+  vendorName: string;
+  vendorAccentColor: string | null;
+  variantChildCountByParentPlu: Map<string, number>;
+  spotlightSections: CustomerVendorMenuCategorySection[];
+  mainSections: CustomerVendorMenuCategorySection[];
+  navSections: CustomerVendorMenuCategorySection[];
+  extraAnchors: { id: string; label: string }[];
+  orderingDisabled: boolean;
+  vendorUsesDeliverect: boolean;
+}) {
   return (
     <VendorMenuModifierProvider>
       <div className="border-b border-oo-light-stone bg-oo-cream/80">
@@ -158,8 +201,7 @@ export function VendorMenuExperience({
                         section={section}
                         podId={podId}
                         vendorId={vendorId}
-                        cartId={cartId}
-                        vendorCartItems={vendorCartItems}
+                        vendorName={vendorName}
                         orderingDisabled={orderingDisabled}
                         vendorUsesDeliverect={vendorUsesDeliverect}
                         vendorAccentColor={vendorAccentColor}
@@ -190,8 +232,7 @@ export function VendorMenuExperience({
                       section={section}
                       podId={podId}
                       vendorId={vendorId}
-                      cartId={cartId}
-                      vendorCartItems={vendorCartItems}
+                      vendorName={vendorName}
                       orderingDisabled={orderingDisabled}
                       vendorUsesDeliverect={vendorUsesDeliverect}
                       vendorAccentColor={vendorAccentColor}
@@ -205,7 +246,7 @@ export function VendorMenuExperience({
         </PageShell>
       </div>
 
-      <VendorMenuMobileCartBar cart={cart} />
+      <VendorMenuMobileCartBar />
     </VendorMenuModifierProvider>
   );
 }

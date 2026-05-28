@@ -10,8 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import type { Cart } from "@/domain/types";
+import { CART_UPDATED_EVENT, dispatchCartUpdated, type CartUpdatedDetail } from "@/lib/cart-client-sync";
 import { getCurrentPodIdFromClient } from "@/lib/quick-cart-pod";
-import { dispatchCartItemAdded } from "@/lib/cart-ui-feedback";
 
 type QuickCartContextValue = {
   enabled: boolean;
@@ -23,6 +23,7 @@ type QuickCartContextValue = {
   itemCount: number;
   refreshCart: () => Promise<void>;
   setCart: (cart: Cart | null) => void;
+  applyCartSnapshot: (cart: Cart | null) => void;
 };
 
 const QuickCartContext = createContext<QuickCartContextValue | null>(null);
@@ -42,6 +43,11 @@ export function QuickCartProvider({
     () => cart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0,
     [cart]
   );
+
+  const applyCartSnapshot = useCallback((next: Cart | null) => {
+    setCart(next);
+    setLoading(false);
+  }, []);
 
   const refreshCart = useCallback(async () => {
     if (!enabled) return;
@@ -71,8 +77,10 @@ export function QuickCartProvider({
   const openCart = useCallback(() => {
     if (!enabled) return;
     setIsOpen(true);
-    void refreshCart();
-  }, [enabled, refreshCart]);
+    if (!cart) {
+      void refreshCart();
+    }
+  }, [enabled, cart, refreshCart]);
 
   const closeCart = useCallback(() => {
     setIsOpen(false);
@@ -85,12 +93,19 @@ export function QuickCartProvider({
 
   useEffect(() => {
     if (!enabled) return;
-    const onCartChange = () => {
-      void refreshCart();
+    const onCartUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
+      if (detail?.cart !== undefined) {
+        applyCartSnapshot(detail.cart);
+        return;
+      }
+      if (detail?.refresh) {
+        void refreshCart();
+      }
     };
-    window.addEventListener("mennyu:cart-added", onCartChange);
-    return () => window.removeEventListener("mennyu:cart-added", onCartChange);
-  }, [enabled, refreshCart]);
+    window.addEventListener(CART_UPDATED_EVENT, onCartUpdated);
+    return () => window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated);
+  }, [enabled, applyCartSnapshot, refreshCart]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -117,8 +132,19 @@ export function QuickCartProvider({
       itemCount,
       refreshCart,
       setCart,
+      applyCartSnapshot,
     }),
-    [enabled, isOpen, openCart, closeCart, cart, loading, itemCount, refreshCart]
+    [
+      enabled,
+      isOpen,
+      openCart,
+      closeCart,
+      cart,
+      loading,
+      itemCount,
+      refreshCart,
+      applyCartSnapshot,
+    ]
   );
 
   return <QuickCartContext.Provider value={value}>{children}</QuickCartContext.Provider>;
@@ -138,6 +164,6 @@ export function useQuickCartOptional(): QuickCartContextValue | null {
 
 /** After server cart mutations from drawer controls. */
 export function notifyQuickCartUpdated(cart: Cart | null) {
-  dispatchCartItemAdded();
+  dispatchCartUpdated({ cart });
   return cart;
 }

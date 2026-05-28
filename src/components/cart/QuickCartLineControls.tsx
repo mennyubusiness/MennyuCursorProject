@@ -23,9 +23,9 @@ export function QuickCartLineControls({
     setLoading(true);
     try {
       if (next <= 0) {
-        await removeFromCartAction(cartId, cartItemId);
-        notifyQuickCartUpdated(null);
-        await onUpdated(null);
+        const removed = await removeFromCartAction(cartId, cartItemId);
+        notifyQuickCartUpdated(removed);
+        await onUpdated(removed);
         return;
       }
       const result = await updateCartItemAction(cartId, cartItemId, next, null);

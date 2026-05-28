@@ -1,6 +1,5 @@
 import { MenuItemImage } from "@/components/images/MenuItemImage";
 import type { CustomerVendorMenuItem } from "@/services/vendor-customer-menu.service";
-import type { CartItem } from "@/domain/types";
 import { serializeModifierConfig } from "@/lib/modifier-config";
 import { AddToCartButton } from "@/app/pod/[podId]/vendor/[vendorId]/AddToCartButton";
 import { cn } from "@/lib/cn";
@@ -10,7 +9,7 @@ type VendorMenuItemCardProps = {
   cartId: string;
   podId: string;
   vendorId: string;
-  vendorCartItems: CartItem[];
+  vendorName: string;
   orderingDisabled: boolean;
   vendorUsesDeliverect: boolean;
   variantChildMenuItemCount?: number;
@@ -21,7 +20,7 @@ export function VendorMenuItemCard({
   cartId,
   podId,
   vendorId,
-  vendorCartItems,
+  vendorName,
   orderingDisabled,
   vendorUsesDeliverect,
   variantChildMenuItemCount = 0,
@@ -63,7 +62,9 @@ export function VendorMenuItemCard({
             shellDeliverectPlu={item.deliverectPlu}
             podId={podId}
             vendorId={vendorId}
-            vendorCartItems={vendorCartItems}
+            vendorName={vendorName}
+            menuItemName={item.name}
+            unitPriceCents={item.priceCents}
             modifierConfig={
               item.modifierGroups?.length
                 ? serializeModifierConfig(item, { variantChildMenuItemCount })

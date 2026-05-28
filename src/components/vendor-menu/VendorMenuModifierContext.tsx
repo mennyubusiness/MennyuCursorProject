@@ -10,7 +10,6 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import { ModifierModal } from "@/app/pod/[podId]/vendor/[vendorId]/ModifierModal";
 import type { ModifierConfigForUI } from "@/app/pod/[podId]/vendor/[vendorId]/modifier-config";
 
@@ -32,7 +31,6 @@ type VendorMenuModifierContextValue = {
 const VendorMenuModifierContext = createContext<VendorMenuModifierContextValue | null>(null);
 
 export function VendorMenuModifierProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const [session, setSession] = useState<VendorMenuModifierSession | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -80,10 +78,7 @@ export function VendorMenuModifierProvider({ children }: { children: ReactNode }
             podId={session.podId}
             vendorId={session.vendorId}
             onClose={closeModifier}
-            onSuccess={() => {
-              router.refresh();
-              closeModifier();
-            }}
+            onSuccess={closeModifier}
             vendorUsesDeliverect={session.vendorUsesDeliverect}
             menuItemDeliverectVariantParentPlu={session.menuItemDeliverectVariantParentPlu}
           />,
