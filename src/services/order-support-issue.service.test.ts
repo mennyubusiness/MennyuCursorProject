@@ -153,4 +153,31 @@ describe("order-support-issue.service", () => {
       })
     );
   });
+
+  it("accepts cancel_request and sends order_issue milestone SMS", async () => {
+    vi.mocked(prisma.orderIssue.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.orderIssue.create).mockResolvedValue({
+      id: "iss_cancel",
+      type: "cancel_request",
+      status: "open",
+      vendorOrderId: null,
+      orderLineItemId: null,
+      customerMessage: "Please cancel",
+      createdAt: new Date(),
+    } as never);
+
+    const result = await createCustomerSupportIssue({
+      orderId: "ord_1",
+      issueType: "cancel_request",
+      customerMessage: "Please cancel",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.orderIssue.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ type: "cancel_request" }),
+      })
+    );
+    expect(sendOrderIssueMilestone).toHaveBeenCalledWith("ord_1", "iss_cancel");
+  });
 });

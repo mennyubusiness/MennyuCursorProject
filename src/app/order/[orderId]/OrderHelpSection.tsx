@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   CUSTOMER_SUPPORT_ISSUE_TYPES,
+  customerSupportIssueSubmitSuccessMessage,
   customerSupportIssueTypeLabel,
 } from "@/domain/order-support-issue";
 
@@ -90,7 +91,10 @@ export function OrderHelpSection({
         setError(data.error ?? "Could not submit your issue. Please try again.");
         return;
       }
-      setSuccess(data.message ?? "We received your issue and our team will review it.");
+      setSuccess(
+        data.message ??
+          customerSupportIssueSubmitSuccessMessage(issueType)
+      );
       setMessage("");
       await loadIssues();
     } finally {

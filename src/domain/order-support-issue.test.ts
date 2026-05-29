@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  customerSupportIssueSubmitSuccessMessage,
+  customerSupportIssueTypeLabel,
   customerSupportIssueStatusMessage,
   isActiveOrderIssueStatus,
   isCustomerReportedOrderIssue,
 } from "./order-support-issue";
 
 describe("order-support-issue domain", () => {
+  it("labels cancellation help reason for customers", () => {
+    expect(customerSupportIssueTypeLabel("cancel_request")).toBe("I need to cancel my order");
+  });
+
+  it("returns cancellation-specific submit success copy", () => {
+    expect(customerSupportIssueSubmitSuccessMessage("cancel_request")).toMatch(/isn't guaranteed/i);
+    expect(customerSupportIssueSubmitSuccessMessage("missing_item")).toContain("received your issue");
+  });
+
   it("customer status copy is safe", () => {
     expect(customerSupportIssueStatusMessage("open")).toBe("We received your issue.");
     expect(customerSupportIssueStatusMessage("reviewing")).toContain("reviewing");

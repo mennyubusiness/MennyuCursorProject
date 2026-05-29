@@ -6,10 +6,7 @@ import type { getOrderStatusAction } from "@/actions/order.actions";
 import { isTerminalStatus } from "@/domain/order-state";
 import { getPickupCode } from "@/lib/pickup-code";
 import { isVendorOrderManuallyRecovered } from "@/lib/vendor-order-effective-state";
-import { canCustomerCancelOrder, canCustomerCancelVendorOrder } from "@/lib/cancel-eligibility";
 import { SetCustomerPhoneFromOrder } from "./SetCustomerPhoneFromOrder";
-import { OrderCancelButton } from "./OrderCancelButton";
-import { VendorOrderCancelButton } from "./VendorOrderCancelButton";
 import { formatOrderStatusTimelineClock, formatPickupDetailLine } from "@/lib/pickup-display";
 import {
   vendorStatusLabelForScheduledPickup,
@@ -187,14 +184,6 @@ export function OrderPageContent({
     resolvedPickupTimezone: order.resolvedPickupTimezone,
   });
   const isMultiVendor = order.vendorOrders.length > 1;
-  const isTerminal = isTerminalStatus(derivedStatus as Parameters<typeof isTerminalStatus>[0]);
-  const customerCanCancel =
-    !isTerminal &&
-    canCustomerCancelOrder({
-      status: derivedStatus,
-      vendorOrders: order.vendorOrders,
-    });
-  const showCancelNote = !isTerminal && !customerCanCancel;
   const isOrderCancelled = derivedStatus === "cancelled";
   const refundMessage = refundDisplayMessage({
     refundAttempts: order.refundAttempts,
@@ -283,7 +272,6 @@ export function OrderPageContent({
                   vo.fulfillmentStatus,
                   recovered
                 );
-                const canCancelThisVo = canCustomerCancelVendorOrder(vo);
                 const showVendorSubtotal = order.vendorOrders.length > 1;
                 return (
                   <div
@@ -362,31 +350,11 @@ export function OrderPageContent({
                         );
                       })}
                     </ul>
-
-                    {canCancelThisVo && (
-                      <VendorOrderCancelButton
-                        orderId={orderId}
-                        vendorOrderId={vo.id}
-                        vendorName={vo.vendor.name}
-                      />
-                    )}
                   </div>
                 );
               })}
             </div>
           </section>
-
-          {customerCanCancel && (
-            <div className="mt-6 lg:hidden">
-              <OrderCancelButton orderId={orderId} disabled={false} />
-            </div>
-          )}
-
-          {showCancelNote && (
-            <p className="mt-6 text-sm text-stone-500 lg:hidden">
-              This order can no longer be cancelled because preparation has started.
-            </p>
-          )}
         </div>
 
         <aside className="order-2 mt-0 space-y-6 lg:col-span-1 lg:row-span-2">
@@ -441,18 +409,6 @@ export function OrderPageContent({
               </div>
             </dl>
           </div>
-
-          {customerCanCancel && (
-            <div className="hidden lg:block">
-              <OrderCancelButton orderId={orderId} disabled={false} />
-            </div>
-          )}
-
-          {showCancelNote && (
-            <p className="hidden text-sm text-stone-500 lg:block">
-              This order can no longer be cancelled because preparation has started.
-            </p>
-          )}
 
           <OrderHelpSection
             orderId={orderId}

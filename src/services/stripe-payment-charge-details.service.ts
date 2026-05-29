@@ -43,7 +43,7 @@ export async function fetchPaymentIntentChargeDetails(
     return {
       chargeId,
       balanceTransactionId: btx.id,
-      feeCents: btx.fee,
+      feeCents: typeof btx.fee === "number" ? btx.fee : null,
     };
   }
 
@@ -51,6 +51,6 @@ export async function fetchPaymentIntentChargeDetails(
   return {
     chargeId,
     balanceTransactionId: btx.id,
-    feeCents: btx.fee,
+    feeCents: typeof btx.fee === "number" ? btx.fee : null,
   };
 }

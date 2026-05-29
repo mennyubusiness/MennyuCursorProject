@@ -13,7 +13,7 @@ export function isDevBypassStripePaymentIntentId(paymentIntentId: string): boole
 
 /**
  * Returns Stripe's processing fee in cents from the charge's balance transaction, or null when
- * unavailable (dev bypass, missing Stripe client, or missing BT — caller may throw in production).
+ * unavailable (dev bypass, missing Stripe client, missing BT, or fee not yet populated).
  */
 export async function fetchStripeProcessingFeeCents(
   paymentIntentId: string

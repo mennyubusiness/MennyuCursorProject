@@ -3,6 +3,7 @@
  */
 
 export const CUSTOMER_SUPPORT_ISSUE_TYPES = [
+  "cancel_request",
   "missing_item",
   "wrong_item",
   "vendor_cancelled",
@@ -14,6 +15,15 @@ export const CUSTOMER_SUPPORT_ISSUE_TYPES = [
 ] as const;
 
 export type CustomerSupportIssueType = (typeof CUSTOMER_SUPPORT_ISSUE_TYPES)[number];
+
+/** Shown after a customer submits a cancellation request via the help form. */
+export const CUSTOMER_CANCEL_REQUEST_SUCCESS_MESSAGE =
+  "We've sent this to support. Cancellation isn't guaranteed once vendors have started preparing your order, but we'll review it as quickly as possible.";
+
+export function customerSupportIssueSubmitSuccessMessage(issueType: string): string {
+  if (issueType === "cancel_request") return CUSTOMER_CANCEL_REQUEST_SUCCESS_MESSAGE;
+  return "We received your issue and our team will review it.";
+}
 
 export const ORDER_ISSUE_PRIORITIES = ["low", "normal", "high"] as const;
 export type OrderIssuePriority = (typeof ORDER_ISSUE_PRIORITIES)[number];
@@ -52,6 +62,8 @@ export function isActiveOrderIssueStatus(status: string): boolean {
 
 export function customerSupportIssueTypeLabel(type: string): string {
   switch (type) {
+    case "cancel_request":
+      return "I need to cancel my order";
     case "missing_item":
       return "Missing item";
     case "wrong_item":

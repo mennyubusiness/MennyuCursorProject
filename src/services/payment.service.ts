@@ -394,12 +394,123 @@ async function verifyExistingPaymentSnapshots(
   payment: {
     id: string;
     stripeProcessingFeeCents: number | null;
+    stripePaymentIntentId: string;
     allocations: { allocatedProcessingFeeCents: number }[];
   },
   stripePaymentIntentId: string
 ): Promise<void> {
   const liveFee = await fetchStripeProcessingFeeCents(stripePaymentIntentId);
   assertPaymentPayoutSnapshotMatchesLiveFee(payment, liveFee);
+
+  if (payment.stripeProcessingFeeCents === null && liveFee !== null) {
+    try {
+      await refreshDeferredPaymentStripeFeeSnapshot(payment.id);
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          event: "payment_stripe_fee_backfill_failed",
+          paymentId: payment.id,
+          stripePaymentIntentId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      );
+    }
+  }
+}
+
+const DEFERRED_FEE_PAYOUT_STATUSES = new Set(["pending", "blocked"]);
+
+/**
+ * Backfill Payment.stripeProcessingFeeCents and allocation snapshots when Stripe fee was
+ * unavailable at payment time. Safe to call from webhook replay or a future admin repair job.
+ */
+export async function refreshDeferredPaymentStripeFeeSnapshot(
+  paymentId: string
+): Promise<{ updated: boolean; reason?: string }> {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: {
+      allocations: { orderBy: { vendorOrderId: "asc" } },
+    },
+  });
+  if (!payment) return { updated: false, reason: "payment_not_found" };
+  if (payment.stripeProcessingFeeCents !== null) {
+    return { updated: false, reason: "fee_already_recorded" };
+  }
+
+  const chargeDetails = await fetchPaymentIntentChargeDetails(payment.stripePaymentIntentId);
+  const feeCents =
+    chargeDetails?.feeCents ?? (await fetchStripeProcessingFeeCents(payment.stripePaymentIntentId));
+  if (feeCents === null) return { updated: false, reason: "fee_still_unavailable" };
+
+  const grosses = payment.allocations.map((a) => a.grossVendorPayableCents);
+  const {
+    allocatedProcessingFeeCents: allocatedCents,
+    netVendorTransferCents: nets,
+    zeroWeightWithPositiveFee,
+  } = computeVendorOrderPayoutSnapshots(grosses, feeCents);
+  if (zeroWeightWithPositiveFee) {
+    throw new Error(
+      "VENDOR_PAYABLE_WEIGHTS_ZERO: cannot backfill Stripe fee when all grossVendorPayableCents are 0"
+    );
+  }
+
+  const feeToAllocate = feeCents;
+  const sumAllocated = allocatedCents.reduce((a, b) => a + b, 0);
+  if (sumAllocated !== feeToAllocate) {
+    throw new Error(
+      `INTERNAL_ALLOCATION_SUM_MISMATCH: sum=${sumAllocated} feeToAllocate=${feeToAllocate}`
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.payment.update({
+      where: { id: paymentId },
+      data: {
+        stripeProcessingFeeCents: feeCents,
+        stripeChargeId: chargeDetails?.chargeId ?? payment.stripeChargeId,
+        stripeBalanceTransactionId:
+          chargeDetails?.balanceTransactionId ?? payment.stripeBalanceTransactionId,
+      },
+    });
+
+    for (let i = 0; i < payment.allocations.length; i++) {
+      const alloc = payment.allocations[i]!;
+      const net = nets[i] ?? 0;
+      await tx.paymentAllocation.update({
+        where: { id: alloc.id },
+        data: {
+          allocatedProcessingFeeCents: allocatedCents[i]!,
+          netVendorTransferCents: net,
+        },
+      });
+
+      const transfer = await tx.vendorPayoutTransfer.findUnique({
+        where: { paymentAllocationId: alloc.id },
+      });
+      if (
+        transfer &&
+        !transfer.stripeTransferId &&
+        DEFERRED_FEE_PAYOUT_STATUSES.has(transfer.status)
+      ) {
+        await tx.vendorPayoutTransfer.update({
+          where: { id: transfer.id },
+          data: { amountCents: net },
+        });
+      }
+    }
+  });
+
+  console.info(
+    JSON.stringify({
+      event: "payment_stripe_fee_backfilled",
+      paymentId,
+      stripePaymentIntentId: payment.stripePaymentIntentId,
+      stripeProcessingFeeCents: feeCents,
+    })
+  );
+
+  return { updated: true };
 }
 
 export async function recordPaymentAndAllocations(
@@ -437,15 +548,19 @@ export async function recordPaymentAndAllocations(
   const chargeDetails = await fetchPaymentIntentChargeDetails(stripePaymentIntentId);
   const feeCents =
     chargeDetails?.feeCents ?? (await fetchStripeProcessingFeeCents(stripePaymentIntentId));
-  const production = process.env.NODE_ENV === "production";
-  if (
-    production &&
-    stripe &&
+  const feeDeferred =
     !isDevBypassStripePaymentIntentId(stripePaymentIntentId) &&
-    feeCents === null
-  ) {
-    throw new Error(
-      "STRIPE_PROCESSING_FEE_UNAVAILABLE: missing balance_transaction.fee for PaymentIntent in production"
+    stripe &&
+    feeCents === null;
+  if (feeDeferred) {
+    console.warn(
+      JSON.stringify({
+        event: "payment_stripe_fee_deferred",
+        orderId,
+        stripePaymentIntentId,
+        message:
+          "Stripe balance_transaction fee unavailable; payment recorded with null fee snapshot for later reconciliation",
+      })
     );
   }
 

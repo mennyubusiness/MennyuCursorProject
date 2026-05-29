@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { auth } from "@/auth";
-import { CUSTOMER_SUPPORT_ISSUE_TYPES } from "@/domain/order-support-issue";
+import { CUSTOMER_SUPPORT_ISSUE_TYPES, customerSupportIssueSubmitSuccessMessage } from "@/domain/order-support-issue";
 import { assertCustomerOrderAccess } from "@/lib/customer-order-access";
 import {
   createCustomerSupportIssue,
@@ -80,6 +80,6 @@ export async function POST(
   return NextResponse.json({
     ok: true,
     issue: result.issue,
-    message: "We received your issue and our team will review it.",
+    message: customerSupportIssueSubmitSuccessMessage(parsed.data.issueType),
   });
 }
