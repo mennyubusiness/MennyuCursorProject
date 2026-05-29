@@ -173,6 +173,126 @@ export async function validatePaymentIntentForOrderProcessing(params: {
   return { ok: true };
 }
 
+/** PaymentIntent statuses where the customer can still complete or retry payment. */
+export const REUSABLE_PAYMENT_INTENT_STATUSES = [
+  "requires_payment_method",
+  "requires_confirmation",
+  "requires_action",
+  "processing",
+] as const;
+
+export type StripePaymentIntentLike = {
+  id: string;
+  client_secret: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  metadata?: { orderId?: string };
+};
+
+export function isReusablePaymentIntentStatus(status: string): boolean {
+  return (REUSABLE_PAYMENT_INTENT_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * Reuse or update an existing order PaymentIntent when checkout is retried.
+ * Returns null when a new PaymentIntent should be created (after canceling stale PI).
+ */
+export async function resolveExistingOrderPaymentIntent(params: {
+  orderId: string;
+  paymentIntentId: string;
+  amountCents: number;
+  currency?: string;
+  retrieve?: (id: string) => Promise<StripePaymentIntentLike>;
+  update?: (
+    id: string,
+    data: { amount: number; currency: string; metadata: { orderId: string } }
+  ) => Promise<StripePaymentIntentLike>;
+  cancel?: (id: string) => Promise<unknown>;
+}): Promise<{ clientSecret: string; paymentIntentId: string } | null> {
+  const currency = (params.currency ?? ORDER_PAYMENT_CURRENCY).toLowerCase();
+  const retrieve = params.retrieve ?? ((id) => stripe.paymentIntents.retrieve(id));
+  const update =
+    params.update ??
+    ((id, data) =>
+      stripe.paymentIntents.update(id, {
+        amount: data.amount,
+        currency: data.currency,
+        metadata: data.metadata,
+      }));
+  const cancel = params.cancel ?? ((id) => stripe.paymentIntents.cancel(id));
+
+  let pi: StripePaymentIntentLike;
+  try {
+    pi = await retrieve(params.paymentIntentId);
+  } catch {
+    return null;
+  }
+
+  if (pi.metadata?.orderId !== params.orderId) {
+    if (pi.status !== "succeeded" && pi.status !== "canceled") {
+      try {
+        await cancel(pi.id);
+      } catch {
+        // Best-effort cancel before replacement.
+      }
+    }
+    return null;
+  }
+
+  if (pi.status === "succeeded") {
+    return {
+      clientSecret: pi.client_secret ?? "",
+      paymentIntentId: pi.id,
+    };
+  }
+
+  if (pi.status === "canceled") {
+    return null;
+  }
+
+  if (isReusablePaymentIntentStatus(pi.status)) {
+    if (pi.currency.toLowerCase() !== currency) {
+      try {
+        await cancel(pi.id);
+      } catch {
+        // Best-effort cancel before replacement.
+      }
+      return null;
+    }
+    if (pi.amount !== params.amountCents) {
+      pi = await update(pi.id, {
+        amount: params.amountCents,
+        currency,
+        metadata: { orderId: params.orderId },
+      });
+    }
+    const secret = pi.client_secret;
+    if (!secret) throw new Error("Missing client_secret");
+    return { clientSecret: secret, paymentIntentId: pi.id };
+  }
+
+  if (pi.status !== "canceled") {
+    try {
+      await cancel(pi.id);
+    } catch {
+      // Best-effort cancel before replacement.
+    }
+  }
+  return null;
+}
+
+async function cancelPaymentIntentIfLive(paymentIntentId: string): Promise<void> {
+  if (!stripe) return;
+  try {
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (pi.status === "succeeded" || pi.status === "canceled") return;
+    await stripe.paymentIntents.cancel(paymentIntentId);
+  } catch {
+    // Ignore — replacement path will create a fresh PaymentIntent.
+  }
+}
+
 export async function createPaymentIntent(
   orderId: string,
   totalCents: number,
@@ -189,25 +309,52 @@ export async function createPaymentIntent(
   }
 
   if (!stripe) throw new Error("Stripe not configured");
-  const key = buildIdempotencyKey("payment_intent", idempotencyKey);
-  const existingPayment = await prisma.payment.findUnique({
-    where: { idempotencyKey: key },
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { status: true, totalCents: true, stripePaymentIntentId: true },
   });
-  if (existingPayment?.stripePaymentIntentId) {
-    const pi = await stripe.paymentIntents.retrieve(existingPayment.stripePaymentIntentId);
-    const secret = pi.client_secret;
-    if (!secret) throw new Error("Missing client_secret");
-    return { clientSecret: secret, paymentIntentId: pi.id };
+  if (!order) throw new Error("Order not found");
+  if (order.status !== "pending_payment") {
+    throw new Error("Order is not awaiting payment");
   }
+
+  const amountCents = order.totalCents;
+  if (totalCents !== amountCents) {
+    console.warn(
+      JSON.stringify({
+        event: "payment_intent_amount_param_mismatch",
+        orderId,
+        paramTotalCents: totalCents,
+        orderTotalCents: amountCents,
+      })
+    );
+  }
+
+  if (order.stripePaymentIntentId) {
+    const reused = await resolveExistingOrderPaymentIntent({
+      orderId,
+      paymentIntentId: order.stripePaymentIntentId,
+      amountCents,
+    });
+    if (reused) {
+      return reused;
+    }
+    await cancelPaymentIntentIfLive(order.stripePaymentIntentId);
+  }
+
+  const stripeIdempotencyKey = order.stripePaymentIntentId
+    ? buildIdempotencyKey("payment_intent", `${orderId}:replace:${Date.now()}`)
+    : buildIdempotencyKey("payment_intent", orderId);
 
   const paymentIntent = await stripe.paymentIntents.create(
     {
-      amount: totalCents,
-      currency: "usd",
+      amount: amountCents,
+      currency: ORDER_PAYMENT_CURRENCY,
       automatic_payment_methods: { enabled: true },
       metadata: { orderId },
     },
-    { idempotencyKey: key }
+    { idempotencyKey: stripeIdempotencyKey }
   );
 
   await prisma.order.update({

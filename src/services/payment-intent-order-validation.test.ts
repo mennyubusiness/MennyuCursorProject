@@ -134,6 +134,22 @@ describe("validatePaymentIntentForOrderProcessing", () => {
     if (!r.ok) expect(r.code).toBe("PAYMENT_INTENT_ORDER_MISMATCH");
   });
 
+  it("rejects replaced old PaymentIntent after order points to a newer PI", async () => {
+    mockOrderFindUnique.mockResolvedValue(
+      pendingOrder({ stripePaymentIntentId: "pi_new_active" })
+    );
+    mockPaymentIntentsRetrieve.mockResolvedValue(
+      succeededPi({ id: PI_ID, metadata: { orderId: ORDER_ID } })
+    );
+
+    const r = await validatePaymentIntentForOrderProcessing({
+      orderId: ORDER_ID,
+      paymentIntentId: PI_ID,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("PAYMENT_INTENT_ORDER_MISMATCH");
+  });
+
   it("allows idempotent replay when Payment already recorded for same order", async () => {
     mockOrderFindUnique.mockResolvedValue(pendingOrder());
     mockPaymentFindUnique.mockResolvedValue({ orderId: ORDER_ID });
