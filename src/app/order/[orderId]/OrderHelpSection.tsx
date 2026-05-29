@@ -26,9 +26,11 @@ type VendorOrderOption = {
 export function OrderHelpSection({
   orderId,
   vendorOrders,
+  className = "",
 }: {
   orderId: string;
   vendorOrders: VendorOrderOption[];
+  className?: string;
 }) {
   const [issues, setIssues] = useState<SupportIssue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,7 +104,7 @@ export function OrderHelpSection({
 
   return (
     <section
-      className="mt-8 rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
+      className={`rounded-xl border border-stone-200 bg-white p-5 shadow-sm ${className}`.trim()}
       aria-label="Order help"
     >
       <h2 className="text-lg font-semibold text-stone-900">Need help with this order?</h2>

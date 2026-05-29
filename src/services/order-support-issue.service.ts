@@ -163,6 +163,11 @@ export async function createCustomerSupportIssue(
     },
   });
 
+  const { sendOrderIssueMilestone } = await import(
+    "@/services/customer-order-notification.service"
+  );
+  await sendOrderIssueMilestone(input.orderId, row.id);
+
   return { ok: true, issue: toSafeIssue(row), created: true };
 }
 

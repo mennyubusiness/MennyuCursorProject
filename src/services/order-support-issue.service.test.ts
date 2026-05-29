@@ -15,7 +15,12 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("@/services/customer-order-notification.service", () => ({
+  sendOrderIssueMilestone: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { prisma } from "@/lib/db";
+import { sendOrderIssueMilestone } from "@/services/customer-order-notification.service";
 import {
   createCustomerSupportIssue,
   findDuplicateOpenCustomerIssue,
@@ -138,6 +143,7 @@ describe("order-support-issue.service", () => {
       customerMessage: "help",
     });
     expect(result.ok).toBe(true);
+    expect(sendOrderIssueMilestone).toHaveBeenCalledWith("ord_1", "iss_1");
     expect(prisma.orderIssue.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

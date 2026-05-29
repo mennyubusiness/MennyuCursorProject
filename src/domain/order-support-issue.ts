@@ -85,3 +85,10 @@ export function customerSupportIssueStatusMessage(status: string): string {
 export function isCustomerSupportIssueType(type: string): type is CustomerSupportIssueType {
   return (CUSTOMER_SUPPORT_ISSUE_TYPES as readonly string[]).includes(type);
 }
+
+/** Customer-visible OrderIssue rows (shown on order status + eligible for issue SMS). */
+export function isCustomerReportedOrderIssue(
+  submittedByRole: string | null | undefined
+): boolean {
+  return submittedByRole === "customer";
+}

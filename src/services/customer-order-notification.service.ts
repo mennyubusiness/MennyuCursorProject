@@ -44,7 +44,7 @@ export function milestoneIdempotencyKey(
 export function buildMilestoneSmsBody(
   milestone: CustomerOrderMilestone,
   ctx: MilestoneTemplateContext,
-  opts?: { multiVendor?: boolean }
+  opts?: { multiVendor?: boolean; vendorIssue?: boolean }
 ): string {
   switch (milestone) {
     case "order_received":
@@ -61,6 +61,9 @@ export function buildMilestoneSmsBody(
     case "order_cancelled":
       return `Your Open Order at ${ctx.podName} was cancelled. Details: ${ctx.orderStatusUrl}`;
     case "order_issue":
+      if (opts?.vendorIssue && ctx.vendorName) {
+        return `There's an issue with your order from ${ctx.vendorName} at ${ctx.podName}. Please check your order status page: ${ctx.orderStatusUrl}`;
+      }
       return `There's an issue with part of your Open Order at ${ctx.podName}. Please check your order status page: ${ctx.orderStatusUrl}`;
   }
 }
@@ -162,12 +165,14 @@ async function sendMilestoneSms(params: {
   phone: string;
   ctx: MilestoneTemplateContext;
   multiVendor?: boolean;
+  vendorIssue?: boolean;
 }): Promise<void> {
   const idempotencyKey = milestoneIdempotencyKey(params.milestone, params.scopeId);
   await sendTransactionalSms({
     to: params.phone,
     body: buildMilestoneSmsBody(params.milestone, params.ctx, {
       multiVendor: params.multiVendor,
+      vendorIssue: params.vendorIssue,
     }),
     orderId: params.orderId,
     vendorOrderId: params.vendorOrderId ?? null,
@@ -294,14 +299,35 @@ export async function sendOrderReceivedMilestone(orderId: string, phone: string)
   });
 }
 
-/** Customer SMS when an order issue is opened (Phase 1 template + idempotency only). */
+/** Customer SMS when a customer-visible order issue is opened. Idempotent per issueId. */
 export async function sendOrderIssueMilestone(orderId: string, issueId: string): Promise<void> {
+  const issue = await prisma.orderIssue.findUnique({
+    where: { id: issueId },
+    select: {
+      id: true,
+      orderId: true,
+      submittedByRole: true,
+      vendorOrderId: true,
+      vendorOrder: { select: { vendor: { select: { name: true } } } },
+    },
+  });
+  if (!issue || issue.orderId !== orderId) return;
+
+  const { isCustomerReportedOrderIssue } = await import("@/domain/order-support-issue");
+  if (!isCustomerReportedOrderIssue(issue.submittedByRole)) return;
+
+  const idempotencyKey = milestoneIdempotencyKey("order_issue", issueId);
+  if (await hasCommittedMilestone(idempotencyKey)) return;
+
   const ctx = await loadOrderNotificationContext(orderId);
   if (!ctx) return;
 
+  const vendorName = issue.vendorOrder?.vendor.name?.trim();
+  const vendorIssue = Boolean(issue.vendorOrderId && vendorName);
+
   const templateCtx: MilestoneTemplateContext = {
     podName: ctx.podName,
-    vendorName: ctx.vendorOrders[0]?.vendor.name ?? "Vendor",
+    vendorName: vendorName ?? ctx.vendorOrders[0]?.vendor.name ?? "Vendor",
     pickupCode: ctx.pickupCode,
     orderStatusUrl: ctx.orderStatusUrl,
   };
@@ -310,8 +336,10 @@ export async function sendOrderIssueMilestone(orderId: string, issueId: string):
     milestone: "order_issue",
     scopeId: issueId,
     orderId,
+    vendorOrderId: issue.vendorOrderId ?? undefined,
     phone: ctx.customerPhone,
     ctx: templateCtx,
+    vendorIssue: vendorIssue ? true : undefined,
   });
 }
 

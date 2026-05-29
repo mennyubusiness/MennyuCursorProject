@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function OrderStatusLoading() {
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-4 w-32" />
       <Skeleton className="h-14 w-full rounded-lg" />

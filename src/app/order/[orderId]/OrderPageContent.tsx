@@ -193,7 +193,14 @@ export function OrderPageContent({
     resolvedPickupTimezone: order.resolvedPickupTimezone,
   });
   const isMultiVendor = order.vendorOrders.length > 1;
-  const customerCanCancel = canCustomerCancelOrder(order);
+  const isTerminal = isTerminalStatus(derivedStatus as Parameters<typeof isTerminalStatus>[0]);
+  const customerCanCancel =
+    !isTerminal &&
+    canCustomerCancelOrder({
+      status: derivedStatus,
+      vendorOrders: order.vendorOrders,
+    });
+  const showCancelNote = !isTerminal && !customerCanCancel;
   const isOrderCancelled = derivedStatus === "cancelled";
   const refundMessage = refundDisplayMessage({
     refundAttempts: order.refundAttempts,
@@ -205,268 +212,317 @@ export function OrderPageContent({
   const completedCount = order.vendorOrders.filter((vo) => vo.fulfillmentStatus === "completed").length;
 
   return (
-    <div className="max-w-2xl">
+    <div className="mx-auto w-full max-w-6xl">
       <SetCustomerPhoneFromOrder customerPhone={order.customerPhone} />
       <OrderPostCheckoutCartSync
         orderId={orderId}
         podId={order.podId}
         orderStatus={order.status}
       />
-      {from === "cart" && (
-        <p className="rounded-lg border border-stone-200 bg-stone-100 px-4 py-2 text-sm text-stone-700">
-          You already have an active order. Here&apos;s your order status.
-        </p>
-      )}
-      <h1 className="text-2xl font-semibold text-stone-900">Your order</h1>
-      <p className="mt-1 text-stone-600">Order #{order.id.slice(-8).toUpperCase()}</p>
 
-      <p className="mt-4 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-800">
-        {pickupLine}
-      </p>
-
-      <section className="mt-6 rounded-xl border-2 border-stone-300 bg-stone-50 p-6" aria-label="Pickup code">
-        <p className="text-sm font-medium uppercase tracking-wide text-stone-500">Pickup code</p>
-        <p className="mt-2 text-4xl font-bold tabular-nums tracking-[0.25em] text-stone-900">
-          {pickupCode}
-        </p>
-        <p className="mt-3 text-sm text-stone-600">
-          Show this code at pickup. Give it to the vendor when you collect your order.
-        </p>
-      </section>
-
-      <div className="mt-4 rounded-lg border border-stone-200 bg-white p-4">
-        <p className="text-sm font-medium text-stone-800">At pickup</p>
-        <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-stone-600">
-          <li>Show your pickup code at pickup.</li>
-          <li>Check each vendor section below for readiness.</li>
-          {isMultiVendor && (
-            <li>Items from different vendors may be ready at different times.</li>
-          )}
-        </ul>
-      </div>
-
-      <section
-        className="mt-6 rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-5 shadow-sm sm:p-6"
-        aria-label="Order progress"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">Overall status</h2>
-            <p className="mt-1 text-lg font-semibold text-stone-900">{statusLabel}</p>
-          </div>
-        </div>
-        <div className="mt-5 border-t border-stone-100 pt-5">
-          <CustomerOrderProgressTimeline steps={parentProgressSteps} />
-        </div>
-        <p className="mt-4 text-sm leading-relaxed text-stone-600">{explanation}</p>
-        {isOrderCancelled && refundMessage && (
-          <p className="mt-2 text-sm font-medium text-stone-700">{refundMessage.line}</p>
-        )}
-        <p className="mt-3 text-xs text-stone-500">Updates will be sent to {order.customerPhone}.</p>
-      </section>
-
-      {isMultiVendor && (readyCount > 0 || completedCount > 0) && (
-        <p className="mt-4 rounded-lg border border-emerald-200/80 bg-emerald-50/60 px-4 py-2.5 text-sm text-emerald-950">
-          {readyCount + completedCount === order.vendorOrders.length ? (
-            <span className="font-medium">All vendors are ready or picked up — you&apos;re good to go.</span>
-          ) : (
-            <>
-              <span className="font-medium text-emerald-900">
-                {readyCount + completedCount} of {order.vendorOrders.length} vendor portions
-              </span>{" "}
-              ready or picked up. Check each kitchen below.
-            </>
-          )}
-        </p>
-      )}
-
-      <section className="mt-8" aria-label="Vendor order status">
-        <h2 className="text-lg font-semibold text-stone-900">By vendor</h2>
-        {isMultiVendor && (
-          <p className="mt-1 text-sm text-stone-600">
-            This order has {order.vendorOrders.length} vendors. Items may be ready at different times.
+      <header className="mb-6">
+        {from === "cart" && (
+          <p className="mb-4 rounded-lg border border-stone-200 bg-stone-100 px-4 py-2 text-sm text-stone-700">
+            You already have an active order. Here&apos;s your order status.
           </p>
         )}
-        {!isMultiVendor && (
-          <p className="mt-1 text-sm text-stone-500">Individual order statuses</p>
-        )}
-        <div className="mt-4 space-y-5">
-          {order.vendorOrders.map((vo) => {
-            const isReady = vo.fulfillmentStatus === "ready";
-            const isCancelled = vo.fulfillmentStatus === "cancelled";
-            const recovered = isVendorOrderManuallyRecovered(vo, vo.statusHistory);
-            const vendorStage = getVendorCustomerStage(vo, recovered);
-            const statusLabelVo = vendorStatusLabelForScheduledPickup(
-              order.requestedPickupAt,
-              vo.routingStatus,
-              vo.fulfillmentStatus,
-              recovered
-            );
-            const canCancelThisVo = canCustomerCancelVendorOrder(vo);
-            const showVendorSubtotal = order.vendorOrders.length > 1;
-            return (
-              <div
-                key={vo.id}
-                className={`rounded-2xl border-2 p-4 shadow-sm transition-shadow ${
-                  isCancelled
-                    ? "border-stone-200 bg-stone-100/80"
-                    : isReady
-                      ? "border-emerald-400/90 bg-emerald-50/90 shadow-emerald-100/80"
-                      : "border-stone-200/90 bg-white"
-                }`}
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="text-base font-semibold text-stone-900">{vo.vendor.name}</h3>
-                  <span
-                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold sm:text-sm ${
+        <h1 className="text-2xl font-semibold text-stone-900 sm:text-3xl">Your order</h1>
+        <p className="mt-1 text-stone-600">Order #{order.id.slice(-8).toUpperCase()}</p>
+        <p className="mt-3 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-800">
+          {pickupLine}
+        </p>
+      </header>
+
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-3 lg:items-start">
+        <div className="order-1 min-w-0 lg:col-span-2">
+          <section
+            className="rounded-xl border-2 border-stone-300 bg-stone-50 p-5 sm:p-6"
+            aria-label="Pickup code"
+          >
+            <p className="text-sm font-medium uppercase tracking-wide text-stone-500">Pickup code</p>
+            <p className="mt-2 text-4xl font-bold tabular-nums tracking-[0.25em] text-stone-900 sm:text-5xl">
+              {pickupCode}
+            </p>
+            <p className="mt-3 text-sm text-stone-600">
+              Show this code at pickup. Give it to the vendor when you collect your order.
+            </p>
+          </section>
+
+          <section
+            className="mt-6 rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-5 shadow-sm sm:p-6"
+            aria-label="Order progress"
+          >
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Overall status
+              </h2>
+              <p className="mt-1 text-xl font-semibold text-stone-900">{statusLabel}</p>
+            </div>
+            <div className="mt-5 border-t border-stone-100 pt-5">
+              <CustomerOrderProgressTimeline steps={parentProgressSteps} />
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-stone-600">{explanation}</p>
+            {isOrderCancelled && refundMessage && (
+              <p className="mt-2 text-sm font-medium text-stone-700">{refundMessage.line}</p>
+            )}
+            <p className="mt-3 text-xs text-stone-500">
+              Updates will be sent to {order.customerPhone}
+            </p>
+          </section>
+
+          {isMultiVendor && (readyCount > 0 || completedCount > 0) && (
+            <p className="mt-4 rounded-lg border border-emerald-200/80 bg-emerald-50/60 px-4 py-2.5 text-sm text-emerald-950">
+              {readyCount + completedCount === order.vendorOrders.length ? (
+                <span className="font-medium">
+                  All vendors are ready or picked up — you&apos;re good to go.
+                </span>
+              ) : (
+                <>
+                  <span className="font-medium text-emerald-900">
+                    {readyCount + completedCount} of {order.vendorOrders.length} vendor portions
+                  </span>{" "}
+                  ready or picked up. Check each kitchen below.
+                </>
+              )}
+            </p>
+          )}
+
+          <section className="mt-8" aria-label="Vendor order status">
+            <h2 className="text-lg font-semibold text-stone-900">By vendor</h2>
+            {isMultiVendor ? (
+              <p className="mt-1 text-sm text-stone-600">
+                This order has {order.vendorOrders.length} vendors. Items may be ready at different
+                times.
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-stone-500">Your items from this vendor</p>
+            )}
+            <div className="mt-4 space-y-4">
+              {order.vendorOrders.map((vo) => {
+                const isReady = vo.fulfillmentStatus === "ready";
+                const isCompleted = vo.fulfillmentStatus === "completed";
+                const isCancelled = vo.fulfillmentStatus === "cancelled";
+                const isTerminalVo = isCompleted || isCancelled;
+                const recovered = isVendorOrderManuallyRecovered(vo, vo.statusHistory);
+                const vendorStage = getVendorCustomerStage(vo, recovered);
+                const statusLabelVo = vendorStatusLabelForScheduledPickup(
+                  order.requestedPickupAt,
+                  vo.routingStatus,
+                  vo.fulfillmentStatus,
+                  recovered
+                );
+                const canCancelThisVo = canCustomerCancelVendorOrder(vo);
+                const showVendorSubtotal = order.vendorOrders.length > 1;
+                return (
+                  <div
+                    key={vo.id}
+                    className={`rounded-xl border p-4 sm:p-5 ${
                       isCancelled
-                        ? "bg-stone-300 text-stone-600"
+                        ? "border-stone-200 bg-stone-100/80"
                         : isReady
-                          ? "bg-emerald-600 text-white"
-                          : "bg-stone-200 text-stone-800"
+                          ? "border-emerald-300/80 bg-emerald-50/50"
+                          : isCompleted
+                            ? "border-stone-200 bg-stone-50/80"
+                            : "border-stone-200/90 bg-white shadow-sm"
                     }`}
                   >
-                    {statusLabelVo}
-                  </span>
-                </div>
-                <VendorCustomerStatusStrip stage={vendorStage} />
-                {isReady && !isCancelled && (
-                  <p className="mt-2 text-sm font-medium text-emerald-800">
-                    This vendor&apos;s portion is ready for pickup.
-                  </p>
-                )}
-                <ul className="mt-3 space-y-2 text-sm text-stone-600">
-                  {vo.lineItems.map((line) => {
-                    const selections = line.selections ?? [];
-                    return (
-                      <li key={line.id}>
-                        <div>
-                          {line.name} × {line.quantity} — $
-                          {((line.priceCents * line.quantity) / 100).toFixed(2)}
-                        </div>
-                        {selections.length > 0 && (
-                          <ul className="mt-1.5 space-y-0.5 pl-3 text-stone-500">
-                            {selections.map((s) => (
-                              <li key={s.id} className="flex gap-2">
-                                <span className="text-stone-400" aria-hidden>
-                                  ·
-                                </span>
-                                <span>
-                                  {s.quantity > 1
-                                    ? `${s.nameSnapshot} ×${s.quantity}`
-                                    : s.nameSnapshot}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="text-base font-semibold text-stone-900">{vo.vendor.name}</h3>
+                        {showVendorSubtotal && (
+                          <p className="mt-0.5 text-sm tabular-nums text-stone-600">
+                            Subtotal ${(vo.totalCents / 100).toFixed(2)}
+                          </p>
                         )}
-                      </li>
-                    );
-                  })}
-                </ul>
-                {showVendorSubtotal && (
-                  <div className="mt-3 border-t border-stone-200 pt-3">
-                    <p className="text-sm font-medium text-stone-800">
-                      Vendor subtotal{" "}
-                      <span className="font-semibold tabular-nums">
-                        ${(vo.totalCents / 100).toFixed(2)}
+                      </div>
+                      <span
+                        className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                          isCancelled
+                            ? "bg-stone-300 text-stone-600"
+                            : isReady
+                              ? "bg-emerald-600 text-white"
+                              : isCompleted
+                                ? "bg-stone-200 text-stone-700"
+                                : "bg-stone-200 text-stone-800"
+                        }`}
+                      >
+                        {statusLabelVo}
                       </span>
-                    </p>
-                    <p className="mt-0.5 text-xs text-stone-500">Food items from this vendor only</p>
+                    </div>
+
+                    {!isTerminalVo && <VendorCustomerStatusStrip stage={vendorStage} />}
+
+                    {isReady && !isCancelled && (
+                      <p className="mt-2 text-sm font-medium text-emerald-800">
+                        Ready for pickup — show your pickup code.
+                      </p>
+                    )}
+                    {isCompleted && (
+                      <p className="mt-2 text-sm text-stone-600">Picked up.</p>
+                    )}
+
+                    <ul className="mt-3 space-y-2 text-sm text-stone-600">
+                      {vo.lineItems.map((line) => {
+                        const selections = line.selections ?? [];
+                        return (
+                          <li key={line.id}>
+                            <div>
+                              {line.name} × {line.quantity} — $
+                              {((line.priceCents * line.quantity) / 100).toFixed(2)}
+                            </div>
+                            {selections.length > 0 && (
+                              <ul className="mt-1.5 space-y-0.5 pl-3 text-stone-500">
+                                {selections.map((s) => (
+                                  <li key={s.id} className="flex gap-2">
+                                    <span className="text-stone-400" aria-hidden>
+                                      ·
+                                    </span>
+                                    <span>
+                                      {s.quantity > 1
+                                        ? `${s.nameSnapshot} ×${s.quantity}`
+                                        : s.nameSnapshot}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+
+                    {canCancelThisVo && (
+                      <VendorOrderCancelButton
+                        orderId={orderId}
+                        vendorOrderId={vo.id}
+                        vendorName={vo.vendor.name}
+                      />
+                    )}
                   </div>
-                )}
-                {canCancelThisVo && (
-                  <VendorOrderCancelButton
-                    orderId={orderId}
-                    vendorOrderId={vo.id}
-                    vendorName={vo.vendor.name}
-                  />
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          </section>
+
+          {customerCanCancel && (
+            <div className="mt-6 lg:hidden">
+              <OrderCancelButton orderId={orderId} disabled={false} />
+            </div>
+          )}
+
+          {showCancelNote && (
+            <p className="mt-6 text-sm text-stone-500 lg:hidden">
+              This order can no longer be cancelled because preparation has started.
+            </p>
+          )}
         </div>
-      </section>
 
-      <div className="mt-6 rounded-xl border-2 border-stone-300 bg-stone-50 p-5 shadow-sm">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">Order total</h3>
-        <p className="mt-1 text-xs text-stone-500">
-          {order.vendorOrders.length > 1
-            ? "Combined across all vendors, fees, and tip."
-            : "What you paid for this order."}
-        </p>
-        <dl className="mt-4 space-y-2 border-t border-stone-200 pt-4 text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">Subtotal</dt>
-            <dd className="tabular-nums text-stone-900">${(order.subtotalCents / 100).toFixed(2)}</dd>
+        <aside className="order-2 mt-0 space-y-6 lg:col-span-1 lg:row-span-2">
+          <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-stone-900">At pickup</h3>
+            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-stone-600">
+              <li>Show your pickup code at pickup.</li>
+              <li>Check each vendor section for readiness.</li>
+              {isMultiVendor && (
+                <li>Items from different vendors may be ready at different times.</li>
+              )}
+            </ul>
           </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">Service fee</dt>
-            <dd className="tabular-nums text-stone-900">${(order.serviceFeeCents / 100).toFixed(2)}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">Tax</dt>
-            <dd className="tabular-nums text-stone-900">${((order.taxCents ?? 0) / 100).toFixed(2)}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">Tip</dt>
-            <dd className="tabular-nums text-stone-900">${(order.tipCents / 100).toFixed(2)}</dd>
-          </div>
-          <div className="flex justify-between gap-4 border-t border-stone-200 pt-3 text-base font-bold text-stone-900">
-            <dt>Total</dt>
-            <dd className="tabular-nums">${(order.totalCents / 100).toFixed(2)}</dd>
-          </div>
-        </dl>
-      </div>
 
-      {!isOrderCancelled && (
-        <OrderCancelButton
-          orderId={orderId}
-          disabled={!customerCanCancel}
-          disabledMessage={
-            !customerCanCancel
-              ? "This order can no longer be cancelled because preparation has started."
-              : undefined
-          }
-        />
-      )}
+          <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+              Order total
+            </h3>
+            <p className="mt-1 text-xs text-stone-500">
+              {order.vendorOrders.length > 1
+                ? "Combined across all vendors, fees, and tip."
+                : "What you paid for this order."}
+            </p>
+            <dl className="mt-4 space-y-2 border-t border-stone-200 pt-4 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-stone-600">Subtotal</dt>
+                <dd className="tabular-nums text-stone-900">
+                  ${(order.subtotalCents / 100).toFixed(2)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-stone-600">Service fee</dt>
+                <dd className="tabular-nums text-stone-900">
+                  ${(order.serviceFeeCents / 100).toFixed(2)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-stone-600">Tax</dt>
+                <dd className="tabular-nums text-stone-900">
+                  ${((order.taxCents ?? 0) / 100).toFixed(2)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-stone-600">Tip</dt>
+                <dd className="tabular-nums text-stone-900">
+                  ${(order.tipCents / 100).toFixed(2)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4 border-t border-stone-200 pt-3 text-base font-bold text-stone-900">
+                <dt>Total</dt>
+                <dd className="tabular-nums">${(order.totalCents / 100).toFixed(2)}</dd>
+              </div>
+            </dl>
+          </div>
 
-      <OrderHelpSection
-        orderId={orderId}
-        vendorOrders={order.vendorOrders.map((vo) => ({
-          id: vo.id,
-          vendorName: vo.vendor.name,
-          lineItems: (vo.lineItems ?? []).map((line) => ({
-            id: line.id,
-            name: line.name,
-          })),
-        }))}
-      />
+          {customerCanCancel && (
+            <div className="hidden lg:block">
+              <OrderCancelButton orderId={orderId} disabled={false} />
+            </div>
+          )}
 
-      {timelineEvents.length > 0 && (
-        <section className="mt-8" aria-label="Order updates">
-          <h2 className="text-lg font-semibold text-stone-900">Recent updates</h2>
-          <p className="mt-1 text-sm text-stone-500">
-            Latest activity on your order, newest at the bottom.
-          </p>
-          <ul className="mt-3 space-y-2 rounded-xl border border-stone-200/90 bg-white p-4 shadow-sm">
-            {timelineEvents.map((evt, i) => (
-              <li
-                key={i}
-                className="flex flex-wrap items-baseline gap-2 border-b border-stone-100 pb-2 last:border-0 last:pb-0"
-              >
-                <time
-                  dateTime={evt.createdAt.toISOString()}
-                  className="text-xs text-stone-500 shrink-0"
+          {showCancelNote && (
+            <p className="hidden text-sm text-stone-500 lg:block">
+              This order can no longer be cancelled because preparation has started.
+            </p>
+          )}
+
+          <OrderHelpSection
+            orderId={orderId}
+            vendorOrders={order.vendorOrders.map((vo) => ({
+              id: vo.id,
+              vendorName: vo.vendor.name,
+              lineItems: (vo.lineItems ?? []).map((line) => ({
+                id: line.id,
+                name: line.name,
+              })),
+            }))}
+          />
+        </aside>
+
+        {timelineEvents.length > 0 && (
+          <section
+            className="order-3 min-w-0 lg:col-span-2"
+            aria-label="Order updates"
+          >
+            <h2 className="text-lg font-semibold text-stone-900">Recent updates</h2>
+            <p className="mt-1 text-sm text-stone-500">
+              Activity on your order, oldest to newest.
+            </p>
+            <ul className="mt-3 max-h-72 space-y-0 overflow-y-auto rounded-xl border border-stone-200/90 bg-white p-3 shadow-sm sm:p-4">
+              {timelineEvents.map((evt, i) => (
+                <li
+                  key={`${evt.label}-${evt.createdAt.toISOString()}-${i}`}
+                  className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-stone-100 py-2.5 last:border-0 last:pb-0"
                 >
-                  {formatOrderStatusTimelineClock(evt.createdAt, order.resolvedPickupTimezone)}
-                </time>
-                <span className="text-sm text-stone-800">{evt.label}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+                  <time
+                    dateTime={evt.createdAt.toISOString()}
+                    className="shrink-0 text-xs tabular-nums text-stone-500"
+                  >
+                    {formatOrderStatusTimelineClock(evt.createdAt, order.resolvedPickupTimezone)}
+                  </time>
+                  <span className="text-sm text-stone-800">{evt.label}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
 
       {process.env.NODE_ENV === "development" && (
         <div className="mt-8 flex flex-wrap gap-4">

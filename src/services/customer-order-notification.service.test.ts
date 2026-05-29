@@ -6,6 +6,7 @@ vi.mock("react", async (importOriginal) => {
 });
 
 const mockOrderFindUnique = vi.fn();
+const mockOrderIssueFindUnique = vi.fn();
 const mockSmsLogFindUnique = vi.fn();
 const mockSendTransactionalSms = vi.fn();
 
@@ -13,6 +14,9 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     order: {
       findUnique: (...args: unknown[]) => mockOrderFindUnique(...args),
+    },
+    orderIssue: {
+      findUnique: (...args: unknown[]) => mockOrderIssueFindUnique(...args),
     },
     smsMessageLog: {
       findUnique: (...args: unknown[]) => mockSmsLogFindUnique(...args),
@@ -29,6 +33,7 @@ import {
   evaluateCustomerOrderMilestones,
   milestoneIdempotencyKey,
   sendOrderReceivedMilestone,
+  sendOrderIssueMilestone,
 } from "./customer-order-notification.service";
 import { getPickupCode } from "@/lib/pickup-code";
 
@@ -101,6 +106,14 @@ describe("customer-order-notification.service", () => {
         buildMilestoneSmsBody("final_vendor_ready", ctx, { multiVendor: true })
       ).toContain("Your final pickup is ready");
     });
+
+    it("builds vendor-scoped order_issue template", () => {
+      expect(
+        buildMilestoneSmsBody("order_issue", ctx, { vendorIssue: true })
+      ).toBe(
+        `There's an issue with your order from Vendor A at ${POD}. Please check your order status page: https://mennyu.com/order/${ORDER_ID}`
+      );
+    });
   });
 
   describe("sendOrderReceivedMilestone", () => {
@@ -117,6 +130,75 @@ describe("customer-order-notification.service", () => {
       expect(mockSendTransactionalSms.mock.calls[0][0].body).toContain(
         `Pickup code: ${getPickupCode(ORDER_ID)}`
       );
+    });
+  });
+
+  describe("sendOrderIssueMilestone", () => {
+    it("sends order_issue once for customer-reported issue", async () => {
+      mockOrderIssueFindUnique.mockResolvedValue({
+        id: "iss_1",
+        orderId: ORDER_ID,
+        submittedByRole: "customer",
+        vendorOrderId: null,
+        vendorOrder: null,
+      });
+
+      await sendOrderIssueMilestone(ORDER_ID, "iss_1");
+
+      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: "milestone_order_issue",
+          idempotencyKey: milestoneIdempotencyKey("order_issue", "iss_1"),
+          body: expect.stringContaining(POD),
+        })
+      );
+    });
+
+    it("uses vendor wording when issue is scoped to a vendor order", async () => {
+      mockOrderIssueFindUnique.mockResolvedValue({
+        id: "iss_2",
+        orderId: ORDER_ID,
+        submittedByRole: "customer",
+        vendorOrderId: VO_A,
+        vendorOrder: { vendor: { name: "Taco Shop" } },
+      });
+
+      await sendOrderIssueMilestone(ORDER_ID, "iss_2");
+
+      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining("your order from Taco Shop"),
+        })
+      );
+    });
+
+    it("does not send for internal system issues", async () => {
+      mockOrderIssueFindUnique.mockResolvedValue({
+        id: "iss_sys",
+        orderId: ORDER_ID,
+        submittedByRole: "system",
+        vendorOrderId: null,
+        vendorOrder: null,
+      });
+
+      await sendOrderIssueMilestone(ORDER_ID, "iss_sys");
+
+      expect(mockSendTransactionalSms).not.toHaveBeenCalled();
+    });
+
+    it("does not resend when milestone already committed", async () => {
+      mockOrderIssueFindUnique.mockResolvedValue({
+        id: "iss_1",
+        orderId: ORDER_ID,
+        submittedByRole: "customer",
+        vendorOrderId: null,
+        vendorOrder: null,
+      });
+      mockSmsLogFindUnique.mockResolvedValue({ status: "sent" });
+
+      await sendOrderIssueMilestone(ORDER_ID, "iss_1");
+
+      expect(mockSendTransactionalSms).not.toHaveBeenCalled();
     });
   });
 

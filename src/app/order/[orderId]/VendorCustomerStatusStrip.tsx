@@ -22,33 +22,37 @@ function activeIndex(stage: VendorStageKey): number {
 export function VendorCustomerStatusStrip({ stage }: { stage: VendorStageKey }) {
   if (stage === "stopped") {
     return (
-      <p className="mt-2 text-xs font-medium text-stone-500">This part of the order did not go through.</p>
+      <p className="mt-2 text-xs text-stone-500">This part of the order did not go through.</p>
     );
   }
 
+  if (stage === "done") {
+    return null;
+  }
+
   const idx = activeIndex(stage);
+  const currentLabel = SEGMENTS[idx]?.label ?? "Received";
+
   return (
-    <div className="mt-3" role="group" aria-label="Vendor progress">
-      <div className="grid grid-cols-5 gap-0.5 rounded-lg bg-stone-100/90 p-1 sm:gap-1">
+    <div className="mt-2.5" role="group" aria-label="Vendor progress">
+      <div className="flex items-center gap-1">
         {SEGMENTS.map((seg, i) => {
-          const complete = stage === "done" || (idx >= 0 && i < idx);
-          const current = stage !== "done" && i === idx;
+          const complete = idx >= 0 && i < idx;
+          const current = i === idx;
           return (
             <div
               key={seg.key}
-              className={`rounded-md px-0.5 py-1.5 text-center text-[9px] font-semibold leading-tight sm:px-1 sm:text-xs ${
-                complete
-                  ? "bg-stone-900/90 text-white"
-                  : current
-                    ? "bg-white text-stone-900 shadow-sm ring-1 ring-stone-900/40"
-                    : "text-stone-400"
+              className={`h-1 flex-1 rounded-full ${
+                complete ? "bg-stone-800" : current ? "bg-stone-500" : "bg-stone-200"
               }`}
-            >
-              {seg.label}
-            </div>
+              aria-hidden
+            />
           );
         })}
       </div>
+      <p className="mt-1.5 text-xs text-stone-500">
+        Step {idx + 1} of {SEGMENTS.length}: {currentLabel}
+      </p>
     </div>
   );
 }

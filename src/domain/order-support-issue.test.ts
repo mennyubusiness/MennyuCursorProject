@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   customerSupportIssueStatusMessage,
   isActiveOrderIssueStatus,
+  isCustomerReportedOrderIssue,
 } from "./order-support-issue";
 
 describe("order-support-issue domain", () => {
@@ -14,5 +15,11 @@ describe("order-support-issue domain", () => {
   it("treats legacy OPEN as active", () => {
     expect(isActiveOrderIssueStatus("OPEN")).toBe(true);
     expect(isActiveOrderIssueStatus("resolved")).toBe(false);
+  });
+
+  it("identifies customer-reported issues for SMS eligibility", () => {
+    expect(isCustomerReportedOrderIssue("customer")).toBe(true);
+    expect(isCustomerReportedOrderIssue("system")).toBe(false);
+    expect(isCustomerReportedOrderIssue("admin")).toBe(false);
   });
 });

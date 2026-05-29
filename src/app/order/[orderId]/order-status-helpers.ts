@@ -293,11 +293,16 @@ export function buildTimelineEvents(order: {
 
   const filtered: TimelineEvent[] = [];
   const orderLabelsSeen = new Set<string>();
+  const vendorLabelsSeen = new Set<string>();
   for (const evt of raw) {
     if (evt.type === "order") {
       if (evt.label === "In progress") continue;
       if (orderLabelsSeen.has(evt.label)) continue;
       orderLabelsSeen.add(evt.label);
+    } else {
+      if (evt.label.endsWith(" — Received")) continue;
+      if (vendorLabelsSeen.has(evt.label)) continue;
+      vendorLabelsSeen.add(evt.label);
     }
     filtered.push({ createdAt: evt.createdAt, label: evt.label });
   }
