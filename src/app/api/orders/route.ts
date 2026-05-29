@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { assertCustomerOrderAccess } from "@/lib/customer-order-access";
 import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
+import { validatePaymentIntentForOrderProcessing } from "@/services/payment.service";
 import { processSuccessfulPayment } from "@/services/post-payment.service";
 
 const bodySchema = z.object({
@@ -11,10 +14,9 @@ const bodySchema = z.object({
 });
 
 /**
- * Called after Stripe payment succeeds (e.g. dev bypass or resume-payment client flows).
- * Delegates to processSuccessfulPayment (same as Stripe webhook): idempotent payment,
- * routing, and confirmation SMS only when payment is first recorded.
- * Accepts dev_bypass_* paymentIntentId in development for testing without Stripe.
+ * Client confirmation after Stripe payment succeeds (dev bypass or resume-payment flows).
+ * Requires customer phone ownership and PaymentIntent validation before post-payment processing.
+ * Stripe webhooks use the same processSuccessfulPayment path with signature auth instead.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -25,12 +27,28 @@ export async function POST(request: NextRequest) {
     }
     const { orderId, paymentIntentId, idempotencyKey } = parsed.data;
 
+    const access = await assertCustomerOrderAccess(orderId, await headers());
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error, code: "ACCESS_DENIED" }, { status: access.status });
+    }
+
     const existing = await prisma.order.findFirst({
       where: { id: orderId, status: { not: "pending_payment" } },
     });
     if (existing) {
       await clearCheckoutSourceCartForOrder(orderId);
       return NextResponse.json({ orderId: existing.id, status: existing.status });
+    }
+
+    const validation = await validatePaymentIntentForOrderProcessing({
+      orderId,
+      paymentIntentId,
+    });
+    if (!validation.ok) {
+      return NextResponse.json(
+        { error: validation.message, code: validation.code },
+        { status: validation.status }
+      );
     }
 
     await processSuccessfulPayment({ orderId, paymentIntentId, idempotencyKey });

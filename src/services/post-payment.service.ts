@@ -5,7 +5,7 @@
  */
 import { prisma } from "@/lib/db";
 import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
-import { recordPaymentAndAllocations } from "@/services/payment.service";
+import { recordPaymentAndAllocations, validatePaymentIntentForOrderProcessing } from "@/services/payment.service";
 import { setOrderStatus } from "@/services/order.service";
 import { submitVendorOrder } from "@/services/routing.service";
 import { sendOrderReceivedMilestone } from "@/services/customer-order-notification.service";
@@ -22,6 +22,23 @@ export async function processSuccessfulPayment(params: {
   idempotencyKey: string;
 }): Promise<void> {
   const { orderId, paymentIntentId, idempotencyKey } = params;
+
+  const orderForValidation = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { status: true },
+  });
+  if (!orderForValidation) {
+    throw new Error("Order not found");
+  }
+  if (orderForValidation.status === "pending_payment") {
+    const validation = await validatePaymentIntentForOrderProcessing({
+      orderId,
+      paymentIntentId,
+    });
+    if (!validation.ok) {
+      throw new Error(validation.message);
+    }
+  }
 
   let paymentCreated: boolean;
   try {

@@ -343,3 +343,152 @@ export function customerStatusLabel(
   if (failedButRecoverable) return "Confirming your order";
   return customerOrderHeaderStatus(derivedStatus as ParentOrderStatus, vendorOrders);
 }
+
+export type CustomerOrderStatusPhase =
+  | "received"
+  | "scheduled"
+  | "in_progress"
+  | "partially_ready"
+  | "ready"
+  | "completed"
+  | "cancelled"
+  | "needs_attention";
+
+export type CustomerOrderStatusCardCopy = {
+  phase: CustomerOrderStatusPhase;
+  /** Short chip-style label for the progress section */
+  shortLabel: string;
+  headline: string;
+  nextAction: string;
+};
+
+function countReadyOrPickedUp(
+  vendorOrders: Array<{ fulfillmentStatus: string }>
+): { readyOrPickedUp: number; active: number } {
+  const activeOrders = vendorOrders.filter((v) => v.fulfillmentStatus !== "cancelled");
+  const readyOrPickedUp = activeOrders.filter((v) =>
+    ["ready", "completed"].includes(v.fulfillmentStatus)
+  ).length;
+  return { readyOrPickedUp, active: activeOrders.length };
+}
+
+function isPartiallyReadyOrder(
+  derivedStatus: string,
+  vendorOrders: Array<{ fulfillmentStatus: string }>
+): boolean {
+  if (vendorOrders.length <= 1) return false;
+  if (["completed", "cancelled", "ready"].includes(derivedStatus)) return false;
+  const { readyOrPickedUp, active } = countReadyOrPickedUp(vendorOrders);
+  return active > 0 && readyOrPickedUp > 0 && readyOrPickedUp < active;
+}
+
+/** UI-only phase for the top customer status card (does not change stored order status). */
+export function resolveCustomerOrderStatusPhase(params: {
+  derivedStatus: string;
+  vendorOrders: Array<{ routingStatus: string; fulfillmentStatus: string }>;
+  failedButRecoverable: boolean;
+  requestedPickupAt: unknown;
+}): CustomerOrderStatusPhase {
+  const { derivedStatus, vendorOrders, failedButRecoverable, requestedPickupAt } = params;
+
+  if (derivedStatus === "cancelled") return "cancelled";
+  if (derivedStatus === "completed") return "completed";
+  if (derivedStatus === "failed") {
+    return failedButRecoverable ? "received" : "needs_attention";
+  }
+  if (derivedStatus === "ready") return "ready";
+  if (isPartiallyReadyOrder(derivedStatus, vendorOrders)) return "partially_ready";
+  if (derivedStatus === "partially_completed") return "partially_ready";
+
+  const maxRank = maxParentFulfillmentStepRank(vendorOrders);
+  const scheduledPreKitchen =
+    requestedPickupAt != null &&
+    shouldShowScheduledPickupCustomerLabels(requestedPickupAt, vendorOrders) &&
+    (derivedStatus === "in_progress" ||
+      derivedStatus === "accepted" ||
+      derivedStatus === "preparing") &&
+    maxRank < 2;
+  if (scheduledPreKitchen) return "scheduled";
+
+  if (
+    derivedStatus === "in_progress" ||
+    derivedStatus === "accepted" ||
+    derivedStatus === "preparing"
+  ) {
+    return "in_progress";
+  }
+
+  return "received";
+}
+
+const STATUS_CARD_COPY: Record<
+  CustomerOrderStatusPhase,
+  Pick<CustomerOrderStatusCardCopy, "shortLabel" | "headline" | "nextAction">
+> = {
+  received: {
+    shortLabel: "Order received",
+    headline: "We received your order",
+    nextAction: "Vendors are confirming it now.",
+  },
+  scheduled: {
+    shortLabel: "Scheduled",
+    headline: "Your pickup is scheduled",
+    nextAction: "Vendors will confirm before your pickup time.",
+  },
+  in_progress: {
+    shortLabel: "Preparing",
+    headline: "Your order is being prepared",
+    nextAction: "We'll text you when each pickup is ready.",
+  },
+  partially_ready: {
+    shortLabel: "Partially ready",
+    headline: "Some items are ready",
+    nextAction: "Check each vendor below before picking up.",
+  },
+  ready: {
+    shortLabel: "Ready for pickup",
+    headline: "Ready for pickup",
+    nextAction: "Show your pickup code to each vendor.",
+  },
+  completed: {
+    shortLabel: "Completed",
+    headline: "Order completed",
+    nextAction: "All vendors are ready or picked up.",
+  },
+  cancelled: {
+    shortLabel: "Cancelled",
+    headline: "Order cancelled",
+    nextAction: "No further pickup is needed.",
+  },
+  needs_attention: {
+    shortLabel: "Needs attention",
+    headline: "Something needs attention",
+    nextAction: "Check the vendor details below.",
+  },
+};
+
+/** Headline + next-action copy for the top order status card on the customer order page. */
+export function customerOrderStatusCardCopy(params: {
+  derivedStatus: string;
+  vendorOrders: Array<{ routingStatus: string; fulfillmentStatus: string }>;
+  failedButRecoverable: boolean;
+  requestedPickupAt: unknown;
+  pickupDisplay?: OrderPickupDisplayInput;
+}): CustomerOrderStatusCardCopy {
+  const phase = resolveCustomerOrderStatusPhase(params);
+  const copy = STATUS_CARD_COPY[phase];
+  let nextAction = copy.nextAction;
+
+  if (phase === "scheduled" && params.pickupDisplay) {
+    const scheduledLead = formatPickupSummaryScheduledLead(params.pickupDisplay);
+    if (scheduledLead) {
+      nextAction = scheduledLead;
+    }
+  }
+
+  if (phase === "received" && params.vendorOrders.length === 1) {
+    nextAction = "The restaurant is confirming your order now.";
+  }
+
+  return { phase, ...copy, nextAction };
+}

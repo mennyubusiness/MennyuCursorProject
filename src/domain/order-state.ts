@@ -188,23 +188,20 @@ export function parentStatusLabel(status: ParentOrderStatus): string {
 }
 
 /**
- * Customer-facing parent order header (short line). Uses explicit single- vs multi-vendor
- * phrasing only for `routed_partial` (partially confirmed).
+ * Customer-facing parent order header (short line).
  */
 export function customerOrderHeaderStatus(
   status: ParentOrderStatus,
   vendorOrders: Array<{ routingStatus: string; fulfillmentStatus: string }>
 ): string {
-  const isMultiVendor = vendorOrders.length > 1;
   switch (status) {
     case "pending_payment":
       return "Awaiting payment";
     case "paid":
     case "routing":
     case "routed":
-      return "Confirming your order";
     case "routed_partial":
-      return isMultiVendor ? "Partially confirmed" : "Confirming your order";
+      return "Confirming your order";
     case "accepted":
     case "preparing":
     case "in_progress":
@@ -237,7 +234,6 @@ export function customerStatusLabelForRouted(
 
 /**
  * Customer-facing labels for parent order rows in "Recent updates" timeline (not admin parentStatusLabel).
- * Multi-vendor only changes copy for `routed_partial` → "Partially confirmed".
  */
 export function customerOrderTimelineParentLabel(
   status: ParentOrderStatus,
@@ -249,9 +245,8 @@ export function customerOrderTimelineParentLabel(
     case "paid":
     case "routing":
     case "routed":
-      return "Confirming your order";
     case "routed_partial":
-      return isMultiVendor ? "Partially confirmed" : "Confirming your order";
+      return "Confirming your order";
     case "accepted":
     case "preparing":
     case "in_progress":

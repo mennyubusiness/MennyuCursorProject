@@ -13,10 +13,9 @@ import { VendorOrderCancelButton } from "./VendorOrderCancelButton";
 import { formatOrderStatusTimelineClock, formatPickupDetailLine } from "@/lib/pickup-display";
 import {
   vendorStatusLabelForScheduledPickup,
-  orderSummaryExplanation,
   buildTimelineEvents,
   refundDisplayMessage,
-  customerStatusLabelForScheduledPickup,
+  customerOrderStatusCardCopy,
 } from "./order-status-helpers";
 import { buildParentOrderProgressSteps, getVendorCustomerStage } from "./customer-order-progress";
 import { CustomerOrderProgressTimeline } from "./CustomerOrderProgressTimeline";
@@ -164,22 +163,17 @@ export function OrderPageContent({
         v.fulfillmentStatus === "cancelled" ||
         (v.routingStatus === "failed" && v.fulfillmentStatus === "pending")
     );
-  const statusLabel = customerStatusLabelForScheduledPickup(
+  const statusCard = customerOrderStatusCardCopy({
     derivedStatus,
-    order.vendorOrders,
+    vendorOrders: order.vendorOrders,
     failedButRecoverable,
-    order.requestedPickupAt
-  );
-  const explanation = orderSummaryExplanation(
-    derivedStatus,
-    order.vendorOrders,
-    order.requestedPickupAt,
-    {
+    requestedPickupAt: order.requestedPickupAt,
+    pickupDisplay: {
       requestedPickupAt: order.requestedPickupAt,
       deliverectEstimatedReadyAt: order.deliverectEstimatedReadyAt,
       resolvedPickupTimezone: order.resolvedPickupTimezone,
-    }
-  );
+    },
+  });
   const timelineEvents = buildTimelineEvents(order);
   const parentProgressSteps = buildParentOrderProgressSteps(
     derivedStatus,
@@ -208,8 +202,6 @@ export function OrderPageContent({
     totalCents: order.totalCents,
     totalRefundedCents: order.totalRefundedCents,
   });
-  const readyCount = order.vendorOrders.filter((vo) => vo.fulfillmentStatus === "ready").length;
-  const completedCount = order.vendorOrders.filter((vo) => vo.fulfillmentStatus === "completed").length;
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -252,40 +244,20 @@ export function OrderPageContent({
             className="mt-6 rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-5 shadow-sm sm:p-6"
             aria-label="Order progress"
           >
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Overall status
-              </h2>
-              <p className="mt-1 text-xl font-semibold text-stone-900">{statusLabel}</p>
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              {statusCard.shortLabel}
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-stone-900 sm:text-2xl">
+              {statusCard.headline}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-stone-600">{statusCard.nextAction}</p>
             <div className="mt-5 border-t border-stone-100 pt-5">
               <CustomerOrderProgressTimeline steps={parentProgressSteps} />
             </div>
-            <p className="mt-4 text-sm leading-relaxed text-stone-600">{explanation}</p>
             {isOrderCancelled && refundMessage && (
-              <p className="mt-2 text-sm font-medium text-stone-700">{refundMessage.line}</p>
+              <p className="mt-4 text-sm font-medium text-stone-700">{refundMessage.line}</p>
             )}
-            <p className="mt-3 text-xs text-stone-500">
-              Updates will be sent to {order.customerPhone}
-            </p>
           </section>
-
-          {isMultiVendor && (readyCount > 0 || completedCount > 0) && (
-            <p className="mt-4 rounded-lg border border-emerald-200/80 bg-emerald-50/60 px-4 py-2.5 text-sm text-emerald-950">
-              {readyCount + completedCount === order.vendorOrders.length ? (
-                <span className="font-medium">
-                  All vendors are ready or picked up — you&apos;re good to go.
-                </span>
-              ) : (
-                <>
-                  <span className="font-medium text-emerald-900">
-                    {readyCount + completedCount} of {order.vendorOrders.length} vendor portions
-                  </span>{" "}
-                  ready or picked up. Check each kitchen below.
-                </>
-              )}
-            </p>
-          )}
 
           <section className="mt-8" aria-label="Vendor order status">
             <h2 className="text-lg font-semibold text-stone-900">By vendor</h2>

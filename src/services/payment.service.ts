@@ -29,6 +29,150 @@ function isDevPaymentBypass(): boolean {
   return !stripe;
 }
 
+export const ORDER_PAYMENT_CURRENCY = "usd";
+
+export type PaymentIntentValidationResult =
+  | { ok: true }
+  | { ok: false; status: 400 | 403 | 404; code: string; message: string };
+
+/**
+ * Verifies a PaymentIntent belongs to the order before post-payment processing.
+ * Used by POST /api/orders and processSuccessfulPayment (defense in depth).
+ */
+export async function validatePaymentIntentForOrderProcessing(params: {
+  orderId: string;
+  paymentIntentId: string;
+}): Promise<PaymentIntentValidationResult> {
+  const { orderId, paymentIntentId } = params;
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      status: true,
+      totalCents: true,
+      stripePaymentIntentId: true,
+    },
+  });
+  if (!order) {
+    return { ok: false, status: 404, code: "ORDER_NOT_FOUND", message: "Order not found" };
+  }
+
+  if (isDevBypassStripePaymentIntentId(paymentIntentId)) {
+    if (process.env.NODE_ENV === "production") {
+      return {
+        ok: false,
+        status: 403,
+        code: "DEV_BYPASS_FORBIDDEN",
+        message: "Development payment bypass is not available in production.",
+      };
+    }
+    const expectedDevId = `dev_bypass_${orderId}`;
+    if (paymentIntentId !== expectedDevId) {
+      return {
+        ok: false,
+        status: 403,
+        code: "PAYMENT_INTENT_ORDER_MISMATCH",
+        message: "Payment does not match this order.",
+      };
+    }
+    if (order.stripePaymentIntentId && order.stripePaymentIntentId !== paymentIntentId) {
+      return {
+        ok: false,
+        status: 403,
+        code: "PAYMENT_INTENT_ORDER_MISMATCH",
+        message: "Payment does not match this order.",
+      };
+    }
+    return { ok: true };
+  }
+
+  const existingPayment = await prisma.payment.findUnique({
+    where: { stripePaymentIntentId: paymentIntentId },
+    select: { orderId: true },
+  });
+  if (existingPayment) {
+    if (existingPayment.orderId !== orderId) {
+      return {
+        ok: false,
+        status: 403,
+        code: "PAYMENT_INTENT_ORDER_MISMATCH",
+        message: "This payment belongs to a different order.",
+      };
+    }
+    return { ok: true };
+  }
+
+  if (!stripe) {
+    return {
+      ok: false,
+      status: 400,
+      code: "STRIPE_NOT_CONFIGURED",
+      message: "Stripe is not configured.",
+    };
+  }
+
+  let pi: { metadata?: { orderId?: string }; amount: number; currency: string; status: string };
+  try {
+    pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+  } catch {
+    return {
+      ok: false,
+      status: 400,
+      code: "PAYMENT_INTENT_NOT_FOUND",
+      message: "Payment could not be verified.",
+    };
+  }
+
+  const metaOrderId = pi.metadata?.orderId;
+  if (!metaOrderId || metaOrderId !== orderId) {
+    return {
+      ok: false,
+      status: 403,
+      code: "PAYMENT_INTENT_METADATA_MISMATCH",
+      message: "Payment does not belong to this order.",
+    };
+  }
+
+  if (pi.amount !== order.totalCents) {
+    return {
+      ok: false,
+      status: 400,
+      code: "PAYMENT_AMOUNT_MISMATCH",
+      message: "Payment amount does not match this order.",
+    };
+  }
+
+  if (pi.currency.toLowerCase() !== ORDER_PAYMENT_CURRENCY) {
+    return {
+      ok: false,
+      status: 400,
+      code: "PAYMENT_CURRENCY_MISMATCH",
+      message: "Payment currency does not match this order.",
+    };
+  }
+
+  if (pi.status !== "succeeded") {
+    return {
+      ok: false,
+      status: 400,
+      code: "PAYMENT_INTENT_NOT_SUCCEEDED",
+      message: "Payment has not succeeded yet.",
+    };
+  }
+
+  if (order.stripePaymentIntentId && order.stripePaymentIntentId !== paymentIntentId) {
+    return {
+      ok: false,
+      status: 403,
+      code: "PAYMENT_INTENT_ORDER_MISMATCH",
+      message: "Payment does not match this order.",
+    };
+  }
+
+  return { ok: true };
+}
+
 export async function createPaymentIntent(
   orderId: string,
   totalCents: number,
