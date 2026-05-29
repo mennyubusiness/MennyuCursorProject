@@ -3,7 +3,7 @@
  * Cart is session-scoped (one per pod per session). Future multi-user/group ordering could
  * introduce a shared cart or order-group id while keeping single-payer and this session model.
  */
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { Cart, CartGroup, CartItem } from "@/domain/types";
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
@@ -53,36 +53,55 @@ export async function unlinkCompletedCheckoutOrdersFromCart(cartId: string): Pro
   return result.count;
 }
 
-export async function getOrCreateCart(podId: string, sessionId: string): Promise<Cart> {
-  let cart = await prisma.cart.findUnique({
-    where: { podId_sessionId: { podId, sessionId } },
+/** Full cart graph for /api/cart GET and checkout-adjacent session cart loads. */
+export const CART_SESSION_FULL_INCLUDE = {
+  items: {
     include: {
-      items: {
-        include: {
-          menuItem: true,
-          vendor: true,
-          selections: { include: { modifierOption: true } },
-        },
-      },
-      pod: true,
+      menuItem: true,
+      vendor: true,
+      selections: { include: { modifierOption: true } },
     },
-  });
+  },
+  pod: true,
+} satisfies Prisma.CartInclude;
 
-  if (!cart) {
-    cart = await prisma.cart.create({
+function isPodSessionCartUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (error.code !== "P2002") return false;
+  const target = error.meta?.target;
+  if (!Array.isArray(target)) return true;
+  return target.includes("podId") && target.includes("sessionId");
+}
+
+/**
+ * Race-safe get-or-create for the unique (`podId`, `sessionId`) cart row.
+ * Concurrent creates that lose the race re-fetch the winner instead of surfacing P2002.
+ */
+export async function findOrCreateCartForPodSession<I extends Prisma.CartInclude>(
+  podId: string,
+  sessionId: string,
+  include: I
+): Promise<Prisma.CartGetPayload<{ include: I }>> {
+  const where = { podId_sessionId: { podId, sessionId } };
+
+  const existing = await prisma.cart.findUnique({ where, include });
+  if (existing) return existing;
+
+  try {
+    return await prisma.cart.create({
       data: { podId, sessionId },
-      include: {
-        items: {
-          include: {
-            menuItem: true,
-            vendor: true,
-            selections: { include: { modifierOption: true } },
-          },
-        },
-        pod: true,
-      },
+      include,
     });
+  } catch (error) {
+    if (!isPodSessionCartUniqueViolation(error)) throw error;
+    const raced = await prisma.cart.findUnique({ where, include });
+    if (!raced) throw error;
+    return raced;
   }
+}
+
+export async function getOrCreateCart(podId: string, sessionId: string): Promise<Cart> {
+  const cart = await findOrCreateCartForPodSession(podId, sessionId, CART_SESSION_FULL_INCLUDE);
 
   await unlinkCompletedCheckoutOrdersFromCart(cart.id);
 
@@ -147,17 +166,11 @@ export async function getOrCreateCartForVendorMenuPage(
   podId: string,
   sessionId: string
 ): Promise<Cart> {
-  let cart = await prisma.cart.findUnique({
-    where: { podId_sessionId: { podId, sessionId } },
-    include: CART_MUTATION_CART_INCLUDE,
-  });
-
-  if (!cart) {
-    cart = await prisma.cart.create({
-      data: { podId, sessionId },
-      include: CART_MUTATION_CART_INCLUDE,
-    });
-  }
+  const cart = await findOrCreateCartForPodSession(
+    podId,
+    sessionId,
+    CART_MUTATION_CART_INCLUDE
+  );
 
   await unlinkCompletedCheckoutOrdersFromCart(cart.id);
 
