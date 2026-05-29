@@ -8,6 +8,8 @@ import {
   getCustomerPhoneFromHeaders,
   MENNYU_SESSION_MAX_AGE,
   ORDER_ACCESS_COOKIE,
+  buildCustomerPhoneCookieHeader,
+  buildOrderAccessCookieHeader,
 } from "@/lib/session";
 
 export type CustomerOrderAccessResult =
@@ -74,13 +76,15 @@ export async function assertCustomerOrderAccess(
   return { ok: true, orderId: order.id, customerPhone: orderPhone };
 }
 
+export type CustomerOrderAccessBootstrapResult = CustomerOrderAccessResult;
+
 /**
- * After a valid signed access link, persist HttpOnly phone + access cookies for polling/refresh.
+ * Validates a signed access link before persisting cookies (route handler or server action).
  */
-export async function persistCustomerOrderAccessCookies(
+export async function resolveCustomerOrderAccessBootstrap(
   orderId: string,
   accessToken: string
-): Promise<CustomerOrderAccessResult> {
+): Promise<CustomerOrderAccessBootstrapResult> {
   if (!verifyCustomerOrderAccessToken(orderId, accessToken)) {
     return { ok: false, status: 403, error: "Invalid or expired order access link." };
   }
@@ -93,9 +97,34 @@ export async function persistCustomerOrderAccessCookies(
     return { ok: false, status: 404, error: "Order not found" };
   }
 
+  return { ok: true, orderId: order.id, customerPhone: order.customerPhone.trim() };
+}
+
+/** HttpOnly Set-Cookie header values for order access bootstrap (route handlers only). */
+export function buildPersistedCustomerOrderAccessCookieHeaders(
+  accessToken: string,
+  customerPhone: string
+): string[] {
+  return [
+    buildCustomerPhoneCookieHeader(customerPhone.trim(), { httpOnly: true }),
+    buildOrderAccessCookieHeader(accessToken),
+  ];
+}
+
+/**
+ * After a valid signed access link, persist HttpOnly phone + access cookies for polling/refresh.
+ * Use only from Server Actions — not from Server Component render. Prefer the access bootstrap route.
+ */
+export async function persistCustomerOrderAccessCookies(
+  orderId: string,
+  accessToken: string
+): Promise<CustomerOrderAccessResult> {
+  const resolved = await resolveCustomerOrderAccessBootstrap(orderId, accessToken);
+  if (!resolved.ok) return resolved;
+
   const isProd = process.env.NODE_ENV === "production";
   const cookieStore = await cookies();
-  cookieStore.set(CUSTOMER_PHONE_COOKIE, order.customerPhone.trim(), {
+  cookieStore.set(CUSTOMER_PHONE_COOKIE, resolved.customerPhone, {
     path: "/",
     maxAge: MENNYU_SESSION_MAX_AGE,
     sameSite: "lax",
@@ -110,5 +139,5 @@ export async function persistCustomerOrderAccessCookies(
     secure: isProd,
   });
 
-  return { ok: true, orderId: order.id, customerPhone: order.customerPhone.trim() };
+  return resolved;
 }

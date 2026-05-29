@@ -2,7 +2,6 @@ import { notFound, redirect } from "next/navigation";
 import {
   clearCartAfterOrderSuccessAction,
   getOrderStatusAction,
-  persistCustomerOrderAccessAction,
   reconcilePaymentIfSucceededAction,
 } from "@/actions/order.actions";
 import { assertCustomerOrderAccess } from "@/lib/customer-order-access";
@@ -22,17 +21,13 @@ export default async function OrderStatusPage({
   const { from, payment, access } = await searchParams;
 
   if (access?.trim()) {
-    const established = await persistCustomerOrderAccessAction(orderId, access.trim());
-    if (established.ok) {
-      const qs = new URLSearchParams();
-      if (from) qs.set("from", from);
-      if (payment) qs.set("payment", payment);
-      const suffix = qs.toString();
-      redirect(suffix ? `/order/${orderId}?${suffix}` : `/order/${orderId}`);
-    }
+    const bootstrapParams = new URLSearchParams({ access: access.trim() });
+    if (from) bootstrapParams.set("from", from);
+    if (payment) bootstrapParams.set("payment", payment);
+    redirect(`/api/orders/${orderId}/access?${bootstrapParams.toString()}`);
   }
 
-  const accessCheck = await assertCustomerOrderAccess(orderId, undefined, access ?? null);
+  const accessCheck = await assertCustomerOrderAccess(orderId);
   if (!accessCheck.ok) {
     return <OrderAccessDenied status={accessCheck.status} message={accessCheck.error} />;
   }

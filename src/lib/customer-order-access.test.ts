@@ -21,6 +21,10 @@ vi.mock("@/lib/session", () => ({
   MENNYU_SESSION_MAX_AGE: 3600,
   getCustomerPhoneFromHeaders: vi.fn(),
   getCustomerOrderAccessTokenFromHeaders: vi.fn(),
+  buildCustomerPhoneCookieHeader: (phone: string) =>
+    `mennyu_customer_phone=${encodeURIComponent(phone)}; Path=/; HttpOnly`,
+  buildOrderAccessCookieHeader: (token: string) =>
+    `mennyu_order_access=${encodeURIComponent(token)}; Path=/; HttpOnly`,
 }));
 
 import { cookies } from "next/headers";
@@ -36,7 +40,9 @@ import {
 } from "./customer-order-access-token";
 import {
   assertCustomerOrderAccess,
+  buildPersistedCustomerOrderAccessCookieHeaders,
   persistCustomerOrderAccessCookies,
+  resolveCustomerOrderAccessBootstrap,
 } from "./customer-order-access";
 
 describe("assertCustomerOrderAccess", () => {
@@ -145,6 +151,40 @@ describe("assertCustomerOrderAccess", () => {
 
     const r = await assertCustomerOrderAccess("ord_legacy", new Headers(), token);
     expect(r.ok).toBe(true);
+  });
+});
+
+describe("resolveCustomerOrderAccessBootstrap", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(prisma.order.findUnique).mockResolvedValue({
+      id: "ord_1",
+      customerPhone: "+15551234567",
+    } as never);
+  });
+
+  it("resolves valid token", async () => {
+    const token = createCustomerOrderAccessToken("ord_1");
+    const r = await resolveCustomerOrderAccessBootstrap("ord_1", token);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.customerPhone).toBe("+15551234567");
+  });
+
+  it("rejects invalid token", async () => {
+    const r = await resolveCustomerOrderAccessBootstrap("ord_1", "bad-token");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(403);
+  });
+});
+
+describe("buildPersistedCustomerOrderAccessCookieHeaders", () => {
+  it("returns HttpOnly phone and access cookie headers", () => {
+    const headers = buildPersistedCustomerOrderAccessCookieHeaders("token_abc", "+15551234567");
+    expect(headers).toHaveLength(2);
+    expect(headers[0]).toContain("mennyu_customer_phone=");
+    expect(headers[0]).toContain("HttpOnly");
+    expect(headers[1]).toContain("mennyu_order_access=");
+    expect(headers[1]).toContain("HttpOnly");
   });
 });
 
