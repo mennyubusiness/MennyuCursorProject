@@ -8,10 +8,8 @@ export default async function AdminDashboardLayout({
   children: React.ReactNode;
 }) {
   const allowed = await isAdminDashboardLayoutAuthorized();
-  if (!allowed) {
-    if (env.NODE_ENV === "production" && env.ADMIN_SECRET) {
-      redirect("/admin/access-denied");
-    }
+  if (!allowed && env.NODE_ENV === "production") {
+    redirect("/admin/access-denied");
   }
 
   return <>{children}</>;

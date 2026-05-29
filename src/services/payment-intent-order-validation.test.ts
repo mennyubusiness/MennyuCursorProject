@@ -38,7 +38,15 @@ function pendingOrder(overrides?: Partial<{ totalCents: number; stripePaymentInt
   };
 }
 
-function succeededPi(overrides?: Partial<{ orderId: string; amount: number; currency: string; status: string }>) {
+function succeededPi(
+  overrides?: Partial<{
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    metadata: { orderId: string };
+  }>
+) {
   return {
     id: PI_ID,
     metadata: { orderId: ORDER_ID },

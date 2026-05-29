@@ -2,12 +2,17 @@
  * POST: Re-check Deliverect for a vendor order (reconciliation fallback via GET order API).
  */
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { attemptDeliverectReconciliationFallback } from "@/services/deliverect-reconciliation-fallback.service";
 
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ vendorOrderId: string }> }
 ) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { vendorOrderId } = await context.params;
   if (!vendorOrderId) {
     return NextResponse.json({ ok: false, error: "Missing vendorOrderId" }, { status: 400 });

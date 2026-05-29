@@ -5,6 +5,7 @@
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import {
   isDeliverectVendorOrderRoutingDegraded,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/vendor-deliverect-dashboard-visibility";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ vendorId: string }> }
 ) {
   const { vendorId } = await context.params;
@@ -22,10 +23,19 @@ export async function GET(
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { id: true, name: true, slug: true, deliverectChannelLinkId: true },
+    select: { id: true, name: true, slug: true, deliverectChannelLinkId: true, vendorDashboardToken: true },
   });
   if (!vendor) {
     return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
+  }
+
+  const access = await verifyVendorAccessForApi(
+    vendorId,
+    request,
+    vendor.vendorDashboardToken
+  );
+  if (!access.ok) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const vendorOrders = await prisma.vendorOrder.findMany({

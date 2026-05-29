@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { assertCustomerOrderAccess, persistCustomerOrderAccessCookies } from "@/lib/customer-order-access";
 import { getOrderWithUnifiedStatus } from "@/services/order-status.service";
 import { getOrdersByCustomerPhone } from "@/services/order.service";
 import { reorderFromOrder } from "@/services/reorder.service";
@@ -9,19 +10,31 @@ import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 
 export async function getOrderStatusAction(orderId: string) {
+  const access = await assertCustomerOrderAccess(orderId);
+  if (!access.ok) return null;
   return getOrderWithUnifiedStatus(orderId);
 }
 
+export async function persistCustomerOrderAccessAction(orderId: string, accessToken: string) {
+  return persistCustomerOrderAccessCookies(orderId, accessToken);
+}
+
 export async function reconcilePaymentIfSucceededAction(orderId: string) {
+  const access = await assertCustomerOrderAccess(orderId);
+  if (!access.ok) {
+    return { reconciled: false, error: access.error };
+  }
   return reconcilePaymentFromRedirect(orderId);
 }
 
 /**
  * Post-payment wait screen: retry redirect reconcile (idempotent) then read unified order state.
- * Matches what a full page refresh does (server runs reconcile again); read-only polling alone
- * does not, so it could stay stuck on pending_payment while refresh fixes the order.
  */
 export async function pollOrderAfterPaymentAction(orderId: string) {
+  const access = await assertCustomerOrderAccess(orderId);
+  if (!access.ok) {
+    throw new Error(access.error);
+  }
   const reconcileResult = await reconcilePaymentFromRedirect(orderId);
   const order = await getOrderWithUnifiedStatus(orderId);
   return { reconcileResult, order };
@@ -29,7 +42,6 @@ export async function pollOrderAfterPaymentAction(orderId: string) {
 
 /**
  * Clear checkout cart snapshot and drop mennyu_checkout cookie after successful payment redirect.
- * Uses Order.sourceCartId (no fragile cookie cart id required).
  */
 export async function clearCartAfterOrderSuccessAction(orderId: string) {
   await clearCheckoutSourceCartForOrder(orderId);

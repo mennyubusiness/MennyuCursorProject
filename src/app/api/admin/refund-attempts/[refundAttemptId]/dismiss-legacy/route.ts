@@ -4,12 +4,17 @@
  * Only allowed for status === "failed". Does not change refund execution logic.
  */
 import { NextResponse } from "next/server";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ refundAttemptId: string }> }
 ) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { refundAttemptId } = await context.params;
   if (!refundAttemptId) {
     return NextResponse.json({ error: "Missing refundAttemptId" }, { status: 400 });

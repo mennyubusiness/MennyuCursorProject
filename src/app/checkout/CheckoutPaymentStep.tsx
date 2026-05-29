@@ -13,6 +13,7 @@ const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : 
 function PaymentStepForm({
   orderId,
   clientSecret,
+  orderAccessToken,
   cartId,
   podId,
   totalWithTip,
@@ -25,6 +26,7 @@ function PaymentStepForm({
 }: {
   orderId: string;
   clientSecret: string;
+  orderAccessToken: string;
   cartId: string;
   podId: string;
   totalWithTip: number;
@@ -52,11 +54,16 @@ function PaymentStepForm({
         setLoading(false);
         return;
       }
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const returnParams = new URLSearchParams({
+        payment: "success",
+        access: orderAccessToken,
+      });
       const { error: confirmError } = await stripe.confirmPayment({
         elements,
         clientSecret,
         confirmParams: {
-          return_url: `${typeof window !== "undefined" ? window.location.origin : ""}/order/${orderId}?payment=success`,
+          return_url: `${origin}/order/${orderId}?${returnParams.toString()}`,
           payment_method_data: {
             billing_details: { address: { country: "US" } },
           },
@@ -142,6 +149,7 @@ function PaymentStepForm({
 export interface CheckoutPaymentStepProps {
   orderId: string;
   clientSecret: string;
+  orderAccessToken: string;
   cartId: string;
   podId: string;
   totalWithTip: number;

@@ -3,13 +3,18 @@
  * Returns ok: false with unavailable: true when routing is not configured (e.g. ROUTING_MODE=mock).
  */
 import { NextResponse } from "next/server";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { isRoutingRetryAvailable, getRoutingUnavailableReason } from "@/lib/routing-availability";
 import { retryVendorOrderRouting } from "@/services/routing.service";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ vendorOrderId: string }> }
 ) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { vendorOrderId } = await context.params;
   if (!vendorOrderId) {
     return NextResponse.json(

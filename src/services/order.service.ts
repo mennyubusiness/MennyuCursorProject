@@ -3,6 +3,7 @@
  * Idempotent by idempotencyKey. Persist status history.
  */
 import { type OrderStatus } from "@prisma/client";
+import { assertCartSessionAccess } from "@/lib/cart-session-access";
 import { prisma } from "@/lib/db";
 import { computeOrderPricing } from "@/domain/fees";
 import { getActivePricingRatesSnapshot } from "@/services/pricing-config.service";
@@ -485,6 +486,27 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
     };
   }
 
+  const access = await assertCartSessionAccess(input.cartId, input.mennyuSessionId ?? null, {
+    authUserId: input.groupOrderHostUserId ?? null,
+    mode: "checkout",
+  });
+  if (!access.ok) {
+    const code =
+      access.status === 401
+        ? "SESSION_REQUIRED"
+        : access.error.includes("host")
+          ? "GROUP_ORDER_HOST_CHECKOUT"
+          : "CART_ACCESS_DENIED";
+    throw new OrderValidationError(code, access.error);
+  }
+
+  const groupSession = access.isGroupOrder
+    ? await prisma.groupOrderSession.findUnique({
+        where: { cartId: input.cartId },
+        select: { id: true },
+      })
+    : null;
+
   const cart = await prisma.cart.findUnique({
     where: { id: input.cartId },
     include: {
@@ -500,22 +522,6 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
   });
   if (!cart || cart.items.length === 0) {
     throw new OrderValidationError("CART_EMPTY", "Cart not found or empty");
-  }
-
-  const groupSession = await prisma.groupOrderSession.findUnique({
-    where: { cartId: cart.id },
-    select: { id: true, hostUserId: true, status: true },
-  });
-  if (groupSession) {
-    if (!input.groupOrderHostUserId || input.groupOrderHostUserId !== groupSession.hostUserId) {
-      throw new OrderValidationError(
-        "GROUP_ORDER_HOST_CHECKOUT",
-        "Only the host can check out a group order."
-      );
-    }
-    if (groupSession.status !== "active" && groupSession.status !== "locked_checkout") {
-      throw new OrderValidationError("GROUP_ORDER_CLOSED", "This group order is no longer active.");
-    }
   }
 
   const validation = await validateCartForOrder(cart);

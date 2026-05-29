@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/db";
+import { assertCartSessionAccess } from "@/lib/cart-session-access";
+import { createCustomerOrderAccessToken } from "@/lib/customer-order-access-token";
+import { buildCustomerPhoneCookieHeader, buildOrderAccessCookieHeader, getSessionIdFromRequest } from "@/lib/session";
 import { createOrderFromCart, OrderValidationError } from "@/services/order.service";
 import { createPaymentIntent } from "@/services/payment.service";
 
@@ -51,22 +53,23 @@ export async function POST(request: NextRequest) {
     scheduledPickupTime,
   } = parsed.data;
 
+  const sessionId = getSessionIdFromRequest(request);
   const authSession = await auth();
-  const groupSession = await prisma.groupOrderSession.findUnique({
-    where: { cartId },
-    select: { hostUserId: true },
+  const access = await assertCartSessionAccess(cartId, sessionId, {
+    authUserId: authSession?.user?.id ?? null,
+    mode: "checkout",
   });
-  let groupOrderHostUserId: string | undefined;
-  if (groupSession) {
-    const uid = authSession?.user?.id;
-    if (!uid || uid !== groupSession.hostUserId) {
-      return NextResponse.json(
-        { error: "Only the host can check out a group order.", code: "GROUP_ORDER_HOST_CHECKOUT" },
-        { status: 403 }
-      );
-    }
-    groupOrderHostUserId = uid;
+  if (!access.ok) {
+    const code =
+      access.error.includes("host")
+        ? "GROUP_ORDER_HOST_CHECKOUT"
+        : access.status === 401
+          ? "SESSION_REQUIRED"
+          : "CART_ACCESS_DENIED";
+    return NextResponse.json({ error: access.error, code }, { status: access.status });
   }
+
+  const groupOrderHostUserId = access.isGroupOrder ? authSession?.user?.id : undefined;
 
   let result;
   try {
@@ -80,6 +83,7 @@ export async function POST(request: NextRequest) {
       scheduledPickupDate,
       scheduledPickupTime,
       groupOrderHostUserId,
+      mennyuSessionId: sessionId,
     });
   } catch (err) {
     if (err instanceof OrderValidationError) {
@@ -108,10 +112,18 @@ export async function POST(request: NextRequest) {
     idempotencyKey
   );
 
-  return NextResponse.json({
+  const orderAccessToken = createCustomerOrderAccessToken(result.order.id);
+  const response = NextResponse.json({
     orderId: result.order.id,
     clientSecret,
     paymentIntentId,
     totalCents: result.order.totalCents,
+    orderAccessToken,
   });
+  response.headers.append(
+    "Set-Cookie",
+    buildCustomerPhoneCookieHeader(customerPhone.trim(), { httpOnly: true })
+  );
+  response.headers.append("Set-Cookie", buildOrderAccessCookieHeader(orderAccessToken));
+  return response;
 }

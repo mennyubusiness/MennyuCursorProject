@@ -6,6 +6,7 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
+import { orderStatusUrlWithAccess } from "@/lib/customer-order-access-token";
 import { getPickupCode } from "@/lib/pickup-code";
 import { sendTransactionalSms } from "@/services/sms.service";
 import type { VendorOrderFulfillmentStatus } from "@/domain/types";
@@ -31,7 +32,7 @@ function publicOrderBaseUrl(): string {
 }
 
 export function orderStatusUrl(orderId: string): string {
-  return `${publicOrderBaseUrl()}/order/${orderId}`;
+  return orderStatusUrlWithAccess(orderId, publicOrderBaseUrl());
 }
 
 export function milestoneIdempotencyKey(

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getOrderStatusAction } from "@/actions/order.actions";
+import { getOrderWithUnifiedStatus } from "@/services/order-status.service";
 import { getOrderVendorOrdersForDeliverect } from "@/integrations/deliverect/load";
 import { mennyuVendorOrderToDeliverectPayload } from "@/integrations/deliverect/transform";
 import { SimulatorControls } from "./SimulatorControls";
@@ -19,7 +19,7 @@ export default async function DevOrderSimulatorPage({
   }
 
   const { orderId } = await params;
-  const order = await getOrderStatusAction(orderId);
+  const order = await getOrderWithUnifiedStatus(orderId);
   if (!order) notFound();
 
   const hydratedVendorOrders = await getOrderVendorOrdersForDeliverect(orderId);

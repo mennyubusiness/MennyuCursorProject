@@ -7,6 +7,7 @@
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
 import { applyVendorOrderTransition } from "@/services/order-status.service";
 import { canVendorRejectVendorOrder } from "@/lib/cancel-eligibility";
 import { getRefundDecision } from "@/lib/refund-decision";
@@ -68,12 +69,23 @@ export async function POST(
       fulfillmentStatus: true,
       manuallyRecoveredAt: true,
       statusHistory: { select: { source: true } },
+      vendor: { select: { vendorDashboardToken: true } },
     },
   });
   if (!vo) {
     return NextResponse.json({ error: "Vendor order not found" }, { status: 404 });
   }
-  if (vo.vendorId !== vendorId) {
+
+  const access = await verifyVendorAccessForApi(
+    vo.vendorId,
+    request,
+    vo.vendor.vendorDashboardToken
+  );
+  if (!access.ok) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (vendorId !== vo.vendorId) {
     return NextResponse.json({ error: "Vendor order does not belong to this vendor" }, { status: 403 });
   }
 

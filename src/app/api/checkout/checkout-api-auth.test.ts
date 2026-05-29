@@ -1,0 +1,112 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+
+const mockAssertCartSessionAccess = vi.fn();
+const mockAuth = vi.fn();
+const mockCreateOrderFromCart = vi.fn();
+const mockCreatePaymentIntent = vi.fn();
+
+vi.mock("@/auth", () => ({
+  auth: (...args: unknown[]) => mockAuth(...args),
+}));
+
+vi.mock("@/lib/cart-session-access", () => ({
+  assertCartSessionAccess: (...args: unknown[]) => mockAssertCartSessionAccess(...args),
+}));
+
+vi.mock("@/lib/customer-order-access-token", () => ({
+  createCustomerOrderAccessToken: () => "token_test",
+}));
+
+vi.mock("@/services/order.service", () => ({
+  createOrderFromCart: (...args: unknown[]) => mockCreateOrderFromCart(...args),
+  OrderValidationError: class OrderValidationError extends Error {},
+}));
+
+vi.mock("@/services/payment.service", () => ({
+  createPaymentIntent: (...args: unknown[]) => mockCreatePaymentIntent(...args),
+}));
+
+import { POST } from "./route";
+
+const CART_ID = "cart_1";
+const SESSION_A = "sess_a";
+
+const checkoutBody = {
+  cartId: CART_ID,
+  customerPhone: "+15551234567",
+  tipCents: 0,
+  idempotencyKey: "idem_1",
+};
+
+function checkoutRequest(sessionId?: string) {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (sessionId) headers.cookie = `mennyu_session=${encodeURIComponent(sessionId)}`;
+  return new NextRequest("http://localhost/api/checkout", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(checkoutBody),
+  });
+}
+
+describe("POST /api/checkout cart session ownership", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue(null);
+    mockCreatePaymentIntent.mockResolvedValue({
+      clientSecret: "cs_test",
+      paymentIntentId: "pi_test",
+    });
+  });
+
+  it("rejects checkout when cart session does not match", async () => {
+    mockAssertCartSessionAccess.mockResolvedValue({
+      ok: false,
+      status: 403,
+      error: "Cart not found or access denied",
+    });
+
+    const res = await POST(checkoutRequest(SESSION_A));
+
+    expect(res.status).toBe(403);
+    expect(mockCreateOrderFromCart).not.toHaveBeenCalled();
+  });
+
+  it("checks out solo cart for matching session", async () => {
+    mockAssertCartSessionAccess.mockResolvedValue({
+      ok: true,
+      cartId: CART_ID,
+      sessionId: SESSION_A,
+      podId: "pod_1",
+      isGroupOrder: false,
+    });
+    mockCreateOrderFromCart.mockResolvedValue({
+      order: { id: "ord_1", totalCents: 1000 },
+    });
+
+    const res = await POST(checkoutRequest(SESSION_A));
+
+    expect(res.status).toBe(200);
+    expect(mockCreateOrderFromCart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cartId: CART_ID,
+        mennyuSessionId: SESSION_A,
+      })
+    );
+  });
+
+  it("rejects group checkout for non-host", async () => {
+    mockAssertCartSessionAccess.mockResolvedValue({
+      ok: false,
+      status: 403,
+      error: "Only the host can check out a group order.",
+    });
+
+    const res = await POST(checkoutRequest(SESSION_A));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.code).toBe("GROUP_ORDER_HOST_CHECKOUT");
+    expect(mockCreateOrderFromCart).not.toHaveBeenCalled();
+  });
+});

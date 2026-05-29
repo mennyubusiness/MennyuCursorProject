@@ -7,15 +7,34 @@ import {
   removeCartItem,
   CartValidationError,
 } from "@/services/cart.service";
-import { getOrSetSessionId, buildSessionCookieHeader } from "@/lib/session";
+import {
+  assertCartSessionAccess,
+  resolveGroupOrderActorFromRequest,
+} from "@/lib/cart-session-access";
+import { getOrSetSessionId, buildSessionCookieHeader, getSessionIdFromRequest } from "@/lib/session";
+
+async function denyCartAccess(
+  access: Extract<Awaited<ReturnType<typeof assertCartSessionAccess>>, { ok: false }>
+) {
+  return NextResponse.json({ error: access.error }, { status: access.status });
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const podId = searchParams.get("podId");
   const cartId = searchParams.get("cartId");
   if (cartId) {
+    const sessionId = getSessionIdFromRequest(request);
+    const groupOrderActor = await resolveGroupOrderActorFromRequest(request, cartId);
+    const access = await assertCartSessionAccess(cartId, sessionId, {
+      groupOrderActor,
+      mode: "read",
+    });
+    if (!access.ok) return denyCartAccess(access);
     const cart = await getCartById(cartId);
-    if (!cart) return NextResponse.json({ error: "Cart not found" }, { status: 404 });
+    if (!cart) {
+      return NextResponse.json({ error: "Cart not found or access denied" }, { status: 403 });
+    }
     return NextResponse.json(cart);
   }
   if (!podId) {
@@ -34,13 +53,23 @@ export async function POST(request: NextRequest) {
   if (!cartId || !menuItemId) {
     return NextResponse.json({ error: "cartId and menuItemId required" }, { status: 400 });
   }
+
+  const sessionId = getSessionIdFromRequest(request);
+  const groupOrderActor = await resolveGroupOrderActorFromRequest(request, cartId);
+  const access = await assertCartSessionAccess(cartId, sessionId, {
+    groupOrderActor,
+    mode: "mutate",
+  });
+  if (!access.ok) return denyCartAccess(access);
+
   try {
     const cart = await addCartItem(
       cartId,
       menuItemId,
       Number(quantity) || 1,
       specialInstructions ?? null,
-      selections ?? null
+      selections ?? null,
+      groupOrderActor
     );
     return NextResponse.json(cart);
   } catch (e) {
@@ -69,13 +98,23 @@ export async function PATCH(request: NextRequest) {
   if (!cartId || !cartItemId) {
     return NextResponse.json({ error: "cartId and cartItemId required" }, { status: 400 });
   }
+
+  const sessionId = getSessionIdFromRequest(request);
+  const groupOrderActor = await resolveGroupOrderActorFromRequest(request, cartId);
+  const access = await assertCartSessionAccess(cartId, sessionId, {
+    groupOrderActor,
+    mode: "mutate",
+  });
+  if (!access.ok) return denyCartAccess(access);
+
   try {
     const cart = await updateCartItem(
       cartId,
       cartItemId,
       Number(quantity) ?? 0,
       specialInstructions ?? null,
-      selections ?? null
+      selections ?? null,
+      groupOrderActor
     );
     return NextResponse.json(cart);
   } catch (e) {
@@ -105,12 +144,20 @@ export async function DELETE(request: NextRequest) {
   if (!cartId || !cartItemId) {
     return NextResponse.json({ error: "cartId and cartItemId required" }, { status: 400 });
   }
+
+  const sessionId = getSessionIdFromRequest(request);
+  const groupOrderActor = await resolveGroupOrderActorFromRequest(request, cartId);
+  const access = await assertCartSessionAccess(cartId, sessionId, {
+    groupOrderActor,
+    mode: "mutate",
+  });
+  if (!access.ok) return denyCartAccess(access);
+
   try {
-    const cart = await removeCartItem(cartId, cartItemId);
+    const cart = await removeCartItem(cartId, cartItemId, groupOrderActor);
     return NextResponse.json(cart);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
-

@@ -3,12 +3,17 @@
  * Updates Vendor.isActive. No schema change; uses existing field.
  */
 import { NextResponse } from "next/server";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 
 export async function PATCH(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ vendorId: string }> }
 ) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { vendorId } = await context.params;
   if (!vendorId) {
     return NextResponse.json({ error: "Missing vendorId" }, { status: 400 });
@@ -16,7 +21,7 @@ export async function PATCH(
 
   let body: { isActive?: boolean };
   try {
-    body = await _request.json();
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }

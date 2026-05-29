@@ -57,6 +57,8 @@ const envSchema = z.object({
    */
   PUBLIC_APP_URL: z.string().url().optional(),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  /** Min 32 characters; preferred secret for signed customer order status links. Falls back to AUTH_SECRET. */
+  ORDER_ACCESS_SIGNING_SECRET: z.string().min(32).optional(),
   /** Required in production for Auth.js (JWT session). Generate: openssl rand -base64 32 */
   AUTH_SECRET: z.string().min(32).optional(),
   /** Optional. When set, admin routes require this value (query param or cookie). TODO: Replace with proper auth. */

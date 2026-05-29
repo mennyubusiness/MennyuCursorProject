@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
+  cookies: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -11,36 +12,117 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/lib/session", () => ({
+  CUSTOMER_PHONE_COOKIE: "mennyu_customer_phone",
+  ORDER_ACCESS_COOKIE: "mennyu_order_access",
+  MENNYU_SESSION_MAX_AGE: 3600,
   getCustomerPhoneFromHeaders: vi.fn(),
+  getCustomerOrderAccessTokenFromHeaders: vi.fn(),
 }));
 
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
-import { getCustomerPhoneFromHeaders } from "@/lib/session";
-import { assertCustomerOrderAccess } from "./customer-order-access";
+import {
+  getCustomerOrderAccessTokenFromHeaders,
+  getCustomerPhoneFromHeaders,
+} from "@/lib/session";
+import {
+  createCustomerOrderAccessToken,
+  verifyCustomerOrderAccessToken,
+} from "./customer-order-access-token";
+import {
+  assertCustomerOrderAccess,
+  persistCustomerOrderAccessCookies,
+} from "./customer-order-access";
 
 describe("assertCustomerOrderAccess", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it("allows matching phone", async () => {
-    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue("+15551234567");
     vi.mocked(prisma.order.findUnique).mockResolvedValue({
       id: "ord_1",
       customerPhone: "+15551234567",
     } as never);
+  });
+
+  it("allows matching phone", async () => {
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue("+15551234567");
+    vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(null);
     const r = await assertCustomerOrderAccess("ord_1", new Headers());
     expect(r.ok).toBe(true);
   });
 
   it("denies wrong phone", async () => {
     vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue("+15550000000");
+    vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(null);
+    const r = await assertCustomerOrderAccess("ord_1", new Headers());
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(403);
+  });
+
+  it("denies unauthenticated callers without phone or token", async () => {
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
+    vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(null);
+    const r = await assertCustomerOrderAccess("ord_1", new Headers());
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(401);
+  });
+
+  it("allows valid signed access token without phone cookie", async () => {
+    const token = createCustomerOrderAccessToken("ord_1");
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
+    vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(null);
+    const r = await assertCustomerOrderAccess("ord_1", new Headers(), token);
+    expect(r.ok).toBe(true);
+  });
+
+  it("allows access token from cookie", async () => {
+    const token = createCustomerOrderAccessToken("ord_1");
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
+    vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(token);
+    const r = await assertCustomerOrderAccess("ord_1", new Headers());
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects token for a different order", async () => {
+    const token = createCustomerOrderAccessToken("ord_other");
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
+    const r = await assertCustomerOrderAccess("ord_1", new Headers(), token);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(401);
+  });
+});
+
+describe("persistCustomerOrderAccessCookies", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(prisma.order.findUnique).mockResolvedValue({
       id: "ord_1",
       customerPhone: "+15551234567",
     } as never);
-    const r = await assertCustomerOrderAccess("ord_1", new Headers());
+  });
+
+  it("sets HttpOnly phone and access cookies for a valid token", async () => {
+    const token = createCustomerOrderAccessToken("ord_1");
+    const set = vi.fn();
+    vi.mocked(cookies).mockResolvedValue({ set } as never);
+
+    const r = await persistCustomerOrderAccessCookies("ord_1", token);
+    expect(r.ok).toBe(true);
+    expect(set).toHaveBeenCalledTimes(2);
+    expect(set.mock.calls[0]?.[2]).toMatchObject({ httpOnly: true });
+    expect(set.mock.calls[1]?.[2]).toMatchObject({ httpOnly: true });
+  });
+
+  it("rejects invalid token", async () => {
+    const r = await persistCustomerOrderAccessCookies("ord_1", "bad-token");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.status).toBe(403);
+  });
+});
+
+describe("customer-order-access-token", () => {
+  it("creates and verifies tokens", () => {
+    const token = createCustomerOrderAccessToken("ord_sms");
+    expect(verifyCustomerOrderAccessToken("ord_sms", token)).toBe(true);
+    expect(verifyCustomerOrderAccessToken("ord_other", token)).toBe(false);
   });
 });

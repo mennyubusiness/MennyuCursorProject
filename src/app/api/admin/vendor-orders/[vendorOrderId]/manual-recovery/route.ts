@@ -4,15 +4,20 @@
  * Idempotent: if fulfillmentStatus is already beyond pending, returns no-op and does not write.
  */
 import { NextResponse } from "next/server";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { applyVendorOrderTransition } from "@/services/order-status.service";
 
 const ELIGIBLE_FULFILLMENT = "pending";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ vendorOrderId: string }> }
 ) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { vendorOrderId } = await context.params;
   if (!vendorOrderId) {
     return NextResponse.json(

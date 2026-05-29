@@ -3,12 +3,17 @@
  * Query: minMinutes (default 45) — idle time from last POS signal, else Deliverect submit time, else updatedAt.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { findStalledPosManagedVendorOrders } from "@/services/pos-stalled-vendor-orders.service";
 
 const DEFAULT_MIN_MINUTES = 45;
 const MAX_MIN_MINUTES = 24 * 60;
 
 export async function GET(request: NextRequest) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const raw = request.nextUrl.searchParams.get("minMinutes");
   let minIdleMinutes = DEFAULT_MIN_MINUTES;
   if (raw != null) {

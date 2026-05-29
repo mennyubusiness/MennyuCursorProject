@@ -2,15 +2,20 @@
  * PATCH: resolve vendor order issue or update notes.
  */
 import { NextResponse } from "next/server";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import {
   resolveVendorOrderIssue,
   updateVendorOrderIssueNotes,
 } from "@/services/issues.service";
 
 export async function PATCH(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ issueId: string }> }
 ) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { issueId } = await context.params;
   if (!issueId) {
     return NextResponse.json({ error: "Missing issueId" }, { status: 400 });
@@ -18,7 +23,7 @@ export async function PATCH(
 
   let body: { resolve?: boolean; notes?: string };
   try {
-    body = await _request.json();
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }

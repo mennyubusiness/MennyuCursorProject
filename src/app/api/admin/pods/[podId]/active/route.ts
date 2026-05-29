@@ -3,12 +3,17 @@
  * Updates Pod.isActive. No schema change; uses existing field.
  */
 import { NextResponse } from "next/server";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 
 export async function PATCH(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ podId: string }> }
 ) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { podId } = await context.params;
   if (!podId) {
     return NextResponse.json({ error: "Missing podId" }, { status: 400 });
@@ -16,7 +21,7 @@ export async function PATCH(
 
   let body: { isActive?: boolean };
   try {
-    body = await _request.json();
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }

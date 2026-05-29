@@ -38,6 +38,17 @@ interface CheckoutFormProps {
 
 type Step = "form" | "payment";
 
+function buildOrderStatusPath(
+  orderId: string,
+  opts?: { accessToken?: string; payment?: "success" }
+): string {
+  const params = new URLSearchParams();
+  if (opts?.accessToken) params.set("access", opts.accessToken);
+  if (opts?.payment) params.set("payment", opts.payment);
+  const qs = params.toString();
+  return qs ? `/order/${orderId}?${qs}` : `/order/${orderId}`;
+}
+
 const stripeConfigured = Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 const TIP_PRESET_PERCENTAGES = [15, 20, 25] as const;
@@ -63,6 +74,7 @@ export function CheckoutForm({
     orderId: string;
     clientSecret: string;
     paymentIntentId: string;
+    orderAccessToken: string;
   } | null>(null);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -190,8 +202,8 @@ export function CheckoutForm({
         setError(data.error?.message ?? data.error ?? "Checkout failed");
         return;
       }
-      const { orderId, clientSecret, paymentIntentId } = data;
-      if (!clientSecret || !orderId) {
+      const { orderId, clientSecret, paymentIntentId, orderAccessToken } = data;
+      if (!clientSecret || !orderId || !orderAccessToken) {
         setError(data.error ?? "Missing payment intent");
         return;
       }
@@ -223,11 +235,11 @@ export function CheckoutForm({
           return;
         }
         await clearCartOnServerAndNotifyClient({ cartId, podId, orderId });
-        router.push(`/order/${orderId}`);
+        router.push(buildOrderStatusPath(orderId, { accessToken: orderAccessToken }));
         return;
       }
 
-      setPaymentData({ orderId, clientSecret, paymentIntentId });
+      setPaymentData({ orderId, clientSecret, paymentIntentId, orderAccessToken });
       setStep("payment");
       if (typeof document !== "undefined") {
         document.cookie = `mennyu_checkout=${encodeURIComponent(JSON.stringify({ orderId, cartId }))}; path=/; max-age=3600; SameSite=Lax`;
@@ -244,6 +256,7 @@ export function CheckoutForm({
       <CheckoutPaymentStep
         orderId={paymentData.orderId}
         clientSecret={paymentData.clientSecret}
+        orderAccessToken={paymentData.orderAccessToken}
         cartId={cartId}
         podId={podId}
         totalWithTip={totalWithTip}
@@ -252,7 +265,13 @@ export function CheckoutForm({
         taxCents={taxCents}
         tipCents={tipCents}
         pickupSummaryLine={pickupSummaryLine}
-        onSuccess={() => router.push(`/order/${paymentData.orderId}`)}
+        onSuccess={() =>
+          router.push(
+            buildOrderStatusPath(paymentData.orderId, {
+              accessToken: paymentData.orderAccessToken,
+            })
+          )
+        }
       />
     );
   }

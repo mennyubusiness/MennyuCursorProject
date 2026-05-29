@@ -235,6 +235,8 @@ export interface CheckoutInput {
   scheduledPickupTime?: string;
   /** When the cart is a group order, must be the host user id (verified in checkout API). */
   groupOrderHostUserId?: string | null;
+  /** Mennyu anonymous session id — required for solo-cart checkout authorization. */
+  mennyuSessionId?: string | null;
 }
 
 // ---- Deliverect (integration) ----

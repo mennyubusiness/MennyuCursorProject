@@ -3,6 +3,7 @@
  * Applies vendor order transition via existing applyVendorOrderTransition with source "admin".
  */
 import { NextResponse } from "next/server";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { applyVendorOrderTransition } from "@/services/order-status.service";
 import type { VendorOrderTargetState } from "@/domain/vendor-order-transition";
 
@@ -18,9 +19,13 @@ const ALLOWED: VendorOrderTargetState[] = [
 ];
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ vendorOrderId: string }> }
 ) {
+  if (!(await isAdminApiRequestAuthorized(request))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { vendorOrderId } = await context.params;
   if (!vendorOrderId) {
     return NextResponse.json({ error: "Missing vendorOrderId" }, { status: 400 });
@@ -28,7 +33,7 @@ export async function POST(
 
   let body: { targetState?: string };
   try {
-    body = await _request.json();
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }

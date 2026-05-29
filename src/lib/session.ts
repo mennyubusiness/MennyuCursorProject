@@ -14,6 +14,8 @@ export const COOKIE_NAME = "mennyu_session";
 export const CURRENT_POD_COOKIE = "mennyu_current_pod";
 /** Cookie storing customer phone for order history (session-based access without full account). */
 export const CUSTOMER_PHONE_COOKIE = "mennyu_customer_phone";
+/** HttpOnly cookie storing signed order access token for status page / poll API. */
+export const ORDER_ACCESS_COOKIE = "mennyu_order_access";
 /** Max-Age (seconds) for mennyu_session — keep in sync with Set-Cookie and cookies().set. */
 export const MENNYU_SESSION_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 const COOKIE_MAX_AGE = MENNYU_SESSION_MAX_AGE;
@@ -96,13 +98,45 @@ export function getCustomerPhoneFromHeaders(headers: Headers): string | null {
 }
 
 /** Build Set-Cookie header for the customer-phone cookie. */
-export function buildCustomerPhoneCookieHeader(phone: string): string {
+export function buildCustomerPhoneCookieHeader(
+  phone: string,
+  options?: { httpOnly?: boolean }
+): string {
   const isProd = process.env.NODE_ENV === "production";
   const parts = [
     `${CUSTOMER_PHONE_COOKIE}=${encodeURIComponent(phone)}`,
     "Path=/",
     `Max-Age=${COOKIE_MAX_AGE}`,
     "SameSite=Lax",
+  ];
+  if (options?.httpOnly) parts.push("HttpOnly");
+  if (isProd) parts.push("Secure");
+  return parts.join("; ");
+}
+
+/** Read signed order access token from request cookies. */
+export function getCustomerOrderAccessTokenFromHeaders(headers: Headers): string | null {
+  const cookieHeader = headers.get("cookie");
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(new RegExp(`${ORDER_ACCESS_COOKIE}=([^;]+)`));
+  const value = match?.[1]?.trim();
+  if (!value) return null;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
+/** Build Set-Cookie header for the order access token (server-established only). */
+export function buildOrderAccessCookieHeader(token: string): string {
+  const isProd = process.env.NODE_ENV === "production";
+  const parts = [
+    `${ORDER_ACCESS_COOKIE}=${encodeURIComponent(token)}`,
+    "Path=/",
+    `Max-Age=${COOKIE_MAX_AGE}`,
+    "SameSite=Lax",
+    "HttpOnly",
   ];
   if (isProd) parts.push("Secure");
   return parts.join("; ");

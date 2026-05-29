@@ -6,7 +6,6 @@ import type { getOrderStatusAction } from "@/actions/order.actions";
 import { isTerminalStatus } from "@/domain/order-state";
 import { getPickupCode } from "@/lib/pickup-code";
 import { isVendorOrderManuallyRecovered } from "@/lib/vendor-order-effective-state";
-import { SetCustomerPhoneFromOrder } from "./SetCustomerPhoneFromOrder";
 import { formatOrderStatusTimelineClock, formatPickupDetailLine } from "@/lib/pickup-display";
 import {
   vendorStatusLabelForScheduledPickup,
@@ -194,7 +193,6 @@ export function OrderPageContent({
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <SetCustomerPhoneFromOrder customerPhone={order.customerPhone} />
       <OrderPostCheckoutCartSync
         orderId={orderId}
         podId={order.podId}

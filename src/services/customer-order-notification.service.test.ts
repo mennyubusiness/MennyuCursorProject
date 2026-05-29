@@ -32,6 +32,7 @@ import {
   buildMilestoneSmsBody,
   evaluateCustomerOrderMilestones,
   milestoneIdempotencyKey,
+  orderStatusUrl,
   sendOrderReceivedMilestone,
   sendOrderIssueMilestone,
 } from "./customer-order-notification.service";
@@ -76,6 +77,13 @@ describe("customer-order-notification.service", () => {
     mockOrderFindUnique.mockImplementation(async () => makeOrder());
     mockSmsLogFindUnique.mockResolvedValue(null);
     mockSendTransactionalSms.mockResolvedValue({ status: "sent" });
+  });
+
+  describe("orderStatusUrl", () => {
+    it("includes signed access token for SMS deep links", () => {
+      const url = orderStatusUrl(ORDER_ID);
+      expect(url).toMatch(new RegExp(`^https://mennyu\\.com/order/${ORDER_ID}\\?access=`));
+    });
   });
 
   describe("buildMilestoneSmsBody", () => {
