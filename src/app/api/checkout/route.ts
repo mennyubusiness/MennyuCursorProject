@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
+import { assertCustomerSession } from "@/lib/customer-session";
 import { createCustomerOrderAccessToken } from "@/lib/customer-order-access-token";
+import { normalizePhoneToE164US } from "@/lib/phone-e164";
 import { buildCustomerPhoneCookieHeader, buildOrderAccessCookieHeader, getSessionIdFromRequest } from "@/lib/session";
 import { createOrderFromCart, OrderValidationError } from "@/services/order.service";
 import { createPaymentIntent } from "@/services/payment.service";
@@ -69,13 +71,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: access.error, code }, { status: access.status });
   }
 
+  const customerSession = await assertCustomerSession(request);
+  if (!customerSession.ok) {
+    return NextResponse.json(
+      { error: customerSession.error, code: "CUSTOMER_SESSION_REQUIRED" },
+      { status: customerSession.status }
+    );
+  }
+
+  const normalizedPhone = normalizePhoneToE164US(customerPhone);
+  if (!normalizedPhone.ok || normalizedPhone.e164 !== customerSession.phoneE164) {
+    return NextResponse.json(
+      {
+        error: "Phone must match your verified number. Verify your phone again if you changed it.",
+        code: "PHONE_MISMATCH",
+      },
+      { status: 403 }
+    );
+  }
+  const submittedPhoneE164 = normalizedPhone.e164;
+
   const groupOrderHostUserId = access.isGroupOrder ? authSession?.user?.id : undefined;
 
   let result;
   try {
     result = await createOrderFromCart({
       cartId,
-      customerPhone,
+      customerPhone: submittedPhoneE164,
       customerEmail,
       tipCents,
       idempotencyKey,
@@ -84,6 +106,7 @@ export async function POST(request: NextRequest) {
       scheduledPickupTime,
       groupOrderHostUserId,
       mennyuSessionId: sessionId,
+      customerAccountId: customerSession.customerAccountId,
     });
   } catch (err) {
     if (err instanceof OrderValidationError) {
@@ -122,7 +145,7 @@ export async function POST(request: NextRequest) {
   });
   response.headers.append(
     "Set-Cookie",
-    buildCustomerPhoneCookieHeader(customerPhone.trim(), { httpOnly: true })
+    buildCustomerPhoneCookieHeader(submittedPhoneE164, { httpOnly: true })
   );
   response.headers.append("Set-Cookie", buildOrderAccessCookieHeader(orderAccessToken));
   return response;

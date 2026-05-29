@@ -11,6 +11,10 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("@/lib/customer-session", () => ({
+  getCustomerSessionFromRequest: vi.fn(),
+}));
+
 vi.mock("@/lib/session", () => ({
   CUSTOMER_PHONE_COOKIE: "mennyu_customer_phone",
   ORDER_ACCESS_COOKIE: "mennyu_order_access",
@@ -21,6 +25,7 @@ vi.mock("@/lib/session", () => ({
 
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { getCustomerSessionFromRequest } from "@/lib/customer-session";
 import {
   getCustomerOrderAccessTokenFromHeaders,
   getCustomerPhoneFromHeaders,
@@ -37,9 +42,11 @@ import {
 describe("assertCustomerOrderAccess", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getCustomerSessionFromRequest).mockResolvedValue(null);
     vi.mocked(prisma.order.findUnique).mockResolvedValue({
       id: "ord_1",
       customerPhone: "+15551234567",
+      customerAccountId: null,
     } as never);
   });
 
@@ -88,6 +95,56 @@ describe("assertCustomerOrderAccess", () => {
     const r = await assertCustomerOrderAccess("ord_1", new Headers(), token);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.status).toBe(401);
+  });
+
+  it("allows matching CustomerSession + order.customerAccountId", async () => {
+    vi.mocked(prisma.order.findUnique).mockResolvedValue({
+      id: "ord_1",
+      customerPhone: "+15551234567",
+      customerAccountId: "acct_1",
+    } as never);
+    vi.mocked(getCustomerSessionFromRequest).mockResolvedValue({
+      customerAccountId: "acct_1",
+      phoneE164: "+15551234567",
+      sessionId: "sess_1",
+    });
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
+    vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(null);
+
+    const r = await assertCustomerOrderAccess("ord_1", new Headers());
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects wrong CustomerSession for order with customerAccountId", async () => {
+    vi.mocked(prisma.order.findUnique).mockResolvedValue({
+      id: "ord_1",
+      customerPhone: "+15551234567",
+      customerAccountId: "acct_1",
+    } as never);
+    vi.mocked(getCustomerSessionFromRequest).mockResolvedValue({
+      customerAccountId: "acct_other",
+      phoneE164: "+15550000000",
+      sessionId: "sess_2",
+    });
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
+    vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(null);
+
+    const r = await assertCustomerOrderAccess("ord_1", new Headers());
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(401);
+  });
+
+  it("legacy order without customerAccountId still works with signed order access token", async () => {
+    const token = createCustomerOrderAccessToken("ord_legacy");
+    vi.mocked(prisma.order.findUnique).mockResolvedValue({
+      id: "ord_legacy",
+      customerPhone: "+15551234567",
+      customerAccountId: null,
+    } as never);
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
+
+    const r = await assertCustomerOrderAccess("ord_legacy", new Headers(), token);
+    expect(r.ok).toBe(true);
   });
 });
 

@@ -237,6 +237,8 @@ export interface CheckoutInput {
   groupOrderHostUserId?: string | null;
   /** Mennyu anonymous session id — required for solo-cart checkout authorization. */
   mennyuSessionId?: string | null;
+  /** Verified phone-first customer account from checkout OTP session. */
+  customerAccountId?: string | null;
 }
 
 // ---- Deliverect (integration) ----

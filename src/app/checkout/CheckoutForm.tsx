@@ -7,6 +7,7 @@ import {
   clearCartOnServerAndNotifyClient,
   rememberCheckoutCartForClientClear,
 } from "@/lib/cart-checkout-client";
+import { CheckoutPhoneVerification } from "./CheckoutPhoneVerification";
 
 const CheckoutPaymentStep = dynamic(
   () => import("./CheckoutPaymentStep").then((m) => m.CheckoutPaymentStep),
@@ -78,6 +79,8 @@ export function CheckoutForm({
   } | null>(null);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [verifiedPhoneE164, setVerifiedPhoneE164] = useState<string | null>(null);
   /** 15 | 20 | 25 when a preset is active; custom otherwise */
   const [tipPresetPercent, setTipPresetPercent] = useState<number | null>(20);
   const defaultTipCents = tipCentsForPercent(subtotalCents, 20);
@@ -162,6 +165,10 @@ export function CheckoutForm({
       }
     }
     if (customTipError) return;
+    if (!phoneVerified) {
+      setError("Verify your phone before continuing to payment.");
+      return;
+    }
     if (isCustomTipSelected && customTipInput.trim() !== "") {
       const cents = parseCustomTip(customTipInput);
       if (cents === null) {
@@ -175,9 +182,10 @@ export function CheckoutForm({
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           cartId,
-          customerPhone: phone,
+          customerPhone: verifiedPhoneE164 ?? phone,
           customerEmail: email || undefined,
           tipCents,
           idempotencyKey,
@@ -283,38 +291,35 @@ export function CheckoutForm({
           Contact
         </h2>
         <p className="mt-1 text-sm text-stone-500">
-          We&apos;ll text order updates to your phone.
+          We&apos;ll use this to send order updates and help you find your order later.
         </p>
-        <div className="mt-4 space-y-4">
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-stone-800">
-              Mobile number <span className="text-red-600">*</span>
-            </label>
-            <input
-              id="phone"
-              type="tel"
-              required
-              autoComplete="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="mt-1.5 w-full max-w-md rounded-lg border border-stone-300 px-3 py-2.5 text-stone-900"
-              placeholder="(555) 123-4567"
-            />
-          </div>
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-stone-800">
-              Email <span className="font-normal text-stone-500">(optional)</span>
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 w-full max-w-md rounded-lg border border-stone-300 px-3 py-2.5"
-              placeholder="you@example.com"
-            />
-          </div>
+        <CheckoutPhoneVerification
+          phone={phone}
+          onPhoneChange={setPhone}
+          phoneVerified={phoneVerified}
+          verifiedPhoneE164={verifiedPhoneE164}
+          onVerified={(phoneE164) => {
+            setPhoneVerified(true);
+            setVerifiedPhoneE164(phoneE164);
+          }}
+          onResetVerification={() => {
+            setPhoneVerified(false);
+            setVerifiedPhoneE164(null);
+          }}
+        />
+        <div className="mt-4">
+          <label htmlFor="email" className="block text-sm font-medium text-stone-800">
+            Email <span className="font-normal text-stone-500">(optional)</span>
+          </label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1.5 w-full max-w-md rounded-lg border border-stone-300 px-3 py-2.5"
+            placeholder="you@example.com"
+          />
         </div>
       </section>
 

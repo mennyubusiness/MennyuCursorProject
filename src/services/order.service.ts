@@ -595,6 +595,7 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
       data: {
         podId: cart.podId,
         groupOrderSessionId: groupSession?.id,
+        customerAccountId: input.customerAccountId ?? undefined,
         customerPhone: input.customerPhone,
         customerEmail: input.customerEmail ?? null,
         orderNotes: input.orderNotes ?? null,

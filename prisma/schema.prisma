@@ -141,6 +141,49 @@ model User {
   isPlatformAdmin Boolean @default(false)
   hostedGroupOrderSessions GroupOrderSession[] @relation("GroupOrderHost")
   groupOrderParticipants   GroupOrderParticipant[]
+  customerAccount          CustomerAccount?
+}
+
+/// Phone-verified diner identity (checkout / order history). Separate from email-based User registration.
+model CustomerAccount {
+  id              String    @id @default(cuid())
+  phoneE164       String    @unique
+  phoneVerifiedAt DateTime
+  displayName     String?
+  email           String?
+  userId          String?   @unique
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  orders          Order[]
+  sessions        CustomerSession[]
+}
+
+model CustomerPhoneVerification {
+  id           String    @id @default(cuid())
+  phoneE164    String
+  codeHash     String
+  expiresAt    DateTime
+  attemptCount Int       @default(0)
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([phoneE164, createdAt])
+}
+
+model CustomerSession {
+  id                String    @id @default(cuid())
+  customerAccountId String
+  tokenHash         String    @unique
+  expiresAt         DateTime
+  lastSeenAt        DateTime  @updatedAt
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
+
+  customerAccount CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  @@index([customerAccountId])
 }
 
 /// Customer-specific profile (optional — many diners use phone-only checkout without a User).
@@ -597,6 +640,8 @@ model Order {
   podId                 String
   /// When set, this order was created from a group-order checkout (internal / admin use).
   groupOrderSessionId   String?
+  /// Verified phone-first customer account (nullable for legacy orders).
+  customerAccountId     String?
   customerPhone         String
   customerEmail         String?
   subtotalCents         Int
@@ -633,6 +678,7 @@ model Order {
   pricingConfig         PricingConfig?       @relation(fields: [pricingConfigId], references: [id], onDelete: SetNull)
   pod                   Pod                  @relation(fields: [podId], references: [id])
   groupOrderSession     GroupOrderSession?   @relation(fields: [groupOrderSessionId], references: [id], onDelete: SetNull)
+  customerAccount       CustomerAccount?     @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
   issues                OrderIssue[]
   statusHistory         OrderStatusHistory[]
   payments              Payment[]
@@ -645,6 +691,7 @@ model Order {
   @@index([stripePaymentIntentId])
   @@index([sourceCartId])
   @@index([groupOrderSessionId])
+  @@index([customerAccountId])
 }
 
 model VendorOrder {

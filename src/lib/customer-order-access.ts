@@ -1,5 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/db";
+import { getCustomerSessionFromRequest } from "@/lib/customer-session";
 import { verifyCustomerOrderAccessToken } from "@/lib/customer-order-access-token";
 import {
   CUSTOMER_PHONE_COOKIE,
@@ -23,7 +24,8 @@ function resolveAccessToken(
 }
 
 /**
- * Validates customer access to an order via matching phone cookie or signed access token.
+ * Validates customer access to an order via signed access token, verified customer session,
+ * or legacy phone cookie (migration fallback).
  */
 export async function assertCustomerOrderAccess(
   orderId: string,
@@ -36,7 +38,7 @@ export async function assertCustomerOrderAccess(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, customerPhone: true },
+    select: { id: true, customerPhone: true, customerAccountId: true },
   });
   if (!order) {
     return { ok: false, status: 404, error: "Order not found" };
@@ -48,11 +50,20 @@ export async function assertCustomerOrderAccess(
     return { ok: true, orderId: order.id, customerPhone: orderPhone };
   }
 
+  const customerSession = await getCustomerSessionFromRequest(h);
+  if (
+    customerSession &&
+    order.customerAccountId &&
+    customerSession.customerAccountId === order.customerAccountId
+  ) {
+    return { ok: true, orderId: order.id, customerPhone: orderPhone };
+  }
+
   if (!customerPhone) {
     return {
       ok: false,
       status: 401,
-      error: "Customer identity required. Open the link from your order confirmation or enter your phone on the orders page.",
+      error: "Customer identity required. Open the link from your order confirmation or verify your phone on the orders page.",
     };
   }
 

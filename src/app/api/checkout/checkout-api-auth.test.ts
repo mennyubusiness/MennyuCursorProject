@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mockAssertCartSessionAccess = vi.fn();
+const mockAssertCustomerSession = vi.fn();
 const mockAuth = vi.fn();
 const mockCreateOrderFromCart = vi.fn();
 const mockCreatePaymentIntent = vi.fn();
@@ -12,6 +13,10 @@ vi.mock("@/auth", () => ({
 
 vi.mock("@/lib/cart-session-access", () => ({
   assertCartSessionAccess: (...args: unknown[]) => mockAssertCartSessionAccess(...args),
+}));
+
+vi.mock("@/lib/customer-session", () => ({
+  assertCustomerSession: (...args: unknown[]) => mockAssertCustomerSession(...args),
 }));
 
 vi.mock("@/lib/customer-order-access-token", () => ({
@@ -39,9 +44,14 @@ const checkoutBody = {
   idempotencyKey: "idem_1",
 };
 
-function checkoutRequest(sessionId?: string) {
+function checkoutRequest(sessionId?: string, customerSessionCookie?: string) {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (sessionId) headers.cookie = `mennyu_session=${encodeURIComponent(sessionId)}`;
+  const cookies: string[] = [];
+  if (sessionId) cookies.push(`mennyu_session=${encodeURIComponent(sessionId)}`);
+  if (customerSessionCookie) {
+    cookies.push(`mennyu_customer=${encodeURIComponent(customerSessionCookie)}`);
+  }
+  if (cookies.length) headers.cookie = cookies.join("; ");
   return new NextRequest("http://localhost/api/checkout", {
     method: "POST",
     headers,
@@ -49,10 +59,86 @@ function checkoutRequest(sessionId?: string) {
   });
 }
 
+describe("POST /api/checkout customer session", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue(null);
+    mockAssertCartSessionAccess.mockResolvedValue({
+      ok: true,
+      cartId: CART_ID,
+      sessionId: SESSION_A,
+      podId: "pod_1",
+      isGroupOrder: false,
+    });
+  });
+
+  it("rejects checkout without verified customer session", async () => {
+    mockAssertCustomerSession.mockResolvedValue({
+      ok: false,
+      status: 401,
+      error: "Verify your phone before checkout.",
+    });
+
+    const res = await POST(checkoutRequest(SESSION_A));
+    const body = await res.json();
+
+    expect(res.status).toBe(401);
+    expect(body.code).toBe("CUSTOMER_SESSION_REQUIRED");
+    expect(mockCreateOrderFromCart).not.toHaveBeenCalled();
+  });
+
+  it("rejects checkout when submitted phone does not match verified account", async () => {
+    mockAssertCustomerSession.mockResolvedValue({
+      ok: true,
+      customerAccountId: "acct_1",
+      phoneE164: "+15559999999",
+    });
+
+    const res = await POST(checkoutRequest(SESSION_A, "tok"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.code).toBe("PHONE_MISMATCH");
+    expect(mockCreateOrderFromCart).not.toHaveBeenCalled();
+  });
+
+  it("checks out with verified customer session and sets customerAccountId", async () => {
+    mockAssertCustomerSession.mockResolvedValue({
+      ok: true,
+      customerAccountId: "acct_1",
+      phoneE164: "+15551234567",
+    });
+    mockCreateOrderFromCart.mockResolvedValue({
+      order: { id: "ord_1", totalCents: 1000, customerPhone: "+15551234567" },
+    });
+    mockCreatePaymentIntent.mockResolvedValue({
+      clientSecret: "cs_test",
+      paymentIntentId: "pi_test",
+    });
+
+    const res = await POST(checkoutRequest(SESSION_A, "tok"));
+
+    expect(res.status).toBe(200);
+    expect(mockCreateOrderFromCart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cartId: CART_ID,
+        customerAccountId: "acct_1",
+        customerPhone: "+15551234567",
+        mennyuSessionId: SESSION_A,
+      })
+    );
+  });
+});
+
 describe("POST /api/checkout cart session ownership", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue(null);
+    mockAssertCustomerSession.mockResolvedValue({
+      ok: true,
+      customerAccountId: "acct_1",
+      phoneE164: "+15551234567",
+    });
     mockCreatePaymentIntent.mockResolvedValue({
       clientSecret: "cs_test",
       paymentIntentId: "pi_test",
