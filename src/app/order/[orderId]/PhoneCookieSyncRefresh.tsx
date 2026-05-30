@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-/** After SetCustomerPhoneFromOrder runs, refresh the server tree so resume payment can see the cookie. */
+/** @deprecated Unused — was paired with SetCustomerPhoneFromOrder for legacy cookie bootstrap. */
 export function PhoneCookieSyncRefresh() {
   const router = useRouter();
   useEffect(() => {

@@ -13,6 +13,8 @@ import { z } from "zod";
 import { hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db";
 import { isAdminBootstrapSecretAuthorized } from "@/lib/admin-auth";
+import { RATE_LIMITS, rateLimitKeys } from "@/lib/rate-limit";
+import { applyRateLimits, getClientIp } from "@/lib/rate-limit-http";
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -20,6 +22,14 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const limited = applyRateLimits([
+    {
+      key: rateLimitKeys.adminBootstrapIp(getClientIp(request)),
+      ...RATE_LIMITS.adminBootstrap,
+    },
+  ]);
+  if (limited) return limited;
+
   if (!isAdminBootstrapSecretAuthorized(request)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

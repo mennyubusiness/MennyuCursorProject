@@ -4,6 +4,7 @@
  */
 import "server-only";
 import { z } from "zod";
+import { assertProductionConfig } from "@/lib/production-config";
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
@@ -77,6 +78,16 @@ const envSchema = z.object({
   VENDOR_ACCESS_SIGNING_SECRET: z.string().min(32).optional(),
   /** Set to "true" to show Deliverect POS status simulation UI on admin order detail (production). */
   SHOW_DELIVERECT_STATUS_SIM_UI: z.enum(["true", "false"]).optional(),
+  /**
+   * When "true", allows ROUTING_MODE=mock while NODE_ENV=production (orders do not reach POS).
+   * Use only for staging/demo; not for live launch.
+   */
+  ALLOW_ROUTING_MODE_MOCK: z.enum(["true", "false"]).optional(),
+  /**
+   * When "true", allows DELIVERECT_ENV=staging (channel-link HMAC) while NODE_ENV=production.
+   * For Deliverect sandbox on preview hosts only — not for live partner webhooks.
+   */
+  ALLOW_DELIVERECT_STAGING_WEBHOOKS: z.enum(["true", "false"]).optional(),
   /** Verbose Deliverect HTTP / normalize logging (server). Keeps warnings for failures. */
   DEBUG_DELIVERECT: z.enum(["true", "false"]).optional(),
   /** IANA timezone when Pod.pickupTimezone is unset (scheduled pickup checkout & display). */
@@ -97,7 +108,9 @@ function loadEnv(): Env {
     console.error("Invalid env:", parsed.error.flatten());
     throw new Error("Invalid environment variables");
   }
-  return parsed.data;
+  const data = parsed.data;
+  assertProductionConfig(data);
+  return data;
 }
 
 export const env = loadEnv();

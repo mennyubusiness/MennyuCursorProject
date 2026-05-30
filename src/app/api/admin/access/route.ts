@@ -1,13 +1,23 @@
+import { NextRequest, NextResponse } from "next/server";
+import { env } from "@/lib/env";
+import { buildAdminCookieHeader } from "@/lib/admin-auth";
+import { RATE_LIMITS, rateLimitKeys } from "@/lib/rate-limit";
+import { applyRateLimits, getClientIp } from "@/lib/rate-limit-http";
+
 /**
  * POST body: { secret: string }
  * If secret matches ADMIN_SECRET, sets cookie and redirects to /admin.
  * TODO: Replace with proper auth.
  */
-import { NextRequest, NextResponse } from "next/server";
-import { env } from "@/lib/env";
-import { buildAdminCookieHeader } from "@/lib/admin-auth";
-
 export async function POST(request: NextRequest) {
+  const limited = applyRateLimits([
+    {
+      key: rateLimitKeys.adminAccessIp(getClientIp(request)),
+      ...RATE_LIMITS.adminAccess,
+    },
+  ]);
+  if (limited) return limited;
+
   if (env.NODE_ENV === "development") {
     const res = NextResponse.redirect(new URL("/admin", request.url), 303);
     res.headers.set("Set-Cookie", buildAdminCookieHeader("dev"));

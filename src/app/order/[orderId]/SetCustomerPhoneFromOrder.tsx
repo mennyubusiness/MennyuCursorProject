@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 
 /**
- * When the customer views an order, set the customer-phone cookie so the order history page
- * can show their orders without re-entering the phone number.
+ * @deprecated Unused — legacy attempt to set mennyu_customer_phone for order lookup.
+ * Order history requires a signed-in account; single-order access uses SMS signed links.
  */
 export function SetCustomerPhoneFromOrder({ customerPhone }: { customerPhone: string }) {
   const done = useRef(false);

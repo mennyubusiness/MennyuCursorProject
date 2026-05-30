@@ -119,7 +119,7 @@ export function CheckoutPhoneVerification({
       {phoneVerified ? (
         <p className="flex items-center gap-2 text-sm font-medium text-emerald-700" role="status">
           <span aria-hidden="true">✓</span>
-          Phone verified
+          Phone verified for order updates
         </p>
       ) : (
         <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">

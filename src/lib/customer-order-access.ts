@@ -77,7 +77,7 @@ export async function assertCustomerOrderAccess(
     return {
       ok: false,
       status: 401,
-      error: "Customer identity required. Open the link from your order confirmation or sign in to view your order history.",
+      error: "Customer identity required. Open the link from your order confirmation, or sign in if this order is on your account.",
     };
   }
 

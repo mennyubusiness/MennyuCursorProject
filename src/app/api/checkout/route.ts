@@ -4,9 +4,11 @@ import { auth } from "@/auth";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
 import { assertCustomerSession } from "@/lib/customer-session";
 import { createCustomerOrderAccessToken } from "@/lib/customer-order-access-token";
-import { linkCustomerAccountToUser } from "@/lib/user-order-access";
+import { linkCheckoutCustomerAccountToUser } from "@/services/customer-account-link.service";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
 import { buildOrderAccessCookieHeader, getSessionIdFromRequest } from "@/lib/session";
+import { RATE_LIMITS, rateLimitKeys } from "@/lib/rate-limit";
+import { applyRateLimits, getClientIp } from "@/lib/rate-limit-http";
 import { createOrderFromCart, OrderValidationError } from "@/services/order.service";
 import { createPaymentIntent } from "@/services/payment.service";
 
@@ -41,6 +43,19 @@ const bodySchema = z
   });
 
 export async function POST(request: NextRequest) {
+  const rateLimitActorKey = getSessionIdFromRequest(request) ?? getClientIp(request);
+  const limited = applyRateLimits([
+    {
+      key: rateLimitKeys.checkoutSession(rateLimitActorKey),
+      ...RATE_LIMITS.checkoutSession,
+    },
+    {
+      key: rateLimitKeys.checkoutIp(getClientIp(request)),
+      ...RATE_LIMITS.checkoutIp,
+    },
+  ]);
+  if (limited) return limited;
+
   const parsed = bodySchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -93,7 +108,11 @@ export async function POST(request: NextRequest) {
   const submittedPhoneE164 = normalizedPhone.e164;
 
   if (authSession?.user?.id) {
-    await linkCustomerAccountToUser(customerSession.customerAccountId, authSession.user.id);
+    await linkCheckoutCustomerAccountToUser({
+      userId: authSession.user.id,
+      customerAccountId: customerSession.customerAccountId,
+      phoneE164: customerSession.phoneE164,
+    }).catch(() => undefined);
   }
 
   const groupOrderHostUserId = access.isGroupOrder ? authSession?.user?.id : undefined;

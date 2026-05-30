@@ -24,6 +24,7 @@ export function LoginForm() {
 
   const callbackUrlRaw = searchParams.get("callbackUrl");
   const callbackPath = useMemo(() => safeCallbackPath(callbackUrlRaw), [callbackUrlRaw]);
+  const isOrdersCallback = callbackPath === "/orders";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,9 +65,12 @@ export function LoginForm() {
     <AuthFormCard>
       <div>
         <h1 className="text-2xl font-black tracking-tight text-black">Sign in</h1>
-        {callbackPath !== "/" && (
+        {isOrdersCallback && (
+          <p className="mt-2 text-sm text-zinc-600">Sign in to view your order history.</p>
+        )}
+        {callbackPath !== "/" && !isOrdersCallback && (
           <p className="mt-2 text-sm text-zinc-600">
-            After you continue, you&apos;ll be sent to the right place for your account.
+            After you sign in, you&apos;ll be sent to the right place for your account.
           </p>
         )}
       </div>
@@ -105,7 +109,7 @@ export function LoginForm() {
           </p>
         )}
         <Button type="submit" disabled={loading} className="w-full">
-          {loading ? "Signing in…" : "Continue"}
+          {loading ? "Signing in…" : "Sign in"}
         </Button>
       </form>
     </AuthFormCard>

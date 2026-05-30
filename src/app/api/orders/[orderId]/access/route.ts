@@ -3,6 +3,8 @@ import {
   buildPersistedCustomerOrderAccessCookieHeaders,
   resolveCustomerOrderAccessBootstrap,
 } from "@/lib/customer-order-access";
+import { RATE_LIMITS, rateLimitKeys } from "@/lib/rate-limit";
+import { applyRateLimits, getClientIp } from "@/lib/rate-limit-http";
 
 function buildOrderPageRedirectUrl(
   request: NextRequest,
@@ -32,6 +34,14 @@ export async function GET(
   if (!access) {
     return NextResponse.redirect(redirectTarget, 302);
   }
+
+  const limited = applyRateLimits([
+    {
+      key: rateLimitKeys.orderAccessBootstrap(orderId, getClientIp(request)),
+      ...RATE_LIMITS.orderAccessBootstrap,
+    },
+  ]);
+  if (limited) return limited;
 
   const resolved = await resolveCustomerOrderAccessBootstrap(orderId, access);
   if (!resolved.ok) {

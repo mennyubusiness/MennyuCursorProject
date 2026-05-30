@@ -15,6 +15,10 @@ Transactional SMS for order confirmation and status updates (future: issue notif
 | `SMS_DRY_RUN` | Recommended | `true` records `dry_run` in `SmsMessageLog` without calling Twilio |
 | `SMS_LOG_ONLY` | Optional | `true` = log only, no Twilio |
 
+## Twilio sender verification
+
+Live sends (`SMS_DRY_RUN=false`) require a verified **From number** or **Messaging Service** in Twilio. US carriers often require A2P 10DLC or toll-free verification before delivery. Until approved, keep `SMS_DRY_RUN=true` — milestones are recorded in `SmsMessageLog` without calling Twilio. See [PRODUCTION_CONFIG.md](./PRODUCTION_CONFIG.md) pre-launch checklist.
+
 ## Developer checklist (manual verification)
 
 Use **`SMS_DRY_RUN=true`** or **`SMS_LOG_ONLY=true`** for safe testing: milestone SMS is logged in `SmsMessageLog` without calling Twilio until you turn dry run off.

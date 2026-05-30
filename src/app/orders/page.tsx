@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { getOrdersForSignedInUserAction } from "@/actions/order.actions";
-import { ORDERS_SIGN_IN_PATH } from "@/lib/auth/account-paths";
+import { ACCOUNT_HUB_PATH, ORDERS_SIGN_IN_PATH } from "@/lib/auth/account-paths";
 import { customerOrderHeaderStatus } from "@/domain/order-state";
 import type { ParentOrderStatus } from "@/domain/types";
 import { ReorderButton } from "@/components/orders/ReorderButton";
@@ -50,13 +50,22 @@ export default async function OrdersPage() {
       {orders.length === 0 ? (
         <div className="rounded-xl border border-stone-200 bg-stone-50 p-6 text-center">
           <p className="text-stone-600">No orders on this account yet.</p>
-          <p className="mt-1 text-sm text-stone-500">
-            Orders placed while signed in will appear here. Phone-only checkout orders stay accessible
-            from your SMS link until linked to this account.
+          <p className="mt-2 text-sm text-stone-500">
+            Orders placed while signed in appear here automatically. Placed an order with phone
+            checkout? Sign in on the same device, go to Account, and choose{" "}
+            <span className="font-medium text-stone-700">Link phone to account</span>.
           </p>
-          <Link href="/explore" className="mt-4 inline-block text-stone-900 hover:underline">
-            Browse pods →
-          </Link>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
+            <Link
+              href={ACCOUNT_HUB_PATH}
+              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800"
+            >
+              Go to account
+            </Link>
+            <Link href="/explore" className="text-sm font-medium text-stone-900 hover:underline">
+              Browse pods →
+            </Link>
+          </div>
         </div>
       ) : (
         <ul className="space-y-4">

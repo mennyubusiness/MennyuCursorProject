@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { CUSTOMER_SUPPORT_ISSUE_TYPES, customerSupportIssueSubmitSuccessMessage } from "@/domain/order-support-issue";
 import { assertCustomerOrderAccess } from "@/lib/customer-order-access";
+import { RATE_LIMITS, RATE_LIMIT_ERROR_MESSAGE, rateLimitKeys, enforceRateLimits } from "@/lib/rate-limit";
+import { getClientIpFromHeaders } from "@/lib/rate-limit-http";
 import {
   createCustomerSupportIssue,
   listCustomerSupportIssuesForOrder,
@@ -43,9 +45,23 @@ export async function POST(
     return NextResponse.json({ error: "Missing orderId" }, { status: 400 });
   }
 
-  const access = await assertCustomerOrderAccess(orderId, await headers());
+  const headersList = await headers();
+  const access = await assertCustomerOrderAccess(orderId, headersList);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const limited = enforceRateLimits([
+    {
+      key: rateLimitKeys.supportIssue(orderId, getClientIpFromHeaders(headersList)),
+      ...RATE_LIMITS.supportIssue,
+    },
+  ]);
+  if (limited) {
+    return NextResponse.json(
+      { error: RATE_LIMIT_ERROR_MESSAGE, code: "RATE_LIMITED" },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfterSec) } }
+    );
   }
 
   let json: unknown;

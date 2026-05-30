@@ -1,6 +1,6 @@
 /**
  * POST /api/orders/clear-phone
- * Clears the customer phone cookie (order history session).
+ * Clears the legacy mennyu_customer_phone cookie (order access bootstrap).
  */
 import { NextResponse } from "next/server";
 import { buildClearCustomerPhoneCookieHeader } from "@/lib/session";

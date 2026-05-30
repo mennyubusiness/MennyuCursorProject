@@ -3,6 +3,9 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCustomerOrderAccess } from "@/lib/customer-order-access";
+import { RATE_LIMITS, rateLimitKeys } from "@/lib/rate-limit";
+import { applyRateLimits, getClientIpFromHeaders } from "@/lib/rate-limit-http";
+import { getSessionIdFromHeaders } from "@/lib/session";
 import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
 import { validatePaymentIntentForOrderProcessing } from "@/services/payment.service";
 import { processSuccessfulPayment } from "@/services/post-payment.service";
@@ -20,6 +23,16 @@ const bodySchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
+    const headersList = await headers();
+    const actorKey = getSessionIdFromHeaders(headersList) ?? getClientIpFromHeaders(headersList);
+    const limited = applyRateLimits([
+      {
+        key: rateLimitKeys.orderConfirmSession(actorKey),
+        ...RATE_LIMITS.orderConfirmSession,
+      },
+    ]);
+    if (limited) return limited;
+
     const body = await request.json();
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {

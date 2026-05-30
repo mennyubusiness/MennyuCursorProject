@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 const mockAssertCustomerOrderAccess = vi.fn();
 const mockGetCustomerOrderStatusPollSnapshot = vi.fn();
@@ -16,6 +17,10 @@ import { GET } from "./route";
 
 const ORDER_ID = "ord_poll_test";
 
+function statusRequest(orderId = ORDER_ID) {
+  return new NextRequest(`http://localhost/api/orders/${orderId}/status`);
+}
+
 describe("GET /api/orders/[orderId]/status auth", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -32,7 +37,7 @@ describe("GET /api/orders/[orderId]/status auth", () => {
       error: "Customer identity required.",
     });
 
-    const res = await GET(new Request(`http://localhost/api/orders/${ORDER_ID}/status`), {
+    const res = await GET(statusRequest(), {
       params: Promise.resolve({ orderId: ORDER_ID }),
     });
 
@@ -47,7 +52,7 @@ describe("GET /api/orders/[orderId]/status auth", () => {
       error: "This order does not belong to you.",
     });
 
-    const res = await GET(new Request(`http://localhost/api/orders/${ORDER_ID}/status`), {
+    const res = await GET(statusRequest(), {
       params: Promise.resolve({ orderId: ORDER_ID }),
     });
 
@@ -62,7 +67,7 @@ describe("GET /api/orders/[orderId]/status auth", () => {
       customerPhone: "+15551234567",
     });
 
-    const res = await GET(new Request(`http://localhost/api/orders/${ORDER_ID}/status`), {
+    const res = await GET(statusRequest(), {
       params: Promise.resolve({ orderId: ORDER_ID }),
     });
 

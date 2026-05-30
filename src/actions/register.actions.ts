@@ -1,7 +1,15 @@
 "use server";
 
+import { headers } from "next/headers";
 import { hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db";
+import {
+  RATE_LIMITS,
+  RATE_LIMIT_ERROR_MESSAGE,
+  enforceRateLimits,
+  rateLimitKeys,
+} from "@/lib/rate-limit";
+import { getClientIpFromHeaders } from "@/lib/rate-limit-http";
 
 const MIN_PASSWORD = 8;
 
@@ -14,6 +22,17 @@ export async function registerWithEmailPassword(input: {
   password: string;
   name?: string;
 }): Promise<RegisterResult> {
+  const headersList = await headers();
+  const limited = enforceRateLimits([
+    {
+      key: rateLimitKeys.registerIp(getClientIpFromHeaders(headersList)),
+      ...RATE_LIMITS.registerIp,
+    },
+  ]);
+  if (limited) {
+    return { ok: false, error: RATE_LIMIT_ERROR_MESSAGE };
+  }
+
   const email = input.email.toLowerCase().trim();
   const password = input.password;
   if (!email.includes("@")) {

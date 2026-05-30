@@ -6,7 +6,7 @@ import {
 
 /**
  * POST /api/customer/session/clear
- * Signs out of verified customer identity (order history / reorder ownership).
+ * Clears verified checkout phone session (mennyu_customer) on this device.
  */
 export async function POST(request: NextRequest) {
   await revokeCustomerSessionFromHeaders(request.headers);

@@ -1,10 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { GROUP_ORDER_JOIN_TOKEN_COOKIE, GROUP_ORDER_JOIN_COOKIE_MAX_AGE_SEC } from "@/lib/group-order-cookies";
+import {
+  RATE_LIMITS,
+  RATE_LIMIT_ERROR_MESSAGE,
+  enforceRateLimits,
+  rateLimitKeys,
+} from "@/lib/rate-limit";
+import { getClientIpFromHeaders } from "@/lib/rate-limit-http";
 import {
   startGroupOrderSession,
   joinGroupOrderSession,
@@ -75,6 +82,22 @@ export async function joinGroupOrderAction(input: {
   displayName: string;
   phone: string;
 }) {
+  const headersList = await headers();
+  const ip = getClientIpFromHeaders(headersList);
+  const limited = enforceRateLimits([
+    {
+      key: rateLimitKeys.groupJoinIp(ip),
+      ...RATE_LIMITS.groupJoinIp,
+    },
+    {
+      key: rateLimitKeys.groupJoinSession(input.groupOrderSessionId.trim()),
+      ...RATE_LIMITS.groupJoinSession,
+    },
+  ]);
+  if (limited) {
+    return { success: false as const, error: RATE_LIMIT_ERROR_MESSAGE };
+  }
+
   try {
     const result = await joinGroupOrderSession({
       groupOrderSessionId: input.groupOrderSessionId,

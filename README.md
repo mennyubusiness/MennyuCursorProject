@@ -10,7 +10,7 @@ Multi-vendor food ordering platform for food cart pods. One cart, one payment, o
 
 ## Setup
 
-1. Copy `.env.example` to `.env.local` and set `DATABASE_URL` (and Stripe/Twilio/Deliverect when ready). See [docs/SMS_SETUP.md](docs/SMS_SETUP.md) for Twilio/SMS flags.
+1. Copy `.env.example` to `.env.local` and set `DATABASE_URL` (and Stripe/Twilio/Deliverect when ready). See [docs/SMS_SETUP.md](docs/SMS_SETUP.md) for Twilio/SMS flags and [docs/PRODUCTION_CONFIG.md](docs/PRODUCTION_CONFIG.md) for production launch requirements.
 2. Install and generate Prisma client:
    ```bash
    npm install

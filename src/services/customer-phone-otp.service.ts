@@ -12,7 +12,7 @@ const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_VERIFY_ATTEMPTS = 5;
 /** Minimum spacing between send-code requests for the same phone. */
 const SEND_COOLDOWN_MS = 60 * 1000;
-// TODO: add shared IP/device rate limiting for send-code across phones.
+// Per-phone send spacing is enforced above; route-level IP/phone windows live in rate-limit.ts.
 
 export type SendPhoneCodeResult =
   | { ok: true; message: string }

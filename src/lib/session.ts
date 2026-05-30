@@ -12,7 +12,7 @@ import { NextRequest } from "next/server";
 export const COOKIE_NAME = "mennyu_session";
 /** Cookie storing the last-visited pod so /cart can show the correct cart when multiple exist per session. */
 export const CURRENT_POD_COOKIE = "mennyu_current_pod";
-/** Cookie storing customer phone for order history (session-based access without full account). */
+/** Legacy cookie for SMS order-access bootstrap (single-order access only; not used for /orders history). */
 export const CUSTOMER_PHONE_COOKIE = "mennyu_customer_phone";
 /** HttpOnly cookie storing signed order access token for status page / poll API. */
 export const ORDER_ACCESS_COOKIE = "mennyu_order_access";
@@ -82,7 +82,7 @@ export function getCurrentPodIdFromHeaders(headers: Headers): string | null {
 }
 
 /**
- * Read customer phone from request (for order history).
+ * Read customer phone from legacy order-access cookie (SMS bootstrap / migration fallback).
  */
 export function getCustomerPhoneFromHeaders(headers: Headers): string | null {
   const cookieHeader = headers.get("cookie");
@@ -142,7 +142,7 @@ export function buildOrderAccessCookieHeader(token: string): string {
   return parts.join("; ");
 }
 
-/** Clear the customer-phone cookie (sign out of order history / phone session). */
+/** Clear the legacy customer-phone cookie (order access bootstrap only). */
 export function buildClearCustomerPhoneCookieHeader(): string {
   const isProd = process.env.NODE_ENV === "production";
   const parts = [`${CUSTOMER_PHONE_COOKIE}=`, "Path=/", "Max-Age=0", "SameSite=Lax"];

@@ -4,12 +4,9 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { loadAccountPageContext } from "@/lib/account-page-context";
-import {
-  ACCOUNT_SIGN_IN_PATH,
-  CUSTOMER_REGISTER_PATH,
-  ORDER_HISTORY_PATH,
-} from "@/lib/auth/account-paths";
+import { ACCOUNT_SIGN_IN_PATH, ORDER_HISTORY_PATH } from "@/lib/auth/account-paths";
 import { AccountSessionActions } from "./AccountSessionActions";
+import { AccountLinkPhoneCard } from "./AccountLinkPhoneCard";
 
 const cardClass = "rounded-xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6";
 
@@ -56,6 +53,25 @@ export default async function AccountPage() {
               <div>
                 <dt className="text-stone-500">Phone for order updates</dt>
                 <dd className="font-medium text-stone-900">{ctx.checkoutPhone.phoneDisplay}</dd>
+                <dd className="mt-0.5 text-xs text-stone-500">{ctx.checkoutPhone.linkStatusLabel}</dd>
+                {ctx.checkoutPhone.linkStatus === "linked_other" && (
+                  <dd className="mt-1 text-xs text-amber-800">
+                    This phone is already linked to another account.
+                  </dd>
+                )}
+                {ctx.checkoutPhone.linkStatus === "user_has_other" && (
+                  <dd className="mt-1 text-xs text-stone-600">
+                    Your account already has a different phone linked.
+                  </dd>
+                )}
+              </div>
+            )}
+            {!ctx.checkoutPhone && (
+              <div>
+                <dt className="text-stone-500">Phone for order updates</dt>
+                <dd className="text-stone-600">
+                  Add a phone for order updates at checkout.
+                </dd>
               </div>
             )}
           </dl>
@@ -65,6 +81,10 @@ export default async function AccountPage() {
             </Link>
           </div>
         </section>
+      )}
+
+      {ctx.checkoutPhone?.canLink && (
+        <AccountLinkPhoneCard phoneDisplay={ctx.checkoutPhone.phoneDisplay} />
       )}
 
       {ctx.staff && (
@@ -126,14 +146,9 @@ export default async function AccountPage() {
       <section className={cardClass}>
         <h2 className="text-lg font-semibold text-stone-900">Sign out</h2>
         <div className="mt-4">
-          <AccountSessionActions hasCheckoutPhoneSession={Boolean(ctx.checkoutPhone)} />
+          <AccountSessionActions hasCheckoutPhoneSession={ctx.hasDeviceCheckoutSession} />
         </div>
-        <p className="mt-4 text-sm text-stone-500">
-          Need a customer account?{" "}
-          <Link href={CUSTOMER_REGISTER_PATH} className="font-medium text-stone-900 hover:underline">
-            Create account
-          </Link>
-        </p>
+        <p className="mt-4 text-sm text-stone-500">Use a different email? Sign out first.</p>
       </section>
     </div>
   );
