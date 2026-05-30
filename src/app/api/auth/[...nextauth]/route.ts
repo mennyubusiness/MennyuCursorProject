@@ -7,6 +7,10 @@ const { GET, POST: nextAuthPost } = handlers;
 
 export { GET };
 
+function isNextAuthSignOutRequest(request: NextRequest): boolean {
+  return request.nextUrl.pathname.endsWith("/signout");
+}
+
 async function extractLoginEmail(request: NextRequest): Promise<string | null> {
   try {
     const contentType = request.headers.get("content-type") ?? "";
@@ -30,24 +34,26 @@ async function extractLoginEmail(request: NextRequest): Promise<string | null> {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = getClientIp(request);
-  const checks = [
-    {
-      key: rateLimitKeys.loginIp(ip),
-      ...RATE_LIMITS.login,
-    },
-  ];
+  if (!isNextAuthSignOutRequest(request)) {
+    const ip = getClientIp(request);
+    const checks = [
+      {
+        key: rateLimitKeys.loginIp(ip),
+        ...RATE_LIMITS.login,
+      },
+    ];
 
-  const email = await extractLoginEmail(request);
-  if (email) {
-    checks.push({
-      key: rateLimitKeys.loginEmail(email),
-      ...RATE_LIMITS.login,
-    });
+    const email = await extractLoginEmail(request);
+    if (email) {
+      checks.push({
+        key: rateLimitKeys.loginEmail(email),
+        ...RATE_LIMITS.login,
+      });
+    }
+
+    const limited = applyRateLimits(checks);
+    if (limited) return limited;
   }
-
-  const limited = applyRateLimits(checks);
-  if (limited) return limited;
 
   return nextAuthPost(request);
 }

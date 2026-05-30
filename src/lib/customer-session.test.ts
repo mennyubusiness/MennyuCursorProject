@@ -6,6 +6,7 @@ vi.mock("@/lib/db", () => ({
     customerSession: {
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -22,6 +23,7 @@ describe("customer-session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(prisma.customerSession.update).mockResolvedValue({} as never);
+    vi.mocked(prisma.customerSession.updateMany).mockResolvedValue({ count: 0 });
   });
 
   it("rejects expired customer session", async () => {
@@ -85,5 +87,11 @@ describe("customer-session", () => {
     const result = await assertCustomerSession(new Headers());
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(401);
+  });
+
+  it("revokeCustomerSessionToken is idempotent for missing token", async () => {
+    const { revokeCustomerSessionToken } = await import("@/lib/customer-session");
+    await expect(revokeCustomerSessionToken(null)).resolves.toBeUndefined();
+    expect(prisma.customerSession.updateMany).not.toHaveBeenCalled();
   });
 });

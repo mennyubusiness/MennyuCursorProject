@@ -136,13 +136,26 @@ export function buildClearCustomerSessionCookieHeader(): string {
   return parts.join("; ");
 }
 
+/** Revoke a customer session token if present. Idempotent — missing/stale/revoked rows are OK. */
+export async function revokeCustomerSessionToken(token: string | null | undefined): Promise<void> {
+  if (!token) return;
+  try {
+    const tokenHash = hashCustomerSessionToken(token);
+    await prisma.customerSession.updateMany({
+      where: { tokenHash, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  } catch (error) {
+    console.error("[customer-session] Failed to revoke session", error);
+  }
+}
+
 /** Revoke the current mennyu_customer session row, if present. */
 export async function revokeCustomerSessionFromHeaders(headers: Headers): Promise<void> {
-  const token = getCustomerSessionTokenFromHeaders(headers);
-  if (!token) return;
-  const tokenHash = hashCustomerSessionToken(token);
-  await prisma.customerSession.updateMany({
-    where: { tokenHash, revokedAt: null },
-    data: { revokedAt: new Date() },
-  });
+  await revokeCustomerSessionToken(getCustomerSessionTokenFromHeaders(headers));
+}
+
+/** Revoke session from a NextRequest (cookie jar or Cookie header). */
+export async function revokeCustomerSessionFromRequest(request: NextRequest): Promise<void> {
+  await revokeCustomerSessionToken(getCustomerSessionTokenFromRequest(request));
 }

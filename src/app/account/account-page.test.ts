@@ -23,6 +23,11 @@ describe("/account signed-out behavior", () => {
     expect(accountPageSrc).not.toMatch(/AccountSignInHub/);
     expect(accountPageSrc).not.toMatch(/Continue with phone/i);
   });
+
+  it("redirects unsigned users before rendering account content", () => {
+    expect(accountPageSrc).toMatch(/if \(!session\?\.user\?\.id\)/);
+    expect(accountPageSrc).toMatch(/redirect\(ACCOUNT_SIGN_IN_PATH\)/);
+  });
 });
 
 describe("/account signed-in behavior", () => {
@@ -107,8 +112,10 @@ describe("orders empty state linking guidance", () => {
 });
 
 describe("/account session actions", () => {
-  it("signs out via NextAuth and can clear checkout phone separately", () => {
-    expect(sessionActionsSrc).toMatch(/signOut\(/);
+  it("signs out via server action and can clear checkout phone separately", () => {
+    expect(sessionActionsSrc).toMatch(/signOutAccountAction/);
+    expect(sessionActionsSrc).toMatch(/action=\{signOutAccountAction\}/);
+    expect(sessionActionsSrc).not.toMatch(/from "next-auth\/react"/);
     expect(sessionActionsSrc).toMatch(/\/api\/customer\/session\/clear/);
     expect(sessionActionsSrc).toMatch(/Clear checkout phone on this device/);
   });
