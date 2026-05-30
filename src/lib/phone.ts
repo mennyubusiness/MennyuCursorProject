@@ -20,6 +20,13 @@ export function phoneLast4(phone: string): string | null {
   return digits.slice(-4);
 }
 
+/** Customer-facing masked US phone, e.g. +1 ••• ••• 1234 */
+export function formatMaskedCustomerPhone(phoneE164: string): string {
+  const last4 = phoneLast4(phoneE164);
+  if (!last4) return "Phone on file";
+  return `+1 ••• ••• ${last4}`;
+}
+
 export function isLikelyE164Phone(phone: string): boolean {
   const t = phone.trim();
   return /^\+[1-9]\d{7,14}$/.test(t);

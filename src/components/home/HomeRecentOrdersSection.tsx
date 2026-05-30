@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getRecentCompletedOrdersForPhone } from "@/services/order.service";
+import { getRecentCompletedOrdersForCustomerAccount } from "@/services/customer-account-orders.service";
 import { ReorderButton } from "@/components/orders/ReorderButton";
 
 function formatDate(d: Date): string {
@@ -28,21 +28,21 @@ function PodInitial({ name }: { name: string }) {
 }
 
 type Props = {
-  customerPhone: string | null;
+  customerAccountId: string | null;
   variant?: "default" | "rail";
   /** Nested in homepage module — no standalone card chrome. */
   embedded?: boolean;
 };
 
 export async function HomeRecentOrdersSection({
-  customerPhone,
+  customerAccountId,
   variant = "default",
   embedded = false,
 }: Props) {
-  const phone = customerPhone?.trim();
-  if (!phone) return null;
+  const accountId = customerAccountId?.trim();
+  if (!accountId) return null;
 
-  const recent = await getRecentCompletedOrdersForPhone(phone, 3);
+  const recent = await getRecentCompletedOrdersForCustomerAccount(accountId, 3);
   if (recent.length === 0) return null;
 
   if (variant === "rail") {

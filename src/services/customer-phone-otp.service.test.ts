@@ -18,6 +18,10 @@ vi.mock("@/lib/customer-session", () => ({
   createCustomerSessionRecord: (...args: unknown[]) => mockCreateCustomerSessionRecord(...args),
 }));
 
+vi.mock("@/services/customer-account-orders.service", () => ({
+  attachLegacyOrdersToCustomerAccount: vi.fn().mockResolvedValue(0),
+}));
+
 vi.mock("@/lib/db", () => ({
   prisma: {
     customerPhoneVerification: {
@@ -33,6 +37,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { prisma } from "@/lib/db";
+import { attachLegacyOrdersToCustomerAccount } from "@/services/customer-account-orders.service";
 import {
   CUSTOMER_PHONE_OTP_MAX_ATTEMPTS,
   sendPhoneVerificationCode,
@@ -174,7 +179,7 @@ describe("customer-phone-otp.service", () => {
     expect(upsert).toHaveBeenCalled();
   });
 
-  it("verify-code success creates CustomerSession", async () => {
+  it("verify-code success creates CustomerSession and attaches legacy orders", async () => {
     vi.mocked(prisma.customerPhoneVerification.findFirst).mockResolvedValue({
       id: "ver_1",
       phoneE164: "+15551234567",
@@ -191,6 +196,7 @@ describe("customer-phone-otp.service", () => {
     if (result.ok) {
       expect(result.sessionToken).toBe("session_token_raw");
       expect(mockCreateCustomerSessionRecord).toHaveBeenCalledWith("acct_1");
+      expect(attachLegacyOrdersToCustomerAccount).toHaveBeenCalledWith("acct_1", "+15551234567");
     }
   });
 });

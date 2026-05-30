@@ -1,11 +1,3 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { ACCOUNT_ROLE_PATH } from "@/lib/auth/account-paths";
-
-export default async function AccountLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    redirect(`/login?callbackUrl=${encodeURIComponent(ACCOUNT_ROLE_PATH)}`);
-  }
-  return <div className="mx-auto max-w-lg px-4 py-8">{children}</div>;
+export default function AccountLayout({ children }: { children: React.ReactNode }) {
+  return <div className="mx-auto max-w-2xl px-4 py-8">{children}</div>;
 }

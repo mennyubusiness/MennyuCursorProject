@@ -20,4 +20,9 @@ describe("OrderPageContent customer cancel UI removed", () => {
   it("still renders the help section for support requests", () => {
     expect(orderPageSrc).toMatch(/OrderHelpSection/);
   });
+
+  it("does not call legacy customer cancel API routes", () => {
+    expect(orderPageSrc).not.toMatch(/\/api\/order\/.*\/cancel/);
+    expect(orderPageSrc).not.toMatch(/vendor-orders\/.*\/cancel/);
+  });
 });

@@ -166,7 +166,7 @@ export function CheckoutForm({
     }
     if (customTipError) return;
     if (!phoneVerified) {
-      setError("Verify your phone before continuing to payment.");
+      setError("Verify your phone for order updates before continuing to payment.");
       return;
     }
     if (isCustomTipSelected && customTipInput.trim() !== "") {

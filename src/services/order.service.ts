@@ -20,7 +20,6 @@ import {
   getOperationalMenuItemIdsForVendor,
   getOperationalModifierOptionIdsForVendor,
 } from "@/services/menu-active-scope.service";
-import { formatPickupDetailLine } from "@/lib/pickup-display";
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
 import {
   countSubItemsChainVariantSelections,
@@ -848,15 +847,14 @@ export async function getOrderWithVendorOrders(orderId: string) {
   });
 }
 
-export interface OrderHistoryEntry {
-  id: string;
-  createdAt: Date;
-  totalCents: number;
-  status: string;
-  podName: string;
-  vendorNames: string[];
-  pickupDisplayLine: string;
-}
+export type { OrderHistoryEntry } from "@/services/customer-account-orders.service";
+export {
+  attachLegacyOrdersToCustomerAccount,
+  getOrdersByCustomerAccountId,
+  getRecentCompletedOrdersForCustomerAccount,
+  getOrdersByCustomerPhone,
+  getRecentCompletedOrdersForPhone,
+} from "@/services/customer-account-orders.service";
 
 /** Terminal Order.status values: no further updates expected; order is not "active". */
 const TERMINAL_ORDER_STATUSES = ["completed", "partially_completed", "cancelled", "failed"] as const;
@@ -886,55 +884,6 @@ export async function getActiveOrderByCustomerPhone(
     select: { id: true },
   });
   return order;
-}
-
-/**
- * List past orders for a customer by phone (for order history page).
- * Returns orders sorted by createdAt desc.
- */
-export async function getOrdersByCustomerPhone(customerPhone: string): Promise<OrderHistoryEntry[]> {
-  const normalized = customerPhone.trim();
-  if (!normalized) return [];
-
-  const orders = await prisma.order.findMany({
-    where: { customerPhone: normalized },
-    include: {
-      pod: { select: { name: true, pickupTimezone: true } },
-      vendorOrders: { include: { vendor: { select: { name: true } } } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  });
-
-  return orders.map((o) => {
-    const tz = resolvePickupTimezone(o.pod);
-    return {
-      id: o.id,
-      createdAt: o.createdAt,
-      totalCents: o.totalCents,
-      status: o.status,
-      podName: o.pod.name,
-      vendorNames: [...new Set(o.vendorOrders.map((vo) => vo.vendor.name))],
-      pickupDisplayLine: formatPickupDetailLine({
-        requestedPickupAt: o.requestedPickupAt,
-        deliverectEstimatedReadyAt: o.deliverectEstimatedReadyAt,
-        resolvedPickupTimezone: tz,
-      }),
-    };
-  });
-}
-
-/**
- * Recent orders suitable for "order again" surfaces (completed outcomes only).
- * Omits in-flight and unpaid orders.
- */
-export async function getRecentCompletedOrdersForPhone(
-  customerPhone: string,
-  take: number
-): Promise<OrderHistoryEntry[]> {
-  const all = await getOrdersByCustomerPhone(customerPhone);
-  const terminal = all.filter((o) => o.status === "completed" || o.status === "partially_completed");
-  return terminal.slice(0, Math.max(0, take));
 }
 
 /** Server-only helper for checkout page default scheduled fields. */

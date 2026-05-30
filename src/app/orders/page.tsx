@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
 import { auth } from "@/auth";
-import { resolveCustomerPhoneForSession } from "@/lib/customer-phone-resolution";
-import { getOrdersByCustomerPhoneAction } from "@/actions/order.actions";
+import { getOrdersForSignedInUserAction } from "@/actions/order.actions";
+import { ORDERS_SIGN_IN_PATH } from "@/lib/auth/account-paths";
 import { customerOrderHeaderStatus } from "@/domain/order-state";
 import type { ParentOrderStatus } from "@/domain/types";
-import { ClearPhoneSessionButton } from "./ClearPhoneSessionButton";
-import { OrderHistoryPhoneForm } from "./OrderHistoryPhoneForm";
 import { ReorderButton } from "@/components/orders/ReorderButton";
 
 function formatDate(d: Date): string {
@@ -14,12 +13,6 @@ function formatDate(d: Date): string {
     dateStyle: "short",
     timeStyle: "short",
   }).format(d);
-}
-
-function formatUsPhone(phone: string): string {
-  const m = phone.replace(/\D/g, "").match(/^(\d{3})(\d{3})(\d{4})$/);
-  if (m) return `(${m[1]}) ${m[2]}-${m[3]}`;
-  return phone;
 }
 
 /** Stub rows so {@link customerOrderHeaderStatus} can branch on multi-vendor (e.g. routed_partial). */
@@ -31,63 +24,36 @@ function stubVendorOrders(count: number): Array<{ routingStatus: string; fulfill
 }
 
 export default async function OrdersPage() {
-  const headersList = await headers();
   const session = await auth();
-  const customerPhone = await resolveCustomerPhoneForSession(headersList, session?.user?.id ?? null);
-  const sessionEmail = session?.user?.email ?? null;
-
-  if (!customerPhone) {
-    return (
-      <div className="mx-auto max-w-xl space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-2xl font-semibold text-stone-900">Your orders</h1>
-          <p className="text-sm text-stone-600">
-            This is where you view past orders. Open Order matches them to the{" "}
-            <span className="font-medium text-stone-800">phone number</span> you used at checkout
-            (not your email address yet).
-          </p>
-          {sessionEmail && (
-            <p className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
-              You’re signed in as <span className="font-medium">{sessionEmail}</span> (for vendor or
-              staff tools if you have access). To see your personal orders, enter the phone number
-              you gave when placing an order.
-            </p>
-          )}
-        </header>
-        <OrderHistoryPhoneForm />
-        <p className="text-sm text-stone-500">
-          <Link href="/explore" className="text-stone-900 hover:underline">
-            ← Back to explore
-          </Link>
-        </p>
-      </div>
-    );
+  if (!session?.user?.id) {
+    redirect(ORDERS_SIGN_IN_PATH);
   }
 
-  const orders = await getOrdersByCustomerPhoneAction(customerPhone);
+  const history = await getOrdersForSignedInUserAction();
+  const orders = history.ok ? history.orders : [];
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold text-stone-900">Your orders</h1>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <p className="text-sm text-stone-600">
-            Showing orders for{" "}
-            <span className="font-medium text-stone-800">{formatUsPhone(customerPhone)}</span>
-          </p>
-          <ClearPhoneSessionButton />
-        </div>
-        {sessionEmail && (
-          <p className="text-xs text-stone-500">
-            Signed in as {sessionEmail}. Order history is still linked to your phone number above.
-          </p>
-        )}
+        <h1 className="text-2xl font-semibold text-stone-900">Order history</h1>
+        <p className="text-sm text-stone-600">
+          Signed in as <span className="font-medium text-stone-800">{session.user.email}</span>
+        </p>
       </header>
+
+      {!history.ok && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          {history.error}
+        </p>
+      )}
 
       {orders.length === 0 ? (
         <div className="rounded-xl border border-stone-200 bg-stone-50 p-6 text-center">
-          <p className="text-stone-600">No orders yet for this phone number.</p>
-          <p className="mt-1 text-sm text-stone-500">Place an order from a pod to see it here.</p>
+          <p className="text-stone-600">No orders on this account yet.</p>
+          <p className="mt-1 text-sm text-stone-500">
+            Orders placed while signed in will appear here. Phone-only checkout orders stay accessible
+            from your SMS link until linked to this account.
+          </p>
           <Link href="/explore" className="mt-4 inline-block text-stone-900 hover:underline">
             Browse pods →
           </Link>

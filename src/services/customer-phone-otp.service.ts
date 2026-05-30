@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
 import { prisma } from "@/lib/db";
 import { createCustomerSessionRecord } from "@/lib/customer-session";
+import { attachLegacyOrdersToCustomerAccount } from "@/services/customer-account-orders.service";
 import { sendTransactionalSms } from "@/services/sms.service";
 
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -134,6 +135,8 @@ export async function verifyPhoneVerificationCode(
       },
     });
   });
+
+  await attachLegacyOrdersToCustomerAccount(account.id, account.phoneE164);
 
   const { token: sessionToken } = await createCustomerSessionRecord(account.id);
 

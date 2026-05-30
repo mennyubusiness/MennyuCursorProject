@@ -6,7 +6,7 @@ import { CustomerRetentionStrip } from "@/components/retention/CustomerRetention
 import { cn } from "@/lib/cn";
 
 type Props = {
-  customerPhone: string | null;
+  customerAccountId: string | null;
 };
 
 const panelInnerClass =
@@ -15,7 +15,7 @@ const panelInnerClass =
 /**
  * Cream band under the hero: one warm-white module with group order (left) + shortcuts (right).
  */
-export function HomeJoinGroupSection({ customerPhone }: Props) {
+export function HomeJoinGroupSection({ customerAccountId }: Props) {
   return (
     <section
       className="relative overflow-hidden border-y border-oo-light-stone bg-oo-cream"
@@ -77,7 +77,7 @@ export function HomeJoinGroupSection({ customerPhone }: Props) {
                 />
               </div>
               <HomeRecentOrdersSection
-                customerPhone={customerPhone}
+                customerAccountId={customerAccountId}
                 variant="rail"
                 embedded
               />

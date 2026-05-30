@@ -123,10 +123,10 @@ export function CheckoutPhoneVerification({
         </p>
       ) : (
         <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-          <p className="text-sm font-medium text-stone-900">Verify your phone</p>
+          <p className="text-sm font-medium text-stone-900">Verify your phone for order updates</p>
           <p className="mt-1 text-sm text-stone-600">
-            We&apos;ll text you a code to confirm it&apos;s you. We&apos;ll use this for order updates
-            and to help you find your order later.
+            We&apos;ll text you a code to confirm it&apos;s you. This is for order updates at
+            checkout — not for creating an account.
           </p>
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <button

@@ -1,17 +1,17 @@
 /**
- * Resolves diner phone for order history / header cart: cookie first, then CustomerProfile for signed-in users.
+ * Resolves verified diner phone from CustomerSession (not forgeable phone cookie).
  */
 import "server-only";
 
 import { prisma } from "@/lib/db";
-import { getCustomerPhoneFromHeaders } from "@/lib/session";
+import { getCustomerSessionFromRequest } from "@/lib/customer-session";
 
 export async function resolveCustomerPhoneForSession(
   headersList: Headers,
   userId: string | null
 ): Promise<string | null> {
-  const fromCookie = getCustomerPhoneFromHeaders(headersList)?.trim();
-  if (fromCookie) return fromCookie;
+  const customerSession = await getCustomerSessionFromRequest(headersList);
+  if (customerSession?.phoneE164) return customerSession.phoneE164;
 
   if (!userId) return null;
 

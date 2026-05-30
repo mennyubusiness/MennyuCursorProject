@@ -4,8 +4,9 @@ import { auth } from "@/auth";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
 import { assertCustomerSession } from "@/lib/customer-session";
 import { createCustomerOrderAccessToken } from "@/lib/customer-order-access-token";
+import { linkCustomerAccountToUser } from "@/lib/user-order-access";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
-import { buildCustomerPhoneCookieHeader, buildOrderAccessCookieHeader, getSessionIdFromRequest } from "@/lib/session";
+import { buildOrderAccessCookieHeader, getSessionIdFromRequest } from "@/lib/session";
 import { createOrderFromCart, OrderValidationError } from "@/services/order.service";
 import { createPaymentIntent } from "@/services/payment.service";
 
@@ -91,6 +92,10 @@ export async function POST(request: NextRequest) {
   }
   const submittedPhoneE164 = normalizedPhone.e164;
 
+  if (authSession?.user?.id) {
+    await linkCustomerAccountToUser(customerSession.customerAccountId, authSession.user.id);
+  }
+
   const groupOrderHostUserId = access.isGroupOrder ? authSession?.user?.id : undefined;
 
   let result;
@@ -98,7 +103,7 @@ export async function POST(request: NextRequest) {
     result = await createOrderFromCart({
       cartId,
       customerPhone: submittedPhoneE164,
-      customerEmail,
+      customerEmail: customerEmail ?? authSession?.user?.email ?? undefined,
       tipCents,
       idempotencyKey,
       pickupMode,
@@ -143,10 +148,6 @@ export async function POST(request: NextRequest) {
     totalCents: result.order.totalCents,
     orderAccessToken,
   });
-  response.headers.append(
-    "Set-Cookie",
-    buildCustomerPhoneCookieHeader(submittedPhoneE164, { httpOnly: true })
-  );
   response.headers.append("Set-Cookie", buildOrderAccessCookieHeader(orderAccessToken));
   return response;
 }

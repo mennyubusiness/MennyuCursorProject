@@ -15,6 +15,14 @@ vi.mock("@/lib/customer-session", () => ({
   getCustomerSessionFromRequest: vi.fn(),
 }));
 
+vi.mock("@/auth", () => ({
+  auth: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/lib/user-order-access", () => ({
+  userCanAccessOrder: vi.fn().mockResolvedValue(false),
+}));
+
 vi.mock("@/lib/session", () => ({
   CUSTOMER_PHONE_COOKIE: "mennyu_customer_phone",
   ORDER_ACCESS_COOKIE: "mennyu_order_access",
@@ -28,8 +36,10 @@ vi.mock("@/lib/session", () => ({
 }));
 
 import { cookies } from "next/headers";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getCustomerSessionFromRequest } from "@/lib/customer-session";
+import { userCanAccessOrder } from "@/lib/user-order-access";
 import {
   getCustomerOrderAccessTokenFromHeaders,
   getCustomerPhoneFromHeaders,
@@ -48,11 +58,14 @@ import {
 describe("assertCustomerOrderAccess", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(auth).mockResolvedValue(null);
+    vi.mocked(userCanAccessOrder).mockResolvedValue(false);
     vi.mocked(getCustomerSessionFromRequest).mockResolvedValue(null);
     vi.mocked(prisma.order.findUnique).mockResolvedValue({
       id: "ord_1",
       customerPhone: "+15551234567",
       customerAccountId: null,
+      customerEmail: null,
     } as never);
   });
 
@@ -150,6 +163,18 @@ describe("assertCustomerOrderAccess", () => {
     vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
 
     const r = await assertCustomerOrderAccess("ord_legacy", new Headers(), token);
+    expect(r.ok).toBe(true);
+  });
+
+  it("allows signed-in user who owns the order", async () => {
+    vi.mocked(auth).mockResolvedValue({
+      user: { id: "user_1", email: "customer@example.com" },
+    } as never);
+    vi.mocked(userCanAccessOrder).mockResolvedValue(true);
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
+    vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(null);
+
+    const r = await assertCustomerOrderAccess("ord_1", new Headers());
     expect(r.ok).toBe(true);
   });
 });

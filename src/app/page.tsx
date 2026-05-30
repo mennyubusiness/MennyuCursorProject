@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { HomeHero } from "@/components/home/HomeHero";
 import { HomeJoinGroupSection } from "@/components/home/HomeJoinGroupSection";
-import { resolveCustomerPhoneForSession } from "@/lib/customer-phone-resolution";
+import { getCustomerSessionFromRequest } from "@/lib/customer-session";
 import { PageBand, PageSection, PageShell } from "@/components/layout/page-shell";
 import { ButtonLink } from "@/components/ui/button";
 
@@ -31,13 +31,13 @@ export default async function HomePage() {
 
   const headersList = await headers();
   const session = await auth();
-  const customerPhone = await resolveCustomerPhoneForSession(headersList, session?.user?.id ?? null);
+  const customerSession = await getCustomerSessionFromRequest(headersList);
 
   return (
     <div className="w-full">
       <HomeHero featuredPods={featuredPods} />
 
-      <HomeJoinGroupSection customerPhone={customerPhone} />
+      <HomeJoinGroupSection customerAccountId={customerSession?.customerAccountId ?? null} />
 
       <PageBand variant="dark">
         <PageSection className="!py-16 sm:!py-20">

@@ -1,10 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockAssertCustomerOrderAccess = vi.fn();
 const mockGetOrderWithUnifiedStatus = vi.fn();
+const mockAssertCustomerOrderAccess = vi.fn();
 
 vi.mock("next/headers", () => ({
   cookies: vi.fn(),
+  headers: vi.fn(),
+}));
+
+vi.mock("@/auth", () => ({
+  auth: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    order: { findUnique: vi.fn() },
+  },
+}));
+
+vi.mock("@/lib/user-order-access", () => ({
+  userCanAccessOrder: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("@/lib/customer-order-access", () => ({
@@ -25,7 +40,8 @@ vi.mock("@/services/cart.service", () => ({
 }));
 
 vi.mock("@/services/order.service", () => ({
-  getOrdersByCustomerPhone: vi.fn(),
+  attachLegacyOrdersToCustomerAccount: vi.fn(),
+  getOrdersByCustomerAccountId: vi.fn(),
 }));
 
 vi.mock("@/services/reorder.service", () => ({
@@ -34,6 +50,14 @@ vi.mock("@/services/reorder.service", () => ({
 
 vi.mock("@/lib/session-request", () => ({
   getMennyuSessionIdForRequest: vi.fn(),
+}));
+
+vi.mock("@/lib/customer-session", () => ({
+  getCustomerSessionFromRequest: vi.fn(),
+}));
+
+vi.mock("@/services/customer-account-orders.service", () => ({
+  getOrdersForSignedInUser: vi.fn(),
 }));
 
 import { getOrderStatusAction } from "@/actions/order.actions";

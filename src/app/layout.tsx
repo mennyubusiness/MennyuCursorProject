@@ -74,12 +74,8 @@ export default async function RootLayout({
             <PageShell className="flex h-16 items-center justify-between gap-4 sm:h-[4.25rem]">
               <OpenOrderLogo variant="header" priority />
               <SiteHeaderNav
-                callbackPath={pathname || "/"}
-                customerPhone={customerPhone}
                 hasServerSession={hasServerSession}
                 navMode={headerNav.mode}
-                dashboardHref={headerNav.dashboardHref}
-                accountLabel={headerNav.accountLabel}
                 activeOrderHref={activeOrder ? `/order/${activeOrder.id}` : null}
                 cartHref="/cart"
               />

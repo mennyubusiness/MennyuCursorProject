@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatMaskedCustomerPhone,
   isLikelyE164Phone,
   maskPhone,
   normalizeUsPhoneToE164,
@@ -22,6 +23,10 @@ describe("phone helpers", () => {
 
   it("masks phone for logs", () => {
     expect(maskPhone("+15551234567")).toBe("+1***4567");
+  });
+
+  it("formats masked customer phone for display", () => {
+    expect(formatMaskedCustomerPhone("+15551234567")).toBe("+1 ••• ••• 4567");
   });
 
   it("detects E.164", () => {

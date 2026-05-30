@@ -122,3 +122,27 @@ export function buildCustomerSessionCookieHeader(token: string): string {
   if (isProd) parts.push("Secure");
   return parts.join("; ");
 }
+
+export function buildClearCustomerSessionCookieHeader(): string {
+  const isProd = process.env.NODE_ENV === "production";
+  const parts = [
+    `${CUSTOMER_SESSION_COOKIE}=`,
+    "Path=/",
+    "Max-Age=0",
+    "SameSite=Lax",
+    "HttpOnly",
+  ];
+  if (isProd) parts.push("Secure");
+  return parts.join("; ");
+}
+
+/** Revoke the current mennyu_customer session row, if present. */
+export async function revokeCustomerSessionFromHeaders(headers: Headers): Promise<void> {
+  const token = getCustomerSessionTokenFromHeaders(headers);
+  if (!token) return;
+  const tokenHash = hashCustomerSessionToken(token);
+  await prisma.customerSession.updateMany({
+    where: { tokenHash, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+}

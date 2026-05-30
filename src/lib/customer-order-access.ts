@@ -1,6 +1,8 @@
 import { cookies, headers } from "next/headers";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getCustomerSessionFromRequest } from "@/lib/customer-session";
+import { userCanAccessOrder } from "@/lib/user-order-access";
 import { verifyCustomerOrderAccessToken } from "@/lib/customer-order-access-token";
 import {
   CUSTOMER_PHONE_COOKIE,
@@ -40,7 +42,7 @@ export async function assertCustomerOrderAccess(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, customerPhone: true, customerAccountId: true },
+    select: { id: true, customerPhone: true, customerAccountId: true, customerEmail: true },
   });
   if (!order) {
     return { ok: false, status: 404, error: "Order not found" };
@@ -49,6 +51,14 @@ export async function assertCustomerOrderAccess(
   const orderPhone = order.customerPhone.trim();
 
   if (token && verifyCustomerOrderAccessToken(orderId, token)) {
+    return { ok: true, orderId: order.id, customerPhone: orderPhone };
+  }
+
+  const session = await auth();
+  if (
+    session?.user?.id &&
+    (await userCanAccessOrder(session.user.id, session.user.email, order))
+  ) {
     return { ok: true, orderId: order.id, customerPhone: orderPhone };
   }
 
@@ -61,11 +71,13 @@ export async function assertCustomerOrderAccess(
     return { ok: true, orderId: order.id, customerPhone: orderPhone };
   }
 
+  // Legacy migration fallback: mennyu_customer_phone cookie (forgeable — not used for /orders history).
+  // Remaining uses: orders placed before CustomerAccount, SMS bootstrap cookie, cancel APIs (Phase 3+).
   if (!customerPhone) {
     return {
       ok: false,
       status: 401,
-      error: "Customer identity required. Open the link from your order confirmation or verify your phone on the orders page.",
+      error: "Customer identity required. Open the link from your order confirmation or sign in to view your order history.",
     };
   }
 

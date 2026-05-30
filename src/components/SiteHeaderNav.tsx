@@ -1,35 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
-import { useCallback, useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
 
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
+import { ACCOUNT_SIGN_IN_PATH } from "@/lib/auth/account-paths";
 import { buttonClassName } from "@/components/ui/button";
 import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
 import { cn } from "@/lib/cn";
 
 type SiteHeaderNavProps = {
-  callbackPath: string;
-  customerPhone: string | null;
   hasServerSession: boolean;
   navMode: HeaderNavMode;
-  dashboardHref: string | null;
-  accountLabel: string | null;
   activeOrderHref: string | null;
   cartHref: string;
 };
-
-function buildLoginHref(callbackPath: string): string {
-  const safe =
-    callbackPath && callbackPath.startsWith("/") && !callbackPath.startsWith("//")
-      ? callbackPath
-      : "/";
-  const q = new URLSearchParams();
-  q.set("callbackUrl", safe);
-  return `/login?${q.toString()}`;
-}
 
 const navPillClass =
   "flex flex-wrap items-center justify-end gap-0.5 rounded-full border border-[#E7E0D6] bg-[#FFFDF8]/95 px-1.5 py-1 shadow-sm backdrop-blur-md sm:gap-1 sm:px-2 sm:py-1.5";
@@ -38,19 +24,13 @@ const navLink =
   "rounded-md px-2.5 py-1.5 text-sm font-medium text-[#1F1F1C] transition-colors duration-200 hover:bg-[#FAF4EA] hover:text-[#1F1F1C] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:text-[0.9375rem]";
 
 export function SiteHeaderNav({
-  callbackPath,
-  customerPhone,
   hasServerSession,
   navMode,
-  dashboardHref,
-  accountLabel,
   activeOrderHref,
   cartHref,
 }: SiteHeaderNavProps) {
-  const router = useRouter();
   const { status } = useSession();
   const quickCart = useQuickCartOptional();
-  const [signingOut, setSigningOut] = useState(false);
   const [cartPulse, setCartPulse] = useState(false);
 
   useEffect(() => {
@@ -67,53 +47,18 @@ export function SiteHeaderNav({
     };
   }, []);
 
-  const hasPhoneSession = Boolean(customerPhone);
-  const hasNextAuthSession = hasServerSession || status === "authenticated";
-  const isSignedIn = hasPhoneSession || hasNextAuthSession;
-
-  const loginHref = buildLoginHref(callbackPath);
-
+  const isSignedIn = hasServerSession || status === "authenticated";
   const showCustomerOrdering = navMode === "guest" || navMode === "customer";
-  const showDashboard =
-    (navMode === "vendor" || navMode === "pod" || navMode === "admin") &&
-    Boolean(dashboardHref);
-
-  const handleSignOut = useCallback(async () => {
-    setSigningOut(true);
-    try {
-      await fetch("/api/orders/clear-phone", { method: "POST" });
-      if (hasServerSession || status === "authenticated") {
-        await signOut({ callbackUrl: "/" });
-        return;
-      }
-      router.refresh();
-    } finally {
-      setSigningOut(false);
-    }
-  }, [hasServerSession, router, status]);
 
   return (
     <nav className="flex flex-wrap items-center justify-end" aria-label="Site">
       <div className={navPillClass}>
-        {isSignedIn && accountLabel && (
-          <span
-            className="mr-0.5 hidden max-w-[8rem] truncate rounded-full border border-oo-light-stone bg-oo-cream/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-oo-stone-gray sm:inline"
-            title="Signed-in account type"
-          >
-            {accountLabel}
-          </span>
-        )}
         <Link href="/explore" className={navLink}>
           Explore
         </Link>
-        {showDashboard && dashboardHref && (
-          <Link href={dashboardHref} className={navLink} title="Your dashboard">
-            Dashboard
-          </Link>
-        )}
         {showCustomerOrdering && (
           <>
-            <Link href="/orders" className={navLink} title="Your order history">
+            <Link href="/orders" className={navLink} title="Order history">
               Orders
             </Link>
             {quickCart?.enabled ? (
@@ -154,29 +99,15 @@ export function SiteHeaderNav({
             )}
           </>
         )}
-        {!isSignedIn && (
-          <Link href={loginHref} className={navLink} title="Sign in or create an account">
+        {isSignedIn ? (
+          <Link href="/account" className={navLink} title="Your account">
+            Account
+          </Link>
+        ) : (
+          <Link href={ACCOUNT_SIGN_IN_PATH} className={navLink} title="Sign in">
             Sign in
           </Link>
         )}
-        {isSignedIn && (
-          <button
-            type="button"
-            disabled={signingOut}
-            onClick={() => void handleSignOut()}
-            className={cn(navLink, "disabled:opacity-50")}
-            title="Sign out"
-          >
-            {signingOut ? "…" : "Sign out"}
-          </button>
-        )}
-        <Link
-          href="/admin"
-          className={cn(navLink, "hidden text-xs font-semibold uppercase tracking-wider sm:inline")}
-          title="Platform admin"
-        >
-          Admin
-        </Link>
       </div>
     </nav>
   );
