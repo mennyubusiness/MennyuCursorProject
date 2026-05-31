@@ -54,12 +54,14 @@ export function AccountLinkPhoneCard({ phoneDisplay }: AccountLinkPhoneCardProps
   }
 
   return (
-    <section className="rounded-xl border border-stone-200 bg-stone-50 p-5 shadow-sm sm:p-6">
-      <h2 className="text-lg font-semibold text-stone-900">Link checkout phone to this account</h2>
-      <p className="mt-2 text-sm text-stone-600">
-        Connect {phoneDisplay} so orders placed with this phone can appear in your order history.
+    <div className="rounded-lg border border-brand/20 bg-brand/5 p-4">
+      <p className="text-sm font-medium text-oo-charcoal">
+        Link {phoneDisplay} to this account
       </p>
-      <div className="mt-4">
+      <p className="mt-1 text-sm text-oo-stone-gray">
+        Orders placed with this phone on this device can appear in your order history.
+      </p>
+      <div className="mt-3">
         <button
           type="button"
           onClick={() => void linkPhoneToAccount()}
@@ -79,6 +81,6 @@ export function AccountLinkPhoneCard({ phoneDisplay }: AccountLinkPhoneCardProps
           {error}
         </p>
       )}
-    </section>
+    </div>
   );
 }

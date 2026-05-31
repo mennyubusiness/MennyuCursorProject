@@ -1,155 +1,41 @@
-import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { loadAccountPageContext } from "@/lib/account-page-context";
-import { ACCOUNT_SIGN_IN_PATH, ORDER_HISTORY_PATH } from "@/lib/auth/account-paths";
-import { AccountSessionActions } from "./AccountSessionActions";
-import { AccountLinkPhoneCard } from "./AccountLinkPhoneCard";
+import { ACCOUNT_SIGN_IN_PATH } from "@/lib/auth/account-paths";
+import { getOrdersForSignedInUser } from "@/services/customer-account-orders.service";
 
-const cardClass = "rounded-xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6";
-
-function RoleBadge({ label }: { label: string }) {
-  return (
-    <span className="inline-flex rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-xs font-medium capitalize text-stone-700">
-      {label.replace(/_/g, " ")}
-    </span>
-  );
-}
+import { AccountHubHeader } from "./AccountHubHeader";
+import { AccountPhoneSection } from "./AccountPhoneSection";
+import { AccountProfileCard } from "./AccountProfileCard";
+import { AccountRecentOrders } from "./AccountRecentOrders";
+import { AccountSecurityCard } from "./AccountSecurityCard";
+import { AccountSignOutSection } from "./AccountSignOutSection";
+import { AccountToolsGrid } from "./AccountToolsGrid";
 
 export default async function AccountPage() {
   const session = await auth();
-  if (!session?.user?.id) {
+  if (!session?.user?.id || !session.user.email) {
     redirect(ACCOUNT_SIGN_IN_PATH);
   }
 
   const ctx = await loadAccountPageContext(await headers());
+  const recentOrders = (
+    await getOrdersForSignedInUser(session.user.id, session.user.email)
+  ).slice(0, 3);
+
+  const showPhoneLinkHint = Boolean(ctx.checkoutPhone?.canLink);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold text-stone-900 sm:text-3xl">Account</h1>
-        <p className="text-sm text-stone-600">
-          Your sign-in, order history, and available tools.
-        </p>
-      </header>
-
-      {ctx.emailAccount && (
-        <section className={cardClass}>
-          <h2 className="text-lg font-semibold text-stone-900">Signed in</h2>
-          <dl className="mt-4 space-y-3 text-sm">
-            <div>
-              <dt className="text-stone-500">Email</dt>
-              <dd className="font-medium text-stone-900">{ctx.emailAccount.email}</dd>
-            </div>
-            {ctx.emailAccount.name && (
-              <div>
-                <dt className="text-stone-500">Name</dt>
-                <dd className="font-medium text-stone-900">{ctx.emailAccount.name}</dd>
-              </div>
-            )}
-            {ctx.checkoutPhone && (
-              <div>
-                <dt className="text-stone-500">Phone for order updates</dt>
-                <dd className="font-medium text-stone-900">{ctx.checkoutPhone.phoneDisplay}</dd>
-                <dd className="mt-0.5 text-xs text-stone-500">{ctx.checkoutPhone.linkStatusLabel}</dd>
-                {ctx.checkoutPhone.linkStatus === "linked_other" && (
-                  <dd className="mt-1 text-xs text-amber-800">
-                    This phone is already linked to another account.
-                  </dd>
-                )}
-                {ctx.checkoutPhone.linkStatus === "user_has_other" && (
-                  <dd className="mt-1 text-xs text-stone-600">
-                    Your account already has a different phone linked.
-                  </dd>
-                )}
-              </div>
-            )}
-            {!ctx.checkoutPhone && (
-              <div>
-                <dt className="text-stone-500">Phone for order updates</dt>
-                <dd className="text-stone-600">
-                  Add a phone for order updates at checkout.
-                </dd>
-              </div>
-            )}
-          </dl>
-          <div className="mt-4">
-            <Link href={ORDER_HISTORY_PATH} className="text-sm font-medium text-stone-900 hover:underline">
-              View order history →
-            </Link>
-          </div>
-        </section>
-      )}
-
-      {ctx.checkoutPhone?.canLink && (
-        <AccountLinkPhoneCard phoneDisplay={ctx.checkoutPhone.phoneDisplay} />
-      )}
-
-      {ctx.staff && (
-        <section className={cardClass}>
-          <h2 className="text-lg font-semibold text-stone-900">Staff, vendors, and admins</h2>
-          <dl className="mt-4 space-y-3 text-sm">
-            <div>
-              <dt className="text-stone-500">Access</dt>
-              <dd className="mt-1 flex flex-wrap gap-2">
-                {ctx.staff.isPlatformAdmin && <RoleBadge label="Platform admin" />}
-                {ctx.staff.vendorMemberships.map((m) => (
-                  <RoleBadge key={`vendor-${m.href}`} label={`Vendor · ${m.role}`} />
-                ))}
-                {ctx.staff.podMemberships.map((m) => (
-                  <RoleBadge key={`pod-${m.href}`} label={`Pod · ${m.role}`} />
-                ))}
-              </dd>
-            </div>
-          </dl>
-        </section>
-      )}
-
-      <section className={cardClass}>
-        <h2 className="text-lg font-semibold text-stone-900">Available tools</h2>
-        <ul className="mt-4 space-y-2 text-sm">
-          <li>
-            <Link href={ORDER_HISTORY_PATH} className="font-medium text-stone-900 hover:underline">
-              Order history
-            </Link>
-            <span className="text-stone-500"> — past orders and reorder</span>
-          </li>
-          {ctx.staff?.vendorMemberships.map((m) => (
-            <li key={m.href}>
-              <Link href={m.href} className="font-medium text-stone-900 hover:underline">
-                {m.vendorName}
-              </Link>
-              <span className="text-stone-500"> — vendor dashboard</span>
-            </li>
-          ))}
-          {ctx.staff?.podMemberships.map((m) => (
-            <li key={m.href}>
-              <Link href={m.href} className="font-medium text-stone-900 hover:underline">
-                {m.podName}
-              </Link>
-              <span className="text-stone-500"> — pod dashboard</span>
-            </li>
-          ))}
-          {ctx.staff?.showAdminLink && (
-            <li>
-              <Link href="/admin" className="font-medium text-stone-900 hover:underline">
-                Platform admin
-              </Link>
-              <span className="text-stone-500"> — operations and support tools</span>
-            </li>
-          )}
-        </ul>
-      </section>
-
-      <section className={cardClass}>
-        <h2 className="text-lg font-semibold text-stone-900">Sign out</h2>
-        <div className="mt-4">
-          <AccountSessionActions hasCheckoutPhoneSession={ctx.hasDeviceCheckoutSession} />
-        </div>
-        <p className="mt-4 text-sm text-stone-500">Use a different email? Sign out first.</p>
-      </section>
+    <div className="space-y-6">
+      <AccountHubHeader ctx={ctx} />
+      <AccountProfileCard email={session.user.email} name={ctx.emailAccount?.name ?? null} />
+      <AccountPhoneSection checkoutPhone={ctx.checkoutPhone} />
+      <AccountRecentOrders orders={recentOrders} showPhoneLinkHint={showPhoneLinkHint} />
+      <AccountSecurityCard email={session.user.email} />
+      <AccountToolsGrid staff={ctx.staff} />
+      <AccountSignOutSection hasCheckoutPhoneSession={ctx.hasDeviceCheckoutSession} />
     </div>
   );
 }

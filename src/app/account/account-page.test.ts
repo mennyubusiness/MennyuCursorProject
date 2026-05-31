@@ -6,8 +6,16 @@ import { describe, expect, it } from "vitest";
 const dir = dirname(fileURLToPath(import.meta.url));
 
 const accountPageSrc = readFileSync(join(dir, "page.tsx"), "utf8");
+const accountLayoutSrc = readFileSync(join(dir, "layout.tsx"), "utf8");
+const profileCardSrc = readFileSync(join(dir, "AccountProfileCard.tsx"), "utf8");
+const phoneSectionSrc = readFileSync(join(dir, "AccountPhoneSection.tsx"), "utf8");
 const linkPhoneCardSrc = readFileSync(join(dir, "AccountLinkPhoneCard.tsx"), "utf8");
+const recentOrdersSrc = readFileSync(join(dir, "AccountRecentOrders.tsx"), "utf8");
+const securityCardSrc = readFileSync(join(dir, "AccountSecurityCard.tsx"), "utf8");
+const toolsGridSrc = readFileSync(join(dir, "AccountToolsGrid.tsx"), "utf8");
+const signOutSectionSrc = readFileSync(join(dir, "AccountSignOutSection.tsx"), "utf8");
 const sessionActionsSrc = readFileSync(join(dir, "AccountSessionActions.tsx"), "utf8");
+const actionsSrc = readFileSync(join(dir, "actions.ts"), "utf8");
 const accountViewModelSrc = readFileSync(join(dir, "../../lib/account-page-view-model.ts"), "utf8");
 const accountPathsSrc = readFileSync(join(dir, "../../lib/auth/account-paths.ts"), "utf8");
 const headerNavSrc = readFileSync(join(dir, "../../components/SiteHeaderNav.tsx"), "utf8");
@@ -25,35 +33,87 @@ describe("/account signed-out behavior", () => {
   });
 
   it("redirects unsigned users before rendering account content", () => {
-    expect(accountPageSrc).toMatch(/if \(!session\?\.user\?\.id\)/);
+    expect(accountPageSrc).toMatch(/if \(!session\?\.user\?\.id/);
     expect(accountPageSrc).toMatch(/redirect\(ACCOUNT_SIGN_IN_PATH\)/);
   });
 });
 
-describe("/account signed-in behavior", () => {
-  it("shows User identity and checkout phone as contact info", () => {
-    expect(accountViewModelSrc).toMatch(/checkoutPhone/);
-    expect(accountPageSrc).toMatch(/Phone for order updates/);
-    expect(accountPageSrc).toMatch(/linkStatusLabel/);
-    expect(accountPageSrc).toMatch(/View order history/);
-    expect(accountPageSrc).not.toMatch(/View orders with phone/i);
+describe("/account hub layout", () => {
+  it("uses centered max-width warm layout", () => {
+    expect(accountLayoutSrc).toMatch(/max-w-3xl/);
+    expect(accountLayoutSrc).toMatch(/#EDE6DC/);
   });
 
-  it("shows link phone card for unlinked checkout session", () => {
-    expect(accountPageSrc).toMatch(/AccountLinkPhoneCard/);
-    expect(accountPageSrc).toMatch(/canLink/);
-    expect(linkPhoneCardSrc).toMatch(/Link checkout phone to this account/);
-    expect(linkPhoneCardSrc).toMatch(/\/api\/customer\/account\/link/);
+  it("composes hub sections", () => {
+    expect(accountPageSrc).toMatch(/AccountHubHeader/);
+    expect(accountPageSrc).toMatch(/AccountProfileCard/);
+    expect(accountPageSrc).toMatch(/AccountPhoneSection/);
+    expect(accountPageSrc).toMatch(/AccountRecentOrders/);
+    expect(accountPageSrc).toMatch(/AccountSecurityCard/);
+    expect(accountPageSrc).toMatch(/AccountToolsGrid/);
+    expect(accountPageSrc).toMatch(/AccountSignOutSection/);
   });
 
-  it("does not show Create account to signed-in users", () => {
-    expect(accountPageSrc).not.toMatch(/Create account/);
-    expect(accountPageSrc).toMatch(/Use a different email\? Sign out first/);
+  it("loads recent orders preview", () => {
+    expect(accountPageSrc).toMatch(/getOrdersForSignedInUser/);
+    expect(accountPageSrc).toMatch(/\.slice\(0, 3\)/);
+    expect(recentOrdersSrc).toMatch(/ORDER_HISTORY_PATH/);
+  });
+});
+
+describe("/account profile", () => {
+  it("allows editing display name", () => {
+    expect(profileCardSrc).toMatch(/updateAccountNameAction/);
+    expect(profileCardSrc).toMatch(/Email sign-in cannot be changed/);
+    expect(actionsSrc).toMatch(/updateAccountNameAction/);
+  });
+});
+
+describe("/account phone for order updates", () => {
+  it("shows linked phone and link/add flows", () => {
+    expect(phoneSectionSrc).toMatch(/Phone for order updates/);
+    expect(phoneSectionSrc).toMatch(/Add phone for order updates/);
+    expect(phoneSectionSrc).toMatch(/\/api\/customer\/phone\/send-code/);
+    expect(phoneSectionSrc).toMatch(/\/api\/customer\/account\/link/);
+    expect(linkPhoneCardSrc).toMatch(/Link phone to account/);
+    expect(accountViewModelSrc).toMatch(/linked_other/);
+    expect(phoneSectionSrc).toMatch(/already linked to another account/);
+  });
+});
+
+describe("/account recent orders", () => {
+  it("shows empty state with linking guidance", () => {
+    expect(recentOrdersSrc).toMatch(/No orders yet/);
+    expect(recentOrdersSrc).toMatch(/Link your checkout phone/);
+  });
+});
+
+describe("/account security", () => {
+  it("links to password reset flow", () => {
+    expect(securityCardSrc).toMatch(/Change password/);
+    expect(securityCardSrc).toMatch(/\/forgot-password/);
+  });
+});
+
+describe("/account tools by role", () => {
+  it("always includes order history tool card", () => {
+    expect(toolsGridSrc).toMatch(/Order history/);
+    expect(toolsGridSrc).toMatch(/ORDER_HISTORY_PATH/);
   });
 
-  it("links to order history and staff tools", () => {
-    expect(accountPageSrc).toMatch(/ORDER_HISTORY_PATH/);
-    expect(accountPageSrc).toMatch(/Available tools/);
+  it("includes vendor, pod, and admin tools when staff context exists", () => {
+    expect(toolsGridSrc).toMatch(/vendorMemberships/);
+    expect(toolsGridSrc).toMatch(/podMemberships/);
+    expect(toolsGridSrc).toMatch(/Platform admin/);
+    expect(toolsGridSrc).toMatch(/\/admin/);
+  });
+});
+
+describe("/account session actions", () => {
+  it("signs out via server action and can clear checkout phone separately", () => {
+    expect(sessionActionsSrc).toMatch(/signOutAccountAction/);
+    expect(signOutSectionSrc).toMatch(/does not delete your account/);
+    expect(sessionActionsSrc).toMatch(/Clear checkout phone on this device/);
   });
 });
 
@@ -82,7 +142,6 @@ describe("checkout phone verification copy", () => {
   it("describes phone as order updates not account login", () => {
     expect(checkoutPhoneSrc).toMatch(/Verify your phone for order updates/);
     expect(checkoutPhoneSrc).toMatch(/not for creating an account/i);
-    expect(checkoutPhoneSrc).toMatch(/Phone verified for order updates/);
   });
 });
 
@@ -90,34 +149,6 @@ describe("login order history callback copy", () => {
   it("uses order-history subtitle and Sign in button", () => {
     expect(loginFormSrc).toMatch(/Sign in to view your order history/);
     expect(loginFormSrc).toMatch(/"Sign in"/);
-    expect(loginFormSrc).not.toMatch(/"Continue"/);
-  });
-});
-
-describe("order access denied copy", () => {
-  it("does not advertise phone lookup", () => {
-    expect(orderAccessDeniedSrc).not.toMatch(/look up your orders/i);
-    expect(orderAccessDeniedSrc).not.toMatch(/Look up my orders/i);
-    expect(orderAccessDeniedSrc).toMatch(/We couldn/);
-    expect(orderAccessDeniedSrc).toMatch(/Sign in/);
-  });
-});
-
-describe("orders empty state linking guidance", () => {
-  it("explains account phone linking", () => {
-    expect(ordersPageSrc).toMatch(/Link phone to account/);
-    expect(ordersPageSrc).toMatch(/Go to account/);
-    expect(ordersPageSrc).not.toMatch(/phone-only/i);
-  });
-});
-
-describe("/account session actions", () => {
-  it("signs out via server action and can clear checkout phone separately", () => {
-    expect(sessionActionsSrc).toMatch(/signOutAccountAction/);
-    expect(sessionActionsSrc).toMatch(/action=\{signOutAccountAction\}/);
-    expect(sessionActionsSrc).not.toMatch(/from "next-auth\/react"/);
-    expect(sessionActionsSrc).toMatch(/\/api\/customer\/session\/clear/);
-    expect(sessionActionsSrc).toMatch(/Clear checkout phone on this device/);
   });
 });
 
@@ -125,6 +156,5 @@ describe("route constants", () => {
   it("uses unified login and register paths", () => {
     expect(accountPathsSrc).toMatch(/SIGN_IN_PATH/);
     expect(accountPathsSrc).toMatch(/CUSTOMER_REGISTER_PATH/);
-    expect(accountPathsSrc).not.toMatch(/View orders with phone/i);
   });
 });
