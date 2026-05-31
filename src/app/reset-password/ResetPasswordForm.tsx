@@ -1,17 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Suspense, useRef, useState } from "react";
 import { resetPasswordAction } from "@/actions/password-reset.actions";
 import { AuthFormCard } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password-policy";
 
+function readResetTokenFromLocation(): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("token")?.trim() ?? "";
+}
+
 function ResetPasswordFormInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = useMemo(() => searchParams.get("token")?.trim() ?? "", [searchParams]);
+  const tokenRef = useRef<string>(readResetTokenFromLocation());
+  const token = tokenRef.current;
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -72,6 +77,7 @@ function ResetPasswordFormInner() {
         <p className="mt-2 text-sm text-zinc-600">Choose a new password for your Open Order account.</p>
       </div>
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-5">
+        <input type="hidden" name="token" value={token} readOnly />
         <div>
           <label htmlFor="reset-password" className="oo-label">
             New password

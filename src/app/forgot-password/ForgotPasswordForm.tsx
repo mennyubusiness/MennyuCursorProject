@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { requestPasswordResetAction } from "@/actions/password-reset.actions";
 import { PASSWORD_RESET_GENERIC_SUCCESS_MESSAGE } from "@/lib/auth/password-reset-messages";
 import { AuthFormCard } from "@/components/auth/auth-shell";
@@ -12,11 +12,14 @@ export function ForgotPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const submitLockRef = useRef(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitLockRef.current) return;
     setError(null);
     setLoading(true);
+    submitLockRef.current = true;
     try {
       const result = await requestPasswordResetAction(email);
       if (!result.ok) {
@@ -26,6 +29,7 @@ export function ForgotPasswordForm() {
       setSubmitted(true);
     } finally {
       setLoading(false);
+      submitLockRef.current = false;
     }
   }
 

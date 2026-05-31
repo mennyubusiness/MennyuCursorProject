@@ -11,8 +11,11 @@ import {
   validateAccountPassword,
 } from "@/lib/auth/password-policy";
 import {
+  buildPasswordResetUrl,
   generatePasswordResetToken,
   hashPasswordResetToken,
+  normalizePasswordResetTokenFromRequest,
+  PASSWORD_RESET_REQUEST_DEDUPE_MS,
   PASSWORD_RESET_TTL_MS,
 } from "@/lib/auth/password-reset-token";
 import { getPublicSiteOriginFromEnv } from "@/lib/public-site-url";
@@ -34,6 +37,21 @@ export type RequestPasswordResetResult =
 export type ResetPasswordResult =
   | { ok: true; message: string }
   | { ok: false; error: string };
+
+type ResetRejectReason = "missing" | "not_found" | "expired" | "consumed";
+
+function logPasswordResetReject(reason: ResetRejectReason, tokenHashPrefix: string): void {
+  console.info("[password-reset] reset rejected", { reason, tokenHashPrefix });
+}
+
+/** Prefer PUBLIC_APP_URL / NEXTAUTH_URL; fall back to request origin in dev when unset. */
+export function resolvePasswordResetLinkOrigin(requestOrigin?: string): string {
+  const fromEnv = getPublicSiteOriginFromEnv();
+  if (process.env.PUBLIC_APP_URL?.trim() || process.env.NEXTAUTH_URL?.trim()) {
+    return fromEnv.replace(/\/$/, "");
+  }
+  return (requestOrigin ?? fromEnv).replace(/\/$/, "");
+}
 
 function buildResetEmailBody(resetUrl: string): { text: string; html: string } {
   const text = [
@@ -57,7 +75,7 @@ function buildResetEmailBody(resetUrl: string): { text: string; html: string } {
 
 export async function requestPasswordReset(
   emailRaw: string,
-  origin?: string
+  requestOrigin?: string
 ): Promise<RequestPasswordResetResult> {
   const email = normalizeAccountEmail(emailRaw);
   if (!email.includes("@")) {
@@ -73,14 +91,31 @@ export async function requestPasswordReset(
     return { ok: true, message: PASSWORD_RESET_GENERIC_SUCCESS_MESSAGE };
   }
 
+  const dedupeSince = new Date(Date.now() - PASSWORD_RESET_REQUEST_DEDUPE_MS);
+  const recentActive = await prisma.passwordResetToken.findFirst({
+    where: {
+      userId: user.id,
+      consumedAt: null,
+      expiresAt: { gt: new Date() },
+      createdAt: { gte: dedupeSince },
+    },
+    select: { id: true },
+  });
+  if (recentActive) {
+    return { ok: true, message: PASSWORD_RESET_GENERIC_SUCCESS_MESSAGE };
+  }
+
   const rawToken = generatePasswordResetToken();
   const tokenHash = hashPasswordResetToken(rawToken);
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
 
   await prisma.$transaction([
-    prisma.passwordResetToken.updateMany({
-      where: { userId: user.id, consumedAt: null },
-      data: { consumedAt: new Date() },
+    prisma.passwordResetToken.deleteMany({
+      where: {
+        userId: user.id,
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
     }),
     prisma.passwordResetToken.create({
       data: {
@@ -91,8 +126,8 @@ export async function requestPasswordReset(
     }),
   ]);
 
-  const siteOrigin = (origin ?? getPublicSiteOriginFromEnv()).replace(/\/$/, "");
-  const resetUrl = `${siteOrigin}/reset-password?token=${encodeURIComponent(rawToken)}`;
+  const siteOrigin = resolvePasswordResetLinkOrigin(requestOrigin);
+  const resetUrl = buildPasswordResetUrl(siteOrigin, rawToken);
   const { text, html } = buildResetEmailBody(resetUrl);
 
   await sendTransactionalEmail({
@@ -110,8 +145,9 @@ export async function resetPasswordWithToken(
   tokenRaw: string,
   newPassword: string
 ): Promise<ResetPasswordResult> {
-  const token = tokenRaw.trim();
+  const token = normalizePasswordResetTokenFromRequest(tokenRaw);
   if (!token) {
+    logPasswordResetReject("missing", "none");
     return { ok: false, error: PASSWORD_RESET_GENERIC_FAILURE_MESSAGE };
   }
 
@@ -121,6 +157,7 @@ export async function resetPasswordWithToken(
   }
 
   const tokenHash = hashPasswordResetToken(token);
+  const tokenHashPrefix = tokenHash.slice(0, 12);
   const resetRow = await prisma.passwordResetToken.findUnique({
     where: { tokenHash },
     select: {
@@ -132,7 +169,16 @@ export async function resetPasswordWithToken(
     },
   });
 
-  if (!resetRow || resetRow.consumedAt || resetRow.expiresAt <= new Date()) {
+  if (!resetRow) {
+    logPasswordResetReject("not_found", tokenHashPrefix);
+    return { ok: false, error: PASSWORD_RESET_GENERIC_FAILURE_MESSAGE };
+  }
+  if (resetRow.consumedAt) {
+    logPasswordResetReject("consumed", tokenHashPrefix);
+    return { ok: false, error: PASSWORD_RESET_GENERIC_FAILURE_MESSAGE };
+  }
+  if (resetRow.expiresAt <= new Date()) {
+    logPasswordResetReject("expired", tokenHashPrefix);
     return { ok: false, error: PASSWORD_RESET_GENERIC_FAILURE_MESSAGE };
   }
 
