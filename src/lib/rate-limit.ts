@@ -38,6 +38,9 @@ export const RATE_LIMITS = {
   orderStatusPoll: { limit: 120, windowMs: 10 * 60 * 1000 },
   orderAccessBootstrap: { limit: 30, windowMs: 10 * 60 * 1000 },
   registerIp: { limit: 10, windowMs: 60 * 60 * 1000 },
+  passwordResetRequestEmail: { limit: 3, windowMs: 60 * 60 * 1000 },
+  passwordResetRequestIp: { limit: 10, windowMs: 60 * 60 * 1000 },
+  passwordResetAttemptIp: { limit: 10, windowMs: 15 * 60 * 1000 },
 } as const;
 
 type Bucket = {
@@ -122,4 +125,7 @@ export const rateLimitKeys = {
   orderStatusPoll: (orderId: string, actorKey: string) => `order:status:${orderId}:${actorKey}`,
   orderAccessBootstrap: (orderId: string, ip: string) => `order:access:${orderId}:${ip}`,
   registerIp: (ip: string) => `register:ip:${ip}`,
+  passwordResetRequestEmail: (email: string) => `password-reset:request:email:${email}`,
+  passwordResetRequestIp: (ip: string) => `password-reset:request:ip:${ip}`,
+  passwordResetAttemptIp: (ip: string) => `password-reset:attempt:ip:${ip}`,
 };

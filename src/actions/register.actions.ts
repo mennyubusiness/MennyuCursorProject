@@ -2,6 +2,11 @@
 
 import { headers } from "next/headers";
 import { hashPassword } from "@/lib/auth/password";
+import {
+  normalizeAccountEmail,
+  validateAccountEmail,
+  validateAccountPassword,
+} from "@/lib/auth/password-policy";
 import { prisma } from "@/lib/db";
 import {
   RATE_LIMITS,
@@ -10,8 +15,6 @@ import {
   rateLimitKeys,
 } from "@/lib/rate-limit";
 import { getClientIpFromHeaders } from "@/lib/rate-limit-http";
-
-const MIN_PASSWORD = 8;
 
 export type RegisterResult =
   | { ok: true }
@@ -33,13 +36,15 @@ export async function registerWithEmailPassword(input: {
     return { ok: false, error: RATE_LIMIT_ERROR_MESSAGE };
   }
 
-  const email = input.email.toLowerCase().trim();
+  const email = normalizeAccountEmail(input.email);
   const password = input.password;
-  if (!email.includes("@")) {
-    return { ok: false, error: "Enter a valid email." };
+  const emailError = validateAccountEmail(email);
+  if (emailError) {
+    return { ok: false, error: emailError };
   }
-  if (password.length < MIN_PASSWORD) {
-    return { ok: false, error: `Password must be at least ${MIN_PASSWORD} characters.` };
+  const passwordError = validateAccountPassword(password);
+  if (passwordError) {
+    return { ok: false, error: passwordError };
   }
 
   const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });

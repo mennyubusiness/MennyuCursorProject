@@ -45,6 +45,15 @@ Startup **fails** if live SMS is enabled without Twilio credentials.
 
 **Twilio note:** US A2P 10DLC / toll-free verification can block sends from unverified numbers or Messaging Services. Use dry-run until Twilio approves your sender; see [docs/SMS_SETUP.md](./SMS_SETUP.md).
 
+## Email / password recovery
+
+| Mode | Variables |
+|------|-----------|
+| **Safe default (local / staging)** | `EMAIL_DRY_RUN=true` — reset links logged to server console, not sent |
+| **Live email** | `EMAIL_ENABLED=true`, `EMAIL_DRY_RUN=false`, plus `RESEND_API_KEY` and `EMAIL_FROM` |
+
+Startup **fails** if live email is enabled without Resend credentials. Password recovery is email-only (not SMS). See [AUTH_UNIFIED.md](./AUTH_UNIFIED.md).
+
 ## Admin access
 
 | Method | Config |

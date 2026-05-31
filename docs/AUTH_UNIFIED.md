@@ -8,6 +8,8 @@ This document complements `AUTH_PHASE1.md` with the **registration** path and a 
 |-------|---------|--------|
 | `/login` | Email + password via NextAuth; intent selector (vendor / pod / customer / admin) | **Canonical** sign-in |
 | `/register` | Create `User`, then `/account/role` → role-specific setup | **Canonical** new accounts |
+| `/forgot-password` | Request email password reset link | **Canonical** account recovery |
+| `/reset-password` | Set new password from reset token | **Canonical** account recovery |
 | `/account/*` | Role selection and customer/vendor/pod profile setup | **Canonical** onboarding shell |
 
 There is **no separate legacy login page** — a single login page serves all intents.
@@ -55,8 +57,14 @@ Manual **paste-the-key-in-the-browser** exists only under **Settings → Automat
 
 ## What we are not building here
 
-- No in-app forgot-password flow yet (none in codebase).
-- Customer checkout **phone session** remains separate from NextAuth (by design).
+- Customer checkout **phone session** remains separate from NextAuth (by design). Phone verification is for checkout and order updates only — not password recovery.
+
+## Password recovery
+
+- **`/forgot-password`** — request a reset link by email (generic success copy; does not reveal whether the email exists).
+- **`/reset-password?token=...`** — set a new password from the emailed link (single-use token, 60-minute expiry).
+- Password recovery uses **email only** — not SMS or phone verification.
+- Production requires **`RESEND_API_KEY`** and **`EMAIL_FROM`** when `EMAIL_DRY_RUN=false` (see `docs/PRODUCTION_CONFIG.md`).
 
 ## End-state summary
 

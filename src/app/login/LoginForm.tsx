@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { AuthFormCard } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { resolvePostLoginDestinationAction } from "./actions";
@@ -14,7 +15,7 @@ function safeCallbackPath(raw: string | null): string {
   return t;
 }
 
-export function LoginForm() {
+function LoginFormInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -25,6 +26,7 @@ export function LoginForm() {
   const callbackUrlRaw = searchParams.get("callbackUrl");
   const callbackPath = useMemo(() => safeCallbackPath(callbackUrlRaw), [callbackUrlRaw]);
   const isOrdersCallback = callbackPath === "/orders";
+  const resetSuccess = searchParams.get("reset") === "success";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,6 +67,11 @@ export function LoginForm() {
     <AuthFormCard>
       <div>
         <h1 className="text-2xl font-black tracking-tight text-black">Sign in</h1>
+        {resetSuccess && (
+          <p className="mt-2 text-sm text-emerald-700" role="status">
+            Your password has been reset. Please sign in.
+          </p>
+        )}
         {isOrdersCallback && (
           <p className="mt-2 text-sm text-zinc-600">Sign in to view your order history.</p>
         )}
@@ -90,9 +97,17 @@ export function LoginForm() {
           />
         </div>
         <div>
-          <label htmlFor="login-password" className="oo-label">
-            Password
-          </label>
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="login-password" className="oo-label">
+              Password
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-xs font-semibold text-brand underline-offset-4 hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <input
             id="login-password"
             type="password"
@@ -113,5 +128,27 @@ export function LoginForm() {
         </Button>
       </form>
     </AuthFormCard>
+  );
+}
+
+function LoginFormFallback() {
+  return (
+    <div className="oo-card animate-pulse p-8" role="status">
+      <div className="h-6 w-32 rounded bg-oo-light-stone" />
+      <div className="mt-6 space-y-4">
+        <div className="h-10 rounded-lg bg-oo-cream" />
+        <div className="h-10 rounded-lg bg-oo-cream" />
+        <div className="h-11 rounded-lg bg-oo-light-stone" />
+      </div>
+      <p className="sr-only">Loading sign in…</p>
+    </div>
+  );
+}
+
+export function LoginForm() {
+  return (
+    <Suspense fallback={<LoginFormFallback />}>
+      <LoginFormInner />
+    </Suspense>
   );
 }

@@ -102,6 +102,16 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   /** Storage bucket for brand logos (public). Default: mennyu-assets. Create in Supabase Dashboard → Storage. */
   SUPABASE_STORAGE_BUCKET: z.string().optional(),
+  /** Master switch for outbound email (password recovery). Default: on in production. */
+  EMAIL_ENABLED: z.enum(["true", "false"]).optional(),
+  /** When true, log email content but do not call provider. Default: on outside production. */
+  EMAIL_DRY_RUN: z.enum(["true", "false"]).optional(),
+  /** When true, log only (no provider). */
+  EMAIL_LOG_ONLY: z.enum(["true", "false"]).optional(),
+  /** Resend API key for transactional email (password recovery). */
+  RESEND_API_KEY: z.string().optional(),
+  /** From address for transactional email, e.g. Open Order <noreply@yourdomain.com> */
+  EMAIL_FROM: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

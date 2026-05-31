@@ -45,6 +45,13 @@ Migration: `prisma/migrations/20250315130000_unified_auth_user_vendor_membership
 |----------|--------|
 | `AUTH_SECRET` | Required in production for JWT signing. |
 | `VENDOR_ACCESS_SIGNING_SECRET` | Still used for magic-link grant route (optional migration path). |
+| `RESEND_API_KEY` + `EMAIL_FROM` | Required in production for live password recovery email (`EMAIL_DRY_RUN=false`). |
+
+## Password recovery
+
+- **`/forgot-password`** → emails a single-use reset link (60 min TTL).
+- **`/reset-password?token=...`** → sets a new password (same rules as registration: min 8 characters).
+- Phone OTP remains for checkout/order access only — not account password recovery.
 
 ## API
 

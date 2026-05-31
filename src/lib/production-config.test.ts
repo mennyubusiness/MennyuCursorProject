@@ -22,6 +22,7 @@ function productionEnv(overrides: Partial<Env> = {}): Env {
     VENDOR_ACCESS_SIGNING_SECRET: "production-vendor-access-signing-secret-32",
     SMS_ENABLED: "false",
     SMS_DRY_RUN: "true",
+    EMAIL_DRY_RUN: "true",
     ...overrides,
   } as Env;
 }
@@ -134,6 +135,29 @@ describe("validateProductionConfig", () => {
       })
     );
     expect(result.errors.filter((e) => e.includes("TWILIO"))).toEqual([]);
+  });
+
+  it("requires Resend credentials when email live send is enabled", () => {
+    const result = validateProductionConfig(
+      productionEnv({
+        EMAIL_ENABLED: "true",
+        EMAIL_DRY_RUN: "false",
+        RESEND_API_KEY: undefined,
+        EMAIL_FROM: undefined,
+      })
+    );
+    expect(result.errors.some((e) => e.includes("RESEND_API_KEY"))).toBe(true);
+  });
+
+  it("allows email dry-run without Resend credentials", () => {
+    const result = validateProductionConfig(
+      productionEnv({
+        EMAIL_ENABLED: "true",
+        EMAIL_DRY_RUN: "true",
+        RESEND_API_KEY: undefined,
+      })
+    );
+    expect(result.errors.filter((e) => e.includes("RESEND_API_KEY"))).toEqual([]);
   });
 
   it("warns on Stripe live/test publishable mismatch", () => {

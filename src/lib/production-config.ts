@@ -66,6 +66,24 @@ function isSmsLogOnly(env: Env): boolean {
   return parseTriState(env.SMS_LOG_ONLY) === true;
 }
 
+function hasEmailCredentials(env: Env): boolean {
+  return Boolean(env.RESEND_API_KEY?.trim() && env.EMAIL_FROM?.trim());
+}
+
+function isEmailEnabledInProduction(env: Env): boolean {
+  const explicit = parseTriState(env.EMAIL_ENABLED);
+  return explicit ?? true;
+}
+
+function isEmailDryRun(env: Env): boolean {
+  const explicit = parseTriState(env.EMAIL_DRY_RUN);
+  return explicit ?? false;
+}
+
+function isEmailLogOnly(env: Env): boolean {
+  return parseTriState(env.EMAIL_LOG_ONLY) === true;
+}
+
 function hasOrderAccessSigningSecret(env: Env): boolean {
   const dedicated = env.ORDER_ACCESS_SIGNING_SECRET?.trim();
   if (dedicated && dedicated.length >= 32) return true;
@@ -174,6 +192,15 @@ export function validateProductionConfig(env: Env): ProductionConfigValidation {
     if (!hasTwilioCredentials(env)) {
       errors.push(
         "SMS_ENABLED with live send (SMS_DRY_RUN=false) requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_PHONE_NUMBER or TWILIO_MESSAGING_SERVICE_SID."
+      );
+    }
+  }
+
+  // --- Email (password recovery) ---
+  if (isEmailEnabledInProduction(env) && !isEmailDryRun(env) && !isEmailLogOnly(env)) {
+    if (!hasEmailCredentials(env)) {
+      errors.push(
+        "EMAIL_ENABLED with live send (EMAIL_DRY_RUN=false) requires RESEND_API_KEY and EMAIL_FROM for password recovery emails."
       );
     }
   }

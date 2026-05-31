@@ -46,6 +46,8 @@ When limited, routes return **HTTP 429** with:
 | SMS order access bootstrap | order + IP | 30 / 10 min |
 | Support issue submit | order + IP | 5 / hour |
 | Register (server action) | IP | 10 / hour |
+| Password reset request (server action) | email + IP | 3 / email / hour; 10 / IP / hour |
+| Password reset submit (server action) | IP | 10 / 15 min |
 | Group order join (server action) | IP + session id | 10 / 10 min each |
 
 OTP verify also enforces per-code attempt limits in the database (`customer-phone-otp.service.ts`).
@@ -66,7 +68,7 @@ OTP verify also enforces per-code attempt limits in the database (`customer-phon
 - `src/lib/rate-limit.ts` — core store + policy constants
 - `src/lib/rate-limit-http.ts` — IP extraction + `429` JSON helper
 - Route wiring in OTP, auth, admin access, checkout, orders, issues, access bootstrap
-- Server actions: `register.actions.ts`, `group-order.actions.ts`
+- Server actions: `register.actions.ts`, `password-reset.actions.ts`, `group-order.actions.ts`
 
 ## Security notes
 
