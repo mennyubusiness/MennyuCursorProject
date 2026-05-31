@@ -7,6 +7,11 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
+import {
+  isJwtSessionValidForPasswordVersion,
+  passwordChangedAtToJwtMs,
+} from "@/lib/auth/password-session-version";
+import { loadUserPasswordChangedAtMs } from "@/lib/auth/password-session-version.server";
 
 function authSecret(): string {
   const s = process.env.AUTH_SECRET?.trim();
@@ -44,7 +49,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = emailRaw.toLowerCase().trim();
         const user = await prisma.user.findUnique({
           where: { email },
-          select: { id: true, email: true, name: true, passwordHash: true, isPlatformAdmin: true },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            passwordHash: true,
+            isPlatformAdmin: true,
+            passwordChangedAt: true,
+          },
         });
         if (!user?.passwordHash) return null;
         const ok = await verifyPassword(passwordRaw, user.passwordHash);
@@ -54,6 +66,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           isPlatformAdmin: user.isPlatformAdmin,
+          passwordChangedAt: user.passwordChangedAt,
         };
       },
     }),
@@ -66,14 +79,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
         token.isPlatformAdmin = Boolean(user.isPlatformAdmin);
+        token.passwordChangedAtMs = passwordChangedAtToJwtMs(user.passwordChangedAt);
+        token.sessionInvalidated = false;
+        return token;
       }
+
+      if (!token.sub || token.sessionInvalidated) {
+        return token;
+      }
+
+      const dbMs = await loadUserPasswordChangedAtMs(token.sub);
+      const tokenMs =
+        typeof token.passwordChangedAtMs === "number" ? token.passwordChangedAtMs : null;
+      if (!isJwtSessionValidForPasswordVersion(tokenMs, dbMs)) {
+        return { ...token, sessionInvalidated: true };
+      }
+
+      token.sessionInvalidated = false;
       return token;
     },
     session({ session, token }) {
+      if (token.sessionInvalidated || !token.sub) {
+        return { ...session, user: undefined, expires: new Date(0).toISOString() };
+      }
       if (session.user && token.sub) {
         session.user.id = token.sub;
         session.user.isPlatformAdmin = Boolean(token.isPlatformAdmin);

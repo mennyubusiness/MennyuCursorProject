@@ -14,6 +14,7 @@ declare module "next-auth" {
 
   interface User {
     isPlatformAdmin?: boolean;
+    passwordChangedAt?: Date | null;
   }
 }
 
@@ -21,5 +22,8 @@ declare module "next-auth/jwt" {
   interface JWT {
     sub?: string;
     isPlatformAdmin?: boolean;
+    /** User.passwordChangedAt at sign-in (ms since epoch); null = never reset. */
+    passwordChangedAtMs?: number | null;
+    sessionInvalidated?: boolean;
   }
 }

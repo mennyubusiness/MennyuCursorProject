@@ -163,7 +163,7 @@ describe("password-reset.service", () => {
     expect(createArg?.data.tokenHash).not.toBe("url-safe-token_abc123");
   });
 
-  it("resets password and consumes valid token only after success", async () => {
+  it("resets password, sets passwordChangedAt, and consumes valid token only after success", async () => {
     vi.mocked(prisma.passwordResetToken.findUnique).mockResolvedValue({
       id: "prt_1",
       userId: "user_1",
@@ -175,7 +175,15 @@ describe("password-reset.service", () => {
     const result = await resetPasswordWithToken("url-safe-token_abc123", "newpassword1");
 
     expect(result.ok).toBe(true);
-    expect(prisma.user.update).toHaveBeenCalled();
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "user_1" },
+        data: expect.objectContaining({
+          passwordHash: "$new_hash$",
+          passwordChangedAt: expect.any(Date),
+        }),
+      })
+    );
     expect(prisma.passwordResetToken.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "prt_1" },

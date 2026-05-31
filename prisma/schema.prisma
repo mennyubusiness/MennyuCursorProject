@@ -127,6 +127,8 @@ model User {
   passwordHash  String?
   name          String?
   image         String?
+  /// Set when password is changed (reset); JWT sessions issued before this time are invalidated.
+  passwordChangedAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
