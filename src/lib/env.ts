@@ -43,10 +43,14 @@ const envSchema = z.object({
   DELIVERECT_GET_ORDER_URL_TEMPLATE: z.string().optional(),
   DELIVERECT_WEBHOOK_SECRET: z.string().optional(),
   /**
-   * Optional override for Deliverect webhook HMAC behavior.
-   * `production` → verify with DELIVERECT_WEBHOOK_SECRET (partner secret).
-   * Anything else (e.g. staging, sandbox) when set → verify with channelLinkId from webhook JSON.
-   * If unset, NODE_ENV === "production" is treated as production.
+   * Deliverect webhook HMAC verification mode.
+   * `channel_link` (default): HMAC key is channelLinkId from payload, gated by Vendor.deliverectChannelLinkId lookup.
+   * `partner_secret`: legacy global DELIVERECT_WEBHOOK_SECRET.
+   */
+  DELIVERECT_WEBHOOK_AUTH_MODE: z.enum(["channel_link", "partner_secret"]).default("channel_link"),
+  /**
+   * Deliverect environment label for API/routing (not the HMAC auth mode).
+   * Set `staging` for sandbox on production hosts with ALLOW_DELIVERECT_STAGING_WEBHOOKS=true.
    */
   DELIVERECT_ENV: z.string().optional(),
   /** When "mock", Deliverect submission is skipped (payload still built and audited). Use "deliverect" for live submission. */

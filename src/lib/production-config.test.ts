@@ -12,7 +12,7 @@ function productionEnv(overrides: Partial<Env> = {}): Env {
     NODE_ENV: "production",
     ROUTING_MODE: "deliverect",
     DELIVERECT_ENV: "production",
-    DELIVERECT_WEBHOOK_SECRET: "deliverect-webhook-secret",
+    DELIVERECT_WEBHOOK_AUTH_MODE: "channel_link",
     STRIPE_SECRET_KEY: "sk_live_test_key_for_validation_only",
     STRIPE_WEBHOOK_SECRET: "whsec_test",
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_live_test",
@@ -54,16 +54,42 @@ describe("validateProductionConfig", () => {
     expect(result.errors.filter((e) => e.includes("ROUTING_MODE=mock"))).toEqual([]);
   });
 
-  it("rejects live routing without DELIVERECT_ENV=production", () => {
+  it("allows ROUTING_MODE=deliverect with channel_link auth without DELIVERECT_WEBHOOK_SECRET", () => {
     const result = validateProductionConfig(
-      productionEnv({ DELIVERECT_ENV: "staging", ALLOW_DELIVERECT_STAGING_WEBHOOKS: "true" })
+      productionEnv({
+        DELIVERECT_WEBHOOK_AUTH_MODE: "channel_link",
+        DELIVERECT_WEBHOOK_SECRET: undefined,
+      })
     );
-    expect(result.errors.some((e) => e.includes("ROUTING_MODE=deliverect requires DELIVERECT_ENV=production"))).toBe(
-      true
-    );
+    expect(result.errors.filter((e) => e.includes("DELIVERECT_WEBHOOK_SECRET"))).toEqual([]);
   });
 
-  it("rejects staging Deliverect webhooks on production NODE_ENV without override", () => {
+  it("allows staging Deliverect on production host when explicitly overridden", () => {
+    const result = validateProductionConfig(
+      productionEnv({
+        DELIVERECT_ENV: "staging",
+        ALLOW_DELIVERECT_STAGING_WEBHOOKS: "true",
+      })
+    );
+    expect(result.errors.filter((e) => e.includes("DELIVERECT_ENV"))).toEqual([]);
+  });
+
+  it("requires DELIVERECT_ENV when ROUTING_MODE=deliverect", () => {
+    const result = validateProductionConfig(productionEnv({ DELIVERECT_ENV: undefined }));
+    expect(result.errors.some((e) => e.includes("DELIVERECT_ENV"))).toBe(true);
+  });
+
+  it("requires DELIVERECT_WEBHOOK_SECRET when partner_secret auth mode is enabled", () => {
+    const result = validateProductionConfig(
+      productionEnv({
+        DELIVERECT_WEBHOOK_AUTH_MODE: "partner_secret",
+        DELIVERECT_WEBHOOK_SECRET: undefined,
+      })
+    );
+    expect(result.errors.some((e) => e.includes("DELIVERECT_WEBHOOK_SECRET"))).toBe(true);
+  });
+
+  it("rejects staging Deliverect on production NODE_ENV without override", () => {
     const result = validateProductionConfig(
       productionEnv({
         ROUTING_MODE: "mock",
@@ -72,11 +98,6 @@ describe("validateProductionConfig", () => {
       })
     );
     expect(result.errors.some((e) => e.includes("DELIVERECT_ENV is not production"))).toBe(true);
-  });
-
-  it("requires Deliverect webhook secret for production webhook mode", () => {
-    const result = validateProductionConfig(productionEnv({ DELIVERECT_WEBHOOK_SECRET: undefined }));
-    expect(result.errors.some((e) => e.includes("DELIVERECT_WEBHOOK_SECRET"))).toBe(true);
   });
 
   it("requires Stripe keys and public app URL", () => {

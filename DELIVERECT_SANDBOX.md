@@ -56,8 +56,8 @@ Response JSON includes `jobId`, `draftVersionId`, `jobStatus`, `issueCount`, `ok
 ### Menu Update webhook
 
 1. Configure Deliverect **Menu Update** (or equivalent) webhook URL to: `{YOUR_APP_ORIGIN}/api/webhooks/deliverect/menu`
-2. **HMAC** matches the order-status webhook: production → `DELIVERECT_WEBHOOK_SECRET`; staging/sandbox → channel link id from JSON body (`DELIVERECT_ENV=staging` on Vercel when needed).
-3. **Vendor match:** `Vendor.deliverectChannelLinkId` must match the channel link id extracted from the payload (same as staging HMAC key source). Unknown link → **200** `outcome: "vendor_not_found"` (no `MenuImportJob`).
+2. **HMAC:** Deliverect signs the raw POST body with SHA256 HMAC using the **channel link id** as the secret. Open Order verifies only when `Vendor.deliverectChannelLinkId` matches the payload channel link id (unknown links → **403**). Set `DELIVERECT_WEBHOOK_AUTH_MODE=channel_link` (default). Optional legacy: `partner_secret` + `DELIVERECT_WEBHOOK_SECRET`.
+3. **Vendor match:** `Vendor.deliverectChannelLinkId` must match the channel link id in the payload. Misconfigured links are rejected at verification (no menu import job).
 4. **Idempotency:** `webhookIdempotencyKey("deliverect_menu", …)` on `MenuImportJob.idempotencyKey`.
 5. **Body shape:** Menu Push may arrive as a **top-level JSON array** with one menu object (`[{...}]`). Multiple elements in one request return **400** `MULTIPLE_MENUS_NOT_SUPPORTED` (not silently ingested).
 
@@ -65,10 +65,8 @@ Response JSON includes `jobId`, `draftVersionId`, `jobStatus`, `issueCount`, `ok
 
 1. In Deliverect **channel link** settings, set the **Order status webhook URL** to:
    `{YOUR_APP_ORIGIN}/api/webhooks/deliverect`
-2. **HMAC:** Deliverect signs the **raw POST body** with **SHA256 HMAC** (header names may include `x-deliverect-hmacsha256`, `X-Deliverect-Hmac-Signature`, etc.).  
-   - **Production** (`DELIVERECT_ENV=production`, or unset with `NODE_ENV=production`): verify with `DELIVERECT_WEBHOOK_SECRET` (partner webhook secret).  
-   - **Staging / sandbox:** Mennyu reads `channelLinkId` or `channelLink.id` from the **JSON body** and uses that string as the HMAC key (no need to duplicate it in env). Set `DELIVERECT_ENV=staging` (or any non-`production` value) on Vercel when `NODE_ENV` is `production` so preview builds use channel-link verification.  
-3. **Invalid JSON** → **400**. **Missing secret** (no env secret in prod, or no channel link id in staging payload) → **401** with a clear message. **Bad signature** → **401** `Invalid signature`.
+2. **HMAC:** Deliverect signs the **raw POST body** with SHA256 HMAC using the **channel link id** as the secret (same in sandbox and production). Open Order requires the channel link id to match a stored `Vendor.deliverectChannelLinkId` before verification succeeds. Unknown channel links → **403**. Bad/missing signature → **401**.
+3. **Invalid JSON** → **400**. **Missing channelLinkId** in payload (when it cannot be resolved from a known order) → **401**.
 
 Payload field notes and example shapes: **`DELIVERECT_WEBHOOK_PAYLOADS.md`**.
 

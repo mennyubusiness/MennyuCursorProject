@@ -3,12 +3,11 @@
  * so ops can correlate failures without relying only on logs. Idempotent per raw body hash.
  */
 import { createHash } from "crypto";
+import type { DeliverectWebhookVerifyFailureReason } from "@/integrations/deliverect/deliverect-inbound-webhook-verify";
 import { prisma } from "@/lib/db";
 
-export type DeliverectOrderWebhookRejectReason =
-  | "bad_signature"
-  | "missing_verification_secret"
-  | "invalid_json";
+/** @deprecated Use DeliverectWebhookVerifyFailureReason from deliverect-inbound-webhook-verify */
+export type DeliverectOrderWebhookRejectReason = DeliverectWebhookVerifyFailureReason;
 
 export function deliverectWebhookRejectIdempotencyKey(rawBody: string): string {
   const h = createHash("sha256").update(rawBody, "utf8").digest("hex").slice(0, 32);
@@ -17,7 +16,7 @@ export function deliverectWebhookRejectIdempotencyKey(rawBody: string): string {
 
 export async function persistDeliverectOrderWebhookRejection(
   rawBody: string,
-  reason: DeliverectOrderWebhookRejectReason
+  reason: DeliverectWebhookVerifyFailureReason
 ): Promise<void> {
   const idempotencyKey = deliverectWebhookRejectIdempotencyKey(rawBody);
   const existing = await prisma.webhookEvent.findUnique({ where: { idempotencyKey } });

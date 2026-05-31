@@ -3,15 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import type { DeliverectWebhookPayload } from "@/integrations/deliverect/payloads";
 import { logDeliverectChannelRegistration } from "@/integrations/deliverect/deliverect-channel-registration-log";
 import {
-  getDeliverectSignatureFromRequest,
-  isDeliverectWebhookProduction,
-  parseDeliverectWebhookJsonObject,
-  resolveDeliverectWebhookVerificationSecret,
-} from "@/integrations/deliverect/webhook-inbound-shared";
-import {
   flattenDeliverectWebhookPayload,
-  verifyDeliverectSignature,
 } from "@/integrations/deliverect/webhook-handler";
+import { verifyDeliverectInboundWebhookJson } from "@/integrations/deliverect/deliverect-inbound-webhook-verify";
 import {
   applyChannelRegistrationToVendor,
   findVendorForChannelRegistration,
@@ -54,53 +48,19 @@ function deliverectRegistrationContractResponse(
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
-  const signature = getDeliverectSignatureFromRequest(request);
 
-  const parsedResult = parseDeliverectWebhookJsonObject(rawBody);
-  if (!parsedResult.ok) {
-    logDeliverectChannelRegistration("invalid_json", {
-      bodyLength: rawBody.length,
-      bodySha256Prefix: bodyShaPrefix(rawBody),
-    });
-    await persistDeliverectOrderWebhookRejection(rawBody, "invalid_json");
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const parsed = parsedResult.parsed;
-
-  const production = isDeliverectWebhookProduction();
-  const { secret: verificationSecret } = resolveDeliverectWebhookVerificationSecret(parsed, production);
-
-  if (!verificationSecret) {
-    logDeliverectChannelRegistration("verification_failed", {
-      reason: "missing_verification_secret",
-      production,
-      bodySha256Prefix: bodyShaPrefix(rawBody),
-    });
-    await persistDeliverectOrderWebhookRejection(rawBody, "missing_verification_secret");
-    return NextResponse.json(
-      {
-        error: production
-          ? "Webhook verification misconfigured: DELIVERECT_WEBHOOK_SECRET is missing"
-          : "Webhook verification failed: channelLinkId not found in payload (required for staging/sandbox HMAC)",
-      },
-      { status: 401 }
-    );
-  }
-
-  const sigOk = verifyDeliverectSignature(rawBody, signature, verificationSecret, {
-    nodeEnv: production ? "production" : "development",
-    allowUnsignedDev: false,
+  const verified = await verifyDeliverectInboundWebhookJson(request, rawBody, undefined, {
+    requireKnownChannelLink: false,
   });
-  if (!sigOk) {
+  if (!verified.ok) {
     logDeliverectChannelRegistration("verification_failed", {
-      reason: "bad_signature",
-      production,
-      hasSignature: Boolean(signature?.trim()),
+      reason: verified.reason,
       bodySha256Prefix: bodyShaPrefix(rawBody),
     });
-    await persistDeliverectOrderWebhookRejection(rawBody, "bad_signature");
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    await persistDeliverectOrderWebhookRejection(rawBody, verified.reason);
+    return verified.response;
   }
+  const parsed = verified.parsed;
 
   const flat = {
     ...flattenDeliverectWebhookPayload(parsed as DeliverectWebhookPayload),

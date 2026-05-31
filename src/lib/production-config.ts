@@ -94,20 +94,25 @@ export function validateProductionConfig(env: Env): ProductionConfigValidation {
     return { errors, warnings };
   }
 
-  const deliverectWebhookProduction = isDeliverectWebhookProductionMode(env);
   const deliverectEnv = env.DELIVERECT_ENV?.trim().toLowerCase();
   const allowStagingWebhooks = parseTriState(env.ALLOW_DELIVERECT_STAGING_WEBHOOKS) === true;
   const allowMockRouting = parseTriState(env.ALLOW_ROUTING_MODE_MOCK) === true;
+  const webhookAuthMode =
+    env.DELIVERECT_WEBHOOK_AUTH_MODE === "partner_secret" ? "partner_secret" : "channel_link";
 
   // --- Deliverect ---
   if (env.ROUTING_MODE === "deliverect") {
-    if (deliverectEnv !== "production") {
+    if (!deliverectEnv) {
+      errors.push("ROUTING_MODE=deliverect requires DELIVERECT_ENV to be set (production or staging).");
+    } else if (deliverectEnv !== "production" && !allowStagingWebhooks) {
       errors.push(
-        "ROUTING_MODE=deliverect requires DELIVERECT_ENV=production for live POS routing and partner webhook verification."
+        "ROUTING_MODE=deliverect with DELIVERECT_ENV=staging requires ALLOW_DELIVERECT_STAGING_WEBHOOKS=true on production hosts."
       );
     }
-    if (!env.DELIVERECT_WEBHOOK_SECRET?.trim()) {
-      errors.push("DELIVERECT_WEBHOOK_SECRET is required when ROUTING_MODE=deliverect.");
+    if (webhookAuthMode === "partner_secret" && !env.DELIVERECT_WEBHOOK_SECRET?.trim()) {
+      errors.push(
+        "DELIVERECT_WEBHOOK_SECRET is required when DELIVERECT_WEBHOOK_AUTH_MODE=partner_secret."
+      );
     }
   }
 
@@ -118,15 +123,17 @@ export function validateProductionConfig(env: Env): ProductionConfigValidation {
     !allowStagingWebhooks
   ) {
     errors.push(
-      "DELIVERECT_ENV is not production while NODE_ENV=production (channel-link HMAC fallback would be used). " +
-        "Set DELIVERECT_ENV=production for live webhooks, or ALLOW_DELIVERECT_STAGING_WEBHOOKS=true for intentional sandbox/preview."
+      "DELIVERECT_ENV is not production while NODE_ENV=production. " +
+        "Set DELIVERECT_ENV=production for live Deliverect, or ALLOW_DELIVERECT_STAGING_WEBHOOKS=true for intentional sandbox/preview."
     );
   }
 
-  if (deliverectWebhookProduction && !env.DELIVERECT_WEBHOOK_SECRET?.trim()) {
-    errors.push(
-      "DELIVERECT_WEBHOOK_SECRET is required when Deliverect webhooks use production partner-secret verification."
-    );
+  if (webhookAuthMode === "partner_secret" && isDeliverectWebhookProductionMode(env)) {
+    if (!env.DELIVERECT_WEBHOOK_SECRET?.trim()) {
+      errors.push(
+        "DELIVERECT_WEBHOOK_SECRET is required when DELIVERECT_WEBHOOK_AUTH_MODE=partner_secret."
+      );
+    }
   }
 
   // --- Routing mode ---

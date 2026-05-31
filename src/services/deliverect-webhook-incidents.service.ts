@@ -116,12 +116,25 @@ function categorizeWebhookEvent(row: {
     if (reason === "invalid_json") {
       label = "Verification failed (invalid JSON)";
       summary = "Request body was not valid JSON or not an object.";
-    } else if (reason === "missing_verification_secret") {
-      label = "Verification failed (missing secret)";
-      summary = "HMAC secret could not be resolved (production partner secret or staging channel link id).";
+    } else if (reason === "missing_signature") {
+      label = "Verification failed (missing signature)";
+      summary = "Deliverect-Signature header was missing.";
+    } else if (reason === "missing_channel_link_id") {
+      label = "Verification failed (missing channel link)";
+      summary = "Payload did not include a channelLinkId for HMAC verification.";
+    } else if (reason === "unknown_channel_link") {
+      label = "Verification failed (unknown channel link)";
+      summary = "channelLinkId is not configured on an active vendor in Open Order.";
+    } else if (reason === "inactive_channel_link") {
+      label = "Verification failed (inactive channel link)";
+      summary = "channelLinkId matches a vendor that is not active.";
+    } else if (reason === "misconfigured" || reason === "missing_verification_secret") {
+      label = "Verification failed (misconfigured)";
+      summary =
+        "Webhook verification is misconfigured (e.g. partner_secret mode without DELIVERECT_WEBHOOK_SECRET).";
     } else {
       label = "Verification failed (bad signature)";
-      summary = "HMAC did not match configured secret(s).";
+      summary = "HMAC did not match the configured channel link id or partner secret.";
     }
   } else if (row.errorMessage?.includes("match_failed")) {
     category = "match_failed";

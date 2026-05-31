@@ -17,9 +17,22 @@ Implementation: `src/lib/production-config.ts` (called from `src/lib/env.ts`).
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook verification |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Checkout (must match live/test mode of secret key) |
 | `ROUTING_MODE=deliverect` | Live POS submission (default `mock` skips Deliverect) |
-| `DELIVERECT_ENV=production` | Required when `ROUTING_MODE=deliverect` |
-| `DELIVERECT_WEBHOOK_SECRET` | Partner webhook HMAC when using production Deliverect webhooks |
+| `DELIVERECT_ENV=production` | Live Deliverect environment label (use `staging` + override for sandbox on preview hosts) |
+| `DELIVERECT_WEBHOOK_AUTH_MODE=channel_link` | Default — HMAC uses each vendor's `deliverectChannelLinkId` (must be stored on `Vendor`) |
+| `Vendor.deliverectChannelLinkId` | Per-vendor channel link id (DB) — required for webhook verification in channel_link mode |
 | Deliverect API credentials | `DELIVERECT_CLIENT_ID`, `DELIVERECT_CLIENT_SECRET`, `DELIVERECT_API_URL`, etc. (see `DELIVERECT_SANDBOX.md`) |
+
+### Deliverect webhook verification (channel_link — default)
+
+Deliverect signs webhooks with **HMAC-SHA256** using the **channel link id** as the secret. Open Order:
+
+1. Parses `channelLinkId` from the payload (or resolves it from a known order for prep-time callbacks).
+2. Looks up `Vendor.deliverectChannelLinkId` — **unknown ids are rejected (403)** even if the signature matches a forged id.
+3. Verifies the signature against the **known** channel link id before any order/menu mutation.
+
+`DELIVERECT_WEBHOOK_SECRET` is **not required** in channel_link mode. Set `DELIVERECT_WEBHOOK_AUTH_MODE=partner_secret` only if Deliverect provides a separate global partner secret (legacy).
+
+Channel-registration webhooks verify HMAC with the **new** channel link id from Deliverect before vendor matching (link id is not pre-stored).
 
 ## SMS / Twilio
 
@@ -51,7 +64,7 @@ Vercel preview builds often have `NODE_ENV=production`. For **sandbox** webhooks
 - `ALLOW_DELIVERECT_STAGING_WEBHOOKS=true`
 - Keep `ROUTING_MODE=mock` unless testing live submission
 
-Live launch must use `DELIVERECT_ENV=production` + `DELIVERECT_WEBHOOK_SECRET` + `ROUTING_MODE=deliverect`.
+Live launch: `ROUTING_MODE=deliverect`, `DELIVERECT_ENV=production`, each live vendor has `deliverectChannelLinkId` set, `DELIVERECT_WEBHOOK_AUTH_MODE=channel_link` (default).
 
 ## Intentional overrides (non-live)
 
@@ -83,7 +96,7 @@ Emergency disable: `RATE_LIMIT_DISABLED=1` (not recommended in production).
 - [ ] `PUBLIC_APP_URL` set to production https origin
 - [ ] Stripe live keys + webhook endpoint configured (`STRIPE_WEBHOOK_SECRET`)
 - [ ] Stripe webhook events subscribed (payment success, refunds, etc.)
-- [ ] `ROUTING_MODE=deliverect`, `DELIVERECT_ENV=production`, `DELIVERECT_WEBHOOK_SECRET` set
+- [ ] `ROUTING_MODE=deliverect`, `DELIVERECT_ENV=production`, all live vendors have `deliverectChannelLinkId` configured
 - [ ] Deliverect channel links and menu IDs validated (see `DELIVERECT_SANDBOX.md`)
 - [ ] `ORDER_ACCESS_SIGNING_SECRET` (or dedicated `AUTH_SECRET`) set and stable (rotating invalidates SMS links)
 - [ ] `VENDOR_ACCESS_SIGNING_SECRET` set if using vendor magic links

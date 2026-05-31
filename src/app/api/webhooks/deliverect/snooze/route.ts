@@ -2,19 +2,16 @@
  * Deliverect Snooze / Unsnooze Products webhook → updates `MenuItem.isAvailable` and/or
  * `ModifierOption.isAvailable` only (no creates, no pricing, no menu structure).
  *
- * HMAC: same as `/api/webhooks/deliverect` and menu webhook — production uses
- * `DELIVERECT_WEBHOOK_SECRET`; staging/sandbox uses channel link id from JSON.
+ * HMAC: same as other inbound Deliverect webhooks — default `channel_link` auth verifies
+ * against known `Vendor.deliverectChannelLinkId`; legacy `partner_secret` uses DELIVERECT_WEBHOOK_SECRET.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { verifyDeliverectSignature } from "@/integrations/deliverect/webhook-handler";
 import { env } from "@/lib/env";
+import { prisma } from "@/lib/db";
+import { verifyDeliverectInboundWebhookJson } from "@/integrations/deliverect/deliverect-inbound-webhook-verify";
 import {
   extractChannelLinkIdSecret,
-  getDeliverectSignatureFromRequest,
-  isDeliverectWebhookProduction,
   nonEmptyStringField,
-  resolveDeliverectWebhookVerificationSecret,
 } from "@/integrations/deliverect/webhook-inbound-shared";
 import {
   loadDeliverectSnoozePublishedScope,
@@ -198,7 +195,6 @@ async function applyPluAvailability(
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
-  const signature = getDeliverectSignatureFromRequest(request);
 
   let parsedJson: unknown;
   try {
@@ -214,64 +210,27 @@ export async function POST(request: NextRequest) {
   }
   const parsed = unwrap.object;
 
-  const production = isDeliverectWebhookProduction();
-  const { secret: verificationSecret, hasChannelLinkId } = resolveDeliverectWebhookVerificationSecret(
-    parsed,
-    production
-  );
-
-  console.log(LOG, "received", {
-    channelLinkIdPresent: Boolean(nonEmptyStringField(parsed.channelLinkId) ?? extractChannelLinkIdSecret(parsed)),
-    hasChannelLinkIdForHmac: hasChannelLinkId,
-    operationCount: Array.isArray(parsed.operations) ? parsed.operations.length : 0,
-  });
-
-  if (!verificationSecret) {
-    return NextResponse.json(
-      {
-        error: production
-          ? "Webhook verification misconfigured: DELIVERECT_WEBHOOK_SECRET is missing"
-          : "Webhook verification failed: channelLinkId not found in payload (required for staging/sandbox HMAC)",
-      },
-      { status: 401 }
-    );
-  }
-
-  if (
-    !verifyDeliverectSignature(rawBody, signature, verificationSecret, {
-      nodeEnv: production ? "production" : "development",
-      allowUnsignedDev: false,
-    })
-  ) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  const verified = await verifyDeliverectInboundWebhookJson(request, rawBody, parsed);
+  if (!verified.ok) {
+    console.warn(LOG, "verification failed", { reason: verified.reason });
+    return verified.response;
   }
 
   const channelLinkId =
-    nonEmptyStringField(parsed.channelLinkId) ?? extractChannelLinkIdSecret(parsed) ?? null;
+    verified.channelLinkId ??
+    nonEmptyStringField(parsed.channelLinkId) ??
+    extractChannelLinkIdSecret(parsed) ??
+    null;
 
-  if (!channelLinkId) {
-    console.warn(LOG, "missing channelLinkId after verify; skipping scoped updates");
-    return NextResponse.json({
-      received: true,
-      outcome: "missing_channel_link_id" as const,
-      processedPlu: 0,
-    });
+  if (!channelLinkId || !verified.vendorId) {
+    console.warn(LOG, "unknown channelLinkId after verify");
+    return NextResponse.json(
+      { error: "Unknown Deliverect channel link", code: "unknown_channel_link" },
+      { status: 403 }
+    );
   }
 
-  const vendors = await prisma.vendor.findMany({
-    where: { deliverectChannelLinkId: channelLinkId },
-    select: { id: true },
-  });
-  const vendorIds = vendors.map((v) => v.id);
-
-  if (vendorIds.length === 0) {
-    console.warn(LOG, "no vendor for channelLinkId; skipping updates", { channelLinkId });
-    return NextResponse.json({
-      received: true,
-      outcome: "vendor_not_found" as const,
-      processedPlu: 0,
-    });
-  }
+  const vendorIds = [verified.vendorId];
 
   const publishedScope = await loadDeliverectSnoozePublishedScope(vendorIds);
 

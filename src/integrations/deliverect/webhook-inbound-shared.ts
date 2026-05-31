@@ -5,10 +5,18 @@
 import type { NextRequest } from "next/server";
 import { env } from "@/lib/env";
 
+export type DeliverectWebhookAuthMode = "channel_link" | "partner_secret";
+
+/** Default: channelLinkId HMAC backed by Vendor.deliverectChannelLinkId lookup. */
+export function getDeliverectWebhookAuthMode(): DeliverectWebhookAuthMode {
+  const mode = env.DELIVERECT_WEBHOOK_AUTH_MODE?.trim().toLowerCase();
+  if (mode === "partner_secret") return "partner_secret";
+  return "channel_link";
+}
+
 /**
- * Webhook HMAC mode (not the same as NODE_ENV on Vercel).
+ * Webhook environment label (API/routing context — not the HMAC auth mode).
  * - Set `DELIVERECT_ENV=staging` when testing Deliverect sandbox while NODE_ENV=production.
- * - Only `DELIVERECT_ENV=production` forces partner-secret verification.
  */
 export function isDeliverectWebhookProduction(): boolean {
   const d = env.DELIVERECT_ENV?.trim();
@@ -37,7 +45,7 @@ export function nonEmptyStringField(v: unknown): string | null {
 }
 
 /**
- * Staging HMAC secret: channel link id from a record or nested `channelLink` object.
+ * Channel link id from a record or nested `channelLink` object.
  */
 export function channelLinkIdFromRecord(obj: Record<string, unknown> | undefined): string | null {
   if (!obj) return null;
@@ -63,7 +71,7 @@ export function channelLinkIdFromRecord(obj: Record<string, unknown> | undefined
   return null;
 }
 
-/** Staging/sandbox: HMAC secret is often the channel link id from the webhook JSON. */
+/** HMAC secret source: channel link id from the webhook JSON. */
 export function extractChannelLinkIdSecret(parsed: Record<string, unknown>): string | null {
   const candidates: Array<Record<string, unknown> | undefined> = [
     parsed,
@@ -100,15 +108,13 @@ export function parseDeliverectWebhookJsonObject(
 }
 
 /**
- * Production: `DELIVERECT_WEBHOOK_SECRET`.
- * Staging/sandbox: prefer channel link id from JSON (HMAC key per Deliverect sandbox docs); if absent
- * (e.g. prep-time / busy-mode bodies), fall back to `DELIVERECT_WEBHOOK_SECRET` when set.
+ * @deprecated Prefer verifyDeliverectInboundWebhookJson — resolves secrets with known channel-link lookup.
  */
 export function resolveDeliverectWebhookVerificationSecret(
   parsed: Record<string, unknown>,
-  production: boolean
+  _production: boolean
 ): { secret: string | undefined; hasChannelLinkId: boolean } {
-  if (production) {
+  if (getDeliverectWebhookAuthMode() === "partner_secret") {
     return {
       secret: env.DELIVERECT_WEBHOOK_SECRET?.trim() || undefined,
       hasChannelLinkId: false,

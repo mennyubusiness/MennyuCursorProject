@@ -1,15 +1,15 @@
 /**
  * Deliverect Menu Update webhook → Phase 1B draft ingest only (no publish, no live menu writes).
  *
- * **HMAC:** Same rules as order-status webhook (`/api/webhooks/deliverect`): production uses
- * `DELIVERECT_WEBHOOK_SECRET`; staging/sandbox uses channel link id from JSON as key.
+ * **HMAC:** Same rules as other inbound Deliverect webhooks: default `channel_link` auth uses
+ * `channelLinkId` from the payload as the HMAC secret after confirming it matches a known
+ * `Vendor.deliverectChannelLinkId`. Legacy `partner_secret` mode uses `DELIVERECT_WEBHOOK_SECRET`.
  *
  * **Idempotency:** `ingestDeliverectMenuImportPhase1b` with `idempotencyKey` derived from
  * {@link webhookIdempotencyKey} (`deliverect_menu` prefix) so retries dedupe on `MenuImportJob`.
  *
- * **Vendor resolution:** `Vendor.deliverectChannelLinkId` must equal the channel link id used as HMAC secret
- * in staging (and typically present in payload). If no vendor matches, returns **200** with
- * `outcome: "vendor_not_found"` to avoid pointless retries when misconfigured.
+ * **Vendor resolution:** `Vendor.deliverectChannelLinkId` must equal the verified channel link id.
+ * If no vendor matches after verification, returns **403** (unknown/inactive channel link).
  *
  * **Payload shape:** In our tenant, Deliverect Menu Push may send a **top-level JSON array** (e.g. `[{...}]`).
  * A single-element array is unwrapped for HMAC secret resolution and Phase 1A; the full parsed value is still
@@ -26,17 +26,10 @@ import {
 import {
   getDeliverectEventId,
   flattenDeliverectWebhookPayload,
-  verifyDeliverectSignature,
 } from "@/integrations/deliverect/webhook-handler";
 import type { DeliverectWebhookPayload } from "@/integrations/deliverect/payloads";
-import {
-  extractChannelLinkIdSecret,
-  getDeliverectSignatureFromRequest,
-  isDeliverectWebhookProduction,
-  parseDeliverectWebhookJsonObject,
-  resolveDeliverectWebhookVerificationSecret,
-} from "@/integrations/deliverect/webhook-inbound-shared";
-import { env } from "@/lib/env";
+import { extractChannelLinkIdSecret } from "@/integrations/deliverect/webhook-inbound-shared";
+import { verifyDeliverectInboundWebhookJson } from "@/integrations/deliverect/deliverect-inbound-webhook-verify";
 import { ingestDeliverectMenuImportPhase1b } from "@/services/menu-import-phase1b.service";
 
 type MenuWebhookUnwrapOk = {
@@ -143,8 +136,6 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   logDeliverectMenuWebhookHeaderDiagnostics(request);
 
-  const signature = getDeliverectSignatureFromRequest(request);
-
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(rawBody) as unknown;
@@ -166,38 +157,14 @@ export async function POST(request: NextRequest) {
   }
   const { verbatim, objectForProcessing, normalizationRaw } = unwrap;
 
-  const production = isDeliverectWebhookProduction();
-  const { secret: verificationSecret, hasChannelLinkId } = resolveDeliverectWebhookVerificationSecret(
-    objectForProcessing,
-    production
+  const verified = await verifyDeliverectInboundWebhookJson(
+    request,
+    rawBody,
+    objectForProcessing
   );
-
-  console.log("[DELIVERECT MENU WEBHOOK VERIFY]", {
-    deliverectEnv: env.DELIVERECT_ENV ?? "(unset)",
-    nodeEnv: env.NODE_ENV,
-    verificationPath: production ? "production_partner_secret" : "staging_channelLinkId",
-    hasSignatureFromKnownHeaders: Boolean(signature?.trim()),
-    hasChannelLinkId,
-  });
-
-  if (!verificationSecret) {
-    return NextResponse.json(
-      {
-        error: production
-          ? "Webhook verification misconfigured: DELIVERECT_WEBHOOK_SECRET is missing"
-          : "Webhook verification failed: channelLinkId not found in payload (required for staging/sandbox HMAC)",
-      },
-      { status: 401 }
-    );
-  }
-
-  if (
-    !verifyDeliverectSignature(rawBody, signature, verificationSecret, {
-      nodeEnv: production ? "production" : "development",
-      allowUnsignedDev: false,
-    })
-  ) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  if (!verified.ok) {
+    console.warn("[DELIVERECT MENU WEBHOOK] verification failed", { reason: verified.reason });
+    return verified.response;
   }
 
   const payload = objectForProcessing as DeliverectWebhookPayload;
@@ -205,28 +172,23 @@ export async function POST(request: NextRequest) {
   const eventId = getDeliverectEventId(payload, flat, rawBody);
   const idemKey = webhookIdempotencyKey("deliverect_menu", eventId, rawBody);
 
-  const channelLinkId = extractChannelLinkIdSecret(objectForProcessing);
-  if (!channelLinkId) {
+  const channelLinkId = verified.channelLinkId ?? extractChannelLinkIdSecret(objectForProcessing);
+  if (!channelLinkId || !verified.vendorId) {
     return NextResponse.json(
-      { received: true, outcome: "missing_channel_link_id" as const },
-      { status: 200 }
+      { error: "Unknown Deliverect channel link", code: "unknown_channel_link" },
+      { status: 403 }
     );
   }
 
-  const vendor = await prisma.vendor.findFirst({
-    where: { deliverectChannelLinkId: channelLinkId },
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: verified.vendorId },
     select: { id: true, deliverectLocationId: true },
   });
 
   if (!vendor) {
-    console.warn("[DELIVERECT MENU WEBHOOK] No vendor for channelLinkId (configure Vendor.deliverectChannelLinkId)");
     return NextResponse.json(
-      {
-        received: true,
-        outcome: "vendor_not_found" as const,
-        channelLinkId,
-      },
-      { status: 200 }
+      { error: "Unknown Deliverect channel link", code: "unknown_channel_link" },
+      { status: 403 }
     );
   }
 
