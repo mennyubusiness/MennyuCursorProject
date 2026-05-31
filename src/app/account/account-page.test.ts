@@ -124,10 +124,12 @@ describe("header identity slot", () => {
     expect(headerNavSrc).not.toMatch(/hasVerifiedCustomerSession/);
   });
 
-  it("does not show role ticker or competing dashboard links", () => {
+  it("uses Account dropdown instead of top-level Orders or role ticker", () => {
+    expect(headerNavSrc).toMatch(/AccountHeaderDropdown/);
+    expect(headerNavSrc).not.toMatch(/>\s*Orders\s*</);
+    expect(headerNavSrc).not.toMatch(/href="\/orders"/);
     expect(headerNavSrc).not.toMatch(/accountLabel/);
     expect(headerNavSrc).not.toMatch(/Dashboard/);
-    expect(headerNavSrc).not.toMatch(/href="\/admin"/);
   });
 });
 

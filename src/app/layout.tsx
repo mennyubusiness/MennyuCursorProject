@@ -76,6 +76,7 @@ export default async function RootLayout({
               <SiteHeaderNav
                 hasServerSession={hasServerSession}
                 navMode={headerNav.mode}
+                accountMenu={headerNav.accountMenu}
                 activeOrderHref={activeOrder ? `/order/${activeOrder.id}` : null}
                 cartHref="/cart"
               />

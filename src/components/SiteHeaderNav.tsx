@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
+import { AccountHeaderDropdown } from "@/components/AccountHeaderDropdown";
+import type { HeaderAccountMenu } from "@/lib/auth/header-account-menu";
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
 import { ACCOUNT_SIGN_IN_PATH } from "@/lib/auth/account-paths";
 import { buttonClassName } from "@/components/ui/button";
@@ -13,6 +15,7 @@ import { cn } from "@/lib/cn";
 type SiteHeaderNavProps = {
   hasServerSession: boolean;
   navMode: HeaderNavMode;
+  accountMenu: HeaderAccountMenu | null;
   activeOrderHref: string | null;
   cartHref: string;
 };
@@ -26,6 +29,7 @@ const navLink =
 export function SiteHeaderNav({
   hasServerSession,
   navMode,
+  accountMenu,
   activeOrderHref,
   cartHref,
 }: SiteHeaderNavProps) {
@@ -49,6 +53,7 @@ export function SiteHeaderNav({
 
   const isSignedIn = hasServerSession || status === "authenticated";
   const showCustomerOrdering = navMode === "guest" || navMode === "customer";
+  const showCart = showCustomerOrdering || isSignedIn;
 
   return (
     <nav className="flex flex-wrap items-center justify-end" aria-label="Site">
@@ -56,11 +61,8 @@ export function SiteHeaderNav({
         <Link href="/explore" className={navLink}>
           Explore
         </Link>
-        {showCustomerOrdering && (
+        {showCart && (
           <>
-            <Link href="/orders" className={navLink} title="Order history">
-              Orders
-            </Link>
             {quickCart?.enabled ? (
               <button
                 type="button"
@@ -100,9 +102,7 @@ export function SiteHeaderNav({
           </>
         )}
         {isSignedIn ? (
-          <Link href="/account" className={navLink} title="Your account">
-            Account
-          </Link>
+          <AccountHeaderDropdown accountMenu={accountMenu} triggerClassName={navLink} />
         ) : (
           <Link href={ACCOUNT_SIGN_IN_PATH} className={navLink} title="Sign in">
             Sign in
