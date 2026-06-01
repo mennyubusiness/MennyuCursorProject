@@ -1,5 +1,6 @@
 /**
- * Central transactional SMS via Twilio (order updates, future issue notifications).
+ * Central transactional SMS via Twilio Messaging Service.
+ * Non-blocking for order flows — failures are logged, not thrown (unless strict).
  */
 import "server-only";
 
@@ -11,20 +12,48 @@ import {
   normalizeUsPhoneToE164,
   phoneLast4,
 } from "@/lib/phone";
+import { isPhoneSmsOptedOut } from "@/lib/sms-opt-out.service";
 import {
-  isSmsDryRun,
-  isSmsEnabled,
-  isSmsLogOnly,
+  resolveSmsMode,
   shouldSendViaTwilio,
   smsOperationalError,
 } from "@/lib/sms-config";
+import {
+  buildOrderCancelledSmsBody,
+  buildOrderIssueSmsBody,
+  buildOrderPreparingSmsBody,
+  buildOrderReadySmsBody,
+  buildOrderReceivedSmsBody,
+  buildPhoneVerificationSmsBody,
+  formatSmsOrderNumber,
+  SMS_TEMPLATE_TYPES,
+  type SmsTemplateType,
+} from "@/lib/sms-templates";
 import { getPickupCode } from "@/lib/pickup-code";
 import { sendTwilioMessage } from "@/lib/twilio";
 import type { ParentOrderStatus } from "@/domain/types";
 import { parentStatusLabel } from "@/domain/order-state";
 
-export type SmsDeliveryStatus = "sent" | "skipped" | "failed" | "dry_run";
+export type SmsDeliveryStatus =
+  | "sent"
+  | "skipped"
+  | "failed"
+  | "logged"
+  | "suppressed"
+  | "queued";
 
+export type SendSmsInput = {
+  to: string;
+  body: string;
+  type: SmsTemplateType | string;
+  orderId?: string | null;
+  vendorOrderId?: string | null;
+  userId?: string | null;
+  idempotencyKey?: string | null;
+  strict?: boolean;
+};
+
+/** @deprecated Prefer SendSmsInput */
 export type SendTransactionalSmsInput = {
   to: string;
   body: string;
@@ -32,14 +61,14 @@ export type SendTransactionalSmsInput = {
   vendorOrderId?: string | null;
   eventType: string;
   idempotencyKey?: string | null;
-  /** When true, throws on failed send (not used by order flows). */
   strict?: boolean;
 };
 
-export type SendTransactionalSmsResult = {
+export type SendSmsResult = {
   status: SmsDeliveryStatus;
   providerMessageId: string | null;
   failureMessage: string | null;
+  errorCode: string | null;
   destinationMasked: string;
 };
 
@@ -51,8 +80,10 @@ function bodyPreview(body: string): string {
   return `${t.slice(0, BODY_PREVIEW_MAX - 1)}…`;
 }
 
-function publicOrderBaseUrl(): string {
-  return env.PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://mennyu.com";
+function mapLogStatus(mode: ReturnType<typeof resolveSmsMode>, twilioStatus?: string): string {
+  if (mode === "log") return "logged";
+  if (twilioStatus === "queued" || twilioStatus === "accepted") return "queued";
+  return "sent";
 }
 
 async function findCommittedSmsLog(idempotencyKey: string) {
@@ -65,12 +96,14 @@ async function findCommittedSmsLog(idempotencyKey: string) {
 async function writeSmsLog(input: {
   orderId?: string | null;
   vendorOrderId?: string | null;
+  userId?: string | null;
   toMasked: string;
   toLast4: string | null;
   eventType: string;
   body: string;
-  status: SmsDeliveryStatus;
+  status: string;
   providerMessageId?: string | null;
+  errorCode?: string | null;
   failureMessage?: string | null;
   idempotencyKey?: string | null;
   sentAt?: Date | null;
@@ -80,6 +113,7 @@ async function writeSmsLog(input: {
       data: {
         orderId: input.orderId ?? null,
         vendorOrderId: input.vendorOrderId ?? null,
+        userId: input.userId ?? null,
         toMasked: input.toMasked,
         toLast4: input.toLast4,
         eventType: input.eventType,
@@ -87,6 +121,7 @@ async function writeSmsLog(input: {
         provider: "twilio",
         providerMessageId: input.providerMessageId ?? null,
         status: input.status,
+        errorCode: input.errorCode ?? null,
         failureMessage: input.failureMessage ?? null,
         idempotencyKey: input.idempotencyKey ?? null,
         sentAt: input.sentAt ?? null,
@@ -105,56 +140,43 @@ async function writeSmsLog(input: {
   }
 }
 
+function normalizeDestination(rawTo: string): { e164: string | null; masked: string } {
+  const raw = rawTo?.trim() ?? "";
+  const masked = raw ? maskPhone(raw) : "***";
+  if (!raw) return { e164: null, masked };
+  const e164 = isLikelyE164Phone(raw) ? raw : normalizeUsPhoneToE164(raw);
+  return { e164, masked };
+}
+
 /**
- * Send a transactional SMS with idempotency, env guards, and audit logging.
+ * Send a transactional SMS with idempotency, opt-out checks, env guards, and audit logging.
  */
-export async function sendTransactionalSms(
-  input: SendTransactionalSmsInput
-): Promise<SendTransactionalSmsResult> {
-  const rawTo = input.to?.trim() ?? "";
-  const masked = rawTo ? maskPhone(rawTo) : "***";
-  const last4 = rawTo ? phoneLast4(rawTo) : null;
+export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
+  const eventType = SMS_TEMPLATE_TYPES.has(input.type as SmsTemplateType)
+    ? (input.type as SmsTemplateType)
+    : String(input.type);
 
-  if (!rawTo) {
-    await writeSmsLog({
-      orderId: input.orderId,
-      vendorOrderId: input.vendorOrderId,
-      toMasked: masked,
-      toLast4: last4,
-      eventType: input.eventType,
-      body: input.body,
-      status: "skipped",
-      failureMessage: "missing_destination_phone",
-      idempotencyKey: input.idempotencyKey,
-    });
-    return {
-      status: "skipped",
-      providerMessageId: null,
-      failureMessage: "missing_destination_phone",
-      destinationMasked: masked,
-    };
-  }
-
-  const e164 = isLikelyE164Phone(rawTo)
-    ? rawTo
-    : normalizeUsPhoneToE164(rawTo);
+  const { e164, masked } = normalizeDestination(input.to);
 
   if (!e164) {
+    const reason = input.to?.trim() ? "invalid_phone_number" : "missing_destination_phone";
     await writeSmsLog({
       orderId: input.orderId,
       vendorOrderId: input.vendorOrderId,
+      userId: input.userId,
       toMasked: masked,
-      toLast4: last4,
-      eventType: input.eventType,
+      toLast4: input.to?.trim() ? phoneLast4(input.to) : null,
+      eventType,
       body: input.body,
       status: "skipped",
-      failureMessage: "invalid_phone_number",
+      failureMessage: reason,
       idempotencyKey: input.idempotencyKey,
     });
     return {
       status: "skipped",
       providerMessageId: null,
-      failureMessage: "invalid_phone_number",
+      failureMessage: reason,
+      errorCode: null,
       destinationMasked: masked,
     };
   }
@@ -163,23 +185,30 @@ export async function sendTransactionalSms(
 
   if (input.idempotencyKey) {
     const existing = await findCommittedSmsLog(input.idempotencyKey);
-    if (existing && (existing.status === "sent" || existing.status === "dry_run")) {
+    if (
+      existing &&
+      ["sent", "logged", "queued", "delivered", "dry_run"].includes(existing.status)
+    ) {
       return {
         status: "skipped",
         providerMessageId: existing.providerMessageId,
         failureMessage: "duplicate_idempotency_key",
+        errorCode: null,
         destinationMasked,
       };
     }
   }
 
-  if (!isSmsEnabled()) {
+  const mode = resolveSmsMode();
+
+  if (mode === "disabled") {
     await writeSmsLog({
       orderId: input.orderId,
       vendorOrderId: input.vendorOrderId,
+      userId: input.userId,
       toMasked: destinationMasked,
       toLast4: phoneLast4(e164),
-      eventType: input.eventType,
+      eventType,
       body: input.body,
       status: "skipped",
       failureMessage: "sms_disabled",
@@ -189,24 +218,45 @@ export async function sendTransactionalSms(
       status: "skipped",
       providerMessageId: null,
       failureMessage: "sms_disabled",
+      errorCode: null,
       destinationMasked,
     };
   }
 
-  if (isSmsDryRun() || isSmsLogOnly() || !shouldSendViaTwilio()) {
-    const reason = isSmsDryRun()
-      ? "dry_run"
-      : isSmsLogOnly()
-        ? "log_only"
-        : smsOperationalError() ?? "twilio_not_configured";
+  if (await isPhoneSmsOptedOut(e164)) {
     await writeSmsLog({
       orderId: input.orderId,
       vendorOrderId: input.vendorOrderId,
+      userId: input.userId,
       toMasked: destinationMasked,
       toLast4: phoneLast4(e164),
-      eventType: input.eventType,
+      eventType,
       body: input.body,
-      status: "dry_run",
+      status: "suppressed",
+      failureMessage: "phone_opted_out",
+      idempotencyKey: input.idempotencyKey,
+    });
+    return {
+      status: "suppressed",
+      providerMessageId: null,
+      failureMessage: "phone_opted_out",
+      errorCode: null,
+      destinationMasked,
+    };
+  }
+
+  if (mode === "log" || !shouldSendViaTwilio()) {
+    const reason =
+      mode === "log" ? "sms_mode_log" : smsOperationalError() ?? "twilio_not_configured";
+    await writeSmsLog({
+      orderId: input.orderId,
+      vendorOrderId: input.vendorOrderId,
+      userId: input.userId,
+      toMasked: destinationMasked,
+      toLast4: phoneLast4(e164),
+      eventType,
+      body: input.body,
+      status: "logged",
       failureMessage: reason,
       idempotencyKey: input.idempotencyKey,
       sentAt: new Date(),
@@ -215,16 +265,17 @@ export async function sendTransactionalSms(
       console.error(
         JSON.stringify({
           event: "sms_operational_error",
-          eventType: input.eventType,
+          eventType,
           orderId: input.orderId,
           reason,
         })
       );
     }
     return {
-      status: "dry_run",
+      status: "logged",
       providerMessageId: null,
       failureMessage: reason,
+      errorCode: null,
       destinationMasked,
     };
   }
@@ -234,21 +285,24 @@ export async function sendTransactionalSms(
     await writeSmsLog({
       orderId: input.orderId,
       vendorOrderId: input.vendorOrderId,
+      userId: input.userId,
       toMasked: destinationMasked,
       toLast4: phoneLast4(e164),
-      eventType: input.eventType,
+      eventType,
       body: input.body,
       status: "failed",
+      errorCode: twilioResult.code ?? null,
       failureMessage: twilioResult.error,
       idempotencyKey: input.idempotencyKey,
     });
     console.warn(
       JSON.stringify({
         event: "sms_send_failed",
-        eventType: input.eventType,
+        eventType,
         orderId: input.orderId,
         vendorOrderId: input.vendorOrderId,
         destinationMasked,
+        errorCode: twilioResult.code,
         message: twilioResult.error,
       })
     );
@@ -259,92 +313,185 @@ export async function sendTransactionalSms(
       status: "failed",
       providerMessageId: null,
       failureMessage: twilioResult.error,
+      errorCode: twilioResult.code ?? null,
       destinationMasked,
     };
   }
 
+  const logStatus = mapLogStatus(mode, twilioResult.status);
+
   await writeSmsLog({
     orderId: input.orderId,
     vendorOrderId: input.vendorOrderId,
+    userId: input.userId,
     toMasked: destinationMasked,
     toLast4: phoneLast4(e164),
-    eventType: input.eventType,
+    eventType,
     body: input.body,
-    status: "sent",
+    status: logStatus,
     providerMessageId: twilioResult.sid,
     idempotencyKey: input.idempotencyKey,
     sentAt: new Date(),
   });
 
   return {
-    status: "sent",
+    status: logStatus === "queued" ? "queued" : "sent",
     providerMessageId: twilioResult.sid,
     failureMessage: null,
+    errorCode: null,
     destinationMasked,
   };
 }
 
-/** @deprecated Prefer sendTransactionalSms. */
-export async function sendSms(
-  to: string,
-  body: string
-): Promise<{ success: boolean; error?: string }> {
-  const r = await sendTransactionalSms({
-    to,
-    body,
-    eventType: "legacy_send_sms",
+/** Backward-compatible alias. */
+export async function sendTransactionalSms(
+  input: SendTransactionalSmsInput
+): Promise<SendSmsResult> {
+  return sendSms({
+    to: input.to,
+    body: input.body,
+    type: input.eventType,
+    orderId: input.orderId,
+    vendorOrderId: input.vendorOrderId,
+    idempotencyKey: input.idempotencyKey,
+    strict: input.strict,
   });
-  return {
-    success: r.status === "sent" || r.status === "dry_run",
-    error: r.failureMessage ?? undefined,
-  };
 }
 
+export async function sendVerificationCodeSms(params: {
+  to: string;
+  code: string;
+  userId?: string | null;
+}): Promise<SendSmsResult> {
+  return sendSms({
+    to: params.to,
+    body: buildPhoneVerificationSmsBody(params.code),
+    type: "PHONE_VERIFICATION",
+    userId: params.userId ?? null,
+  });
+}
+
+export async function sendOrderReceivedSms(params: {
+  to: string;
+  orderId: string;
+}): Promise<SendSmsResult> {
+  const orderNumber = formatSmsOrderNumber(params.orderId);
+  return sendSms({
+    to: params.to,
+    body: buildOrderReceivedSmsBody(orderNumber),
+    type: "ORDER_RECEIVED",
+    orderId: params.orderId,
+    idempotencyKey: `sms:ORDER_RECEIVED:${params.orderId}`,
+  });
+}
+
+export async function sendOrderPreparingSms(params: {
+  to: string;
+  orderId: string;
+  vendorOrderId?: string | null;
+}): Promise<SendSmsResult> {
+  const orderNumber = formatSmsOrderNumber(params.orderId);
+  const scope = params.vendorOrderId ?? params.orderId;
+  return sendSms({
+    to: params.to,
+    body: buildOrderPreparingSmsBody(orderNumber),
+    type: "ORDER_PREPARING",
+    orderId: params.orderId,
+    vendorOrderId: params.vendorOrderId ?? null,
+    idempotencyKey: `sms:ORDER_PREPARING:${scope}`,
+  });
+}
+
+export async function sendOrderReadySms(params: {
+  to: string;
+  orderId: string;
+  vendorOrderId?: string | null;
+}): Promise<SendSmsResult> {
+  const orderNumber = formatSmsOrderNumber(params.orderId);
+  const pickupCode = getPickupCode(params.orderId);
+  const scope = params.vendorOrderId ?? params.orderId;
+  return sendSms({
+    to: params.to,
+    body: buildOrderReadySmsBody(orderNumber, pickupCode),
+    type: "ORDER_READY",
+    orderId: params.orderId,
+    vendorOrderId: params.vendorOrderId ?? null,
+    idempotencyKey: `sms:ORDER_READY:${scope}`,
+  });
+}
+
+export async function sendOrderCancelledSms(params: {
+  to: string;
+  orderId: string;
+}): Promise<SendSmsResult> {
+  const orderNumber = formatSmsOrderNumber(params.orderId);
+  return sendSms({
+    to: params.to,
+    body: buildOrderCancelledSmsBody(orderNumber),
+    type: "ORDER_CANCELLED",
+    orderId: params.orderId,
+    idempotencyKey: `sms:ORDER_CANCELLED:${params.orderId}`,
+  });
+}
+
+export async function sendOrderIssueSms(params: {
+  to: string;
+  orderId: string;
+  issueId: string;
+}): Promise<SendSmsResult> {
+  const orderNumber = formatSmsOrderNumber(params.orderId);
+  return sendSms({
+    to: params.to,
+    body: buildOrderIssueSmsBody(orderNumber),
+    type: "ORDER_ISSUE",
+    orderId: params.orderId,
+    idempotencyKey: `sms:ORDER_ISSUE:${params.issueId}`,
+  });
+}
+
+/** @deprecated Prefer sendOrderReceivedSms. */
 export async function sendOrderConfirmation(
   phone: string,
   orderId: string,
-  totalCents: number,
-  pickupFragment?: string
-): Promise<SendTransactionalSmsResult> {
-  const total = (totalCents / 100).toFixed(2);
-  const pickup = pickupFragment ? ` ${pickupFragment}.` : "";
-  const shortId = orderId.slice(-8).toUpperCase();
-  const body = `Your order with Open Order is confirmed. Order #${shortId}.${pickup} Total $${total}. Track status: ${publicOrderBaseUrl()}/order/${orderId}`;
-
-  return sendTransactionalSms({
-    to: phone,
-    body,
-    orderId,
-    eventType: "order_confirmation",
-    idempotencyKey: `sms:order_confirmation:${orderId}`,
-  });
+  _totalCents: number,
+  _pickupFragment?: string
+): Promise<SendSmsResult> {
+  return sendOrderReceivedSms({ to: phone, orderId });
 }
 
+/** @deprecated Prefer typed order SMS helpers. */
 export async function sendOrderStatusUpdate(
   phone: string,
   orderId: string,
   parentStatus: ParentOrderStatus
-): Promise<SendTransactionalSmsResult> {
-  const shortId = orderId.slice(-8).toUpperCase();
-  const url = `${publicOrderBaseUrl()}/order/${orderId}`;
-  const pickupCode = getPickupCode(orderId);
-
-  let body: string;
-  let eventType: string;
-
+): Promise<SendSmsResult> {
   if (parentStatus === "ready") {
-    eventType = "order_ready_for_pickup";
-    body = `Open Order: Your order is ready for pickup. Pickup code: ${pickupCode}. Details: ${url}`;
-  } else {
-    eventType = `order_status_${parentStatus}`;
-    body = `Open Order #${shortId}: ${parentStatusLabel(parentStatus)}. Details: ${url}`;
+    return sendOrderReadySms({ to: phone, orderId });
   }
-
-  return sendTransactionalSms({
+  if (parentStatus === "cancelled") {
+    return sendOrderCancelledSms({ to: phone, orderId });
+  }
+  if (parentStatus === "preparing" || parentStatus === "accepted") {
+    return sendOrderPreparingSms({ to: phone, orderId });
+  }
+  const orderNumber = formatSmsOrderNumber(orderId);
+  return sendSms({
     to: phone,
-    body,
+    body: `Open Order: Update on pickup order #${orderNumber} — ${parentStatusLabel(parentStatus)}. Reply STOP to opt out.`,
+    type: `ORDER_STATUS_${parentStatus}`,
     orderId,
-    eventType,
     idempotencyKey: `sms:order_status:${orderId}:${parentStatus}`,
   });
+}
+
+/** @deprecated Prefer sendSms. */
+export async function sendSmsLegacy(
+  to: string,
+  body: string
+): Promise<{ success: boolean; error?: string }> {
+  const r = await sendSms({ to, body, type: "legacy_send_sms" });
+  return {
+    success: ["sent", "logged", "queued"].includes(r.status),
+    error: r.failureMessage ?? undefined,
+  };
 }

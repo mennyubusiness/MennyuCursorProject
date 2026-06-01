@@ -11,6 +11,7 @@ import {
   accountHubSectionTitleClass,
 } from "./account-hub-styles";
 import { buttonClassName } from "@/components/ui/button";
+import { SmsConsentNotice } from "@/components/legal/SmsConsentNotice";
 import { cn } from "@/lib/cn";
 
 type AccountPhoneSectionProps = {
@@ -165,6 +166,7 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
                 className="oo-input mt-1 max-w-md"
                 placeholder="(555) 123-4567"
               />
+              <SmsConsentNotice className="mt-2 max-w-md" />
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <button

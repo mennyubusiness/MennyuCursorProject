@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { SmsConsentNotice } from "@/components/legal/SmsConsentNotice";
+
 type CheckoutPhoneVerificationProps = {
   phone: string;
   onPhoneChange: (phone: string) => void;
@@ -114,6 +116,7 @@ export function CheckoutPhoneVerification({
           className="mt-1.5 w-full max-w-md rounded-lg border border-stone-300 px-3 py-2.5 text-stone-900"
           placeholder="(555) 123-4567"
         />
+        <SmsConsentNotice className="mt-2 max-w-md" />
       </div>
 
       {phoneVerified ? (

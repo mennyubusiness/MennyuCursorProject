@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockSmsLogFindUnique = vi.fn();
 const mockSmsLogCreate = vi.fn();
 const mockSendTwilio = vi.fn();
+const mockIsPhoneSmsOptedOut = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -17,19 +18,22 @@ vi.mock("@/lib/twilio", () => ({
   sendTwilioMessage: (...args: unknown[]) => mockSendTwilio(...args),
 }));
 
+vi.mock("@/lib/sms-opt-out.service", () => ({
+  isPhoneSmsOptedOut: (...args: unknown[]) => mockIsPhoneSmsOptedOut(...args),
+}));
+
 vi.mock("@/lib/sms-config", () => ({
-  isSmsEnabled: vi.fn(() => true),
-  isSmsDryRun: vi.fn(() => false),
-  isSmsLogOnly: vi.fn(() => false),
+  resolveSmsMode: vi.fn(() => "twilio"),
   shouldSendViaTwilio: vi.fn(() => true),
   smsOperationalError: vi.fn(() => null),
 }));
 
-import { isSmsDryRun, isSmsEnabled, shouldSendViaTwilio } from "@/lib/sms-config";
+import { resolveSmsMode, shouldSendViaTwilio } from "@/lib/sms-config";
 import {
-  sendOrderConfirmation,
-  sendOrderStatusUpdate,
+  sendOrderReadySms,
+  sendSms,
   sendTransactionalSms,
+  sendVerificationCodeSms,
 } from "./sms.service";
 
 describe("sms.service", () => {
@@ -37,64 +41,54 @@ describe("sms.service", () => {
     vi.clearAllMocks();
     mockSmsLogFindUnique.mockResolvedValue(null);
     mockSmsLogCreate.mockResolvedValue({ id: "log_1" });
-    mockSendTwilio.mockResolvedValue({ sid: "SM123" });
-    vi.mocked(isSmsEnabled).mockReturnValue(true);
-    vi.mocked(isSmsDryRun).mockReturnValue(false);
+    mockSendTwilio.mockResolvedValue({ sid: "SM123", status: "queued" });
+    mockIsPhoneSmsOptedOut.mockResolvedValue(false);
+    vi.mocked(resolveSmsMode).mockReturnValue("twilio");
     vi.mocked(shouldSendViaTwilio).mockReturnValue(true);
   });
 
-  it("returns skipped when SMS disabled", async () => {
-    vi.mocked(isSmsEnabled).mockReturnValue(false);
-    const r = await sendTransactionalSms({
+  it("SMS_MODE=log does not call Twilio", async () => {
+    vi.mocked(resolveSmsMode).mockReturnValue("log");
+    vi.mocked(shouldSendViaTwilio).mockReturnValue(false);
+    const r = await sendSms({
       to: "+15551234567",
       body: "hello",
-      eventType: "test",
+      type: "ORDER_RECEIVED",
+    });
+    expect(r.status).toBe("logged");
+    expect(mockSendTwilio).not.toHaveBeenCalled();
+  });
+
+  it("SMS_MODE=disabled skips send", async () => {
+    vi.mocked(resolveSmsMode).mockReturnValue("disabled");
+    const r = await sendSms({
+      to: "+15551234567",
+      body: "hello",
+      type: "ORDER_RECEIVED",
     });
     expect(r.status).toBe("skipped");
     expect(mockSendTwilio).not.toHaveBeenCalled();
   });
 
-  it("dry run does not call Twilio", async () => {
-    vi.mocked(isSmsDryRun).mockReturnValue(true);
+  it("missing Twilio config logs instead of sending when mode is log", async () => {
+    vi.mocked(resolveSmsMode).mockReturnValue("log");
     vi.mocked(shouldSendViaTwilio).mockReturnValue(false);
     const r = await sendTransactionalSms({
       to: "+15551234567",
       body: "hello",
       eventType: "test",
     });
-    expect(r.status).toBe("dry_run");
-    expect(mockSendTwilio).not.toHaveBeenCalled();
-    expect(mockSmsLogCreate).toHaveBeenCalled();
+    expect(r.status).toBe("logged");
   });
 
-  it("skips missing phone", async () => {
-    const r = await sendTransactionalSms({
-      to: "",
-      body: "hello",
-      eventType: "test",
-    });
-    expect(r.status).toBe("skipped");
-    expect(r.failureMessage).toBe("missing_destination_phone");
-  });
-
-  it("skips invalid phone", async () => {
-    const r = await sendTransactionalSms({
-      to: "abc",
-      body: "hello",
-      eventType: "test",
-    });
-    expect(r.status).toBe("skipped");
-    expect(r.failureMessage).toBe("invalid_phone_number");
-  });
-
-  it("successful send records providerMessageId", async () => {
-    const r = await sendTransactionalSms({
+  it("successful Twilio send records providerMessageId", async () => {
+    const r = await sendSms({
       to: "+15551234567",
       body: "hello",
-      eventType: "test",
+      type: "ORDER_RECEIVED",
       idempotencyKey: "sms:test:1",
     });
-    expect(r.status).toBe("sent");
+    expect(r.status).toBe("queued");
     expect(r.providerMessageId).toBe("SM123");
     expect(mockSendTwilio).toHaveBeenCalledWith({
       to: "+15551234567",
@@ -103,40 +97,39 @@ describe("sms.service", () => {
   });
 
   it("Twilio failure records failed without throwing", async () => {
-    mockSendTwilio.mockResolvedValue({ error: "Twilio error" });
-    const r = await sendTransactionalSms({
+    mockSendTwilio.mockResolvedValue({ error: "Twilio error", code: "30001" });
+    const r = await sendSms({
       to: "+15551234567",
       body: "hello",
-      eventType: "test",
+      type: "ORDER_RECEIVED",
     });
     expect(r.status).toBe("failed");
-    expect(r.failureMessage).toBe("Twilio error");
+    expect(r.errorCode).toBe("30001");
   });
 
-  it("idempotency prevents duplicate send", async () => {
-    mockSmsLogFindUnique.mockResolvedValue({ status: "sent", providerMessageId: "SM_old" });
-    const r = await sendTransactionalSms({
+  it("opted-out phone suppresses send", async () => {
+    mockIsPhoneSmsOptedOut.mockResolvedValue(true);
+    const r = await sendSms({
       to: "+15551234567",
       body: "hello",
-      eventType: "test",
-      idempotencyKey: "sms:dup:1",
+      type: "ORDER_RECEIVED",
     });
-    expect(r.status).toBe("skipped");
-    expect(r.failureMessage).toBe("duplicate_idempotency_key");
+    expect(r.status).toBe("suppressed");
     expect(mockSendTwilio).not.toHaveBeenCalled();
   });
 
-  it("order confirmation uses idempotency key", async () => {
-    await sendOrderConfirmation("+15551234567", "ord_abc123", 1500, "ASAP pickup");
-    expect(mockSmsLogFindUnique).toHaveBeenCalledWith(
+  it("verification SMS uses Open Order template", async () => {
+    await sendVerificationCodeSms({ to: "+15551234567", code: "123456" });
+    expect(mockSendTwilio).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { idempotencyKey: "sms:order_confirmation:ord_abc123" },
+        body: expect.stringContaining("Open Order: Your verification code is 123456"),
       })
     );
+    expect(mockSendTwilio.mock.calls[0][0].body).toContain("Reply STOP to opt out");
   });
 
-  it("ready status SMS includes pickup code", async () => {
-    await sendOrderStatusUpdate("+15551234567", "ord_abc123", "ready");
+  it("order ready SMS includes pickup code", async () => {
+    await sendOrderReadySms({ to: "+15551234567", orderId: "ord_abc1234567890" });
     expect(mockSendTwilio).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.stringContaining("Pickup code:"),

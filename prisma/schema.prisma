@@ -1086,21 +1086,26 @@ model OrderIssue {
   @@index([vendorIssueStatus])
 }
 
-/// Audit log for outbound transactional SMS (Twilio).
+/// Audit log for outbound transactional SMS (Twilio) — notification attempt tracking.
 model SmsMessageLog {
   id                String    @id @default(cuid())
   orderId           String?
   vendorOrderId     String?
+  userId            String?
   toMasked          String
   toLast4           String?
+  /// e.g. PHONE_VERIFICATION, ORDER_RECEIVED, milestone_order_received (legacy)
   eventType         String
   bodyPreview       String
   provider          String    @default("twilio")
   providerMessageId String?
+  /// pending | queued | sent | delivered | failed | undelivered | suppressed | logged | skipped | dry_run
   status            String
+  errorCode         String?
   failureMessage    String?
   idempotencyKey    String?   @unique
   createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   sentAt            DateTime?
 
   order       Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
@@ -1110,6 +1115,19 @@ model SmsMessageLog {
   @@index([vendorOrderId])
   @@index([eventType])
   @@index([status])
+  @@index([providerMessageId])
+}
+
+/// TCPA opt-out registry for transactional SMS (STOP/START keywords).
+model SmsOptOut {
+  id         String    @id @default(cuid())
+  phoneE164  String    @unique
+  optedOutAt DateTime?
+  optedInAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([optedOutAt])
 }
 
 model VendorOrderIssue {

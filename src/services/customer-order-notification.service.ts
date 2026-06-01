@@ -1,71 +1,47 @@
 /**
- * Customer-facing order milestone SMS (replaces generic parent-status texts).
- * Idempotency via SmsMessageLog keys; no OrderCustomerNotificationMilestone table yet.
+ * Customer-facing order milestone SMS (transactional templates via sms.service).
+ * Idempotency via SmsMessageLog keys.
  */
 import "server-only";
 
 import { prisma } from "@/lib/db";
-import { env } from "@/lib/env";
-import { orderStatusUrlWithAccess } from "@/lib/customer-order-access-token";
-import { getPickupCode } from "@/lib/pickup-code";
-import { sendTransactionalSms } from "@/services/sms.service";
 import type { VendorOrderFulfillmentStatus } from "@/domain/types";
 import { DEV_SIMULATOR_SOURCE } from "@/services/dev-order-simulator.service";
+import {
+  sendOrderCancelledSms,
+  sendOrderIssueSms,
+  sendOrderPreparingSms,
+  sendOrderReadySms,
+  sendOrderReceivedSms,
+} from "@/services/sms.service";
 
 export type CustomerOrderMilestone =
   | "order_received"
+  | "order_preparing"
   | "vendor_ready"
   | "final_vendor_ready"
   | "vendor_cancelled"
   | "order_cancelled"
   | "order_issue";
 
-export type MilestoneTemplateContext = {
-  podName: string;
-  vendorName: string;
-  pickupCode: string;
-  orderStatusUrl: string;
-};
-
-function publicOrderBaseUrl(): string {
-  return env.PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://mennyu.com";
-}
-
-export function orderStatusUrl(orderId: string): string {
-  return orderStatusUrlWithAccess(orderId, publicOrderBaseUrl());
-}
-
 export function milestoneIdempotencyKey(
   milestone: CustomerOrderMilestone,
   scopeId: string
 ): string {
-  return `sms:milestone:${milestone}:${scopeId}`;
-}
-
-export function buildMilestoneSmsBody(
-  milestone: CustomerOrderMilestone,
-  ctx: MilestoneTemplateContext,
-  opts?: { multiVendor?: boolean; vendorIssue?: boolean }
-): string {
   switch (milestone) {
     case "order_received":
-      return `Open Order received your order at ${ctx.podName}. We'll text you when each pickup is ready. Pickup code: ${ctx.pickupCode}.`;
-    case "vendor_ready":
-      return `Ready for pickup: ${ctx.vendorName} at ${ctx.podName}. Pickup code: ${ctx.pickupCode}.`;
+      return `sms:ORDER_RECEIVED:${scopeId}`;
+    case "order_preparing":
+      return `sms:ORDER_PREPARING:${scopeId}`;
     case "final_vendor_ready":
-      if (opts?.multiVendor === false) {
-        return `Your order is ready for pickup: ${ctx.vendorName} at ${ctx.podName}. Pickup code: ${ctx.pickupCode}.`;
-      }
-      return `Your final pickup is ready: ${ctx.vendorName} at ${ctx.podName}. Pickup code: ${ctx.pickupCode}.`;
-    case "vendor_cancelled":
-      return `Update: ${ctx.vendorName} could not complete their part of your Open Order. Please check your order status page: ${ctx.orderStatusUrl}`;
+    case "vendor_ready":
+      return `sms:ORDER_READY:${scopeId}`;
     case "order_cancelled":
-      return `Your Open Order at ${ctx.podName} was cancelled. Details: ${ctx.orderStatusUrl}`;
+      return `sms:ORDER_CANCELLED:${scopeId}`;
     case "order_issue":
-      if (opts?.vendorIssue && ctx.vendorName) {
-        return `There's an issue with your order from ${ctx.vendorName} at ${ctx.podName}. Please check your order status page: ${ctx.orderStatusUrl}`;
-      }
-      return `There's an issue with part of your Open Order at ${ctx.podName}. Please check your order status page: ${ctx.orderStatusUrl}`;
+      return `sms:ORDER_ISSUE:${scopeId}`;
+    case "vendor_cancelled":
+      return `sms:milestone:vendor_cancelled:${scopeId}`;
   }
 }
 
@@ -74,16 +50,14 @@ async function hasCommittedMilestone(key: string): Promise<boolean> {
     where: { idempotencyKey: key },
     select: { status: true },
   });
-  return row?.status === "sent" || row?.status === "dry_run";
+  if (!row) return false;
+  return ["sent", "logged", "queued", "delivered", "dry_run"].includes(row.status);
 }
 
 type OrderNotificationContext = {
   orderId: string;
   customerPhone: string;
   parentStatus: string;
-  podName: string;
-  pickupCode: string;
-  orderStatusUrl: string;
   vendorOrders: Array<{
     id: string;
     fulfillmentStatus: VendorOrderFulfillmentStatus;
@@ -99,7 +73,6 @@ async function loadOrderNotificationContext(orderId: string): Promise<OrderNotif
       id: true,
       customerPhone: true,
       status: true,
-      pod: { select: { name: true } },
       vendorOrders: {
         select: {
           id: true,
@@ -116,9 +89,6 @@ async function loadOrderNotificationContext(orderId: string): Promise<OrderNotif
     orderId: order.id,
     customerPhone: order.customerPhone,
     parentStatus: order.status,
-    podName: order.pod.name,
-    pickupCode: getPickupCode(order.id),
-    orderStatusUrl: orderStatusUrl(order.id),
     vendorOrders: order.vendorOrders.map((vo) => ({
       id: vo.id,
       fulfillmentStatus: vo.fulfillmentStatus as VendorOrderFulfillmentStatus,
@@ -155,31 +125,10 @@ function isLastActivePickupReady(
   const readyOrCompleted = active.filter((vo) =>
     ["ready", "completed"].includes(vo.fulfillmentStatus)
   );
-  return readyOrCompleted.length === active.length && readyOrCompleted.some((vo) => vo.id === triggeredVendorOrderId);
-}
-
-async function sendMilestoneSms(params: {
-  milestone: CustomerOrderMilestone;
-  scopeId: string;
-  orderId: string;
-  vendorOrderId?: string;
-  phone: string;
-  ctx: MilestoneTemplateContext;
-  multiVendor?: boolean;
-  vendorIssue?: boolean;
-}): Promise<void> {
-  const idempotencyKey = milestoneIdempotencyKey(params.milestone, params.scopeId);
-  await sendTransactionalSms({
-    to: params.phone,
-    body: buildMilestoneSmsBody(params.milestone, params.ctx, {
-      multiVendor: params.multiVendor,
-      vendorIssue: params.vendorIssue,
-    }),
-    orderId: params.orderId,
-    vendorOrderId: params.vendorOrderId ?? null,
-    eventType: `milestone_${params.milestone}`,
-    idempotencyKey,
-  });
+  return (
+    readyOrCompleted.length === active.length &&
+    readyOrCompleted.some((vo) => vo.id === triggeredVendorOrderId)
+  );
 }
 
 async function maybeSendPickupReadyMilestone(
@@ -191,44 +140,33 @@ async function maybeSendPickupReadyMilestone(
 
   const active = activeNonCancelledVendorOrders(ctx.vendorOrders);
   const multiVendor = active.length > 1;
-  const templateCtx: MilestoneTemplateContext = {
-    podName: ctx.podName,
-    vendorName: vo.vendor.name,
-    pickupCode: ctx.pickupCode,
-    orderStatusUrl: ctx.orderStatusUrl,
-  };
-
   const isFinal = isLastActivePickupReady(ctx, triggeredVendorOrderId);
 
-  if (isFinal) {
-    const finalKey = milestoneIdempotencyKey("final_vendor_ready", ctx.orderId);
-    if (await hasCommittedMilestone(finalKey)) return;
-
-    await sendMilestoneSms({
-      milestone: "final_vendor_ready",
-      scopeId: ctx.orderId,
-      orderId: ctx.orderId,
-      vendorOrderId: triggeredVendorOrderId,
-      phone: ctx.customerPhone,
-      ctx: templateCtx,
-      multiVendor: multiVendor ? true : false,
-    });
+  if (multiVendor && !isFinal) {
     return;
   }
 
-  const vendorReadyKey = milestoneIdempotencyKey("vendor_ready", triggeredVendorOrderId);
-  if (await hasCommittedMilestone(vendorReadyKey)) return;
+  const readyKey = milestoneIdempotencyKey("final_vendor_ready", triggeredVendorOrderId);
+  if (await hasCommittedMilestone(readyKey)) return;
 
-  const finalKey = milestoneIdempotencyKey("final_vendor_ready", ctx.orderId);
-  if (await hasCommittedMilestone(finalKey)) return;
-
-  await sendMilestoneSms({
-    milestone: "vendor_ready",
-    scopeId: triggeredVendorOrderId,
+  await sendOrderReadySms({
+    to: ctx.customerPhone,
     orderId: ctx.orderId,
     vendorOrderId: triggeredVendorOrderId,
-    phone: ctx.customerPhone,
-    ctx: templateCtx,
+  });
+}
+
+async function maybeSendPreparingMilestone(
+  ctx: OrderNotificationContext,
+  triggeredVendorOrderId: string
+): Promise<void> {
+  const key = milestoneIdempotencyKey("order_preparing", triggeredVendorOrderId);
+  if (await hasCommittedMilestone(key)) return;
+
+  await sendOrderPreparingSms({
+    to: ctx.customerPhone,
+    orderId: ctx.orderId,
+    vendorOrderId: triggeredVendorOrderId,
   });
 }
 
@@ -239,23 +177,10 @@ async function maybeSendCancellationMilestones(
   const vo = ctx.vendorOrders.find((v) => v.id === triggeredVendorOrderId);
   if (!vo || vo.fulfillmentStatus !== "cancelled") return;
 
-  const templateCtx: MilestoneTemplateContext = {
-    podName: ctx.podName,
-    vendorName: vo.vendor.name,
-    pickupCode: ctx.pickupCode,
-    orderStatusUrl: ctx.orderStatusUrl,
-  };
-
   if (ctx.parentStatus === "cancelled") {
     const orderKey = milestoneIdempotencyKey("order_cancelled", ctx.orderId);
     if (await hasCommittedMilestone(orderKey)) return;
-    await sendMilestoneSms({
-      milestone: "order_cancelled",
-      scopeId: ctx.orderId,
-      orderId: ctx.orderId,
-      phone: ctx.customerPhone,
-      ctx: templateCtx,
-    });
+    await sendOrderCancelledSms({ to: ctx.customerPhone, orderId: ctx.orderId });
     return;
   }
 
@@ -264,40 +189,14 @@ async function maybeSendCancellationMilestones(
     remainingActive.length > 0 && remainingActive.every(isPrePreparationVendorOrder);
   if (wholeOrderCancelInProgress) return;
 
-  const vendorKey = milestoneIdempotencyKey("vendor_cancelled", triggeredVendorOrderId);
-  if (await hasCommittedMilestone(vendorKey)) return;
-
-  await sendMilestoneSms({
-    milestone: "vendor_cancelled",
-    scopeId: triggeredVendorOrderId,
-    orderId: ctx.orderId,
-    vendorOrderId: triggeredVendorOrderId,
-    phone: ctx.customerPhone,
-    ctx: templateCtx,
-  });
+  // Partial vendor cancellation — no dedicated A2P template; skip SMS.
 }
 
 /**
- * Send order_received after successful payment (replaces legacy order_confirmation SMS).
+ * Send order_received after successful payment.
  */
 export async function sendOrderReceivedMilestone(orderId: string, phone: string): Promise<void> {
-  const ctx = await loadOrderNotificationContext(orderId);
-  if (!ctx) return;
-
-  const templateCtx: MilestoneTemplateContext = {
-    podName: ctx.podName,
-    vendorName: ctx.vendorOrders[0]?.vendor.name ?? "Vendor",
-    pickupCode: ctx.pickupCode,
-    orderStatusUrl: ctx.orderStatusUrl,
-  };
-
-  await sendMilestoneSms({
-    milestone: "order_received",
-    scopeId: orderId,
-    orderId,
-    phone,
-    ctx: templateCtx,
-  });
+  await sendOrderReceivedSms({ to: phone, orderId });
 }
 
 /** Customer SMS when a customer-visible order issue is opened. Idempotent per issueId. */
@@ -308,8 +207,6 @@ export async function sendOrderIssueMilestone(orderId: string, issueId: string):
       id: true,
       orderId: true,
       submittedByRole: true,
-      vendorOrderId: true,
-      vendorOrder: { select: { vendor: { select: { name: true } } } },
     },
   });
   if (!issue || issue.orderId !== orderId) return;
@@ -323,24 +220,10 @@ export async function sendOrderIssueMilestone(orderId: string, issueId: string):
   const ctx = await loadOrderNotificationContext(orderId);
   if (!ctx) return;
 
-  const vendorName = issue.vendorOrder?.vendor.name?.trim();
-  const vendorIssue = Boolean(issue.vendorOrderId && vendorName);
-
-  const templateCtx: MilestoneTemplateContext = {
-    podName: ctx.podName,
-    vendorName: vendorName ?? ctx.vendorOrders[0]?.vendor.name ?? "Vendor",
-    pickupCode: ctx.pickupCode,
-    orderStatusUrl: ctx.orderStatusUrl,
-  };
-
-  await sendMilestoneSms({
-    milestone: "order_issue",
-    scopeId: issueId,
+  await sendOrderIssueSms({
+    to: ctx.customerPhone,
     orderId,
-    vendorOrderId: issue.vendorOrderId ?? undefined,
-    phone: ctx.customerPhone,
-    ctx: templateCtx,
-    vendorIssue: vendorIssue ? true : undefined,
+    issueId,
   });
 }
 
@@ -361,17 +244,21 @@ export async function evaluateCustomerOrderMilestones(params: {
   const vo = ctx.vendorOrders.find((v) => v.id === params.vendorOrderId);
   if (!vo) return;
 
+  if (vo.fulfillmentStatus === "preparing" || vo.fulfillmentStatus === "accepted") {
+    if (vo.fulfillmentStatus === "preparing") {
+      await maybeSendPreparingMilestone(ctx, params.vendorOrderId);
+    }
+    return;
+  }
+
   if (vo.fulfillmentStatus === "ready") {
     await maybeSendPickupReadyMilestone(ctx, params.vendorOrderId);
     return;
   }
 
   if (vo.fulfillmentStatus === "completed") {
-    const vendorReadyKey = milestoneIdempotencyKey("vendor_ready", params.vendorOrderId);
-    const finalKey = milestoneIdempotencyKey("final_vendor_ready", ctx.orderId);
-    const alreadyNotified =
-      (await hasCommittedMilestone(vendorReadyKey)) || (await hasCommittedMilestone(finalKey));
-    if (!alreadyNotified) {
+    const readyKey = milestoneIdempotencyKey("final_vendor_ready", params.vendorOrderId);
+    if (!(await hasCommittedMilestone(readyKey))) {
       await maybeSendPickupReadyMilestone(ctx, params.vendorOrderId);
     }
     return;
@@ -380,4 +267,26 @@ export async function evaluateCustomerOrderMilestones(params: {
   if (vo.fulfillmentStatus === "cancelled") {
     await maybeSendCancellationMilestones(ctx, params.vendorOrderId);
   }
+}
+
+/** @deprecated Tests only — templates live in sms-templates.ts */
+export type MilestoneTemplateContext = {
+  podName: string;
+  vendorName: string;
+  pickupCode: string;
+  orderStatusUrl: string;
+};
+
+/** @deprecated Tests only */
+export function buildMilestoneSmsBody(
+  milestone: CustomerOrderMilestone,
+  _ctx: MilestoneTemplateContext,
+  _opts?: { multiVendor?: boolean; vendorIssue?: boolean }
+): string {
+  return `milestone:${milestone}`;
+}
+
+/** @deprecated Tests only */
+export function orderStatusUrl(_orderId: string): string {
+  return "https://example.com/order";
 }

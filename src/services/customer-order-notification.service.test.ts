@@ -8,7 +8,11 @@ vi.mock("react", async (importOriginal) => {
 const mockOrderFindUnique = vi.fn();
 const mockOrderIssueFindUnique = vi.fn();
 const mockSmsLogFindUnique = vi.fn();
-const mockSendTransactionalSms = vi.fn();
+const mockSendOrderReceivedSms = vi.fn();
+const mockSendOrderPreparingSms = vi.fn();
+const mockSendOrderReadySms = vi.fn();
+const mockSendOrderCancelledSms = vi.fn();
+const mockSendOrderIssueSms = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -25,7 +29,11 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/services/sms.service", () => ({
-  sendTransactionalSms: (...args: unknown[]) => mockSendTransactionalSms(...args),
+  sendOrderReceivedSms: (...args: unknown[]) => mockSendOrderReceivedSms(...args),
+  sendOrderPreparingSms: (...args: unknown[]) => mockSendOrderPreparingSms(...args),
+  sendOrderReadySms: (...args: unknown[]) => mockSendOrderReadySms(...args),
+  sendOrderCancelledSms: (...args: unknown[]) => mockSendOrderCancelledSms(...args),
+  sendOrderIssueSms: (...args: unknown[]) => mockSendOrderIssueSms(...args),
 }));
 
 import {
@@ -36,12 +44,10 @@ import {
   sendOrderReceivedMilestone,
   sendOrderIssueMilestone,
 } from "./customer-order-notification.service";
-import { getPickupCode } from "@/lib/pickup-code";
 
 const ORDER_ID = "ord_test1234567890";
 const VO_A = "vo_a";
 const VO_B = "vo_b";
-const POD = "Test Pod";
 const PHONE = "+15551234567";
 
 function makeOrder(overrides?: {
@@ -66,7 +72,7 @@ function makeOrder(overrides?: {
     id: ORDER_ID,
     customerPhone: PHONE,
     status: overrides?.parentStatus ?? "routing",
-    pod: { name: POD },
+    pod: { name: "Test Pod" },
     vendorOrders,
   };
 }
@@ -76,68 +82,36 @@ describe("customer-order-notification.service", () => {
     vi.clearAllMocks();
     mockOrderFindUnique.mockImplementation(async () => makeOrder());
     mockSmsLogFindUnique.mockResolvedValue(null);
-    mockSendTransactionalSms.mockResolvedValue({ status: "sent" });
+    mockSendOrderReceivedSms.mockResolvedValue({ status: "sent" });
+    mockSendOrderPreparingSms.mockResolvedValue({ status: "sent" });
+    mockSendOrderReadySms.mockResolvedValue({ status: "sent" });
+    mockSendOrderCancelledSms.mockResolvedValue({ status: "sent" });
+    mockSendOrderIssueSms.mockResolvedValue({ status: "sent" });
   });
 
-  describe("orderStatusUrl", () => {
-    it("includes signed access token for SMS deep links", () => {
-      const url = orderStatusUrl(ORDER_ID);
-      expect(url).toMatch(new RegExp(`^https://mennyu\\.com/order/${ORDER_ID}\\?access=`));
+  describe("orderStatusUrl (deprecated stub)", () => {
+    it("returns placeholder in tests", () => {
+      expect(orderStatusUrl(ORDER_ID)).toBe("https://example.com/order");
     });
   });
 
-  describe("buildMilestoneSmsBody", () => {
-    const ctx = {
-      podName: POD,
-      vendorName: "Vendor A",
-      pickupCode: "1234",
-      orderStatusUrl: `https://mennyu.com/order/${ORDER_ID}`,
-    };
-
-    it("builds order_received template", () => {
-      expect(buildMilestoneSmsBody("order_received", ctx)).toContain(
-        `Open Order received your order at ${POD}`
-      );
-      expect(buildMilestoneSmsBody("order_received", ctx)).toContain("Pickup code: 1234");
-    });
-
-    it("builds single-vendor final ready template", () => {
+  describe("buildMilestoneSmsBody (deprecated stub)", () => {
+    it("returns milestone label", () => {
       expect(
-        buildMilestoneSmsBody("final_vendor_ready", ctx, { multiVendor: false })
-      ).toBe(
-        `Your order is ready for pickup: Vendor A at ${POD}. Pickup code: 1234.`
-      );
-    });
-
-    it("builds multi-vendor final ready template", () => {
-      expect(
-        buildMilestoneSmsBody("final_vendor_ready", ctx, { multiVendor: true })
-      ).toContain("Your final pickup is ready");
-    });
-
-    it("builds vendor-scoped order_issue template", () => {
-      expect(
-        buildMilestoneSmsBody("order_issue", ctx, { vendorIssue: true })
-      ).toBe(
-        `There's an issue with your order from Vendor A at ${POD}. Please check your order status page: https://mennyu.com/order/${ORDER_ID}`
-      );
+        buildMilestoneSmsBody("order_received", {
+          podName: "P",
+          vendorName: "V",
+          pickupCode: "1",
+          orderStatusUrl: "u",
+        })
+      ).toBe("milestone:order_received");
     });
   });
 
   describe("sendOrderReceivedMilestone", () => {
-    it("sends order_received with pod and pickup code", async () => {
+    it("delegates to sendOrderReceivedSms", async () => {
       await sendOrderReceivedMilestone(ORDER_ID, PHONE);
-      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
-        expect.objectContaining({
-          to: PHONE,
-          eventType: "milestone_order_received",
-          idempotencyKey: milestoneIdempotencyKey("order_received", ORDER_ID),
-          body: expect.stringContaining(POD),
-        })
-      );
-      expect(mockSendTransactionalSms.mock.calls[0][0].body).toContain(
-        `Pickup code: ${getPickupCode(ORDER_ID)}`
-      );
+      expect(mockSendOrderReceivedSms).toHaveBeenCalledWith({ to: PHONE, orderId: ORDER_ID });
     });
   });
 
@@ -147,37 +121,15 @@ describe("customer-order-notification.service", () => {
         id: "iss_1",
         orderId: ORDER_ID,
         submittedByRole: "customer",
-        vendorOrderId: null,
-        vendorOrder: null,
       });
 
       await sendOrderIssueMilestone(ORDER_ID, "iss_1");
 
-      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: "milestone_order_issue",
-          idempotencyKey: milestoneIdempotencyKey("order_issue", "iss_1"),
-          body: expect.stringContaining(POD),
-        })
-      );
-    });
-
-    it("uses vendor wording when issue is scoped to a vendor order", async () => {
-      mockOrderIssueFindUnique.mockResolvedValue({
-        id: "iss_2",
+      expect(mockSendOrderIssueSms).toHaveBeenCalledWith({
+        to: PHONE,
         orderId: ORDER_ID,
-        submittedByRole: "customer",
-        vendorOrderId: VO_A,
-        vendorOrder: { vendor: { name: "Taco Shop" } },
+        issueId: "iss_1",
       });
-
-      await sendOrderIssueMilestone(ORDER_ID, "iss_2");
-
-      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.stringContaining("your order from Taco Shop"),
-        })
-      );
     });
 
     it("does not send for internal system issues", async () => {
@@ -185,13 +137,11 @@ describe("customer-order-notification.service", () => {
         id: "iss_sys",
         orderId: ORDER_ID,
         submittedByRole: "system",
-        vendorOrderId: null,
-        vendorOrder: null,
       });
 
       await sendOrderIssueMilestone(ORDER_ID, "iss_sys");
 
-      expect(mockSendTransactionalSms).not.toHaveBeenCalled();
+      expect(mockSendOrderIssueSms).not.toHaveBeenCalled();
     });
 
     it("does not resend when milestone already committed", async () => {
@@ -199,19 +149,39 @@ describe("customer-order-notification.service", () => {
         id: "iss_1",
         orderId: ORDER_ID,
         submittedByRole: "customer",
-        vendorOrderId: null,
-        vendorOrder: null,
       });
       mockSmsLogFindUnique.mockResolvedValue({ status: "sent" });
 
       await sendOrderIssueMilestone(ORDER_ID, "iss_1");
 
-      expect(mockSendTransactionalSms).not.toHaveBeenCalled();
+      expect(mockSendOrderIssueSms).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("evaluateCustomerOrderMilestones — preparing", () => {
+    it("sends preparing SMS when vendor enters preparing", async () => {
+      mockOrderFindUnique.mockResolvedValue(
+        makeOrder({
+          vendorOrders: [{ id: VO_A, fulfillmentStatus: "preparing", vendorName: "Vendor A" }],
+        })
+      );
+
+      await evaluateCustomerOrderMilestones({
+        orderId: ORDER_ID,
+        vendorOrderId: VO_A,
+        source: "vendor_dashboard",
+      });
+
+      expect(mockSendOrderPreparingSms).toHaveBeenCalledWith({
+        to: PHONE,
+        orderId: ORDER_ID,
+        vendorOrderId: VO_A,
+      });
     });
   });
 
   describe("evaluateCustomerOrderMilestones — ready", () => {
-    it("single vendor ready sends final_vendor_ready wording", async () => {
+    it("single vendor ready sends ORDER_READY", async () => {
       mockOrderFindUnique.mockResolvedValue(
         makeOrder({
           vendorOrders: [{ id: VO_A, fulfillmentStatus: "ready", vendorName: "Vendor A" }],
@@ -225,17 +195,14 @@ describe("customer-order-notification.service", () => {
         source: "vendor_dashboard",
       });
 
-      expect(mockSendTransactionalSms).toHaveBeenCalledTimes(1);
-      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: "milestone_final_vendor_ready",
-          idempotencyKey: milestoneIdempotencyKey("final_vendor_ready", ORDER_ID),
-          body: expect.stringContaining("Your order is ready for pickup"),
-        })
-      );
+      expect(mockSendOrderReadySms).toHaveBeenCalledWith({
+        to: PHONE,
+        orderId: ORDER_ID,
+        vendorOrderId: VO_A,
+      });
     });
 
-    it("multi-vendor first ready sends vendor_ready", async () => {
+    it("multi-vendor first ready does not SMS until final vendor ready", async () => {
       mockOrderFindUnique.mockResolvedValue(
         makeOrder({
           parentStatus: "in_progress",
@@ -252,16 +219,10 @@ describe("customer-order-notification.service", () => {
         source: "deliverect",
       });
 
-      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: "milestone_vendor_ready",
-          idempotencyKey: milestoneIdempotencyKey("vendor_ready", VO_A),
-          body: expect.stringContaining("Ready for pickup: Vendor A"),
-        })
-      );
+      expect(mockSendOrderReadySms).not.toHaveBeenCalled();
     });
 
-    it("multi-vendor final ready sends final_vendor_ready", async () => {
+    it("multi-vendor final ready sends ORDER_READY", async () => {
       mockOrderFindUnique.mockResolvedValue(
         makeOrder({
           parentStatus: "ready",
@@ -278,30 +239,11 @@ describe("customer-order-notification.service", () => {
         source: "deliverect",
       });
 
-      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: "milestone_final_vendor_ready",
-          body: expect.stringContaining("Your final pickup is ready: Vendor B"),
-        })
-      );
-    });
-
-    it("accepted to ready sends only ready milestone", async () => {
-      mockOrderFindUnique.mockResolvedValue(
-        makeOrder({
-          vendorOrders: [{ id: VO_A, fulfillmentStatus: "ready", vendorName: "Vendor A" }],
-          parentStatus: "ready",
-        })
-      );
-
-      await evaluateCustomerOrderMilestones({
+      expect(mockSendOrderReadySms).toHaveBeenCalledWith({
+        to: PHONE,
         orderId: ORDER_ID,
-        vendorOrderId: VO_A,
-        source: "deliverect",
+        vendorOrderId: VO_B,
       });
-
-      expect(mockSendTransactionalSms).toHaveBeenCalledTimes(1);
-      expect(mockSendTransactionalSms.mock.calls[0][0].eventType).toMatch(/ready/);
     });
 
     it("duplicate ready events do not duplicate SMS", async () => {
@@ -318,81 +260,12 @@ describe("customer-order-notification.service", () => {
         source: "deliverect",
       });
 
-      expect(mockSendTransactionalSms).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("evaluateCustomerOrderMilestones — completed without ready", () => {
-    it("sends final ready once when vendor jumps to completed", async () => {
-      mockOrderFindUnique.mockResolvedValue(
-        makeOrder({
-          vendorOrders: [{ id: VO_A, fulfillmentStatus: "completed", vendorName: "Vendor A" }],
-          parentStatus: "completed",
-        })
-      );
-
-      await evaluateCustomerOrderMilestones({
-        orderId: ORDER_ID,
-        vendorOrderId: VO_A,
-        source: "deliverect",
-      });
-
-      expect(mockSendTransactionalSms).toHaveBeenCalledTimes(1);
-      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: "milestone_final_vendor_ready",
-          body: expect.stringContaining("Pickup code:"),
-        })
-      );
-      expect(mockSendTransactionalSms.mock.calls[0][0].body).not.toContain("Completed");
-    });
-
-    it("does not send generic completed SMS", async () => {
-      mockOrderFindUnique.mockResolvedValue(
-        makeOrder({
-          vendorOrders: [{ id: VO_A, fulfillmentStatus: "completed", vendorName: "Vendor A" }],
-        })
-      );
-
-      await evaluateCustomerOrderMilestones({
-        orderId: ORDER_ID,
-        vendorOrderId: VO_A,
-        source: "deliverect",
-      });
-
-      for (const call of mockSendTransactionalSms.mock.calls) {
-        expect(call[0].eventType).not.toMatch(/order_status_completed/);
-      }
+      expect(mockSendOrderReadySms).not.toHaveBeenCalled();
     });
   });
 
   describe("evaluateCustomerOrderMilestones — cancellation", () => {
-    it("vendor cancelled sends vendor_cancelled once", async () => {
-      mockOrderFindUnique.mockResolvedValue(
-        makeOrder({
-          parentStatus: "in_progress",
-          vendorOrders: [
-            { id: VO_A, fulfillmentStatus: "cancelled", vendorName: "Vendor A" },
-            { id: VO_B, fulfillmentStatus: "preparing", vendorName: "Vendor B" },
-          ],
-        })
-      );
-
-      await evaluateCustomerOrderMilestones({
-        orderId: ORDER_ID,
-        vendorOrderId: VO_A,
-        source: "vendor_dashboard",
-      });
-
-      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: "milestone_vendor_cancelled",
-          idempotencyKey: milestoneIdempotencyKey("vendor_cancelled", VO_A),
-        })
-      );
-    });
-
-    it("whole order cancelled sends order_cancelled once", async () => {
+    it("whole order cancelled sends ORDER_CANCELLED once", async () => {
       mockOrderFindUnique.mockResolvedValue(
         makeOrder({
           parentStatus: "cancelled",
@@ -409,27 +282,20 @@ describe("customer-order-notification.service", () => {
         source: "customer",
       });
 
-      expect(mockSendTransactionalSms).toHaveBeenCalledTimes(1);
-      expect(mockSendTransactionalSms).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: "milestone_order_cancelled",
-          idempotencyKey: milestoneIdempotencyKey("order_cancelled", ORDER_ID),
-        })
-      );
+      expect(mockSendOrderCancelledSms).toHaveBeenCalledWith({
+        to: PHONE,
+        orderId: ORDER_ID,
+      });
+      expect(mockSendOrderCancelledSms).toHaveBeenCalledTimes(1);
     });
 
-    it("skips vendor_cancelled during whole-order pre-preparation cancel", async () => {
+    it("partial vendor cancel does not send SMS", async () => {
       mockOrderFindUnique.mockResolvedValue(
         makeOrder({
           parentStatus: "in_progress",
           vendorOrders: [
             { id: VO_A, fulfillmentStatus: "cancelled", vendorName: "Vendor A" },
-            {
-              id: VO_B,
-              fulfillmentStatus: "pending",
-              routingStatus: "sent",
-              vendorName: "Vendor B",
-            },
+            { id: VO_B, fulfillmentStatus: "preparing", vendorName: "Vendor B" },
           ],
         })
       );
@@ -437,10 +303,10 @@ describe("customer-order-notification.service", () => {
       await evaluateCustomerOrderMilestones({
         orderId: ORDER_ID,
         vendorOrderId: VO_A,
-        source: "customer",
+        source: "vendor_dashboard",
       });
 
-      expect(mockSendTransactionalSms).not.toHaveBeenCalled();
+      expect(mockSendOrderCancelledSms).not.toHaveBeenCalled();
     });
   });
 
@@ -458,7 +324,15 @@ describe("customer-order-notification.service", () => {
         source: "dev_simulator",
       });
 
-      expect(mockSendTransactionalSms).not.toHaveBeenCalled();
+      expect(mockSendOrderReadySms).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("milestoneIdempotencyKey", () => {
+    it("maps order_received to ORDER_RECEIVED key", () => {
+      expect(milestoneIdempotencyKey("order_received", ORDER_ID)).toBe(
+        `sms:ORDER_RECEIVED:${ORDER_ID}`
+      );
     });
   });
 });

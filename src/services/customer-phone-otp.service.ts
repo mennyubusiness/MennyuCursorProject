@@ -6,7 +6,7 @@ import { normalizePhoneToE164US } from "@/lib/phone-e164";
 import { prisma } from "@/lib/db";
 import { createCustomerSessionRecord } from "@/lib/customer-session";
 import { attachLegacyOrdersToCustomerAccount } from "@/services/customer-account-orders.service";
-import { sendTransactionalSms } from "@/services/sms.service";
+import { sendVerificationCodeSms } from "@/services/sms.service";
 
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_VERIFY_ATTEMPTS = 5;
@@ -61,11 +61,9 @@ export async function sendPhoneVerificationCode(phoneRaw: string): Promise<SendP
     },
   });
 
-  const body = `Your Open Order verification code is ${code}. It expires in 10 minutes.`;
-  await sendTransactionalSms({
+  await sendVerificationCodeSms({
     to: phoneE164,
-    body,
-    eventType: "customer_phone_otp",
+    code,
   });
 
   return { ok: true, message: genericSendSuccessMessage() };

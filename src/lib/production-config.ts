@@ -48,8 +48,16 @@ function hasTwilioCredentials(env: Env): boolean {
   return Boolean(
     env.TWILIO_ACCOUNT_SID?.trim() &&
       env.TWILIO_AUTH_TOKEN?.trim() &&
-      (twilioFromPhoneNumber(env)?.trim() || env.TWILIO_MESSAGING_SERVICE_SID?.trim())
+      env.TWILIO_MESSAGING_SERVICE_SID?.trim()
   );
+}
+
+function resolveSmsModeForProduction(env: Env): "log" | "twilio" | "disabled" {
+  const raw = env.SMS_MODE?.trim().toLowerCase();
+  if (raw === "log" || raw === "twilio" || raw === "disabled") return raw;
+  if (!isSmsEnabledInProduction(env)) return "disabled";
+  if (isSmsDryRun(env) || isSmsLogOnly(env)) return "log";
+  return "twilio";
 }
 
 function isSmsEnabledInProduction(env: Env): boolean {
@@ -188,10 +196,27 @@ export function validateProductionConfig(env: Env): ProductionConfigValidation {
   }
 
   // --- SMS / Twilio ---
-  if (isSmsEnabledInProduction(env) && !isSmsDryRun(env) && !isSmsLogOnly(env)) {
+  const smsMode = resolveSmsModeForProduction(env);
+  if (smsMode === "twilio") {
     if (!hasTwilioCredentials(env)) {
       errors.push(
-        "SMS_ENABLED with live send (SMS_DRY_RUN=false) requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_PHONE_NUMBER or TWILIO_MESSAGING_SERVICE_SID."
+        "SMS_MODE=twilio requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_MESSAGING_SERVICE_SID."
+      );
+    }
+    if (!hasPublicAppOrigin(env)) {
+      warnings.push(
+        "PUBLIC_APP_URL or NEXTAUTH_URL recommended for Twilio status callbacks (defaults to /api/twilio/sms-status)."
+      );
+    }
+  } else if (
+    isSmsEnabledInProduction(env) &&
+    !isSmsDryRun(env) &&
+    !isSmsLogOnly(env) &&
+    env.SMS_MODE == null
+  ) {
+    if (!hasTwilioCredentials(env)) {
+      errors.push(
+        "Legacy live SMS (SMS_ENABLED without SMS_MODE=log) requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_MESSAGING_SERVICE_SID."
       );
     }
   }

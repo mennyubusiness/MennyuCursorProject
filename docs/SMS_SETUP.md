@@ -1,57 +1,64 @@
 # Twilio SMS setup (Open Order)
 
-Transactional SMS for order confirmation and status updates (future: issue notifications).
+Transactional SMS for phone verification, order confirmation, status updates, pickup-ready alerts, cancellations, and order issues. **No marketing SMS.**
 
 ## Environment variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `TWILIO_ACCOUNT_SID` | Production send | Twilio Account SID |
-| `TWILIO_AUTH_TOKEN` | Production send | Twilio Auth Token |
-| `TWILIO_FROM_PHONE_NUMBER` | If no Messaging Service | E.164 sender, e.g. `+15551234567` |
-| `TWILIO_MESSAGING_SERVICE_SID` | Optional | Use Messaging Service instead of From |
-| `TWILIO_PHONE_NUMBER` | Optional | Legacy alias for `TWILIO_FROM_PHONE_NUMBER` |
-| `SMS_ENABLED` | Recommended | `true` / `false` (default: off in dev, on in production) |
-| `SMS_DRY_RUN` | Recommended | `true` records `dry_run` in `SmsMessageLog` without calling Twilio |
-| `SMS_LOG_ONLY` | Optional | `true` = log only, no Twilio |
+| `TWILIO_ACCOUNT_SID` | `SMS_MODE=twilio` | Twilio Account SID |
+| `TWILIO_AUTH_TOKEN` | `SMS_MODE=twilio` | Twilio Auth Token |
+| `TWILIO_MESSAGING_SERVICE_SID` | `SMS_MODE=twilio` | **Primary send path** — Messaging Service SID |
+| `TWILIO_STATUS_CALLBACK_URL` | Optional | Delivery status webhook (default: `{PUBLIC_APP_URL}/api/twilio/sms-status`) |
+| `SMS_MODE` | Recommended | `log` (safe default), `twilio` (live), `disabled` |
+| `PUBLIC_APP_URL` | Production | Public https origin for status callbacks |
+| `NEXT_PUBLIC_APP_URL` | Optional | Client-readable origin alias |
+
+Legacy (used when `SMS_MODE` is unset): `SMS_ENABLED`, `SMS_DRY_RUN`, `SMS_LOG_ONLY`.
+
+## Twilio Console URLs (A2P / Messaging Service)
+
+Configure these on your **Messaging Service** (and/or inbound phone number):
+
+| Twilio field | URL |
+|--------------|-----|
+| **A message comes in** (inbound webhook) | `https://<your-domain>/api/twilio/inbound-sms` |
+| **Status callback URL** (outbound delivery) | `https://<your-domain>/api/twilio/sms-status` |
+
+Or set `TWILIO_STATUS_CALLBACK_URL=https://<your-domain>/api/twilio/sms-status` — outbound sends also pass this on each `messages.create`.
+
+Inbound webhook handles **STOP**, **START**, **HELP**, and other replies with TwiML (TCPA). Opt-outs are stored in `SmsOptOut`.
 
 ## Twilio sender verification
 
-Live sends (`SMS_DRY_RUN=false`) require a verified **From number** or **Messaging Service** in Twilio. US carriers often require A2P 10DLC or toll-free verification before delivery. Until approved, keep `SMS_DRY_RUN=true` — milestones are recorded in `SmsMessageLog` without calling Twilio. See [PRODUCTION_CONFIG.md](./PRODUCTION_CONFIG.md) pre-launch checklist.
+Live sends (`SMS_MODE=twilio`) require a verified **Messaging Service** in Twilio. US carriers require A2P 10DLC or toll-free verification. Until approved, keep `SMS_MODE=log` — attempts are recorded in `SmsMessageLog` without calling Twilio.
 
-## Developer checklist (manual verification)
+## Developer checklist
 
-Use **`SMS_DRY_RUN=true`** or **`SMS_LOG_ONLY=true`** for safe testing: milestone SMS is logged in `SmsMessageLog` without calling Twilio until you turn dry run off.
+1. Copy `.env.example` → `.env.local`; set `SMS_MODE=log` for local dev.
+2. Run migration: `npx prisma migrate deploy`.
+3. Set Twilio credentials + `TWILIO_MESSAGING_SERVICE_SID`.
+4. Configure inbound + status webhooks in Twilio Console (see URLs above).
+5. For live send: `SMS_MODE=twilio` and verified Messaging Service.
+6. Trigger paths: OTP send, payment (`ORDER_RECEIVED`), vendor **preparing**, vendor **ready**, cancellation, order issue.
+7. Check `SmsMessageLog` and Twilio Messaging logs.
+8. Reply **STOP** to a test message — confirm `SmsOptOut` row and TwiML reply.
 
-**Do not use the dev order simulator** to verify customer milestone SMS. Transitions with source `dev_simulator` intentionally suppress milestone texts (`evaluateCustomerOrderMilestones` returns early).
+## Event types (`SmsMessageLog.eventType`)
 
-1. Copy `.env.example` to `.env.local` and set Twilio credentials.
-2. Run migration: `npx prisma migrate deploy` (or `migrate dev` locally).
-3. Set `SMS_ENABLED=true`.
-4. Keep `SMS_DRY_RUN=true` (or `SMS_LOG_ONLY=true`) until you intend to send a real message.
-5. When ready for a real send: `SMS_DRY_RUN=false` and ensure `SMS_LOG_ONLY` is not blocking Twilio.
-6. Trigger a real milestone path:
-   - **`milestone_order_received`**: complete payment on a test order (`processSuccessfulPayment`).
-   - **Ready milestones** (`milestone_vendor_ready` / `milestone_final_vendor_ready`): advance the vendor order to **ready** via the **vendor dashboard**, a **Deliverect webhook/status** update, or another non-`dev_simulator` status path — not the dev simulator.
-   - **`milestone_order_issue`**: submit a customer support issue from the order status page.
-7. Confirm the message in the [Twilio Console](https://console.twilio.com/) → Messaging → Logs (skip during dry run / log-only).
-8. Confirm a row in `SmsMessageLog` with `status=sent` (or `dry_run` / `skipped` during safe testing).
-9. Trigger the same event again and confirm **no second** Twilio message (idempotency key).
-
-## Current wired events
-
-- `milestone_order_received` — after payment is first recorded (`processSuccessfulPayment`).
-- `milestone_vendor_ready` — per vendor when ready in a multi-vendor order (not the final pickup).
-- `milestone_final_vendor_ready` — last active vendor ready, or single-vendor ready (includes pickup code).
-- `milestone_vendor_cancelled` — one vendor cancelled while the order continues.
-- `milestone_order_cancelled` — whole parent order cancelled.
-- `milestone_order_issue` — when a customer-reported support issue is created (`createCustomerSupportIssue`).
-
-Legacy parent-status SMS (`order_status_*`, `order_confirmation`) is bypassed in favor of milestones.
+- `PHONE_VERIFICATION`
+- `ORDER_RECEIVED`
+- `ORDER_PREPARING`
+- `ORDER_READY`
+- `ORDER_CANCELLED`
+- `ORDER_ISSUE`
 
 ## Code entry points
 
-- `src/services/customer-order-notification.service.ts` — milestone templates + evaluator
-- `src/services/sms.service.ts` — `sendTransactionalSms`
-- `src/lib/twilio.ts` — Twilio client
+- `src/services/sms.service.ts` — centralized send + templates
+- `src/services/customer-order-notification.service.ts` — order milestones
+- `src/services/customer-phone-otp.service.ts` — verification codes
+- `src/app/api/twilio/inbound-sms/route.ts` — inbound STOP/START/HELP
+- `src/app/api/twilio/sms-status/route.ts` — delivery status callbacks
+- `src/lib/twilio.ts` — Twilio REST client
 - `src/lib/phone.ts` — US E.164 normalization

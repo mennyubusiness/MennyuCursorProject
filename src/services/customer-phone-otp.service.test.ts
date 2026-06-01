@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockHashPassword = vi.fn();
 const mockVerifyPassword = vi.fn();
-const mockSendTransactionalSms = vi.fn();
+const mockSendVerificationCodeSms = vi.fn();
 const mockCreateCustomerSessionRecord = vi.fn();
 
 vi.mock("@/lib/auth/password", () => ({
@@ -11,7 +11,7 @@ vi.mock("@/lib/auth/password", () => ({
 }));
 
 vi.mock("@/services/sms.service", () => ({
-  sendTransactionalSms: (...args: unknown[]) => mockSendTransactionalSms(...args),
+  sendVerificationCodeSms: (...args: unknown[]) => mockSendVerificationCodeSms(...args),
 }));
 
 vi.mock("@/lib/customer-session", () => ({
@@ -49,7 +49,7 @@ describe("customer-phone-otp.service", () => {
     vi.clearAllMocks();
     mockHashPassword.mockResolvedValue("$hash$");
     mockVerifyPassword.mockResolvedValue(false);
-    mockSendTransactionalSms.mockResolvedValue({ status: "dry_run" });
+    mockSendVerificationCodeSms.mockResolvedValue({ status: "logged" });
     mockCreateCustomerSessionRecord.mockResolvedValue({
       token: "session_token_raw",
       expiresAt: new Date(Date.now() + 86400000),
@@ -83,7 +83,7 @@ describe("customer-phone-otp.service", () => {
         }),
       })
     );
-    expect(mockSendTransactionalSms).toHaveBeenCalled();
+    expect(mockSendVerificationCodeSms).toHaveBeenCalled();
   });
 
   it("send-code stores hash, not raw code", async () => {

@@ -19,8 +19,15 @@ const envSchema = z.object({
   TWILIO_FROM_PHONE_NUMBER: z.string().optional(),
   /** Legacy alias for TWILIO_FROM_PHONE_NUMBER. */
   TWILIO_PHONE_NUMBER: z.string().optional(),
-  /** When set, sends via Messaging Service instead of From number. */
+  /** When set, sends via Messaging Service (required for SMS_MODE=twilio). */
   TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
+  /** Optional override for outbound SMS delivery status callbacks. */
+  TWILIO_STATUS_CALLBACK_URL: z.string().url().optional(),
+  /**
+   * Primary SMS control: `log` (record only), `twilio` (live send), `disabled`.
+   * Legacy SMS_ENABLED / SMS_DRY_RUN / SMS_LOG_ONLY still supported when unset.
+   */
+  SMS_MODE: z.enum(["log", "twilio", "disabled"]).optional(),
   /** Master switch for outbound SMS. Default: off in dev, on in production. */
   SMS_ENABLED: z.enum(["true", "false"]).optional(),
   /** When true, log/record SMS but do not call Twilio. Default: on outside production. */
@@ -57,10 +64,12 @@ const envSchema = z.object({
   ROUTING_MODE: z.enum(["mock", "deliverect"]).default("mock"),
   NEXTAUTH_URL: z.string().url().optional(),
   /**
-   * Public https origin for this deployment (no trailing slash), e.g. https://app.mennyu.com
-   * Used to build Deliverect channel-registration callback URLs. Falls back to request Host / NEXTAUTH_URL.
+   * Public https origin for this deployment (no trailing slash), e.g. https://app.openorder.co
+   * Used for payment redirects, SMS links, and Twilio webhooks. Falls back to NEXTAUTH_URL.
    */
   PUBLIC_APP_URL: z.string().url().optional(),
+  /** Client-readable public origin (optional; server prefers PUBLIC_APP_URL). */
+  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   /** Min 32 characters; preferred secret for signed customer order status links. Falls back to AUTH_SECRET. */
   ORDER_ACCESS_SIGNING_SECRET: z.string().min(32).optional(),
