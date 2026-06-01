@@ -10,8 +10,8 @@ import {
   loadActiveDisplayCartForSession,
 } from "@/services/cart.service";
 import { getActiveOrderByCustomerPhone, validateCartItemsForDisplay, getCartValidationMessage } from "@/services/order.service";
-import type { CartForValidation } from "@/services/order.service";
 import type { Cart } from "@/domain/types";
+import { buildCartForValidationFromDisplayCart } from "@/lib/cart-for-validation";
 import { MenuItemImage } from "@/components/images/MenuItemImage";
 import { loadCartEditModifierPayloadsForCartPage } from "@/services/cart-edit-modal-payload.service";
 import { cartPagePerfMark, cartPagePerfNow, CART_PAGE_PERF_LOG } from "@/lib/cart-page-perf";
@@ -23,12 +23,16 @@ import {
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartItemActions } from "./CartItemActions";
 import {
+  CartPageLiveCheckoutActions,
   CartPageLiveCheckoutGate,
   CartPageLiveEmptyNotice,
   CartPageLiveFoodSubtotal,
+  CartPageLiveLineError,
   CartPageLiveLineGate,
+  CartPageLiveLineShell,
   CartPageLiveLineTotal,
   CartPageLiveQuantity,
+  CartPageLiveValidationBanner,
   CartPageLiveVendorLineCountLabel,
   CartPageLiveVendorSection,
   CartPageLiveVendorSubtotal,
@@ -311,36 +315,8 @@ export default async function CartPage({
   cartPagePerfMark("variant_size_labels_batch", tVar);
 
   const tVal = cartPagePerfNow();
-  const cartForValidation: CartForValidation = {
-    podId: cart.podId,
-    items: cart.items.map((i) => ({
-      id: i.id,
-      menuItemId: i.menuItemId,
-      vendorId: i.vendorId,
-      quantity: i.quantity,
-      priceCents: i.priceCents,
-      menuItem: {
-        priceCents: i.menuItem.priceCents,
-        isAvailable: i.menuItem.isAvailable,
-        name: i.menuItem.name,
-        basketMaxQuantity: i.menuItem.basketMaxQuantity ?? null,
-        deliverectProductId: i.menuItem.deliverectProductId ?? null,
-        deliverectPlu: i.menuItem.deliverectPlu ?? null,
-        deliverectVariantParentPlu: i.menuItem.deliverectVariantParentPlu ?? null,
-      },
-      vendor: {
-        isActive: i.vendor.isActive,
-        mennyuOrdersPaused: i.vendor.mennyuOrdersPaused ?? undefined,
-        posOpen: undefined,
-      },
-      selections: i.selections?.map((s) => ({
-        modifierOptionId: s.modifierOptionId,
-        quantity: s.quantity,
-        modifierOption: s.modifierOption ? { priceCents: s.modifierOption.priceCents } : undefined,
-      })),
-    })),
-  };
-  const { valid: cartValid, errors: validationErrors } = await validateCartItemsForDisplay(cartForValidation);
+  const cartForValidation = buildCartForValidationFromDisplayCart(cart);
+  const initialValidation = await validateCartItemsForDisplay(cartForValidation);
   cartPagePerfMark("validate_cart_items_for_display", tVal, {
     itemCount: cart.items.length,
   });
@@ -348,18 +324,6 @@ export default async function CartPage({
     itemCount: cart.items.length,
     perfLogEnabled: CART_PAGE_PERF_LOG,
   });
-  const errorByCartItemId = new Map<string, string>();
-  for (const e of validationErrors) {
-    if (e.cartItemId) {
-      errorByCartItemId.set(e.cartItemId, e.message);
-    } else if (e.menuItemId) {
-      for (const item of cart.items) {
-        if (item.menuItemId === e.menuItemId) errorByCartItemId.set(item.id, e.message);
-      }
-    }
-  }
-  const canCheckout = cartValid;
-
   const goState = await getGroupOrderStateAction(cart.id);
   const groupActor = goState.active
     ? await resolveActorForGroupCart(cart.id, {
@@ -460,12 +424,6 @@ export default async function CartPage({
           {getCartValidationMessage(checkoutErrorCode)} Update or remove items below, then try again.
         </p>
       )}
-      {!cartValid && validationErrors.length > 0 && (
-        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
-          <span className="font-medium">Some items can&apos;t be ordered as shown.</span> Update or
-          remove highlighted lines, then continue.
-        </p>
-      )}
       {reorderSkipped > 0 && (
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           {reorderAdded > 0 && `${reorderAdded} item(s) from your previous order were added. `}
@@ -477,7 +435,9 @@ export default async function CartPage({
         cartId={cart.id}
         podId={cart.podId}
         initialCart={initialCartSnapshot}
+        initialValidation={initialValidation}
       >
+      <CartPageLiveValidationBanner />
       <CartPageLiveEmptyNotice />
 
       <div className="mt-10 space-y-10">
@@ -530,7 +490,6 @@ export default async function CartPage({
                               reason:
                                 "This is another participant's line — only they or the host can change it.",
                             };
-                const itemError = errorByCartItemId.get(item.id);
                 const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
                 const parentShell = pplu
                   ? parentShellByVendorParentPlu.get(shellBasePriceKey(item.vendorId, pplu))
@@ -554,9 +513,7 @@ export default async function CartPage({
                 ];
                 return (
                   <CartPageLiveLineGate key={item.id} cartItemId={item.id}>
-                  <li
-                    className={`flex gap-3 px-4 py-4 sm:px-5 ${itemError ? "bg-amber-50/50" : ""}`}
-                  >
+                  <CartPageLiveLineShell cartItemId={item.id}>
                     <MenuItemImage imageUrl={lineImageUrl} itemName={lineTitle} />
                     <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
@@ -584,9 +541,7 @@ export default async function CartPage({
                             {item.specialInstructions}
                           </p>
                         )}
-                        {itemError && (
-                          <p className="mt-2 text-sm font-medium text-amber-900">{itemError}</p>
-                        )}
+                        <CartPageLiveLineError cartItemId={item.id} />
                       </div>
                       <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end">
                       <span className="text-lg font-semibold tabular-nums text-stone-900">
@@ -619,7 +574,7 @@ export default async function CartPage({
                       />
                     </div>
                     </div>
-                  </li>
+                  </CartPageLiveLineShell>
                   </CartPageLiveLineGate>
                 );
               })}
@@ -705,45 +660,11 @@ export default async function CartPage({
                 </>
               )}
             </div>
-            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:items-end">
-              {canCheckout && !showParticipantTotalsOnly && (
-                <p className="text-center text-xs leading-snug text-stone-500 sm:text-right">
-                  Secure checkout with Stripe · Each vendor is notified after you pay
-                </p>
-              )}
-              {showParticipantTotalsOnly ? (
-                <div className="w-full text-center sm:text-right">
-                  {!canCheckout ? (
-                    <p className="text-xs text-amber-900">
-                      Some items need attention before checkout — only the host can complete fixes for the whole group.
-                    </p>
-                  ) : (
-                    <>
-                      <p className="text-xs text-stone-500">
-                        The host completes payment for the full order — you won&apos;t be charged here.
-                      </p>
-                      <span
-                        className="mt-2 inline-flex min-h-[48px] w-full cursor-not-allowed items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-600 sm:min-w-[14rem] sm:w-auto"
-                        aria-disabled
-                      >
-                        Host checks out
-                      </span>
-                    </>
-                  )}
-                </div>
-              ) : canCheckout ? (
-                <Link
-                  href={`/checkout?cartId=${cart.id}`}
-                  className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-900 px-8 py-3.5 text-center text-base font-bold text-white shadow-md transition duration-200 hover:bg-stone-800 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98] sm:min-w-[14rem] sm:w-auto"
-                >
-                  Continue to checkout
-                </Link>
-              ) : (
-                <span className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-500 sm:w-auto">
-                  Fix items above to continue
-                </span>
-              )}
-            </div>
+            <CartPageLiveCheckoutActions
+              showParticipantTotalsOnly={showParticipantTotalsOnly}
+              myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
+              totalCentsFallback={totalCents}
+            />
           </div>
         </div>
         <Link
