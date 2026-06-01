@@ -1,13 +1,16 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/db";
 import { SIGN_IN_PATH } from "@/lib/auth/account-paths";
 
 export type UpdateAccountNameResult = { ok: true } | { ok: false; error: string };
 
-/** Clears NextAuth User session and redirects to sign-in. */
+/** Clears NextAuth User session, revalidates auth-dependent layout, redirects to sign-in. */
 export async function signOutAccountAction(): Promise<void> {
+  revalidatePath("/", "layout");
   await signOut({ redirectTo: SIGN_IN_PATH });
 }
 

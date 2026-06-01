@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 
-import { signOutAccountAction } from "@/app/account/actions";
+import { CustomerSignOutForm } from "@/components/auth/CustomerSignOutForm";
 import {
   ACCOUNT_HUB_PATH,
   ORDER_HISTORY_PATH,
@@ -15,6 +13,7 @@ import { cn } from "@/lib/cn";
 
 type AccountHeaderDropdownProps = {
   accountMenu: HeaderAccountMenu | null;
+  hasServerSession: boolean;
   triggerClassName: string;
 };
 
@@ -24,50 +23,13 @@ const menuPanelClass =
 const menuItemClass =
   "block w-full px-3.5 py-2 text-left text-sm font-medium text-[#1F1F1C] transition-colors hover:bg-[#FAF4EA] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand";
 
-function SignOutMenuItem({ onClose }: { onClose: () => void }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      role="menuitem"
-      disabled={pending}
-      className={cn(menuItemClass, "text-red-800 hover:bg-red-50")}
-      onClick={onClose}
-    >
-      {pending ? "Signing out…" : "Sign out"}
-    </button>
-  );
-}
-
-function resolveMenu(
-  accountMenu: HeaderAccountMenu | null,
-  sessionEmail: string | null | undefined,
-  sessionName: string | null | undefined
-): HeaderAccountMenu | null {
-  if (accountMenu) return accountMenu;
-  if (!sessionEmail) return null;
-  return {
-    email: sessionEmail,
-    name: sessionName?.trim() || null,
-    roleHint: null,
-    adminDashboardHref: null,
-    vendorDashboardHref: null,
-    vendorDashboardLabel: null,
-    podDashboardHref: null,
-    podDashboardLabel: null,
-  };
-}
-
 export function AccountHeaderDropdown({
   accountMenu,
+  hasServerSession,
   triggerClassName,
 }: AccountHeaderDropdownProps) {
-  const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  const menu = resolveMenu(accountMenu, session?.user?.email, session?.user?.name);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -87,9 +49,9 @@ export function AccountHeaderDropdown({
     };
   }, [open, close]);
 
-  if (!menu) return null;
+  if (!hasServerSession || !accountMenu) return null;
 
-  const displayLabel = menu.name?.trim() || menu.email.split("@")[0] || "Account";
+  const displayLabel = accountMenu.name?.trim() || accountMenu.email.split("@")[0] || "Account";
 
   return (
     <div ref={ref} className="relative">
@@ -110,10 +72,10 @@ export function AccountHeaderDropdown({
         <div className={menuPanelClass} role="menu">
           <div className="border-b border-[#E7E0D6] px-3.5 py-2.5">
             <p className="truncate text-sm font-semibold text-[#1F1F1C]">{displayLabel}</p>
-            <p className="truncate text-xs text-[#6B6560]">{menu.email}</p>
-            {menu.roleHint && (
+            <p className="truncate text-xs text-[#6B6560]">{accountMenu.email}</p>
+            {accountMenu.roleHint && (
               <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-brand">
-                {menu.roleHint}
+                {accountMenu.roleHint}
               </p>
             )}
           </div>
@@ -133,9 +95,9 @@ export function AccountHeaderDropdown({
           >
             Order history
           </Link>
-          {menu.adminDashboardHref && (
+          {accountMenu.adminDashboardHref && (
             <Link
-              href={menu.adminDashboardHref}
+              href={accountMenu.adminDashboardHref}
               role="menuitem"
               className={menuItemClass}
               onClick={close}
@@ -143,30 +105,32 @@ export function AccountHeaderDropdown({
               Platform admin
             </Link>
           )}
-          {menu.vendorDashboardHref && menu.vendorDashboardLabel && (
+          {accountMenu.vendorDashboardHref && accountMenu.vendorDashboardLabel && (
             <Link
-              href={menu.vendorDashboardHref}
+              href={accountMenu.vendorDashboardHref}
               role="menuitem"
               className={menuItemClass}
               onClick={close}
             >
-              {menu.vendorDashboardLabel}
+              {accountMenu.vendorDashboardLabel}
             </Link>
           )}
-          {menu.podDashboardHref && menu.podDashboardLabel && (
+          {accountMenu.podDashboardHref && accountMenu.podDashboardLabel && (
             <Link
-              href={menu.podDashboardHref}
+              href={accountMenu.podDashboardHref}
               role="menuitem"
               className={menuItemClass}
               onClick={close}
             >
-              {menu.podDashboardLabel}
+              {accountMenu.podDashboardLabel}
             </Link>
           )}
           <div className="my-1 border-t border-[#E7E0D6]" />
-          <form action={signOutAccountAction}>
-            <SignOutMenuItem onClose={close} />
-          </form>
+          <CustomerSignOutForm
+            onSignOutStart={close}
+            className={cn(menuItemClass, "text-red-800 hover:bg-red-50")}
+            role="menuitem"
+          />
         </div>
       )}
     </div>

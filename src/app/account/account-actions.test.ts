@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockSignOut = vi.fn();
 const mockAuth = vi.fn();
 const mockUserUpdate = vi.fn();
+const mockRevalidatePath = vi.fn();
+
+vi.mock("next/cache", () => ({
+  revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
+}));
 
 vi.mock("@/auth", () => ({
   signOut: (...args: unknown[]) => mockSignOut(...args),
@@ -25,9 +30,10 @@ describe("signOutAccountAction", () => {
     vi.clearAllMocks();
   });
 
-  it("calls Auth.js signOut with login redirect", async () => {
+  it("calls Auth.js signOut with login redirect and revalidates layout", async () => {
     mockSignOut.mockResolvedValue(undefined);
     await signOutAccountAction();
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/", "layout");
     expect(mockSignOut).toHaveBeenCalledWith({ redirectTo: SIGN_IN_PATH });
   });
 });

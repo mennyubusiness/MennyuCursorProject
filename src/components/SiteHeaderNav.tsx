@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
 import { AccountHeaderDropdown } from "@/components/AccountHeaderDropdown";
@@ -33,7 +32,6 @@ export function SiteHeaderNav({
   activeOrderHref,
   cartHref,
 }: SiteHeaderNavProps) {
-  const { status } = useSession();
   const quickCart = useQuickCartOptional();
   const [cartPulse, setCartPulse] = useState(false);
 
@@ -51,7 +49,7 @@ export function SiteHeaderNav({
     };
   }, []);
 
-  const isSignedIn = hasServerSession || status === "authenticated";
+  const isSignedIn = hasServerSession;
   const showCustomerOrdering = navMode === "guest" || navMode === "customer";
   const showCart = showCustomerOrdering || isSignedIn;
 
@@ -102,7 +100,11 @@ export function SiteHeaderNav({
           </>
         )}
         {isSignedIn ? (
-          <AccountHeaderDropdown accountMenu={accountMenu} triggerClassName={navLink} />
+          <AccountHeaderDropdown
+            accountMenu={accountMenu}
+            hasServerSession={hasServerSession}
+            triggerClassName={navLink}
+          />
         ) : (
           <Link href={ACCOUNT_SIGN_IN_PATH} className={navLink} title="Sign in">
             Sign in

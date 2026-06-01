@@ -1,30 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useFormStatus } from "react-dom";
 import { useState } from "react";
 
+import { CustomerSignOutForm } from "@/components/auth/CustomerSignOutForm";
 import { buttonClassName } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-
-import { signOutAccountAction } from "./actions";
 
 type AccountSessionActionsProps = {
   hasCheckoutPhoneSession: boolean;
 };
-
-function SignOutSubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className={cn(buttonClassName({ variant: "secondary", size: "sm" }), "w-full sm:w-auto")}
-    >
-      {pending ? "Signing out…" : "Sign out"}
-    </button>
-  );
-}
 
 export function AccountSessionActions({ hasCheckoutPhoneSession }: AccountSessionActionsProps) {
   const router = useRouter();
@@ -53,9 +38,9 @@ export function AccountSessionActions({ hasCheckoutPhoneSession }: AccountSessio
 
   return (
     <div className="space-y-3">
-      <form action={signOutAccountAction}>
-        <SignOutSubmitButton />
-      </form>
+      <CustomerSignOutForm
+        className={cn(buttonClassName({ variant: "secondary", size: "sm" }), "w-full sm:w-auto")}
+      />
       {hasCheckoutPhoneSession && (
         <div className="space-y-1">
           <button

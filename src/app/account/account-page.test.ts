@@ -111,7 +111,7 @@ describe("/account tools by role", () => {
 
 describe("/account session actions", () => {
   it("signs out via server action and can clear checkout phone separately", () => {
-    expect(sessionActionsSrc).toMatch(/signOutAccountAction/);
+    expect(sessionActionsSrc).toMatch(/CustomerSignOutForm/);
     expect(signOutSectionSrc).toMatch(/does not delete your account/);
     expect(sessionActionsSrc).toMatch(/Clear checkout phone on this device/);
   });

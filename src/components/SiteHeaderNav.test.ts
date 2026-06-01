@@ -7,8 +7,14 @@ const dir = dirname(fileURLToPath(import.meta.url));
 
 const headerNavSrc = readFileSync(join(dir, "SiteHeaderNav.tsx"), "utf8");
 const dropdownSrc = readFileSync(join(dir, "AccountHeaderDropdown.tsx"), "utf8");
+const signOutFormSrc = readFileSync(join(dir, "auth/CustomerSignOutForm.tsx"), "utf8");
+const authProviderSrc = readFileSync(join(dir, "AuthSessionProvider.tsx"), "utf8");
 const headerNavContextSrc = readFileSync(join(dir, "../lib/auth/header-nav-context.ts"), "utf8");
 const accountActionsSrc = readFileSync(join(dir, "../app/account/actions.ts"), "utf8");
+const accountSessionActionsSrc = readFileSync(
+  join(dir, "../app/account/AccountSessionActions.tsx"),
+  "utf8"
+);
 const layoutSrc = readFileSync(join(dir, "../app/layout.tsx"), "utf8");
 
 describe("SiteHeaderNav signed-out pills", () => {
@@ -39,6 +45,12 @@ describe("SiteHeaderNav signed-in pills", () => {
     expect(layoutSrc).toMatch(/accountMenu=\{headerNav\.accountMenu\}/);
     expect(headerNavSrc).toMatch(/accountMenu/);
   });
+
+  it("uses server session as auth source of truth for header", () => {
+    expect(headerNavSrc).toMatch(/const isSignedIn = hasServerSession;/);
+    expect(headerNavSrc).not.toMatch(/status === "authenticated"/);
+    expect(headerNavSrc).toMatch(/hasServerSession=\{hasServerSession\}/);
+  });
 });
 
 describe("AccountHeaderDropdown menu items", () => {
@@ -47,8 +59,7 @@ describe("AccountHeaderDropdown menu items", () => {
     expect(dropdownSrc).toMatch(/ACCOUNT_HUB_PATH/);
     expect(dropdownSrc).toMatch(/Order history/);
     expect(dropdownSrc).toMatch(/ORDER_HISTORY_PATH/);
-    expect(dropdownSrc).toMatch(/Sign out/);
-    expect(dropdownSrc).toMatch(/signOutAccountAction/);
+    expect(dropdownSrc).toMatch(/CustomerSignOutForm/);
   });
 
   it("uses accessible dropdown trigger", () => {
@@ -59,6 +70,16 @@ describe("AccountHeaderDropdown menu items", () => {
 
   it("closes after navigation", () => {
     expect(dropdownSrc).toMatch(/onClick=\{close\}/);
+  });
+
+  it("does not close sign-out form before submit starts", () => {
+    expect(dropdownSrc).toMatch(/onSignOutStart=\{close\}/);
+    expect(dropdownSrc).not.toMatch(/onClick=\{close\}[\s\S]*Sign out/);
+  });
+
+  it("requires server session and account menu", () => {
+    expect(dropdownSrc).toMatch(/!hasServerSession \|\| !accountMenu/);
+    expect(dropdownSrc).not.toMatch(/useSession/);
   });
 
   it("includes optional single-role dashboard links", () => {
@@ -82,10 +103,26 @@ describe("header account menu server context", () => {
   });
 });
 
-describe("header sign-out behavior", () => {
-  it("reuses existing server sign-out action", () => {
+describe("shared customer sign-out path", () => {
+  it("uses one server action for account page and header dropdown", () => {
+    expect(signOutFormSrc).toMatch(/signOutAccountAction/);
+    expect(accountSessionActionsSrc).toMatch(/CustomerSignOutForm/);
     expect(accountActionsSrc).toMatch(/signOutAccountAction/);
+    expect(accountActionsSrc).toMatch(/revalidatePath\("\/", "layout"\)/);
     expect(accountActionsSrc).toMatch(/signOut\(\{ redirectTo: SIGN_IN_PATH \}\)/);
     expect(dropdownSrc).not.toMatch(/\/api\/customer\/session\/clear/);
+  });
+
+  it("closes dropdown only after sign-out submit is pending", () => {
+    expect(signOutFormSrc).toMatch(/onSignOutStart/);
+    expect(signOutFormSrc).toMatch(/if \(pending\) onSignOutStart/);
+  });
+});
+
+describe("AuthSessionProvider stale session sync", () => {
+  it("clears client session when server session is gone", () => {
+    expect(authProviderSrc).toMatch(/hasServerSession/);
+    expect(authProviderSrc).toMatch(/signOut\(\{ redirect: false \}\)/);
+    expect(layoutSrc).toMatch(/hasServerSession=\{hasServerSession\}/);
   });
 });
