@@ -25,6 +25,12 @@ export function SiteFooter() {
           <Link href="/login" className="transition hover:text-oo-warm-white">
             Sign in
           </Link>
+          <Link href="/privacy" className="transition hover:text-oo-warm-white">
+            Privacy
+          </Link>
+          <Link href="/terms" className="transition hover:text-oo-warm-white">
+            Terms
+          </Link>
         </nav>
         <p className="text-xs text-oo-stone-gray/80 sm:text-right">
           © {new Date().getFullYear()} Open Order Co.

@@ -48,6 +48,8 @@ export default async function RootLayout({
     pathname === "/explore" ||
     pathname === "/login" ||
     pathname === "/register" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
     isPodMarketplace ||
     isVendorMenuPage;
   const hideFooter =
