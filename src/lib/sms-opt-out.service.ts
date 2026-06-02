@@ -10,7 +10,14 @@ export function normalizeSmsPhoneE164(raw: string): string | null {
   const trimmed = raw?.trim() ?? "";
   if (!trimmed) return null;
   if (isLikelyE164Phone(trimmed)) return trimmed;
-  return normalizeUsPhoneToE164(trimmed);
+  const normalized = normalizeUsPhoneToE164(trimmed);
+  if (normalized) return normalized;
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length >= 10) {
+    const last10 = digits.slice(-10);
+    if (/^[2-9]\d{9}$/.test(last10)) return `+1${last10}`;
+  }
+  return null;
 }
 
 export async function isPhoneSmsOptedOut(phoneE164: string): Promise<boolean> {

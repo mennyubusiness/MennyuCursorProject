@@ -6,6 +6,8 @@ import { NextResponse } from "next/server";
 import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 import { isRoutingRetryAvailable, getRoutingUnavailableReason } from "@/lib/routing-availability";
 import { retryVendorOrderRouting } from "@/services/routing.service";
+import { recomputeAndPersistParentStatus } from "@/services/order-status.service";
+import { prisma } from "@/lib/db";
 
 export async function POST(
   request: Request,
@@ -41,6 +43,13 @@ export async function POST(
     });
   }
   if (result.success) {
+    const vo = await prisma.vendorOrder.findUnique({
+      where: { id: vendorOrderId },
+      select: { orderId: true },
+    });
+    if (vo) {
+      await recomputeAndPersistParentStatus(vo.orderId, "admin_retry_routing");
+    }
     return NextResponse.json({
       ok: true,
       action: "retry-routing",

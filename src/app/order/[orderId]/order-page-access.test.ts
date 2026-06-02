@@ -31,6 +31,11 @@ describe("customer order page access hardening", () => {
     expect(orderPageSrc).toMatch(/assertCustomerOrderAccess/);
     expect(orderPageSrc).toMatch(/OrderAccessDenied/);
   });
+
+  it("clears checkout source cart for any paid order view (idempotent)", () => {
+    expect(orderPageSrc).toMatch(/clearCartAfterOrderSuccessAction/);
+    expect(orderPageSrc).toMatch(/order\.status !== "pending_payment"/);
+  });
 });
 
 describe("signed order access URL flows", () => {

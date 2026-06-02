@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { auth } from "@/auth";
 import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
-import { getMennyuSessionIdForRequest } from "@/lib/session-request";
+import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import {
   discardStaleCheckoutCartsForSession,
   getOrCreateCart,
@@ -83,11 +83,9 @@ export default async function CartPage({
     redirect(`/order/${activeOrder.id}?from=cart`);
   }
 
-  /** Align with getOrCreateCartAction: prefer cookies() then header fallback (same as cart writes). */
-  const sessionId = (await getMennyuSessionIdForRequest()) ?? "__no_session__";
-  if (sessionId !== "__no_session__") {
-    await discardStaleCheckoutCartsForSession(sessionId);
-  }
+  /** Same session mint path as cart mutations — never load carts under a synthetic id. */
+  const sessionId = await getOrCreateMennyuSessionIdForCart();
+  await discardStaleCheckoutCartsForSession(sessionId);
   const currentPodId = getCurrentPodIdFromHeaders(headersList);
   const params = await searchParams;
   const reorderSkipped = params.reorder_skipped ? parseInt(params.reorder_skipped, 10) : 0;
@@ -113,9 +111,7 @@ export default async function CartPage({
       const dest = `/cart?startGroupOrder=1&podId=${encodeURIComponent(targetPodForGroup)}`;
       redirect(`/login?callbackUrl=${encodeURIComponent(dest)}`);
     }
-    if (sessionId !== "__no_session__") {
-      await getOrCreateCart(targetPodForGroup, sessionId);
-    }
+    await getOrCreateCart(targetPodForGroup, sessionId);
   }
 
   const preferredPodId = startGroupOrder && targetPodForGroup ? targetPodForGroup : currentPodId;

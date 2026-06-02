@@ -51,7 +51,16 @@ async function hasCommittedMilestone(key: string): Promise<boolean> {
     select: { status: true },
   });
   if (!row) return false;
-  return ["sent", "logged", "queued", "delivered", "dry_run"].includes(row.status);
+  return [
+    "pending",
+    "sent",
+    "logged",
+    "queued",
+    "delivered",
+    "dry_run",
+    "suppressed",
+    "skipped",
+  ].includes(row.status);
 }
 
 type OrderNotificationContext = {
@@ -146,13 +155,14 @@ async function maybeSendPickupReadyMilestone(
     return;
   }
 
-  const readyKey = milestoneIdempotencyKey("final_vendor_ready", triggeredVendorOrderId);
+  const readyScopeId = multiVendor ? ctx.orderId : triggeredVendorOrderId;
+  const readyKey = milestoneIdempotencyKey("final_vendor_ready", readyScopeId);
   if (await hasCommittedMilestone(readyKey)) return;
 
   await sendOrderReadySms({
     to: ctx.customerPhone,
     orderId: ctx.orderId,
-    vendorOrderId: triggeredVendorOrderId,
+    vendorOrderId: multiVendor ? null : triggeredVendorOrderId,
   });
 }
 
@@ -257,7 +267,10 @@ export async function evaluateCustomerOrderMilestones(params: {
   }
 
   if (vo.fulfillmentStatus === "completed") {
-    const readyKey = milestoneIdempotencyKey("final_vendor_ready", params.vendorOrderId);
+    const active = activeNonCancelledVendorOrders(ctx.vendorOrders);
+    const multiVendor = active.length > 1;
+    const readyScopeId = multiVendor ? ctx.orderId : params.vendorOrderId;
+    const readyKey = milestoneIdempotencyKey("final_vendor_ready", readyScopeId);
     if (!(await hasCommittedMilestone(readyKey))) {
       await maybeSendPickupReadyMilestone(ctx, params.vendorOrderId);
     }

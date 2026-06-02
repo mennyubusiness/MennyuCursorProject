@@ -2,9 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import {
+  clearMennyuCheckoutCookieClient,
   consumePendingClientCartClear,
   dispatchCartCleared,
   emptyCartSnapshot,
+  readMennyuCheckoutCookie,
 } from "@/lib/cart-client-sync";
 
 /**
@@ -27,13 +29,22 @@ export function OrderPostCheckoutCartSync({
     if (orderStatus === "pending_payment") return;
 
     const pending = consumePendingClientCartClear(orderId);
-    if (!pending) return;
+    const checkoutCookie = readMennyuCheckoutCookie();
+    const checkoutMatch =
+      checkoutCookie?.orderId === orderId
+        ? { cartId: checkoutCookie.cartId, podId, orderId }
+        : null;
+    const target = pending ?? checkoutMatch;
+    if (!target) return;
 
     syncedRef.current = true;
+    if (checkoutMatch) {
+      clearMennyuCheckoutCookieClient();
+    }
     dispatchCartCleared({
-      cartId: pending.cartId,
-      podId: pending.podId || podId,
-      cart: emptyCartSnapshot({ id: pending.cartId, podId: pending.podId || podId }),
+      cartId: target.cartId,
+      podId: target.podId || podId,
+      cart: emptyCartSnapshot({ id: target.cartId, podId: target.podId || podId }),
       source: "order-page",
     });
   }, [orderId, podId, orderStatus]);

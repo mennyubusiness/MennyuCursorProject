@@ -242,8 +242,29 @@ describe("customer-order-notification.service", () => {
       expect(mockSendOrderReadySms).toHaveBeenCalledWith({
         to: PHONE,
         orderId: ORDER_ID,
-        vendorOrderId: VO_B,
+        vendorOrderId: null,
       });
+    });
+
+    it("multi-vendor re-evaluation for earlier vendor does not duplicate ORDER_READY", async () => {
+      mockOrderFindUnique.mockResolvedValue(
+        makeOrder({
+          parentStatus: "ready",
+          vendorOrders: [
+            { id: VO_A, fulfillmentStatus: "ready", vendorName: "Vendor A" },
+            { id: VO_B, fulfillmentStatus: "ready", vendorName: "Vendor B" },
+          ],
+        })
+      );
+      mockSmsLogFindUnique.mockResolvedValue({ status: "logged" });
+
+      await evaluateCustomerOrderMilestones({
+        orderId: ORDER_ID,
+        vendorOrderId: VO_A,
+        source: "deliverect",
+      });
+
+      expect(mockSendOrderReadySms).not.toHaveBeenCalled();
     });
 
     it("duplicate ready events do not duplicate SMS", async () => {

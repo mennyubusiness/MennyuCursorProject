@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   classifyInboundSmsBody,
   readTwilioWebhookParams,
+  resolveTwilioWebhookRequestUrl,
   TWILIO_INBOUND_HELP_REPLY,
   TWILIO_INBOUND_OTHER_REPLY,
   TWILIO_INBOUND_START_REPLY,
@@ -32,7 +33,7 @@ function twimlResponse(message: string): NextResponse {
 export async function POST(request: NextRequest) {
   const params = await readTwilioWebhookParams(request);
   const signature = request.headers.get("x-twilio-signature");
-  const requestUrl = request.url;
+  const requestUrl = resolveTwilioWebhookRequestUrl(request);
 
   if (!validateTwilioWebhookRequest(requestUrl, params, signature)) {
     return NextResponse.json({ error: "Invalid Twilio signature" }, { status: 403 });

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { clearCartOnServerAndNotifyClient } from "@/lib/cart-checkout-client";
 import { CheckoutProgress } from "./CheckoutProgress";
 
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
@@ -74,7 +73,6 @@ function PaymentStepForm({
         setLoading(false);
         return;
       }
-      await clearCartOnServerAndNotifyClient({ cartId, podId, orderId });
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

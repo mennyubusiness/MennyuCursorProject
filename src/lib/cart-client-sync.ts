@@ -35,6 +35,35 @@ export type PendingCartClear = {
   orderId: string;
 };
 
+export type MennyuCheckoutCookie = {
+  orderId: string;
+  cartId: string;
+};
+
+const MENNYU_CHECKOUT_COOKIE_NAME = "mennyu_checkout";
+
+/** Client-side checkout marker set before Stripe redirect (see CheckoutForm). */
+export function readMennyuCheckoutCookie(): MennyuCheckoutCookie | null {
+  if (typeof document === "undefined") return null;
+  const prefix = `${MENNYU_CHECKOUT_COOKIE_NAME}=`;
+  const entry = document.cookie.split(";").map((c) => c.trim()).find((c) => c.startsWith(prefix));
+  if (!entry) return null;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(entry.slice(prefix.length))) as MennyuCheckoutCookie;
+    if (typeof parsed.orderId === "string" && typeof parsed.cartId === "string") {
+      return parsed;
+    }
+  } catch {
+    /* ignore malformed cookie */
+  }
+  return null;
+}
+
+export function clearMennyuCheckoutCookieClient(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${MENNYU_CHECKOUT_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+}
+
 /** True when a cart snapshot belongs to the given cart/pod (ignore foreign pods). */
 export function cartSnapshotAppliesToContext(
   cart: Cart | null | undefined,

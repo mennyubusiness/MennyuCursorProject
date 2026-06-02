@@ -31,5 +31,7 @@ export async function updateAccountNameAction(name: string): Promise<UpdateAccou
     data: { name: trimmed || null },
   });
 
+  revalidatePath("/", "layout");
+
   return { ok: true };
 }

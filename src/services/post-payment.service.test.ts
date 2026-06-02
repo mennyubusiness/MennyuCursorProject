@@ -101,4 +101,21 @@ describe("processSuccessfulPayment validation gate", () => {
 
     expect(mockRecordPayment).not.toHaveBeenCalled();
   });
+
+  it("no-ops replay when order is already past pending_payment", async () => {
+    mockOrderFindUnique.mockReset();
+    mockOrderFindUnique.mockResolvedValueOnce({ status: "paid" });
+
+    await processSuccessfulPayment({
+      orderId: "ord_1",
+      paymentIntentId: "pi_1",
+      idempotencyKey: "stripe_evt",
+    });
+
+    expect(mockValidate).not.toHaveBeenCalled();
+    expect(mockRecordPayment).not.toHaveBeenCalled();
+    expect(mockSetOrderStatus).not.toHaveBeenCalled();
+    expect(mockSendSms).not.toHaveBeenCalled();
+    expect(mockClearCart).toHaveBeenCalledWith("ord_1");
+  });
 });

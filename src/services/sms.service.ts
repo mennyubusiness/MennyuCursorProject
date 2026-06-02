@@ -4,7 +4,6 @@
  */
 import "server-only";
 
-import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import {
   isLikelyE164Phone,
@@ -18,6 +17,12 @@ import {
   shouldSendViaTwilio,
   smsOperationalError,
 } from "@/lib/sms-config";
+import {
+  createSmsMessageLogWithoutKey,
+  finalizeSmsMessageLog,
+  reserveSmsMessageLog,
+  type SmsLogReservation,
+} from "@/lib/sms-message-log-reservation";
 import {
   buildOrderCancelledSmsBody,
   buildOrderIssueSmsBody,
@@ -72,72 +77,10 @@ export type SendSmsResult = {
   destinationMasked: string;
 };
 
-const BODY_PREVIEW_MAX = 240;
-
-function bodyPreview(body: string): string {
-  const t = body.trim();
-  if (t.length <= BODY_PREVIEW_MAX) return t;
-  return `${t.slice(0, BODY_PREVIEW_MAX - 1)}…`;
-}
-
 function mapLogStatus(mode: ReturnType<typeof resolveSmsMode>, twilioStatus?: string): string {
   if (mode === "log") return "logged";
   if (twilioStatus === "queued" || twilioStatus === "accepted") return "queued";
   return "sent";
-}
-
-async function findCommittedSmsLog(idempotencyKey: string) {
-  return prisma.smsMessageLog.findUnique({
-    where: { idempotencyKey },
-    select: { status: true, providerMessageId: true },
-  });
-}
-
-async function writeSmsLog(input: {
-  orderId?: string | null;
-  vendorOrderId?: string | null;
-  userId?: string | null;
-  toMasked: string;
-  toLast4: string | null;
-  eventType: string;
-  body: string;
-  status: string;
-  providerMessageId?: string | null;
-  errorCode?: string | null;
-  failureMessage?: string | null;
-  idempotencyKey?: string | null;
-  sentAt?: Date | null;
-}) {
-  try {
-    await prisma.smsMessageLog.create({
-      data: {
-        orderId: input.orderId ?? null,
-        vendorOrderId: input.vendorOrderId ?? null,
-        userId: input.userId ?? null,
-        toMasked: input.toMasked,
-        toLast4: input.toLast4,
-        eventType: input.eventType,
-        bodyPreview: bodyPreview(input.body),
-        provider: "twilio",
-        providerMessageId: input.providerMessageId ?? null,
-        status: input.status,
-        errorCode: input.errorCode ?? null,
-        failureMessage: input.failureMessage ?? null,
-        idempotencyKey: input.idempotencyKey ?? null,
-        sentAt: input.sentAt ?? null,
-      },
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.warn(
-      JSON.stringify({
-        event: "sms_log_write_failed",
-        eventType: input.eventType,
-        orderId: input.orderId,
-        message: msg,
-      })
-    );
-  }
 }
 
 function normalizeDestination(rawTo: string): { e164: string | null; masked: string } {
@@ -148,8 +91,111 @@ function normalizeDestination(rawTo: string): { e164: string | null; masked: str
   return { e164, masked };
 }
 
+function duplicateReservationResult(
+  reservation: Extract<SmsLogReservation, { outcome: "duplicate" }>,
+  destinationMasked: string
+): SendSmsResult {
+  return {
+    status: "skipped",
+    providerMessageId: reservation.providerMessageId,
+    failureMessage: reservation.reason,
+    errorCode: null,
+    destinationMasked,
+  };
+}
+
+type ReserveContext = {
+  orderId?: string | null;
+  vendorOrderId?: string | null;
+  userId?: string | null;
+  toMasked: string;
+  toLast4: string | null;
+  eventType: string;
+  body: string;
+  idempotencyKey?: string | null;
+};
+
+async function reserveTerminalSmsLog(
+  ctx: ReserveContext,
+  status: string,
+  failureMessage: string,
+  sentAt?: Date | null
+): Promise<{ ok: true } | { ok: false; result: SendSmsResult }> {
+  if (!ctx.idempotencyKey) {
+    await createSmsMessageLogWithoutKey({
+      orderId: ctx.orderId,
+      vendorOrderId: ctx.vendorOrderId,
+      userId: ctx.userId,
+      toMasked: ctx.toMasked,
+      toLast4: ctx.toLast4,
+      eventType: ctx.eventType,
+      body: ctx.body,
+      status,
+      failureMessage,
+      sentAt: sentAt ?? null,
+    });
+    return { ok: true };
+  }
+
+  const reservation = await reserveSmsMessageLog({
+    orderId: ctx.orderId,
+    vendorOrderId: ctx.vendorOrderId,
+    userId: ctx.userId,
+    toMasked: ctx.toMasked,
+    toLast4: ctx.toLast4,
+    eventType: ctx.eventType,
+    body: ctx.body,
+    status,
+    failureMessage,
+    idempotencyKey: ctx.idempotencyKey,
+    sentAt: sentAt ?? null,
+  });
+
+  if (reservation.outcome === "duplicate") {
+    return { ok: false, result: duplicateReservationResult(reservation, ctx.toMasked) };
+  }
+
+  return { ok: true };
+}
+
+async function reservePendingSmsLog(
+  ctx: ReserveContext
+): Promise<{ ok: true; logId: string } | { ok: false; result: SendSmsResult }> {
+  if (!ctx.idempotencyKey) {
+    const row = await createSmsMessageLogWithoutKey({
+      orderId: ctx.orderId,
+      vendorOrderId: ctx.vendorOrderId,
+      userId: ctx.userId,
+      toMasked: ctx.toMasked,
+      toLast4: ctx.toLast4,
+      eventType: ctx.eventType,
+      body: ctx.body,
+      status: "pending",
+    });
+    return { ok: true, logId: row.id };
+  }
+
+  const reservation = await reserveSmsMessageLog({
+    orderId: ctx.orderId,
+    vendorOrderId: ctx.vendorOrderId,
+    userId: ctx.userId,
+    toMasked: ctx.toMasked,
+    toLast4: ctx.toLast4,
+    eventType: ctx.eventType,
+    body: ctx.body,
+    status: "pending",
+    idempotencyKey: ctx.idempotencyKey,
+  });
+
+  if (reservation.outcome === "duplicate") {
+    return { ok: false, result: duplicateReservationResult(reservation, ctx.toMasked) };
+  }
+
+  return { ok: true, logId: reservation.logId };
+}
+
 /**
- * Send a transactional SMS with idempotency, opt-out checks, env guards, and audit logging.
+ * Send a transactional SMS with atomic idempotency, opt-out checks, env guards, and audit logging.
  */
 export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
   const eventType = SMS_TEMPLATE_TYPES.has(input.type as SmsTemplateType)
@@ -158,20 +204,20 @@ export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
 
   const { e164, masked } = normalizeDestination(input.to);
 
+  const ctx: ReserveContext = {
+    orderId: input.orderId,
+    vendorOrderId: input.vendorOrderId,
+    userId: input.userId,
+    toMasked: masked,
+    toLast4: input.to?.trim() ? phoneLast4(input.to) : null,
+    eventType,
+    body: input.body,
+    idempotencyKey: input.idempotencyKey,
+  };
+
   if (!e164) {
     const reason = input.to?.trim() ? "invalid_phone_number" : "missing_destination_phone";
-    await writeSmsLog({
-      orderId: input.orderId,
-      vendorOrderId: input.vendorOrderId,
-      userId: input.userId,
-      toMasked: masked,
-      toLast4: input.to?.trim() ? phoneLast4(input.to) : null,
-      eventType,
-      body: input.body,
-      status: "skipped",
-      failureMessage: reason,
-      idempotencyKey: input.idempotencyKey,
-    });
+    await reserveTerminalSmsLog(ctx, "skipped", reason);
     return {
       status: "skipped",
       providerMessageId: null,
@@ -182,38 +228,14 @@ export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
   }
 
   const destinationMasked = maskPhone(e164);
-
-  if (input.idempotencyKey) {
-    const existing = await findCommittedSmsLog(input.idempotencyKey);
-    if (
-      existing &&
-      ["sent", "logged", "queued", "delivered", "dry_run"].includes(existing.status)
-    ) {
-      return {
-        status: "skipped",
-        providerMessageId: existing.providerMessageId,
-        failureMessage: "duplicate_idempotency_key",
-        errorCode: null,
-        destinationMasked,
-      };
-    }
-  }
+  ctx.toMasked = destinationMasked;
+  ctx.toLast4 = phoneLast4(e164);
 
   const mode = resolveSmsMode();
 
   if (mode === "disabled") {
-    await writeSmsLog({
-      orderId: input.orderId,
-      vendorOrderId: input.vendorOrderId,
-      userId: input.userId,
-      toMasked: destinationMasked,
-      toLast4: phoneLast4(e164),
-      eventType,
-      body: input.body,
-      status: "skipped",
-      failureMessage: "sms_disabled",
-      idempotencyKey: input.idempotencyKey,
-    });
+    const reserved = await reserveTerminalSmsLog(ctx, "skipped", "sms_disabled");
+    if (!reserved.ok) return reserved.result;
     return {
       status: "skipped",
       providerMessageId: null,
@@ -224,18 +246,8 @@ export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
   }
 
   if (await isPhoneSmsOptedOut(e164)) {
-    await writeSmsLog({
-      orderId: input.orderId,
-      vendorOrderId: input.vendorOrderId,
-      userId: input.userId,
-      toMasked: destinationMasked,
-      toLast4: phoneLast4(e164),
-      eventType,
-      body: input.body,
-      status: "suppressed",
-      failureMessage: "phone_opted_out",
-      idempotencyKey: input.idempotencyKey,
-    });
+    const reserved = await reserveTerminalSmsLog(ctx, "suppressed", "phone_opted_out");
+    if (!reserved.ok) return reserved.result;
     return {
       status: "suppressed",
       providerMessageId: null,
@@ -248,19 +260,8 @@ export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
   if (mode === "log" || !shouldSendViaTwilio()) {
     const reason =
       mode === "log" ? "sms_mode_log" : smsOperationalError() ?? "twilio_not_configured";
-    await writeSmsLog({
-      orderId: input.orderId,
-      vendorOrderId: input.vendorOrderId,
-      userId: input.userId,
-      toMasked: destinationMasked,
-      toLast4: phoneLast4(e164),
-      eventType,
-      body: input.body,
-      status: "logged",
-      failureMessage: reason,
-      idempotencyKey: input.idempotencyKey,
-      sentAt: new Date(),
-    });
+    const reserved = await reserveTerminalSmsLog(ctx, "logged", reason, new Date());
+    if (!reserved.ok) return reserved.result;
     if (env.NODE_ENV === "production" && reason.includes("missing")) {
       console.error(
         JSON.stringify({
@@ -280,20 +281,15 @@ export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
     };
   }
 
+  const pending = await reservePendingSmsLog(ctx);
+  if (!pending.ok) return pending.result;
+
   const twilioResult = await sendTwilioMessage({ to: e164, body: input.body });
   if ("error" in twilioResult) {
-    await writeSmsLog({
-      orderId: input.orderId,
-      vendorOrderId: input.vendorOrderId,
-      userId: input.userId,
-      toMasked: destinationMasked,
-      toLast4: phoneLast4(e164),
-      eventType,
-      body: input.body,
+    await finalizeSmsMessageLog(pending.logId, {
       status: "failed",
       errorCode: twilioResult.code ?? null,
       failureMessage: twilioResult.error,
-      idempotencyKey: input.idempotencyKey,
     });
     console.warn(
       JSON.stringify({
@@ -319,18 +315,9 @@ export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
   }
 
   const logStatus = mapLogStatus(mode, twilioResult.status);
-
-  await writeSmsLog({
-    orderId: input.orderId,
-    vendorOrderId: input.vendorOrderId,
-    userId: input.userId,
-    toMasked: destinationMasked,
-    toLast4: phoneLast4(e164),
-    eventType,
-    body: input.body,
+  await finalizeSmsMessageLog(pending.logId, {
     status: logStatus,
     providerMessageId: twilioResult.sid,
-    idempotencyKey: input.idempotencyKey,
     sentAt: new Date(),
   });
 

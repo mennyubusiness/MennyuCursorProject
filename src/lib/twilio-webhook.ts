@@ -38,6 +38,25 @@ export async function readTwilioWebhookParams(request: Request): Promise<Record<
   return {};
 }
 
+export function resolveTwilioWebhookRequestUrl(request: {
+  url: string;
+  nextUrl: { pathname: string; search: string };
+  headers: Headers;
+}): string {
+  const pathname = request.nextUrl.pathname;
+  const search = request.nextUrl.search;
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = forwardedHost || request.headers.get("host")?.trim();
+  if (host) {
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+    const proto =
+      forwardedProto ||
+      (host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https");
+    return `${proto}://${host}${pathname}${search}`;
+  }
+  return request.url;
+}
+
 export function validateTwilioWebhookRequest(
   requestUrl: string,
   params: Record<string, string>,

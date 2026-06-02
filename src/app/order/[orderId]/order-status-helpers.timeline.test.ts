@@ -70,4 +70,23 @@ describe("buildTimelineEvents", () => {
     });
     expect(events.filter((e) => e.label === "Burger Co — Preparing")).toHaveLength(1);
   });
+
+  it("does not label manually recovered vendor history as Failed", () => {
+    const events = buildTimelineEvents({
+      statusHistory: [],
+      vendorOrders: [
+        {
+          vendor: { name: "Taco Shop" },
+          statusHistory: [
+            {
+              routingStatus: "failed",
+              fulfillmentStatus: "accepted",
+              createdAt: baseDate,
+            },
+          ],
+        },
+      ],
+    });
+    expect(events.some((e) => e.label === "Taco Shop — Failed")).toBe(false);
+  });
 });

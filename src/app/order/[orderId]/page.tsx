@@ -41,9 +41,13 @@ export default async function OrderStatusPage({
   }
 
   if (payment === "success" && order.status !== "pending_payment") {
-    await clearCartAfterOrderSuccessAction(orderId);
     const qs = from ? `?from=${encodeURIComponent(from)}` : "";
     redirect(`/order/${orderId}${qs}`);
+  }
+
+  /** Idempotent: clears checkout source cart when still linked (Stripe lag / confirming screen path). */
+  if (order.status !== "pending_payment") {
+    await clearCartAfterOrderSuccessAction(orderId);
   }
 
   if (order.status === "pending_payment") {

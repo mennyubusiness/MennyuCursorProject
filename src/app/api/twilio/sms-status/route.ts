@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { applyTwilioSmsStatusCallback } from "@/services/sms-status-update.service";
-import { readTwilioWebhookParams, validateTwilioWebhookRequest } from "@/lib/twilio-webhook";
+import { readTwilioWebhookParams, resolveTwilioWebhookRequestUrl, validateTwilioWebhookRequest } from "@/lib/twilio-webhook";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   const params = await readTwilioWebhookParams(request);
   const signature = request.headers.get("x-twilio-signature");
-  const requestUrl = request.url;
+  const requestUrl = resolveTwilioWebhookRequestUrl(request);
 
   if (!validateTwilioWebhookRequest(requestUrl, params, signature)) {
     return NextResponse.json({ error: "Invalid Twilio signature" }, { status: 403 });

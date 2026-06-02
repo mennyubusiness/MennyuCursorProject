@@ -192,59 +192,97 @@ export async function validateCartForOrder(cart: {
     }
   }
 
+  const nestingFailure = await validateDeliverectSubItemsNestingForOrder(cart.items);
+  if (nestingFailure) return nestingFailure;
+
+  return { valid: true };
+}
+
+type CartLineForDeliverectNestingCheck = {
+  id: string;
+  menuItemId: string;
+  menuItem: {
+    name: string;
+    deliverectVariantParentPlu?: string | null;
+  };
+  vendor?: { deliverectChannelLinkId?: string | null };
+  selections?: Array<{ modifierOptionId: string; quantity: number }>;
+};
+
+/** Shared Deliverect subItems depth validation for cart display and checkout. */
+export async function collectDeliverectSubItemsNestingErrors(
+  items: CartLineForDeliverectNestingCheck[]
+): Promise<CartItemValidationError[]> {
+  const errors: CartItemValidationError[] = [];
   const optionIdsForNesting = [
-    ...new Set(cart.items.flatMap((i) => i.selections?.map((s) => s.modifierOptionId) ?? [])),
+    ...new Set(items.flatMap((i) => i.selections?.map((s) => s.modifierOptionId) ?? [])),
   ];
-  if (optionIdsForNesting.length > 0) {
-    const optsWithGroup = await prisma.modifierOption.findMany({
-      where: { id: { in: optionIdsForNesting } },
-      select: {
-        id: true,
-        modifierGroup: {
-          select: {
-            id: true,
-            sortOrder: true,
-            deliverectIsVariantGroup: true,
-            parentModifierOptionId: true,
-          },
+  if (optionIdsForNesting.length === 0) return errors;
+
+  const optsWithGroup = await prisma.modifierOption.findMany({
+    where: { id: { in: optionIdsForNesting } },
+    select: {
+      id: true,
+      modifierGroup: {
+        select: {
+          id: true,
+          sortOrder: true,
+          deliverectIsVariantGroup: true,
+          parentModifierOptionId: true,
         },
       },
-    });
-    const optGroupById = new Map(optsWithGroup.map((o) => [o.id, o]));
-    for (const item of cart.items) {
-      if (!item.vendor?.deliverectChannelLinkId?.trim()) continue;
-      const sels = item.selections ?? [];
-      if (sels.length === 0) continue;
-      const subItemsChainVariantSteps = countSubItemsChainVariantSelections({
-        selections: sels
-          .map((s) => {
-            const row = optGroupById.get(s.modifierOptionId);
-            if (!row) return null;
-            return { modifierOption: { modifierGroup: row.modifierGroup } };
-          })
-          .filter((x): x is NonNullable<typeof x> => x != null),
-      });
-      const hasParentPlu = Boolean(item.menuItem.deliverectVariantParentPlu?.trim());
-      if (
-        !isDeliverectSubItemsChainDepthAllowed({
-          hasDeliverectVariantParentPlu: hasParentPlu,
-          chainVariantStepCount: subItemsChainVariantSteps,
+    },
+  });
+  const optGroupById = new Map(optsWithGroup.map((o) => [o.id, o]));
+
+  for (const item of items) {
+    if (!item.vendor?.deliverectChannelLinkId?.trim()) continue;
+    const sels = item.selections ?? [];
+    if (sels.length === 0) continue;
+    const subItemsChainVariantSteps = countSubItemsChainVariantSelections({
+      selections: sels
+        .map((s) => {
+          const row = optGroupById.get(s.modifierOptionId);
+          if (!row) return null;
+          return { modifierOption: { modifierGroup: row.modifierGroup } };
         })
-      ) {
-        const max = maxSubItemsChainVariantStepsForProductShape(hasParentPlu);
-        return {
-          valid: false,
-          code: "DELIVERECT_SUBITEMS_NESTING_LIMIT",
-          message: deliverectSubItemsChainLimitMessage(item.menuItem.name, max),
-          cartItemId: item.id,
-          menuItemId: item.menuItemId,
-          menuItemName: item.menuItem.name,
-        };
-      }
+        .filter((x): x is NonNullable<typeof x> => x != null),
+    });
+    const hasParentPlu = Boolean(item.menuItem.deliverectVariantParentPlu?.trim());
+    if (
+      !isDeliverectSubItemsChainDepthAllowed({
+        hasDeliverectVariantParentPlu: hasParentPlu,
+        chainVariantStepCount: subItemsChainVariantSteps,
+      })
+    ) {
+      const max = maxSubItemsChainVariantStepsForProductShape(hasParentPlu);
+      errors.push({
+        code: "DELIVERECT_SUBITEMS_NESTING_LIMIT",
+        message: deliverectSubItemsChainLimitMessage(item.menuItem.name, max),
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      });
     }
   }
 
-  return { valid: true };
+  return errors;
+}
+
+async function validateDeliverectSubItemsNestingForOrder(
+  cart: CartLineForDeliverectNestingCheck[]
+): Promise<CartValidationResult | null> {
+  const errors = await collectDeliverectSubItemsNestingErrors(cart);
+  if (errors.length === 0) return null;
+  const first = errors[0]!;
+  return {
+    valid: false,
+    code: first.code,
+    message: first.message,
+    cartItemId: first.cartItemId,
+    menuItemId: first.menuItemId,
+    menuItemName: first.menuItemName,
+  };
 }
 
 export type CartItemValidationError = {
@@ -274,7 +312,7 @@ export type CartForValidation = {
       deliverectPlu?: string | null;
       deliverectVariantParentPlu?: string | null;
     };
-    vendor: { isActive?: boolean; mennyuOrdersPaused?: boolean; posOpen?: boolean };
+    vendor: { isActive?: boolean; mennyuOrdersPaused?: boolean; posOpen?: boolean; deliverectChannelLinkId?: string | null };
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
   }>;
 };
@@ -437,6 +475,8 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
     }
   }
 
+  errors.push(...(await collectDeliverectSubItemsNestingErrors(cart.items)));
+
   return { valid: errors.length === 0, errors };
 }
 
@@ -482,6 +522,18 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
     return {
       order: toOrder(existing),
       vendorOrders: existing.vendorOrders.map(toVendorOrder),
+    };
+  }
+
+  /** One unpaid checkout per cart — reuse existing pending order instead of duplicating. */
+  const pendingFromSameCart = await prisma.order.findFirst({
+    where: { sourceCartId: input.cartId, status: "pending_payment" },
+    include: { vendorOrders: true },
+  });
+  if (pendingFromSameCart) {
+    return {
+      order: toOrder(pendingFromSameCart),
+      vendorOrders: pendingFromSameCart.vendorOrders.map(toVendorOrder),
     };
   }
 

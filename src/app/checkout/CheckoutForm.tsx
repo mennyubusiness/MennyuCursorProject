@@ -242,7 +242,12 @@ export function CheckoutForm({
           setError(orderData.error ?? "Order confirmation failed");
           return;
         }
-        await clearCartOnServerAndNotifyClient({ cartId, podId, orderId });
+        await clearCartOnServerAndNotifyClient({
+          cartId,
+          podId,
+          orderId,
+          serverAlreadyCleared: true,
+        });
         router.push(buildOrderStatusPath(orderId, { accessToken: orderAccessToken }));
         return;
       }
@@ -277,6 +282,7 @@ export function CheckoutForm({
           router.push(
             buildOrderStatusPath(paymentData.orderId, {
               accessToken: paymentData.orderAccessToken,
+              payment: "success",
             })
           )
         }

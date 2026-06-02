@@ -224,7 +224,9 @@ export function timelineEntryLabel(
   }
   const r = routingStatus ?? "";
   const f = fulfillmentStatus ?? "";
-  const part = vendorStatusLabel(r, f, false);
+  const isManuallyRecovered =
+    r === "failed" && ["accepted", "preparing", "ready", "completed"].includes(f);
+  const part = vendorStatusLabel(r, f, isManuallyRecovered);
   return vendorName ? `${vendorName} — ${part}` : part;
 }
 

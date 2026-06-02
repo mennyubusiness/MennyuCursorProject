@@ -22,6 +22,7 @@ export type DisplayCartRowForValidation = {
       isActive?: boolean;
       mennyuOrdersPaused?: boolean | null;
       posOpen?: boolean;
+      deliverectChannelLinkId?: string | null;
     };
     selections?: Array<{
       modifierOptionId: string;
@@ -55,6 +56,7 @@ export function buildCartForValidationFromDisplayCart(
         isActive: i.vendor.isActive,
         mennyuOrdersPaused: i.vendor.mennyuOrdersPaused ?? undefined,
         posOpen: undefined,
+        deliverectChannelLinkId: i.vendor.deliverectChannelLinkId ?? null,
       },
       selections: i.selections?.map((s) => ({
         modifierOptionId: s.modifierOptionId,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyInboundSmsBody,
+  resolveTwilioWebhookRequestUrl,
   TWILIO_INBOUND_HELP_REPLY,
   TWILIO_INBOUND_OTHER_REPLY,
   TWILIO_INBOUND_START_REPLY,
@@ -34,5 +35,19 @@ describe("twilio inbound SMS classification", () => {
     expect(TWILIO_INBOUND_STOP_REPLY).toContain("unsubscribed");
     expect(TWILIO_INBOUND_START_REPLY).toContain("transactional");
     expect(TWILIO_INBOUND_OTHER_REPLY).toContain("automated pickup order notifications");
+  });
+});
+
+describe("resolveTwilioWebhookRequestUrl", () => {
+  it("uses forwarded host/proto for signature validation behind proxy", () => {
+    const url = resolveTwilioWebhookRequestUrl({
+      url: "http://internal:3000/api/twilio/inbound-sms",
+      nextUrl: { pathname: "/api/twilio/inbound-sms", search: "" },
+      headers: new Headers({
+        "x-forwarded-host": "app.openorder.co",
+        "x-forwarded-proto": "https",
+      }),
+    });
+    expect(url).toBe("https://app.openorder.co/api/twilio/inbound-sms");
   });
 });

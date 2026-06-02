@@ -53,6 +53,14 @@ describe("SiteHeaderNav signed-in pills", () => {
   });
 });
 
+describe("AuthSessionProvider stale session sync", () => {
+  it("clears client session when server session is gone", () => {
+    expect(authProviderSrc).toMatch(/hasServerSession/);
+    expect(authProviderSrc).toMatch(/signOut\(\{ redirect: false \}\)/);
+    expect(layoutSrc).toMatch(/hasServerSession=\{hasServerSession\}/);
+  });
+});
+
 describe("AccountHeaderDropdown menu items", () => {
   it("includes identity summary and core links", () => {
     expect(dropdownSrc).toMatch(/View account/);
@@ -116,13 +124,5 @@ describe("shared customer sign-out path", () => {
   it("closes dropdown only after sign-out submit is pending", () => {
     expect(signOutFormSrc).toMatch(/onSignOutStart/);
     expect(signOutFormSrc).toMatch(/if \(pending\) onSignOutStart/);
-  });
-});
-
-describe("AuthSessionProvider stale session sync", () => {
-  it("clears client session when server session is gone", () => {
-    expect(authProviderSrc).toMatch(/hasServerSession/);
-    expect(authProviderSrc).toMatch(/signOut\(\{ redirect: false \}\)/);
-    expect(layoutSrc).toMatch(/hasServerSession=\{hasServerSession\}/);
   });
 });

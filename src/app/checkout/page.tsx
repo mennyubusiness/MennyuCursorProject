@@ -4,12 +4,13 @@ import { auth } from "@/auth";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 import { prisma } from "@/lib/db";
 import { lockGroupOrderSessionForCheckout } from "@/services/group-order.service";
-import { CHECKOUT_SUMMARY_CART_INCLUDE } from "@/services/cart.service";
+import { CART_DISPLAY_SESSION_CART_INCLUDE, CHECKOUT_SUMMARY_CART_INCLUDE } from "@/services/cart.service";
+import { buildCartForValidationFromDisplayCart } from "@/lib/cart-for-validation";
 import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutProgress } from "./CheckoutProgress";
 import { computeOrderPricing } from "@/domain/fees";
 import { getActivePricingRatesSnapshot } from "@/services/pricing-config.service";
-import { getCheckoutDefaultScheduledPickup } from "@/services/order.service";
+import { getCheckoutDefaultScheduledPickup, validateCartItemsForDisplay } from "@/services/order.service";
 import {
   getParentShellInfoByVendorParentPlu,
   getVariantOptionDisplayNamesForLeafLines,
@@ -47,6 +48,20 @@ export default async function CheckoutPage({
     await lockGroupOrderSessionForCheckout(cart.id, groupSession.hostUserId);
   } else if (cart.sessionId !== (sessionId ?? "")) {
     redirect("/cart");
+  }
+
+  const validationCart = await prisma.cart.findUnique({
+    where: { id: cartId },
+    include: CART_DISPLAY_SESSION_CART_INCLUDE,
+  });
+  if (validationCart && validationCart.items.length > 0) {
+    const validation = await validateCartItemsForDisplay(
+      buildCartForValidationFromDisplayCart(validationCart)
+    );
+    if (!validation.valid && validation.errors.length > 0) {
+      const code = validation.errors[0]?.code ?? "CART_INVALID";
+      redirect(`/cart?error=${encodeURIComponent(code)}`);
+    }
   }
 
   const [parentShellByVendorParentPlu, variantDisplayNames, { rates }] = await Promise.all([

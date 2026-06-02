@@ -164,7 +164,8 @@ export function IssuesWorkbench({
     setBusyId(`retry:${vendorOrderId}`);
     try {
       const res = await fetch(`/api/admin/vendor-orders/${vendorOrderId}/retry-routing`, { method: "POST" });
-      if (res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
+      if (res.ok && data.ok !== false) {
         refresh();
         setActiveItems((prev) => prev.filter((i) => i.vendorOrderId !== vendorOrderId));
       }

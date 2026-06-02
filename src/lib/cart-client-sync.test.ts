@@ -24,6 +24,7 @@ import {
   ensureCartSnapshotScalars,
   markPendingClientCartClear,
   PENDING_CART_CLEAR_STORAGE_KEY,
+  readMennyuCheckoutCookie,
   shouldApplyCartFetchResult,
   shouldApplyCartSnapshot,
   shouldQuickCartApplyCartSnapshot,
@@ -226,5 +227,12 @@ describe("cart-client-sync", () => {
       orderId: "ord_1",
     });
     expect(sessionStorage.getItem(PENDING_CART_CLEAR_STORAGE_KEY)).toBeNull();
+  });
+
+  it("readMennyuCheckoutCookie parses checkout marker", () => {
+    vi.stubGlobal("document", {
+      cookie: `mennyu_checkout=${encodeURIComponent(JSON.stringify({ orderId: "ord_1", cartId: "cart_1" }))}`,
+    });
+    expect(readMennyuCheckoutCookie()).toEqual({ orderId: "ord_1", cartId: "cart_1" });
   });
 });

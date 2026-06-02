@@ -111,10 +111,19 @@ export function CartPageMutationProvider({
       })
       .catch(() => {
         if (seq !== revalidateSeqRef.current) return;
-        // Keep pruned optimistic state; server refresh remains fallback.
+        setServerValidation({
+          valid: false,
+          errors: [
+            {
+              code: "REVALIDATION_FAILED",
+              message: "Could not verify your cart. Refresh the page and try again.",
+            },
+          ],
+        });
       })
       .finally(() => {
         if (seq === revalidateSeqRef.current) {
+          skipRevalidateForFingerprintRef.current = cartFingerprint;
           setIsRevalidating(false);
         }
       });
@@ -309,7 +318,7 @@ export function CartPageLiveCheckoutActions({
   totalCentsFallback: number;
 }) {
   const { cartId, canCheckout, isRevalidating } = useCartPageMutation();
-  const checkoutEnabled = canCheckout;
+  const checkoutEnabled = canCheckout && !isRevalidating;
   const blockedLabel =
     !canCheckout && isRevalidating ? "Checking cart…" : "Fix items above to continue";
 
