@@ -4,19 +4,58 @@ import type { AdminPayoutTransferRow } from "@/app/admin/(dashboard)/payout-tran
 import { isAdminDashboardLayoutAuthorized } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import {
+  retryAllEligibleFailedVendorPayoutTransfers,
   retryFailedVendorPayoutTransfer,
   runManualVendorPayoutTransferBatch,
 } from "@/services/vendor-payout-transfer.service";
+import { fetchStripePlatformBalance } from "@/services/stripe-balance.service";
 
 export async function adminRunVendorPayoutTransferBatchAction(batchKey?: string) {
   const ok = await isAdminDashboardLayoutAuthorized();
   if (!ok) {
     return { ok: false as const, error: "Unauthorized" };
   }
-  const summary = await runManualVendorPayoutTransferBatch(
+  const result = await runManualVendorPayoutTransferBatch(
     batchKey?.trim() ? { batchKey: batchKey.trim() } : undefined
   );
-  return { ok: true as const, summary };
+  if (!result.ok) {
+    return {
+      ok: false as const,
+      error: result.error,
+      balanceError: result.balanceError,
+    };
+  }
+  return { ok: true as const, summary: result.summary };
+}
+
+export async function adminRetryAllEligibleVendorPayoutTransfersAction(batchKey?: string) {
+  const ok = await isAdminDashboardLayoutAuthorized();
+  if (!ok) {
+    return { ok: false as const, error: "Unauthorized" };
+  }
+  const result = await retryAllEligibleFailedVendorPayoutTransfers(
+    batchKey?.trim() ? { batchKey: batchKey.trim() } : undefined
+  );
+  if (!result.ok) {
+    return {
+      ok: false as const,
+      error: result.error,
+      balanceError: result.balanceError,
+    };
+  }
+  return { ok: true as const, summary: result.summary };
+}
+
+export async function adminFetchStripePlatformBalanceAction() {
+  const ok = await isAdminDashboardLayoutAuthorized();
+  if (!ok) {
+    return { ok: false as const, error: "Unauthorized" };
+  }
+  const result = await fetchStripePlatformBalance("usd");
+  if (!result.ok) {
+    return { ok: false as const, error: result.error };
+  }
+  return { ok: true as const, balance: result.balance };
 }
 
 const transferSelect = {
@@ -46,6 +85,9 @@ export async function adminRetryVendorPayoutTransferAction(transferId: string) {
     return { ok: false as const, error: "Unauthorized" };
   }
   const r = await retryFailedVendorPayoutTransfer(transferId);
+  if (r.outcome === "blocked_balance_unavailable") {
+    return { ok: false as const, error: r.message };
+  }
   const transfer = await prisma.vendorPayoutTransfer.findUnique({
     where: { id: transferId },
     select: transferSelect,

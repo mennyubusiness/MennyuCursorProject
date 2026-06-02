@@ -3,19 +3,29 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { adminRetryVendorPayoutTransferAction } from "@/actions/admin-payout-transfer.actions";
+import {
+  adminFetchStripePlatformBalanceAction,
+  adminRetryAllEligibleVendorPayoutTransfersAction,
+  adminRetryVendorPayoutTransferAction,
+  adminRunVendorPayoutTransferBatchAction,
+} from "@/actions/admin-payout-transfer.actions";
 import {
   adminRetryTransferReversalAction,
   adminRunTransferReversalBatchAction,
 } from "@/actions/admin-payout-transfer-reversal.actions";
-import { adminRunVendorPayoutTransferBatchAction } from "@/actions/admin-payout-transfer.actions";
+import {
+  displayPayoutTransferFailure,
+  INSUFFICIENT_BALANCE_STATUS,
+  isInsufficientBalanceTransfer,
+  isRetryablePayoutTransfer,
+} from "@/lib/vendor-payout-transfer-failure";
+import type { StripePlatformBalanceSnapshot } from "@/services/stripe-balance.service";
+
 import type {
   AdminPayoutTransferRow,
   AdminTransferReversalRow,
   AdminVendorOption,
 } from "./payout-transfers-admin.types";
-
-export type { AdminPayoutTransferRow, AdminTransferReversalRow, AdminVendorOption } from "./payout-transfers-admin.types";
 
 type DatePreset = "all" | "today" | "7d";
 
@@ -40,6 +50,7 @@ function shortenStripeId(id: string | null | undefined): string {
 }
 
 function statusFilterBucket(status: string): "pending" | "paid" | "failed" | "blocked" {
+  if (status === INSUFFICIENT_BALANCE_STATUS) return "blocked";
   if (status === "blocked") return "blocked";
   if (status === "failed") return "failed";
   if (status === "paid") return "paid";
@@ -47,7 +58,15 @@ function statusFilterBucket(status: string): "pending" | "paid" | "failed" | "bl
   return "pending";
 }
 
+function statusLabel(status: string): string {
+  if (status === INSUFFICIENT_BALANCE_STATUS) return "blocked: insufficient balance";
+  return status;
+}
+
 function statusBadgeClass(status: string): string {
+  if (status === INSUFFICIENT_BALANCE_STATUS) {
+    return "bg-orange-100 text-orange-950 ring-orange-200";
+  }
   const b = statusFilterBucket(status);
   if (b === "paid") return "bg-emerald-100 text-emerald-900 ring-emerald-200";
   if (b === "failed") return "bg-red-100 text-red-900 ring-red-200";
@@ -130,6 +149,30 @@ function inDateRange(iso: string, preset: DatePreset): boolean {
 
 function FailureText({ text }: { text: string | null }) {
   const [open, setOpen] = useState(false);
+  if (!text?.trim()) return null;
+  const t = text.trim();
+  const short = t.length > 140;
+  const shown = short && !open ? `${t.slice(0, 140)}…` : t;
+  return (
+    <div className="mt-1 max-w-xs">
+      <p className="whitespace-pre-wrap break-words font-mono text-[10px] leading-snug text-oo-stone-gray">
+        Stripe detail: {shown}
+      </p>
+      {short && (
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="mt-0.5 text-[10px] font-semibold text-oo-charcoal hover:underline"
+        >
+          {open ? "Hide Stripe detail" : "Show Stripe detail"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ReversalFailureText({ text }: { text: string | null }) {
+  const [open, setOpen] = useState(false);
   if (!text?.trim()) return <span className="text-oo-stone-gray">—</span>;
   const t = text.trim();
   const short = t.length > 140;
@@ -150,6 +193,31 @@ function FailureText({ text }: { text: string | null }) {
   );
 }
 
+function PayoutFailureCell({
+  row,
+}: {
+  row: Pick<AdminPayoutTransferRow, "status" | "blockedReason" | "failureMessage">;
+}) {
+  if (row.status === "blocked" && row.blockedReason) {
+    return (
+      <div>
+        <span className="font-mono text-xs">{row.blockedReason}</span>
+      </div>
+    );
+  }
+  const failure = displayPayoutTransferFailure(row);
+  if (failure.primary === "—") {
+    return <span className="text-oo-stone-gray">—</span>;
+  }
+  return (
+    <div>
+      <p className="text-xs font-medium text-oo-charcoal">{failure.primary}</p>
+      {failure.detail ? <p className="mt-0.5 text-[11px] text-oo-stone-gray">{failure.detail}</p> : null}
+      {failure.raw ? <FailureText text={failure.raw} /> : null}
+    </div>
+  );
+}
+
 function groupTransferKey(row: AdminPayoutTransferRow): string {
   const bk = row.batchKey?.trim();
   if (bk) return `batch:${bk}`;
@@ -166,10 +234,14 @@ export function PayoutTransfersDashboard({
   initialTransfers,
   initialReversals,
   vendors,
+  initialBalance,
+  initialBalanceError,
 }: {
   initialTransfers: AdminPayoutTransferRow[];
   initialReversals: AdminTransferReversalRow[];
   vendors: AdminVendorOption[];
+  initialBalance: StripePlatformBalanceSnapshot | null;
+  initialBalanceError: string | null;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -184,15 +256,20 @@ export function PayoutTransfersDashboard({
   const [batchKey, setBatchKey] = useState("");
   const [batchMsg, setBatchMsg] = useState<string | null>(null);
   const [batchErr, setBatchErr] = useState<string | null>(null);
-  const [batchBusy, setBatchBusy] = useState<"payout" | "reversal" | null>(null);
+  const [batchBusy, setBatchBusy] = useState<"payout" | "retry_all" | "reversal" | null>(null);
   const [vendorSearch, setVendorSearch] = useState("");
   const [retryPayoutId, setRetryPayoutId] = useState<string | null>(null);
   const [retryReversalId, setRetryReversalId] = useState<string | null>(null);
+  const [balance, setBalance] = useState<StripePlatformBalanceSnapshot | null>(initialBalance);
+  const [balanceError, setBalanceError] = useState<string | null>(initialBalanceError);
+  const [balanceBusy, setBalanceBusy] = useState(false);
 
   useEffect(() => {
     setTransfers(initialTransfers);
     setReversals(initialReversals);
-  }, [initialTransfers, initialReversals]);
+    setBalance(initialBalance);
+    setBalanceError(initialBalanceError);
+  }, [initialTransfers, initialReversals, initialBalance, initialBalanceError]);
 
   const vendorsFiltered = useMemo(() => {
     const q = vendorSearch.trim().toLowerCase();
@@ -222,15 +299,33 @@ export function PayoutTransfersDashboard({
     let pendingCents = 0;
     let paidCents = 0;
     let failed = 0;
-    let blocked = 0;
+    let blockedConnect = 0;
+    let blockedInsufficientCents = 0;
+    let retryableFailedCents = 0;
     for (const t of filteredTransfers) {
       const bucket = statusFilterBucket(t.status);
       if (bucket === "pending") pendingCents += t.amountCents;
       if (bucket === "paid") paidCents += t.amountCents;
-      if (bucket === "failed") failed++;
-      if (bucket === "blocked") blocked++;
+      if (bucket === "failed") {
+        failed++;
+        if (isRetryablePayoutTransfer(t)) retryableFailedCents += t.amountCents;
+      }
+      if (bucket === "blocked") {
+        if (isInsufficientBalanceTransfer(t)) {
+          blockedInsufficientCents += t.amountCents;
+        } else {
+          blockedConnect++;
+        }
+      }
     }
-    return { pendingCents, paidCents, failed, blocked };
+    return {
+      pendingCents,
+      paidCents,
+      failed,
+      blockedConnect,
+      blockedInsufficientCents,
+      retryableFailedCents,
+    };
   }, [filteredTransfers]);
 
   const transferGroups = useMemo(() => {
@@ -282,15 +377,61 @@ export function PayoutTransfersDashboard({
     try {
       const r = await adminRunVendorPayoutTransferBatchAction(batchKey.trim() || undefined);
       if (!r.ok) {
-        setBatchErr(r.error);
+        setBatchErr(
+          "balanceError" in r && r.balanceError ? `${r.error} (${r.balanceError})` : r.error
+        );
         return;
       }
-      setBatchMsg(`Payout batch: examined ${r.summary.examined}, settled ${r.summary.settled}, skipped ${r.summary.skipped}, failed ${r.summary.failed}.`);
+      setBatchMsg(
+        `Payout batch: examined ${r.summary.examined}, settled ${r.summary.settled}, skipped ${r.summary.skipped}, failed ${r.summary.failed}, blocked (balance) ${r.summary.blockedInsufficientBalance}.`
+      );
       startTransition(() => router.refresh());
     } catch (e) {
       setBatchErr(e instanceof Error ? e.message : "Batch failed");
     } finally {
       setBatchBusy(null);
+    }
+  }
+
+  async function runRetryAllPayouts() {
+    setBatchBusy("retry_all");
+    setBatchErr(null);
+    setBatchMsg(null);
+    try {
+      const r = await adminRetryAllEligibleVendorPayoutTransfersAction(batchKey.trim() || undefined);
+      if (!r.ok) {
+        setBatchErr(
+          "balanceError" in r && r.balanceError ? `${r.error} (${r.balanceError})` : r.error
+        );
+        return;
+      }
+      setBatchMsg(
+        `Retry all: examined ${r.summary.examined}, settled ${r.summary.settled}, skipped ${r.summary.skipped}, failed ${r.summary.failed}, blocked (balance) ${r.summary.blockedInsufficientBalance}.`
+      );
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setBatchErr(e instanceof Error ? e.message : "Retry all failed");
+    } finally {
+      setBatchBusy(null);
+    }
+  }
+
+  async function refreshBalance() {
+    setBalanceBusy(true);
+    setBalanceError(null);
+    try {
+      const r = await adminFetchStripePlatformBalanceAction();
+      if (!r.ok) {
+        setBalanceError(r.error);
+        setBalance(null);
+        return;
+      }
+      setBalance(r.balance);
+    } catch (e) {
+      setBalanceError(e instanceof Error ? e.message : "Unable to fetch Stripe balance");
+      setBalance(null);
+    } finally {
+      setBalanceBusy(false);
     }
   }
 
@@ -319,12 +460,17 @@ export function PayoutTransfersDashboard({
     setRetryPayoutId(id);
     try {
       const r = await adminRetryVendorPayoutTransferAction(id);
-      if (!r.ok || !r.transfer) {
-        alert(r.ok === false ? r.error : "Retry failed");
+      if (!r.ok) {
+        alert(r.error);
+        return;
+      }
+      if (!r.transfer) {
+        alert("Retry failed");
         return;
       }
       const row = normalizeTransferRow(r.transfer);
       setTransfers((prev) => prev.map((t) => (t.id === id ? row : t)));
+      startTransition(() => router.refresh());
     } finally {
       setRetryPayoutId(null);
     }
@@ -349,6 +495,64 @@ export function PayoutTransfersDashboard({
 
   return (
     <div className="space-y-8">
+      <div className="rounded-xl border border-oo-light-stone bg-oo-cream p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-oo-charcoal">Stripe platform balance</h2>
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">
+              Vendor transfers can only be sent from Stripe available balance. Pending customer payments and funds
+              already paid out to the platform bank cannot fund Connect transfers until available in Stripe.
+            </p>
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">
+              Automatic platform payouts are currently expected to run weekly. If vendor transfers are blocked, wait for
+              pending funds to become available or add funds, then retry.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={balanceBusy || actionLocked}
+            onClick={() => void refreshBalance()}
+            className="shrink-0 rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-white disabled:opacity-50"
+          >
+            {balanceBusy ? "Refreshing…" : "Refresh Stripe balance"}
+          </button>
+        </div>
+        {balanceError ? (
+          <p className="mt-3 text-sm text-amber-900" role="status">
+            Unable to fetch Stripe balance: {balanceError}
+          </p>
+        ) : balance ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Available</p>
+              <p className="mt-1 text-lg font-semibold text-emerald-900">
+                {formatMoney(balance.availableCents, balance.currency)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Pending</p>
+              <p className="mt-1 text-lg font-semibold text-oo-charcoal">
+                {formatMoney(balance.pendingCents, balance.currency)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Retryable failed (filtered)</p>
+              <p className="mt-1 text-lg font-semibold text-red-800">
+                {formatMoney(summary.retryableFailedCents + summary.blockedInsufficientCents, "usd")}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">As of</p>
+              <p className="mt-1 font-mono text-xs text-oo-stone-gray">
+                {balance.retrievedAt.slice(0, 19).replace("T", " ")}Z
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-oo-stone-gray">Stripe balance unavailable.</p>
+        )}
+      </div>
+
       <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-wrap gap-2">
@@ -359,6 +563,14 @@ export function PayoutTransfersDashboard({
               className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-hover disabled:opacity-50"
             >
               {batchBusy === "payout" ? "Running…" : "Run payout batch"}
+            </button>
+            <button
+              type="button"
+              disabled={actionLocked}
+              onClick={() => void runRetryAllPayouts()}
+              className="rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-950 shadow-sm hover:bg-orange-100 disabled:opacity-50"
+            >
+              {batchBusy === "retry_all" ? "Retrying…" : "Retry all eligible failed payouts"}
             </button>
             <button
               type="button"
@@ -438,7 +650,7 @@ export function PayoutTransfersDashboard({
         {batchMsg && <p className="mt-3 text-sm text-emerald-800">{batchMsg}</p>}
       </div>
 
-      <div className="grid gap-3 rounded-xl border border-oo-light-stone bg-oo-cream p-4 sm:grid-cols-4">
+      <div className="grid gap-3 rounded-xl border border-oo-light-stone bg-oo-cream p-4 sm:grid-cols-2 lg:grid-cols-5">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Pending (filtered)</p>
           <p className="mt-1 text-lg font-semibold text-oo-charcoal">{formatMoney(summary.pendingCents, "usd")}</p>
@@ -452,16 +664,22 @@ export function PayoutTransfersDashboard({
           <p className="mt-1 text-lg font-semibold text-red-800">{summary.failed}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Blocked rows</p>
-          <p className="mt-1 text-lg font-semibold text-amber-900">{summary.blocked}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Blocked (Connect)</p>
+          <p className="mt-1 text-lg font-semibold text-amber-900">{summary.blockedConnect}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Blocked (balance)</p>
+          <p className="mt-1 text-lg font-semibold text-orange-900">
+            {formatMoney(summary.blockedInsufficientCents, "usd")}
+          </p>
         </div>
       </div>
 
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-oo-charcoal">Payout transfers</h2>
         <p className="text-sm text-oo-stone-gray">
-          Stripe Connect transfers from allocations. Retries reset failed rows to pending then call Stripe (idempotent
-          keys).
+          Stripe Connect transfers from allocations. Retries use stable Stripe idempotency keys and check platform
+          available balance before calling Stripe.
         </p>
         {transferGroups.length === 0 ? (
           <p className="rounded-lg border border-dashed border-oo-light-stone bg-oo-warm-white p-8 text-center text-oo-stone-gray">
@@ -502,18 +720,17 @@ export function PayoutTransfersDashboard({
                       <tbody className="divide-y divide-oo-light-stone">
                         {rows.map((t) => {
                           const bucket = statusFilterBucket(t.status);
-                          const reason =
-                            bucket === "blocked"
-                              ? t.blockedReason
-                              : bucket === "failed"
-                                ? t.failureMessage
-                                : null;
-                          const failedRow = bucket === "failed";
+                          const insufficient = isInsufficientBalanceTransfer(t);
+                          const retryable = isRetryablePayoutTransfer(t);
+                          const rowTint = insufficient
+                            ? "bg-orange-50/50"
+                            : bucket === "failed"
+                              ? "bg-red-50/50"
+                              : bucket === "blocked"
+                                ? "bg-amber-50/40"
+                                : "";
                           return (
-                            <tr
-                              key={t.id}
-                              className={failedRow ? "bg-red-50/50" : bucket === "blocked" ? "bg-amber-50/40" : ""}
-                            >
+                            <tr key={t.id} className={rowTint}>
                               <td className="px-3 py-2 font-medium text-oo-charcoal">{t.vendor.name}</td>
                               <td className="px-3 py-2">
                                 <Link
@@ -528,16 +745,12 @@ export function PayoutTransfersDashboard({
                                 <span
                                   className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${statusBadgeClass(t.status)}`}
                                 >
-                                  {t.status}
+                                  {statusLabel(t.status)}
                                 </span>
                               </td>
                               <td className="px-3 py-2 text-xs text-oo-charcoal">
-                                {reason ? (
-                                  <span className="font-mono">{reason}</span>
-                                ) : (
-                                  <span className="text-oo-stone-gray">—</span>
-                                )}
-                                {bucket === "blocked" && (
+                                <PayoutFailureCell row={t} />
+                                {t.status === "blocked" && !insufficient && (
                                   <div className="mt-1">
                                     <Link
                                       href={`/admin/vendors/${t.vendorId}`}
@@ -561,7 +774,7 @@ export function PayoutTransfersDashboard({
                                 {shortenStripeId(t.stripeTransferId)}
                               </td>
                               <td className="px-3 py-2">
-                                {bucket === "failed" && (
+                                {retryable ? (
                                   <button
                                     type="button"
                                     disabled={retryPayoutId !== null}
@@ -570,9 +783,7 @@ export function PayoutTransfersDashboard({
                                   >
                                     {retryPayoutId === t.id ? "Retrying…" : "Retry payout"}
                                   </button>
-                                )}
-                                {bucket === "paid" && <span className="text-xs text-oo-stone-gray">—</span>}
-                                {(bucket === "pending" || bucket === "blocked") && (
+                                ) : (
                                   <span className="text-xs text-oo-stone-gray">—</span>
                                 )}
                               </td>
@@ -653,7 +864,7 @@ export function PayoutTransfersDashboard({
                                 {shortenStripeId(r.stripeTransferReversalId)}
                               </td>
                               <td className="px-3 py-2">
-                                <FailureText text={r.failureMessage} />
+                                <ReversalFailureText text={r.failureMessage} />
                               </td>
                               <td className="whitespace-nowrap px-3 py-2 text-xs text-oo-stone-gray">
                                 {r.createdAt.slice(0, 19).replace("T", " ")}Z

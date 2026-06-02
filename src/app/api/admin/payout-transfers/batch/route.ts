@@ -20,6 +20,17 @@ export async function POST(request: Request) {
     // empty body
   }
 
-  const summary = await runManualVendorPayoutTransferBatch(batchKey ? { batchKey } : undefined);
-  return NextResponse.json(summary);
+  const result = await runManualVendorPayoutTransferBatch(batchKey ? { batchKey } : undefined);
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: result.error,
+        balanceError: result.balanceError,
+        summary: result.summary,
+      },
+      { status: 503 }
+    );
+  }
+  return NextResponse.json(result.summary);
 }

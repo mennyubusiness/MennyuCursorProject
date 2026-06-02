@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { fetchStripePlatformBalance } from "@/services/stripe-balance.service";
 import type {
   AdminPayoutTransferRow,
   AdminTransferReversalRow,
@@ -10,7 +11,7 @@ const TRANSFER_TAKE = 400;
 const REVERSAL_TAKE = 400;
 
 export default async function AdminPayoutTransfersPage() {
-  const [vendors, transfers, reversals] = await Promise.all([
+  const [vendors, transfers, reversals, balanceResult] = await Promise.all([
     prisma.vendor.findMany({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
@@ -63,6 +64,7 @@ export default async function AdminPayoutTransfersPage() {
         order: { select: { id: true } },
       },
     }),
+    fetchStripePlatformBalance("usd"),
   ]);
 
   const initialTransfers: AdminPayoutTransferRow[] = transfers.map((t) => ({
@@ -94,6 +96,8 @@ export default async function AdminPayoutTransfersPage() {
         initialTransfers={initialTransfers}
         initialReversals={initialReversals}
         vendors={vendorOptions}
+        initialBalance={balanceResult.ok ? balanceResult.balance : null}
+        initialBalanceError={balanceResult.ok ? null : balanceResult.error}
       />
     </div>
   );
