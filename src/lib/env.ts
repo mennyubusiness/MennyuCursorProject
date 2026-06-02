@@ -91,6 +91,8 @@ const envSchema = z.object({
   VENDOR_ACCESS_SIGNING_SECRET: z.string().min(32).optional(),
   /** Set to "true" to show Deliverect POS status simulation UI on admin order detail (production). */
   SHOW_DELIVERECT_STATUS_SIM_UI: z.enum(["true", "false"]).optional(),
+  /** When "true", enables admin QA tools (e.g. simulate routing failure) in production. */
+  ENABLE_ADMIN_TEST_TOOLS: z.enum(["true", "false"]).optional(),
   /**
    * When "true", allows ROUTING_MODE=mock while NODE_ENV=production (orders do not reach POS).
    * Use only for staging/demo; not for live launch.

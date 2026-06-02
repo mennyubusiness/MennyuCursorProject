@@ -20,7 +20,10 @@ import { AdminVendorOrderExceptionActions } from "./AdminVendorOrderExceptionAct
 import { AdminVendorOrderTransition } from "./AdminVendorOrderTransition";
 import { AdminDeliverectRecheck } from "./AdminDeliverectRecheck";
 import { AdminDeliverectDiagnosticsPanel } from "./AdminDeliverectDiagnosticsPanel";
+import { AdminSimulateRoutingFailureButton } from "./AdminSimulateRoutingFailureButton";
 import { getDeliverectAdminCompactBadges } from "@/lib/deliverect-admin-lifecycle";
+import { canShowAdminTestToolsUi } from "@/lib/admin-test-tools";
+import { evaluateSimulateRoutingFailureEligibility } from "@/lib/admin-simulate-routing-failure";
 
 function isDeliverectRecheckEligible(vo: AdminOrderDetail["vendorOrders"][number]): boolean {
   const ch = vo.deliverectChannelLinkId ?? vo.vendor.deliverectChannelLinkId;
@@ -78,6 +81,7 @@ export default async function AdminOrderDetailPage({
   }
 
   const routingAvailable = isRoutingRetryAvailable();
+  const showAdminTestTools = await canShowAdminTestToolsUi();
 
   function formatDate(d: Date) {
     return new Intl.DateTimeFormat("en-US", { dateStyle: "short", timeStyle: "short" }).format(d);
@@ -264,6 +268,43 @@ export default async function AdminOrderDetailPage({
                 </div>
               ))}
           </div>
+        </section>
+      )}
+
+      {showAdminTestTools && adminOrder.vendorOrders.length > 0 && (
+        <section className="rounded-lg border border-dashed border-amber-300/80 bg-amber-50/50 p-4">
+          <h2 className="text-lg font-semibold text-oo-charcoal">Admin QA tools</h2>
+          <p className="mt-1 text-sm text-oo-stone-gray">
+            Dev/staging only — simulates routing failure locally. Does not call Deliverect or duplicate
+            vendor orders.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {adminOrder.vendorOrders.map((vo) => {
+              const sim = evaluateSimulateRoutingFailureEligibility({
+                orderStatus: adminOrder.status,
+                fulfillmentStatus: vo.fulfillmentStatus,
+              });
+              return (
+                <li
+                  key={vo.id}
+                  className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-amber-200/80 bg-oo-warm-white/80 px-3 py-2"
+                >
+                  <div>
+                    <p className="font-medium text-oo-charcoal">{vo.vendor.name}</p>
+                    <p className="text-xs text-oo-stone-gray">
+                      Routing: {vo.routingStatus} · Fulfillment: {vo.fulfillmentStatus}
+                    </p>
+                  </div>
+                  <AdminSimulateRoutingFailureButton
+                    vendorOrderId={vo.id}
+                    vendorName={vo.vendor.name}
+                    disabled={!sim.eligible}
+                    disabledReason={sim.eligible ? undefined : sim.message}
+                  />
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
 
