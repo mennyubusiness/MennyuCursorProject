@@ -3,6 +3,7 @@
 import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
 import { useVendorMenuCartOptional } from "@/components/vendor-menu/VendorMenuCartContext";
 import { cn } from "@/lib/cn";
+import { mobileStickyCartBarFixedClass } from "@/lib/mobile-sticky-cart-bar-classes";
 
 type VendorMenuMobileCartBarProps = {
   className?: string;
@@ -26,18 +27,13 @@ export function VendorMenuMobileCartBar({ className }: VendorMenuMobileCartBarPr
   };
 
   return (
-    <div
-      className={cn(
-        "fixed inset-x-0 bottom-0 z-40 border-t border-oo-light-stone bg-oo-warm-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(31,31,28,0.08)] backdrop-blur-md supports-[backdrop-filter]:bg-oo-warm-white/90 lg:hidden",
-        className
-      )}
-    >
+    <div className={cn(mobileStickyCartBarFixedClass, "lg:hidden", className)}>
       <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-bold text-oo-charcoal">
             {itemCount} in cart · ${(displayCart.subtotalCents / 100).toFixed(2)}
           </p>
-          <p className="truncate text-xs text-oo-stone-gray">Shared pod cart · tap to review</p>
+          <p className="truncate text-xs text-oo-charcoal/70">Shared pod cart · tap to review</p>
         </div>
         <button
           type="button"

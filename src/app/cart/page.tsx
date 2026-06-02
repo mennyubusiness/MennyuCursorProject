@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
+import { mobileStickyCartBarSurfaceClass } from "@/lib/mobile-sticky-cart-bar-classes";
 import {
   discardStaleCheckoutCartsForSession,
   getOrCreateCart,
@@ -627,7 +628,9 @@ export default async function CartPage({
 
       {/* Sticky checkout strip on small screens; flows inline from md+ */}
       <CartPageLiveCheckoutGate>
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200/90 bg-white/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.1)] backdrop-blur-md supports-[backdrop-filter]:bg-white/90 sm:static sm:z-auto sm:mt-10 sm:border-0 sm:bg-transparent sm:p-0 sm:pb-0 sm:shadow-none sm:backdrop-blur-none">
+      <div
+        className={`${mobileStickyCartBarSurfaceClass} fixed inset-x-0 bottom-0 z-30 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:mt-10 sm:border-0 sm:bg-transparent sm:p-0 sm:pb-0 sm:shadow-none`}
+      >
         <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <Link
             href={`/pod/${cart.podId}`}

@@ -10,8 +10,8 @@ import {
 } from "@/lib/cart-client-sync";
 
 /**
- * After Stripe redirect (or any checkout where client clear did not run inline),
- * consume the pending cart clear marker and empty Quick Cart / vendor menu state.
+ * After a paid order loads, sync server cart cleanup (route handler) and empty Quick Cart / vendor menu state.
+ * Failures are non-fatal — the order page must still render.
  */
 export function OrderPostCheckoutCartSync({
   orderId,
@@ -28,25 +28,56 @@ export function OrderPostCheckoutCartSync({
     if (syncedRef.current) return;
     if (orderStatus === "pending_payment") return;
 
-    const pending = consumePendingClientCartClear(orderId);
-    const checkoutCookie = readMennyuCheckoutCookie();
-    const checkoutMatch =
-      checkoutCookie?.orderId === orderId
-        ? { cartId: checkoutCookie.cartId, podId, orderId }
-        : null;
-    const target = pending ?? checkoutMatch;
-    if (!target) return;
-
     syncedRef.current = true;
-    if (checkoutMatch) {
-      clearMennyuCheckoutCookieClient();
-    }
-    dispatchCartCleared({
-      cartId: target.cartId,
-      podId: target.podId || podId,
-      cart: emptyCartSnapshot({ id: target.cartId, podId: target.podId || podId }),
-      source: "order-page",
-    });
+
+    void (async () => {
+      let serverCartId: string | null = null;
+      let serverPodId = podId;
+
+      try {
+        const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/post-checkout-sync`, {
+          method: "POST",
+          credentials: "same-origin",
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          cartId?: string | null;
+          podId?: string;
+        };
+        if (data.ok) {
+          serverCartId = data.cartId ?? null;
+          if (data.podId) serverPodId = data.podId;
+        }
+      } catch {
+        /* best-effort; client sync below still runs */
+      }
+
+      const pending = consumePendingClientCartClear(orderId);
+      const checkoutCookie = readMennyuCheckoutCookie();
+      const checkoutMatch =
+        checkoutCookie?.orderId === orderId
+          ? { cartId: checkoutCookie.cartId, podId, orderId }
+          : null;
+      const target =
+        pending ??
+        checkoutMatch ??
+        (serverCartId
+          ? { cartId: serverCartId, podId: serverPodId, orderId }
+          : null);
+
+      if (checkoutMatch || serverCartId) {
+        clearMennyuCheckoutCookieClient();
+      }
+
+      if (!target) return;
+
+      dispatchCartCleared({
+        cartId: target.cartId,
+        podId: target.podId || podId,
+        cart: emptyCartSnapshot({ id: target.cartId, podId: target.podId || podId }),
+        source: "order-page",
+      });
+    })();
   }, [orderId, podId, orderStatus]);
 
   return null;

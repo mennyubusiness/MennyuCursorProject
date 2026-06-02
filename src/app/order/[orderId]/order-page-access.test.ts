@@ -6,8 +6,13 @@ import { describe, expect, it } from "vitest";
 const dir = dirname(fileURLToPath(import.meta.url));
 
 const orderPageContentSrc = readFileSync(join(dir, "OrderPageContent.tsx"), "utf8");
+const orderPostCheckoutSyncSrc = readFileSync(join(dir, "OrderPostCheckoutCartSync.tsx"), "utf8");
 const orderResumePaymentSrc = readFileSync(join(dir, "OrderResumePayment.tsx"), "utf8");
 const orderPageSrc = readFileSync(join(dir, "page.tsx"), "utf8");
+const postCheckoutSyncRouteSrc = readFileSync(
+  join(dir, "../../api/orders/[orderId]/post-checkout-sync/route.ts"),
+  "utf8"
+);
 
 describe("customer order page access hardening", () => {
   it("does not bootstrap phone cookie from public order view", () => {
@@ -16,10 +21,12 @@ describe("customer order page access hardening", () => {
     expect(orderResumePaymentSrc).not.toMatch(/PhoneCookieSyncRefresh/);
   });
 
-  it("does not set cookies during Server Component render", () => {
+  it("does not mutate cookies or call cart cleanup during Server Component render", () => {
     expect(orderPageSrc).not.toMatch(/persistCustomerOrderAccessAction/);
     expect(orderPageSrc).not.toMatch(/cookies\(\)\.set/);
     expect(orderPageSrc).not.toMatch(/persistCustomerOrderAccessCookies/);
+    expect(orderPageSrc).not.toMatch(/clearCartAfterOrderSuccessAction/);
+    expect(orderPageSrc).not.toMatch(/clearCheckoutSourceCartForOrder/);
   });
 
   it("redirects signed access links to bootstrap route handler", () => {
@@ -32,9 +39,19 @@ describe("customer order page access hardening", () => {
     expect(orderPageSrc).toMatch(/OrderAccessDenied/);
   });
 
-  it("clears checkout source cart for any paid order view (idempotent)", () => {
-    expect(orderPageSrc).toMatch(/clearCartAfterOrderSuccessAction/);
-    expect(orderPageSrc).toMatch(/order\.status !== "pending_payment"/);
+  it("delegates paid-order cart cleanup to client post-checkout sync", () => {
+    expect(orderPageContentSrc).toMatch(/OrderPostCheckoutCartSync/);
+    expect(orderPostCheckoutSyncSrc).toMatch(/post-checkout-sync/);
+    expect(orderPostCheckoutSyncSrc).toMatch(/orderStatus === "pending_payment"/);
+  });
+});
+
+describe("post-checkout sync route", () => {
+  it("clears source cart and checkout cookie only for paid orders", () => {
+    expect(postCheckoutSyncRouteSrc).toMatch(/clearCheckoutSourceCartForOrder/);
+    expect(postCheckoutSyncRouteSrc).toMatch(/cookieStore\.delete\("mennyu_checkout"\)/);
+    expect(postCheckoutSyncRouteSrc).toMatch(/order\.status === "pending_payment"/);
+    expect(postCheckoutSyncRouteSrc).toMatch(/PENDING_PAYMENT/);
   });
 });
 
