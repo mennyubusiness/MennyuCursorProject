@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { Suspense, useMemo, useState } from "react";
 import { AuthFormCard } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -38,10 +38,12 @@ function LoginFormInner() {
         password,
         redirect: false,
       });
-      if (res?.error) {
+      if (!res || res.error) {
         setError("Invalid email or password.");
         return;
       }
+
+      await getSession();
 
       const callbackForResolver = (() => {
         if (!callbackUrlRaw) return null;
@@ -56,7 +58,7 @@ function LoginFormInner() {
         return;
       }
 
-      router.push(dest.path);
+      router.replace(dest.path);
       router.refresh();
     } finally {
       setLoading(false);

@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import {
   resolvePostLoginDestination,
@@ -13,5 +14,6 @@ export async function resolvePostLoginDestinationAction(
   if (!session?.user?.id) {
     return { kind: "error", message: "Session not found. Try signing in again." };
   }
+  revalidatePath("/", "layout");
   return resolvePostLoginDestination(session.user.id, callbackUrl);
 }

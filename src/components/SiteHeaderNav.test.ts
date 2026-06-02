@@ -54,8 +54,11 @@ describe("SiteHeaderNav signed-in pills", () => {
 });
 
 describe("AuthSessionProvider stale session sync", () => {
-  it("clears client session when server session is gone", () => {
-    expect(authProviderSrc).toMatch(/hasServerSession/);
+  it("clears client session only after server session was present then removed", () => {
+    expect(authProviderSrc).toMatch(/hadServerSessionRef/);
+    expect(authProviderSrc).toMatch(
+      /if \(hadServerSession && !hasServerSession && status === "authenticated"\)/
+    );
     expect(authProviderSrc).toMatch(/signOut\(\{ redirect: false \}\)/);
     expect(layoutSrc).toMatch(/hasServerSession=\{hasServerSession\}/);
   });

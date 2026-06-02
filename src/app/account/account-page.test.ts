@@ -22,6 +22,7 @@ const headerNavSrc = readFileSync(join(dir, "../../components/SiteHeaderNav.tsx"
 const ordersPageSrc = readFileSync(join(dir, "../orders/page.tsx"), "utf8");
 const checkoutPhoneSrc = readFileSync(join(dir, "../checkout/CheckoutPhoneVerification.tsx"), "utf8");
 const loginFormSrc = readFileSync(join(dir, "../login/LoginForm.tsx"), "utf8");
+const loginActionsSrc = readFileSync(join(dir, "../login/actions.ts"), "utf8");
 const orderAccessDeniedSrc = readFileSync(join(dir, "../order/[orderId]/OrderAccessDenied.tsx"), "utf8");
 
 describe("/account signed-out behavior", () => {
@@ -151,6 +152,18 @@ describe("login order history callback copy", () => {
   it("uses order-history subtitle and Sign in button", () => {
     expect(loginFormSrc).toMatch(/Sign in to view your order history/);
     expect(loginFormSrc).toMatch(/"Sign in"/);
+  });
+});
+
+describe("login session establishment", () => {
+  it("waits for client session before resolving destination", () => {
+    expect(loginFormSrc).toMatch(/await getSession\(\)/);
+    expect(loginFormSrc).toMatch(/resolvePostLoginDestinationAction/);
+    expect(loginFormSrc).toMatch(/router\.replace/);
+  });
+
+  it("revalidates layout after credentials sign-in", () => {
+    expect(loginActionsSrc).toMatch(/revalidatePath\("\/", "layout"\)/);
   });
 });
 

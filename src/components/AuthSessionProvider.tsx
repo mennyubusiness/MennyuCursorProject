@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { Session } from "next-auth";
 import { SessionProvider, signOut, useSession } from "next-auth/react";
 
+/**
+ * After server sign-out, the JWT cookie is cleared but the client SessionProvider can
+ * still report `authenticated` until signOut runs. Only clear the client session when the
+ * server session transitions from present → absent — not on initial load or right after
+ * sign-in (when the client updates before `router.refresh()`).
+ */
 function SessionServerSync({
   hasServerSession,
   children,
@@ -12,9 +18,13 @@ function SessionServerSync({
   children: React.ReactNode;
 }) {
   const { status } = useSession();
+  const hadServerSessionRef = useRef(hasServerSession);
 
   useEffect(() => {
-    if (!hasServerSession && status === "authenticated") {
+    const hadServerSession = hadServerSessionRef.current;
+    hadServerSessionRef.current = hasServerSession;
+
+    if (hadServerSession && !hasServerSession && status === "authenticated") {
       void signOut({ redirect: false });
     }
   }, [hasServerSession, status]);
