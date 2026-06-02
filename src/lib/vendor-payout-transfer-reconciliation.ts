@@ -170,14 +170,29 @@ export function pickUniqueStripeTransferMatch(
   return { kind: "none" };
 }
 
-export function reconciliationResultMessage(outcome: string, detail?: string): string {
+export function reconciliationResultMessage(
+  outcome: string,
+  detail?: string,
+  context?: {
+    hasCustomerPayment?: boolean;
+    platformPayoutPaidOut?: boolean;
+  }
+): string {
   switch (outcome) {
     case "updated_paid":
-      return detail ? `Updated from Stripe transfer ${detail}` : "Updated from Stripe transfer";
+      return "Matching vendor Connect transfer found and row was marked paid.";
     case "already_paid":
       return "Already marked paid and verified in Stripe";
-    case "unchanged_not_found":
-      return "No matching Stripe transfer found";
+    case "unchanged_not_found": {
+      const base =
+        context?.hasCustomerPayment === false
+          ? "No matching Stripe transfer found"
+          : "Customer payment exists, but no vendor Connect transfer was found. This vendor payout is still unpaid.";
+      if (context?.platformPayoutPaidOut) {
+        return `${base} Platform payout to Open Order bank found. This does not count as vendor payment.`;
+      }
+      return base;
+    }
     case "unchanged_ambiguous":
       return "Multiple possible Stripe transfers found — manual review required";
     case "mismatch":

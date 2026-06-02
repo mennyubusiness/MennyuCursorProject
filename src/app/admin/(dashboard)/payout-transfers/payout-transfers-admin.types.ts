@@ -1,3 +1,5 @@
+import type { PlatformPayoutDisplayStatus } from "@/lib/stripe-money-movement";
+
 export type AdminPayoutTransferRow = {
   id: string;
   paymentAllocationId: string;
@@ -17,6 +19,16 @@ export type AdminPayoutTransferRow = {
   failedAt: string | null;
   vendor: { id: string; name: string };
   vendorOrder: { id: string; orderId: string };
+  moneyMovement: {
+    customerPaymentCents: number;
+    stripeProcessingFeeCents: number | null;
+    stripeNetToPlatformCents: number | null;
+    vendorConnectTransferOwedCents: number;
+    vendorStillOwedCents: number;
+    openOrderRetainedCents: number;
+    stripeBalanceTransactionId: string | null;
+    platformPayout: PlatformPayoutDisplayStatus;
+  } | null;
 };
 
 export type AdminTransferReversalRow = {

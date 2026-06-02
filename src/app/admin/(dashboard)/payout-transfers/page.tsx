@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { fetchStripePlatformBalance } from "@/services/stripe-balance.service";
+import { platformPayoutDisplayForListRow } from "@/services/stripe-platform-payout-lookup.service";
+import { buildPayoutTransferMoneyContext } from "@/lib/stripe-money-movement";
 import type {
   AdminPayoutTransferRow,
   AdminTransferReversalRow,
@@ -38,6 +40,19 @@ export default async function AdminPayoutTransfersPage() {
         failedAt: true,
         vendor: { select: { id: true, name: true } },
         vendorOrder: { select: { id: true, orderId: true } },
+        paymentAllocation: {
+          select: {
+            netVendorTransferCents: true,
+            serviceFeeCents: true,
+            payment: {
+              select: {
+                amountCents: true,
+                stripeProcessingFeeCents: true,
+                stripeBalanceTransactionId: true,
+              },
+            },
+          },
+        },
       },
     }),
     prisma.vendorPayoutTransferReversal.findMany({
@@ -67,12 +82,51 @@ export default async function AdminPayoutTransfersPage() {
     fetchStripePlatformBalance("usd"),
   ]);
 
-  const initialTransfers: AdminPayoutTransferRow[] = transfers.map((t) => ({
-    ...t,
-    createdAt: t.createdAt.toISOString(),
-    submittedAt: t.submittedAt?.toISOString() ?? null,
-    failedAt: t.failedAt?.toISOString() ?? null,
-  }));
+  const initialTransfers: AdminPayoutTransferRow[] = transfers.map((t) => {
+    const pa = t.paymentAllocation;
+    const payment = pa.payment;
+    const balanceTxnId = payment.stripeBalanceTransactionId;
+    const ctx = buildPayoutTransferMoneyContext({
+      paymentAmountCents: payment.amountCents,
+      stripeProcessingFeeCents: payment.stripeProcessingFeeCents,
+      allocationServiceFeeCents: pa.serviceFeeCents,
+      netVendorTransferCents: pa.netVendorTransferCents,
+      transferStatus: t.status,
+      stripeTransferId: t.stripeTransferId,
+      stripeBalanceTransactionId: balanceTxnId,
+    });
+
+    return {
+      id: t.id,
+      paymentAllocationId: t.paymentAllocationId,
+      vendorOrderId: t.vendorOrderId,
+      vendorId: t.vendorId,
+      destinationAccountId: t.destinationAccountId,
+      amountCents: t.amountCents,
+      currency: t.currency,
+      status: t.status,
+      blockedReason: t.blockedReason,
+      stripeTransferId: t.stripeTransferId,
+      idempotencyKey: t.idempotencyKey,
+      batchKey: t.batchKey,
+      failureMessage: t.failureMessage,
+      createdAt: t.createdAt.toISOString(),
+      submittedAt: t.submittedAt?.toISOString() ?? null,
+      failedAt: t.failedAt?.toISOString() ?? null,
+      vendor: t.vendor,
+      vendorOrder: t.vendorOrder,
+      moneyMovement: {
+        customerPaymentCents: ctx.customerPaymentCents,
+        stripeProcessingFeeCents: ctx.stripeProcessingFeeCents,
+        stripeNetToPlatformCents: ctx.stripeNetToPlatformCents,
+        vendorConnectTransferOwedCents: ctx.vendorConnectTransferOwedCents,
+        vendorStillOwedCents: ctx.vendorStillOwedCents,
+        openOrderRetainedCents: ctx.openOrderRetainedCents,
+        stripeBalanceTransactionId: balanceTxnId,
+        platformPayout: platformPayoutDisplayForListRow(balanceTxnId),
+      },
+    };
+  });
 
   const initialReversals: AdminTransferReversalRow[] = reversals.map((r) => ({
     ...r,
@@ -88,7 +142,8 @@ export default async function AdminPayoutTransfersPage() {
       <div>
         <h1 className="text-2xl font-semibold text-oo-charcoal">Payout transfers</h1>
         <p className="mt-1 text-sm text-oo-stone-gray">
-          Stripe Connect transfer execution and reversals. Use filters and retries for safe testing and debugging.
+          Stripe Connect transfer execution and reversals. Customer payments, platform bank payouts, and vendor Connect
+          transfers are separate money movements.
         </p>
       </div>
 

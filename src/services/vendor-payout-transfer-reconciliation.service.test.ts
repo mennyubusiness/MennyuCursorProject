@@ -33,6 +33,15 @@ vi.mock("@/lib/env", () => ({
   env: { STRIPE_SECRET_KEY: "sk_test_x" },
 }));
 
+vi.mock("@/services/stripe-platform-payout-lookup.service", () => ({
+  lookupPlatformPayoutForBalanceTransaction: vi.fn(async () => ({
+    kind: "paid_out",
+    payoutId: "po_1",
+    stripeStatus: "paid",
+    amountCents: 5000,
+  })),
+}));
+
 import {
   reconcileEligibleVendorPayoutTransfers,
   reconcileVendorPayoutTransfer,
@@ -52,6 +61,9 @@ const rowPayload = {
   submittedAt: null,
   failedAt: new Date("2026-01-15T12:01:00Z"),
   vendorOrder: { orderId: "ord_1" },
+  paymentAllocation: {
+    payment: { id: "pay_1", stripeBalanceTransactionId: "txn_1" },
+  },
 };
 
 describe("vendor-payout-transfer-reconciliation.service", () => {
@@ -135,6 +147,8 @@ describe("vendor-payout-transfer-reconciliation.service", () => {
     mockFindUnique.mockResolvedValue(rowPayload);
     const result = await reconcileVendorPayoutTransfer("vpt_1");
     expect(result.outcome).toBe("unchanged_not_found");
+    expect(result.message).toContain("Customer payment exists");
+    expect(result.message).toContain("Platform payout to Open Order bank found");
     expect(mockCreate).not.toHaveBeenCalled();
   });
 

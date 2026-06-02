@@ -10,10 +10,12 @@ import {
   pickUniqueStripeTransferMatch,
   RECONCILE_ELIGIBLE_STATUSES,
   reconciliationCreatedWindow,
+  reconciliationResultMessage,
   type StripeTransferMatchInput,
   type VendorPayoutReconciliationRow,
   stripeTransferMatchesVendorPayoutRow,
 } from "@/lib/vendor-payout-transfer-reconciliation";
+import { lookupPlatformPayoutForBalanceTransaction } from "@/services/stripe-platform-payout-lookup.service";
 import { VENDOR_PAYOUT_TRANSFER_STATUS } from "@/services/vendor-payout-transfer.service";
 
 export type ReconcileVendorPayoutTransferOutcome =
@@ -59,6 +61,16 @@ const vendorPayoutTransferReconcileSelect = {
   submittedAt: true,
   failedAt: true,
   vendorOrder: { select: { orderId: true } },
+  paymentAllocation: {
+    select: {
+      payment: {
+        select: {
+          id: true,
+          stripeBalanceTransactionId: true,
+        },
+      },
+    },
+  },
 } as const;
 
 function toReconciliationRow(
@@ -208,6 +220,24 @@ export async function findMatchingStripeTransferForVendorPayoutTransfer(
   return pickUniqueStripeTransferMatch(candidates, row);
 }
 
+async function reconciliationMessageContext(
+  paymentAllocation: {
+    payment: { id: string; stripeBalanceTransactionId: string | null };
+  } | null
+): Promise<{ hasCustomerPayment: boolean; platformPayoutPaidOut: boolean }> {
+  const hasCustomerPayment = Boolean(paymentAllocation?.payment.id);
+  if (!paymentAllocation?.payment.stripeBalanceTransactionId?.trim()) {
+    return { hasCustomerPayment, platformPayoutPaidOut: false };
+  }
+  const platformPayout = await lookupPlatformPayoutForBalanceTransaction(
+    paymentAllocation.payment.stripeBalanceTransactionId
+  );
+  return {
+    hasCustomerPayment,
+    platformPayoutPaidOut: platformPayout.kind === "paid_out",
+  };
+}
+
 export async function reconcileVendorPayoutTransfer(
   rowId: string
 ): Promise<ReconcileVendorPayoutTransferResult> {
@@ -278,10 +308,11 @@ export async function reconcileVendorPayoutTransfer(
   }
 
   if (match.kind === "none") {
+    const msgContext = await reconciliationMessageContext(row.paymentAllocation);
     return {
       vendorPayoutTransferId: rowId,
       outcome: "unchanged_not_found",
-      message: "No matching Stripe transfer found",
+      message: reconciliationResultMessage("unchanged_not_found", undefined, msgContext),
     };
   }
 
@@ -312,7 +343,7 @@ export async function reconcileVendorPayoutTransfer(
   return {
     vendorPayoutTransferId: rowId,
     outcome: "updated_paid",
-    message: `Updated from Stripe transfer ${match.transfer.id}`,
+    message: reconciliationResultMessage("updated_paid", match.transfer.id),
     stripeTransferId: match.transfer.id,
     detail: metadataStrongMatch(match.transfer.metadata, reconRow)
       ? "metadata_match"

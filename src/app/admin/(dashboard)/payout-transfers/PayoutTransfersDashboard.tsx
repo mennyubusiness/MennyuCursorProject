@@ -23,8 +23,12 @@ import {
 } from "@/lib/vendor-payout-transfer-failure";
 import {
   isReconcilablePayoutTransfer,
-  reconciliationResultMessage,
 } from "@/lib/vendor-payout-transfer-reconciliation";
+import {
+  computeVendorLiabilityTotals,
+  STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT,
+} from "@/lib/stripe-money-movement";
+import { StripeMoneyMovementBreakdown } from "@/components/admin/StripeMoneyMovementBreakdown";
 import type { StripePlatformBalanceSnapshot } from "@/services/stripe-balance.service";
 
 import type {
@@ -303,6 +307,8 @@ export function PayoutTransfersDashboard({
     });
   }, [reversals, datePreset, vendorId, statusFilter]);
 
+  const liabilityTotals = useMemo(() => computeVendorLiabilityTotals(transfers), [transfers]);
+
   const summary = useMemo(() => {
     let pendingCents = 0;
     let paidCents = 0;
@@ -493,7 +499,7 @@ export function PayoutTransfersDashboard({
         setReconcileNotes((prev) => ({ ...prev, [id]: r.error }));
         return;
       }
-      const msg = reconciliationResultMessage(r.result.outcome, r.result.message);
+      const msg = r.result.message;
       setReconcileNotes((prev) => ({
         ...prev,
         [id]:
@@ -610,6 +616,40 @@ export function PayoutTransfersDashboard({
         ) : (
           <p className="mt-3 text-sm text-oo-stone-gray">Stripe balance unavailable.</p>
         )}
+      </div>
+
+      <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-sm font-semibold text-oo-charcoal">Vendor liability summary</h2>
+        <p className="mt-1 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">
+          {STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT} Money paid out to the Open Order bank may still include vendor
+          liabilities below until Connect transfers succeed.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Vendor still owed</p>
+            <p className="mt-1 text-lg font-semibold text-amber-900">
+              {formatMoney(liabilityTotals.vendorOwedCents, "usd")}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Vendor paid (Connect)</p>
+            <p className="mt-1 text-lg font-semibold text-emerald-900">
+              {formatMoney(liabilityTotals.vendorPaidCents, "usd")}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
+              Blocked: insufficient balance
+            </p>
+            <p className="mt-1 text-lg font-semibold text-orange-900">
+              {formatMoney(liabilityTotals.blockedInsufficientBalanceCents, "usd")}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Connect-blocked vendors</p>
+            <p className="mt-1 text-lg font-semibold text-oo-charcoal">{liabilityTotals.blockedConnectCount}</p>
+          </div>
+        </div>
       </div>
 
       <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm sm:p-5">
@@ -798,6 +838,7 @@ export function PayoutTransfersDashboard({
                                 ? "bg-amber-50/40"
                                 : "";
                           return (
+                            <>
                             <tr key={t.id} className={rowTint}>
                               <td className="px-3 py-2 font-medium text-oo-charcoal">{t.vendor.name}</td>
                               <td className="px-3 py-2">
@@ -808,7 +849,14 @@ export function PayoutTransfersDashboard({
                                   {t.vendorOrder.orderId.slice(-10)}
                                 </Link>
                               </td>
-                              <td className="px-3 py-2 tabular-nums">{formatMoney(t.amountCents, t.currency)}</td>
+                              <td className="px-3 py-2 tabular-nums">
+                                <div>{formatMoney(t.amountCents, t.currency)}</div>
+                                {t.moneyMovement && t.moneyMovement.vendorStillOwedCents > 0 && (
+                                  <div className="text-[10px] font-medium text-amber-900">
+                                    owed {formatMoney(t.moneyMovement.vendorStillOwedCents, t.currency)}
+                                  </div>
+                                )}
+                              </td>
                               <td className="px-3 py-2">
                                 <span
                                   className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${statusBadgeClass(t.status)}`}
@@ -874,6 +922,37 @@ export function PayoutTransfersDashboard({
                                 </div>
                               </td>
                             </tr>
+                            {t.moneyMovement ? (
+                              <tr key={`${t.id}-money`} className={rowTint}>
+                                <td colSpan={9} className="border-t border-oo-light-stone/60 px-3 py-3">
+                                  <details className="text-xs">
+                                    <summary className="cursor-pointer font-medium text-oo-stone-gray hover:text-oo-charcoal">
+                                      Money movement breakdown
+                                    </summary>
+                                    <div className="mt-2 max-w-xl rounded-lg border border-oo-light-stone bg-white/80 p-3">
+                                      <StripeMoneyMovementBreakdown
+                                        compact
+                                        currency={t.currency}
+                                        customerPaymentCents={t.moneyMovement.customerPaymentCents}
+                                        stripeProcessingFeeCents={t.moneyMovement.stripeProcessingFeeCents}
+                                        stripeNetToPlatformCents={t.moneyMovement.stripeNetToPlatformCents}
+                                        platformPayout={t.moneyMovement.platformPayout}
+                                        vendorConnectTransferOwedCents={t.moneyMovement.vendorConnectTransferOwedCents}
+                                        vendorConnectTransferStatus={t.status}
+                                        vendorStillOwedCents={t.moneyMovement.vendorStillOwedCents}
+                                        openOrderRetainedCents={t.moneyMovement.openOrderRetainedCents}
+                                        stripeTransferId={t.stripeTransferId}
+                                        showBlockedNote={
+                                          t.moneyMovement.vendorStillOwedCents > 0 &&
+                                          (insufficient || t.status === "failed" || t.status === "blocked")
+                                        }
+                                      />
+                                    </div>
+                                  </details>
+                                </td>
+                              </tr>
+                            ) : null}
+                            </>
                           );
                         })}
                       </tbody>

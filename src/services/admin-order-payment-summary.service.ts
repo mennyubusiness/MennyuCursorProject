@@ -12,6 +12,14 @@ import {
 } from "@/services/refund-ledger.service";
 import { VENDOR_PAYOUT_TRANSFER_STATUS } from "@/services/vendor-payout-transfer.service";
 import { getVendorTransferReversalAmountCents } from "@/services/vendor-payout-transfer-reversal.service";
+import {
+  openOrderRetainedFromPayment,
+  openOrderRetainedFromVendorSlice,
+  stripeNetToPlatformCents,
+  vendorStillOwedCents,
+  type PlatformPayoutDisplayStatus,
+} from "@/lib/stripe-money-movement";
+import { lookupPlatformPayoutForBalanceTransaction } from "@/services/stripe-platform-payout-lookup.service";
 
 export class AdminPaymentSummarySchemaError extends Error {
   constructor(message: string) {
@@ -160,6 +168,8 @@ export type AdminOrderPaymentSummaryVendorOrder = {
   transferStatus: string | null;
   stripeTransferId: string | null;
   transferAmountCents: number | null;
+  vendorStillOwedCents: number;
+  openOrderRetainedCents: number | null;
   transferMessage: VendorTransferUiMessage;
   fullRefundMayRequireReversal: boolean;
   partialRefundWouldRequirePlatformAbsorption: boolean;
@@ -216,6 +226,13 @@ export type AdminOrderPaymentSummary = {
     remainingRefundableCents: number;
     paymentRefundStatus: string;
     hasPendingRefund: boolean;
+  } | null;
+  moneyMovement: {
+    customerPaymentCents: number;
+    stripeProcessingFeeCents: number | null;
+    stripeNetToPlatformCents: number | null;
+    openOrderRetainedCents: number | null;
+    platformPayout: PlatformPayoutDisplayStatus;
   } | null;
 };
 
@@ -380,6 +397,7 @@ export async function fetchAdminOrderPaymentSummary(
           Boolean(vpt?.stripeTransferId?.trim()) &&
           vpt != null &&
           getVendorTransferReversalAmountCents(vpt) > 0;
+        const netTransfer = alloc?.netVendorTransferCents ?? vpt?.amountCents ?? 0;
 
         return {
           id: vo.id,
@@ -408,6 +426,12 @@ export async function fetchAdminOrderPaymentSummary(
           transferStatus,
           stripeTransferId: vpt?.stripeTransferId ?? null,
           transferAmountCents: vpt?.amountCents ?? null,
+          vendorStillOwedCents: vendorStillOwedCents({
+            transferStatus: transferStatus ?? "missing",
+            stripeTransferId: vpt?.stripeTransferId ?? null,
+            vendorConnectTransferOwedCents: netTransfer,
+          }),
+          openOrderRetainedCents: openOrderRetainedFromVendorSlice(vo.serviceFeeCents),
           transferMessage,
           fullRefundMayRequireReversal:
             transferStatus === VENDOR_PAYOUT_TRANSFER_STATUS.paid && reversalPossible,
@@ -418,6 +442,15 @@ export async function fetchAdminOrderPaymentSummary(
     );
 
     const vendorNameById = new Map(order.vendorOrders.map((v) => [v.id, v.vendor.name]));
+
+    const sumNetVendorTransfer =
+      payment?.allocations.reduce((sum, a) => sum + a.netVendorTransferCents, 0) ?? 0;
+    const stripeNet = payment
+      ? stripeNetToPlatformCents(payment.amountCents, payment.stripeProcessingFeeCents)
+      : null;
+    const platformPayout = payment
+      ? await lookupPlatformPayoutForBalanceTransaction(payment.stripeBalanceTransactionId)
+      : { kind: "unknown" as const, reason: "no_balance_transaction" as const };
 
     const orderRefunds: AdminOrderPaymentSummaryRefund[] = order.orderRefunds.map((r) => ({
       id: r.id,
@@ -476,6 +509,15 @@ export async function fetchAdminOrderPaymentSummary(
             remainingRefundableCents: ledgerSummary.remainingRefundableCents,
             paymentRefundStatus: ledgerSummary.paymentRefundStatus,
             hasPendingRefund: ledgerSummary.hasPendingRefund,
+          }
+        : null,
+      moneyMovement: payment
+        ? {
+            customerPaymentCents: payment.amountCents,
+            stripeProcessingFeeCents: payment.stripeProcessingFeeCents,
+            stripeNetToPlatformCents: stripeNet,
+            openOrderRetainedCents: openOrderRetainedFromPayment(stripeNet, sumNetVendorTransfer),
+            platformPayout,
           }
         : null,
     };
