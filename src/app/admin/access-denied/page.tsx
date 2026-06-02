@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { AuthFormCard } from "@/components/auth/auth-shell";
+import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { Button } from "@/components/ui/button";
 
 export default function AdminAccessDeniedPage() {
@@ -45,7 +46,7 @@ export default function AdminAccessDeniedPage() {
           <p className="mt-3 text-sm text-oo-stone-gray">
             Platform admin?{" "}
             <Link
-              href={`/login?callbackUrl=${encodeURIComponent("/admin")}`}
+              href={buildLoginHrefWithReturn("/admin")}
               className="font-semibold text-brand underline-offset-4 hover:underline"
             >
               Sign in with email

@@ -2,11 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 
 export default async function VendorSelectPage() {
   const session = await auth();
   if (!session?.user?.id) {
-    redirect(`/login?callbackUrl=${encodeURIComponent("/vendor/select")}`);
+    redirect(buildLoginHrefWithReturn("/vendor/select"));
   }
 
   const rows = await prisma.vendorMembership.findMany({
@@ -16,7 +17,7 @@ export default async function VendorSelectPage() {
   });
 
   if (rows.length === 0) {
-    redirect(`/login?callbackUrl=${encodeURIComponent("/vendor/select")}`);
+    redirect(buildLoginHrefWithReturn("/vendor/select"));
   }
 
   if (rows.length === 1) {

@@ -4,6 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
+import { canRetryRouting, isOrderPaidForAdminRecovery } from "@/lib/admin-needs-attention-actions";
 import { isRoutingRetryAvailable, getRoutingUnavailableReason } from "@/lib/routing-availability";
 import { retryVendorOrderRouting } from "@/services/routing.service";
 import { recomputeAndPersistParentStatus } from "@/services/order-status.service";
@@ -33,6 +34,44 @@ export async function POST(
     });
   }
 
+  const vo = await prisma.vendorOrder.findUnique({
+    where: { id: vendorOrderId },
+    select: {
+      routingStatus: true,
+      fulfillmentStatus: true,
+      deliverectOrderId: true,
+      manuallyRecoveredAt: true,
+      order: { select: { status: true } },
+    },
+  });
+  if (!vo) {
+    return NextResponse.json({ ok: false, error: "Vendor order not found" }, { status: 404 });
+  }
+
+  const orderSnap = { status: vo.order.status };
+  if (!isOrderPaidForAdminRecovery(orderSnap)) {
+    return NextResponse.json({
+      ok: false,
+      error: "Routing retry requires a paid order.",
+      code: "ORDER_UNPAID",
+    });
+  }
+
+  const voSnap = {
+    routingStatus: vo.routingStatus,
+    fulfillmentStatus: vo.fulfillmentStatus,
+    deliverectOrderId: vo.deliverectOrderId,
+    manuallyRecoveredAt: vo.manuallyRecoveredAt,
+  };
+  if (!canRetryRouting(voSnap, orderSnap)) {
+    return NextResponse.json({
+      ok: false,
+      error:
+        "Routing retry is not safe for this vendor order (already sent to POS, terminal state, or manually recovered). Use manual recovery or view the order.",
+      code: "NOT_ELIGIBLE",
+    });
+  }
+
   const result = await retryVendorOrderRouting(vendorOrderId);
 
   if (result.skipped) {
@@ -43,12 +82,12 @@ export async function POST(
     });
   }
   if (result.success) {
-    const vo = await prisma.vendorOrder.findUnique({
+    const voAfter = await prisma.vendorOrder.findUnique({
       where: { id: vendorOrderId },
       select: { orderId: true },
     });
-    if (vo) {
-      await recomputeAndPersistParentStatus(vo.orderId, "admin_retry_routing");
+    if (voAfter) {
+      await recomputeAndPersistParentStatus(voAfter.orderId, "admin_retry_routing");
     }
     return NextResponse.json({
       ok: true,

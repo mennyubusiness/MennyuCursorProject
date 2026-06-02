@@ -8,12 +8,12 @@ import {
 } from "@/lib/auth/post-login-destination";
 
 export async function resolvePostLoginDestinationAction(
-  callbackUrl: string | null
+  returnPath: string | null
 ): Promise<PostLoginDestinationResult | { kind: "error"; message: string }> {
   const session = await auth();
   if (!session?.user?.id) {
     return { kind: "error", message: "Session not found. Try signing in again." };
   }
   revalidatePath("/", "layout");
-  return resolvePostLoginDestination(session.user.id, callbackUrl);
+  return resolvePostLoginDestination(session.user.id, returnPath);
 }

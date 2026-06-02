@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canAccessVendorDashboard, isVendorDashboardDevOpen } from "@/lib/vendor-dashboard-auth";
 import { VendorAreaNav } from "./VendorAreaNav";
 
@@ -29,9 +30,7 @@ export default async function VendorAreaLayout({
       if (vendor.vendorDashboardToken?.trim()) {
         redirect(`/vendor/${vendorId}/settings?access=needs_session`);
       }
-      redirect(
-        `/login?callbackUrl=${encodeURIComponent(`/vendor/${vendorId}`)}`
-      );
+      redirect(buildLoginHrefWithReturn(`/vendor/${vendorId}`));
     }
   }
 

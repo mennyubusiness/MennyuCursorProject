@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 
 /**
  * Hub: sends the user to their most recently joined pod dashboard.
@@ -9,7 +10,7 @@ import { prisma } from "@/lib/db";
 export default async function PodDashboardHubPage() {
   const session = await auth();
   if (!session?.user?.id) {
-    redirect(`/login?${new URLSearchParams({ callbackUrl: "/pod/dashboard" }).toString()}`);
+    redirect(buildLoginHrefWithReturn("/pod/dashboard"));
   }
 
   const rows = await prisma.podMembership.findMany({

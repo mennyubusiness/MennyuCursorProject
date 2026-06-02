@@ -43,7 +43,7 @@ export function AdminVendorOrderExceptionActions({
         text: data.message ?? data.error ?? (res.ok ? "Submitted" : "Failed"),
         error: !res.ok || data.ok === false,
       });
-      if (res.ok && data.ok !== false) router.refresh();
+      if (res.ok && data.ok === true) router.refresh();
     } catch {
       setMessage({ text: "Error", error: true });
     } finally {
@@ -52,18 +52,30 @@ export function AdminVendorOrderExceptionActions({
   }
 
   async function handleManualRecovery() {
+    const notes = window.prompt(
+      "Recovery note (required): what did the vendor confirm?",
+      ""
+    );
+    if (notes == null) return;
+    const trimmed = notes.trim();
+    if (trimmed.length < 3) {
+      setMessage({ text: "Recovery note must be at least 3 characters.", error: true });
+      return;
+    }
     setMessage(null);
     setLoading("manual");
     try {
       const res = await fetch(`/api/admin/vendor-orders/${vendorOrderId}/manual-recovery`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: trimmed }),
       });
       const data = await res.json().catch(() => ({}));
       setMessage({
         text: data.noop ? data.message : (data.message ?? data.error ?? (res.ok ? "Marked manually received" : "Failed")),
         error: !res.ok || data.ok === false,
       });
-      if (res.ok && data.ok !== false) router.refresh();
+      if (res.ok && data.ok === true) router.refresh();
     } catch {
       setMessage({ text: "Error", error: true });
     } finally {
@@ -85,7 +97,7 @@ export function AdminVendorOrderExceptionActions({
         text: data.message ?? data.error ?? (res.ok ? "Cancelled" : "Cancel failed"),
         error: !res.ok || data.ok === false,
       });
-      if (res.ok && data.ok !== false) router.refresh();
+      if (res.ok && data.ok === true) router.refresh();
     } catch {
       setMessage({ text: "Error", error: true });
     } finally {

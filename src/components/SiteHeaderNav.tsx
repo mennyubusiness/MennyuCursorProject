@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { AccountHeaderDropdown } from "@/components/AccountHeaderDropdown";
 import type { HeaderAccountMenu } from "@/lib/auth/header-account-menu";
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
-import { ACCOUNT_SIGN_IN_PATH } from "@/lib/auth/account-paths";
+import { HeaderSignInLink } from "@/components/HeaderSignInLink";
 import { buttonClassName } from "@/components/ui/button";
 import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
 import { cn } from "@/lib/cn";
@@ -106,9 +106,7 @@ export function SiteHeaderNav({
             triggerClassName={navLink}
           />
         ) : (
-          <Link href={ACCOUNT_SIGN_IN_PATH} className={navLink} title="Sign in">
-            Sign in
-          </Link>
+          <HeaderSignInLink className={navLink} title="Sign in" />
         )}
       </div>
     </nav>

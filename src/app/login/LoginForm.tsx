@@ -6,14 +6,11 @@ import { getSession, signIn } from "next-auth/react";
 import { Suspense, useMemo, useState } from "react";
 import { AuthFormCard } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
+import {
+  readLoginReturnParam,
+  sanitizeLoginReturnPath,
+} from "@/lib/auth/login-return-path";
 import { resolvePostLoginDestinationAction } from "./actions";
-
-function safeCallbackPath(raw: string | null): string {
-  if (!raw || typeof raw !== "string") return "/";
-  const t = raw.trim();
-  if (!t.startsWith("/") || t.startsWith("//")) return "/";
-  return t;
-}
 
 function LoginFormInner() {
   const router = useRouter();
@@ -23,9 +20,12 @@ function LoginFormInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const callbackUrlRaw = searchParams.get("callbackUrl");
-  const callbackPath = useMemo(() => safeCallbackPath(callbackUrlRaw), [callbackUrlRaw]);
-  const isOrdersCallback = callbackPath === "/orders";
+  const returnPathRaw = readLoginReturnParam(searchParams);
+  const returnPathSafe = useMemo(
+    () => sanitizeLoginReturnPath(returnPathRaw),
+    [returnPathRaw]
+  );
+  const isOrdersReturn = returnPathSafe?.split("?")[0] === "/orders";
   const resetSuccess = searchParams.get("reset") === "success";
 
   async function onSubmit(e: React.FormEvent) {
@@ -45,13 +45,7 @@ function LoginFormInner() {
 
       await getSession();
 
-      const callbackForResolver = (() => {
-        if (!callbackUrlRaw) return null;
-        const safe = safeCallbackPath(callbackUrlRaw);
-        return safe === "/" ? null : safe;
-      })();
-
-      const dest = await resolvePostLoginDestinationAction(callbackForResolver);
+      const dest = await resolvePostLoginDestinationAction(returnPathSafe);
 
       if (dest.kind === "error") {
         setError(dest.message);
@@ -74,12 +68,12 @@ function LoginFormInner() {
             Your password has been reset. Please sign in.
           </p>
         )}
-        {isOrdersCallback && (
+        {isOrdersReturn && (
           <p className="mt-2 text-sm text-zinc-600">Sign in to view your order history.</p>
         )}
-        {callbackPath !== "/" && !isOrdersCallback && (
+        {returnPathSafe && !isOrdersReturn && (
           <p className="mt-2 text-sm text-zinc-600">
-            After you sign in, you&apos;ll be sent to the right place for your account.
+            After you sign in, you&apos;ll return to where you left off.
           </p>
         )}
       </div>

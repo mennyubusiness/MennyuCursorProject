@@ -5,6 +5,7 @@ import { redirect, notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
+import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canAccessPodDashboardLayout } from "@/lib/permissions";
 import { PodAreaNav } from "../PodAreaNav";
 
@@ -22,7 +23,7 @@ export default async function PodDashboardLayout({
     if (env.NODE_ENV === "production") {
       const session = await auth();
       if (!session?.user?.id) {
-        redirect(`/login?callbackUrl=${encodeURIComponent(`/pod/${podId}/dashboard`)}`);
+        redirect(buildLoginHrefWithReturn(`/pod/${podId}/dashboard`));
       }
       redirect("/admin/access-denied");
     }

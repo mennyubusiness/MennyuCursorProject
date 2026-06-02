@@ -58,6 +58,6 @@ describe("checkout payment lifecycle guards", () => {
   });
 
   it("Issues workbench only removes retry item when API ok is true", () => {
-    expect(issuesWorkbenchSrc).toMatch(/data\.ok !== false/);
+    expect(issuesWorkbenchSrc).toMatch(/data\.ok === true/);
   });
 });

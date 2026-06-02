@@ -8,6 +8,7 @@ import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoVie
 import { PageBand, PageSection, PageShell } from "@/components/layout/page-shell";
 import { ButtonLink } from "@/components/ui/button";
 import { POD_QR_ENTRY_VALUE } from "@/lib/pod-ordering-url";
+import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { prisma } from "@/lib/db";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
 
@@ -111,7 +112,7 @@ export default async function PodPage({
   const groupOrderCartUrl = `/cart?startGroupOrder=1&podId=${encodeURIComponent(pod.id)}`;
   const groupOrderHref = session?.user
     ? groupOrderCartUrl
-    : `/login?callbackUrl=${encodeURIComponent(groupOrderCartUrl)}`;
+    : buildLoginHrefWithReturn(groupOrderCartUrl);
 
   const hasInfoSection = Boolean(pod.description?.trim() || pod.address?.trim());
   const navItems: PodPageNavItem[] = [];

@@ -234,6 +234,9 @@ export async function submitVendorOrderToDeliverect(
       `${LOG_PREFIX} Mock mode vendorOrderId=${vendorOrderId} vendorId=${vendorOrder.vendor.id} (payload not sent)`
     );
   } else {
+    // TODO(ops): Concurrent admin retries could race two live submits while routingStatus is still
+    // `pending` before either completes. Mitigated for `sent`+deliverectOrderId via idempotency below.
+    // A dedicated submit-claim column or row lock would harden this path without rewriting routing.
     console.info(
       `${LOG_PREFIX} Submitting vendorOrderId=${vendorOrderId} vendorId=${vendorOrder.vendor.id} vendorName=${vendorOrder.vendor.name} channelLinkId=****${String(channelLinkId).slice(-4)}`
     );

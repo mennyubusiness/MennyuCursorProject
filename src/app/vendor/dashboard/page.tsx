@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 
 /**
  * Hub: sends the user to their vendor area (single vendor) or chooser (multiple).
@@ -9,7 +10,7 @@ import { prisma } from "@/lib/db";
 export default async function VendorDashboardHubPage() {
   const session = await auth();
   if (!session?.user?.id) {
-    redirect(`/login?${new URLSearchParams({ callbackUrl: "/vendor/dashboard" }).toString()}`);
+    redirect(buildLoginHrefWithReturn("/vendor/dashboard"));
   }
 
   const memberships = await prisma.vendorMembership.findMany({

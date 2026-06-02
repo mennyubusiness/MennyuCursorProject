@@ -1,25 +1,27 @@
 /**
- * Post-login routing: optional safe callbackUrl, else role-based default
- * (admin → /admin, vendor → /vendor/dashboard, pod → /pod/dashboard, else /orders).
+ * Post-login routing: optional safe `next` path, else role-based default.
+ * Platform admins → /admin (unless `next` is an allowed admin path).
+ * Customers without `next` → /account (not order history).
  */
 import "server-only";
 
 import { extractVendorIdFromVendorPath } from "@/lib/auth/login-intent";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
+import {
+  DEFAULT_CUSTOMER_POST_LOGIN_PATH,
+  isAdminReturnPath,
+  sanitizeLoginReturnPath,
+} from "@/lib/auth/login-return-path";
 import { prisma } from "@/lib/db";
 import { canViewPod, canViewVendor, getUserAccessContext, isAdminUser } from "@/lib/permissions";
 
 export type PostLoginDestinationResult = { kind: "redirect"; path: string };
 
-function safeInternalPath(raw: string | null): string | null {
-  if (!raw || typeof raw !== "string") return null;
-  const t = raw.trim();
-  if (!t.startsWith("/") || t.startsWith("//")) return null;
-  return t;
-}
-
 async function canRedirectToPath(userId: string, path: string): Promise<boolean> {
-  const clean = path.split("?")[0]?.trim() ?? "";
+  const safe = sanitizeLoginReturnPath(path);
+  if (!safe) return false;
+
+  const clean = safe.split("?")[0]?.trim() ?? "";
   if (!clean.startsWith("/")) return false;
 
   if (clean === "/admin" || clean.startsWith("/admin/")) {
@@ -53,6 +55,8 @@ async function canRedirectToPath(userId: string, path: string): Promise<boolean>
   }
 
   if (
+    clean === "/account" ||
+    clean.startsWith("/account/") ||
     clean === "/orders" ||
     clean === "/explore" ||
     clean === "/cart" ||
@@ -62,7 +66,6 @@ async function canRedirectToPath(userId: string, path: string): Promise<boolean>
     return true;
   }
   if (clean.startsWith("/order/")) return true;
-  if (clean.startsWith("/account/")) return true;
 
   return false;
 }
@@ -78,7 +81,7 @@ async function resolveDefaultDestinationForUser(userId: string): Promise<PostLog
   });
 
   if (!user) {
-    return { kind: "redirect", path: "/orders" };
+    return { kind: "redirect", path: DEFAULT_CUSTOMER_POST_LOGIN_PATH };
   }
 
   if (user.isPlatformAdmin) {
@@ -93,24 +96,34 @@ async function resolveDefaultDestinationForUser(userId: string): Promise<PostLog
     return { kind: "redirect", path: "/pod/dashboard" };
   }
 
-  return { kind: "redirect", path: "/orders" };
+  return { kind: "redirect", path: DEFAULT_CUSTOMER_POST_LOGIN_PATH };
 }
 
 export async function resolvePostLoginDestination(
   userId: string,
-  callbackUrl: string | null
+  returnPath: string | null
 ): Promise<PostLoginDestinationResult> {
   const pendingSetup = await getPendingAccountSetupRedirect(userId);
   if (pendingSetup) {
     return { kind: "redirect", path: pendingSetup };
   }
 
-  const cb = safeInternalPath(callbackUrl);
-  if (cb) {
-    const allowed = await canRedirectToPath(userId, cb);
-    if (allowed) {
-      return { kind: "redirect", path: cb };
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isPlatformAdmin: true },
+  });
+
+  const safeReturn = sanitizeLoginReturnPath(returnPath);
+
+  if (user?.isPlatformAdmin) {
+    if (safeReturn && isAdminReturnPath(safeReturn) && (await canRedirectToPath(userId, safeReturn))) {
+      return { kind: "redirect", path: safeReturn };
     }
+    return { kind: "redirect", path: "/admin" };
+  }
+
+  if (safeReturn && (await canRedirectToPath(userId, safeReturn))) {
+    return { kind: "redirect", path: safeReturn };
   }
 
   return resolveDefaultDestinationForUser(userId);

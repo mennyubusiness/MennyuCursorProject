@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canViewVendor } from "@/lib/permissions";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { ConnectPosWizard } from "./ConnectPosWizard";
@@ -14,7 +15,7 @@ export default async function VendorConnectPosPage({
   const { vendorId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    redirect(`/login?callbackUrl=${encodeURIComponent(`/vendor/${vendorId}/connect-pos`)}`);
+    redirect(buildLoginHrefWithReturn(`/vendor/${vendorId}/connect-pos`));
   }
   if (!(await canViewVendor(session.user.id, vendorId))) {
     notFound();

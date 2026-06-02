@@ -21,7 +21,7 @@ describe("SiteHeaderNav signed-out pills", () => {
   it("shows Explore, Cart, and Sign in when signed out", () => {
     expect(headerNavSrc).toMatch(/Explore/);
     expect(headerNavSrc).toMatch(/Sign in/);
-    expect(headerNavSrc).toMatch(/ACCOUNT_SIGN_IN_PATH/);
+    expect(headerNavSrc).toMatch(/HeaderSignInLink/);
     expect(headerNavSrc).toMatch(/showCart/);
   });
 

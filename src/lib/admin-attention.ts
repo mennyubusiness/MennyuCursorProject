@@ -23,6 +23,14 @@ import {
 } from "@/domain/order-support-issue";
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
 import { ageMinutes as ageMinutesUtil } from "@/lib/date-utils";
+import {
+  canManualRecoverVendorOrder,
+  canRetryRouting,
+  formatOrderPaymentLabel,
+  getNeedsAttentionSuggestedActions,
+  type OrderRecoverySnapshot,
+  type VendorOrderRecoverySnapshot,
+} from "@/lib/admin-needs-attention-actions";
 
 // ---- Types (normalized attention item) ----
 
@@ -89,8 +97,24 @@ export interface AdminAttentionItem {
   refundAttemptId?: string | null;
   retryMayBePossible?: boolean;
 
-  order?: { id: string; customerPhone: string | null; pod?: { id: string; name: string } | null };
+  order?: {
+    id: string;
+    customerPhone: string | null;
+    customerEmail?: string | null;
+    status?: string;
+    pod?: { id: string; name: string } | null;
+  };
   vendor?: { name: string };
+  /** Parent order payment / lifecycle (vendor-order queue). */
+  orderStatus?: string;
+  paymentLabel?: string;
+  vendorOrderRoutingStatus?: string;
+  vendorOrderFulfillmentStatus?: string;
+  manuallyRecoveredAt?: Date | null;
+  manualRecoveryNotes?: string | null;
+  canRetryRouting?: boolean;
+  canManualRecover?: boolean;
+  suggestedActions?: import("@/lib/admin-needs-attention-actions").WorkbenchSuggestedAction[];
   deliverectLastError?: string | null;
   deliverectAttempts?: number | null;
   deliverectSubmittedAt?: Date | null;
@@ -127,9 +151,65 @@ function orderIssuesHref(orderId: string): string {
 }
 
 const VO_INCLUDE = {
-  order: { select: { id: true, customerPhone: true, pod: { select: { id: true, name: true } } } },
+  order: {
+    select: {
+      id: true,
+      status: true,
+      customerPhone: true,
+      customerEmail: true,
+      pod: { select: { id: true, name: true } },
+    },
+  },
   vendor: { select: { name: true, deliverectChannelLinkId: true } },
 } as const;
+
+type VoAttentionRow = Awaited<
+  ReturnType<typeof prisma.vendorOrder.findMany<{ include: typeof VO_INCLUDE }>>
+>[number];
+
+function voRecoverySnapshot(vo: VoAttentionRow): VendorOrderRecoverySnapshot {
+  return {
+    routingStatus: vo.routingStatus,
+    fulfillmentStatus: vo.fulfillmentStatus,
+    deliverectOrderId: vo.deliverectOrderId,
+    manuallyRecoveredAt: vo.manuallyRecoveredAt,
+  };
+}
+
+function orderRecoverySnapshot(vo: VoAttentionRow): OrderRecoverySnapshot {
+  return { status: vo.order?.status ?? "unknown" };
+}
+
+function attachVendorOrderAttentionActions(
+  base: AdminAttentionItem,
+  vo: VoAttentionRow,
+  reason: AdminAttentionReason
+): AdminAttentionItem {
+  const voSnap = voRecoverySnapshot(vo);
+  const orderSnap = orderRecoverySnapshot(vo);
+  return {
+    ...base,
+    order: vo.order
+      ? {
+          id: vo.order.id,
+          customerPhone: vo.order.customerPhone,
+          customerEmail: vo.order.customerEmail,
+          status: vo.order.status,
+          pod: vo.order.pod ?? undefined,
+        }
+      : undefined,
+    orderStatus: vo.order?.status,
+    paymentLabel: vo.order?.status ? formatOrderPaymentLabel(vo.order.status) : undefined,
+    vendorOrderRoutingStatus: vo.routingStatus,
+    vendorOrderFulfillmentStatus: vo.fulfillmentStatus,
+    manuallyRecoveredAt: vo.manuallyRecoveredAt,
+    manualRecoveryNotes: vo.manualRecoveryNotes,
+    canRetryRouting: canRetryRouting(voSnap, orderSnap),
+    canManualRecover: canManualRecoverVendorOrder(voSnap, orderSnap),
+    suggestedActions: getNeedsAttentionSuggestedActions(reason, voSnap, orderSnap),
+    recommendedAction: reasonToRecommendedAction(reason, vo.fulfillmentStatus, voSnap, orderSnap),
+  };
+}
 
 // ---- Helpers ----
 
@@ -165,14 +245,22 @@ function reasonToBucket(reason: AdminAttentionReason): AdminAttentionBucket {
 
 function reasonToRecommendedAction(
   reason: AdminAttentionReason,
-  fulfillmentStatus?: string
+  fulfillmentStatus?: string,
+  vo?: VendorOrderRecoverySnapshot,
+  order?: OrderRecoverySnapshot
 ): AdminRecommendedAction {
   switch (reason) {
     case "routing_failed":
     case "routing_stuck":
-    case "deliverect_reconciliation_overdue":
-    case "manual_recovery_required":
+      if (vo && order && canRetryRouting(vo, order)) return "retry_routing";
+      if (vo && order && canManualRecoverVendorOrder(vo, order)) return "mark_manually_received";
       return fulfillmentStatus === "pending" ? "retry_routing" : "view_order";
+    case "deliverect_reconciliation_overdue":
+      if (vo && order && canManualRecoverVendorOrder(vo, order)) return "mark_manually_received";
+      if (vo && order && canRetryRouting(vo, order)) return "retry_routing";
+      return "view_order";
+    case "manual_recovery_required":
+      return "mark_manually_received";
     case "fulfillment_stuck":
       return "view_order";
     case "open_issue":
@@ -347,92 +435,107 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
     if (vo.fulfillmentStatus !== "pending") continue;
     const urgency = getExceptionUrgency(vo.createdAt);
     const reason: AdminAttentionReason = "routing_failed";
-    items.push({
-      id: `vendor_order:${vo.id}`,
-      scope: "vendor_order",
-      reason,
-      bucket: reasonToBucket(reason),
-      severity: urgencyToSeverity(urgency.urgency),
-      ageMinutes: urgency.ageMinutes,
-      recommendedAction: reasonToRecommendedAction(reason, vo.fulfillmentStatus),
-      reasonLabel: reasonToLabel(reason, vo),
-      currentStatus: buildCurrentStatus(vo.routingStatus, vo.fulfillmentStatus),
-      orderId: vo.orderId,
-      vendorOrderId: vo.id,
-      primaryEntityHref: `/admin/orders/${vo.orderId}`,
-      order: vo.order ?? undefined,
-      vendor: vo.vendor ?? undefined,
-      deliverectLastError: vo.deliverectLastError,
-      deliverectAttempts: vo.deliverectAttempts,
-      deliverectSubmittedAt: vo.deliverectSubmittedAt,
-      deliverectBadges: deliverectBadgesForAttentionVo(vo),
-      deliverectGuidance: deliverectGuidanceForAttentionVo(vo),
-    });
+    items.push(
+      attachVendorOrderAttentionActions(
+        {
+          id: `vendor_order:${vo.id}`,
+          scope: "vendor_order",
+          reason,
+          bucket: reasonToBucket(reason),
+          severity: urgencyToSeverity(urgency.urgency),
+          ageMinutes: urgency.ageMinutes,
+          recommendedAction: "retry_routing",
+          reasonLabel: reasonToLabel(reason, vo),
+          currentStatus: buildCurrentStatus(vo.routingStatus, vo.fulfillmentStatus),
+          orderId: vo.orderId,
+          vendorOrderId: vo.id,
+          primaryEntityHref: `/admin/orders/${vo.orderId}`,
+          vendor: vo.vendor ?? undefined,
+          deliverectLastError: vo.deliverectLastError,
+          deliverectAttempts: vo.deliverectAttempts,
+          deliverectSubmittedAt: vo.deliverectSubmittedAt,
+          deliverectBadges: deliverectBadgesForAttentionVo(vo),
+          deliverectGuidance: deliverectGuidanceForAttentionVo(vo),
+        },
+        vo,
+        reason
+      )
+    );
   }
 
   for (const vo of stuckPending) {
     if (vo.fulfillmentStatus !== "pending") continue;
     const urgency = getExceptionUrgency(vo.createdAt);
     const reason: AdminAttentionReason = "routing_stuck";
-    items.push({
-      id: `vendor_order:${vo.id}`,
-      scope: "vendor_order",
-      reason,
-      bucket: reasonToBucket(reason),
-      severity: urgencyToSeverity(urgency.urgency),
-      ageMinutes: urgency.ageMinutes,
-      recommendedAction: reasonToRecommendedAction(reason, vo.fulfillmentStatus),
-      reasonLabel: reasonToLabel(reason, vo),
-      currentStatus: buildCurrentStatus(vo.routingStatus, vo.fulfillmentStatus),
-      orderId: vo.orderId,
-      vendorOrderId: vo.id,
-      primaryEntityHref: `/admin/orders/${vo.orderId}`,
-      order: vo.order ?? undefined,
-      vendor: vo.vendor ?? undefined,
-      deliverectLastError: vo.deliverectLastError,
-      deliverectAttempts: vo.deliverectAttempts,
-      deliverectSubmittedAt: vo.deliverectSubmittedAt,
-      deliverectBadges: deliverectBadgesForAttentionVo(vo),
-    });
+    items.push(
+      attachVendorOrderAttentionActions(
+        {
+          id: `vendor_order:${vo.id}`,
+          scope: "vendor_order",
+          reason,
+          bucket: reasonToBucket(reason),
+          severity: urgencyToSeverity(urgency.urgency),
+          ageMinutes: urgency.ageMinutes,
+          recommendedAction: "retry_routing",
+          reasonLabel: reasonToLabel(reason, vo),
+          currentStatus: buildCurrentStatus(vo.routingStatus, vo.fulfillmentStatus),
+          orderId: vo.orderId,
+          vendorOrderId: vo.id,
+          primaryEntityHref: `/admin/orders/${vo.orderId}`,
+          vendor: vo.vendor ?? undefined,
+          deliverectLastError: vo.deliverectLastError,
+          deliverectAttempts: vo.deliverectAttempts,
+          deliverectSubmittedAt: vo.deliverectSubmittedAt,
+          deliverectBadges: deliverectBadgesForAttentionVo(vo),
+        },
+        vo,
+        reason
+      )
+    );
     seenVoIds.add(vo.id);
   }
 
   for (const vo of deliverectReconciliationOverdue) {
     const urgency = getExceptionUrgency(vo.deliverectSubmittedAt ?? vo.createdAt);
     const reason: AdminAttentionReason = "deliverect_reconciliation_overdue";
-    items.push({
-      id: `vendor_order:${vo.id}`,
-      scope: "vendor_order",
-      reason,
-      bucket: reasonToBucket(reason),
-      severity: urgencyToSeverity(urgency.urgency),
-      ageMinutes: urgency.ageMinutes,
-      recommendedAction: reasonToRecommendedAction(reason, vo.fulfillmentStatus),
-      reasonLabel: reasonToLabel(reason, vo),
-      currentStatus: buildCurrentStatus(vo.routingStatus, vo.fulfillmentStatus),
-      orderId: vo.orderId,
-      vendorOrderId: vo.id,
-      primaryEntityHref: `/admin/orders/${vo.orderId}`,
-      order: vo.order ?? undefined,
-      vendor: vo.vendor ?? undefined,
-      deliverectLastError: vo.deliverectLastError,
-      deliverectAttempts: vo.deliverectAttempts,
-      deliverectSubmittedAt: vo.deliverectSubmittedAt,
-      deliverectDiagnostic: describeDeliverectReconciliationForAdmin(
+    items.push(
+      attachVendorOrderAttentionActions(
         {
-          routingStatus: vo.routingStatus,
-          fulfillmentStatus: vo.fulfillmentStatus,
-          deliverectOrderId: vo.deliverectOrderId,
-          lastDeliverectResponse: vo.lastDeliverectResponse,
-          lastExternalStatusAt: vo.lastExternalStatusAt,
+          id: `vendor_order:${vo.id}`,
+          scope: "vendor_order",
+          reason,
+          bucket: reasonToBucket(reason),
+          severity: urgencyToSeverity(urgency.urgency),
+          ageMinutes: urgency.ageMinutes,
+          recommendedAction: "mark_manually_received",
+          reasonLabel: reasonToLabel(reason, vo),
+          currentStatus: buildCurrentStatus(vo.routingStatus, vo.fulfillmentStatus),
+          orderId: vo.orderId,
+          vendorOrderId: vo.id,
+          primaryEntityHref: `/admin/orders/${vo.orderId}`,
+          vendor: vo.vendor ?? undefined,
+          deliverectLastError: vo.deliverectLastError,
+          deliverectAttempts: vo.deliverectAttempts,
           deliverectSubmittedAt: vo.deliverectSubmittedAt,
-          createdAt: vo.createdAt,
+          deliverectDiagnostic: describeDeliverectReconciliationForAdmin(
+            {
+              routingStatus: vo.routingStatus,
+              fulfillmentStatus: vo.fulfillmentStatus,
+              deliverectOrderId: vo.deliverectOrderId,
+              lastDeliverectResponse: vo.lastDeliverectResponse,
+              lastExternalStatusAt: vo.lastExternalStatusAt,
+              deliverectSubmittedAt: vo.deliverectSubmittedAt,
+              createdAt: vo.createdAt,
+            },
+            { now, staleMinutes: DELIVERECT_RECONCILIATION_STALE_MINUTES }
+          ),
+          deliverectBadges: deliverectBadgesForAttentionVo(vo),
+          deliverectGuidance: deliverectGuidanceForAttentionVo(vo),
         },
-        { now, staleMinutes: DELIVERECT_RECONCILIATION_STALE_MINUTES }
-      ),
-      deliverectBadges: deliverectBadgesForAttentionVo(vo),
-      deliverectGuidance: deliverectGuidanceForAttentionVo(vo),
-    });
+        vo,
+        reason
+      )
+    );
     seenVoIds.add(vo.id);
   }
 
@@ -440,27 +543,32 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
     if (seenVoIds.has(vo.id)) continue;
     const urgency = getExceptionUrgency(vo.createdAt);
     const reason: AdminAttentionReason = "fulfillment_stuck";
-    items.push({
-      id: `vendor_order:${vo.id}`,
-      scope: "vendor_order",
-      reason,
-      bucket: reasonToBucket(reason),
-      severity: urgencyToSeverity(urgency.urgency),
-      ageMinutes: urgency.ageMinutes,
-      recommendedAction: reasonToRecommendedAction(reason, vo.fulfillmentStatus),
-      reasonLabel: reasonToLabel(reason, vo),
-      currentStatus: buildCurrentStatus(vo.routingStatus, vo.fulfillmentStatus),
-      orderId: vo.orderId,
-      vendorOrderId: vo.id,
-      primaryEntityHref: `/admin/orders/${vo.orderId}`,
-      order: vo.order ?? undefined,
-      vendor: vo.vendor ?? undefined,
-      deliverectLastError: vo.deliverectLastError,
-      deliverectAttempts: vo.deliverectAttempts,
-      deliverectSubmittedAt: vo.deliverectSubmittedAt,
-      deliverectBadges: deliverectBadgesForAttentionVo(vo),
-      deliverectGuidance: deliverectGuidanceForAttentionVo(vo),
-    });
+    items.push(
+      attachVendorOrderAttentionActions(
+        {
+          id: `vendor_order:${vo.id}`,
+          scope: "vendor_order",
+          reason,
+          bucket: reasonToBucket(reason),
+          severity: urgencyToSeverity(urgency.urgency),
+          ageMinutes: urgency.ageMinutes,
+          recommendedAction: "view_order",
+          reasonLabel: reasonToLabel(reason, vo),
+          currentStatus: buildCurrentStatus(vo.routingStatus, vo.fulfillmentStatus),
+          orderId: vo.orderId,
+          vendorOrderId: vo.id,
+          primaryEntityHref: `/admin/orders/${vo.orderId}`,
+          vendor: vo.vendor ?? undefined,
+          deliverectLastError: vo.deliverectLastError,
+          deliverectAttempts: vo.deliverectAttempts,
+          deliverectSubmittedAt: vo.deliverectSubmittedAt,
+          deliverectBadges: deliverectBadgesForAttentionVo(vo),
+          deliverectGuidance: deliverectGuidanceForAttentionVo(vo),
+        },
+        vo,
+        reason
+      )
+    );
   }
 
   return items;

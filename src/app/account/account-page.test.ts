@@ -23,12 +23,13 @@ const ordersPageSrc = readFileSync(join(dir, "../orders/page.tsx"), "utf8");
 const checkoutPhoneSrc = readFileSync(join(dir, "../checkout/CheckoutPhoneVerification.tsx"), "utf8");
 const loginFormSrc = readFileSync(join(dir, "../login/LoginForm.tsx"), "utf8");
 const loginActionsSrc = readFileSync(join(dir, "../login/actions.ts"), "utf8");
+const headerSignInSrc = readFileSync(join(dir, "../../components/HeaderSignInLink.tsx"), "utf8");
 const orderAccessDeniedSrc = readFileSync(join(dir, "../order/[orderId]/OrderAccessDenied.tsx"), "utf8");
 
 describe("/account signed-out behavior", () => {
   it("redirects to unified sign-in", () => {
     expect(accountPageSrc).toMatch(/redirect\(/);
-    expect(accountPageSrc).toMatch(/ACCOUNT_SIGN_IN_PATH/);
+    expect(accountPageSrc).toMatch(/buildLoginHrefWithReturn|ACCOUNT_SIGN_IN_PATH/);
     expect(accountPageSrc).not.toMatch(/AccountSignInHub/);
     expect(accountPageSrc).not.toMatch(/Continue with phone/i);
   });
@@ -120,7 +121,7 @@ describe("/account session actions", () => {
 
 describe("header identity slot", () => {
   it("uses Sign in linking to unified login when signed out", () => {
-    expect(headerNavSrc).toMatch(/ACCOUNT_SIGN_IN_PATH/);
+    expect(headerNavSrc).toMatch(/HeaderSignInLink/);
     expect(headerNavSrc).toMatch(/isSignedIn \?/);
     expect(headerNavSrc).not.toMatch(/hasVerifiedCustomerSession/);
   });
@@ -158,12 +159,24 @@ describe("login order history callback copy", () => {
 describe("login session establishment", () => {
   it("waits for client session before resolving destination", () => {
     expect(loginFormSrc).toMatch(/await getSession\(\)/);
+    expect(loginFormSrc).toMatch(/readLoginReturnParam/);
     expect(loginFormSrc).toMatch(/resolvePostLoginDestinationAction/);
     expect(loginFormSrc).toMatch(/router\.replace/);
   });
 
+  it("header sign-in passes current path as next", () => {
+    expect(headerSignInSrc).toMatch(/buildLoginHrefFromLocation/);
+    expect(headerSignInSrc).toMatch(/usePathname/);
+  });
+
   it("revalidates layout after credentials sign-in", () => {
     expect(loginActionsSrc).toMatch(/revalidatePath\("\/", "layout"\)/);
+  });
+
+  it("uses next param for protected sign-in links", () => {
+    expect(accountPathsSrc).toMatch(/buildLoginHrefWithReturn\("\/account"\)/);
+    expect(accountPathsSrc).toMatch(/buildLoginHrefWithReturn\("\/orders"\)/);
+    expect(ordersPageSrc).toMatch(/ORDERS_SIGN_IN_PATH/);
   });
 });
 

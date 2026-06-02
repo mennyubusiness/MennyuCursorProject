@@ -17,7 +17,6 @@ const STATUS_OPTIONS: { value: AdminAttentionReason | "all"; label: string }[] =
   { value: "fulfillment_stuck", label: "Fulfillment stalled" },
   { value: "open_issue", label: "Tracked issue" },
   { value: "refund_failed", label: "Refund failed" },
-  { value: "manual_recovery_required", label: "Manual recovery" },
   { value: "financial_resolution", label: "Financial resolution" },
   { value: "unknown_attention_needed", label: "Other" },
 ];
@@ -42,8 +41,6 @@ function issueTitle(reason: AdminAttentionReason): string {
       return "Tracked issue";
     case "refund_failed":
       return "Refund failed";
-    case "manual_recovery_required":
-      return "Manual recovery required";
     case "financial_resolution":
       return "Financial resolution";
     default:
@@ -110,6 +107,13 @@ export function IssuesWorkbench({
 
   const [activeItems, setActiveItems] = useState(initialActiveItems);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [manualRecoveryTarget, setManualRecoveryTarget] = useState<{
+    vendorOrderId: string;
+    itemId: string;
+    vendorName?: string;
+  } | null>(null);
+  const [manualRecoveryNote, setManualRecoveryNote] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const onRemoveItem = useCallback((itemId: string) => {
     setActiveItems((prev) => prev.filter((i) => i.id !== itemId));
@@ -160,14 +164,58 @@ export function IssuesWorkbench({
 
   const routingAvailable = isRoutingRetryAvailable();
 
-  async function handleRetryRouting(vendorOrderId: string) {
+  async function handleRetryRouting(vendorOrderId: string, itemId: string) {
+    setActionError(null);
     setBusyId(`retry:${vendorOrderId}`);
     try {
       const res = await fetch(`/api/admin/vendor-orders/${vendorOrderId}/retry-routing`, { method: "POST" });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
-      if (res.ok && data.ok !== false) {
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (res.ok && data.ok === true) {
         refresh();
-        setActiveItems((prev) => prev.filter((i) => i.vendorOrderId !== vendorOrderId));
+        onRemoveItem(itemId);
+      } else {
+        setActionError(data.error ?? "Retry routing failed. The item stays in the queue.");
+      }
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleManualRecoverySubmit() {
+    if (!manualRecoveryTarget) return;
+    const notes = manualRecoveryNote.trim();
+    if (notes.length < 3) {
+      setActionError("Add a short recovery note (what the vendor confirmed).");
+      return;
+    }
+    setActionError(null);
+    setBusyId(`manual:${manualRecoveryTarget.vendorOrderId}`);
+    try {
+      const res = await fetch(
+        `/api/admin/vendor-orders/${manualRecoveryTarget.vendorOrderId}/manual-recovery`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes }),
+        }
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        noop?: boolean;
+        error?: string;
+      };
+      if (res.ok && data.ok === true && !data.noop) {
+        onRemoveItem(manualRecoveryTarget.itemId);
+        setManualRecoveryTarget(null);
+        setManualRecoveryNote("");
+        refresh();
+      } else if (res.ok && data.noop) {
+        onRemoveItem(manualRecoveryTarget.itemId);
+        setManualRecoveryTarget(null);
+        setManualRecoveryNote("");
+        refresh();
+      } else {
+        setActionError(data.error ?? "Manual recovery failed. The item stays in the queue.");
       }
     } finally {
       setBusyId(null);
@@ -340,7 +388,9 @@ export function IssuesWorkbench({
                 const showRetry =
                   Boolean(item.vendorOrderId) &&
                   routingAvailable &&
-                  item.recommendedAction === "retry_routing";
+                  item.canRetryRouting === true;
+                const showManualRecovery =
+                  Boolean(item.vendorOrderId) && item.canManualRecover === true;
                 const showMarkResolved =
                   item.reason === "open_issue" && item.issueId && item.scope === "order";
                 const refundId = getRefundAttemptIdFromItemId(item.id);
@@ -371,6 +421,57 @@ export function IssuesWorkbench({
                         {item.vendor?.name && (
                           <p className="text-xs text-oo-stone-gray">{item.vendor.name}</p>
                         )}
+                        {item.vendorOrderId && (
+                          <dl className="mt-2 grid gap-1 text-xs text-oo-stone-gray sm:grid-cols-2">
+                            {item.paymentLabel && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Payment</dt>
+                                <dd>{item.paymentLabel}</dd>
+                              </>
+                            )}
+                            {item.orderStatus && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Parent order</dt>
+                                <dd className="font-mono">{item.orderStatus}</dd>
+                              </>
+                            )}
+                            {item.vendorOrderRoutingStatus && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Routing</dt>
+                                <dd className="font-mono">{item.vendorOrderRoutingStatus}</dd>
+                              </>
+                            )}
+                            {item.vendorOrderFulfillmentStatus && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Fulfillment</dt>
+                                <dd className="font-mono">{item.vendorOrderFulfillmentStatus}</dd>
+                              </>
+                            )}
+                            {item.deliverectAttempts != null && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Deliverect attempts</dt>
+                                <dd>{item.deliverectAttempts}</dd>
+                              </>
+                            )}
+                            {item.deliverectSubmittedAt && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Last submit</dt>
+                                <dd>{new Date(item.deliverectSubmittedAt).toLocaleString()}</dd>
+                              </>
+                            )}
+                            {item.order?.customerPhone && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Customer phone</dt>
+                                <dd>{item.order.customerPhone}</dd>
+                              </>
+                            )}
+                          </dl>
+                        )}
+                        {item.manualRecoveryNotes && (
+                          <p className="text-xs text-emerald-800">
+                            Recovery note: {oneLine(item.manualRecoveryNotes, 200)}
+                          </p>
+                        )}
                         {item.deliverectGuidance || item.deliverectDiagnostic ? (
                           <details className="text-sm">
                             <summary className="cursor-pointer text-oo-stone-gray hover:text-oo-charcoal">
@@ -399,10 +500,28 @@ export function IssuesWorkbench({
                           <button
                             type="button"
                             disabled={busyId !== null}
-                            onClick={() => handleRetryRouting(item.vendorOrderId!)}
+                            onClick={() => void handleRetryRouting(item.vendorOrderId!, item.id)}
                             className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
                           >
                             {busyId === `retry:${item.vendorOrderId}` ? "…" : "Retry routing"}
+                          </button>
+                        )}
+                        {showManualRecovery && item.vendorOrderId && (
+                          <button
+                            type="button"
+                            disabled={busyId !== null}
+                            onClick={() => {
+                              setActionError(null);
+                              setManualRecoveryNote("");
+                              setManualRecoveryTarget({
+                                vendorOrderId: item.vendorOrderId!,
+                                itemId: item.id,
+                                vendorName: item.vendor?.name,
+                              });
+                            }}
+                            className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-950 hover:bg-emerald-100 disabled:opacity-50"
+                          >
+                            Mark manually received
                           </button>
                         )}
                         {showMarkResolved && item.issueId && (
@@ -432,7 +551,64 @@ export function IssuesWorkbench({
               })}
             </ul>
           )}
+          {actionError && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800" role="alert">
+              {actionError}
+            </p>
+          )}
         </>
+      )}
+
+      {manualRecoveryTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-labelledby="manual-recovery-title"
+        >
+          <div className="w-full max-w-md rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-lg">
+            <h2 id="manual-recovery-title" className="text-lg font-semibold text-oo-charcoal">
+              Mark manually received
+            </h2>
+            <p className="mt-1 text-sm text-oo-stone-gray">
+              {manualRecoveryTarget.vendorName
+                ? `${manualRecoveryTarget.vendorName} confirmed they have this order outside Deliverect/POS sync.`
+                : "Confirm the vendor has the order before continuing."}{" "}
+              Fulfillment will move to accepted; routing history is preserved for audit.
+            </p>
+            <label className="mt-4 block text-sm font-medium text-oo-charcoal" htmlFor="recovery-note">
+              Recovery note
+            </label>
+            <textarea
+              id="recovery-note"
+              rows={3}
+              value={manualRecoveryNote}
+              onChange={(e) => setManualRecoveryNote(e.target.value)}
+              placeholder="e.g. Vendor confirmed by phone at 2:15pm — order on grill"
+              className="mt-1 w-full rounded-lg border border-oo-light-stone px-3 py-2 text-sm"
+            />
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-oo-light-stone px-3 py-2 text-sm"
+                disabled={busyId !== null}
+                onClick={() => {
+                  setManualRecoveryTarget(null);
+                  setManualRecoveryNote("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+                disabled={busyId !== null}
+                onClick={() => void handleManualRecoverySubmit()}
+              >
+                {busyId === `manual:${manualRecoveryTarget.vendorOrderId}` ? "…" : "Confirm recovery"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {tab === "resolved" && (

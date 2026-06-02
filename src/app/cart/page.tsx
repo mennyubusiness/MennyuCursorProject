@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { auth } from "@/auth";
 import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
+import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import {
   discardStaleCheckoutCartsForSession,
   getOrCreateCart,
@@ -109,7 +110,7 @@ export default async function CartPage({
     }
     if (!authSession?.user?.id) {
       const dest = `/cart?startGroupOrder=1&podId=${encodeURIComponent(targetPodForGroup)}`;
-      redirect(`/login?callbackUrl=${encodeURIComponent(dest)}`);
+      redirect(buildLoginHrefWithReturn(dest));
     }
     await getOrCreateCart(targetPodForGroup, sessionId);
   }

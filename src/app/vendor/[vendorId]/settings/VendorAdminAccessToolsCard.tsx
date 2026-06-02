@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { VendorDashboardTokenForm } from "./VendorDashboardTokenForm";
 
 /**
@@ -13,7 +14,7 @@ export function VendorAdminAccessToolsCard({
   hasDashboardSecret: boolean;
 }) {
   const vendorUrl = `/vendor/${vendorId}`;
-  const loginHref = `/login?callbackUrl=${encodeURIComponent(vendorUrl)}`;
+  const loginHref = buildLoginHrefWithReturn(vendorUrl);
 
   return (
     <div className="space-y-4 rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/80 p-5 text-sm text-oo-stone-gray">
