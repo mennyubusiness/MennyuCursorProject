@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import type { AdminRefundScopeKey } from "@/lib/admin-refund-idempotency";
 import type { LinkedIssueRefundContext } from "@/lib/admin-order-issue-refund-link";
 import type { AdminOrderPaymentSummary } from "@/services/admin-order-payment-summary.service";
 import { customerSupportIssueTypeLabel } from "@/domain/order-support-issue";
 import { AdminPaymentsRefundsPanel } from "./AdminPaymentsRefundsPanel";
-import { AdminOrderIssuesPanel } from "./AdminOrderIssuesPanel";
+import { AdminOrderIssuesPanel, type VendorRecoveryContext } from "./AdminOrderIssuesPanel";
 
 type CustomerSupportIssueRow = Parameters<
   typeof AdminOrderIssuesPanel
@@ -14,19 +14,25 @@ type CustomerSupportIssueRow = Parameters<
 
 type IssuesPanelProps = Omit<
   Parameters<typeof AdminOrderIssuesPanel>[0],
-  "onRefundFromIssue"
+  "onRefundFromIssue" | "vendorRecoveryContexts" | "routingAvailable"
 >;
 
-export function AdminOrderIssuesRefundsBridge({
+export function AdminOrderDetailClientLayout({
   paymentSummary,
   paymentSummaryError,
   canExecuteRefunds,
   issuesPanel,
+  vendorRecoveryContexts,
+  routingAvailable,
+  children,
 }: {
   paymentSummary: AdminOrderPaymentSummary | null;
   paymentSummaryError: string | null;
   canExecuteRefunds: boolean;
   issuesPanel: IssuesPanelProps;
+  vendorRecoveryContexts: VendorRecoveryContext[];
+  routingAvailable: boolean;
+  children: ReactNode;
 }) {
   const [linkedIssue, setLinkedIssue] = useState<LinkedIssueRefundContext | null>(null);
   const [openRefundModal, setOpenRefundModal] = useState<{
@@ -69,13 +75,25 @@ export function AdminOrderIssuesRefundsBridge({
 
   return (
     <>
+      <AdminOrderIssuesPanel
+        {...issuesPanel}
+        vendorRecoveryContexts={vendorRecoveryContexts}
+        routingAvailable={routingAvailable}
+        canExecuteRefunds={canExecuteRefunds}
+        onRefundFromIssue={canExecuteRefunds ? handleRefundFromIssue : undefined}
+      />
+
+      {children}
+
       {paymentSummaryError ? (
         <section
           id="payments-refunds"
-          className="scroll-mt-4 rounded-lg border border-red-300 bg-red-50 p-4"
+          className="scroll-mt-4 rounded-xl border border-red-300 bg-red-50 p-5"
           role="alert"
         >
-          <h2 className="text-lg font-semibold text-red-950">Payments &amp; Refunds</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-red-950">
+            Payments &amp; Refunds
+          </h2>
           <p className="mt-2 text-sm text-red-900">{paymentSummaryError}</p>
           <p className="mt-2 text-xs text-red-800">
             Apply pending Prisma migrations before issuing refunds from an issue.
@@ -90,12 +108,11 @@ export function AdminOrderIssuesRefundsBridge({
           onRefundModalClosed={clearLinkedIssue}
         />
       ) : null}
-
-      <AdminOrderIssuesPanel
-        {...issuesPanel}
-        canExecuteRefunds={canExecuteRefunds}
-        onRefundFromIssue={canExecuteRefunds ? handleRefundFromIssue : undefined}
-      />
     </>
   );
+}
+
+/** @deprecated Use AdminOrderDetailClientLayout */
+export function AdminOrderIssuesRefundsBridge(props: Parameters<typeof AdminOrderDetailClientLayout>[0]) {
+  return <AdminOrderDetailClientLayout {...props} />;
 }

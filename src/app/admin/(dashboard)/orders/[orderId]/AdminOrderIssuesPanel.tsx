@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,6 +8,15 @@ import {
   isActiveOrderIssueStatus,
 } from "@/domain/order-support-issue";
 import { vendorIssueStatusLabel } from "@/domain/vendor-order-issue";
+import type { ExceptionType } from "@/lib/admin-exceptions";
+import {
+  ADMIN_SECTION_CARD,
+  formatAdminOrderDate,
+  isSystemIssueActive,
+  issueStatusBadgeClass,
+  severityBadgeClass,
+} from "@/lib/admin-order-detail-ui";
+import { AdminVendorOrderExceptionActions } from "./AdminVendorOrderExceptionActions";
 
 type SystemIssueRow = {
   id: string;
@@ -48,21 +57,25 @@ type VendorOrderIssueRow = SystemIssueRow & {
 
 type OrderRefundLinkOption = { id: string; label: string };
 
-function formatDate(d: Date): string {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "short", timeStyle: "short" }).format(d);
-}
+export type VendorRecoveryContext = {
+  vendorOrderId: string;
+  vendorId: string;
+  vendorName: string;
+  exceptionType: ExceptionType;
+  reason: string | null;
+  fulfillmentStatus: string;
+  hasExceptionAction: boolean;
+  canCancel: boolean;
+};
 
 function humanizeType(type: string): string {
   return customerSupportIssueTypeLabel(type) || type.replace(/_/g, " ");
 }
 
-function statusBadgeClass(status: string): string {
-  const s = status.toLowerCase();
-  if (s === "open" || s === "open") return "bg-amber-100 text-amber-900";
-  if (s === "reviewing") return "bg-blue-100 text-blue-900";
-  if (s === "resolved") return "bg-emerald-100 text-emerald-900";
-  if (s === "dismissed") return "bg-stone-200 text-stone-700";
-  return "bg-stone-200 text-stone-800";
+function systemRecommendedAction(type: string): string {
+  if (type === "routing_failure") return "Retry routing or mark manually received after vendor confirms.";
+  if (type.includes("routing")) return "Review routing state and retry or recover manually.";
+  return "Review and resolve when handled.";
 }
 
 export function AdminOrderIssuesPanel({
@@ -74,6 +87,8 @@ export function AdminOrderIssuesPanel({
   initialResolutionNotes,
   canExecuteRefunds,
   onRefundFromIssue,
+  vendorRecoveryContexts = [],
+  routingAvailable = false,
 }: {
   orderId: string;
   customerSupportIssues: CustomerSupportIssueRow[];
@@ -83,6 +98,8 @@ export function AdminOrderIssuesPanel({
   initialResolutionNotes: string | null;
   canExecuteRefunds?: boolean;
   onRefundFromIssue?: (issue: CustomerSupportIssueRow) => void;
+  vendorRecoveryContexts?: VendorRecoveryContext[];
+  routingAvailable?: boolean;
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -149,222 +166,298 @@ export function AdminOrderIssuesPanel({
     }
   }
 
-  const systemAll = [
-    ...systemOrderIssues.map((i) => ({ ...i, kind: "order" as const })),
-    ...vendorOrderIssues.map((i) => ({ ...i, kind: "vendor" as const })),
-  ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const systemAll = useMemo(
+    () =>
+      [
+        ...systemOrderIssues.map((i) => ({ ...i, kind: "order" as const })),
+        ...vendorOrderIssues.map((i) => ({ ...i, kind: "vendor" as const })),
+      ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+    [systemOrderIssues, vendorOrderIssues]
+  );
+
+  const activeCustomerIssues = customerSupportIssues.filter((i) => isActiveOrderIssueStatus(i.status));
+  const resolvedCustomerIssues = customerSupportIssues.filter((i) => !isActiveOrderIssueStatus(i.status));
+  const activeSystemIssues = systemAll.filter((i) => isSystemIssueActive(i.status));
+  const resolvedSystemIssues = systemAll.filter((i) => !isSystemIssueActive(i.status));
+
+  const activeRecoveryContexts = vendorRecoveryContexts.filter((c) => c.hasExceptionAction);
+  const hasActiveWork =
+    activeCustomerIssues.length > 0 ||
+    activeSystemIssues.length > 0 ||
+    activeRecoveryContexts.length > 0;
+
+  const recoveryByVendorOrderId = new Map(
+    activeRecoveryContexts.map((c) => [c.vendorOrderId, c] as const)
+  );
+
+  function renderCustomerIssue(issue: CustomerSupportIssueRow, active: boolean) {
+    return (
+      <li
+        key={issue.id}
+        className={`rounded-lg border p-3 text-sm ${
+          active
+            ? "border-amber-300 bg-oo-warm-white shadow-sm"
+            : "border-oo-light-stone/80 bg-oo-cream/30"
+        }`}
+      >
+        <div className="flex flex-wrap items-baseline gap-2">
+          <span className="font-semibold text-oo-charcoal">{humanizeType(issue.issueType)}</span>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${issueStatusBadgeClass(issue.status)}`}>
+            {issue.status}
+          </span>
+          {issue.priority && (
+            <span className="text-xs text-oo-stone-gray">Priority: {issue.priority}</span>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-oo-stone-gray">
+          {formatAdminOrderDate(new Date(issue.createdAt))}
+          {issue.vendorName && ` · ${issue.vendorName}`}
+          {issue.lineItemName && ` · ${issue.lineItemName}`}
+        </p>
+        {issue.customerMessage && (
+          <p className="mt-2 rounded border border-oo-light-stone bg-white/80 px-2 py-1.5 text-oo-charcoal">
+            <span className="text-xs font-medium text-oo-stone-gray">Customer: </span>
+            {issue.customerMessage}
+          </p>
+        )}
+        {(issue.vendorResponse || issue.vendorIssueStatus) && (
+          <div className="mt-2 rounded border border-blue-200 bg-blue-50/70 px-2 py-1.5 text-xs text-blue-950">
+            <p className="font-medium">
+              Vendor: {vendorIssueStatusLabel(issue.vendorIssueStatus)}
+              {issue.vendorRespondedAt && ` · ${formatAdminOrderDate(new Date(issue.vendorRespondedAt))}`}
+            </p>
+            {issue.vendorResponse && <p className="mt-1 whitespace-pre-wrap">{issue.vendorResponse}</p>}
+          </div>
+        )}
+        {issue.linkedOrderRefundId && (
+          <p className="mt-2 text-xs text-oo-stone-gray">
+            Linked refund: {issue.linkedRefundStatus ?? "—"}
+            {issue.linkedRefundAmountCents != null &&
+              ` · $${(issue.linkedRefundAmountCents / 100).toFixed(2)}`}
+          </p>
+        )}
+        {active && (
+          <>
+            <label className="mt-2 block text-xs font-medium text-oo-stone-gray">Internal note</label>
+            <textarea
+              className="mt-1 w-full min-h-[56px] rounded border border-oo-light-stone bg-white px-2 py-1 text-sm"
+              value={draftNotes[issue.id] ?? ""}
+              onChange={(e) => setDraftNotes((prev) => ({ ...prev, [issue.id]: e.target.value }))}
+            />
+            {orderRefundOptions.length > 0 && (
+              <div className="mt-2">
+                <label className="text-xs font-medium text-oo-stone-gray">Link refund (optional)</label>
+                <select
+                  className="mt-1 w-full rounded border border-oo-light-stone bg-white px-2 py-1 text-xs"
+                  value={issue.linkedOrderRefundId ?? ""}
+                  onChange={(e) =>
+                    void patchIssue(issue.id, { linkedOrderRefundId: e.target.value || null })
+                  }
+                  disabled={busyId === issue.id}
+                >
+                  <option value="">None</option>
+                  {orderRefundOptions.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {canExecuteRefunds && onRefundFromIssue && (
+                <button
+                  type="button"
+                  disabled={busyId === issue.id}
+                  onClick={() => onRefundFromIssue(issue)}
+                  className="rounded-md border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-medium text-oo-charcoal hover:bg-brand/20 disabled:opacity-50"
+                >
+                  Refund from this issue
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={busyId === issue.id}
+                onClick={() => void patchIssue(issue.id, { internalNote: draftNotes[issue.id] ?? null })}
+                className="rounded-md border border-oo-light-stone bg-white px-3 py-1.5 text-xs font-medium hover:bg-oo-cream/80 disabled:opacity-50"
+              >
+                Save note
+              </button>
+              {issue.status !== "reviewing" && issue.status !== "OPEN" && (
+                <button
+                  type="button"
+                  disabled={busyId === issue.id}
+                  onClick={() => void patchIssue(issue.id, { reviewing: true })}
+                  className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-900 disabled:opacity-50"
+                >
+                  Mark reviewing
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={busyId === issue.id}
+                onClick={() => void patchIssue(issue.id, { resolve: true })}
+                className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-hover disabled:opacity-50"
+              >
+                Resolve
+              </button>
+              <button
+                type="button"
+                disabled={busyId === issue.id}
+                onClick={() => void patchIssue(issue.id, { dismiss: true })}
+                className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              >
+                Dismiss
+              </button>
+            </div>
+          </>
+        )}
+      </li>
+    );
+  }
+
+  function renderSystemIssue(
+    issue: (typeof systemAll)[number],
+    active: boolean
+  ) {
+    const recovery =
+      issue.kind === "vendor" && "vendorOrderId" in issue
+        ? recoveryByVendorOrderId.get(issue.vendorOrderId)
+        : undefined;
+
+    return (
+      <li
+        key={issue.id}
+        className={`rounded-lg border p-3 text-sm ${
+          active
+            ? "border-red-200 bg-oo-warm-white shadow-sm"
+            : "border-oo-light-stone/80 bg-oo-cream/30"
+        }`}
+      >
+        <div className="flex flex-wrap items-baseline gap-2">
+          <span className="font-semibold capitalize text-oo-charcoal">{humanizeType(issue.type)}</span>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${issueStatusBadgeClass(issue.status)}`}>
+            {active ? "Open" : "Resolved"}
+          </span>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${severityBadgeClass(issue.severity)}`}>
+            {issue.severity}
+          </span>
+          {"vendorName" in issue && (
+            <span className="text-xs font-medium text-oo-charcoal">{issue.vendorName}</span>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-oo-stone-gray">{formatAdminOrderDate(new Date(issue.createdAt))}</p>
+        <p className="mt-2 text-oo-charcoal">
+          {issue.notes?.trim() || `${humanizeType(issue.type)} — ${issue.status.toLowerCase()}`}
+        </p>
+        {active && (
+          <p className="mt-1 text-xs text-oo-stone-gray">{systemRecommendedAction(issue.type)}</p>
+        )}
+        {active && recovery && (
+          <div className="mt-3 border-t border-oo-light-stone pt-3">
+            <AdminVendorOrderExceptionActions
+              vendorOrderId={recovery.vendorOrderId}
+              exceptionType={recovery.exceptionType}
+              fulfillmentStatus={recovery.fulfillmentStatus}
+              routingAvailable={routingAvailable}
+              canCancel={recovery.canCancel}
+            />
+            <Link
+              href={`#vendor-order-${recovery.vendorOrderId}`}
+              className="mt-2 inline-block text-xs text-oo-stone-gray underline hover:text-oo-charcoal"
+            >
+              View vendor order ↓
+            </Link>
+          </div>
+        )}
+        {active && !recovery && (
+          <button
+            type="button"
+            onClick={() => void handleResolveSystem(issue.kind, issue.id)}
+            disabled={busyId === issue.id}
+            className="mt-3 rounded-md border border-oo-light-stone bg-white px-3 py-1.5 text-xs font-medium hover:bg-oo-cream/80 disabled:opacity-50"
+          >
+            Mark resolved
+          </button>
+        )}
+      </li>
+    );
+  }
+
+  const sectionClass = hasActiveWork
+    ? "scroll-mt-4 rounded-xl border-2 border-amber-300/70 bg-amber-50/30 p-5 shadow-sm"
+    : `${ADMIN_SECTION_CARD} scroll-mt-4 py-4`;
 
   return (
-    <section
-      id="order-issues"
-      className="scroll-mt-4 rounded-lg border border-amber-200/80 bg-amber-50/40 p-4"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-oo-charcoal">Order issues</h2>
-          <p className="mt-1 text-sm text-oo-stone-gray">
-            Customer reports and system flags. Refunds are issued separately in{" "}
-            <Link href="#payments-refunds" className="font-medium text-oo-charcoal underline">
+    <section id="order-issues" className={sectionClass}>
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
+          Action needed
+        </h2>
+        {hasActiveWork ? (
+          <p className="mt-1 text-sm text-oo-charcoal">
+            Resolve routing failures and customer reports. Refunds are in{" "}
+            <Link href="#payments-refunds" className="underline">
               Payments &amp; Refunds
             </Link>
             .
           </p>
-        </div>
+        ) : (
+          <p className="mt-1 text-xs text-oo-stone-gray">No open issues — order is operating normally.</p>
+        )}
       </div>
 
-      {customerSupportIssues.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-sm font-semibold text-oo-charcoal">Customer reports</h3>
-          <ul className="mt-2 space-y-3">
-            {customerSupportIssues.map((issue) => {
-              const active = isActiveOrderIssueStatus(issue.status);
-              return (
-                <li
-                  key={issue.id}
-                  className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 text-sm shadow-sm"
-                >
-                  <div className="flex flex-wrap items-baseline gap-2">
-                    <span className="font-semibold text-oo-charcoal">
-                      {humanizeType(issue.issueType)}
-                    </span>
-                    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${statusBadgeClass(issue.status)}`}>
-                      {issue.status}
-                    </span>
-                    {issue.priority && (
-                      <span className="text-xs text-oo-stone-gray">Priority: {issue.priority}</span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-oo-stone-gray">
-                    {formatDate(new Date(issue.createdAt))}
-                    {issue.vendorName && ` · ${issue.vendorName}`}
-                    {issue.lineItemName && ` · ${issue.lineItemName}`}
-                  </p>
-                  {issue.customerMessage && (
-                    <p className="mt-2 rounded border border-oo-light-stone bg-white/80 px-2 py-1.5 text-oo-charcoal">
-                      <span className="text-xs font-medium text-oo-stone-gray">Customer: </span>
-                      {issue.customerMessage}
-                    </p>
-                  )}
-                  {(issue.vendorResponse || issue.vendorIssueStatus) && (
-                    <div className="mt-2 rounded border border-blue-200 bg-blue-50/70 px-2 py-1.5 text-xs text-blue-950">
-                      <p className="font-medium">
-                        Vendor: {vendorIssueStatusLabel(issue.vendorIssueStatus)}
-                        {issue.vendorRespondedAt &&
-                          ` · ${formatDate(new Date(issue.vendorRespondedAt))}`}
-                      </p>
-                      {issue.vendorResponse && (
-                        <p className="mt-1 whitespace-pre-wrap">{issue.vendorResponse}</p>
-                      )}
-                    </div>
-                  )}
-                  {issue.linkedOrderRefundId && (
-                    <p className="mt-2 text-xs text-oo-stone-gray">
-                      Linked refund: {issue.linkedRefundStatus ?? "—"}
-                      {issue.linkedRefundAmountCents != null &&
-                        ` · $${(issue.linkedRefundAmountCents / 100).toFixed(2)}`}
-                    </p>
-                  )}
-                  <label className="mt-2 block text-xs font-medium text-oo-stone-gray">
-                    Internal note
-                  </label>
-                  <textarea
-                    className="mt-1 w-full min-h-[60px] rounded border border-oo-light-stone bg-white px-2 py-1 text-sm"
-                    value={draftNotes[issue.id] ?? ""}
-                    onChange={(e) =>
-                      setDraftNotes((prev) => ({ ...prev, [issue.id]: e.target.value }))
-                    }
-                  />
-                  {orderRefundOptions.length > 0 && (
-                    <div className="mt-2">
-                      <label className="text-xs font-medium text-oo-stone-gray">
-                        Link refund (optional)
-                      </label>
-                      <select
-                        className="mt-1 w-full rounded border border-oo-light-stone bg-white px-2 py-1 text-xs"
-                        value={issue.linkedOrderRefundId ?? ""}
-                        onChange={(e) =>
-                          void patchIssue(issue.id, {
-                            linkedOrderRefundId: e.target.value || null,
-                          })
-                        }
-                        disabled={busyId === issue.id}
-                      >
-                        <option value="">None</option>
-                        {orderRefundOptions.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {active && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {canExecuteRefunds && onRefundFromIssue && (
-                        <button
-                          type="button"
-                          disabled={busyId === issue.id}
-                          onClick={() => onRefundFromIssue(issue)}
-                          className="rounded-md border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-medium text-oo-charcoal hover:bg-brand/20 disabled:opacity-50"
-                        >
-                          Refund from this issue
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        disabled={busyId === issue.id}
-                        onClick={() =>
-                          void patchIssue(issue.id, {
-                            internalNote: draftNotes[issue.id] ?? null,
-                          })
-                        }
-                        className="rounded-md border border-oo-light-stone bg-white px-3 py-1.5 text-xs font-medium hover:bg-oo-cream/80 disabled:opacity-50"
-                      >
-                        Save note
-                      </button>
-                      {issue.status !== "reviewing" && issue.status !== "OPEN" && (
-                        <button
-                          type="button"
-                          disabled={busyId === issue.id}
-                          onClick={() => void patchIssue(issue.id, { reviewing: true })}
-                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-900 disabled:opacity-50"
-                        >
-                          Mark reviewing
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        disabled={busyId === issue.id}
-                        onClick={() => void patchIssue(issue.id, { resolve: true })}
-                        className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-hover disabled:opacity-50"
-                      >
-                        Resolve
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busyId === issue.id}
-                        onClick={() => void patchIssue(issue.id, { dismiss: true })}
-                        className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                      >
-                        Dismiss
-                      </button>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      {customerSupportIssues.length === 0 && (
-        <p className="mt-4 text-sm text-oo-stone-gray">No customer-reported issues for this order.</p>
-      )}
-
-      {systemAll.length > 0 && (
-        <div className="mt-6 border-t border-amber-200/80 pt-4">
-          <h3 className="text-sm font-semibold text-oo-charcoal">System / operational issues</h3>
-          <ul className="mt-2 space-y-3">
-            {systemAll.map((issue) => (
+      {hasActiveWork && (
+        <ul className="mt-4 space-y-3">
+          {activeSystemIssues.map((issue) => renderSystemIssue(issue, true))}
+          {activeRecoveryContexts
+            .filter((c) => !activeSystemIssues.some((i) => i.kind === "vendor" && "vendorOrderId" in i && i.vendorOrderId === c.vendorOrderId))
+            .map((c) => (
               <li
-                key={issue.id}
-                className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 text-sm shadow-sm"
+                key={c.vendorOrderId}
+                className="rounded-lg border border-red-200 bg-oo-warm-white p-3 text-sm shadow-sm"
               >
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <span className="font-semibold capitalize text-oo-charcoal">
-                    {humanizeType(issue.type)}
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-semibold text-oo-charcoal">{c.vendorName}</span>
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-900">
+                    {c.exceptionType.replace(/_/g, " ")}
                   </span>
-                  <span className="text-xs text-oo-stone-gray">
-                    {"vendorName" in issue ? issue.vendorName : "Order-wide"}
-                  </span>
-                  <span className="text-xs">{issue.status}</span>
                 </div>
-                <p className="mt-2 text-oo-charcoal">
-                  {issue.notes?.trim() || `${humanizeType(issue.type)} — ${issue.status.toLowerCase()}`}
-                </p>
-                {(issue.status === "OPEN" || issue.status === "open") && (
-                  <button
-                    type="button"
-                    onClick={() => void handleResolveSystem(issue.kind, issue.id)}
-                    disabled={busyId === issue.id}
-                    className="mt-3 rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-hover disabled:opacity-50"
-                  >
-                    Mark resolved
-                  </button>
-                )}
+                {c.reason && <p className="mt-2 text-sm text-red-900">{c.reason}</p>}
+                <div className="mt-3">
+                  <AdminVendorOrderExceptionActions
+                    vendorOrderId={c.vendorOrderId}
+                    exceptionType={c.exceptionType}
+                    fulfillmentStatus={c.fulfillmentStatus}
+                    routingAvailable={routingAvailable}
+                    canCancel={c.canCancel}
+                  />
+                </div>
               </li>
             ))}
-          </ul>
-        </div>
+          {activeCustomerIssues.map((issue) => renderCustomerIssue(issue, true))}
+        </ul>
       )}
 
-      <div className="mt-6 border-t border-amber-200/80 pt-4">
-        <label htmlFor="admin-resolution-notes" className="block text-sm font-medium text-oo-charcoal">
-          Resolution notes (order-wide)
-        </label>
+      {(resolvedCustomerIssues.length > 0 || resolvedSystemIssues.length > 0) && (
+        <details className="mt-4 rounded-lg border border-oo-light-stone/80 bg-oo-cream/20 px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
+            Resolved system issues ({resolvedSystemIssues.length + resolvedCustomerIssues.length})
+          </summary>
+          <ul className="mt-3 space-y-2">
+            {resolvedSystemIssues.map((issue) => renderSystemIssue(issue, false))}
+            {resolvedCustomerIssues.map((issue) => renderCustomerIssue(issue, false))}
+          </ul>
+        </details>
+      )}
+
+      <details className="mt-4 rounded-lg border border-oo-light-stone/60 bg-oo-warm-white/50 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
+          Order resolution notes
+        </summary>
         <textarea
           id="admin-resolution-notes"
-          className="mt-2 w-full min-h-[100px] rounded-md border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm"
+          className="mt-2 w-full min-h-[80px] rounded-md border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm"
           value={resolutionNotes}
           onChange={(e) => setResolutionNotes(e.target.value)}
         />
@@ -373,13 +466,13 @@ export function AdminOrderIssuesPanel({
             type="button"
             onClick={() => void handleSaveResolutionNotes()}
             disabled={savingNotes}
-            className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
+            className="rounded-md border border-oo-light-stone bg-white px-3 py-1.5 text-xs font-medium hover:bg-oo-cream/80 disabled:opacity-50"
           >
             {savingNotes ? "Saving…" : "Save notes"}
           </button>
-          {notesMessage && <span className="text-sm text-oo-stone-gray">{notesMessage}</span>}
+          {notesMessage && <span className="text-xs text-oo-stone-gray">{notesMessage}</span>}
         </div>
-      </div>
+      </details>
     </section>
   );
 }

@@ -820,11 +820,13 @@ export function AdminPaymentsRefundsPanel({
   return (
     <section
       id="payments-refunds"
-      className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 scroll-mt-4"
+      className="scroll-mt-4 rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-oo-charcoal">Payments &amp; Refunds</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
+            Payments &amp; Refunds
+          </h2>
           <p className="mt-1 text-sm text-oo-stone-gray">
             Customer refunds debit the platform PaymentIntent. Vendor clawback uses a separate{" "}
             <Link href="/admin/payout-transfers" className="font-medium text-oo-charcoal underline">
@@ -881,29 +883,42 @@ export function AdminPaymentsRefundsPanel({
         )}
       </div>
 
-      {/* Order payment summary */}
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 p-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
-            Order payment
-          </h3>
-          <dl className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between gap-2">
-              <dt className="text-oo-stone-gray">Customer paid</dt>
-              <dd className="font-medium tabular-nums">
-                {formatAdminMoney(payment?.amountCents ?? summary.order.totalCents)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-oo-stone-gray">Total refunded</dt>
-              <dd className="tabular-nums">{formatAdminMoney(summary.order.totalRefundedCents)}</dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-oo-stone-gray">Remaining refundable</dt>
-              <dd className="font-semibold tabular-nums text-oo-charcoal">
-                {formatAdminMoney(summary.order.remainingRefundableCents)}
-              </dd>
-            </div>
+      {/* Order payment summary — compact top row */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
+          <p className="text-xs text-oo-stone-gray">Customer paid</p>
+          <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
+            {formatAdminMoney(payment?.amountCents ?? summary.order.totalCents)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
+          <p className="text-xs text-oo-stone-gray">Refunded</p>
+          <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
+            {formatAdminMoney(summary.order.totalRefundedCents)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
+          <p className="text-xs text-oo-stone-gray">Remaining refundable</p>
+          <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
+            {formatAdminMoney(summary.order.remainingRefundableCents)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
+          <p className="text-xs text-oo-stone-gray">Stripe processing fee</p>
+          <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
+            {payment?.stripeProcessingFeeCents != null
+              ? formatAdminMoney(payment.stripeProcessingFeeCents)
+              : "—"}
+          </p>
+        </div>
+      </div>
+
+      <details className="mt-3 rounded-lg border border-oo-light-stone bg-oo-cream/30 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
+          Payment breakdown &amp; Stripe IDs
+        </summary>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 text-sm">
+          <dl className="space-y-1">
             <div className="flex justify-between gap-2">
               <dt className="text-oo-stone-gray">Refund status</dt>
               <dd>{paymentRefundStatusLabel(summary.order.paymentRefundStatus)}</dd>
@@ -921,46 +936,28 @@ export function AdminPaymentsRefundsPanel({
               <dd className="tabular-nums">{formatAdminMoney(summary.order.tipCents)}</dd>
             </div>
           </dl>
-        </div>
-        <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 p-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
-            Stripe
-          </h3>
-          <dl className="mt-2 space-y-1 text-sm">
+          <dl className="space-y-2 text-xs">
             <div>
               <dt className="text-oo-stone-gray">PaymentIntent</dt>
-              <dd className="break-all font-mono text-xs">
+              <dd className="break-all font-mono">
                 {payment?.stripePaymentIntentId ?? summary.order.stripePaymentIntentId ?? "—"}
               </dd>
             </div>
             <div>
               <dt className="text-oo-stone-gray">Charge</dt>
-              <dd className="break-all font-mono text-xs">
+              <dd className="break-all font-mono">
                 {payment?.stripeChargeId ?? (
-                  <span className="text-amber-800">
-                    Charge ID missing for this payment. Historical payment may need reconciliation
-                    before some refund operations.
-                  </span>
+                  <span className="font-sans text-amber-800">Charge ID missing — may need reconciliation</span>
                 )}
               </dd>
             </div>
             <div>
               <dt className="text-oo-stone-gray">Balance transaction</dt>
-              <dd className="break-all font-mono text-xs">
-                {payment?.stripeBalanceTransactionId ?? "—"}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-oo-stone-gray">Processing fee</dt>
-              <dd className="tabular-nums">
-                {payment?.stripeProcessingFeeCents != null
-                  ? formatAdminMoney(payment.stripeProcessingFeeCents)
-                  : "—"}
-              </dd>
+              <dd className="break-all font-mono">{payment?.stripeBalanceTransactionId ?? "—"}</dd>
             </div>
           </dl>
         </div>
-      </div>
+      </details>
 
       {/* Vendor breakdown */}
       <div className="mt-6">
@@ -968,9 +965,9 @@ export function AdminPaymentsRefundsPanel({
         <p className="text-xs text-oo-stone-gray">
           PaymentAllocation is the source of truth for net vendor transfer amounts.
         </p>
-        <div className="mt-3 overflow-x-auto">
+        <div className="mt-3 overflow-x-auto rounded-lg border border-oo-light-stone">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-oo-cream/90 backdrop-blur-sm">
               <tr className="border-b border-oo-light-stone text-xs uppercase tracking-wide text-oo-stone-gray">
                 <th className="px-2 py-2">Vendor</th>
                 <th className="px-2 py-2">Status</th>

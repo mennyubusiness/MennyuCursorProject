@@ -55,6 +55,7 @@ export const adminOrderDetailSelect = Prisma.validator<Prisma.OrderSelect>()({
       fulfillmentStatus: true,
       totalCents: true,
       manuallyRecoveredAt: true,
+      manualRecoveryNotes: true,
       deliverectAttempts: true,
       deliverectSubmittedAt: true,
       deliverectLastError: true,

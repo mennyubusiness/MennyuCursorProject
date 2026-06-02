@@ -27,12 +27,18 @@ describe("admin test tools gating", () => {
       join(root, "src/app/admin/(dashboard)/orders/[orderId]/page.tsx"),
       "utf8"
     );
+    const qaSrc = readFileSync(
+      join(root, "src/app/admin/(dashboard)/orders/[orderId]/AdminOrderQaToolsSection.tsx"),
+      "utf8"
+    );
     const buttonSrc = readFileSync(
       join(root, "src/app/admin/(dashboard)/orders/[orderId]/AdminSimulateRoutingFailureButton.tsx"),
       "utf8"
     );
     expect(pageSrc).toMatch(/canShowAdminTestToolsUi/);
-    expect(pageSrc).toMatch(/AdminSimulateRoutingFailureButton/);
+    expect(pageSrc).toMatch(/showAdminTestTools/);
+    expect(pageSrc).toMatch(/AdminOrderQaToolsSection/);
+    expect(qaSrc).toMatch(/AdminSimulateRoutingFailureButton/);
     expect(buttonSrc).toMatch(/Simulate routing failure/);
   });
 });
