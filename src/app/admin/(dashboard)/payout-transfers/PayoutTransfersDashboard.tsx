@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   adminFetchStripePlatformBalanceAction,
+  adminReconcileEligibleVendorPayoutTransfersAction,
+  adminReconcileVendorPayoutTransferAction,
   adminRetryAllEligibleVendorPayoutTransfersAction,
   adminRetryVendorPayoutTransferAction,
   adminRunVendorPayoutTransferBatchAction,
@@ -19,6 +21,10 @@ import {
   isInsufficientBalanceTransfer,
   isRetryablePayoutTransfer,
 } from "@/lib/vendor-payout-transfer-failure";
+import {
+  isReconcilablePayoutTransfer,
+  reconciliationResultMessage,
+} from "@/lib/vendor-payout-transfer-reconciliation";
 import type { StripePlatformBalanceSnapshot } from "@/services/stripe-balance.service";
 
 import type {
@@ -256,9 +262,11 @@ export function PayoutTransfersDashboard({
   const [batchKey, setBatchKey] = useState("");
   const [batchMsg, setBatchMsg] = useState<string | null>(null);
   const [batchErr, setBatchErr] = useState<string | null>(null);
-  const [batchBusy, setBatchBusy] = useState<"payout" | "retry_all" | "reversal" | null>(null);
+  const [batchBusy, setBatchBusy] = useState<"payout" | "retry_all" | "reconcile" | "reversal" | null>(null);
   const [vendorSearch, setVendorSearch] = useState("");
   const [retryPayoutId, setRetryPayoutId] = useState<string | null>(null);
+  const [reconcilePayoutId, setReconcilePayoutId] = useState<string | null>(null);
+  const [reconcileNotes, setReconcileNotes] = useState<Record<string, string>>({});
   const [retryReversalId, setRetryReversalId] = useState<string | null>(null);
   const [balance, setBalance] = useState<StripePlatformBalanceSnapshot | null>(initialBalance);
   const [balanceError, setBalanceError] = useState<string | null>(initialBalanceError);
@@ -456,6 +464,56 @@ export function PayoutTransfersDashboard({
     }
   }
 
+  async function runBulkReconcile() {
+    setBatchBusy("reconcile");
+    setBatchErr(null);
+    setBatchMsg(null);
+    try {
+      const r = await adminReconcileEligibleVendorPayoutTransfersAction(50);
+      if (!r.ok) {
+        setBatchErr(r.error);
+        return;
+      }
+      setBatchMsg(
+        `Reconcile with Stripe: checked ${r.summary.checked}, updated paid ${r.summary.updatedPaid}, not found ${r.summary.notFound}, ambiguous ${r.summary.ambiguous}, mismatched ${r.summary.mismatched}, errors ${r.summary.errors}.`
+      );
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setBatchErr(e instanceof Error ? e.message : "Reconciliation failed");
+    } finally {
+      setBatchBusy(null);
+    }
+  }
+
+  async function checkStripeTransfer(id: string) {
+    setReconcilePayoutId(id);
+    try {
+      const r = await adminReconcileVendorPayoutTransferAction(id);
+      if (!r.ok) {
+        setReconcileNotes((prev) => ({ ...prev, [id]: r.error }));
+        return;
+      }
+      const msg = reconciliationResultMessage(r.result.outcome, r.result.message);
+      setReconcileNotes((prev) => ({
+        ...prev,
+        [id]:
+          r.result.detail && r.result.outcome !== "updated_paid"
+            ? `${msg} (${r.result.detail})`
+            : msg,
+      }));
+      if (r.result.outcome === "updated_paid" && r.transfer) {
+        setTransfers((prev) =>
+          prev.map((t) => (t.id === id ? normalizeTransferRow(r.transfer!) : t))
+        );
+      }
+      if (r.result.outcome === "updated_paid") {
+        startTransition(() => router.refresh());
+      }
+    } finally {
+      setReconcilePayoutId(null);
+    }
+  }
+
   async function retryTransfer(id: string) {
     setRetryPayoutId(id);
     try {
@@ -491,7 +549,8 @@ export function PayoutTransfersDashboard({
     }
   }
 
-  const actionLocked = batchBusy !== null || retryPayoutId !== null || retryReversalId !== null;
+  const actionLocked =
+    batchBusy !== null || retryPayoutId !== null || retryReversalId !== null || reconcilePayoutId !== null;
 
   return (
     <div className="space-y-8">
@@ -571,6 +630,14 @@ export function PayoutTransfersDashboard({
               className="rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-950 shadow-sm hover:bg-orange-100 disabled:opacity-50"
             >
               {batchBusy === "retry_all" ? "Retrying…" : "Retry all eligible failed payouts"}
+            </button>
+            <button
+              type="button"
+              disabled={actionLocked}
+              onClick={() => void runBulkReconcile()}
+              className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-950 shadow-sm hover:bg-sky-100 disabled:opacity-50"
+            >
+              {batchBusy === "reconcile" ? "Reconciling…" : "Reconcile with Stripe"}
             </button>
             <button
               type="button"
@@ -722,6 +789,7 @@ export function PayoutTransfersDashboard({
                           const bucket = statusFilterBucket(t.status);
                           const insufficient = isInsufficientBalanceTransfer(t);
                           const retryable = isRetryablePayoutTransfer(t);
+                          const reconcilable = isReconcilablePayoutTransfer(t);
                           const rowTint = insufficient
                             ? "bg-orange-50/50"
                             : bucket === "failed"
@@ -774,18 +842,36 @@ export function PayoutTransfersDashboard({
                                 {shortenStripeId(t.stripeTransferId)}
                               </td>
                               <td className="px-3 py-2">
-                                {retryable ? (
-                                  <button
-                                    type="button"
-                                    disabled={retryPayoutId !== null}
-                                    onClick={() => void retryTransfer(t.id)}
-                                    className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
-                                  >
-                                    {retryPayoutId === t.id ? "Retrying…" : "Retry payout"}
-                                  </button>
-                                ) : (
-                                  <span className="text-xs text-oo-stone-gray">—</span>
-                                )}
+                                <div className="flex flex-col gap-1">
+                                  {reconcilable ? (
+                                    <button
+                                      type="button"
+                                      disabled={reconcilePayoutId !== null || retryPayoutId !== null}
+                                      onClick={() => void checkStripeTransfer(t.id)}
+                                      className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-950 hover:bg-sky-100 disabled:opacity-50"
+                                    >
+                                      {reconcilePayoutId === t.id ? "Checking…" : "Check Stripe"}
+                                    </button>
+                                  ) : null}
+                                  {retryable ? (
+                                    <button
+                                      type="button"
+                                      disabled={retryPayoutId !== null || reconcilePayoutId !== null}
+                                      onClick={() => void retryTransfer(t.id)}
+                                      className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
+                                    >
+                                      {retryPayoutId === t.id ? "Retrying…" : "Retry payout"}
+                                    </button>
+                                  ) : null}
+                                  {!reconcilable && !retryable ? (
+                                    <span className="text-xs text-oo-stone-gray">—</span>
+                                  ) : null}
+                                  {reconcileNotes[t.id] ? (
+                                    <span className="max-w-[160px] text-[10px] leading-snug text-oo-stone-gray">
+                                      {reconcileNotes[t.id]}
+                                    </span>
+                                  ) : null}
+                                </div>
                               </td>
                             </tr>
                           );

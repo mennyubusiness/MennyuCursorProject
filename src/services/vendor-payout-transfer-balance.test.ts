@@ -86,14 +86,27 @@ describe("vendor payout transfer balance checks", () => {
       destinationAccountId: "acct_1",
       idempotencyKey: "mennyu_vpt_pa_2",
       paymentAllocationId: "pa_2",
+      vendorOrderId: "vo_2",
+      vendorId: "v_2",
       stripeTransferId: null,
+      vendorOrder: { orderId: "ord_2" },
     });
     mockTransferCreate.mockResolvedValue({ id: "tr_abc" });
 
     const result = await executeVendorPayoutTransfer("vpt_2");
     expect(result.outcome).toBe("paid");
     expect(mockTransferCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 50, destination: "acct_1" }),
+      expect.objectContaining({
+        amount: 50,
+        destination: "acct_1",
+        transfer_group: "order_ord_2",
+        metadata: expect.objectContaining({
+          openOrderVendorPayoutTransferId: "vpt_2",
+          paymentAllocationId: "pa_2",
+          orderId: "ord_2",
+          mennyu_vendor_payout_transfer_id: "vpt_2",
+        }),
+      }),
       { idempotencyKey: "mennyu_vpt_pa_2" }
     );
   });
@@ -121,7 +134,10 @@ describe("vendor payout transfer balance checks", () => {
       destinationAccountId: "acct_1",
       idempotencyKey: "key_4",
       paymentAllocationId: "pa_4",
+      vendorOrderId: "vo_4",
+      vendorId: "v_4",
       stripeTransferId: null,
+      vendorOrder: { orderId: "ord_4" },
     });
     mockTransferCreate.mockRejectedValue({
       code: "balance_insufficient",

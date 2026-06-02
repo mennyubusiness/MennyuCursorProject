@@ -15,6 +15,10 @@ import {
   isStripeInsufficientFundsError,
 } from "@/lib/vendor-payout-transfer-failure";
 import {
+  buildVendorPayoutTransferGroup,
+  buildVendorPayoutTransferStripeMetadata,
+} from "@/lib/vendor-payout-transfer-stripe-metadata";
+import {
   fetchStripePlatformBalance,
   type StripePlatformBalanceSnapshot,
 } from "@/services/stripe-balance.service";
@@ -200,6 +204,7 @@ export async function executeVendorPayoutTransfer(
 
   const row = await prisma.vendorPayoutTransfer.findUnique({
     where: { id: transferId },
+    include: { vendorOrder: { select: { orderId: true } } },
   });
   if (!row) {
     return { outcome: "skipped", reason: "not_found" };
@@ -250,10 +255,14 @@ export async function executeVendorPayoutTransfer(
         amount: row.amountCents,
         currency: row.currency,
         destination: row.destinationAccountId,
-        metadata: {
-          mennyu_vendor_payout_transfer_id: row.id,
-          mennyu_payment_allocation_id: row.paymentAllocationId,
-        },
+        transfer_group: buildVendorPayoutTransferGroup(row.vendorOrder.orderId),
+        metadata: buildVendorPayoutTransferStripeMetadata({
+          id: row.id,
+          paymentAllocationId: row.paymentAllocationId,
+          vendorOrderId: row.vendorOrderId,
+          vendorId: row.vendorId,
+          orderId: row.vendorOrder.orderId,
+        }),
       },
       { idempotencyKey: row.idempotencyKey }
     );

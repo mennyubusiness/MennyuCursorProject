@@ -8,6 +8,10 @@ import {
   retryFailedVendorPayoutTransfer,
   runManualVendorPayoutTransferBatch,
 } from "@/services/vendor-payout-transfer.service";
+import {
+  reconcileEligibleVendorPayoutTransfers,
+  reconcileVendorPayoutTransfer,
+} from "@/services/vendor-payout-transfer-reconciliation.service";
 import { fetchStripePlatformBalance } from "@/services/stripe-balance.service";
 
 export async function adminRunVendorPayoutTransferBatchAction(batchKey?: string) {
@@ -100,4 +104,33 @@ export async function adminRetryVendorPayoutTransferAction(transferId: string) {
     result: r,
     transfer: JSON.parse(JSON.stringify(transfer)) as AdminPayoutTransferRow,
   };
+}
+
+export async function adminReconcileVendorPayoutTransferAction(transferId: string) {
+  const ok = await isAdminDashboardLayoutAuthorized();
+  if (!ok) {
+    return { ok: false as const, error: "Unauthorized" };
+  }
+  const result = await reconcileVendorPayoutTransfer(transferId);
+  const transfer = await prisma.vendorPayoutTransfer.findUnique({
+    where: { id: transferId },
+    select: transferSelect,
+  });
+  if (!transfer) {
+    return { ok: false as const, error: "Transfer not found" };
+  }
+  return {
+    ok: true as const,
+    result,
+    transfer: JSON.parse(JSON.stringify(transfer)) as AdminPayoutTransferRow,
+  };
+}
+
+export async function adminReconcileEligibleVendorPayoutTransfersAction(limit?: number) {
+  const ok = await isAdminDashboardLayoutAuthorized();
+  if (!ok) {
+    return { ok: false as const, error: "Unauthorized" };
+  }
+  const summary = await reconcileEligibleVendorPayoutTransfers({ limit });
+  return { ok: true as const, summary };
 }
