@@ -1,6 +1,6 @@
 /**
  * When to omit Deliverect-integrated vendor orders from the vendor dashboard vs show degraded fallback.
- * Healthy path: submit runs soon after payment → sent/confirmed → vendor sees Accept/Deny.
+ * Healthy path: submit runs soon after payment → sent/confirmed → POS drives kitchen status via webhooks.
  * While still within the grace window after order update (payment), hide pending/pending so we don’t
  * show “POS didn’t sync” before routing has had a fair chance to complete.
  */

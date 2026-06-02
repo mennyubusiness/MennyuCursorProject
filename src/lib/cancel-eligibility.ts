@@ -4,15 +4,15 @@
  */
 
 import { isVendorReceiptConfirmed } from "@/lib/vendor-order-effective-state";
+import type { VendorOrderAuthoritySnapshot } from "@/domain/status-authority";
+import { canVendorDashboardMutateVendorOrder } from "@/lib/deliverect-vendor-order-authority";
 
 /** Fulfillment states where the vendor has not yet started preparation. */
 const PRE_PREPARATION_FULFILLMENT = new Set<string>(["pending", "accepted"]);
 
-export type VendorOrderForCancelEligibility = {
+export type VendorOrderForCancelEligibility = VendorOrderAuthoritySnapshot & {
   routingStatus: string;
   fulfillmentStatus: string;
-  /** Accept Date (Prisma) or string; eligibility logic does not use this. */
-  manuallyRecoveredAt?: Date | string | null;
   statusHistory?: Array<{ source?: string | null }> | null;
 };
 
@@ -52,6 +52,7 @@ export function canCustomerCancelWholeOrder(order: Parameters<typeof canCustomer
 export function canVendorRejectVendorOrder(
   vo: VendorOrderForCancelEligibility
 ): boolean {
+  if (!canVendorDashboardMutateVendorOrder(vo)) return false;
   if (vo.fulfillmentStatus === "cancelled") return false;
   if (vo.fulfillmentStatus === "completed") return false;
   if (!PRE_PREPARATION_FULFILLMENT.has(vo.fulfillmentStatus)) return false;

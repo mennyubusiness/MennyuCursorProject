@@ -3,6 +3,8 @@
  * Drives grouping, badges, and visibility of status controls.
  */
 import { isManuallyRecovered } from "@/lib/admin-manual-recovery";
+import { isDeliverectAuthoritativeVendorOrder } from "@/lib/deliverect-vendor-order-authority";
+import type { VendorOrderAuthoritySnapshot } from "@/domain/status-authority";
 
 export type VendorOrderOperatingMode =
   | "pos_synced"
@@ -14,6 +16,9 @@ export interface VOForOperatingMode {
   routingStatus: string;
   fulfillmentStatus: string;
   manuallyRecoveredAt?: Date | string | null;
+  statusAuthority?: VendorOrderAuthoritySnapshot["statusAuthority"];
+  deliverectChannelLinkId?: string | null;
+  vendor?: { deliverectChannelLinkId?: string | null };
 }
 
 export interface StatusHistoryEntryForMode {
@@ -97,9 +102,13 @@ export function getOperatingModeActionHint(
   if (deliverectRoutingDegraded === true) {
     return "Deliverect routing didn’t complete in time. Confirm manually only if this order already appears in your POS; otherwise contact support.";
   }
+  if (vo && isDeliverectAuthoritativeVendorOrder({ ...vo, lastStatusSource: null })) {
+    return null;
+  }
+
   switch (mode) {
     case "pos_synced":
-      return "Update status in your POS. Use buttons below only if POS is not syncing.";
+      return "Update status in your POS. Open Order updates automatically from Deliverect.";
     case "fallback_required":
       return "Use the buttons below to update status (POS sync issue or recovered order).";
     case "needs_attention":
@@ -114,6 +123,10 @@ export function getOperatingModeActionHint(
 }
 
 /** Whether to show Open Order status controls as primary (true) or as fallback/secondary (false). */
-export function isMennyuControlsPrimary(mode: VendorOrderOperatingMode): boolean {
+export function isMennyuControlsPrimary(
+  mode: VendorOrderOperatingMode,
+  vo?: VOForOperatingMode
+): boolean {
+  if (vo && isDeliverectAuthoritativeVendorOrder({ ...vo, lastStatusSource: null })) return false;
   return mode === "manual" || mode === "needs_attention" || mode === "fallback_required";
 }

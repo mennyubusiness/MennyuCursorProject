@@ -10,6 +10,12 @@ import { prisma } from "@/lib/db";
 import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
 import { applyVendorOrderTransition } from "@/services/order-status.service";
 import { canVendorRejectVendorOrder } from "@/lib/cancel-eligibility";
+import {
+  canVendorDashboardMutateVendorOrder,
+  VENDOR_DELIVERECT_CONTROLLED_MESSAGE,
+} from "@/lib/deliverect-vendor-order-authority";
+import { isRoutingRetryAvailable } from "@/lib/routing-availability";
+import { isDeliverectVendorOrderRoutingDegraded } from "@/lib/vendor-deliverect-dashboard-visibility";
 import { getRefundDecision } from "@/lib/refund-decision";
 import { runAutomaticRefundForDecision } from "@/lib/refund-route-helpers";
 import type { VendorOrderTargetState } from "@/domain/vendor-order-transition";
@@ -68,8 +74,18 @@ export async function POST(
       routingStatus: true,
       fulfillmentStatus: true,
       manuallyRecoveredAt: true,
+      statusAuthority: true,
+      lastStatusSource: true,
+      deliverectChannelLinkId: true,
+      deliverectAttempts: true,
+      order: { select: { updatedAt: true } },
       statusHistory: { select: { source: true } },
-      vendor: { select: { vendorDashboardToken: true } },
+      vendor: {
+        select: {
+          vendorDashboardToken: true,
+          deliverectChannelLinkId: true,
+        },
+      },
     },
   });
   if (!vo) {
@@ -89,7 +105,43 @@ export async function POST(
     return NextResponse.json({ error: "Vendor order does not belong to this vendor" }, { status: 403 });
   }
 
-  if (targetState === "cancelled" && !canVendorRejectVendorOrder(vo)) {
+  const authorityVo = {
+    statusAuthority: vo.statusAuthority,
+    lastStatusSource: vo.lastStatusSource,
+    deliverectChannelLinkId: vo.deliverectChannelLinkId,
+    vendor: vo.vendor,
+    routingStatus: vo.routingStatus,
+    manuallyRecoveredAt: vo.manuallyRecoveredAt,
+  };
+
+  if (!canVendorDashboardMutateVendorOrder(authorityVo)) {
+    const isDeliverectLive = isRoutingRetryAvailable();
+    const routingDegraded = isDeliverectVendorOrderRoutingDegraded(
+      vo,
+      vo.vendor,
+      isDeliverectLive,
+      Date.now()
+    );
+    const allowDegradedConfirmOnly =
+      routingDegraded &&
+      targetState === "confirmed" &&
+      vo.routingStatus === "pending" &&
+      vo.fulfillmentStatus === "pending";
+
+    if (!allowDegradedConfirmOnly) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: VENDOR_DELIVERECT_CONTROLLED_MESSAGE,
+          code: "POS_MANAGED_USE_FALLBACK",
+          precedenceReason: "POS_MANAGED_USE_FALLBACK",
+        },
+        { status: 409 }
+      );
+    }
+  }
+
+  if (targetState === "cancelled" && !canVendorRejectVendorOrder({ ...authorityVo, fulfillmentStatus: vo.fulfillmentStatus, statusHistory: vo.statusHistory })) {
     return NextResponse.json(
       {
         error:

@@ -41,8 +41,8 @@ export type StatusUpdatePrecedenceResult =
   | { allowed: false; reason: "POS_MANAGED_USE_FALLBACK" | "UNKNOWN" };
 
 export interface VendorOrderAuthoritySnapshot {
-  statusAuthority: VendorOrderStatusAuthority | null;
-  lastStatusSource: VendorOrderStatusSource | null;
+  statusAuthority?: VendorOrderStatusAuthority | null;
+  lastStatusSource?: VendorOrderStatusSource | null;
   deliverectChannelLinkId?: string | null;
   vendor?: { deliverectChannelLinkId?: string | null } | null;
   routingStatus: string;
@@ -92,6 +92,18 @@ export function getEffectiveAuthority(
  * POS-managed orders: allow deliverect_webhook and system; block vendor_dashboard/dma_action
  * unless authority is admin_override.
  */
+function hasDeliverectChannelLink(vo: VendorOrderAuthoritySnapshot): boolean {
+  const ch = vo.deliverectChannelLinkId ?? vo.vendor?.deliverectChannelLinkId;
+  return Boolean(ch != null && String(ch).trim() !== "");
+}
+
+/** Channel-linked kitchen orders are POS-managed unless admin recovery took control. */
+export function isDeliverectKitchenAuthority(vo: VendorOrderAuthoritySnapshot): boolean {
+  if (vo.manuallyRecoveredAt != null) return false;
+  if (getEffectiveAuthority(vo) === "admin_override") return false;
+  return hasDeliverectChannelLink(vo);
+}
+
 export function shouldApplyStatusUpdate(
   vo: VendorOrderAuthoritySnapshot,
   source: VendorOrderStatusSource
@@ -100,6 +112,12 @@ export function shouldApplyStatusUpdate(
 
   if (source === "admin_action") return { allowed: true };
   if (authority === "admin_override") return { allowed: true };
+
+  if (source === "vendor_dashboard" || source === "dma_action") {
+    if (isDeliverectKitchenAuthority(vo)) {
+      return { allowed: false, reason: "POS_MANAGED_USE_FALLBACK" };
+    }
+  }
 
   if (authority === "pos") {
     if (source === "deliverect_webhook" || source === "deliverect_fallback" || source === "system")

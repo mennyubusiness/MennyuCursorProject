@@ -188,7 +188,7 @@ describe("vendor operational API auth", () => {
       expect(mockApplyTransition).not.toHaveBeenCalled();
     });
 
-    it("allows authorized vendor to mutate status", async () => {
+    it("allows authorized vendor to mutate status on manual (non-Deliverect) orders", async () => {
       mockVendorOrderFindUnique.mockResolvedValue(voRecord(VENDOR_A));
       mockVerifyVendorAccess.mockResolvedValue({ ok: true, mode: "session" });
 
@@ -203,6 +203,36 @@ describe("vendor operational API auth", () => {
 
       expect(res.status).toBe(200);
       expect(mockApplyTransition).toHaveBeenCalledWith(VO_ID, "accepted", "vendor_dashboard");
+    });
+
+    it("rejects Deliverect-authoritative vendor status mutations", async () => {
+      mockVendorOrderFindUnique.mockResolvedValue({
+        ...voRecord(VENDOR_A),
+        statusAuthority: "pos",
+        lastStatusSource: "deliverect_webhook",
+        deliverectChannelLinkId: "ch_deliverect",
+        deliverectAttempts: 1,
+        order: { updatedAt: new Date(Date.now() - 600_000) },
+        vendor: {
+          vendorDashboardToken: "token_a",
+          deliverectChannelLinkId: "ch_deliverect",
+        },
+      });
+      mockVerifyVendorAccess.mockResolvedValue({ ok: true, mode: "session" });
+
+      const res = await postVendorOrderStatus(
+        new Request("http://localhost/api/vendor/orders/vo/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        }),
+        { params: Promise.resolve({ vendorOrderId: VO_ID }) }
+      );
+
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error).toMatch(/Deliverect\/POS/i);
+      expect(mockApplyTransition).not.toHaveBeenCalled();
     });
   });
 

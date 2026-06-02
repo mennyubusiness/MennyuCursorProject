@@ -150,6 +150,8 @@ export function legacySourceToStatusSource(legacy: string): VendorOrderStatusSou
       return "deliverect_webhook";
     case "deliverect_fallback":
       return "deliverect_fallback";
+    case "admin_simulate_deliverect_status":
+      return "deliverect_webhook";
     case "manual":
       return "system";
     case "dev_simulator":

@@ -51,7 +51,7 @@ export interface DeliverectWebhookIncidentRow {
   errorMessage: string | null;
   /** From deliverectWebhookLastApply when source is vendor_order_audit */
   applyOutcome: DeliverectWebhookLastApplyRecord["outcome"] | null;
-  applySource: "webhook" | "fallback" | null;
+  applySource: "webhook" | "fallback" | "admin_simulator" | null;
   manualRecoveryContext: boolean;
   fallbackEpisodeContext: boolean;
   overdueReconciliationContext: boolean;

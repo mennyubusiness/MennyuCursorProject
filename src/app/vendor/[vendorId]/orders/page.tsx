@@ -57,6 +57,10 @@ const getVendorOrdersPageData = cache(async (vendorId: string) => {
         },
       },
       deliverectAttempts: true,
+      deliverectChannelLinkId: true,
+      statusAuthority: true,
+      lastExternalStatus: true,
+      lastExternalStatusAt: true,
       lineItems: {
         select: {
           id: true,
@@ -120,6 +124,7 @@ export default async function VendorOrdersPage({
   const initialVendorOrdersForClient = visibleVendorOrders.map((vo) => ({
     ...vo,
     manuallyRecoveredAt: vo.manuallyRecoveredAt?.toISOString() ?? null,
+    lastExternalStatusAt: vo.lastExternalStatusAt?.toISOString() ?? null,
     order: {
       ...vo.order,
       createdAt: vo.order.createdAt.toISOString(),
@@ -165,6 +170,7 @@ export default async function VendorOrdersPage({
 
       <VendorDashboardLiveOrders
         vendorId={vendor.id}
+        vendorDeliverectChannelLinkId={vendor.deliverectChannelLinkId}
         initialVendorOrders={initialVendorOrdersForClient}
         initialNowMs={initialNowMs}
         isDeliverectLive={isDeliverectLive}

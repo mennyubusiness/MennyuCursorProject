@@ -1,5 +1,8 @@
 import type { AdminOrderDetail } from "@/lib/admin-order-detail-query";
+import { evaluateSimulateDeliverectStatusEligibility } from "@/lib/admin-simulate-deliverect-status";
 import { evaluateSimulateRoutingFailureEligibility } from "@/lib/admin-simulate-routing-failure";
+import { hasDeliverectChannelLink } from "@/lib/deliverect-vendor-order-authority";
+import { AdminSimulateDeliverectStatusButton } from "./AdminSimulateDeliverectStatusButton";
 import { AdminSimulateRoutingFailureButton } from "./AdminSimulateRoutingFailureButton";
 
 export function AdminOrderQaToolsSection({
@@ -18,12 +21,29 @@ export function AdminOrderQaToolsSection({
     );
   }
 
-  const anyEligible = vendorOrders.some((vo) =>
+  const anyRoutingEligible = vendorOrders.some((vo) =>
     evaluateSimulateRoutingFailureEligibility({
       orderStatus,
       fulfillmentStatus: vo.fulfillmentStatus,
     }).eligible
   );
+
+  const anyDeliverectStatusEligible = vendorOrders.some((vo) => {
+    const linked = hasDeliverectChannelLink({
+      deliverectChannelLinkId: vo.deliverectChannelLinkId,
+      vendor: vo.vendor,
+    });
+    if (!linked && !vo.deliverectOrderId) return false;
+    return evaluateSimulateDeliverectStatusEligibility({
+      orderStatus,
+      fulfillmentStatus: vo.fulfillmentStatus,
+      routingStatus: vo.routingStatus,
+      statusCode: 20,
+      deliverectChannelLinkId: vo.deliverectChannelLinkId,
+      vendorDeliverectChannelLinkId: vo.vendor.deliverectChannelLinkId,
+      deliverectOrderId: vo.deliverectOrderId,
+    }).eligible;
+  });
 
   return (
     <section className="rounded-lg border border-dashed border-amber-300/50 bg-amber-50/20 px-3 py-2.5">
@@ -33,29 +53,56 @@ export function AdminOrderQaToolsSection({
           Dev / staging
         </span>
       </div>
-      {!anyEligible && (
+      {!anyRoutingEligible && !anyDeliverectStatusEligible && (
         <p className="mt-1 text-xs text-oo-stone-gray">
-          Simulate routing failure is unavailable for current vendor order states.
+          QA simulations are unavailable for current vendor order states.
         </p>
       )}
-      <ul className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <ul className="mt-2 flex flex-col gap-2">
         {vendorOrders.map((vo) => {
-          const sim = evaluateSimulateRoutingFailureEligibility({
+          const simRouting = evaluateSimulateRoutingFailureEligibility({
             orderStatus,
             fulfillmentStatus: vo.fulfillmentStatus,
           });
+          const deliverectLinked =
+            hasDeliverectChannelLink({
+              deliverectChannelLinkId: vo.deliverectChannelLinkId,
+              vendor: vo.vendor,
+            }) || Boolean(vo.deliverectOrderId?.trim());
+          const simDeliverect = evaluateSimulateDeliverectStatusEligibility({
+            orderStatus,
+            fulfillmentStatus: vo.fulfillmentStatus,
+            routingStatus: vo.routingStatus,
+            statusCode: 20,
+            deliverectChannelLinkId: vo.deliverectChannelLinkId,
+            vendorDeliverectChannelLinkId: vo.vendor.deliverectChannelLinkId,
+            deliverectOrderId: vo.deliverectOrderId,
+          });
+
           return (
             <li
               key={vo.id}
-              className="flex min-w-[200px] flex-1 flex-wrap items-center justify-between gap-2 rounded border border-amber-200/40 bg-oo-warm-white/60 px-2 py-1.5"
+              className="flex flex-col gap-2 rounded border border-amber-200/40 bg-oo-warm-white/60 px-2 py-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between"
             >
               <span className="text-xs font-medium text-oo-charcoal">{vo.vendor.name}</span>
-              <AdminSimulateRoutingFailureButton
-                vendorOrderId={vo.id}
-                vendorName={vo.vendor.name}
-                disabled={!sim.eligible}
-                disabledReason={sim.eligible ? undefined : sim.message}
-              />
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
+                <AdminSimulateRoutingFailureButton
+                  vendorOrderId={vo.id}
+                  vendorName={vo.vendor.name}
+                  disabled={!simRouting.eligible}
+                  disabledReason={simRouting.eligible ? undefined : simRouting.message}
+                />
+                {deliverectLinked ? (
+                  <AdminSimulateDeliverectStatusButton
+                    vendorOrderId={vo.id}
+                    vendorName={vo.vendor.name}
+                    disabled={!simDeliverect.eligible}
+                    disabledReason={
+                      simDeliverect.eligible ? undefined : simDeliverect.message
+                    }
+                  />
+                ) : null}
+              </div>
             </li>
           );
         })}

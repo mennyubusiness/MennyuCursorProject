@@ -23,10 +23,14 @@ export const DELIVERECT_MAPPED_NUMERIC_CODES: ReadonlySet<number> = new Set([
   40,
   50,
   60,
+  /** Pickup ready — customer-facing ready milestone (SMS) ties to this code only. */
   70,
   90,
+  /** Auto-finalized — treat as completed (POS closed the order). */
   95,
   89,
+  /** Dispatch — logged; pickup orders do not advance customer-ready from this code. */
+  100,
 ]);
 
 export type DeliverectMennyuOperationalMapping = {
@@ -49,7 +53,7 @@ export type DeliverectStatusInterpretation =
     };
 
 function interpretNumericCode(code: number): DeliverectStatusInterpretation {
-  if ([110, 100, 115].includes(code)) {
+  if ([110, 115].includes(code)) {
     return {
       kind: "mapped",
       fulfillmentStatus: "cancelled",
@@ -90,7 +94,15 @@ function interpretNumericCode(code: number): DeliverectStatusInterpretation {
       rawNumericCode: code,
     };
   }
-  if (code === 40 || code === 50) {
+  if (code === 40) {
+    return {
+      kind: "mapped",
+      fulfillmentStatus: "accepted",
+      routingStatus: "confirmed",
+      rawNumericCode: code,
+    };
+  }
+  if (code === 50 || code === 60) {
     return {
       kind: "mapped",
       fulfillmentStatus: "preparing",
@@ -98,10 +110,18 @@ function interpretNumericCode(code: number): DeliverectStatusInterpretation {
       rawNumericCode: code,
     };
   }
-  if (code === 60 || code === 70) {
+  if (code === 70) {
     return {
       kind: "mapped",
       fulfillmentStatus: "ready",
+      routingStatus: "confirmed",
+      rawNumericCode: code,
+    };
+  }
+  if (code === 100) {
+    return {
+      kind: "mapped",
+      fulfillmentStatus: "pending",
       routingStatus: "confirmed",
       rawNumericCode: code,
     };

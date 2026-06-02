@@ -63,6 +63,10 @@ export async function GET(
         },
       },
       deliverectAttempts: true,
+      deliverectChannelLinkId: true,
+      statusAuthority: true,
+      lastExternalStatus: true,
+      lastExternalStatusAt: true,
       lineItems: {
         select: {
           id: true,
@@ -166,6 +170,7 @@ export async function GET(
         ...vo.order,
         createdAt: vo.order.createdAt.toISOString(),
       },
+      lastExternalStatusAt: vo.lastExternalStatusAt?.toISOString() ?? null,
       statusHistory: vo.statusHistory.map((h) => ({
         ...h,
         createdAt: h.createdAt.toISOString(),
@@ -181,7 +186,12 @@ export async function GET(
   });
 
   return NextResponse.json({
-    vendor: { id: vendor.id, name: vendor.name, slug: vendor.slug },
+    vendor: {
+      id: vendor.id,
+      name: vendor.name,
+      slug: vendor.slug,
+      deliverectChannelLinkId: vendor.deliverectChannelLinkId,
+    },
     vendorOrders: serialized,
   });
 }

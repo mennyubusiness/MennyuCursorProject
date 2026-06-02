@@ -49,6 +49,10 @@ type VendorOrderFromApi = {
   routingStatus: string;
   fulfillmentStatus: string;
   manuallyRecoveredAt?: string | null;
+  statusAuthority?: string | null;
+  lastExternalStatus?: string | null;
+  lastExternalStatusAt?: string | null;
+  deliverectChannelLinkId?: string | null;
   totalCents: number;
   tipCents: number;
   order: {
@@ -96,11 +100,13 @@ const AGE_UPDATE_INTERVAL_MS = 60_000;
 
 export function VendorDashboardLiveOrders({
   vendorId,
+  vendorDeliverectChannelLinkId = null,
   initialVendorOrders,
   initialNowMs,
   isDeliverectLive = false,
 }: {
   vendorId: string;
+  vendorDeliverectChannelLinkId?: string | null;
   initialVendorOrders: VendorOrderFromApi[];
   /** Stable "now" from server for initial render so SSR and hydration match. */
   initialNowMs: number;
@@ -241,7 +247,17 @@ export function VendorDashboardLiveOrders({
             <div className="space-y-5">
               {list.map((vo) => {
                 const operatingMode = getVendorOrderOperatingMode(
-                    vo,
+                  {
+                    routingStatus: vo.routingStatus,
+                    fulfillmentStatus: vo.fulfillmentStatus,
+                    manuallyRecoveredAt: vo.manuallyRecoveredAt,
+                    statusAuthority: vo.statusAuthority as
+                      | import("@/domain/status-authority").VendorOrderStatusAuthority
+                      | null
+                      | undefined,
+                    deliverectChannelLinkId: vo.deliverectChannelLinkId,
+                    vendor: { deliverectChannelLinkId: vendorDeliverectChannelLinkId },
+                  },
                   vo.statusHistory,
                   isDeliverectLive
                 ) as VendorOrderOperatingMode;
@@ -264,6 +280,7 @@ export function VendorDashboardLiveOrders({
                   <VendorOrderCard
                     key={vo.id}
                     vendorId={vendorId}
+                    vendorDeliverectChannelLinkId={vendorDeliverectChannelLinkId}
                     isDeliverectLive={isDeliverectLive}
                     deliverectRoutingDegraded={vo.deliverectRoutingDegraded === true}
                     onStatusSuccess={onStatusSuccess}
@@ -274,6 +291,10 @@ export function VendorDashboardLiveOrders({
                       routingStatus: vo.routingStatus,
                       fulfillmentStatus: vo.fulfillmentStatus,
                       manuallyRecoveredAt: vo.manuallyRecoveredAt ?? undefined,
+                      statusAuthority: vo.statusAuthority ?? undefined,
+                      lastExternalStatus: vo.lastExternalStatus ?? undefined,
+                      lastExternalStatusAt: vo.lastExternalStatusAt ?? undefined,
+                      deliverectChannelLinkId: vo.deliverectChannelLinkId ?? undefined,
                       statusHistory: vo.statusHistory?.map((h) => ({ source: h.source })) ?? undefined,
                       totalCents: vo.totalCents,
                       tipCents: vo.tipCents ?? 0,

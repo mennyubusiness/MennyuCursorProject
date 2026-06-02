@@ -22,6 +22,20 @@ describe("admin test tools gating", () => {
     expect(src).not.toMatch(/submitOrder/);
   });
 
+  it("simulate deliverect status route requires platform admin and shared service", () => {
+    const src = readFileSync(
+      join(
+        root,
+        "src/app/api/admin/vendor-orders/[vendorOrderId]/simulate-deliverect-status/route.ts"
+      ),
+      "utf8"
+    );
+    expect(src).toMatch(/assertAdminTestToolsApiAccess/);
+    expect(src).toMatch(/simulateVendorOrderDeliverectStatus/);
+    expect(src).not.toMatch(/submitVendorOrder/);
+    expect(src).not.toMatch(/deliverect.*fetch/i);
+  });
+
   it("admin order detail hides QA section unless canShowAdminTestToolsUi", () => {
     const pageSrc = readFileSync(
       join(root, "src/app/admin/(dashboard)/orders/[orderId]/page.tsx"),
@@ -39,6 +53,16 @@ describe("admin test tools gating", () => {
     expect(pageSrc).toMatch(/showAdminTestTools/);
     expect(pageSrc).toMatch(/AdminOrderQaToolsSection/);
     expect(qaSrc).toMatch(/AdminSimulateRoutingFailureButton/);
+    expect(qaSrc).toMatch(/AdminSimulateDeliverectStatusButton/);
     expect(buttonSrc).toMatch(/Simulate routing failure/);
+    const deliverectBtnSrc = readFileSync(
+      join(
+        root,
+        "src/app/admin/(dashboard)/orders/[orderId]/AdminSimulateDeliverectStatusButton.tsx"
+      ),
+      "utf8"
+    );
+    expect(deliverectBtnSrc).toMatch(/Apply simulated Deliverect status/);
+    expect(deliverectBtnSrc).toMatch(/simulate-deliverect-status/);
   });
 });

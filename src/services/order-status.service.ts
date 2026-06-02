@@ -268,7 +268,7 @@ async function persistDeliverectWebhookAuditOnly(
   await recomputeAndPersistParentStatus(orderId, "deliverect");
 }
 
-type DeliverectInboundKind = "webhook" | "fallback";
+type DeliverectInboundKind = "webhook" | "fallback" | "admin_simulator";
 
 /**
  * Shared inbound pipeline: webhook POST and reconciliation fallback use the same mapper + merge + applyVendorOrderStatusWithMeta.
@@ -280,10 +280,21 @@ async function applyDeliverectInboundStatus(
   inbound: DeliverectInboundKind
 ): Promise<DeliverectWebhookApplyResult> {
   const statusSource: VendorOrderStatusSource =
-    inbound === "webhook" ? "deliverect_webhook" : "deliverect_fallback";
-  const historySource = inbound === "webhook" ? "deliverect" : "deliverect_fallback";
+    inbound === "webhook" || inbound === "admin_simulator"
+      ? "deliverect_webhook"
+      : "deliverect_fallback";
+  const historySource =
+    inbound === "webhook"
+      ? "deliverect"
+      : inbound === "fallback"
+        ? "deliverect_fallback"
+        : "admin_simulate_deliverect_status";
   const applySource: DeliverectWebhookLastApplyRecord["applySource"] =
-    inbound === "webhook" ? "webhook" : "fallback";
+    inbound === "webhook"
+      ? "webhook"
+      : inbound === "fallback"
+        ? "fallback"
+        : "admin_simulator";
 
   const vo = await prisma.vendorOrder.findUnique({
     where: { id: vendorOrderId },
@@ -322,9 +333,11 @@ async function applyDeliverectInboundStatus(
       applySource,
       processedAt: nowIso(),
       detail:
-        inbound === "fallback"
-          ? "Deliverect API lookup: payload did not map to an Open Order status (strict allowlist)."
-          : "Deliverect payload did not resolve to a mapped Open Order status (strict allowlist). Raw codes/events are logged server-side.",
+        inbound === "admin_simulator"
+          ? "Admin QA simulator: payload did not map to an Open Order status (strict allowlist)."
+          : inbound === "fallback"
+            ? "Deliverect API lookup: payload did not map to an Open Order status (strict allowlist)."
+            : "Deliverect payload did not resolve to a mapped Open Order status (strict allowlist). Raw codes/events are logged server-side.",
       currentFulfillment: vo.fulfillmentStatus,
       currentRouting: vo.routingStatus,
       rawNumericCode: interpretation.rawNumericCode,
@@ -396,9 +409,11 @@ async function applyDeliverectInboundStatus(
       processedAt: nowIso(),
       detail: backward
         ? `Ignored POS fulfillment regression vs current ${vo.fulfillmentStatus} (webhook proposed ${interpretedFulfillment}).`
-        : inbound === "fallback"
-          ? "Deliverect API lookup: mapped status matches current Open Order state (no row change)."
-          : "Mapped status matches current Open Order state after reconciliation.",
+        : inbound === "admin_simulator"
+          ? "Admin QA simulator: mapped status matches current Open Order state (no row change)."
+          : inbound === "fallback"
+            ? "Deliverect API lookup: mapped status matches current Open Order state (no row change)."
+            : "Mapped status matches current Open Order state after reconciliation.",
       currentFulfillment: vo.fulfillmentStatus,
       currentRouting: vo.routingStatus,
       rawNumericCode: interpretation.rawNumericCode,
@@ -468,13 +483,18 @@ async function applyDeliverectInboundStatus(
       (priorFallbackEpisode
         ? "Webhook arrived after a prior automatic Deliverect recheck episode on this row. "
         : "") +
+      (inbound === "admin_simulator"
+        ? "Admin QA simulator applied Deliverect status (same mapper as webhook). "
+        : "") +
       (idBackfill
         ? inbound === "fallback"
           ? "Vendor order updated from Deliverect API lookup (includes deliverectOrderId backfill)."
           : "Vendor order updated from Deliverect (includes deliverectOrderId backfill)."
         : inbound === "fallback"
           ? "Vendor order updated from Deliverect API lookup (reconciliation fallback)."
-          : "Vendor order updated from Deliverect."),
+          : inbound === "admin_simulator"
+            ? "Vendor order updated from admin Deliverect status simulator."
+            : "Vendor order updated from Deliverect."),
     currentFulfillment: vo.fulfillmentStatus,
     currentRouting: vo.routingStatus,
     rawNumericCode: interpretation.rawNumericCode,
@@ -600,6 +620,22 @@ export async function applyDeliverectStatusFromFallbackLookup(
   return applyDeliverectInboundStatus(vendorOrderId, deliverectExternalId, rawPayload, "fallback");
 }
 
+/**
+ * Same pipeline as webhook (strict mapper + monotonic merge); history/audit tagged as admin simulator.
+ */
+export async function applyDeliverectStatusFromAdminSimulator(
+  vendorOrderId: string,
+  deliverectExternalId: string | null,
+  rawPayload: unknown
+): Promise<DeliverectWebhookApplyResult> {
+  return applyDeliverectInboundStatus(
+    vendorOrderId,
+    deliverectExternalId,
+    rawPayload,
+    "admin_simulator"
+  );
+}
+
 export interface ApplyVendorOrderTransitionResult {
   success: true;
   vendorOrderId: string;
@@ -626,7 +662,7 @@ export type ApplyVendorOrderTransitionOpts = {
 };
 
 const VENDOR_DASHBOARD_POS_BLOCK_MESSAGE =
-  "This order is managed by the POS. Updates should come from the kitchen system. If the POS is wrong, ask an admin to use manual recovery to take control.";
+  "This order is controlled by Deliverect/POS. Status updates must come from the POS.";
 
 /**
  * Apply a single state transition for a vendor order (shared by dev simulator and vendor dashboard).

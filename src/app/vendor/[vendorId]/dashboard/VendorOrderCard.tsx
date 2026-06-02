@@ -14,6 +14,11 @@ import {
 } from "@/lib/vendor-order-operating-mode";
 import { isVendorOrderManuallyRecovered } from "@/lib/vendor-order-effective-state";
 import { canVendorRejectVendorOrder } from "@/lib/cancel-eligibility";
+import type { VendorOrderStatusAuthority } from "@/domain/status-authority";
+import {
+  isDeliverectAuthoritativeVendorOrder,
+  VENDOR_DELIVERECT_CONTROLLED_NOTICE,
+} from "@/lib/deliverect-vendor-order-authority";
 
 type VendorOrderForCard = {
   id: string;
@@ -21,6 +26,10 @@ type VendorOrderForCard = {
   routingStatus: string;
   fulfillmentStatus: string;
   manuallyRecoveredAt?: string | null;
+  statusAuthority?: string | null;
+  lastExternalStatus?: string | null;
+  lastExternalStatusAt?: string | null;
+  deliverectChannelLinkId?: string | null;
   statusHistory?: Array<{ source?: string | null }>;
   totalCents: number;
   tipCents: number;
@@ -114,6 +123,7 @@ export function VendorOrderCard({
   onStatusSuccess,
   isDeliverectLive = false,
   deliverectRoutingDegraded = false,
+  vendorDeliverectChannelLinkId = null,
 }: {
   vendorId: string;
   vendorOrder: VendorOrderForCard;
@@ -138,26 +148,46 @@ export function VendorOrderCard({
   isDeliverectLive?: boolean;
   /** Live Deliverect VO stuck in pending/pending past the healthy wait — show manual confirm + degraded copy. */
   deliverectRoutingDegraded?: boolean;
+  vendorDeliverectChannelLinkId?: string | null;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const nextAction = getNextAction(
-    vendorOrder.routingStatus,
-    vendorOrder.fulfillmentStatus,
-    isDeliverectLive
-  );
-  const showManualConfirmFallback = deliverectRoutingDegraded === true;
-  const actionHint = getOperatingModeActionHint(
-    operatingMode,
-    vendorOrder,
-    isDeliverectLive,
-    deliverectRoutingDegraded
-  );
+  const authorityVo = {
+    routingStatus: vendorOrder.routingStatus,
+    fulfillmentStatus: vendorOrder.fulfillmentStatus,
+    manuallyRecoveredAt: vendorOrder.manuallyRecoveredAt,
+    statusAuthority: (vendorOrder.statusAuthority as VendorOrderStatusAuthority | null) ?? null,
+    lastStatusSource: null,
+    deliverectChannelLinkId:
+      vendorOrder.deliverectChannelLinkId ?? vendorDeliverectChannelLinkId,
+    vendor: { deliverectChannelLinkId: vendorDeliverectChannelLinkId },
+  };
+  const deliverectAuthoritative = isDeliverectAuthoritativeVendorOrder(authorityVo);
+
+  const nextAction = deliverectAuthoritative
+    ? null
+    : getNextAction(vendorOrder.routingStatus, vendorOrder.fulfillmentStatus, isDeliverectLive);
+  const showManualConfirmFallback =
+    deliverectRoutingDegraded === true &&
+    vendorOrder.routingStatus === "pending" &&
+    vendorOrder.fulfillmentStatus === "pending";
+  const actionHint = deliverectAuthoritative
+    ? null
+    : getOperatingModeActionHint(
+        operatingMode,
+        authorityVo,
+        isDeliverectLive,
+        deliverectRoutingDegraded
+      );
   const isTerminal = ["completed", "cancelled"].includes(vendorOrder.fulfillmentStatus);
   const recovered = isVendorOrderManuallyRecovered(vendorOrder, vendorOrder.statusHistory);
-  const canDeny = canVendorRejectVendorOrder(vendorOrder);
+  const canDeny = canVendorRejectVendorOrder({
+    ...authorityVo,
+    fulfillmentStatus: vendorOrder.fulfillmentStatus,
+    statusHistory: vendorOrder.statusHistory,
+  });
   const isCancelledOrFailed =
     vendorOrder.fulfillmentStatus === "cancelled" ||
     (vendorOrder.routingStatus === "failed" && !recovered);
@@ -316,13 +346,34 @@ export function VendorOrderCard({
         </p>
       </div>
 
-      {/* Status actions: mode-aware (primary vs fallback, with hint) */}
+      {deliverectAuthoritative && !isTerminal && !isCancelledOrFailed && !showManualConfirmFallback && (
+        <div className="mt-3 rounded-lg border border-oo-light-stone bg-oo-cream/50 px-3 py-2.5">
+          <p className="text-xs text-oo-stone-gray">{VENDOR_DELIVERECT_CONTROLLED_NOTICE}</p>
+          {(vendorOrder.lastExternalStatus || vendorOrder.lastExternalStatusAt) && (
+            <p className="mt-1.5 text-xs text-oo-charcoal">
+              {vendorOrder.lastExternalStatus && (
+                <span className="font-medium">POS status: {vendorOrder.lastExternalStatus}</span>
+              )}
+              {vendorOrder.lastExternalStatusAt && (
+                <span className="text-oo-stone-gray">
+                  {vendorOrder.lastExternalStatus ? " · " : ""}
+                  Updated{" "}
+                  {new Intl.DateTimeFormat("en-US", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  }).format(new Date(vendorOrder.lastExternalStatusAt))}
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Status actions: Open Order–authoritative orders only */}
       {(nextAction || canDeny || showManualConfirmFallback) && !isTerminal && (
         <div className="mt-3 border-t border-oo-light-stone/90 pt-3">
           {actionHint && (
-            <p className="mb-1.5 text-xs text-oo-stone-gray">
-              {actionHint}
-            </p>
+            <p className="mb-1.5 text-xs text-oo-stone-gray">{actionHint}</p>
           )}
           <div className="flex flex-wrap items-center gap-2">
             {nextAction && (
@@ -331,7 +382,7 @@ export function VendorOrderCard({
                 onClick={() => handleStatusChange(nextAction.targetState)}
                 disabled={loading}
                 className={
-                  isMennyuControlsPrimary(operatingMode)
+                  isMennyuControlsPrimary(operatingMode, authorityVo)
                     ? "rounded-lg border border-brand bg-brand px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-hover disabled:opacity-50"
                     : "rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm font-medium text-oo-charcoal shadow-sm hover:bg-oo-cream disabled:opacity-50"
                 }
