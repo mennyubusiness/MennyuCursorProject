@@ -72,4 +72,14 @@ describe("vendor-payout-transfer-failure", () => {
       false
     );
   });
+
+  it("blocks retry for cancelled_due_to_refund", () => {
+    expect(
+      isRetryablePayoutTransfer({
+        status: "cancelled_due_to_refund",
+        stripeTransferId: null,
+        destinationAccountId: "acct_1",
+      })
+    ).toBe(false);
+  });
 });

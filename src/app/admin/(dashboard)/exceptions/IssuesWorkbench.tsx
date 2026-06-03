@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminAttentionItem, AdminAttentionReason } from "@/lib/admin-attention";
+import { isVendorClawbackAttentionReason } from "@/lib/vendor-clawback-status";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import type { AdminResolvedIssueHistoryRow } from "@/services/issues.service";
 
@@ -17,6 +18,10 @@ const STATUS_OPTIONS: { value: AdminAttentionReason | "all"; label: string }[] =
   { value: "fulfillment_stuck", label: "Fulfillment stalled" },
   { value: "open_issue", label: "Tracked issue" },
   { value: "refund_failed", label: "Refund failed" },
+  { value: "refund_review_required", label: "Refund review required" },
+  { value: "vendor_clawback_failed", label: "Vendor clawback failed" },
+  { value: "vendor_clawback_pending", label: "Vendor clawback pending" },
+  { value: "vendor_clawback_missing", label: "Vendor clawback missing" },
   { value: "financial_resolution", label: "Financial resolution" },
   { value: "unknown_attention_needed", label: "Other" },
 ];
@@ -41,6 +46,14 @@ function issueTitle(reason: AdminAttentionReason): string {
       return "Tracked issue";
     case "refund_failed":
       return "Refund failed";
+    case "refund_review_required":
+      return "Refund review required";
+    case "vendor_clawback_failed":
+      return "Vendor clawback failed";
+    case "vendor_clawback_pending":
+      return "Vendor clawback pending";
+    case "vendor_clawback_missing":
+      return "Vendor clawback setup missing";
     case "financial_resolution":
       return "Financial resolution";
     default:
@@ -421,7 +434,47 @@ export function IssuesWorkbench({
                         {item.vendor?.name && (
                           <p className="text-xs text-oo-stone-gray">{item.vendor.name}</p>
                         )}
-                        {item.vendorOrderId && (
+                        {isVendorClawbackAttentionReason(item.reason) && (
+                          <dl className="mt-2 grid gap-1 text-xs text-oo-stone-gray sm:grid-cols-2">
+                            {item.paymentRefundStatus && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Customer refund</dt>
+                                <dd>{item.paymentRefundStatus.replace(/_/g, " ")}</dd>
+                              </>
+                            )}
+                            {item.clawbackAmountCents != null && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Clawback amount</dt>
+                                <dd className="tabular-nums">${(item.clawbackAmountCents / 100).toFixed(2)}</dd>
+                              </>
+                            )}
+                            {item.clawbackStatus && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Clawback status</dt>
+                                <dd className="font-mono">{item.clawbackStatus}</dd>
+                              </>
+                            )}
+                            {item.stripeTransferId && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Stripe transfer</dt>
+                                <dd className="break-all font-mono">{item.stripeTransferId}</dd>
+                              </>
+                            )}
+                            {item.stripeTransferReversalId && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Stripe reversal</dt>
+                                <dd className="break-all font-mono">{item.stripeTransferReversalId}</dd>
+                              </>
+                            )}
+                            {item.failureMessage && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Failure</dt>
+                                <dd>{oneLine(item.failureMessage, 120)}</dd>
+                              </>
+                            )}
+                          </dl>
+                        )}
+                        {item.vendorOrderId && !isVendorClawbackAttentionReason(item.reason) && (
                           <dl className="mt-2 grid gap-1 text-xs text-oo-stone-gray sm:grid-cols-2">
                             {item.paymentLabel && (
                               <>
@@ -491,11 +544,25 @@ export function IssuesWorkbench({
                       </div>
                       <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-oo-light-stone pt-3 sm:border-t-0 sm:pt-0">
                         <Link
-                          href={`/admin/orders/${item.orderId}`}
+                          href={
+                            isVendorClawbackAttentionReason(item.reason)
+                              ? `/admin/orders/${item.orderId}#payments-refunds`
+                              : `/admin/orders/${item.orderId}`
+                          }
                           className="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-hover"
                         >
-                          View order
+                          {isVendorClawbackAttentionReason(item.reason)
+                            ? "View clawback"
+                            : "View order"}
                         </Link>
+                        {isVendorClawbackAttentionReason(item.reason) && (
+                          <Link
+                            href="/admin/payout-transfers"
+                            className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm font-medium text-oo-charcoal hover:bg-oo-cream"
+                          >
+                            Retry reversal
+                          </Link>
+                        )}
                         {showRetry && item.vendorOrderId && (
                           <button
                             type="button"

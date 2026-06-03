@@ -9,6 +9,11 @@ import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 import { env } from "@/lib/env";
 import {
+  isCancelledDueToRefundTransfer,
+  isPartialRefundManualReviewTransfer,
+  isVendorTransferExecutionBlockedByRefund,
+} from "@/lib/vendor-payout-transfer-refund-eligibility";
+import {
   IDEMPOTENCY_MISMATCH_BLOCKED_REASON,
   IDEMPOTENCY_MISMATCH_DISPLAY,
   IDEMPOTENCY_MISMATCH_STATUS,
@@ -34,6 +39,8 @@ export const VENDOR_PAYOUT_TRANSFER_STATUS = {
   blocked: "blocked",
   blockedInsufficientBalance: INSUFFICIENT_BALANCE_STATUS,
   blockedIdempotencyMismatch: IDEMPOTENCY_MISMATCH_STATUS,
+  blockedPartialRefundReview: "blocked_partial_refund_review",
+  cancelledDueToRefund: "cancelled_due_to_refund",
   submitted: "submitted",
   paid: "paid",
   failed: "failed",
@@ -278,6 +285,16 @@ export async function executeVendorPayoutTransfer(
   if (!row) {
     return { outcome: "skipped", reason: "not_found" };
   }
+  if (isVendorTransferExecutionBlockedByRefund(row)) {
+    return {
+      outcome: "skipped",
+      reason: isCancelledDueToRefundTransfer(row)
+        ? "cancelled_due_to_refund"
+        : isPartialRefundManualReviewTransfer(row)
+          ? "blocked_partial_refund_review"
+          : "not_payable",
+    };
+  }
   if (row.status === VENDOR_PAYOUT_TRANSFER_STATUS.paid && row.stripeTransferId) {
     return { outcome: "skipped", reason: "already_paid" };
   }
@@ -373,6 +390,14 @@ export async function retryFailedVendorPayoutTransfer(
   if (!row) {
     return { outcome: "skipped", reason: "not_found" };
   }
+  if (isVendorTransferExecutionBlockedByRefund(row)) {
+    return {
+      outcome: "skipped",
+      reason: isCancelledDueToRefundTransfer(row)
+        ? "cancelled_due_to_refund"
+        : "blocked_partial_refund_review",
+    };
+  }
   if (row.status === VENDOR_PAYOUT_TRANSFER_STATUS.paid && row.stripeTransferId) {
     return { outcome: "skipped", reason: "already_paid" };
   }
@@ -436,6 +461,9 @@ export async function retryVendorPayoutTransferWithNewKey(
   const row = await prisma.vendorPayoutTransfer.findUnique({ where: { id: transferId } });
   if (!row) {
     return { outcome: "skipped", reason: "not_found" };
+  }
+  if (isVendorTransferExecutionBlockedByRefund(row)) {
+    return { outcome: "skipped", reason: "cancelled_or_blocked_by_refund" };
   }
   if (row.status === VENDOR_PAYOUT_TRANSFER_STATUS.paid && row.stripeTransferId) {
     return { outcome: "skipped", reason: "already_paid" };
@@ -621,6 +649,14 @@ export async function retryAllEligibleFailedVendorPayoutTransfers(params?: {
       },
       destinationAccountId: { not: BLOCKED_DESTINATION_SENTINEL },
       OR: [{ stripeTransferId: null }, { stripeTransferId: "" }],
+      NOT: {
+        status: {
+          in: [
+            VENDOR_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund,
+            VENDOR_PAYOUT_TRANSFER_STATUS.blockedPartialRefundReview,
+          ],
+        },
+      },
     },
     orderBy: { createdAt: "asc" },
   });

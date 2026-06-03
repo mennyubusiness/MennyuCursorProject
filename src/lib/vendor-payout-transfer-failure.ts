@@ -1,6 +1,11 @@
-/**
- * Normalize vendor payout transfer failure reasons for admin display.
- */
+import {
+  CANCELLED_DUE_TO_REFUND_DISPLAY,
+  CANCELLED_DUE_TO_REFUND_STATUS,
+  isCancelledDueToRefundTransfer,
+  isPartialRefundManualReviewTransfer,
+  isVendorTransferExecutionBlockedByRefund,
+  PARTIAL_REFUND_MANUAL_REVIEW_DISPLAY,
+} from "@/lib/vendor-payout-transfer-refund-eligibility";
 
 export const INSUFFICIENT_BALANCE_STATUS = "blocked_insufficient_balance" as const;
 export const INSUFFICIENT_BALANCE_BLOCKED_REASON = "insufficient_stripe_available_balance" as const;
@@ -46,9 +51,12 @@ export function canRetryWithNewIdempotencyKey(
     status: string;
     stripeTransferId?: string | null;
     destinationAccountId: string;
+    blockedReason?: string | null;
   },
   lastReconciliationOutcome?: string | null
 ): boolean {
+  if (isCancelledDueToRefundTransfer(row)) return false;
+  if (isPartialRefundManualReviewTransfer(row)) return false;
   if (!isIdempotencyMismatchTransfer(row)) return false;
   if (row.stripeTransferId?.trim()) return false;
   if (row.destinationAccountId === "blocked") return false;
@@ -85,6 +93,20 @@ export function displayPayoutTransferFailure(row: {
   blockedReason?: string | null;
   failureMessage?: string | null;
 }): { primary: string; detail: string | null; raw: string | null } {
+  if (isCancelledDueToRefundTransfer(row)) {
+    return {
+      primary: CANCELLED_DUE_TO_REFUND_DISPLAY,
+      detail: null,
+      raw: row.failureMessage?.trim() ? row.failureMessage : null,
+    };
+  }
+  if (isPartialRefundManualReviewTransfer(row)) {
+    return {
+      primary: PARTIAL_REFUND_MANUAL_REVIEW_DISPLAY,
+      detail: null,
+      raw: row.failureMessage?.trim() ? row.failureMessage : null,
+    };
+  }
   if (row.status === "blocked" && row.blockedReason) {
     return { primary: row.blockedReason, detail: null, raw: row.failureMessage ?? null };
   }
@@ -112,7 +134,9 @@ export function isRetryablePayoutTransfer(row: {
   status: string;
   stripeTransferId?: string | null;
   destinationAccountId: string;
+  blockedReason?: string | null;
 }): boolean {
+  if (isVendorTransferExecutionBlockedByRefund(row)) return false;
   if (row.stripeTransferId?.trim() && row.status === "paid") return false;
   if (row.stripeTransferId?.trim() && row.status !== "paid") return false;
   if (row.destinationAccountId === "blocked") return false;

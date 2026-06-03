@@ -34,6 +34,12 @@ import {
   ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE,
   VENDOR_PAID_VIA_CONNECT_LABEL,
 } from "@/lib/stripe-money-movement";
+import {
+  CANCELLED_DUE_TO_REFUND_STATUS,
+  isCancelledDueToRefundTransfer,
+  isPartialRefundManualReviewTransfer,
+  PARTIAL_REFUND_MANUAL_REVIEW_STATUS,
+} from "@/lib/vendor-payout-transfer-refund-eligibility";
 import { VendorTransferRowDetails } from "@/components/admin/VendorTransferRowDetails";
 import type { StripePlatformBalanceSnapshot } from "@/services/stripe-balance.service";
 
@@ -66,6 +72,8 @@ function shortenStripeId(id: string | null | undefined): string {
 }
 
 function statusFilterBucket(status: string): "pending" | "paid" | "failed" | "blocked" {
+  if (status === CANCELLED_DUE_TO_REFUND_STATUS) return "blocked";
+  if (status === PARTIAL_REFUND_MANUAL_REVIEW_STATUS) return "blocked";
   if (status === INSUFFICIENT_BALANCE_STATUS) return "blocked";
   if (status === IDEMPOTENCY_MISMATCH_STATUS) return "blocked";
   if (status === "blocked") return "blocked";
@@ -80,6 +88,12 @@ function statusLabel(status: string): string {
 }
 
 function statusBadgeClass(status: string): string {
+  if (status === CANCELLED_DUE_TO_REFUND_STATUS) {
+    return "bg-slate-100 text-slate-800 ring-slate-200";
+  }
+  if (status === PARTIAL_REFUND_MANUAL_REVIEW_STATUS) {
+    return "bg-violet-100 text-violet-950 ring-violet-200";
+  }
   if (status === INSUFFICIENT_BALANCE_STATUS || status === IDEMPOTENCY_MISMATCH_STATUS) {
     return "bg-orange-100 text-orange-950 ring-orange-200";
   }
@@ -548,7 +562,7 @@ export function PayoutTransfersDashboard({
             Unable to fetch Stripe balance: {balanceError}
           </p>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Stripe available balance</p>
             <p className="mt-1 text-lg font-semibold text-emerald-900">
@@ -583,6 +597,12 @@ export function PayoutTransfersDashboard({
             <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Manual review</p>
             <p className="mt-1 text-lg font-semibold text-violet-900">
               {formatMoney(liabilityTotals.idempotencyMismatchCents, "usd")}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Cancelled due to refund</p>
+            <p className="mt-1 text-lg font-semibold text-slate-800">
+              {formatMoney(liabilityTotals.cancelledDueToRefundCents, "usd")}
             </p>
           </div>
           <div>
@@ -756,16 +776,22 @@ export function PayoutTransfersDashboard({
                           const bucket = statusFilterBucket(t.status);
                           const insufficient = isInsufficientBalanceTransfer(t);
                           const idempotencyMismatch = isIdempotencyMismatchTransfer(t);
+                          const cancelledDueToRefund = isCancelledDueToRefundTransfer(t);
+                          const partialRefundReview = isPartialRefundManualReviewTransfer(t);
                           const retryable = isRetryablePayoutTransfer(t);
                           const reconcilable = isReconcilablePayoutTransfer(t);
                           const newKeyRetry = canRetryWithNewIdempotencyKey(t, reconcileOutcomes[t.id]);
-                          const rowTint = insufficient || idempotencyMismatch
-                            ? "bg-orange-50/50"
-                            : bucket === "failed"
-                              ? "bg-red-50/50"
-                              : bucket === "blocked"
-                                ? "bg-amber-50/40"
-                                : "";
+                          const rowTint = cancelledDueToRefund
+                            ? "bg-slate-50/70"
+                            : partialRefundReview
+                              ? "bg-violet-50/50"
+                              : insufficient || idempotencyMismatch
+                                ? "bg-orange-50/50"
+                                : bucket === "failed"
+                                  ? "bg-red-50/50"
+                                  : bucket === "blocked"
+                                    ? "bg-amber-50/40"
+                                    : "";
                           return (
                             <>
                             <tr key={t.id} className={rowTint}>
@@ -896,8 +922,11 @@ export function PayoutTransfersDashboard({
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-oo-charcoal">Transfer reversals</h2>
-        <p className="text-sm text-oo-stone-gray">Stripe transfer reversals after platform refunds.</p>
+        <h2 className="text-lg font-semibold text-oo-charcoal">Vendor clawbacks / transfer reversals</h2>
+        <p className="text-sm text-oo-stone-gray">
+          These recover funds from vendor connected accounts after a customer refund when the vendor had
+          already been paid via Connect. Customer refund success does not imply vendor clawback success.
+        </p>
         {reversalGroups.length === 0 ? (
           <p className="rounded-lg border border-dashed border-oo-light-stone bg-oo-warm-white p-8 text-center text-oo-stone-gray">
             No reversals match filters.
@@ -937,7 +966,7 @@ export function PayoutTransfersDashboard({
                         {rows.map((r) => {
                           const failed = r.status === "failed";
                           return (
-                            <tr key={r.id} className={failed ? "bg-red-50/50" : ""}>
+                            <tr key={r.id} className={failed ? "bg-red-50/70" : ""}>
                               <td className="px-3 py-2 font-medium text-oo-charcoal">{r.vendor.name}</td>
                               <td className="px-3 py-2">
                                 <Link
@@ -952,7 +981,13 @@ export function PayoutTransfersDashboard({
                                 <span
                                   className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${reversalStatusBadgeClass(r.status)}`}
                                 >
-                                  {r.status}
+                                  {r.status === "failed"
+                                    ? "clawback failed"
+                                    : r.status === "reversed"
+                                      ? "clawback recovered"
+                                      : r.status === "pending" || r.status === "submitted"
+                                        ? "clawback pending"
+                                        : r.status}
                                 </span>
                               </td>
                               <td className="max-w-[120px] truncate px-3 py-2 font-mono text-xs" title={r.stripeTransferReversalId ?? ""}>
@@ -966,14 +1001,22 @@ export function PayoutTransfersDashboard({
                               </td>
                               <td className="px-3 py-2">
                                 {failed ? (
-                                  <button
-                                    type="button"
-                                    disabled={retryReversalId !== null}
-                                    onClick={() => void retryReversal(r.id)}
-                                    className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
-                                  >
-                                    {retryReversalId === r.id ? "Retrying…" : "Retry reversal"}
-                                  </button>
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      type="button"
+                                      disabled={retryReversalId !== null}
+                                      onClick={() => void retryReversal(r.id)}
+                                      className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
+                                    >
+                                      {retryReversalId === r.id ? "Retrying…" : "Retry reversal"}
+                                    </button>
+                                    <Link
+                                      href={`/admin/orders/${r.orderId}#payments-refunds`}
+                                      className="text-xs font-semibold text-red-900 underline"
+                                    >
+                                      View order / Needs Attention
+                                    </Link>
+                                  </div>
                                 ) : (
                                   <span className="text-xs text-oo-stone-gray">—</span>
                                 )}

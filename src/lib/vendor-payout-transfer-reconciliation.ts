@@ -1,4 +1,8 @@
 import { INSUFFICIENT_BALANCE_STATUS, IDEMPOTENCY_MISMATCH_STATUS } from "@/lib/vendor-payout-transfer-failure";
+import {
+  isCancelledDueToRefundTransfer,
+  isPartialRefundManualReviewTransfer,
+} from "@/lib/vendor-payout-transfer-refund-eligibility";
 
 export const BLOCKED_DESTINATION_SENTINEL = "blocked";
 
@@ -40,7 +44,10 @@ export function isReconcilablePayoutTransfer(row: {
   status: string;
   destinationAccountId: string;
   stripeTransferId?: string | null;
+  blockedReason?: string | null;
 }): boolean {
+  if (isCancelledDueToRefundTransfer(row)) return false;
+  if (isPartialRefundManualReviewTransfer(row)) return false;
   if (row.destinationAccountId === BLOCKED_DESTINATION_SENTINEL) return false;
   if (row.status === "blocked") return false;
   if (row.status === "paid" && row.stripeTransferId?.trim()) return false;

@@ -24,6 +24,11 @@ import {
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
 import { ageMinutes as ageMinutesUtil } from "@/lib/date-utils";
 import {
+  isReversalPendingAttentionStale,
+  VENDOR_CLAWBACK_PENDING_ATTENTION_MINUTES,
+} from "@/lib/vendor-clawback-status";
+import { VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS } from "@/services/vendor-payout-transfer-reversal.service";
+import {
   canManualRecoverVendorOrder,
   canRetryRouting,
   formatOrderPaymentLabel,
@@ -45,6 +50,9 @@ export type AdminAttentionReason =
   | "customer_reported_issue"
   | "refund_failed"
   | "refund_review_required"
+  | "vendor_clawback_failed"
+  | "vendor_clawback_pending"
+  | "vendor_clawback_missing"
   | "manual_recovery_required"
   | "financial_resolution"
   | "unknown_attention_needed";
@@ -97,6 +105,17 @@ export interface AdminAttentionItem {
   refundAttemptId?: string | null;
   retryMayBePossible?: boolean;
 
+  /** Vendor clawback / transfer reversal queue metadata. */
+  clawbackStatus?: string;
+  clawbackAmountCents?: number;
+  clawbackRecoveredCents?: number;
+  clawbackPendingCents?: number;
+  clawbackFailedCents?: number;
+  vendorPayoutTransferReversalId?: string | null;
+  stripeTransferId?: string | null;
+  stripeTransferReversalId?: string | null;
+  paymentRefundStatus?: string | null;
+
   order?: {
     id: string;
     customerPhone: string | null;
@@ -141,6 +160,7 @@ const TAKE_VO = 200;
 const TAKE_OPEN_ISSUE_ORDERS = 500;
 const TAKE_REFUND_FAILED = 100;
 const TAKE_ORDER_REFUND_ATTENTION = 100;
+const TAKE_VENDOR_CLAWBACK_ATTENTION = 100;
 
 function paymentsRefundsHref(orderId: string): string {
   return `/admin/orders/${orderId}#payments-refunds`;
@@ -236,6 +256,9 @@ function reasonToBucket(reason: AdminAttentionReason): AdminAttentionBucket {
       return "recoverable";
     case "refund_failed":
     case "refund_review_required":
+    case "vendor_clawback_failed":
+    case "vendor_clawback_pending":
+    case "vendor_clawback_missing":
     case "financial_resolution":
       return "financial_resolution";
     default:
@@ -268,6 +291,9 @@ function reasonToRecommendedAction(
       return "resolve_issue";
     case "refund_failed":
     case "refund_review_required":
+    case "vendor_clawback_failed":
+    case "vendor_clawback_pending":
+    case "vendor_clawback_missing":
       return "view_order";
     case "financial_resolution":
       return "view_order";
@@ -357,6 +383,14 @@ function reasonToLabel(
         : "Refund failed — complete in Payments & Refunds";
     case "refund_review_required":
       return "Customer refund awaiting admin review — Payments & Refunds";
+    case "vendor_clawback_failed":
+      return vo && "failureMessage" in vo && vo.failureMessage
+        ? `Vendor clawback failed: ${vo.failureMessage.slice(0, 80)}`
+        : "Vendor clawback failed — retry transfer reversal";
+    case "vendor_clawback_pending":
+      return `Vendor clawback pending for ${VENDOR_CLAWBACK_PENDING_ATTENTION_MINUTES}+ min`;
+    case "vendor_clawback_missing":
+      return "Vendor clawback setup missing after customer refund";
     case "manual_recovery_required":
       return "Manual recovery required";
     case "financial_resolution":
@@ -767,6 +801,205 @@ async function fetchFailedRefundAttemptAttentionItems(now: Date): Promise<AdminA
     });
 }
 
+type ClawbackReversalAttentionRow = Awaited<
+  ReturnType<
+    typeof prisma.vendorPayoutTransferReversal.findMany<{
+      include: {
+        order: {
+          select: {
+            id: true;
+            customerPhone: true;
+            paymentRefundStatus: true;
+            pod: { select: { id: true; name: true } };
+          };
+        };
+        vendor: { select: { name: true } };
+        vendorPayoutTransfer: { select: { stripeTransferId: true } };
+      };
+    }>
+  >
+>[number];
+
+function mapClawbackReversalAttentionItem(
+  row: ClawbackReversalAttentionRow,
+  now: Date,
+  reason: Extract<
+    AdminAttentionReason,
+    "vendor_clawback_failed" | "vendor_clawback_pending"
+  >
+): AdminAttentionItem {
+  const anchor = row.failedAt ?? row.submittedAt ?? row.createdAt;
+  const ageMinutes = ageMinutesUtil(anchor, now.getTime());
+  return {
+    id: `vendor_clawback:${reason}:${row.id}`,
+    scope: "vendor_order",
+    reason,
+    bucket: reasonToBucket(reason),
+    severity: reason === "vendor_clawback_failed" ? (ageMinutes > 60 ? "critical" : "high") : "medium",
+    ageMinutes,
+    recommendedAction: reasonToRecommendedAction(reason),
+    reasonLabel: reasonToLabel(reason, { failureMessage: row.failureMessage }),
+    currentStatus: `Reversal ${row.status}`,
+    orderId: row.orderId,
+    vendorOrderId: row.vendorOrderId,
+    primaryEntityHref: paymentsRefundsHref(row.orderId),
+    order: row.order
+      ? {
+          id: row.order.id,
+          customerPhone: row.order.customerPhone,
+          pod: row.order.pod ?? undefined,
+        }
+      : undefined,
+    vendor: row.vendor ? { name: row.vendor.name } : undefined,
+    paymentRefundStatus: row.order?.paymentRefundStatus ?? null,
+    clawbackStatus: reason === "vendor_clawback_failed" ? "failed" : "pending",
+    clawbackAmountCents: row.amountCents,
+    clawbackPendingCents: reason === "vendor_clawback_pending" ? row.amountCents : 0,
+    clawbackFailedCents: reason === "vendor_clawback_failed" ? row.amountCents : 0,
+    vendorPayoutTransferReversalId: row.id,
+    stripeTransferId: row.vendorPayoutTransfer.stripeTransferId,
+    stripeTransferReversalId: row.stripeTransferReversalId,
+    failureMessage: row.failureMessage,
+    refundAttemptId: row.refundAttemptId,
+  };
+}
+
+async function fetchFailedVendorClawbackAttentionItems(now: Date): Promise<AdminAttentionItem[]> {
+  const failed = await prisma.vendorPayoutTransferReversal.findMany({
+    where: { status: VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.failed },
+    include: {
+      order: {
+        select: {
+          id: true,
+          customerPhone: true,
+          paymentRefundStatus: true,
+          pod: { select: { id: true, name: true } },
+        },
+      },
+      vendor: { select: { name: true } },
+      vendorPayoutTransfer: { select: { stripeTransferId: true } },
+    },
+    orderBy: { failedAt: "desc" },
+    take: TAKE_VENDOR_CLAWBACK_ATTENTION,
+  });
+
+  return failed.map((row) => mapClawbackReversalAttentionItem(row, now, "vendor_clawback_failed"));
+}
+
+async function fetchStalePendingVendorClawbackAttentionItems(now: Date): Promise<AdminAttentionItem[]> {
+  const staleBefore = new Date(
+    now.getTime() - VENDOR_CLAWBACK_PENDING_ATTENTION_MINUTES * 60 * 1000
+  );
+  const pending = await prisma.vendorPayoutTransferReversal.findMany({
+    where: {
+      status: {
+        in: [
+          VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.pending,
+          VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.submitted,
+        ],
+      },
+      createdAt: { lt: staleBefore },
+    },
+    include: {
+      order: {
+        select: {
+          id: true,
+          customerPhone: true,
+          paymentRefundStatus: true,
+          pod: { select: { id: true, name: true } },
+        },
+      },
+      vendor: { select: { name: true } },
+      vendorPayoutTransfer: { select: { stripeTransferId: true } },
+    },
+    orderBy: { createdAt: "asc" },
+    take: TAKE_VENDOR_CLAWBACK_ATTENTION,
+  });
+
+  return pending
+    .filter((row) =>
+      isReversalPendingAttentionStale(
+        {
+          status: row.status,
+          createdAt: row.createdAt,
+          submittedAt: row.submittedAt,
+        },
+        now.getTime()
+      )
+    )
+    .map((row) => mapClawbackReversalAttentionItem(row, now, "vendor_clawback_pending"));
+}
+
+async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<AdminAttentionItem[]> {
+  const candidates = await prisma.vendorPayoutTransfer.findMany({
+    where: {
+      status: "paid",
+      stripeTransferId: { not: null },
+      vendorOrder: { totalRefundedCents: { gt: 0 } },
+    },
+    include: {
+      vendorOrder: {
+        select: {
+          id: true,
+          orderId: true,
+          totalCents: true,
+          totalRefundedCents: true,
+          vendor: { select: { name: true } },
+          order: {
+            select: {
+              id: true,
+              customerPhone: true,
+              paymentRefundStatus: true,
+              pod: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
+      reversals: { select: { id: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: TAKE_VENDOR_CLAWBACK_ATTENTION,
+  });
+
+  const items: AdminAttentionItem[] = [];
+  for (const vpt of candidates) {
+    const vo = vpt.vendorOrder;
+    if (!vo) continue;
+    if (vpt.reversals.length > 0) continue;
+    if (vo.totalRefundedCents < vo.totalCents) continue;
+
+    const ageMinutes = ageMinutesUtil(vpt.updatedAt, now.getTime());
+    items.push({
+      id: `vendor_clawback:missing:${vpt.id}`,
+      scope: "vendor_order",
+      reason: "vendor_clawback_missing",
+      bucket: reasonToBucket("vendor_clawback_missing"),
+      severity: ageMinutes > 120 ? "high" : "medium",
+      ageMinutes,
+      recommendedAction: reasonToRecommendedAction("vendor_clawback_missing"),
+      reasonLabel: reasonToLabel("vendor_clawback_missing"),
+      currentStatus: "Paid vendor transfer · no reversal row",
+      orderId: vo.orderId,
+      vendorOrderId: vo.id,
+      primaryEntityHref: paymentsRefundsHref(vo.orderId),
+      order: vo.order
+        ? {
+            id: vo.order.id,
+            customerPhone: vo.order.customerPhone,
+            pod: vo.order.pod ?? undefined,
+          }
+        : undefined,
+      vendor: vo.vendor ? { name: vo.vendor.name } : undefined,
+      paymentRefundStatus: vo.order?.paymentRefundStatus ?? null,
+      clawbackStatus: "manual_review",
+      clawbackAmountCents: vpt.amountCents,
+      stripeTransferId: vpt.stripeTransferId,
+      failureMessage: null,
+    });
+  }
+  return items;
+}
+
 /**
  * Returns all attention items: VO-level (failed, stuck routing, stuck fulfillment),
  * order-level (open issues only for orders that have no VO-level item), and
@@ -775,10 +1008,14 @@ async function fetchFailedRefundAttemptAttentionItems(now: Date): Promise<AdminA
  */
 export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
   const now = new Date();
-  const [voItems, refundAttemptFailedItems, customerIssueItems] = await Promise.all([
+  const [voItems, refundAttemptFailedItems, customerIssueItems, clawbackFailedItems, clawbackPendingItems, clawbackMissingItems] =
+    await Promise.all([
     fetchVendorOrderAttentionItems(now),
     fetchFailedRefundAttemptAttentionItems(now),
     fetchCustomerReportedIssueAttentionItems(now),
+    fetchFailedVendorClawbackAttentionItems(now),
+    fetchStalePendingVendorClawbackAttentionItems(now),
+    fetchMissingVendorClawbackAttentionItems(now),
   ]);
   const linkedAttemptIds = new Set(
     refundAttemptFailedItems
@@ -848,7 +1085,15 @@ export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
     });
   }
 
-  const all = [...voItems, ...orderLevelItems, ...refundFailedItems, ...customerIssueItems];
+  const all = [
+    ...voItems,
+    ...orderLevelItems,
+    ...refundFailedItems,
+    ...customerIssueItems,
+    ...clawbackFailedItems,
+    ...clawbackPendingItems,
+    ...clawbackMissingItems,
+  ];
   /** Newest / most recent queue entries first (smaller age = order created more recently). */
   return all.sort((a, b) => a.ageMinutes - b.ageMinutes);
 }
@@ -873,6 +1118,7 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
     refundFailed,
     orderRefundAttention,
     customerIssueAttention,
+    clawbackAttention,
   ] = await Promise.all([
     prisma.vendorOrder.findMany({
       where: {
@@ -940,6 +1186,26 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
       select: { orderId: true },
       take: TAKE_ORDER_REFUND_ATTENTION,
     }),
+    prisma.vendorPayoutTransferReversal.findMany({
+      where: {
+        OR: [
+          { status: VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.failed },
+          {
+            status: {
+              in: [
+                VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.pending,
+                VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.submitted,
+              ],
+            },
+            createdAt: {
+              lt: new Date(now.getTime() - VENDOR_CLAWBACK_PENDING_ATTENTION_MINUTES * 60 * 1000),
+            },
+          },
+        ],
+      },
+      select: { orderId: true },
+      take: TAKE_VENDOR_CLAWBACK_ATTENTION,
+    }),
   ]);
 
   const voOrderIds = [...failed, ...stuckPending, ...deliverectReconciliationOverdue, ...stuckSentConfirmed].map(
@@ -949,6 +1215,7 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
     ...refundFailed.map((r) => r.orderId),
     ...orderRefundAttention.map((r) => r.orderId),
     ...customerIssueAttention.map((r) => r.orderId),
+    ...clawbackAttention.map((r) => r.orderId),
   ];
   const orderIds = [...new Set([...voOrderIds, ...openIssueOrderIds, ...refundOrderIds])];
   return orderIds;

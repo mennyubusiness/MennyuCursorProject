@@ -175,6 +175,27 @@ describe("vendor payout transfer balance checks", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("skips cancelled_due_to_refund without calling Stripe", async () => {
+    mockFindUnique.mockResolvedValue({
+      id: "vpt_cancelled",
+      status: VENDOR_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund,
+      amountCents: 500,
+      currency: "usd",
+      destinationAccountId: "acct_1",
+      stripeTransferId: null,
+      blockedReason: "customer_refund_extinguished_obligation",
+      vendorOrder: { orderId: "ord_1" },
+    });
+
+    const result = await executeVendorPayoutTransfer("vpt_cancelled");
+    expect(result.outcome).toBe("skipped");
+    if (result.outcome === "skipped") {
+      expect(result.reason).toBe("cancelled_due_to_refund");
+    }
+    expect(mockTransferCreate).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("does not call Stripe or mutate row when single retry balance fetch fails", async () => {
     mockBalance.mockResolvedValue({ ok: false, error: "timeout" });
     mockFindUnique.mockResolvedValue({

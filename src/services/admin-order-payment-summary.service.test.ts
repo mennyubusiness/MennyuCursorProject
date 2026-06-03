@@ -42,4 +42,26 @@ describe("admin-order-payment-summary.service", () => {
     expect(m.message).toContain("Stripe transfer ID is missing");
     expect(m.tone).toBe("danger");
   });
+
+  it("vendorTransferUiMessage for cancelled due to refund", () => {
+    const m = vendorTransferUiMessage({
+      transferStatus: "cancelled_due_to_refund",
+      stripeTransferId: null,
+    });
+    expect(m.message).toContain("Customer refund extinguished");
+    expect(m.tone).toBe("neutral");
+  });
+
+  it("computeVendorClawbackSummary pending maps to vendor clawback pending label", async () => {
+    const { computeVendorClawbackSummary } = await import("@/lib/vendor-clawback-status");
+    const s = computeVendorClawbackSummary({
+      transferStatus: "paid",
+      stripeTransferId: "tr_1",
+      transferAmountCents: 1000,
+      vendorOrderTotalCents: 1000,
+      vendorOrderRefundedCents: 1000,
+      reversals: [{ status: "pending", amountCents: 1000 }],
+    });
+    expect(s.adminLabel).toBe("Vendor clawback pending");
+  });
 });

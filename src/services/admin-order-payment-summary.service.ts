@@ -13,6 +13,16 @@ import {
 import { VENDOR_PAYOUT_TRANSFER_STATUS } from "@/services/vendor-payout-transfer.service";
 import { getVendorTransferReversalAmountCents } from "@/services/vendor-payout-transfer-reversal.service";
 import {
+  CANCELLED_DUE_TO_REFUND_DISPLAY,
+  CANCELLED_DUE_TO_REFUND_STATUS,
+  PARTIAL_REFUND_MANUAL_REVIEW_DISPLAY,
+  PARTIAL_REFUND_MANUAL_REVIEW_STATUS,
+} from "@/lib/vendor-payout-transfer-refund-eligibility";
+import {
+  computeVendorClawbackSummary,
+  type VendorClawbackSummary,
+} from "@/lib/vendor-clawback-status";
+import {
   openOrderRetainedFromPayment,
   openOrderRetainedFromVendorSlice,
   stripeNetToPlatformCents,
@@ -91,6 +101,20 @@ export function vendorTransferUiMessage(input: {
   }
 
   const status = input.transferStatus ?? "missing";
+  if (status === CANCELLED_DUE_TO_REFUND_STATUS) {
+    return {
+      status,
+      message: CANCELLED_DUE_TO_REFUND_DISPLAY,
+      tone: "neutral",
+    };
+  }
+  if (status === PARTIAL_REFUND_MANUAL_REVIEW_STATUS) {
+    return {
+      status,
+      message: PARTIAL_REFUND_MANUAL_REVIEW_DISPLAY,
+      tone: "warning",
+    };
+  }
   if (status === "paid") {
     if (!input.stripeTransferId?.trim()) {
       return {
@@ -171,6 +195,7 @@ export type AdminOrderPaymentSummaryVendorOrder = {
   vendorStillOwedCents: number;
   openOrderRetainedCents: number | null;
   transferMessage: VendorTransferUiMessage;
+  clawback: VendorClawbackSummary;
   fullRefundMayRequireReversal: boolean;
   partialRefundWouldRequirePlatformAbsorption: boolean;
   reversals: Array<{
@@ -179,7 +204,9 @@ export type AdminOrderPaymentSummaryVendorOrder = {
     amountCents: number;
     stripeTransferReversalId: string | null;
     refundAttemptId: string;
+    failureMessage: string | null;
     createdAt: string;
+    submittedAt: string | null;
   }>;
 };
 
@@ -347,7 +374,9 @@ export async function fetchAdminOrderPaymentSummary(
             amountCents: true,
             stripeTransferReversalId: true,
             refundAttemptId: true,
+            failureMessage: true,
             createdAt: true,
+            submittedAt: true,
           },
         },
       },
@@ -368,7 +397,9 @@ export async function fetchAdminOrderPaymentSummary(
         amountCents: r.amountCents,
         stripeTransferReversalId: r.stripeTransferReversalId,
         refundAttemptId: r.refundAttemptId,
+        failureMessage: r.failureMessage,
         createdAt: r.createdAt.toISOString(),
+        submittedAt: r.submittedAt?.toISOString() ?? null,
       });
       reversalsByVo.set(r.vendorOrderId, list);
     }
@@ -398,6 +429,14 @@ export async function fetchAdminOrderPaymentSummary(
           vpt != null &&
           getVendorTransferReversalAmountCents(vpt) > 0;
         const netTransfer = alloc?.netVendorTransferCents ?? vpt?.amountCents ?? 0;
+        const clawback = computeVendorClawbackSummary({
+          transferStatus,
+          stripeTransferId: vpt?.stripeTransferId ?? null,
+          transferAmountCents: vpt?.amountCents ?? null,
+          vendorOrderTotalCents: vo.totalCents,
+          vendorOrderRefundedCents: vo.totalRefundedCents,
+          reversals: voReversals,
+        });
 
         return {
           id: vo.id,
@@ -433,6 +472,7 @@ export async function fetchAdminOrderPaymentSummary(
           }),
           openOrderRetainedCents: openOrderRetainedFromVendorSlice(vo.serviceFeeCents),
           transferMessage,
+          clawback,
           fullRefundMayRequireReversal:
             transferStatus === VENDOR_PAYOUT_TRANSFER_STATUS.paid && reversalPossible,
           partialRefundWouldRequirePlatformAbsorption: paidOrSubmitted,

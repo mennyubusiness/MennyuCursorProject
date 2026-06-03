@@ -1,4 +1,13 @@
-import { INSUFFICIENT_BALANCE_STATUS, IDEMPOTENCY_MISMATCH_STATUS } from "@/lib/vendor-payout-transfer-failure";
+import {
+  IDEMPOTENCY_MISMATCH_STATUS,
+  INSUFFICIENT_BALANCE_STATUS,
+} from "@/lib/vendor-payout-transfer-failure";
+import {
+  CANCELLED_DUE_TO_REFUND_STATUS,
+  isCancelledDueToRefundTransfer,
+  isPartialRefundManualReviewTransfer,
+  PARTIAL_REFUND_MANUAL_REVIEW_STATUS,
+} from "@/lib/vendor-payout-transfer-refund-eligibility";
 
 /** Admin copy — platform bank payout ≠ vendor Connect transfer. */
 export const STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT =
@@ -27,6 +36,12 @@ export const VENDOR_PAID_VIA_CONNECT_LABEL = "vendor paid via Connect";
 /** Map internal VendorPayoutTransfer.status to admin-visible label. */
 export function adminVendorConnectTransferStatusLabel(status: string): string {
   if (status === "paid") return VENDOR_PAID_VIA_CONNECT_LABEL;
+  if (status === CANCELLED_DUE_TO_REFUND_STATUS) {
+    return "Cancelled: customer refunded";
+  }
+  if (status === PARTIAL_REFUND_MANUAL_REVIEW_STATUS) {
+    return "Manual review: partial refund";
+  }
   if (status === INSUFFICIENT_BALANCE_STATUS) {
     return "Vendor transfer blocked: insufficient Stripe available balance";
   }
@@ -67,6 +82,12 @@ export function vendorStillOwedCents(input: {
   stripeTransferId?: string | null;
   vendorConnectTransferOwedCents: number;
 }): number {
+  if (isCancelledDueToRefundTransfer({ status: input.transferStatus })) {
+    return 0;
+  }
+  if (isPartialRefundManualReviewTransfer({ status: input.transferStatus })) {
+    return 0;
+  }
   if (isVendorConnectTransferPaid(input.transferStatus, input.stripeTransferId)) {
     return 0;
   }
@@ -115,12 +136,15 @@ export type VendorLiabilityTotals = {
   readyToTransferCents: number;
   blockedInsufficientBalanceCents: number;
   idempotencyMismatchCents: number;
+  cancelledDueToRefundCents: number;
   blockedConnectCount: number;
 };
 
 /** Short badge label for vendor transfer table rows. */
 export function vendorTransferStatusBadgeLabel(status: string): string {
   if (status === "paid") return "vendor paid via Connect";
+  if (status === CANCELLED_DUE_TO_REFUND_STATUS) return "cancelled: customer refunded";
+  if (status === PARTIAL_REFUND_MANUAL_REVIEW_STATUS) return "manual review: partial refund";
   if (status === "pending" || status === "submitted") return "ready to send";
   if (status === INSUFFICIENT_BALANCE_STATUS) return "blocked: insufficient balance";
   if (status === IDEMPOTENCY_MISMATCH_STATUS) return "manual review";
@@ -151,9 +175,17 @@ export function computeVendorLiabilityTotals(
   let readyToTransferCents = 0;
   let blockedInsufficientBalanceCents = 0;
   let idempotencyMismatchCents = 0;
+  let cancelledDueToRefundCents = 0;
   let blockedConnectCount = 0;
 
   for (const t of transfers) {
+    if (isCancelledDueToRefundTransfer({ status: t.status })) {
+      cancelledDueToRefundCents += t.amountCents;
+      continue;
+    }
+    if (isPartialRefundManualReviewTransfer({ status: t.status })) {
+      continue;
+    }
     if (isVendorConnectTransferPaid(t.status, t.stripeTransferId)) {
       vendorPaidCents += t.amountCents;
       continue;
@@ -189,6 +221,7 @@ export function computeVendorLiabilityTotals(
     readyToTransferCents,
     blockedInsufficientBalanceCents,
     idempotencyMismatchCents,
+    cancelledDueToRefundCents,
     blockedConnectCount,
   };
 }

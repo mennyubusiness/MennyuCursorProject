@@ -76,6 +76,22 @@ describe("stripe-money-movement", () => {
     expect(totals.blockedInsufficientBalanceCents).toBe(300);
     expect(totals.idempotencyMismatchCents).toBe(100);
   });
+
+  it("excludes cancelled_due_to_refund from vendor owed", () => {
+    const totals = computeVendorLiabilityTotals([
+      { status: "cancelled_due_to_refund", amountCents: 900, destinationAccountId: "acct_1" },
+      { status: "pending", amountCents: 100, destinationAccountId: "acct_1" },
+    ]);
+    expect(totals.cancelledDueToRefundCents).toBe(900);
+    expect(totals.vendorOwedCents).toBe(100);
+    expect(
+      vendorStillOwedCents({
+        transferStatus: "cancelled_due_to_refund",
+        stripeTransferId: null,
+        vendorConnectTransferOwedCents: 900,
+      })
+    ).toBe(0);
+  });
 });
 
 describe("reconciliation messaging distinguishes platform payout from vendor transfer", () => {

@@ -63,4 +63,23 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).not.toMatch(/Retry payout/);
     expect(dashboardSrc).not.toMatch(/Run payout batch/);
   });
+
+  it("shows cancelled due to refund badge and hides retry for cancelled rows", () => {
+    const dashboardSrc = readFileSync(
+      join(root, "src/app/admin/(dashboard)/payout-transfers/PayoutTransfersDashboard.tsx"),
+      "utf8"
+    );
+    expect(dashboardSrc).toMatch(/Cancelled due to refund/);
+    expect(dashboardSrc).toMatch(/isCancelledDueToRefundTransfer/);
+    expect(dashboardSrc).toMatch(/vendorTransferStatusBadgeLabel/);
+  });
+
+  it("uses vendor clawback language on reversal section", () => {
+    const dashboardSrc = readFileSync(
+      join(root, "src/app/admin/(dashboard)/payout-transfers/PayoutTransfersDashboard.tsx"),
+      "utf8"
+    );
+    expect(dashboardSrc).toMatch(/Vendor clawbacks \/ transfer reversals/);
+    expect(dashboardSrc).toMatch(/clawback failed/);
+  });
 });

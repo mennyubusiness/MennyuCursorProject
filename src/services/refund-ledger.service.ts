@@ -19,6 +19,7 @@ import {
   ORDER_REFUND_SUCCEEDED_STATUS,
 } from "@/domain/order-refund";
 import type { PaymentRefundStatusLabel } from "@/domain/order-refund";
+import { syncVendorTransferEligibilityAfterRefundSuccess } from "@/services/vendor-payout-transfer-refund-eligibility.service";
 
 export type OrderRefundSummary = {
   orderId: string;
@@ -407,12 +408,20 @@ export async function markRefundSucceeded(args: {
   stripeRawJson?: Prisma.InputJsonValue;
   completedAt?: Date;
 }): Promise<void> {
+  const refundRow = await prisma.orderRefund.findUnique({
+    where: { id: args.orderRefundId },
+    select: {
+      orderId: true,
+      vendorOrderId: true,
+      refundAttemptId: true,
+      status: true,
+    },
+  });
+  if (!refundRow) throw new Error("ORDER_REFUND_NOT_FOUND");
+
+  const wasSucceeded = refundRow.status === ORDER_REFUND_SUCCEEDED_STATUS;
+
   await prisma.$transaction(async (tx) => {
-    const row = await tx.orderRefund.findUnique({ where: { id: args.orderRefundId } });
-    if (!row) throw new Error("ORDER_REFUND_NOT_FOUND");
-
-    const wasSucceeded = row.status === ORDER_REFUND_SUCCEEDED_STATUS;
-
     await tx.orderRefund.update({
       where: { id: args.orderRefundId },
       data: {
@@ -426,9 +435,18 @@ export async function markRefundSucceeded(args: {
     });
 
     if (!wasSucceeded) {
-      await refreshOrderRefundDenormalized(tx, row.orderId);
+      await refreshOrderRefundDenormalized(tx, refundRow.orderId);
     }
   });
+
+  if (!wasSucceeded) {
+    await syncVendorTransferEligibilityAfterRefundSuccess({
+      orderId: refundRow.orderId,
+      vendorOrderId: refundRow.vendorOrderId,
+      orderRefundId: args.orderRefundId,
+      refundAttemptId: refundRow.refundAttemptId,
+    }).catch(() => undefined);
+  }
 }
 
 export async function markRefundFailed(args: {

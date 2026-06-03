@@ -379,6 +379,12 @@ export async function retryFailedVendorPayoutTransferReversal(
   if (!row) {
     return { outcome: "skipped", reason: "not_found" };
   }
+  if (
+    row.status === VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.reversed &&
+    row.stripeTransferReversalId?.trim()
+  ) {
+    return { outcome: "skipped", reason: "already_reversed" };
+  }
   if (row.status !== VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.failed) {
     return { outcome: "skipped", reason: `not_failed_status_${row.status}` };
   }

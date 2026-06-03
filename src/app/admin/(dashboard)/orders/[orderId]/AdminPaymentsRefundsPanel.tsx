@@ -18,6 +18,7 @@ import type {
 } from "@/services/admin-order-payment-summary.service";
 import { StripeMoneyMovementBreakdown } from "@/components/admin/StripeMoneyMovementBreakdown";
 import { adminVendorConnectTransferStatusLabel } from "@/lib/stripe-money-movement";
+import { vendorClawbackStatusBadgeClass } from "@/lib/vendor-clawback-status";
 import type { AdminRefundPreviewPayload } from "@/lib/admin-refund-preview.types";
 import type { LinkedIssueRefundContext } from "@/lib/admin-order-issue-refund-link";
 
@@ -820,6 +821,12 @@ export function AdminPaymentsRefundsPanel({
     (n, v) => n + v.reversals.filter((r) => r.status === "pending" || r.status === "submitted").length,
     0
   );
+  const failedClawbackCount = summary.vendorOrders.filter(
+    (v) => v.clawback.clawbackStatus === "failed"
+  ).length;
+  const pendingClawbackCount = summary.vendorOrders.filter(
+    (v) => v.clawback.clawbackStatus === "pending"
+  ).length;
 
   return (
     <section
@@ -840,8 +847,25 @@ export function AdminPaymentsRefundsPanel({
           </p>
           {pendingReversalCount > 0 && (
             <p className="mt-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-              {pendingReversalCount} transfer reversal row(s) need manual execution — prepared rows
-              are not completed until processed in vendor transfer reversals.
+              {pendingClawbackCount > 0
+                ? `${pendingClawbackCount} vendor clawback(s) pending`
+                : `${pendingReversalCount} transfer reversal row(s) need manual execution`}
+              {" — "}
+              prepared rows are not completed until processed in{" "}
+              <Link href="/admin/payout-transfers" className="font-medium underline">
+                vendor clawbacks / transfer reversals
+              </Link>
+              .
+            </p>
+          )}
+          {failedClawbackCount > 0 && (
+            <p className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-950" role="alert">
+              {failedClawbackCount} vendor clawback(s) failed. Customer refund succeeded separately — retry
+              the transfer reversal from{" "}
+              <Link href="/admin/payout-transfers" className="font-medium underline">
+                vendor clawbacks / transfer reversals
+              </Link>{" "}
+              or review in Needs Attention.
             </p>
           )}
         </div>
@@ -888,7 +912,7 @@ export function AdminPaymentsRefundsPanel({
       </div>
 
       {/* Order payment summary — compact top row */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
           <p className="text-xs text-oo-stone-gray">Customer paid</p>
           <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
@@ -915,6 +939,12 @@ export function AdminPaymentsRefundsPanel({
           <p className="text-xs text-oo-stone-gray">Refunded</p>
           <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
             {formatAdminMoney(summary.order.totalRefundedCents)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
+          <p className="text-xs text-oo-stone-gray">Customer refund status</p>
+          <p className="mt-0.5 text-sm font-semibold text-oo-charcoal">
+            {paymentRefundStatusLabel(summary.order.paymentRefundStatus)}
           </p>
         </div>
         <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
@@ -1017,7 +1047,7 @@ export function AdminPaymentsRefundsPanel({
                 <th className="px-2 py-2">Vendor still owed</th>
                 <th className="px-2 py-2">OO retained</th>
                 <th className="px-2 py-2">Transfer</th>
-                <th className="px-2 py-2">Reversal</th>
+                <th className="px-2 py-2">Vendor clawback</th>
               </tr>
             </thead>
             <tbody>
@@ -1114,20 +1144,55 @@ export function AdminPaymentsRefundsPanel({
                     )}
                   </td>
                   <td className="px-2 py-2">
-                    <p
-                      className={`rounded border px-2 py-1 text-xs ${transferToneClass(v.transferMessage.tone)}`}
-                    >
-                      {v.transferMessage.message}
-                    </p>
-                    {v.reversals.length > 0 && (
-                      <ul className="mt-1 text-[10px] text-oo-stone-gray">
-                        {v.reversals.map((rev) => (
-                          <li key={rev.id}>
-                            Reversal {rev.status} {formatAdminMoney(rev.amountCents)}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    <div className="space-y-1.5">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${vendorClawbackStatusBadgeClass(v.clawback.clawbackStatus)}`}
+                      >
+                        {v.clawback.adminLabel}
+                      </span>
+                      {v.clawback.adminDetail ? (
+                        <p className="text-[10px] leading-snug text-oo-stone-gray">{v.clawback.adminDetail}</p>
+                      ) : null}
+                      {v.clawback.clawbackRequiredCents > 0 ? (
+                        <p className="text-[10px] tabular-nums text-oo-charcoal">
+                          Required {formatAdminMoney(v.clawback.clawbackRequiredCents)}
+                          {v.clawback.clawbackRecoveredCents > 0
+                            ? ` · recovered ${formatAdminMoney(v.clawback.clawbackRecoveredCents)}`
+                            : ""}
+                        </p>
+                      ) : null}
+                      {v.clawback.adminWarning ? (
+                        <p className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[10px] text-red-950">
+                          {v.clawback.adminWarning}
+                        </p>
+                      ) : null}
+                      {(v.clawback.recommendedAction === "retry_reversal" ||
+                        v.clawback.recommendedAction === "run_reversal_batch") && (
+                        <Link
+                          href="/admin/payout-transfers"
+                          className="inline-block text-[10px] font-semibold text-oo-charcoal underline"
+                        >
+                          {v.clawback.recommendedAction === "retry_reversal"
+                            ? "Retry reversal"
+                            : "Run reversal batch"}
+                        </Link>
+                      )}
+                      {v.reversals.length > 0 && (
+                        <ul className="text-[10px] text-oo-stone-gray">
+                          {v.reversals.map((rev) => (
+                            <li key={rev.id}>
+                              Reversal {rev.status} {formatAdminMoney(rev.amountCents)}
+                              {rev.failureMessage ? ` — ${rev.failureMessage.slice(0, 80)}` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {v.transferStatus === "cancelled_due_to_refund" && (
+                        <p className="text-[10px] text-oo-stone-gray">
+                          Vendor transfer cancelled due to refund — clawback not needed.
+                        </p>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

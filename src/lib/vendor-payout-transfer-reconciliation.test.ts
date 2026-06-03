@@ -36,6 +36,15 @@ describe("vendor-payout-transfer-reconciliation lib", () => {
     expect(isReconcilablePayoutTransfer({ status: "failed", destinationAccountId: "acct_1" })).toBe(true);
   });
 
+  it("skips cancelled_due_to_refund rows", () => {
+    expect(
+      isReconcilablePayoutTransfer({
+        status: "cancelled_due_to_refund",
+        destinationAccountId: "acct_1",
+      })
+    ).toBe(false);
+  });
+
   it("matches retrieve path when amount/currency/destination align", () => {
     const window = reconciliationCreatedWindow(baseRow);
     const transfer = {
