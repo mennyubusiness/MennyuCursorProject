@@ -34,6 +34,8 @@ export type AdminRefundPreviewPayload = {
   warnings: string[];
   blockingReasons: string[];
   idempotencyKey: string;
+  hasPendingRefund: boolean;
+  inFlightRefundReservedCents: number;
   lineItem?: {
     orderLineItemId: string;
     itemName: string;

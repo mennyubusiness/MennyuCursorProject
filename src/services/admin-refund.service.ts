@@ -23,6 +23,7 @@ import {
   linkOrderRefundToRefundAttempt,
   recordPendingRefund,
 } from "@/services/refund-ledger.service";
+import { formatAdminRefundCapErrorMessage } from "@/lib/admin-refund-error-messages";
 import {
   executeStripeRefundForAdmin,
   type RefundResult,
@@ -204,6 +205,41 @@ async function executeAdminRefundInternal(
   });
 }
 
+async function mapRefundCapErrorToAdmin(
+  error: unknown,
+  orderId: string
+): Promise<AdminRefundError> {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    !message.includes("REFUND_EXCEEDS_ORDER_REMAINING") &&
+    !message.includes("REFUND_EXCEEDS_VENDOR_ORDER_REMAINING")
+  ) {
+    throw error instanceof Error ? error : new Error(message);
+  }
+
+  const summary = await getOrderRefundSummary(orderId);
+  if (summary?.hasPendingRefund) {
+    return new AdminRefundError(
+      "REFUND_IN_PROGRESS",
+      formatAdminRefundCapErrorMessage({ code: "REFUND_IN_PROGRESS" })
+    );
+  }
+  if (
+    summary &&
+    summary.remainingRefundableCents <= 0 &&
+    summary.totalRefundedCents >= summary.paymentAmountCents
+  ) {
+    return new AdminRefundError(
+      "ORDER_ALREADY_FULLY_REFUNDED",
+      formatAdminRefundCapErrorMessage({ code: "ORDER_ALREADY_FULLY_REFUNDED" })
+    );
+  }
+  return new AdminRefundError(
+    "REFUND_AVAILABILITY_CHANGED",
+    formatAdminRefundCapErrorMessage({ code: "REFUND_AVAILABILITY_CHANGED" })
+  );
+}
+
 async function runAdminRefundExecution(args: {
   plan: RefundExecutionPlan;
   adminUserId: string;
@@ -245,6 +281,15 @@ async function runAdminRefundExecution(args: {
       refundSummary: summary ?? undefined,
     };
   }
+  if (
+    existingLedger &&
+    (existingLedger.status === "pending" || existingLedger.status === "requires_action")
+  ) {
+    throw new AdminRefundError(
+      "REFUND_IN_PROGRESS",
+      formatAdminRefundCapErrorMessage({ code: "REFUND_IN_PROGRESS" })
+    );
+  }
 
   let refundAttemptId: string;
   const existingAttempt = await prisma.refundAttempt.findUnique({
@@ -252,25 +297,48 @@ async function runAdminRefundExecution(args: {
     select: { id: true, status: true, stripeRefundId: true },
   });
 
+  if (existingAttempt?.status === "succeeded") {
+    const summary = await getOrderRefundSummary(plan.orderId);
+    return {
+      success: true,
+      idempotent: true,
+      message: "Refund attempt already succeeded.",
+      refundAttemptId: existingAttempt.id,
+      stripeRefundId: existingAttempt.stripeRefundId ?? undefined,
+      amountCents,
+      refundSummary: summary ?? undefined,
+    };
+  }
+  if (existingAttempt?.status === "attempted") {
+    throw new AdminRefundError(
+      "REFUND_IN_PROGRESS",
+      formatAdminRefundCapErrorMessage({ code: "REFUND_IN_PROGRESS" })
+    );
+  }
+
+  let orderRefundId: string;
+  try {
+    const pending = await recordPendingRefund({
+      orderId: plan.orderId,
+      vendorOrderId: plan.vendorOrderId,
+      amountCents,
+      idempotencyKey,
+      reason: args.reason,
+      refundScope: plan.refundScope,
+      initiatedByRole: "admin",
+      initiatedByUserId: args.adminUserId,
+      stripePaymentIntentId: plan.stripePaymentIntentId!,
+      stripeChargeId: plan.stripeChargeId,
+      paymentId: plan.paymentId,
+      adminNote: args.adminNote,
+      customerVisibleNote: args.customerVisibleNote,
+    });
+    orderRefundId = pending.id;
+  } catch (e) {
+    throw await mapRefundCapErrorToAdmin(e, plan.orderId);
+  }
+
   if (existingAttempt) {
-    if (existingAttempt.status === "succeeded") {
-      const summary = await getOrderRefundSummary(plan.orderId);
-      return {
-        success: true,
-        idempotent: true,
-        message: "Refund attempt already succeeded.",
-        refundAttemptId: existingAttempt.id,
-        stripeRefundId: existingAttempt.stripeRefundId ?? undefined,
-        amountCents,
-        refundSummary: summary ?? undefined,
-      };
-    }
-    if (existingAttempt.status === "attempted") {
-      throw new AdminRefundError(
-        "REFUND_IN_PROGRESS",
-        "A refund for this idempotency key is already in progress."
-      );
-    }
     await prisma.refundAttempt.update({
       where: { id: existingAttempt.id },
       data: {
@@ -304,33 +372,25 @@ async function runAdminRefundExecution(args: {
         select: { id: true, status: true },
       });
       if (!again) throw e;
+      if (again.status === "attempted") {
+        throw new AdminRefundError(
+          "REFUND_IN_PROGRESS",
+          formatAdminRefundCapErrorMessage({ code: "REFUND_IN_PROGRESS" })
+        );
+      }
       refundAttemptId = again.id;
     }
   }
 
-  const pending = await recordPendingRefund({
-    orderId: plan.orderId,
-    vendorOrderId: plan.vendorOrderId,
-    amountCents,
-    idempotencyKey,
-    reason: args.reason,
-    refundScope: plan.refundScope,
-    initiatedByRole: "admin",
-    initiatedByUserId: args.adminUserId,
-    refundAttemptId,
-    stripePaymentIntentId: plan.stripePaymentIntentId!,
-    stripeChargeId: plan.stripeChargeId,
-    paymentId: plan.paymentId,
-    adminNote: args.adminNote,
-    customerVisibleNote: args.customerVisibleNote,
+  await prisma.orderRefund.update({
+    where: { id: orderRefundId },
+    data: { refundAttemptId },
   });
 
   await linkOrderRefundToRefundAttempt({
     idempotencyKey,
     refundAttemptId,
   });
-
-  const orderRefundId = pending.id;
 
   if (args.refundLineItem) {
     await prisma.refundLineItem.create({

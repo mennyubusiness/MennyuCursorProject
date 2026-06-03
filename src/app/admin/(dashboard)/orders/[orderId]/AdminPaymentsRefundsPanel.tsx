@@ -20,6 +20,10 @@ import { StripeMoneyMovementBreakdown } from "@/components/admin/StripeMoneyMove
 import { adminVendorConnectTransferStatusLabel } from "@/lib/stripe-money-movement";
 import { vendorClawbackStatusBadgeClass } from "@/lib/vendor-clawback-status";
 import type { AdminRefundPreviewPayload } from "@/lib/admin-refund-preview.types";
+import {
+  formatAdminRefundBlockingReason,
+  formatAdminRefundCapErrorMessage,
+} from "@/lib/admin-refund-error-messages";
 import type { LinkedIssueRefundContext } from "@/lib/admin-order-issue-refund-link";
 
 type ModalKind = AdminRefundScopeKey | null;
@@ -174,7 +178,7 @@ function PreviewBlock({ preview }: { preview: AdminRefundPreviewPayload }) {
           <p className="font-semibold">Cannot proceed</p>
           <ul className="mt-1 list-disc pl-4">
             {preview.blockingReasons.map((b) => (
-              <li key={b}>{b}</li>
+              <li key={b}>{formatAdminRefundBlockingReason(b)}</li>
             ))}
           </ul>
         </div>
@@ -341,9 +345,16 @@ function RefundModal({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setExecuteError(
-          data.message ?? data.error ?? `Refund failed (${res.status})`
-        );
+        const friendlyMessage = formatAdminRefundCapErrorMessage({
+          code: typeof data.code === "string" ? data.code : "",
+          message:
+            typeof data.message === "string"
+              ? data.message
+              : typeof data.error === "string"
+                ? data.error
+                : undefined,
+        });
+        setExecuteError(friendlyMessage);
         if (data.blockingReasons) {
           setPreview((p) =>
             p
@@ -365,8 +376,17 @@ function RefundModal({
                   warnings: [],
                   blockingReasons: data.blockingReasons,
                   idempotencyKey: "",
+                  hasPendingRefund: false,
+                  inFlightRefundReservedCents: 0,
                 }
           );
+        }
+        if (
+          data.code === "REFUND_AVAILABILITY_CHANGED" ||
+          data.code === "REFUND_IN_PROGRESS" ||
+          data.code === "ORDER_ALREADY_FULLY_REFUNDED"
+        ) {
+          void runPreview();
         }
         return;
       }

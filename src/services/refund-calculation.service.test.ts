@@ -5,6 +5,7 @@ const mockOrderLineItemFindUnique = vi.fn();
 const mockRefundLineItemFindMany = vi.fn();
 const mockGetRemainingOrder = vi.fn();
 const mockGetRemainingVendor = vi.fn();
+const mockGetOrderRefundSummary = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -15,6 +16,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/services/refund-ledger.service", () => ({
+  getOrderRefundSummary: (...args: unknown[]) => mockGetOrderRefundSummary(...args),
   getRemainingOrderRefundableCents: (...args: unknown[]) => mockGetRemainingOrder(...args),
   getRemainingVendorOrderRefundableCents: (...args: unknown[]) =>
     mockGetRemainingVendor(...args),
@@ -85,6 +87,11 @@ function baseOrder(overrides?: Record<string, unknown>) {
 describe("refund-calculation.service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetOrderRefundSummary.mockResolvedValue({
+      remainingRefundableCents: 2000,
+      hasPendingRefund: false,
+      refunds: [],
+    });
     mockGetRemainingOrder.mockResolvedValue(2000);
     mockGetRemainingVendor.mockResolvedValue(1200);
     mockOrderFindUnique.mockResolvedValue(baseOrder());
@@ -93,6 +100,11 @@ describe("refund-calculation.service", () => {
   });
 
   it("previewFullOrderRefund uses remaining order refundable", async () => {
+    mockGetOrderRefundSummary.mockResolvedValue({
+      remainingRefundableCents: 1500,
+      hasPendingRefund: false,
+      refunds: [],
+    });
     mockGetRemainingOrder.mockResolvedValue(1500);
     const preview = await previewFullOrderRefund("ord_1");
     expect(preview?.customerRefundAmountCents).toBe(1500);
@@ -364,5 +376,27 @@ describe("refund-calculation.service", () => {
       linkedIssueHasCustomerMessage: true,
     });
     expect(preview?.blockingReasons).not.toContain("admin_note_required_for_line_item_refund");
+  });
+
+  it("blocks preview when refund is already in progress", async () => {
+    mockGetOrderRefundSummary.mockResolvedValue({
+      remainingRefundableCents: 2000,
+      hasPendingRefund: true,
+      refunds: [{ status: "pending", amountCents: 2000 }],
+    });
+    const preview = await previewFullOrderRefund("ord_1");
+    expect(preview?.hasPendingRefund).toBe(true);
+    expect(preview?.blockingReasons).toContain("refund_already_in_progress");
+  });
+
+  it("preview remaining order matches getOrderRefundSummary", async () => {
+    mockGetOrderRefundSummary.mockResolvedValue({
+      remainingRefundableCents: 2408,
+      hasPendingRefund: false,
+      refunds: [],
+    });
+    const preview = await previewFullOrderRefund("ord_1");
+    expect(preview?.remainingOrderRefundableCents).toBe(2408);
+    expect(mockGetOrderRefundSummary).toHaveBeenCalledWith("ord_1");
   });
 });

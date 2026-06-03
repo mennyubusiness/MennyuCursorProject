@@ -8,6 +8,7 @@ import {
   type AdminRefundScopeKey,
 } from "@/lib/admin-refund-idempotency";
 import {
+  getOrderRefundSummary,
   getRemainingOrderRefundableCents,
   getRemainingVendorOrderRefundableCents,
 } from "@/services/refund-ledger.service";
@@ -67,6 +68,8 @@ export type RefundCalculationPreview = {
   warnings: string[];
   blockingReasons: string[];
   idempotencyKey: string;
+  hasPendingRefund: boolean;
+  inFlightRefundReservedCents: number;
 };
 
 export type AssertRefundAllowedInput = {
@@ -238,7 +241,12 @@ async function buildPreviewBase(input: {
   if (!order) return null;
 
   const payment = order.payments[0] ?? null;
-  const remainingOrder = await getRemainingOrderRefundableCents(input.orderId);
+  const refundSummary = await getOrderRefundSummary(input.orderId);
+  const remainingOrder = refundSummary?.remainingRefundableCents ?? 0;
+  const hasPendingRefund = refundSummary?.hasPendingRefund ?? false;
+  const inFlightRefundReservedCents = (refundSummary?.refunds ?? [])
+    .filter((r) => r.status === "pending" || r.status === "requires_action")
+    .reduce((sum, r) => sum + r.amountCents, 0);
   const remainingVendor =
     input.vendorOrderId != null
       ? await getRemainingVendorOrderRefundableCents(input.vendorOrderId)
@@ -307,6 +315,14 @@ async function buildPreviewBase(input: {
 
   if (input.amountCents <= 0) {
     blockingReasons.push("amount_must_be_positive");
+  }
+
+  if (hasPendingRefund) {
+    blockingReasons.push("refund_already_in_progress");
+  }
+
+  if (remainingOrder <= 0 && input.amountCents > 0) {
+    blockingReasons.push("order_already_fully_refunded");
   }
 
   if (input.amountCents > remainingOrder) {
@@ -431,6 +447,8 @@ async function buildPreviewBase(input: {
     warnings,
     blockingReasons,
     idempotencyKey,
+    hasPendingRefund,
+    inFlightRefundReservedCents,
   };
 }
 

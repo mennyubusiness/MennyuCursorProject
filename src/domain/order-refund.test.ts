@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertRefundAmountWithinCaps,
+  computeCommittedRefundCents,
   computeRemainingRefundableCents,
   computeTotalRefundedCents,
   computeVendorOrderRefundedCents,
@@ -90,5 +91,46 @@ describe("order-refund domain", () => {
     expect(mapStripeRefundStatus("succeeded")).toBe("succeeded");
     expect(mapStripeRefundStatus("failed")).toBe("failed");
     expect(mapStripeRefundStatus(undefined)).toBe("pending");
+  });
+
+  it("computeCommittedRefundCents counts pending ledger but not attempted legacy", () => {
+    expect(
+      computeCommittedRefundCents({
+        orderRefunds: [{ amountCents: 500, status: "pending" }],
+        legacyAttempts: [
+          { amountCents: 500, status: "attempted", hasLinkedOrderRefund: false },
+        ],
+      })
+    ).toBe(500);
+  });
+
+  it("failed legacy refund attempt does not reduce committed refundable", () => {
+    expect(
+      computeCommittedRefundCents({
+        orderRefunds: [],
+        legacyAttempts: [
+          { amountCents: 2408, status: "failed", hasLinkedOrderRefund: false },
+        ],
+      })
+    ).toBe(0);
+  });
+
+  it("preview and confirm cap math share committed refund totals", () => {
+    const paidCents = 2408;
+    const committed = computeCommittedRefundCents({
+      orderRefunds: [],
+      legacyAttempts: [
+        { amountCents: 2408, status: "attempted", hasLinkedOrderRefund: false },
+      ],
+    });
+    const remaining = computeRemainingRefundableCents(paidCents, committed);
+    expect(remaining).toBe(2408);
+    expect(() =>
+      assertRefundAmountWithinCaps({
+        amountCents: 2408,
+        orderPaidCents: paidCents,
+        orderRefundedCents: committed,
+      })
+    ).not.toThrow();
   });
 });

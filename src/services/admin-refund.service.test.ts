@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockUserFindUnique = vi.fn();
 const mockOrderRefundFindUnique = vi.fn();
+const mockOrderRefundUpdate = vi.fn();
 const mockRefundAttemptFindUnique = vi.fn();
 const mockRefundAttemptCreate = vi.fn();
 const mockRefundAttemptUpdate = vi.fn();
@@ -20,7 +21,10 @@ const mockRefundLineItemCreate = vi.fn();
 vi.mock("@/lib/db", () => ({
   prisma: {
     user: { findUnique: (...args: unknown[]) => mockUserFindUnique(...args) },
-    orderRefund: { findUnique: (...args: unknown[]) => mockOrderRefundFindUnique(...args) },
+    orderRefund: {
+      findUnique: (...args: unknown[]) => mockOrderRefundFindUnique(...args),
+      update: (...args: unknown[]) => mockOrderRefundUpdate(...args),
+    },
     orderIssue: { findFirst: (...args: unknown[]) => mockOrderIssueFindFirst(...args) },
     refundLineItem: { create: (...args: unknown[]) => mockRefundLineItemCreate(...args) },
     refundAttempt: {
@@ -106,6 +110,7 @@ describe("admin-refund.service", () => {
     mockRefundAttemptFindUnique.mockResolvedValue(null);
     mockRefundAttemptCreate.mockResolvedValue({ id: "ra_1" });
     mockRecordPending.mockResolvedValue({ id: "or_1", created: true });
+    mockOrderRefundUpdate.mockResolvedValue({ id: "or_1" });
     mockLinkLedger.mockResolvedValue("or_1");
     mockGetSummary.mockResolvedValue({ orderId: "ord_1", totalRefundedCents: 2000 });
     mockStripeRefund.mockResolvedValue({
@@ -377,5 +382,107 @@ describe("admin-refund.service", () => {
         reason: "test",
       })
     ).rejects.toMatchObject({ code: "REFUND_BLOCKED" });
+  });
+
+  it("creates pending ledger before refund attempt", async () => {
+    const callOrder: string[] = [];
+    mockRecordPending.mockImplementation(async () => {
+      callOrder.push("recordPending");
+      return { id: "or_1", created: true };
+    });
+    mockRefundAttemptCreate.mockImplementation(async () => {
+      callOrder.push("refundAttemptCreate");
+      return { id: "ra_1" };
+    });
+    await executeAdminFullOrderRefund({
+      orderId: "ord_1",
+      adminUserId: "admin_1",
+      reason: "test",
+    });
+    expect(callOrder).toEqual(["recordPending", "refundAttemptCreate"]);
+    expect(mockOrderRefundUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "or_1" },
+        data: { refundAttemptId: "ra_1" },
+      })
+    );
+  });
+
+  it("maps cap errors to friendly availability-changed error", async () => {
+    mockRecordPending.mockRejectedValue(
+      new Error("REFUND_EXCEEDS_ORDER_REMAINING: remaining=0, requested=2408")
+    );
+    mockGetSummary.mockResolvedValue({
+      remainingRefundableCents: 2408,
+      totalRefundedCents: 0,
+      paymentAmountCents: 2408,
+      hasPendingRefund: false,
+    });
+    await expect(
+      executeAdminFullOrderRefund({
+        orderId: "ord_1",
+        adminUserId: "admin_1",
+        reason: "test",
+      })
+    ).rejects.toMatchObject({
+      code: "REFUND_AVAILABILITY_CHANGED",
+      message: "Refund availability changed since preview. Preview the refund again.",
+    });
+  });
+
+  it("maps cap errors to in-progress when pending refund exists", async () => {
+    mockRecordPending.mockRejectedValue(
+      new Error("REFUND_EXCEEDS_ORDER_REMAINING: remaining=0, requested=2408")
+    );
+    mockGetSummary.mockResolvedValue({
+      remainingRefundableCents: 0,
+      totalRefundedCents: 0,
+      paymentAmountCents: 2408,
+      hasPendingRefund: true,
+    });
+    await expect(
+      executeAdminFullOrderRefund({
+        orderId: "ord_1",
+        adminUserId: "admin_1",
+        reason: "test",
+      })
+    ).rejects.toMatchObject({
+      code: "REFUND_IN_PROGRESS",
+      message:
+        "A refund for this order is already in progress. Refresh the order before trying again.",
+    });
+  });
+
+  it("blocks confirm when pending ledger row exists for idempotency key", async () => {
+    mockOrderRefundFindUnique.mockResolvedValue({
+      id: "or_pending",
+      status: "pending",
+      stripeRefundId: null,
+      refundAttemptId: null,
+    });
+    await expect(
+      executeAdminFullOrderRefund({
+        orderId: "ord_1",
+        adminUserId: "admin_1",
+        reason: "test",
+      })
+    ).rejects.toMatchObject({ code: "REFUND_IN_PROGRESS" });
+    expect(mockRecordPending).not.toHaveBeenCalled();
+  });
+
+  it("blocks confirm when refund attempt is already attempted", async () => {
+    mockRefundAttemptFindUnique.mockResolvedValue({
+      id: "ra_attempted",
+      status: "attempted",
+      stripeRefundId: null,
+    });
+    await expect(
+      executeAdminFullOrderRefund({
+        orderId: "ord_1",
+        adminUserId: "admin_1",
+        reason: "test",
+      })
+    ).rejects.toMatchObject({ code: "REFUND_IN_PROGRESS" });
+    expect(mockRecordPending).not.toHaveBeenCalled();
   });
 });

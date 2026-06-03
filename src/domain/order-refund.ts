@@ -52,7 +52,7 @@ export function computeCommittedRefundCents(input: {
     .filter(
       (a) =>
         !a.hasLinkedOrderRefund &&
-        (a.status === "succeeded" || a.status === "attempted")
+        a.status === "succeeded"
     )
     .reduce((s, a) => s + a.amountCents, 0);
   return ledger + legacy;
@@ -71,7 +71,7 @@ export function computeVendorOrderRefundedCents(input: {
   committed?: boolean;
 }): number {
   const ledgerFilter = input.committed ? isLedgerCommitted : (s: string) => s === ORDER_REFUND_SUCCEEDED_STATUS;
-  const legacyStatuses = input.committed ? new Set(["succeeded", "attempted"]) : new Set(["succeeded"]);
+  const legacyStatuses = input.committed ? new Set(["succeeded"]) : new Set(["succeeded"]);
 
   const fromLedger = input.orderRefunds
     .filter(
