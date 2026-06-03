@@ -90,6 +90,7 @@ describe("refund-calculation.service", () => {
     mockGetOrderRefundSummary.mockResolvedValue({
       remainingRefundableCents: 2000,
       hasPendingRefund: false,
+      staleBlockingRefundAttempts: [],
       refunds: [],
     });
     mockGetRemainingOrder.mockResolvedValue(2000);
@@ -103,6 +104,7 @@ describe("refund-calculation.service", () => {
     mockGetOrderRefundSummary.mockResolvedValue({
       remainingRefundableCents: 1500,
       hasPendingRefund: false,
+      staleBlockingRefundAttempts: [],
       refunds: [],
     });
     mockGetRemainingOrder.mockResolvedValue(1500);
@@ -382,17 +384,44 @@ describe("refund-calculation.service", () => {
     mockGetOrderRefundSummary.mockResolvedValue({
       remainingRefundableCents: 2000,
       hasPendingRefund: true,
+      staleBlockingRefundAttempts: [],
       refunds: [{ status: "pending", amountCents: 2000 }],
     });
     const preview = await previewFullOrderRefund("ord_1");
     expect(preview?.hasPendingRefund).toBe(true);
     expect(preview?.blockingReasons).toContain("refund_already_in_progress");
+    expect(preview?.blockingReasons).not.toContain("stale_refund_attempt_blocks_refund");
+  });
+
+  it("blocks preview for stale orphan RefundAttempt with dismissible state", async () => {
+    mockGetOrderRefundSummary.mockResolvedValue({
+      remainingRefundableCents: 2408,
+      hasPendingRefund: false,
+      staleBlockingRefundAttempts: [
+        {
+          id: "ra_stale",
+          amountCents: 2408,
+          status: "attempted",
+          stripeRefundId: null,
+          failureCode: null,
+          failureMessage: null,
+          createdAt: "2026-06-03T22:50:02.533Z",
+          dismissible: true,
+          dismissBlockReason: null,
+        },
+      ],
+      refunds: [],
+    });
+    const preview = await previewFullOrderRefund("ord_1");
+    expect(preview?.blockingReasons).toContain("stale_refund_attempt_blocks_refund");
+    expect(preview?.blockingReasons).not.toContain("refund_already_in_progress");
   });
 
   it("preview remaining order matches getOrderRefundSummary", async () => {
     mockGetOrderRefundSummary.mockResolvedValue({
       remainingRefundableCents: 2408,
       hasPendingRefund: false,
+      staleBlockingRefundAttempts: [],
       refunds: [],
     });
     const preview = await previewFullOrderRefund("ord_1");

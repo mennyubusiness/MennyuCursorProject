@@ -19,6 +19,13 @@ import {
   ORDER_REFUND_SUCCEEDED_STATUS,
 } from "@/domain/order-refund";
 import type { PaymentRefundStatusLabel } from "@/domain/order-refund";
+import {
+  canDismissStaleRefundAttempt,
+  findStaleBlockingRefundAttempts,
+  isRealInFlightRefundAttempt,
+  type RefundAttemptBlockingContext,
+} from "@/domain/stale-refund-attempt";
+import type { StaleRefundAttemptSummary } from "@/services/stale-refund-attempt.service";
 import { syncVendorTransferEligibilityAfterRefundSuccess } from "@/services/vendor-payout-transfer-refund-eligibility.service";
 
 export type OrderRefundSummary = {
@@ -30,6 +37,7 @@ export type OrderRefundSummary = {
   remainingRefundableCents: number;
   paymentRefundStatus: PaymentRefundStatusLabel;
   hasPendingRefund: boolean;
+  staleBlockingRefundAttempts: StaleRefundAttemptSummary[];
   refunds: Array<{
     id: string;
     amountCents: number;
@@ -94,6 +102,11 @@ async function loadRefundContext(orderId: string) {
           status: true,
           vendorOrderId: true,
           stripeRefundId: true,
+          dismissedAsLegacyAt: true,
+          idempotencyKey: true,
+          failureCode: true,
+          failureMessage: true,
+          createdAt: true,
         },
       },
     },
@@ -108,6 +121,26 @@ async function loadRefundContext(orderId: string) {
     hasLinkedOrderRefund: linkedAttemptIds.has(a.id),
   }));
   return { order, payment, legacyAttempts };
+}
+
+function buildStaleBlockingSummaries(
+  attempts: RefundAttemptBlockingContext[],
+  orderRefunds: Array<{ refundAttemptId: string | null; status: string }>
+): StaleRefundAttemptSummary[] {
+  return findStaleBlockingRefundAttempts(attempts, orderRefunds).map((a) => {
+    const eligibility = canDismissStaleRefundAttempt(a, orderRefunds);
+    return {
+      id: a.id,
+      amountCents: a.amountCents,
+      status: a.status,
+      stripeRefundId: a.stripeRefundId,
+      failureCode: a.failureCode,
+      failureMessage: a.failureMessage,
+      createdAt: a.createdAt.toISOString(),
+      dismissible: eligibility.ok,
+      dismissBlockReason: eligibility.ok ? null : eligibility.reason,
+    };
+  });
 }
 
 function buildRefundRows(
@@ -125,6 +158,7 @@ function buildRefundRows(
     stripeRefundId: string | null;
     vendorOrderId: string | null;
     hasLinkedOrderRefund: boolean;
+    dismissedAsLegacyAt: Date | null;
   }>
 ) {
   const rows: OrderRefundSummary["refunds"] = orderRefunds.map((r) => ({
@@ -136,7 +170,7 @@ function buildRefundRows(
     source: "order_refund" as const,
   }));
   for (const a of legacyAttempts) {
-    if (a.hasLinkedOrderRefund) continue;
+    if (a.hasLinkedOrderRefund || a.dismissedAsLegacyAt) continue;
     rows.push({
       id: `legacy:${a.id}`,
       amountCents: a.amountCents,
@@ -158,9 +192,24 @@ export async function getOrderRefundSummary(orderId: string): Promise<OrderRefun
     orderRefunds: ctx.order.orderRefunds,
     legacyAttempts: ctx.legacyAttempts,
   });
+  const attemptContexts: RefundAttemptBlockingContext[] = ctx.legacyAttempts.map((a) => ({
+    ...a,
+    idempotencyKey: a.idempotencyKey,
+    failureCode: a.failureCode,
+    failureMessage: a.failureMessage,
+    createdAt: a.createdAt,
+  }));
+  const orderRefundLinks = ctx.order.orderRefunds.map((r) => ({
+    refundAttemptId: r.refundAttemptId,
+    status: r.status,
+  }));
   const hasPendingRefund =
     ctx.order.orderRefunds.some((r) => r.status === "pending" || r.status === "requires_action") ||
-    ctx.legacyAttempts.some((a) => a.status === "attempted");
+    attemptContexts.some((a) => isRealInFlightRefundAttempt(a, orderRefundLinks));
+  const staleBlockingRefundAttempts = buildStaleBlockingSummaries(
+    attemptContexts,
+    orderRefundLinks
+  );
 
   return {
     orderId,
@@ -172,7 +221,7 @@ export async function getOrderRefundSummary(orderId: string): Promise<OrderRefun
       paymentAmountCents,
       computeCommittedRefundCents({
         orderRefunds: ctx.order.orderRefunds,
-        legacyAttempts: ctx.legacyAttempts,
+        legacyAttempts: ctx.legacyAttempts.filter((a) => !a.dismissedAsLegacyAt),
       })
     ),
     paymentRefundStatus: derivePaymentRefundStatus({
@@ -181,6 +230,7 @@ export async function getOrderRefundSummary(orderId: string): Promise<OrderRefun
       hasPendingRefund,
     }),
     hasPendingRefund,
+    staleBlockingRefundAttempts,
     refunds: buildRefundRows(ctx.order.orderRefunds, ctx.legacyAttempts),
   };
 }
@@ -312,6 +362,11 @@ async function loadRefundContextInTx(tx: Prisma.TransactionClient, orderId: stri
           status: true,
           vendorOrderId: true,
           stripeRefundId: true,
+          dismissedAsLegacyAt: true,
+          idempotencyKey: true,
+          failureCode: true,
+          failureMessage: true,
+          createdAt: true,
         },
       },
     },
@@ -345,7 +400,7 @@ export async function recordPendingRefund(
   const paymentAmountCents = ctx.payment?.amountCents ?? ctx.order.totalCents;
   const committedCents = computeCommittedRefundCents({
     orderRefunds: ctx.order.orderRefunds,
-    legacyAttempts: ctx.legacyAttempts,
+    legacyAttempts: ctx.legacyAttempts.filter((a) => !a.dismissedAsLegacyAt),
   });
 
   let vendorOrderTotalCents: number | null = null;
@@ -360,7 +415,7 @@ export async function recordPendingRefund(
     vendorOrderRefundedCents = computeVendorOrderRefundedCents({
       vendorOrderId: input.vendorOrderId,
       orderRefunds: ctx.order.orderRefunds,
-      legacyAttempts: ctx.legacyAttempts,
+      legacyAttempts: ctx.legacyAttempts.filter((a) => !a.dismissedAsLegacyAt),
       committed: true,
     });
   }

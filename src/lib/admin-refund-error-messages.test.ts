@@ -33,5 +33,8 @@ describe("admin-refund-error-messages", () => {
     expect(formatAdminRefundBlockingReason("order_already_fully_refunded")).toContain(
       "fully refunded"
     );
+    expect(formatAdminRefundBlockingReason("stale_refund_attempt_blocks_refund")).toContain(
+      "Dismiss the stale attempt"
+    );
   });
 });

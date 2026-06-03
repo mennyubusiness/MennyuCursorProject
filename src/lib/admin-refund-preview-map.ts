@@ -23,6 +23,7 @@ export function toAdminRefundPreviewPayload(
     idempotencyKey: plan.idempotencyKey,
     hasPendingRefund: plan.hasPendingRefund,
     inFlightRefundReservedCents: plan.inFlightRefundReservedCents,
+    staleBlockingRefundAttempts: plan.staleBlockingRefundAttempts,
   };
   if (plan.lineItem) {
     base.lineItem = {

@@ -24,6 +24,7 @@ import {
   recordPendingRefund,
 } from "@/services/refund-ledger.service";
 import { formatAdminRefundCapErrorMessage } from "@/lib/admin-refund-error-messages";
+import { isStaleBlockingRefundAttempt } from "@/domain/stale-refund-attempt";
 import {
   executeStripeRefundForAdmin,
   type RefundResult,
@@ -218,6 +219,13 @@ async function mapRefundCapErrorToAdmin(
   }
 
   const summary = await getOrderRefundSummary(orderId);
+  if (summary?.staleBlockingRefundAttempts.length) {
+    return new AdminRefundError(
+      "STALE_REFUND_ATTEMPT_BLOCKS_REFUND",
+      formatAdminRefundCapErrorMessage({ code: "STALE_REFUND_ATTEMPT_BLOCKS_REFUND" }),
+      ["stale_refund_attempt_blocks_refund"]
+    );
+  }
   if (summary?.hasPendingRefund) {
     return new AdminRefundError(
       "REFUND_IN_PROGRESS",
@@ -294,7 +302,18 @@ async function runAdminRefundExecution(args: {
   let refundAttemptId: string;
   const existingAttempt = await prisma.refundAttempt.findUnique({
     where: { idempotencyKey },
-    select: { id: true, status: true, stripeRefundId: true },
+    select: {
+      id: true,
+      status: true,
+      stripeRefundId: true,
+      amountCents: true,
+      dismissedAsLegacyAt: true,
+      idempotencyKey: true,
+      failureCode: true,
+      failureMessage: true,
+      createdAt: true,
+      orderRefund: { select: { id: true } },
+    },
   });
 
   if (existingAttempt?.status === "succeeded") {
@@ -310,6 +329,25 @@ async function runAdminRefundExecution(args: {
     };
   }
   if (existingAttempt?.status === "attempted") {
+    const orderRefunds = await prisma.orderRefund.findMany({
+      where: { orderId: plan.orderId },
+      select: { refundAttemptId: true, status: true },
+    });
+    if (
+      isStaleBlockingRefundAttempt(
+        {
+          ...existingAttempt,
+          hasLinkedOrderRefund: existingAttempt.orderRefund != null,
+        },
+        orderRefunds
+      )
+    ) {
+      throw new AdminRefundError(
+        "STALE_REFUND_ATTEMPT_BLOCKS_REFUND",
+        formatAdminRefundCapErrorMessage({ code: "STALE_REFUND_ATTEMPT_BLOCKS_REFUND" }),
+        ["stale_refund_attempt_blocks_refund"]
+      );
+    }
     throw new AdminRefundError(
       "REFUND_IN_PROGRESS",
       formatAdminRefundCapErrorMessage({ code: "REFUND_IN_PROGRESS" })

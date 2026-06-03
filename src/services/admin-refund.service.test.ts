@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockUserFindUnique = vi.fn();
 const mockOrderRefundFindUnique = vi.fn();
 const mockOrderRefundUpdate = vi.fn();
+const mockOrderRefundFindMany = vi.fn();
 const mockRefundAttemptFindUnique = vi.fn();
 const mockRefundAttemptCreate = vi.fn();
 const mockRefundAttemptUpdate = vi.fn();
@@ -24,6 +25,7 @@ vi.mock("@/lib/db", () => ({
     orderRefund: {
       findUnique: (...args: unknown[]) => mockOrderRefundFindUnique(...args),
       update: (...args: unknown[]) => mockOrderRefundUpdate(...args),
+      findMany: (...args: unknown[]) => mockOrderRefundFindMany(...args),
     },
     orderIssue: { findFirst: (...args: unknown[]) => mockOrderIssueFindFirst(...args) },
     refundLineItem: { create: (...args: unknown[]) => mockRefundLineItemCreate(...args) },
@@ -107,6 +109,7 @@ describe("admin-refund.service", () => {
     mockLinkIssueToRefund.mockResolvedValue(undefined);
     mockUserFindUnique.mockResolvedValue({ isPlatformAdmin: true });
     mockOrderRefundFindUnique.mockResolvedValue(null);
+    mockOrderRefundFindMany.mockResolvedValue([]);
     mockRefundAttemptFindUnique.mockResolvedValue(null);
     mockRefundAttemptCreate.mockResolvedValue({ id: "ra_1" });
     mockRecordPending.mockResolvedValue({ id: "or_1", created: true });
@@ -417,6 +420,7 @@ describe("admin-refund.service", () => {
       totalRefundedCents: 0,
       paymentAmountCents: 2408,
       hasPendingRefund: false,
+      staleBlockingRefundAttempts: [],
     });
     await expect(
       executeAdminFullOrderRefund({
@@ -439,6 +443,7 @@ describe("admin-refund.service", () => {
       totalRefundedCents: 0,
       paymentAmountCents: 2408,
       hasPendingRefund: true,
+      staleBlockingRefundAttempts: [],
     });
     await expect(
       executeAdminFullOrderRefund({
@@ -470,11 +475,18 @@ describe("admin-refund.service", () => {
     expect(mockRecordPending).not.toHaveBeenCalled();
   });
 
-  it("blocks confirm when refund attempt is already attempted", async () => {
+  it("blocks confirm when refund attempt is already attempted in-flight", async () => {
     mockRefundAttemptFindUnique.mockResolvedValue({
       id: "ra_attempted",
       status: "attempted",
-      stripeRefundId: null,
+      stripeRefundId: "re_in_flight",
+      amountCents: 2000,
+      dismissedAsLegacyAt: null,
+      idempotencyKey: "admin:full_order:ord_1:_:2000",
+      failureCode: null,
+      failureMessage: null,
+      createdAt: new Date(),
+      orderRefund: null,
     });
     await expect(
       executeAdminFullOrderRefund({
@@ -483,6 +495,32 @@ describe("admin-refund.service", () => {
         reason: "test",
       })
     ).rejects.toMatchObject({ code: "REFUND_IN_PROGRESS" });
+    expect(mockRecordPending).not.toHaveBeenCalled();
+  });
+
+  it("blocks confirm with stale message for orphaned attempted RefundAttempt", async () => {
+    mockRefundAttemptFindUnique.mockResolvedValue({
+      id: "ra_stale",
+      status: "attempted",
+      stripeRefundId: null,
+      amountCents: 2000,
+      dismissedAsLegacyAt: null,
+      idempotencyKey: "admin:full_order:ord_1:_:2000",
+      failureCode: null,
+      failureMessage: null,
+      createdAt: new Date(),
+      orderRefund: null,
+    });
+    await expect(
+      executeAdminFullOrderRefund({
+        orderId: "ord_1",
+        adminUserId: "admin_1",
+        reason: "test",
+      })
+    ).rejects.toMatchObject({
+      code: "STALE_REFUND_ATTEMPT_BLOCKS_REFUND",
+      blockingReasons: ["stale_refund_attempt_blocks_refund"],
+    });
     expect(mockRecordPending).not.toHaveBeenCalled();
   });
 });

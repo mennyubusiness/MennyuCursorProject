@@ -11,6 +11,8 @@ export function formatAdminRefundCapErrorMessage(input: {
       return "This order has already been fully refunded.";
     case "REFUND_IN_PROGRESS":
       return "A refund for this order is already in progress. Refresh the order before trying again.";
+    case "STALE_REFUND_ATTEMPT_BLOCKS_REFUND":
+      return "A legacy refund attempt is blocking new refunds. Dismiss the stale attempt below, then preview again.";
     case "REFUND_AVAILABILITY_CHANGED":
       return "Refund availability changed since preview. Preview the refund again.";
     case "REFUND_EXCEEDS_ORDER_REMAINING":
@@ -39,6 +41,9 @@ export function formatAdminRefundBlockingReason(reason: string): string {
   }
   if (reason === "order_already_fully_refunded") {
     return "This order has already been fully refunded.";
+  }
+  if (reason === "stale_refund_attempt_blocks_refund") {
+    return "A legacy refund attempt is blocking new refunds. Dismiss the stale attempt, then preview again.";
   }
   if (reason.startsWith("refund_exceeds_order_remaining")) {
     return "Refund amount exceeds remaining refundable balance.";

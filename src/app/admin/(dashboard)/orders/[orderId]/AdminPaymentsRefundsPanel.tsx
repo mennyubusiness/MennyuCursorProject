@@ -173,6 +173,23 @@ function PreviewBlock({ preview }: { preview: AdminRefundPreviewPayload }) {
         </div>
       )}
 
+      {preview.staleBlockingRefundAttempts.length > 0 && (
+        <div className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950">
+          <p className="font-semibold">Stale refund attempt blocking refunds</p>
+          <ul className="mt-1 space-y-1">
+            {preview.staleBlockingRefundAttempts.map((a) => (
+              <li key={a.id}>
+                {formatAdminMoney(a.amountCents)} · {a.status}
+                {a.failureMessage ? ` · ${a.failureMessage}` : ""}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1">
+            Dismiss the stale attempt from the Payments &amp; Refunds section before confirming.
+          </p>
+        </div>
+      )}
+
       {preview.blockingReasons.length > 0 && (
         <div className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-950">
           <p className="font-semibold">Cannot proceed</p>
@@ -378,13 +395,15 @@ function RefundModal({
                   idempotencyKey: "",
                   hasPendingRefund: false,
                   inFlightRefundReservedCents: 0,
+                  staleBlockingRefundAttempts: [],
                 }
           );
         }
         if (
           data.code === "REFUND_AVAILABILITY_CHANGED" ||
           data.code === "REFUND_IN_PROGRESS" ||
-          data.code === "ORDER_ALREADY_FULLY_REFUNDED"
+          data.code === "ORDER_ALREADY_FULLY_REFUNDED" ||
+          data.code === "STALE_REFUND_ATTEMPT_BLOCKS_REFUND"
         ) {
           void runPreview();
         }
@@ -803,6 +822,109 @@ function RefundsTable({ rows }: { rows: AdminOrderPaymentSummaryRefund[] }) {
   );
 }
 
+function StaleRefundAttemptBanner({
+  attempts,
+  canDismiss,
+}: {
+  attempts: NonNullable<AdminOrderPaymentSummary["ledgerSummary"]>["staleBlockingRefundAttempts"];
+  canDismiss: boolean;
+}) {
+  const router = useRouter();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (attempts.length === 0) return null;
+
+  async function dismiss(refundAttemptId: string) {
+    setBusyId(refundAttemptId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/refund-attempts/${refundAttemptId}/dismiss-legacy`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "Could not dismiss stale refund attempt.");
+        return;
+      }
+      setConfirmId(null);
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/90 p-3 text-sm text-amber-950">
+      <p className="font-medium">Legacy refund attempt blocking new refunds</p>
+      <p className="mt-1 text-xs text-amber-900/90">
+        This legacy refund attempt did not create a refund ledger entry or Stripe refund, but it is
+        blocking new refunds. Dismiss it to retry the refund flow.
+      </p>
+      <ul className="mt-2 space-y-2">
+        {attempts.map((a) => (
+          <li key={a.id} className="rounded border border-amber-200/80 bg-white/70 p-2 text-xs">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p>
+                  <span className="font-medium">{formatAdminMoney(a.amountCents)}</span> · status{" "}
+                  {a.status} · {new Date(a.createdAt).toLocaleString()}
+                </p>
+                {a.failureMessage && <p className="mt-1 text-amber-900/90">{a.failureMessage}</p>}
+                <p className="mt-1 text-amber-900/80">
+                  Stripe refund ID: {a.stripeRefundId ?? "none"}
+                </p>
+              </div>
+              {canDismiss && a.dismissible && confirmId !== a.id && (
+                <button
+                  type="button"
+                  className="rounded border border-amber-300 bg-white px-2 py-1 text-xs font-medium hover:bg-amber-50"
+                  onClick={() => setConfirmId(a.id)}
+                  disabled={busyId != null}
+                >
+                  Dismiss stale refund attempt
+                </button>
+              )}
+            </div>
+            {confirmId === a.id && (
+              <div className="mt-2 border-t border-amber-200 pt-2">
+                <p className="text-xs">Dismiss this stale attempt so a new refund can be processed?</p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    className="rounded bg-amber-900 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                    disabled={busyId === a.id}
+                    onClick={() => void dismiss(a.id)}
+                  >
+                    {busyId === a.id ? "Dismissing…" : "Confirm dismiss"}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border border-amber-300 px-2 py-1 text-xs"
+                    disabled={busyId === a.id}
+                    onClick={() => setConfirmId(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {!a.dismissible && a.dismissBlockReason && (
+              <p className="mt-1 text-red-800">{a.dismissBlockReason.replace(/_/g, " ")}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+      {error && (
+        <p className="mt-2 text-xs text-red-800" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function AdminPaymentsRefundsPanel({
   summary,
   canExecuteRefunds,
@@ -889,6 +1011,10 @@ export function AdminPaymentsRefundsPanel({
             </p>
           )}
         </div>
+        <StaleRefundAttemptBanner
+          attempts={summary.ledgerSummary?.staleBlockingRefundAttempts ?? []}
+          canDismiss={canExecuteRefunds}
+        />
         {canExecuteRefunds && hasRemaining && (
           <div className="flex flex-wrap gap-2">
             <button

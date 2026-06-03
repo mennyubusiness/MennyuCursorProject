@@ -253,6 +253,17 @@ export type AdminOrderPaymentSummary = {
     remainingRefundableCents: number;
     paymentRefundStatus: string;
     hasPendingRefund: boolean;
+    staleBlockingRefundAttempts: Array<{
+      id: string;
+      amountCents: number;
+      status: string;
+      stripeRefundId: string | null;
+      failureCode: string | null;
+      failureMessage: string | null;
+      createdAt: string;
+      dismissible: boolean;
+      dismissBlockReason: string | null;
+    }>;
   } | null;
   moneyMovement: {
     customerPaymentCents: number;
@@ -549,6 +560,7 @@ export async function fetchAdminOrderPaymentSummary(
             remainingRefundableCents: ledgerSummary.remainingRefundableCents,
             paymentRefundStatus: ledgerSummary.paymentRefundStatus,
             hasPendingRefund: ledgerSummary.hasPendingRefund,
+            staleBlockingRefundAttempts: ledgerSummary.staleBlockingRefundAttempts,
           }
         : null,
       moneyMovement: payment
