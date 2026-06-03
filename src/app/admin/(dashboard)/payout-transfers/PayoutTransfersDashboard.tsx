@@ -30,11 +30,11 @@ import {
 } from "@/lib/vendor-payout-transfer-reconciliation";
 import {
   computeVendorLiabilityTotals,
-  adminVendorConnectTransferStatusLabel,
-  STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT,
+  vendorTransferStatusBadgeLabel,
+  ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE,
   VENDOR_PAID_VIA_CONNECT_LABEL,
 } from "@/lib/stripe-money-movement";
-import { StripeMoneyMovementBreakdown } from "@/components/admin/StripeMoneyMovementBreakdown";
+import { VendorTransferRowDetails } from "@/components/admin/VendorTransferRowDetails";
 import type { StripePlatformBalanceSnapshot } from "@/services/stripe-balance.service";
 
 import type {
@@ -76,7 +76,7 @@ function statusFilterBucket(status: string): "pending" | "paid" | "failed" | "bl
 }
 
 function statusLabel(status: string): string {
-  return adminVendorConnectTransferStatusLabel(status);
+  return vendorTransferStatusBadgeLabel(status);
 }
 
 function statusBadgeClass(status: string): string {
@@ -163,26 +163,26 @@ function inDateRange(iso: string, preset: DatePreset): boolean {
   return new Date(iso).getTime() >= start.getTime();
 }
 
-function FailureText({ text }: { text: string | null }) {
-  const [open, setOpen] = useState(false);
-  if (!text?.trim()) return null;
-  const t = text.trim();
-  const short = t.length > 140;
-  const shown = short && !open ? `${t.slice(0, 140)}…` : t;
+function PayoutFailureCell({
+  row,
+}: {
+  row: Pick<AdminPayoutTransferRow, "status" | "blockedReason" | "failureMessage">;
+}) {
+  if (row.status === "blocked" && row.blockedReason) {
+    return (
+      <div>
+        <span className="font-mono text-xs">{row.blockedReason}</span>
+      </div>
+    );
+  }
+  const failure = displayPayoutTransferFailure(row);
+  if (failure.primary === "—") {
+    return <span className="text-oo-stone-gray">—</span>;
+  }
   return (
-    <div className="mt-1 max-w-xs">
-      <p className="whitespace-pre-wrap break-words font-mono text-[10px] leading-snug text-oo-stone-gray">
-        Stripe detail: {shown}
-      </p>
-      {short && (
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className="mt-0.5 text-[10px] font-semibold text-oo-charcoal hover:underline"
-        >
-          {open ? "Hide Stripe detail" : "Show Stripe detail"}
-        </button>
-      )}
+    <div>
+      <p className="text-xs font-medium text-oo-charcoal">{failure.primary}</p>
+      {failure.detail ? <p className="mt-0.5 text-[11px] text-oo-stone-gray">{failure.detail}</p> : null}
     </div>
   );
 }
@@ -205,31 +205,6 @@ function ReversalFailureText({ text }: { text: string | null }) {
           {open ? "Show less" : "Show more"}
         </button>
       )}
-    </div>
-  );
-}
-
-function PayoutFailureCell({
-  row,
-}: {
-  row: Pick<AdminPayoutTransferRow, "status" | "blockedReason" | "failureMessage">;
-}) {
-  if (row.status === "blocked" && row.blockedReason) {
-    return (
-      <div>
-        <span className="font-mono text-xs">{row.blockedReason}</span>
-      </div>
-    );
-  }
-  const failure = displayPayoutTransferFailure(row);
-  if (failure.primary === "—") {
-    return <span className="text-oo-stone-gray">—</span>;
-  }
-  return (
-    <div>
-      <p className="text-xs font-medium text-oo-charcoal">{failure.primary}</p>
-      {failure.detail ? <p className="mt-0.5 text-[11px] text-oo-stone-gray">{failure.detail}</p> : null}
-      {failure.raw ? <FailureText text={failure.raw} /> : null}
     </div>
   );
 }
@@ -316,39 +291,6 @@ export function PayoutTransfersDashboard({
   }, [reversals, datePreset, vendorId, statusFilter]);
 
   const liabilityTotals = useMemo(() => computeVendorLiabilityTotals(transfers), [transfers]);
-
-  const summary = useMemo(() => {
-    let pendingCents = 0;
-    let paidCents = 0;
-    let failed = 0;
-    let blockedConnect = 0;
-    let blockedInsufficientCents = 0;
-    let retryableFailedCents = 0;
-    for (const t of filteredTransfers) {
-      const bucket = statusFilterBucket(t.status);
-      if (bucket === "pending") pendingCents += t.amountCents;
-      if (bucket === "paid") paidCents += t.amountCents;
-      if (bucket === "failed") {
-        failed++;
-        if (isRetryablePayoutTransfer(t)) retryableFailedCents += t.amountCents;
-      }
-      if (bucket === "blocked") {
-        if (isInsufficientBalanceTransfer(t)) {
-          blockedInsufficientCents += t.amountCents;
-        } else {
-          blockedConnect++;
-        }
-      }
-    }
-    return {
-      pendingCents,
-      paidCents,
-      failed,
-      blockedConnect,
-      blockedInsufficientCents,
-      retryableFailedCents,
-    };
-  }, [filteredTransfers]);
 
   const transferGroups = useMemo(() => {
     const map = new Map<string, AdminPayoutTransferRow[]>();
@@ -599,76 +541,48 @@ export function PayoutTransfersDashboard({
     newKeyRetryId !== null;
 
   return (
-    <div className="space-y-8">
-      <div className="rounded-xl border border-oo-light-stone bg-oo-cream p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-oo-charcoal">Stripe platform balance</h2>
-            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">
-              Vendor transfers can only be sent from Stripe available balance. Pending customer payments and funds
-              already paid out to the platform bank cannot fund Connect transfers until available in Stripe.
-            </p>
-            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">
-              Automatic platform payouts are currently expected to run weekly. If vendor transfers are blocked, wait for
-              pending funds to become available or add funds, then retry.
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={balanceBusy || actionLocked}
-            onClick={() => void refreshBalance()}
-            className="shrink-0 rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-white disabled:opacity-50"
-          >
-            {balanceBusy ? "Refreshing…" : "Refresh Stripe balance"}
-          </button>
-        </div>
+    <div className="space-y-6">
+      <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm sm:p-5">
         {balanceError ? (
-          <p className="mt-3 text-sm text-amber-900" role="status">
+          <p className="text-sm text-amber-900" role="status">
             Unable to fetch Stripe balance: {balanceError}
           </p>
-        ) : balance ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Available</p>
-              <p className="mt-1 text-lg font-semibold text-emerald-900">
-                {formatMoney(balance.availableCents, balance.currency)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Pending</p>
-              <p className="mt-1 text-lg font-semibold text-oo-charcoal">
-                {formatMoney(balance.pendingCents, balance.currency)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Retryable vendor transfers (filtered)</p>
-              <p className="mt-1 text-lg font-semibold text-red-800">
-                {formatMoney(summary.retryableFailedCents + summary.blockedInsufficientCents, "usd")}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">As of</p>
-              <p className="mt-1 font-mono text-xs text-oo-stone-gray">
-                {balance.retrievedAt.slice(0, 19).replace("T", " ")}Z
-              </p>
-            </div>
+        ) : null}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Stripe available balance</p>
+            <p className="mt-1 text-lg font-semibold text-emerald-900">
+              {balance ? formatMoney(balance.availableCents, balance.currency) : "—"}
+            </p>
           </div>
-        ) : (
-          <p className="mt-3 text-sm text-oo-stone-gray">Stripe balance unavailable.</p>
-        )}
-      </div>
-
-      <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm sm:p-5">
-        <h2 className="text-sm font-semibold text-oo-charcoal">Vendor liability summary</h2>
-        <p className="mt-1 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">
-          {STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT} Money paid out to the Open Order bank may still include vendor
-          liabilities below until Connect transfers succeed.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Stripe pending balance</p>
+            <p className="mt-1 text-lg font-semibold text-oo-charcoal">
+              {balance ? formatMoney(balance.pendingCents, balance.currency) : "—"}
+            </p>
+          </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Vendor still owed</p>
             <p className="mt-1 text-lg font-semibold text-amber-900">
               {formatMoney(liabilityTotals.vendorOwedCents, "usd")}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Ready to transfer</p>
+            <p className="mt-1 text-lg font-semibold text-oo-charcoal">
+              {formatMoney(liabilityTotals.readyToTransferCents, "usd")}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Blocked: insufficient balance</p>
+            <p className="mt-1 text-lg font-semibold text-orange-900">
+              {formatMoney(liabilityTotals.blockedInsufficientBalanceCents, "usd")}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Manual review</p>
+            <p className="mt-1 text-lg font-semibold text-violet-900">
+              {formatMoney(liabilityTotals.idempotencyMismatchCents, "usd")}
             </p>
           </div>
           <div>
@@ -677,57 +591,59 @@ export function PayoutTransfersDashboard({
               {formatMoney(liabilityTotals.vendorPaidCents, "usd")}
             </p>
           </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
-              Blocked vendor transfers: insufficient balance
-            </p>
-            <p className="mt-1 text-lg font-semibold text-orange-900">
-              {formatMoney(liabilityTotals.blockedInsufficientBalanceCents, "usd")}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Connect-blocked vendors</p>
-            <p className="mt-1 text-lg font-semibold text-oo-charcoal">{liabilityTotals.blockedConnectCount}</p>
-          </div>
         </div>
-      </div>
+        {balance?.retrievedAt ? (
+          <p className="mt-3 font-mono text-[10px] text-oo-stone-gray">
+            Balance as of {balance.retrievedAt.slice(0, 19).replace("T", " ")}Z
+          </p>
+        ) : null}
 
-      <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={actionLocked}
-              onClick={() => void runPayoutBatch()}
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-hover disabled:opacity-50"
-            >
-              {batchBusy === "payout" ? "Running…" : "Run vendor transfer batch"}
-            </button>
-            <button
-              type="button"
-              disabled={actionLocked}
-              onClick={() => void runRetryAllPayouts()}
-              className="rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-950 shadow-sm hover:bg-orange-100 disabled:opacity-50"
-            >
-              {batchBusy === "retry_all" ? "Retrying…" : "Retry all eligible vendor transfers"}
-            </button>
-            <button
-              type="button"
-              disabled={actionLocked}
-              onClick={() => void runBulkReconcile()}
-              className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-950 shadow-sm hover:bg-sky-100 disabled:opacity-50"
-            >
-              {batchBusy === "reconcile" ? "Reconciling…" : "Reconcile with Stripe"}
-            </button>
-            <button
-              type="button"
-              disabled={actionLocked}
-              onClick={() => void runReversalBatch()}
-              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-2 text-sm font-semibold text-oo-charcoal shadow-sm hover:bg-oo-cream disabled:opacity-50"
-            >
-              {batchBusy === "reversal" ? "Running…" : "Run reversal batch"}
-            </button>
-          </div>
+        <p className="mt-4 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">{ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE}</p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={balanceBusy || actionLocked}
+            onClick={() => void refreshBalance()}
+            className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-white disabled:opacity-50"
+          >
+            {balanceBusy ? "Refreshing…" : "Refresh Stripe balance"}
+          </button>
+          <button
+            type="button"
+            disabled={actionLocked}
+            onClick={() => void runPayoutBatch()}
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-hover disabled:opacity-50"
+          >
+            {batchBusy === "payout" ? "Running…" : "Run vendor transfer batch"}
+          </button>
+          <button
+            type="button"
+            disabled={actionLocked}
+            onClick={() => void runRetryAllPayouts()}
+            className="rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-950 shadow-sm hover:bg-orange-100 disabled:opacity-50"
+          >
+            {batchBusy === "retry_all" ? "Retrying…" : "Retry all eligible vendor transfers"}
+          </button>
+          <button
+            type="button"
+            disabled={actionLocked}
+            onClick={() => void runBulkReconcile()}
+            className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-950 shadow-sm hover:bg-sky-100 disabled:opacity-50"
+          >
+            {batchBusy === "reconcile" ? "Reconciling…" : "Reconcile with Stripe"}
+          </button>
+          <button
+            type="button"
+            disabled={actionLocked}
+            onClick={() => void runReversalBatch()}
+            className="rounded-lg border border-oo-light-stone bg-oo-cream px-4 py-2 text-sm font-semibold text-oo-charcoal shadow-sm hover:bg-oo-warm-white disabled:opacity-50"
+          >
+            {batchBusy === "reversal" ? "Running…" : "Run reversal batch"}
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-4 border-t border-oo-light-stone pt-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1 text-xs font-medium text-oo-stone-gray">
               Status
@@ -797,37 +713,8 @@ export function PayoutTransfersDashboard({
         {batchMsg && <p className="mt-3 text-sm text-emerald-800">{batchMsg}</p>}
       </div>
 
-      <div className="grid gap-3 rounded-xl border border-oo-light-stone bg-oo-cream p-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Pending (filtered)</p>
-          <p className="mt-1 text-lg font-semibold text-oo-charcoal">{formatMoney(summary.pendingCents, "usd")}</p>
-        </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Paid (filtered)</p>
-          <p className="mt-1 text-lg font-semibold text-emerald-900">{formatMoney(summary.paidCents, "usd")}</p>
-        </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Failed rows</p>
-          <p className="mt-1 text-lg font-semibold text-red-800">{summary.failed}</p>
-        </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Blocked (Connect)</p>
-          <p className="mt-1 text-lg font-semibold text-amber-900">{summary.blockedConnect}</p>
-        </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Blocked (balance)</p>
-          <p className="mt-1 text-lg font-semibold text-orange-900">
-            {formatMoney(summary.blockedInsufficientCents, "usd")}
-          </p>
-        </div>
-      </div>
-
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-oo-charcoal">Vendor Connect transfers</h2>
-        <p className="text-sm text-oo-stone-gray">
-          Execution rows for Open Order → vendor connected account transfers. Retries use stable Stripe idempotency keys
-          and check platform available balance before calling Stripe.
-        </p>
+        <h2 className="text-lg font-semibold text-oo-charcoal">Vendor transfers</h2>
         {transferGroups.length === 0 ? (
           <p className="rounded-lg border border-dashed border-oo-light-stone bg-oo-warm-white p-8 text-center text-oo-stone-gray">
             No transfers match filters.
@@ -855,7 +742,7 @@ export function PayoutTransfersDashboard({
                         <tr>
                           <th className="px-3 py-2">Vendor</th>
                           <th className="px-3 py-2">Order</th>
-                          <th className="px-3 py-2">Amount</th>
+                          <th className="px-3 py-2">Vendor transfer amount</th>
                           <th className="px-3 py-2">Status</th>
                           <th className="px-3 py-2">Reason</th>
                           <th className="px-3 py-2">Destination</th>
@@ -892,12 +779,7 @@ export function PayoutTransfersDashboard({
                                 </Link>
                               </td>
                               <td className="px-3 py-2 tabular-nums">
-                                <div>{formatMoney(t.amountCents, t.currency)}</div>
-                                {t.moneyMovement && t.moneyMovement.vendorStillOwedCents > 0 && (
-                                  <div className="text-[10px] font-medium text-amber-900">
-                                    owed {formatMoney(t.moneyMovement.vendorStillOwedCents, t.currency)}
-                                  </div>
-                                )}
+                                {formatMoney(t.amountCents, t.currency)}
                               </td>
                               <td className="px-3 py-2">
                                 <span
@@ -933,16 +815,6 @@ export function PayoutTransfersDashboard({
                               </td>
                               <td className="px-3 py-2">
                                 <div className="flex flex-col gap-1">
-                                  {reconcilable ? (
-                                    <button
-                                      type="button"
-                                      disabled={reconcilePayoutId !== null || retryPayoutId !== null}
-                                      onClick={() => void checkStripeTransfer(t.id)}
-                                      className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-950 hover:bg-sky-100 disabled:opacity-50"
-                                    >
-                                      {reconcilePayoutId === t.id ? "Checking…" : "Check Stripe"}
-                                    </button>
-                                  ) : null}
                                   {retryable ? (
                                     <button
                                       type="button"
@@ -951,6 +823,16 @@ export function PayoutTransfersDashboard({
                                       className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
                                     >
                                       {retryPayoutId === t.id ? "Retrying…" : "Retry vendor transfer"}
+                                    </button>
+                                  ) : null}
+                                  {reconcilable ? (
+                                    <button
+                                      type="button"
+                                      disabled={reconcilePayoutId !== null || retryPayoutId !== null}
+                                      onClick={() => void checkStripeTransfer(t.id)}
+                                      className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-950 hover:bg-sky-100 disabled:opacity-50"
+                                    >
+                                      {reconcilePayoutId === t.id ? "Checking…" : "Check Stripe"}
                                     </button>
                                   ) : null}
                                   {newKeyRetry ? (
@@ -963,41 +845,37 @@ export function PayoutTransfersDashboard({
                                       {newKeyRetryId === t.id ? "Retrying…" : "Retry with new transfer key"}
                                     </button>
                                   ) : null}
-                                  {!reconcilable && !retryable && !newKeyRetry ? (
-                                    <span className="text-xs text-oo-stone-gray">—</span>
-                                  ) : null}
-                                  {reconcileNotes[t.id] ? (
-                                    <span className="max-w-[160px] text-[10px] leading-snug text-oo-stone-gray">
-                                      {reconcileNotes[t.id]}
-                                    </span>
-                                  ) : null}
+                                  <Link
+                                    href={`/admin/orders/${t.vendorOrder.orderId}`}
+                                    className="rounded-md border border-oo-light-stone bg-oo-warm-white px-2 py-1 text-center text-xs font-semibold text-oo-charcoal hover:bg-oo-cream"
+                                  >
+                                    View order
+                                  </Link>
                                 </div>
                               </td>
                             </tr>
                             {t.moneyMovement ? (
                               <tr key={`${t.id}-money`} className={rowTint}>
                                 <td colSpan={9} className="border-t border-oo-light-stone/60 px-3 py-3">
-                                  <details className="text-xs">
-                                    <summary className="cursor-pointer font-medium text-oo-stone-gray hover:text-oo-charcoal">
-                                      Money movement breakdown
+                                  <details>
+                                    <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
+                                      Transfer details
                                     </summary>
-                                    <div className="mt-2 max-w-xl rounded-lg border border-oo-light-stone bg-white/80 p-3">
-                                      <StripeMoneyMovementBreakdown
-                                        compact
+                                    <div className="mt-2">
+                                      <VendorTransferRowDetails
                                         currency={t.currency}
-                                        customerPaymentCents={t.moneyMovement.customerPaymentCents}
-                                        stripeProcessingFeeCents={t.moneyMovement.stripeProcessingFeeCents}
-                                        stripeNetToPlatformCents={t.moneyMovement.stripeNetToPlatformCents}
-                                        platformPayout={t.moneyMovement.platformPayout}
-                                        vendorConnectTransferOwedCents={t.moneyMovement.vendorConnectTransferOwedCents}
-                                        vendorConnectTransferStatus={adminVendorConnectTransferStatusLabel(t.status)}
-                                        vendorStillOwedCents={t.moneyMovement.vendorStillOwedCents}
-                                        openOrderRetainedCents={t.moneyMovement.openOrderRetainedCents}
+                                        status={t.status}
+                                        failureMessage={t.failureMessage}
+                                        blockedReason={t.blockedReason}
+                                        idempotencyKey={t.idempotencyKey}
+                                        batchKey={t.batchKey}
                                         stripeTransferId={t.stripeTransferId}
+                                        reconcileNote={reconcileNotes[t.id]}
                                         showBlockedNote={
                                           t.moneyMovement.vendorStillOwedCents > 0 &&
                                           (insufficient || t.status === "failed" || t.status === "blocked")
                                         }
+                                        moneyMovement={t.moneyMovement}
                                       />
                                     </div>
                                   </details>

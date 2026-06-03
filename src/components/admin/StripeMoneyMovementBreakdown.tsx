@@ -1,6 +1,5 @@
 import {
   BLOCKED_VENDOR_TRANSFER_STILL_OWED,
-  adminVendorConnectTransferStatusLabel,
   platformPayoutDisplayLabel,
   STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT,
   type PlatformPayoutDisplayStatus,
@@ -26,6 +25,8 @@ export type StripeMoneyMovementBreakdownProps = {
   currency?: string;
   compact?: boolean;
   showBlockedNote?: boolean;
+  /** full = all rows + disclaimer; accounting = platform payout chain only */
+  mode?: "full" | "accounting";
 };
 
 export function StripeMoneyMovementBreakdown({
@@ -41,8 +42,9 @@ export function StripeMoneyMovementBreakdown({
   currency = "usd",
   compact = false,
   showBlockedNote = false,
+  mode = "full",
 }: StripeMoneyMovementBreakdownProps) {
-  const rows = [
+  const accountingRows = [
     { label: "Customer payment total", value: formatMoney(customerPaymentCents, currency) },
     {
       label: "Stripe processing fee",
@@ -63,13 +65,16 @@ export function StripeMoneyMovementBreakdown({
       value: platformPayoutDisplayLabel(platformPayout),
       emphasize: platformPayout.kind === "paid_out",
     },
+  ];
+
+  const transferRows = [
     {
       label: "Vendor Connect transfer owed",
       value: formatMoney(vendorConnectTransferOwedCents, currency),
     },
     {
       label: "Vendor Connect transfer status",
-      value: adminVendorConnectTransferStatusLabel(vendorConnectTransferStatus),
+      value: vendorConnectTransferStatus,
     },
     {
       label: "Vendor still owed",
@@ -85,9 +90,13 @@ export function StripeMoneyMovementBreakdown({
     },
   ];
 
+  const rows = mode === "accounting" ? accountingRows : [...accountingRows, ...transferRows];
+
   return (
     <div className={compact ? "space-y-2 text-xs" : "space-y-3 text-sm"}>
-      <p className="leading-relaxed text-oo-stone-gray">{STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT}</p>
+      {mode === "full" ? (
+        <p className="leading-relaxed text-oo-stone-gray">{STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT}</p>
+      ) : null}
       <dl className="grid gap-1.5">
         {rows.map((row) => (
           <div key={row.label} className="flex justify-between gap-3">

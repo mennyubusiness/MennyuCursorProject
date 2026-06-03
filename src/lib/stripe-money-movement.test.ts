@@ -65,12 +65,16 @@ describe("stripe-money-movement", () => {
   it("aggregates vendor liability totals", () => {
     const totals = computeVendorLiabilityTotals([
       { status: "paid", amountCents: 1000, destinationAccountId: "acct_1", stripeTransferId: "tr_1" },
+      { status: "pending", amountCents: 200, destinationAccountId: "acct_1" },
       { status: "failed", amountCents: 500, destinationAccountId: "acct_1" },
       { status: "blocked_insufficient_balance", amountCents: 300, destinationAccountId: "acct_1" },
+      { status: "blocked_idempotency_mismatch", amountCents: 100, destinationAccountId: "acct_1" },
     ]);
     expect(totals.vendorPaidCents).toBe(1000);
-    expect(totals.vendorOwedCents).toBe(800);
+    expect(totals.vendorOwedCents).toBe(1100);
+    expect(totals.readyToTransferCents).toBe(200);
     expect(totals.blockedInsufficientBalanceCents).toBe(300);
+    expect(totals.idempotencyMismatchCents).toBe(100);
   });
 });
 
@@ -96,6 +100,9 @@ describe("adminVendorConnectTransferStatusLabel", () => {
     expect(adminVendorConnectTransferStatusLabel("paid")).toBe("vendor paid via Connect");
     expect(adminVendorConnectTransferStatusLabel("blocked_insufficient_balance")).toContain(
       "Vendor transfer blocked"
+    );
+    expect(adminVendorConnectTransferStatusLabel("blocked_idempotency_mismatch")).toBe(
+      "Manual review: Stripe idempotency mismatch"
     );
   });
 });

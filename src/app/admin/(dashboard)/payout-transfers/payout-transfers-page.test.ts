@@ -22,14 +22,32 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).toMatch(/Unable to fetch Stripe balance/);
   });
 
-  it("uses Vendor Transfers title and defines Connect transfer vs platform payout", () => {
+  it("uses Vendor Transfers title and defines Connect transfer", () => {
     const pageSrc = readFileSync(
       join(root, "src/app/admin/(dashboard)/payout-transfers/page.tsx"),
       "utf8"
     );
     expect(pageSrc).toMatch(/Vendor Transfers/);
-    expect(pageSrc).toMatch(/ADMIN_STRIPE_MONEY_MOVEMENT_DEFINITIONS/);
+    expect(pageSrc).toMatch(/ADMIN_VENDOR_TRANSFERS_PAGE_INTRO/);
+    expect(pageSrc).not.toMatch(/ADMIN_STRIPE_MONEY_MOVEMENT_DEFINITIONS/);
     expect(pageSrc).not.toMatch(/Payout transfers/);
+  });
+
+  it("does not prominently show platform bank payout details by default", () => {
+    const pageSrc = readFileSync(
+      join(root, "src/app/admin/(dashboard)/payout-transfers/page.tsx"),
+      "utf8"
+    );
+    const dashboardSrc = readFileSync(
+      join(root, "src/app/admin/(dashboard)/payout-transfers/PayoutTransfersDashboard.tsx"),
+      "utf8"
+    );
+
+    expect(pageSrc).not.toMatch(/Platform payout to Open Order bank/);
+    expect(dashboardSrc).not.toMatch(/Vendor liability summary/);
+    expect(dashboardSrc).not.toMatch(/STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT/);
+    expect(dashboardSrc).toMatch(/VendorTransferRowDetails/);
+    expect(dashboardSrc).not.toMatch(/StripeMoneyMovementBreakdown/);
   });
 
   it("uses Retry vendor transfer and blocked vendor transfer copy", () => {
@@ -40,6 +58,8 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).toMatch(/Retry vendor transfer/);
     expect(dashboardSrc).toMatch(/Run vendor transfer batch/);
     expect(dashboardSrc).toMatch(/Retry all eligible vendor transfers/);
+    expect(dashboardSrc).toMatch(/Vendor transfer amount/);
+    expect(dashboardSrc).toMatch(/VENDOR_PAID_VIA_CONNECT_LABEL/);
     expect(dashboardSrc).not.toMatch(/Retry payout/);
     expect(dashboardSrc).not.toMatch(/Run payout batch/);
   });

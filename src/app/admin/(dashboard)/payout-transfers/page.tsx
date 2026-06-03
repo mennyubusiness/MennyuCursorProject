@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { fetchStripePlatformBalance } from "@/services/stripe-balance.service";
 import { platformPayoutDisplayForListRow } from "@/services/stripe-platform-payout-lookup.service";
-import { buildPayoutTransferMoneyContext, ADMIN_STRIPE_MONEY_MOVEMENT_DEFINITIONS, ADMIN_VENDOR_TRANSFERS_PAGE_INTRO } from "@/lib/stripe-money-movement";
+import { buildPayoutTransferMoneyContext, ADMIN_VENDOR_TRANSFERS_PAGE_INTRO } from "@/lib/stripe-money-movement";
 import type {
   AdminPayoutTransferRow,
   AdminTransferReversalRow,
@@ -142,13 +142,6 @@ export default async function AdminPayoutTransfersPage() {
       <div>
         <h1 className="text-2xl font-semibold text-oo-charcoal">Vendor Transfers</h1>
         <p className="mt-1 max-w-3xl text-sm text-oo-stone-gray">{ADMIN_VENDOR_TRANSFERS_PAGE_INTRO}</p>
-        <div className="mt-3 max-w-3xl rounded-lg border border-oo-light-stone bg-oo-cream/50 px-3 py-2.5 text-xs leading-relaxed text-oo-stone-gray">
-          <ul className="list-disc space-y-1 pl-4">
-            {ADMIN_STRIPE_MONEY_MOVEMENT_DEFINITIONS.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </div>
       </div>
 
       <PayoutTransfersDashboard

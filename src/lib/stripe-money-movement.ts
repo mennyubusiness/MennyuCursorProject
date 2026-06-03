@@ -5,7 +5,13 @@ export const STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT =
   "Stripe payouts to the Open Order bank are not vendor payments. Vendors are paid only when a Stripe Connect transfer (tr_...) is sent to their connected account.";
 
 export const ADMIN_VENDOR_TRANSFERS_PAGE_INTRO =
-  "Vendor transfers move funds from Open Order's Stripe platform balance to each vendor's connected Stripe account. This is different from a Stripe payout, which moves money from a Stripe account to a bank account.";
+  "Vendor transfers move funds from Open Order's Stripe platform balance to vendor connected Stripe accounts.";
+
+export const ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE =
+  "Transfers can only be sent from Stripe available balance. Pending funds and funds already paid to the Open Order bank cannot fund vendor transfers.";
+
+export const ADMIN_ACCOUNTING_CONTEXT_INTRO =
+  "Platform payout information explains whether Stripe paid Open Order's bank. It does not determine whether the vendor was paid.";
 
 export const ADMIN_STRIPE_MONEY_MOVEMENT_DEFINITIONS = [
   "Vendor Connect transfer: Open Order → vendor connected Stripe account.",
@@ -14,7 +20,7 @@ export const ADMIN_STRIPE_MONEY_MOVEMENT_DEFINITIONS = [
 ] as const;
 
 export const BLOCKED_VENDOR_TRANSFER_STILL_OWED =
-  "This vendor transfer is still owed. The customer payment may already have been paid out to the Open Order bank, but no matching vendor Connect transfer has been recorded.";
+  "Customer payment exists, but no vendor Connect transfer has been recorded. Vendor is still owed.";
 
 export const VENDOR_PAID_VIA_CONNECT_LABEL = "vendor paid via Connect";
 
@@ -25,7 +31,7 @@ export function adminVendorConnectTransferStatusLabel(status: string): string {
     return "Vendor transfer blocked: insufficient Stripe available balance";
   }
   if (status === IDEMPOTENCY_MISMATCH_STATUS) {
-    return "blocked: idempotency mismatch";
+    return "Manual review: Stripe idempotency mismatch";
   }
   if (status === "blocked") return "Blocked vendor transfer";
   if (status === "failed") return "Vendor transfer failed";
@@ -106,9 +112,22 @@ export function platformPayoutDisplayLabel(status: PlatformPayoutDisplayStatus):
 export type VendorLiabilityTotals = {
   vendorOwedCents: number;
   vendorPaidCents: number;
+  readyToTransferCents: number;
   blockedInsufficientBalanceCents: number;
+  idempotencyMismatchCents: number;
   blockedConnectCount: number;
 };
+
+/** Short badge label for vendor transfer table rows. */
+export function vendorTransferStatusBadgeLabel(status: string): string {
+  if (status === "paid") return "vendor paid via Connect";
+  if (status === "pending" || status === "submitted") return "ready to send";
+  if (status === INSUFFICIENT_BALANCE_STATUS) return "blocked: insufficient balance";
+  if (status === IDEMPOTENCY_MISMATCH_STATUS) return "manual review";
+  if (status === "blocked") return "blocked";
+  if (status === "failed") return "failed";
+  return status;
+}
 
 const OWED_STATUSES = new Set([
   "failed",
@@ -129,7 +148,9 @@ export function computeVendorLiabilityTotals(
 ): VendorLiabilityTotals {
   let vendorOwedCents = 0;
   let vendorPaidCents = 0;
+  let readyToTransferCents = 0;
   let blockedInsufficientBalanceCents = 0;
+  let idempotencyMismatchCents = 0;
   let blockedConnectCount = 0;
 
   for (const t of transfers) {
@@ -137,8 +158,18 @@ export function computeVendorLiabilityTotals(
       vendorPaidCents += t.amountCents;
       continue;
     }
+    if (t.status === "pending" || t.status === "submitted") {
+      readyToTransferCents += t.amountCents;
+      vendorOwedCents += t.amountCents;
+      continue;
+    }
     if (t.status === INSUFFICIENT_BALANCE_STATUS) {
       blockedInsufficientBalanceCents += t.amountCents;
+      vendorOwedCents += t.amountCents;
+      continue;
+    }
+    if (t.status === IDEMPOTENCY_MISMATCH_STATUS) {
+      idempotencyMismatchCents += t.amountCents;
       vendorOwedCents += t.amountCents;
       continue;
     }
@@ -155,7 +186,9 @@ export function computeVendorLiabilityTotals(
   return {
     vendorOwedCents,
     vendorPaidCents,
+    readyToTransferCents,
     blockedInsufficientBalanceCents,
+    idempotencyMismatchCents,
     blockedConnectCount,
   };
 }

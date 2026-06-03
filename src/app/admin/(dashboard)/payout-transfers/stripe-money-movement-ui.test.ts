@@ -6,9 +6,13 @@ import { describe, expect, it } from "vitest";
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../../../..");
 
 describe("admin stripe money movement UI terminology", () => {
-  it("vendor transfers dashboard separates customer payment, platform payout, and vendor transfer", () => {
+  it("vendor transfers dashboard focuses on Connect transfers; accounting is collapsed", () => {
     const dashboard = readFileSync(
       join(root, "src/app/admin/(dashboard)/payout-transfers/PayoutTransfersDashboard.tsx"),
+      "utf8"
+    );
+    const rowDetails = readFileSync(
+      join(root, "src/components/admin/VendorTransferRowDetails.tsx"),
       "utf8"
     );
     const panel = readFileSync(
@@ -21,10 +25,14 @@ describe("admin stripe money movement UI terminology", () => {
     );
     const nav = readFileSync(join(root, "src/components/admin/AdminTopNav.tsx"), "utf8");
 
-    expect(dashboard).toMatch(/StripeMoneyMovementBreakdown/);
-    expect(dashboard).toMatch(/Vendor liability summary/);
+    expect(dashboard).toMatch(/VendorTransferRowDetails/);
+    expect(dashboard).toMatch(/Stripe available balance/);
+    expect(dashboard).toMatch(/Vendor still owed/);
+    expect(dashboard).not.toMatch(/StripeMoneyMovementBreakdown/);
+    expect(rowDetails).toMatch(/Additional accounting context/);
+    expect(rowDetails).toMatch(/ADMIN_ACCOUNTING_CONTEXT_INTRO/);
     expect(breakdown).toMatch(/Platform payout to Open Order bank/);
-    expect(dashboard).toMatch(/Vendor Connect transfers/);
+    expect(breakdown).toMatch(/mode === "accounting"/);
     expect(panel).toMatch(/Vendor Connect transfer breakdown/);
     expect(nav).toMatch(/Vendor Transfers/);
   });
