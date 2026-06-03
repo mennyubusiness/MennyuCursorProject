@@ -9,6 +9,7 @@ import {
   adminReconcileVendorPayoutTransferAction,
   adminRetryAllEligibleVendorPayoutTransfersAction,
   adminRetryVendorPayoutTransferAction,
+  adminRetryVendorPayoutTransferWithNewKeyAction,
   adminRunVendorPayoutTransferBatchAction,
 } from "@/actions/admin-payout-transfer.actions";
 import {
@@ -17,16 +18,21 @@ import {
 } from "@/actions/admin-payout-transfer-reversal.actions";
 import {
   displayPayoutTransferFailure,
+  IDEMPOTENCY_MISMATCH_STATUS,
   INSUFFICIENT_BALANCE_STATUS,
   isInsufficientBalanceTransfer,
+  isIdempotencyMismatchTransfer,
   isRetryablePayoutTransfer,
+  canRetryWithNewIdempotencyKey,
 } from "@/lib/vendor-payout-transfer-failure";
 import {
   isReconcilablePayoutTransfer,
 } from "@/lib/vendor-payout-transfer-reconciliation";
 import {
   computeVendorLiabilityTotals,
+  adminVendorConnectTransferStatusLabel,
   STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT,
+  VENDOR_PAID_VIA_CONNECT_LABEL,
 } from "@/lib/stripe-money-movement";
 import { StripeMoneyMovementBreakdown } from "@/components/admin/StripeMoneyMovementBreakdown";
 import type { StripePlatformBalanceSnapshot } from "@/services/stripe-balance.service";
@@ -61,6 +67,7 @@ function shortenStripeId(id: string | null | undefined): string {
 
 function statusFilterBucket(status: string): "pending" | "paid" | "failed" | "blocked" {
   if (status === INSUFFICIENT_BALANCE_STATUS) return "blocked";
+  if (status === IDEMPOTENCY_MISMATCH_STATUS) return "blocked";
   if (status === "blocked") return "blocked";
   if (status === "failed") return "failed";
   if (status === "paid") return "paid";
@@ -69,12 +76,11 @@ function statusFilterBucket(status: string): "pending" | "paid" | "failed" | "bl
 }
 
 function statusLabel(status: string): string {
-  if (status === INSUFFICIENT_BALANCE_STATUS) return "blocked: insufficient balance";
-  return status;
+  return adminVendorConnectTransferStatusLabel(status);
 }
 
 function statusBadgeClass(status: string): string {
-  if (status === INSUFFICIENT_BALANCE_STATUS) {
+  if (status === INSUFFICIENT_BALANCE_STATUS || status === IDEMPOTENCY_MISMATCH_STATUS) {
     return "bg-orange-100 text-orange-950 ring-orange-200";
   }
   const b = statusFilterBucket(status);
@@ -271,6 +277,8 @@ export function PayoutTransfersDashboard({
   const [retryPayoutId, setRetryPayoutId] = useState<string | null>(null);
   const [reconcilePayoutId, setReconcilePayoutId] = useState<string | null>(null);
   const [reconcileNotes, setReconcileNotes] = useState<Record<string, string>>({});
+  const [reconcileOutcomes, setReconcileOutcomes] = useState<Record<string, string>>({});
+  const [newKeyRetryId, setNewKeyRetryId] = useState<string | null>(null);
   const [retryReversalId, setRetryReversalId] = useState<string | null>(null);
   const [balance, setBalance] = useState<StripePlatformBalanceSnapshot | null>(initialBalance);
   const [balanceError, setBalanceError] = useState<string | null>(initialBalanceError);
@@ -397,7 +405,7 @@ export function PayoutTransfersDashboard({
         return;
       }
       setBatchMsg(
-        `Payout batch: examined ${r.summary.examined}, settled ${r.summary.settled}, skipped ${r.summary.skipped}, failed ${r.summary.failed}, blocked (balance) ${r.summary.blockedInsufficientBalance}.`
+        `Vendor transfer batch: examined ${r.summary.examined}, settled ${r.summary.settled}, skipped ${r.summary.skipped}, failed ${r.summary.failed}, blocked (balance) ${r.summary.blockedInsufficientBalance}.`
       );
       startTransition(() => router.refresh());
     } catch (e) {
@@ -420,7 +428,7 @@ export function PayoutTransfersDashboard({
         return;
       }
       setBatchMsg(
-        `Retry all: examined ${r.summary.examined}, settled ${r.summary.settled}, skipped ${r.summary.skipped}, failed ${r.summary.failed}, blocked (balance) ${r.summary.blockedInsufficientBalance}.`
+        `Retry all vendor transfers: examined ${r.summary.examined}, settled ${r.summary.settled}, skipped ${r.summary.skipped}, failed ${r.summary.failed}, blocked (balance) ${r.summary.blockedInsufficientBalance}.`
       );
       startTransition(() => router.refresh());
     } catch (e) {
@@ -500,6 +508,7 @@ export function PayoutTransfersDashboard({
         return;
       }
       const msg = r.result.message;
+      setReconcileOutcomes((prev) => ({ ...prev, [id]: r.result.outcome }));
       setReconcileNotes((prev) => ({
         ...prev,
         [id]:
@@ -507,16 +516,43 @@ export function PayoutTransfersDashboard({
             ? `${msg} (${r.result.detail})`
             : msg,
       }));
-      if (r.result.outcome === "updated_paid" && r.transfer) {
+      if (
+        (r.result.outcome === "updated_paid" || r.result.outcome === "already_paid") &&
+        r.transfer
+      ) {
         setTransfers((prev) =>
           prev.map((t) => (t.id === id ? normalizeTransferRow(r.transfer!) : t))
         );
-      }
-      if (r.result.outcome === "updated_paid") {
         startTransition(() => router.refresh());
       }
     } finally {
       setReconcilePayoutId(null);
+    }
+  }
+
+  async function retryWithNewTransferKey(id: string) {
+    const confirmed = window.confirm(
+      "Only use this if no matching Stripe Connect transfer exists. This will attempt a new vendor transfer with a new idempotency key."
+    );
+    if (!confirmed) return;
+    setNewKeyRetryId(id);
+    try {
+      const r = await adminRetryVendorPayoutTransferWithNewKeyAction(id);
+      if (!r.ok) {
+        alert(r.error);
+        return;
+      }
+      if (
+        (r.result.outcome === "reconciled_paid" || r.result.outcome === "paid") &&
+        r.transfer
+      ) {
+        setTransfers((prev) =>
+          prev.map((t) => (t.id === id ? normalizeTransferRow(r.transfer!) : t))
+        );
+        startTransition(() => router.refresh());
+      }
+    } finally {
+      setNewKeyRetryId(null);
     }
   }
 
@@ -556,7 +592,11 @@ export function PayoutTransfersDashboard({
   }
 
   const actionLocked =
-    batchBusy !== null || retryPayoutId !== null || retryReversalId !== null || reconcilePayoutId !== null;
+    batchBusy !== null ||
+    retryPayoutId !== null ||
+    retryReversalId !== null ||
+    reconcilePayoutId !== null ||
+    newKeyRetryId !== null;
 
   return (
     <div className="space-y-8">
@@ -601,7 +641,7 @@ export function PayoutTransfersDashboard({
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Retryable failed (filtered)</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Retryable vendor transfers (filtered)</p>
               <p className="mt-1 text-lg font-semibold text-red-800">
                 {formatMoney(summary.retryableFailedCents + summary.blockedInsufficientCents, "usd")}
               </p>
@@ -632,14 +672,14 @@ export function PayoutTransfersDashboard({
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Vendor paid (Connect)</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Vendor paid via Connect</p>
             <p className="mt-1 text-lg font-semibold text-emerald-900">
               {formatMoney(liabilityTotals.vendorPaidCents, "usd")}
             </p>
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
-              Blocked: insufficient balance
+              Blocked vendor transfers: insufficient balance
             </p>
             <p className="mt-1 text-lg font-semibold text-orange-900">
               {formatMoney(liabilityTotals.blockedInsufficientBalanceCents, "usd")}
@@ -661,7 +701,7 @@ export function PayoutTransfersDashboard({
               onClick={() => void runPayoutBatch()}
               className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-hover disabled:opacity-50"
             >
-              {batchBusy === "payout" ? "Running…" : "Run payout batch"}
+              {batchBusy === "payout" ? "Running…" : "Run vendor transfer batch"}
             </button>
             <button
               type="button"
@@ -669,7 +709,7 @@ export function PayoutTransfersDashboard({
               onClick={() => void runRetryAllPayouts()}
               className="rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-950 shadow-sm hover:bg-orange-100 disabled:opacity-50"
             >
-              {batchBusy === "retry_all" ? "Retrying…" : "Retry all eligible failed payouts"}
+              {batchBusy === "retry_all" ? "Retrying…" : "Retry all eligible vendor transfers"}
             </button>
             <button
               type="button"
@@ -698,7 +738,7 @@ export function PayoutTransfersDashboard({
               >
                 <option value="all">All</option>
                 <option value="pending">Pending / submitted</option>
-                <option value="paid">Paid</option>
+                <option value="paid">{VENDOR_PAID_VIA_CONNECT_LABEL}</option>
                 <option value="failed">Failed</option>
                 <option value="blocked">Blocked</option>
               </select>
@@ -783,10 +823,10 @@ export function PayoutTransfersDashboard({
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-oo-charcoal">Payout transfers</h2>
+        <h2 className="text-lg font-semibold text-oo-charcoal">Vendor Connect transfers</h2>
         <p className="text-sm text-oo-stone-gray">
-          Stripe Connect transfers from allocations. Retries use stable Stripe idempotency keys and check platform
-          available balance before calling Stripe.
+          Execution rows for Open Order → vendor connected account transfers. Retries use stable Stripe idempotency keys
+          and check platform available balance before calling Stripe.
         </p>
         {transferGroups.length === 0 ? (
           <p className="rounded-lg border border-dashed border-oo-light-stone bg-oo-warm-white p-8 text-center text-oo-stone-gray">
@@ -828,9 +868,11 @@ export function PayoutTransfersDashboard({
                         {rows.map((t) => {
                           const bucket = statusFilterBucket(t.status);
                           const insufficient = isInsufficientBalanceTransfer(t);
+                          const idempotencyMismatch = isIdempotencyMismatchTransfer(t);
                           const retryable = isRetryablePayoutTransfer(t);
                           const reconcilable = isReconcilablePayoutTransfer(t);
-                          const rowTint = insufficient
+                          const newKeyRetry = canRetryWithNewIdempotencyKey(t, reconcileOutcomes[t.id]);
+                          const rowTint = insufficient || idempotencyMismatch
                             ? "bg-orange-50/50"
                             : bucket === "failed"
                               ? "bg-red-50/50"
@@ -908,10 +950,20 @@ export function PayoutTransfersDashboard({
                                       onClick={() => void retryTransfer(t.id)}
                                       className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
                                     >
-                                      {retryPayoutId === t.id ? "Retrying…" : "Retry payout"}
+                                      {retryPayoutId === t.id ? "Retrying…" : "Retry vendor transfer"}
                                     </button>
                                   ) : null}
-                                  {!reconcilable && !retryable ? (
+                                  {newKeyRetry ? (
+                                    <button
+                                      type="button"
+                                      disabled={newKeyRetryId !== null || reconcilePayoutId !== null}
+                                      onClick={() => void retryWithNewTransferKey(t.id)}
+                                      className="rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-950 hover:bg-violet-100 disabled:opacity-50"
+                                    >
+                                      {newKeyRetryId === t.id ? "Retrying…" : "Retry with new transfer key"}
+                                    </button>
+                                  ) : null}
+                                  {!reconcilable && !retryable && !newKeyRetry ? (
                                     <span className="text-xs text-oo-stone-gray">—</span>
                                   ) : null}
                                   {reconcileNotes[t.id] ? (
@@ -938,7 +990,7 @@ export function PayoutTransfersDashboard({
                                         stripeNetToPlatformCents={t.moneyMovement.stripeNetToPlatformCents}
                                         platformPayout={t.moneyMovement.platformPayout}
                                         vendorConnectTransferOwedCents={t.moneyMovement.vendorConnectTransferOwedCents}
-                                        vendorConnectTransferStatus={t.status}
+                                        vendorConnectTransferStatus={adminVendorConnectTransferStatusLabel(t.status)}
                                         vendorStillOwedCents={t.moneyMovement.vendorStillOwedCents}
                                         openOrderRetainedCents={t.moneyMovement.openOrderRetainedCents}
                                         stripeTransferId={t.stripeTransferId}

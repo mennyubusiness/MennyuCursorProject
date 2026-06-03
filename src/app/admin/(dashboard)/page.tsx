@@ -8,7 +8,7 @@ const quickActions = [
   { label: "Issues", href: "/admin/exceptions", hint: "Routing and fulfillment queue" },
   { label: "Vendors", href: "/admin/vendors", hint: "Marketplace" },
   { label: "Pods", href: "/admin/pods", hint: "Locations" },
-  { label: "Payouts", href: "/admin/payout-transfers", hint: "Stripe transfers" },
+  { label: "Vendor Transfers", href: "/admin/payout-transfers", hint: "Connect transfers to vendors" },
 ] as const;
 
 export default async function AdminDashboardPage() {

@@ -17,6 +17,7 @@ import type {
   AdminOrderPaymentSummaryRefund,
 } from "@/services/admin-order-payment-summary.service";
 import { StripeMoneyMovementBreakdown } from "@/components/admin/StripeMoneyMovementBreakdown";
+import { adminVendorConnectTransferStatusLabel } from "@/lib/stripe-money-movement";
 import type { AdminRefundPreviewPayload } from "@/lib/admin-refund-preview.types";
 import type { LinkedIssueRefundContext } from "@/lib/admin-order-issue-refund-link";
 
@@ -370,7 +371,7 @@ function RefundModal({
       }
       const reversalNote =
         data.transferReversal?.outcome === "created_pending"
-          ? " Vendor transfer reversal rows were prepared — execute reversals from the payout reversal workflow."
+          ? " Vendor transfer reversal rows were prepared — execute reversals from the vendor transfer reversals workflow."
           : data.transferReversal?.reason === "platform_absorbs_refund_no_transfer_reversal"
             ? " Open Order is bearing this refund; no vendor transfer reversal was prepared."
             : data.transferReversal?.outcome === "skipped_ineligible" ||
@@ -833,14 +834,14 @@ export function AdminPaymentsRefundsPanel({
           <p className="mt-1 text-sm text-oo-stone-gray">
             Customer refunds debit the platform PaymentIntent. Vendor clawback uses a separate{" "}
             <Link href="/admin/payout-transfers" className="font-medium text-oo-charcoal underline">
-              payout reversals workflow
+              vendor transfer reversals workflow
             </Link>
             .
           </p>
           {pendingReversalCount > 0 && (
             <p className="mt-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
               {pendingReversalCount} transfer reversal row(s) need manual execution — prepared rows
-              are not completed until processed in payout reversals.
+              are not completed until processed in vendor transfer reversals.
             </p>
           )}
         </div>
@@ -997,9 +998,9 @@ export function AdminPaymentsRefundsPanel({
 
       {/* Vendor breakdown */}
       <div className="mt-6">
-        <h3 className="font-medium text-oo-charcoal">Vendor payout breakdown</h3>
+        <h3 className="font-medium text-oo-charcoal">Vendor Connect transfer breakdown</h3>
         <p className="text-xs text-oo-stone-gray">
-          PaymentAllocation is the source of truth for net vendor transfer amounts.
+          PaymentAllocation is the source of truth for net vendor Connect transfer amounts.
         </p>
         <div className="mt-3 overflow-x-auto rounded-lg border border-oo-light-stone">
           <table className="w-full min-w-[900px] text-left text-sm">
@@ -1106,7 +1107,7 @@ export function AdminPaymentsRefundsPanel({
                   </td>
                   <td className="px-2 py-2 text-xs">
                     <span className="rounded bg-oo-cream px-1.5 py-0.5 ring-1 ring-stone-200">
-                      {v.transferStatus ?? "missing"}
+                      {adminVendorConnectTransferStatusLabel(v.transferStatus ?? "missing")}
                     </span>
                     {v.stripeTransferId && (
                       <p className="mt-0.5 font-mono text-[10px]">{shortenId(v.stripeTransferId)}</p>

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import {
   retryAllEligibleFailedVendorPayoutTransfers,
   retryFailedVendorPayoutTransfer,
+  retryVendorPayoutTransferWithNewKey,
   runManualVendorPayoutTransferBatch,
 } from "@/services/vendor-payout-transfer.service";
 import {
@@ -91,6 +92,32 @@ export async function adminRetryVendorPayoutTransferAction(transferId: string) {
   const r = await retryFailedVendorPayoutTransfer(transferId);
   if (r.outcome === "blocked_balance_unavailable") {
     return { ok: false as const, error: r.message };
+  }
+  const transfer = await prisma.vendorPayoutTransfer.findUnique({
+    where: { id: transferId },
+    select: transferSelect,
+  });
+  if (!transfer) {
+    return { ok: false as const, error: "Transfer not found" };
+  }
+  return {
+    ok: true as const,
+    result: r,
+    transfer: JSON.parse(JSON.stringify(transfer)) as AdminPayoutTransferRow,
+  };
+}
+
+export async function adminRetryVendorPayoutTransferWithNewKeyAction(transferId: string) {
+  const ok = await isAdminDashboardLayoutAuthorized();
+  if (!ok) {
+    return { ok: false as const, error: "Unauthorized" };
+  }
+  const r = await retryVendorPayoutTransferWithNewKey(transferId);
+  if (r.outcome === "blocked_balance_unavailable") {
+    return { ok: false as const, error: r.message };
+  }
+  if (r.outcome === "skipped") {
+    return { ok: false as const, error: `Cannot retry with new key: ${r.reason}` };
   }
   const transfer = await prisma.vendorPayoutTransfer.findUnique({
     where: { id: transferId },

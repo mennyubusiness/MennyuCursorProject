@@ -14,7 +14,7 @@ describe("admin-order-payment-summary.service", () => {
       stripeTransferId: "tr_123",
       reversals: [{ status: "pending" }],
     });
-    expect(m.message).toContain("payout reversals");
+    expect(m.message).toContain("vendor transfer reversals");
     expect(m.tone).toBe("warning");
   });
 

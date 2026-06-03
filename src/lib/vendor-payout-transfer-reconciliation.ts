@@ -1,10 +1,11 @@
-import { INSUFFICIENT_BALANCE_STATUS } from "@/lib/vendor-payout-transfer-failure";
+import { INSUFFICIENT_BALANCE_STATUS, IDEMPOTENCY_MISMATCH_STATUS } from "@/lib/vendor-payout-transfer-failure";
 
 export const BLOCKED_DESTINATION_SENTINEL = "blocked";
 
 export const RECONCILE_ELIGIBLE_STATUSES = [
   "failed",
   INSUFFICIENT_BALANCE_STATUS,
+  IDEMPOTENCY_MISMATCH_STATUS,
   "pending",
   "submitted",
 ] as const;
@@ -180,14 +181,14 @@ export function reconciliationResultMessage(
 ): string {
   switch (outcome) {
     case "updated_paid":
-      return "Matching vendor Connect transfer found and row was marked paid.";
+      return "Matching vendor Connect transfer found and row was marked vendor paid via Connect.";
     case "already_paid":
-      return "Already marked paid and verified in Stripe";
+      return "Already vendor paid via Connect and verified in Stripe";
     case "unchanged_not_found": {
       const base =
         context?.hasCustomerPayment === false
-          ? "No matching Stripe transfer found"
-          : "Customer payment exists, but no vendor Connect transfer was found. This vendor payout is still unpaid.";
+          ? "No matching vendor Connect transfer found"
+          : "Customer payment exists, but no vendor Connect transfer was found. This vendor transfer is still unpaid.";
       if (context?.platformPayoutPaidOut) {
         return `${base} Platform payout to Open Order bank found. This does not count as vendor payment.`;
       }

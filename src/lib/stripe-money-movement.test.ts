@@ -6,6 +6,7 @@ import {
   openOrderRetainedFromPayment,
   openOrderRetainedFromVendorSlice,
   platformPayoutDisplayLabel,
+  adminVendorConnectTransferStatusLabel,
   stripeNetToPlatformCents,
   vendorStillOwedCents,
 } from "@/lib/stripe-money-movement";
@@ -86,6 +87,15 @@ describe("reconciliation messaging distinguishes platform payout from vendor tra
   });
 
   it("marks paid only from Connect transfer reconciliation outcome", () => {
-    expect(reconcileMsg("updated_paid")).toContain("Matching vendor Connect transfer found");
+    expect(reconcileMsg("updated_paid")).toContain("vendor paid via Connect");
+  });
+});
+
+describe("adminVendorConnectTransferStatusLabel", () => {
+  it("labels paid Connect transfer status for admin UI", () => {
+    expect(adminVendorConnectTransferStatusLabel("paid")).toBe("vendor paid via Connect");
+    expect(adminVendorConnectTransferStatusLabel("blocked_insufficient_balance")).toContain(
+      "Vendor transfer blocked"
+    );
   });
 });

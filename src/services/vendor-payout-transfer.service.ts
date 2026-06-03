@@ -9,9 +9,15 @@ import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 import { env } from "@/lib/env";
 import {
+  IDEMPOTENCY_MISMATCH_BLOCKED_REASON,
+  IDEMPOTENCY_MISMATCH_DISPLAY,
+  IDEMPOTENCY_MISMATCH_STATUS,
   INSUFFICIENT_BALANCE_BLOCKED_REASON,
   INSUFFICIENT_BALANCE_DISPLAY,
   INSUFFICIENT_BALANCE_STATUS,
+  isIdempotencyMismatchMessage,
+  isIdempotencyMismatchTransfer,
+  isStripeIdempotencyParameterMismatchError,
   isStripeInsufficientFundsError,
 } from "@/lib/vendor-payout-transfer-failure";
 import {
@@ -27,6 +33,7 @@ export const VENDOR_PAYOUT_TRANSFER_STATUS = {
   pending: "pending",
   blocked: "blocked",
   blockedInsufficientBalance: INSUFFICIENT_BALANCE_STATUS,
+  blockedIdempotencyMismatch: IDEMPOTENCY_MISMATCH_STATUS,
   submitted: "submitted",
   paid: "paid",
   failed: "failed",
@@ -36,7 +43,7 @@ export const BLOCKED_DESTINATION_SENTINEL = "blocked";
 
 /** Shown when Stripe balance cannot be fetched — no transfer attempts are made. */
 export const BALANCE_UNAVAILABLE_ADMIN_MESSAGE =
-  "Unable to verify Stripe available balance. Payout transfers were not attempted. Refresh balance and try again.";
+  "Unable to verify Stripe available balance. Vendor Connect transfers were not attempted. Refresh balance and try again.";
 
 type VendorStripeFields = {
   stripeConnectedAccountId: string | null;
@@ -59,6 +66,49 @@ export function blockedReasonForVendor(v: VendorStripeFields): string {
 
 function stableIdempotencyKey(paymentAllocationId: string): string {
   return `mennyu_vpt_${paymentAllocationId}`;
+}
+
+/** Rotate idempotency key after reconciliation finds no matching Stripe transfer. */
+export function buildRotatedIdempotencyKey(
+  paymentAllocationId: string,
+  currentKey: string
+): string {
+  const base = stableIdempotencyKey(paymentAllocationId);
+  const retryMatch = currentKey.match(/_r(\d+)$/);
+  if (retryMatch) {
+    return `${base}_r${parseInt(retryMatch[1]!, 10) + 1}`;
+  }
+  if (currentKey === base) {
+    return `${base}_r1`;
+  }
+  return `${base}_r${Date.now()}`;
+}
+
+type VendorPayoutTransferStripeRow = {
+  id: string;
+  paymentAllocationId: string;
+  vendorOrderId: string;
+  vendorId: string;
+  amountCents: number;
+  currency: string;
+  destinationAccountId: string;
+  vendorOrder: { orderId: string };
+};
+
+export function buildStripeTransferCreateParams(row: VendorPayoutTransferStripeRow) {
+  return {
+    amount: row.amountCents,
+    currency: row.currency,
+    destination: row.destinationAccountId,
+    transfer_group: buildVendorPayoutTransferGroup(row.vendorOrder.orderId),
+    metadata: buildVendorPayoutTransferStripeMetadata({
+      id: row.id,
+      paymentAllocationId: row.paymentAllocationId,
+      vendorOrderId: row.vendorOrderId,
+      vendorId: row.vendorId,
+      orderId: row.vendorOrder.orderId,
+    }),
+  };
 }
 
 type AllocationWithVendor = Prisma.PaymentAllocationGetPayload<{
@@ -121,9 +171,11 @@ export async function ensureVendorPayoutTransferRecordsForPayment(paymentId: str
 export type ExecuteStripeTransferResult =
   | { outcome: "paid"; stripeTransferId: string }
   | { outcome: "blocked_insufficient_balance"; message: string }
+  | { outcome: "blocked_idempotency_mismatch"; message: string }
   | { outcome: "blocked_balance_unavailable"; message: string }
   | { outcome: "skipped"; reason: string }
-  | { outcome: "failed"; message: string };
+  | { outcome: "failed"; message: string }
+  | { outcome: "reconciled_paid"; stripeTransferId: string };
 
 type ExecuteOpts = {
   batchKey?: string;
@@ -167,6 +219,23 @@ function hasSufficientTrackedBalance(tracker: BalanceTracker, amountCents: numbe
 function consumeTrackedBalance(tracker: BalanceTracker | undefined, amountCents: number): void {
   if (!tracker || amountCents <= 0) return;
   tracker.remainingAvailableCents = Math.max(0, tracker.remainingAvailableCents - amountCents);
+}
+
+async function markBlockedIdempotencyMismatch(
+  transferId: string,
+  rawMessage: string,
+  opts?: ExecuteOpts
+): Promise<void> {
+  await prisma.vendorPayoutTransfer.update({
+    where: { id: transferId },
+    data: {
+      status: VENDOR_PAYOUT_TRANSFER_STATUS.blockedIdempotencyMismatch,
+      blockedReason: IDEMPOTENCY_MISMATCH_BLOCKED_REASON,
+      failureMessage: rawMessage.slice(0, 2000),
+      failedAt: new Date(),
+      ...(opts?.batchKey ? { batchKey: opts.batchKey } : {}),
+    },
+  });
 }
 
 async function markBlockedInsufficientBalance(
@@ -251,19 +320,7 @@ export async function executeVendorPayoutTransfer(
 
   try {
     const tr = await stripe.transfers.create(
-      {
-        amount: row.amountCents,
-        currency: row.currency,
-        destination: row.destinationAccountId,
-        transfer_group: buildVendorPayoutTransferGroup(row.vendorOrder.orderId),
-        metadata: buildVendorPayoutTransferStripeMetadata({
-          id: row.id,
-          paymentAllocationId: row.paymentAllocationId,
-          vendorOrderId: row.vendorOrderId,
-          vendorId: row.vendorId,
-          orderId: row.vendorOrder.orderId,
-        }),
-      },
+      buildStripeTransferCreateParams(row),
       { idempotencyKey: row.idempotencyKey }
     );
 
@@ -284,6 +341,10 @@ export async function executeVendorPayoutTransfer(
     return { outcome: "paid", stripeTransferId: tr.id };
   } catch (e) {
     const message = stripeErrorMessage(e);
+    if (isStripeIdempotencyParameterMismatchError(e)) {
+      await markBlockedIdempotencyMismatch(transferId, message, opts);
+      return { outcome: "blocked_idempotency_mismatch", message: IDEMPOTENCY_MISMATCH_DISPLAY };
+    }
     if (isStripeInsufficientFundsError(e)) {
       await markBlockedInsufficientBalance(transferId, message, opts);
       return { outcome: "blocked_insufficient_balance", message };
@@ -317,6 +378,18 @@ export async function retryFailedVendorPayoutTransfer(
   }
   if (row.stripeTransferId?.trim() && row.status !== VENDOR_PAYOUT_TRANSFER_STATUS.paid) {
     return { outcome: "skipped", reason: "inconsistent_stripe_transfer_id" };
+  }
+  if (
+    isIdempotencyMismatchTransfer(row) ||
+    isIdempotencyMismatchMessage(row.failureMessage)
+  ) {
+    if (row.status !== VENDOR_PAYOUT_TRANSFER_STATUS.blockedIdempotencyMismatch) {
+      await markBlockedIdempotencyMismatch(
+        transferId,
+        row.failureMessage ?? IDEMPOTENCY_MISMATCH_DISPLAY
+      );
+    }
+    return { outcome: "blocked_idempotency_mismatch", message: IDEMPOTENCY_MISMATCH_DISPLAY };
   }
   const retryable =
     row.status === VENDOR_PAYOUT_TRANSFER_STATUS.failed ||
@@ -352,6 +425,86 @@ export async function retryFailedVendorPayoutTransfer(
   return executeVendorPayoutTransfer(transferId, executeOpts);
 }
 
+/**
+ * Reconcile first; if no matching Stripe transfer, rotate idempotency key and retry once.
+ * Admin-only — requires prior reconciliation no_match (enforced here by re-running reconcile).
+ */
+export async function retryVendorPayoutTransferWithNewKey(
+  transferId: string,
+  opts?: ExecuteOpts
+): Promise<ExecuteStripeTransferResult> {
+  const row = await prisma.vendorPayoutTransfer.findUnique({ where: { id: transferId } });
+  if (!row) {
+    return { outcome: "skipped", reason: "not_found" };
+  }
+  if (row.status === VENDOR_PAYOUT_TRANSFER_STATUS.paid && row.stripeTransferId) {
+    return { outcome: "skipped", reason: "already_paid" };
+  }
+  if (row.stripeTransferId?.trim()) {
+    return { outcome: "skipped", reason: "inconsistent_stripe_transfer_id" };
+  }
+  if (!isIdempotencyMismatchTransfer(row)) {
+    return { outcome: "skipped", reason: "not_idempotency_mismatch" };
+  }
+  if (row.destinationAccountId === BLOCKED_DESTINATION_SENTINEL) {
+    return { outcome: "skipped", reason: "blocked_destination" };
+  }
+
+  const { reconcileVendorPayoutTransfer } = await import(
+    "./vendor-payout-transfer-reconciliation.service"
+  );
+  const reconcile = await reconcileVendorPayoutTransfer(transferId);
+  if (
+    reconcile.outcome === "updated_paid" ||
+    reconcile.outcome === "already_paid"
+  ) {
+    return {
+      outcome: "reconciled_paid",
+      stripeTransferId: reconcile.stripeTransferId ?? "",
+    };
+  }
+  if (
+    reconcile.outcome === "unchanged_ambiguous" ||
+    reconcile.outcome === "mismatch"
+  ) {
+    return {
+      outcome: "skipped",
+      reason: `reconciliation_${reconcile.outcome}`,
+    };
+  }
+  if (reconcile.outcome !== "unchanged_not_found") {
+    return { outcome: "skipped", reason: `reconciliation_${reconcile.outcome}` };
+  }
+
+  let executeOpts = opts;
+  if (row.amountCents > 0 && !opts?.balanceTracker) {
+    const balanceResolved = await resolveBalanceTracker(row.currency, opts);
+    if (!balanceResolved.ok) {
+      return {
+        outcome: "blocked_balance_unavailable",
+        message: BALANCE_UNAVAILABLE_ADMIN_MESSAGE,
+      };
+    }
+    executeOpts = { ...opts, balanceTracker: balanceResolved.tracker };
+  }
+
+  const newKey = buildRotatedIdempotencyKey(row.paymentAllocationId, row.idempotencyKey);
+  const rotationNote = `Idempotency key rotated from ${row.idempotencyKey} to ${newKey} after reconciliation found no matching Stripe Connect transfer.`;
+
+  await prisma.vendorPayoutTransfer.update({
+    where: { id: transferId },
+    data: {
+      idempotencyKey: newKey,
+      status: VENDOR_PAYOUT_TRANSFER_STATUS.pending,
+      blockedReason: null,
+      failureMessage: rotationNote.slice(0, 2000),
+      failedAt: null,
+    },
+  });
+
+  return executeVendorPayoutTransfer(transferId, executeOpts);
+}
+
 export type PayoutTransferBatchSummary = {
   batchKey: string;
   examined: number;
@@ -378,14 +531,17 @@ function summarizeExecuteResult(
   r: ExecuteStripeTransferResult,
   summary: PayoutTransferBatchSummary
 ): void {
-  if (r.outcome === "paid") {
+  if (r.outcome === "paid" || r.outcome === "reconciled_paid") {
     summary.settled++;
   } else if (r.outcome === "skipped" || r.outcome === "blocked_balance_unavailable") {
     summary.skipped++;
   } else if (r.outcome === "blocked_insufficient_balance") {
     summary.blockedInsufficientBalance++;
     summary.failures.push({ transferId, message: r.message });
-  } else {
+  } else if (r.outcome === "blocked_idempotency_mismatch") {
+    summary.failed++;
+    summary.failures.push({ transferId, message: r.message });
+  } else if (r.outcome === "failed") {
     summary.failed++;
     summary.failures.push({ transferId, message: r.message });
   }

@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../../../..");
 
-describe("admin stripe money movement UI", () => {
-  it("payout transfers dashboard separates customer payment, platform payout, and vendor transfer", () => {
+describe("admin stripe money movement UI terminology", () => {
+  it("vendor transfers dashboard separates customer payment, platform payout, and vendor transfer", () => {
     const dashboard = readFileSync(
       join(root, "src/app/admin/(dashboard)/payout-transfers/PayoutTransfersDashboard.tsx"),
       "utf8"
@@ -15,16 +15,29 @@ describe("admin stripe money movement UI", () => {
       join(root, "src/app/admin/(dashboard)/orders/[orderId]/AdminPaymentsRefundsPanel.tsx"),
       "utf8"
     );
+    const breakdown = readFileSync(
+      join(root, "src/components/admin/StripeMoneyMovementBreakdown.tsx"),
+      "utf8"
+    );
+    const nav = readFileSync(join(root, "src/components/admin/AdminTopNav.tsx"), "utf8");
 
     expect(dashboard).toMatch(/StripeMoneyMovementBreakdown/);
     expect(dashboard).toMatch(/Vendor liability summary/);
-    expect(dashboard).toMatch(/STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT/);
-    expect(panel).toMatch(/Stripe money movement/);
-    expect(panel).toMatch(/Vendor still owed/);
-    expect(panel).toMatch(/OO retained/);
+    expect(breakdown).toMatch(/Platform payout to Open Order bank/);
+    expect(dashboard).toMatch(/Vendor Connect transfers/);
+    expect(panel).toMatch(/Vendor Connect transfer breakdown/);
+    expect(nav).toMatch(/Vendor Transfers/);
   });
 
-  it("platform payout lookup service is explanatory only on payout page", () => {
+  it("blocked row copy uses vendor transfer blocked wording", () => {
+    const failure = readFileSync(
+      join(root, "src/lib/vendor-payout-transfer-failure.ts"),
+      "utf8"
+    );
+    expect(failure).toMatch(/Vendor transfer blocked: insufficient Stripe available balance/);
+  });
+
+  it("platform payout lookup on list page does not create Connect transfers", () => {
     const page = readFileSync(
       join(root, "src/app/admin/(dashboard)/payout-transfers/page.tsx"),
       "utf8"

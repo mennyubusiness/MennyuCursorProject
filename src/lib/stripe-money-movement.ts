@@ -1,11 +1,38 @@
-import { INSUFFICIENT_BALANCE_STATUS } from "@/lib/vendor-payout-transfer-failure";
+import { INSUFFICIENT_BALANCE_STATUS, IDEMPOTENCY_MISMATCH_STATUS } from "@/lib/vendor-payout-transfer-failure";
 
 /** Admin copy — platform bank payout ≠ vendor Connect transfer. */
 export const STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT =
-  "Stripe payouts to the Open Order bank are not vendor payments. Vendors are paid only when a Stripe Connect transfer is created to their connected account.";
+  "Stripe payouts to the Open Order bank are not vendor payments. Vendors are paid only when a Stripe Connect transfer (tr_...) is sent to their connected account.";
+
+export const ADMIN_VENDOR_TRANSFERS_PAGE_INTRO =
+  "Vendor transfers move funds from Open Order's Stripe platform balance to each vendor's connected Stripe account. This is different from a Stripe payout, which moves money from a Stripe account to a bank account.";
+
+export const ADMIN_STRIPE_MONEY_MOVEMENT_DEFINITIONS = [
+  "Vendor Connect transfer: Open Order → vendor connected Stripe account.",
+  "Platform payout: Stripe → Open Order bank account.",
+  "Only a Connect transfer with a tr_... ID means the vendor was paid through Stripe.",
+] as const;
 
 export const BLOCKED_VENDOR_TRANSFER_STILL_OWED =
   "This vendor transfer is still owed. The customer payment may already have been paid out to the Open Order bank, but no matching vendor Connect transfer has been recorded.";
+
+export const VENDOR_PAID_VIA_CONNECT_LABEL = "vendor paid via Connect";
+
+/** Map internal VendorPayoutTransfer.status to admin-visible label. */
+export function adminVendorConnectTransferStatusLabel(status: string): string {
+  if (status === "paid") return VENDOR_PAID_VIA_CONNECT_LABEL;
+  if (status === INSUFFICIENT_BALANCE_STATUS) {
+    return "Vendor transfer blocked: insufficient Stripe available balance";
+  }
+  if (status === IDEMPOTENCY_MISMATCH_STATUS) {
+    return "blocked: idempotency mismatch";
+  }
+  if (status === "blocked") return "Blocked vendor transfer";
+  if (status === "failed") return "Vendor transfer failed";
+  if (status === "pending") return "Vendor transfer pending";
+  if (status === "submitted") return "Vendor transfer submitted";
+  return status;
+}
 
 export type PlatformPayoutDisplayStatus =
   | { kind: "unknown"; reason: "no_balance_transaction" | "stripe_unavailable" | "lookup_failed" }
@@ -86,6 +113,7 @@ export type VendorLiabilityTotals = {
 const OWED_STATUSES = new Set([
   "failed",
   INSUFFICIENT_BALANCE_STATUS,
+  IDEMPOTENCY_MISMATCH_STATUS,
   "pending",
   "submitted",
   "blocked",

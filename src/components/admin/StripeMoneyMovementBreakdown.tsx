@@ -1,5 +1,6 @@
 import {
   BLOCKED_VENDOR_TRANSFER_STILL_OWED,
+  adminVendorConnectTransferStatusLabel,
   platformPayoutDisplayLabel,
   STRIPE_PLATFORM_PAYOUT_NOT_VENDOR_PAYMENT,
   type PlatformPayoutDisplayStatus,
@@ -68,7 +69,7 @@ export function StripeMoneyMovementBreakdown({
     },
     {
       label: "Vendor Connect transfer status",
-      value: vendorConnectTransferStatus,
+      value: adminVendorConnectTransferStatusLabel(vendorConnectTransferStatus),
     },
     {
       label: "Vendor still owed",

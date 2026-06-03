@@ -18,7 +18,7 @@ const MARKETPLACE: NavItem[] = [
 ];
 
 const OPERATIONS: NavItem[] = [
-  { href: "/admin/payout-transfers", label: "Payouts" },
+  { href: "/admin/payout-transfers", label: "Vendor Transfers" },
   { href: "/admin/deliverect-webhook-incidents", label: "POS sync" },
   { href: "/admin/deliverect-channel-registrations", label: "Channel registration" },
 ];

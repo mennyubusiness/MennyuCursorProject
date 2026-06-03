@@ -4,6 +4,7 @@ import {
   INSUFFICIENT_BALANCE_DISPLAY,
   isInsufficientBalanceTransfer,
   isInsufficientFundsMessage,
+  isIdempotencyMismatchTransfer,
   isRetryablePayoutTransfer,
   isStripeInsufficientFundsError,
 } from "./vendor-payout-transfer-failure";
@@ -58,5 +59,17 @@ describe("vendor-payout-transfer-failure", () => {
         destinationAccountId: "acct_1",
       })
     ).toBe(false);
+  });
+
+  it("detects idempotency mismatch messages", () => {
+    const row = {
+      status: "failed",
+      failureMessage:
+        "Keys for idempotent requests can only be used with the same parameters they were first used with.",
+    };
+    expect(isIdempotencyMismatchTransfer(row)).toBe(true);
+    expect(isRetryablePayoutTransfer({ ...row, stripeTransferId: null, destinationAccountId: "acct_1" })).toBe(
+      false
+    );
   });
 });

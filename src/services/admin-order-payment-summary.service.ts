@@ -69,7 +69,7 @@ export function vendorTransferUiMessage(input: {
     return {
       status: input.transferStatus ?? "paid",
       message:
-        "Transfer reversal failed. Retry from the payout reversals workflow (/admin/payout-transfers).",
+        "Transfer reversal failed. Retry from the vendor transfer reversals workflow (/admin/payout-transfers).",
       tone: "danger",
     };
   }
@@ -77,7 +77,7 @@ export function vendorTransferUiMessage(input: {
     return {
       status: input.transferStatus ?? "paid",
       message:
-        "Transfer reversal submitted to Stripe — confirm status in payout reversals workflow.",
+        "Transfer reversal submitted to Stripe — confirm status in vendor transfer reversals workflow.",
       tone: "warning",
     };
   }
@@ -85,7 +85,7 @@ export function vendorTransferUiMessage(input: {
     return {
       status: input.transferStatus ?? "paid",
       message:
-        "Transfer reversal prepared (pending). Execute manually in payout reversals workflow (/admin/payout-transfers). Customer refund alone does not claw back vendor funds.",
+        "Transfer reversal prepared (pending). Execute manually in vendor transfer reversals workflow (/admin/payout-transfers). Customer refund alone does not claw back vendor funds.",
       tone: "warning",
     };
   }
