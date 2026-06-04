@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminAttentionItem, AdminAttentionReason } from "@/lib/admin-attention";
+import { LEGACY_CLAWBACK_REVIEW_EXPLANATION } from "@/lib/legacy-clawback-review";
+import type { LegacyClawbackReviewStatus } from "@/lib/legacy-clawback-review";
 import { isVendorClawbackAttentionReason } from "@/lib/vendor-clawback-status";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import type { AdminResolvedIssueHistoryRow } from "@/services/issues.service";
@@ -86,6 +88,8 @@ function borderClass(severity: AdminAttentionItem["severity"]): string {
 }
 
 function humanizeIssueType(type: string): string {
+  if (type === "legacy_clawback_reviewed") return "Legacy clawback reviewed";
+  if (type === "legacy_clawback_deferred") return "Legacy clawback deferred";
   return type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -105,12 +109,21 @@ function getRefundAttemptIdFromItemId(itemId: string): string | null {
   return itemId.slice("refund_attempt:".length) || null;
 }
 
+function vendorPayoutTransferIdFromItem(item: AdminAttentionItem): string | null {
+  if (item.vendorPayoutTransferId) return item.vendorPayoutTransferId;
+  const prefix = "legacy_clawback:missing:";
+  if (item.id.startsWith(prefix)) return item.id.slice(prefix.length) || null;
+  return null;
+}
+
 export function IssuesWorkbench({
-  initialActiveItems,
+  initialCurrentItems,
+  initialLegacyItems,
   resolvedHistory,
   pods,
 }: {
-  initialActiveItems: AdminAttentionItem[];
+  initialCurrentItems: AdminAttentionItem[];
+  initialLegacyItems: AdminAttentionItem[];
   resolvedHistory: AdminResolvedIssueHistoryRow[];
   pods: PodOption[];
 }) {
@@ -121,7 +134,8 @@ export function IssuesWorkbench({
   const [status, setStatus] = useState<AdminAttentionReason | "all">("all");
   const [timeRange, setTimeRange] = useState<(typeof TIME_OPTIONS)[number]["value"]>("all");
 
-  const [activeItems, setActiveItems] = useState(initialActiveItems);
+  const [currentItems, setCurrentItems] = useState(initialCurrentItems);
+  const [legacyItems, setLegacyItems] = useState(initialLegacyItems);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [manualRecoveryTarget, setManualRecoveryTarget] = useState<{
     vendorOrderId: string;
@@ -131,8 +145,20 @@ export function IssuesWorkbench({
   const [manualRecoveryNote, setManualRecoveryNote] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const onRemoveItem = useCallback((itemId: string) => {
-    setActiveItems((prev) => prev.filter((i) => i.id !== itemId));
+  const [legacyReviewTarget, setLegacyReviewTarget] = useState<{
+    itemId: string;
+    vendorPayoutTransferId: string;
+    status: LegacyClawbackReviewStatus;
+    orderId: string;
+  } | null>(null);
+  const [legacyReviewNote, setLegacyReviewNote] = useState("");
+
+  const onRemoveCurrentItem = useCallback((itemId: string) => {
+    setCurrentItems((prev) => prev.filter((i) => i.id !== itemId));
+  }, []);
+
+  const onRemoveLegacyItem = useCallback((itemId: string) => {
+    setLegacyItems((prev) => prev.filter((i) => i.id !== itemId));
   }, []);
 
   const refresh = useCallback(() => {
@@ -141,25 +167,37 @@ export function IssuesWorkbench({
 
   const maxAge = TIME_OPTIONS.find((t) => t.value === timeRange)?.maxMinutes ?? Infinity;
 
-  const filteredActive = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return activeItems.filter((item) => {
-      if (item.ageMinutes > maxAge) return false;
-      if (status !== "all" && item.reason !== status) return false;
-      if (podId && item.order?.pod?.id !== podId) return false;
-      if (!q) return true;
-      const orderShort = item.orderId.toLowerCase();
-      const vendor = item.vendor?.name?.toLowerCase() ?? "";
-      const pod = item.order?.pod?.name?.toLowerCase() ?? "";
-      return (
-        orderShort.includes(q) ||
-        item.orderId.toLowerCase() === q ||
-        item.orderId.toLowerCase().endsWith(q) ||
-        vendor.includes(q) ||
-        pod.includes(q)
-      );
-    });
-  }, [activeItems, search, podId, status, maxAge]);
+  const filterAttentionList = useCallback(
+    (items: AdminAttentionItem[]) => {
+      const q = search.trim().toLowerCase();
+      return items.filter((item) => {
+        if (item.ageMinutes > maxAge) return false;
+        if (status !== "all" && item.reason !== status) return false;
+        if (podId && item.order?.pod?.id !== podId) return false;
+        if (!q) return true;
+        const orderShort = item.orderId.toLowerCase();
+        const vendor = item.vendor?.name?.toLowerCase() ?? "";
+        const pod = item.order?.pod?.name?.toLowerCase() ?? "";
+        return (
+          orderShort.includes(q) ||
+          item.orderId.toLowerCase() === q ||
+          item.orderId.toLowerCase().endsWith(q) ||
+          vendor.includes(q) ||
+          pod.includes(q)
+        );
+      });
+    },
+    [search, podId, status, maxAge]
+  );
+
+  const filteredCurrent = useMemo(
+    () => filterAttentionList(currentItems),
+    [currentItems, filterAttentionList]
+  );
+  const filteredLegacy = useMemo(
+    () => filterAttentionList(legacyItems),
+    [legacyItems, filterAttentionList]
+  );
 
   const resolvedSearch = search.trim().toLowerCase();
   const filteredResolved = useMemo(() => {
@@ -188,7 +226,7 @@ export function IssuesWorkbench({
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (res.ok && data.ok === true) {
         refresh();
-        onRemoveItem(itemId);
+        onRemoveCurrentItem(itemId);
       } else {
         setActionError(data.error ?? "Retry routing failed. The item stays in the queue.");
       }
@@ -221,12 +259,12 @@ export function IssuesWorkbench({
         error?: string;
       };
       if (res.ok && data.ok === true && !data.noop) {
-        onRemoveItem(manualRecoveryTarget.itemId);
+        onRemoveCurrentItem(manualRecoveryTarget.itemId);
         setManualRecoveryTarget(null);
         setManualRecoveryNote("");
         refresh();
       } else if (res.ok && data.noop) {
-        onRemoveItem(manualRecoveryTarget.itemId);
+        onRemoveCurrentItem(manualRecoveryTarget.itemId);
         setManualRecoveryTarget(null);
         setManualRecoveryNote("");
         refresh();
@@ -246,8 +284,40 @@ export function IssuesWorkbench({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resolve: true }),
       });
-      if (res.ok) onRemoveItem(itemId);
+      if (res.ok) onRemoveCurrentItem(itemId);
       if (res.ok) refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleLegacyClawbackReviewSubmit() {
+    if (!legacyReviewTarget) return;
+    const note = legacyReviewNote.trim();
+    if (!note) {
+      setActionError("Add a note before marking this legacy case reviewed or deferred.");
+      return;
+    }
+    setActionError(null);
+    setBusyId(`legacy:${legacyReviewTarget.vendorPayoutTransferId}`);
+    try {
+      const res = await fetch(
+        `/api/admin/vendor-payout-transfers/${legacyReviewTarget.vendorPayoutTransferId}/legacy-clawback-review`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: legacyReviewTarget.status, note }),
+        }
+      );
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (res.ok && data.ok !== false) {
+        onRemoveLegacyItem(legacyReviewTarget.itemId);
+        setLegacyReviewTarget(null);
+        setLegacyReviewNote("");
+        refresh();
+      } else {
+        setActionError(data.error ?? "Could not save legacy review. The item stays in the queue.");
+      }
     } finally {
       setBusyId(null);
     }
@@ -260,7 +330,7 @@ export function IssuesWorkbench({
         method: "POST",
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.ok !== false) onRemoveItem(itemId);
+      if (res.ok && data.ok !== false) onRemoveCurrentItem(itemId);
       if (res.ok) refresh();
     } finally {
       setBusyId(null);
@@ -279,10 +349,10 @@ export function IssuesWorkbench({
               : "text-oo-stone-gray hover:text-oo-charcoal"
           }`}
         >
-          Active issues
-          {activeItems.length > 0 && (
+          Current needs attention
+          {currentItems.length > 0 && (
             <span className="ml-2 rounded-full bg-stone-200 px-2 py-0.5 text-xs tabular-nums text-oo-charcoal">
-              {activeItems.length}
+              {currentItems.length}
             </span>
           )}
         </button>
@@ -382,25 +452,32 @@ export function IssuesWorkbench({
 
       {tab === "active" && (
         <>
-          {filteredActive.length === 0 ? (
-            <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white px-6 py-12 text-center">
-              <p className="text-sm font-medium text-oo-charcoal">
-                {activeItems.length === 0 ? "No active issues" : "No issues match your filters"}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold text-oo-charcoal">Current needs attention</h2>
+              <p className="mt-0.5 text-xs text-oo-stone-gray">
+                Operational issues requiring routing, refund, or clawback action.
               </p>
-              <p className="mt-1 text-sm text-oo-stone-gray">
-                {activeItems.length === 0
-                  ? "When something breaks routing or fulfillment, it will show up here."
-                  : "Try clearing search or widening the time range."}
-              </p>
-              {activeItems.length === 0 && (
-                <Link href="/admin/orders" className="mt-4 inline-block text-sm font-medium text-oo-charcoal underline">
-                  Browse orders
-                </Link>
-              )}
             </div>
-          ) : (
-            <ul className="space-y-3">
-              {filteredActive.map((item) => {
+            {filteredCurrent.length === 0 ? (
+              <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white px-6 py-10 text-center">
+                <p className="text-sm font-medium text-oo-charcoal">
+                  {currentItems.length === 0 ? "No urgent issues" : "No issues match your filters"}
+                </p>
+                <p className="mt-1 text-sm text-oo-stone-gray">
+                  {currentItems.length === 0
+                    ? "When something breaks routing, fulfillment, or safe clawback prep, it will show up here."
+                    : "Try clearing search or widening the time range."}
+                </p>
+                {currentItems.length === 0 && legacyItems.length === 0 && (
+                  <Link href="/admin/orders" className="mt-4 inline-block text-sm font-medium text-oo-charcoal underline">
+                    Browse orders
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {filteredCurrent.map((item) => {
                 const showRetry =
                   Boolean(item.vendorOrderId) &&
                   routingAvailable &&
@@ -558,7 +635,8 @@ export function IssuesWorkbench({
                             ? "View clawback"
                             : "View order"}
                         </Link>
-                        {isVendorClawbackAttentionReason(item.reason) && (
+                        {isVendorClawbackAttentionReason(item.reason) &&
+                          item.reason !== "legacy_clawback_review" && (
                           <Link
                             href={
                               item.reason === "vendor_clawback_pending" || item.reason === "vendor_clawback_failed"
@@ -571,9 +649,7 @@ export function IssuesWorkbench({
                               ? "Prepare vendor reversal"
                               : item.reason === "vendor_clawback_pending"
                                 ? "Run reversal batch"
-                                : item.reason === "legacy_clawback_review"
-                                  ? "Review manually"
-                                  : "Retry reversal"}
+                                : "Retry reversal"}
                           </Link>
                         )}
                         {showRetry && item.vendorOrderId && (
@@ -629,14 +705,200 @@ export function IssuesWorkbench({
                   </li>
                 );
               })}
-            </ul>
-          )}
+              </ul>
+            )}
+          </section>
+
+          <section className="mt-10 space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold text-oo-charcoal">Legacy financial review</h2>
+              <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">
+                {LEGACY_CLAWBACK_REVIEW_EXPLANATION} Mark reviewed or defer after manual Stripe review — this does not
+                create a transfer reversal or mark clawback recovered.
+              </p>
+              {legacyItems.length > 0 && (
+                <span className="mt-2 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-950">
+                  {legacyItems.length} open
+                </span>
+              )}
+            </div>
+            {filteredLegacy.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/40 px-6 py-8 text-center">
+                <p className="text-sm text-oo-stone-gray">
+                  {legacyItems.length === 0
+                    ? "No historical clawback cases need review."
+                    : "No legacy cases match your filters."}
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {filteredLegacy.map((item) => {
+                  const vptId = vendorPayoutTransferIdFromItem(item);
+                  return (
+                    <li
+                      key={item.id}
+                      className={`overflow-hidden rounded-xl border border-violet-200 bg-violet-50/30 shadow-sm ${borderClass(item.severity)}`}
+                    >
+                      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                            <Link
+                              href={`/admin/orders/${item.orderId}`}
+                              className="font-mono text-sm font-semibold text-oo-charcoal hover:underline"
+                            >
+                              #{item.orderId.slice(-8).toUpperCase()}
+                            </Link>
+                            {item.order?.pod?.name && (
+                              <span className="text-sm text-oo-stone-gray">{item.order.pod.name}</span>
+                            )}
+                          </div>
+                          <h3 className="text-base font-semibold text-oo-charcoal">Historical clawback review</h3>
+                          <p className="text-sm leading-snug text-oo-stone-gray">{oneLine(item.reasonLabel, 220)}</p>
+                          {item.vendor?.name && (
+                            <p className="text-xs text-oo-stone-gray">{item.vendor.name}</p>
+                          )}
+                          <dl className="mt-2 grid gap-1 text-xs text-oo-stone-gray sm:grid-cols-2">
+                            {item.clawbackAmountCents != null && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Vendor transfer</dt>
+                                <dd className="tabular-nums">${(item.clawbackAmountCents / 100).toFixed(2)}</dd>
+                              </>
+                            )}
+                            {item.legacyRefundDetectedCents != null && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Detected refund</dt>
+                                <dd className="tabular-nums">
+                                  ${(item.legacyRefundDetectedCents / 100).toFixed(2)}
+                                  {item.legacyRefundSource ? ` · ${item.legacyRefundSource}` : ""}
+                                </dd>
+                              </>
+                            )}
+                            {item.stripeTransferId && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Stripe transfer</dt>
+                                <dd className="break-all font-mono">{item.stripeTransferId}</dd>
+                              </>
+                            )}
+                            {item.legacyUnsafeReversalDetail && (
+                              <>
+                                <dt className="font-medium text-oo-charcoal">Why auto-prep is unsafe</dt>
+                                <dd>{oneLine(item.legacyUnsafeReversalDetail, 160)}</dd>
+                              </>
+                            )}
+                          </dl>
+                        </div>
+                        <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-violet-200 pt-3 sm:border-t-0 sm:pt-0">
+                          <Link
+                            href={`/admin/orders/${item.orderId}#payments-refunds`}
+                            className="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-hover"
+                          >
+                            View order
+                          </Link>
+                          {vptId && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={busyId !== null}
+                                onClick={() => {
+                                  setActionError(null);
+                                  setLegacyReviewNote("");
+                                  setLegacyReviewTarget({
+                                    itemId: item.id,
+                                    vendorPayoutTransferId: vptId,
+                                    status: "reviewed",
+                                    orderId: item.orderId,
+                                  });
+                                }}
+                                className="rounded-lg border border-violet-300 bg-violet-100 px-3 py-2 text-sm font-medium text-violet-950 hover:bg-violet-200 disabled:opacity-50"
+                              >
+                                Mark reviewed
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyId !== null}
+                                onClick={() => {
+                                  setActionError(null);
+                                  setLegacyReviewNote("");
+                                  setLegacyReviewTarget({
+                                    itemId: item.id,
+                                    vendorPayoutTransferId: vptId,
+                                    status: "deferred",
+                                    orderId: item.orderId,
+                                  });
+                                }}
+                                className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+                              >
+                                Defer
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
           {actionError && (
             <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800" role="alert">
               {actionError}
             </p>
           )}
         </>
+      )}
+
+      {legacyReviewTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-labelledby="legacy-review-title"
+        >
+          <div className="w-full max-w-md rounded-xl border border-violet-200 bg-oo-warm-white p-5 shadow-lg">
+            <h2 id="legacy-review-title" className="text-lg font-semibold text-oo-charcoal">
+              {legacyReviewTarget.status === "reviewed"
+                ? "Mark legacy clawback reviewed"
+                : "Defer legacy clawback review"}
+            </h2>
+            <p className="mt-1 text-sm text-oo-stone-gray">
+              Order #{legacyReviewTarget.orderId.slice(-8).toUpperCase()}. This records your manual review only — it
+              does not create a Stripe transfer reversal or mark clawback recovered.
+            </p>
+            <label className="mt-4 block text-sm font-medium text-oo-charcoal" htmlFor="legacy-review-note">
+              Admin note (required)
+            </label>
+            <textarea
+              id="legacy-review-note"
+              rows={4}
+              value={legacyReviewNote}
+              onChange={(e) => setLegacyReviewNote(e.target.value)}
+              placeholder="e.g. Verified Stripe refund re_… and transfer tr_…; vendor balance adjusted manually in Stripe."
+              className="mt-1 w-full rounded-lg border border-oo-light-stone px-3 py-2 text-sm"
+            />
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-oo-light-stone px-3 py-2 text-sm"
+                disabled={busyId !== null}
+                onClick={() => {
+                  setLegacyReviewTarget(null);
+                  setLegacyReviewNote("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-violet-800 px-3 py-2 text-sm font-medium text-white hover:bg-violet-900 disabled:opacity-50"
+                disabled={busyId !== null}
+                onClick={() => void handleLegacyClawbackReviewSubmit()}
+              >
+                {busyId === `legacy:${legacyReviewTarget.vendorPayoutTransferId}` ? "…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {manualRecoveryTarget && (

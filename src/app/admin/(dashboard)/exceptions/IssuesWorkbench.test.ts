@@ -71,6 +71,13 @@ describe("admin attention queue", () => {
   it("does not label missing clawback action as retry reversal", () => {
     expect(workbenchSrc).toMatch(/Prepare vendor reversal/);
     expect(workbenchSrc).toMatch(/Run reversal batch/);
-    expect(workbenchSrc).toMatch(/Review manually/);
+  });
+
+  it("separates legacy financial review from urgent current queue", () => {
+    expect(workbenchSrc).toMatch(/Legacy financial review/i);
+    expect(workbenchSrc).toMatch(/initialLegacyItems/);
+    expect(workbenchSrc).toMatch(/Mark reviewed/);
+    expect(workbenchSrc).toMatch(/legacy-clawback-review/);
+    expect(workbenchSrc).toMatch(/item\.reason !== "legacy_clawback_review"/);
   });
 });

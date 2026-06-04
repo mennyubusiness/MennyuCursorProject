@@ -24,6 +24,15 @@ import {
 } from "@/lib/vendor-clawback-status";
 import { computeVendorOrderRefundedCents } from "@/domain/order-refund";
 import {
+  assessRefundEvidenceForReversalPrep,
+  prepareMissingReversalBlockMessage,
+  type PrepareMissingReversalBlockReason,
+} from "@/lib/admin-refund-evidence";
+import {
+  isLegacyClawbackReviewClosed,
+  legacyClawbackReviewStatusLabel,
+} from "@/lib/legacy-clawback-review";
+import {
   openOrderRetainedFromPayment,
   openOrderRetainedFromVendorSlice,
   stripeNetToPlatformCents,
@@ -209,6 +218,37 @@ export type AdminOrderPaymentSummaryVendorOrder = {
     createdAt: string;
     submittedAt: string | null;
   }>;
+  reversalPrepare: {
+    canPrepare: boolean;
+    blockReason: PrepareMissingReversalBlockReason | null;
+  };
+  legacyClawbackReview: {
+    status: string | null;
+    note: string | null;
+    reviewedAt: string | null;
+    reviewedBy: string | null;
+    needsReview: boolean;
+  } | null;
+};
+
+export type AdminOrderRefundLedgerRow = {
+  id: string;
+  source: "order_refund" | "legacy_refund_attempt";
+  createdAt: string | null;
+  refundScope: string | null;
+  vendorName: string | null;
+  amountCents: number;
+  status: string;
+  stripeRefundId: string | null;
+  refundAttemptId: string | null;
+  refundAttemptStatus: string | null;
+};
+
+export type AdminOrderRefundDisplay = {
+  refundedCents: number;
+  denormalizedRefundedCents: number;
+  inconsistentLedger: boolean;
+  ledgerRowCount: number;
 };
 
 export type AdminOrderPaymentSummaryRefund = {
@@ -248,9 +288,13 @@ export type AdminOrderPaymentSummary = {
   payment: AdminOrderPaymentSummaryPayment | null;
   vendorOrders: AdminOrderPaymentSummaryVendorOrder[];
   orderRefunds: AdminOrderPaymentSummaryRefund[];
+  refundLedgerRows: AdminOrderRefundLedgerRow[];
+  refundDisplay: AdminOrderRefundDisplay;
   ledgerSummary: {
     paymentAmountCents: number;
     totalRefundedCents: number;
+    ledgerRefundedCents: number;
+    legacyRefundedCents: number;
     remainingRefundableCents: number;
     paymentRefundStatus: string;
     hasPendingRefund: boolean;
@@ -325,6 +369,10 @@ export async function fetchAdminOrderPaymentSummary(
                     status: true,
                     stripeTransferId: true,
                     amountCents: true,
+                    legacyClawbackReviewStatus: true,
+                    legacyClawbackReviewNote: true,
+                    legacyClawbackReviewedAt: true,
+                    legacyClawbackReviewedBy: true,
                   },
                 },
               },
@@ -374,7 +422,7 @@ export async function fetchAdminOrderPaymentSummary(
           },
         },
         refundAttempts: {
-          orderBy: { createdAt: "asc" },
+          orderBy: { createdAt: "desc" },
           select: {
             id: true,
             vendorOrderId: true,
@@ -383,6 +431,7 @@ export async function fetchAdminOrderPaymentSummary(
             stripeRefundId: true,
             reason: true,
             createdAt: true,
+            dismissedAsLegacyAt: true,
           },
         },
         vendorPayoutTransferReversals: {
@@ -430,9 +479,12 @@ export async function fetchAdminOrderPaymentSummary(
         .filter((id): id is string => Boolean(id))
     );
     const legacyAttempts = order.refundAttempts.map((a) => ({
+      id: a.id,
       vendorOrderId: a.vendorOrderId,
       amountCents: a.amountCents,
       status: a.status,
+      stripeRefundId: a.stripeRefundId,
+      dismissedAsLegacyAt: a.dismissedAsLegacyAt,
       hasLinkedOrderRefund: linkedAttemptIds.has(a.id),
     }));
     const orderRefundsForAllocation = order.orderRefunds.map((r) => ({
@@ -440,6 +492,16 @@ export async function fetchAdminOrderPaymentSummary(
       amountCents: r.amountCents,
       status: r.status,
       refundScope: r.refundScope,
+    }));
+    const orderRefundsForEvidence = order.orderRefunds.map((r) => ({
+      id: r.id,
+      vendorOrderId: r.vendorOrderId,
+      amountCents: r.amountCents,
+      status: r.status,
+      refundScope: r.refundScope,
+      refundAttemptId: r.refundAttemptId,
+      refundAttemptStatus: r.refundAttempt?.status ?? null,
+      stripeRefundId: r.stripeRefundId,
     }));
 
     const [remainingOrder, ledgerSummary] = await Promise.all([
@@ -473,14 +535,109 @@ export async function fetchAdminOrderPaymentSummary(
           orderRefunds: orderRefundsForAllocation,
           legacyAttempts,
         });
-        const clawback = computeVendorClawbackSummary({
+        const refundEvidence = assessRefundEvidenceForReversalPrep({
+          orderId,
+          orderTotalCents: order.totalCents,
+          denormalizedOrderRefundedCents: order.totalRefundedCents,
+          ledgerRefundedCents: ledgerSummary?.ledgerRefundedCents ?? 0,
+          legacyRefundedCents: ledgerSummary?.legacyRefundedCents ?? 0,
+          vendorOrderId: vo.id,
+          vendorOrderTotalCents: vo.totalCents,
+          orderRefunds: orderRefundsForEvidence,
+          legacyAttempts,
+        });
+
+        const vendorRefundedForClawback =
+          refundEvidence.inconsistentLedger || refundEvidence.denormalizedOnlyRefund
+            ? 0
+            : effectiveVendorOrderRefundedCents;
+
+        let clawback = computeVendorClawbackSummary({
           transferStatus,
           stripeTransferId: vpt?.stripeTransferId ?? null,
           transferAmountCents: vpt?.amountCents ?? null,
           vendorOrderTotalCents: vo.totalCents,
-          vendorOrderRefundedCents: effectiveVendorOrderRefundedCents,
+          vendorOrderRefundedCents: vendorRefundedForClawback,
           reversals: voReversals,
         });
+
+        const paidViaConnect =
+          transferStatus === VENDOR_PAYOUT_TRANSFER_STATUS.paid &&
+          Boolean(vpt?.stripeTransferId?.trim());
+
+        let reversalPrepare: AdminOrderPaymentSummaryVendorOrder["reversalPrepare"] = {
+          canPrepare: false,
+          blockReason: refundEvidence.prepareBlockReason,
+        };
+
+        if (clawback.hasMissingReversalSetup && refundEvidence.hasSafeFullScopeSucceededRefund) {
+          reversalPrepare = { canPrepare: true, blockReason: null };
+        } else if (
+          clawback.hasMissingReversalSetup &&
+          !refundEvidence.hasSafeFullScopeSucceededRefund
+        ) {
+          clawback = {
+            ...clawback,
+            clawbackStatus: "manual_review",
+            adminLabel: "Vendor clawback manual review",
+            adminDetail:
+              refundEvidence.inconsistentLedger || refundEvidence.denormalizedOnlyRefund
+                ? "Refund total exists, but no refund ledger entry was found. This may be legacy or inconsistent data."
+                : prepareMissingReversalBlockMessage(
+                    refundEvidence.prepareBlockReason ?? "no_succeeded_order_refund"
+                  ),
+            hasMissingReversalSetup: false,
+            recommendedAction: "manual_review",
+          };
+          reversalPrepare = {
+            canPrepare: false,
+            blockReason: refundEvidence.prepareBlockReason,
+          };
+        } else if (
+          paidViaConnect &&
+          (refundEvidence.inconsistentLedger || refundEvidence.denormalizedOnlyRefund) &&
+          voReversals.length === 0 &&
+          clawback.clawbackStatus === "not_needed"
+        ) {
+          clawback = {
+            ...clawback,
+            clawbackStatus: "manual_review",
+            adminLabel: "Vendor clawback manual review",
+            adminDetail:
+              "Refund total exists, but no refund ledger entry was found. This may be legacy or inconsistent data.",
+            recommendedAction: "manual_review",
+          };
+        }
+
+        const needsLegacyClawbackReview =
+          Boolean(vpt?.stripeTransferId?.trim()) &&
+          transferStatus === VENDOR_PAYOUT_TRANSFER_STATUS.paid &&
+          !reversalPrepare.canPrepare &&
+          (refundEvidence.inconsistentLedger || refundEvidence.denormalizedOnlyRefund) &&
+          voReversals.length === 0 &&
+          !isLegacyClawbackReviewClosed(vpt?.legacyClawbackReviewStatus);
+
+        if (vpt && isLegacyClawbackReviewClosed(vpt.legacyClawbackReviewStatus)) {
+          clawback = {
+            ...clawback,
+            clawbackStatus: "manual_review",
+            adminLabel: `Legacy clawback ${legacyClawbackReviewStatusLabel(vpt.legacyClawbackReviewStatus).toLowerCase()}`,
+            adminDetail:
+              vpt.legacyClawbackReviewNote?.trim() ||
+              "Marked after manual Stripe review. No automatic transfer reversal was created.",
+            hasMissingReversalSetup: false,
+            recommendedAction: "manual_review",
+          };
+        } else if (needsLegacyClawbackReview) {
+          clawback = {
+            ...clawback,
+            clawbackStatus: "manual_review",
+            adminLabel: "Legacy clawback review required",
+            adminDetail:
+              "Refund evidence is incomplete, so Open Order cannot safely prepare an automatic vendor reversal.",
+            recommendedAction: "manual_review",
+          };
+        }
 
         return {
           id: vo.id,
@@ -521,20 +678,72 @@ export async function fetchAdminOrderPaymentSummary(
             transferStatus === VENDOR_PAYOUT_TRANSFER_STATUS.paid && reversalPossible,
           partialRefundWouldRequirePlatformAbsorption: paidOrSubmitted,
           reversals: voReversals,
+          reversalPrepare,
+          legacyClawbackReview: vpt
+            ? {
+                status: vpt.legacyClawbackReviewStatus,
+                note: vpt.legacyClawbackReviewNote,
+                reviewedAt: vpt.legacyClawbackReviewedAt?.toISOString() ?? null,
+                reviewedBy: vpt.legacyClawbackReviewedBy,
+                needsReview: needsLegacyClawbackReview,
+              }
+            : null,
         };
       })
     );
 
     const vendorNameById = new Map(order.vendorOrders.map((v) => [v.id, v.vendor.name]));
 
-    const sumNetVendorTransfer =
-      payment?.allocations.reduce((sum, a) => sum + a.netVendorTransferCents, 0) ?? 0;
-    const stripeNet = payment
-      ? stripeNetToPlatformCents(payment.amountCents, payment.stripeProcessingFeeCents)
-      : null;
-    const platformPayout = payment
-      ? await lookupPlatformPayoutForBalanceTransaction(payment.stripeBalanceTransactionId)
-      : { kind: "unknown" as const, reason: "no_balance_transaction" as const };
+    const refundLedgerRows: AdminOrderRefundLedgerRow[] = (ledgerSummary?.refunds ?? []).map(
+      (r) => {
+        if (r.source === "legacy_refund_attempt") {
+          const attemptId = r.id.replace(/^legacy:/, "");
+          const attempt = order.refundAttempts.find((a) => a.id === attemptId);
+          return {
+            id: r.id,
+            source: r.source,
+            createdAt: attempt?.createdAt.toISOString() ?? null,
+            refundScope: "legacy",
+            vendorName: attempt?.vendorOrderId
+              ? (vendorNameById.get(attempt.vendorOrderId) ?? null)
+              : null,
+            amountCents: r.amountCents,
+            status: r.status,
+            stripeRefundId: r.stripeRefundId,
+            refundAttemptId: attemptId,
+            refundAttemptStatus: attempt?.status ?? null,
+          };
+        }
+        const ledgerRow = order.orderRefunds.find((or) => or.id === r.id);
+        return {
+          id: r.id,
+          source: r.source,
+          createdAt: ledgerRow?.createdAt.toISOString() ?? null,
+          refundScope: ledgerRow?.refundScope ?? null,
+          vendorName: ledgerRow?.vendorOrderId
+            ? (ledgerRow.vendorOrder?.vendor.name ??
+              vendorNameById.get(ledgerRow.vendorOrderId) ??
+              null)
+            : null,
+          amountCents: r.amountCents,
+          status: r.status,
+          stripeRefundId: r.stripeRefundId,
+          refundAttemptId: ledgerRow?.refundAttemptId ?? null,
+          refundAttemptStatus: ledgerRow?.refundAttempt?.status ?? null,
+        };
+      }
+    );
+
+    const refundDisplay: AdminOrderRefundDisplay = {
+      refundedCents: ledgerSummary?.totalRefundedCents ?? order.totalRefundedCents,
+      denormalizedRefundedCents: order.totalRefundedCents,
+      inconsistentLedger:
+        order.totalRefundedCents > 0 &&
+        order.orderRefunds.length === 0 &&
+        (ledgerSummary?.ledgerRefundedCents ?? 0) === 0 &&
+        (ledgerSummary?.legacyRefundedCents ?? 0) === 0,
+      ledgerRowCount: refundLedgerRows.length,
+    };
 
     const orderRefunds: AdminOrderPaymentSummaryRefund[] = order.orderRefunds.map((r) => ({
       id: r.id,
@@ -557,6 +766,15 @@ export async function fetchAdminOrderPaymentSummary(
       refundAttemptId: r.refundAttemptId,
       refundAttemptStatus: r.refundAttempt?.status ?? null,
     }));
+
+    const sumNetVendorTransfer =
+      payment?.allocations.reduce((sum, a) => sum + a.netVendorTransferCents, 0) ?? 0;
+    const stripeNet = payment
+      ? stripeNetToPlatformCents(payment.amountCents, payment.stripeProcessingFeeCents)
+      : null;
+    const platformPayout = payment
+      ? await lookupPlatformPayoutForBalanceTransaction(payment.stripeBalanceTransactionId)
+      : { kind: "unknown" as const, reason: "no_balance_transaction" as const };
 
     return {
       order: {
@@ -586,10 +804,14 @@ export async function fetchAdminOrderPaymentSummary(
         : null,
       vendorOrders,
       orderRefunds,
+      refundLedgerRows,
+      refundDisplay,
       ledgerSummary: ledgerSummary
         ? {
             paymentAmountCents: ledgerSummary.paymentAmountCents,
             totalRefundedCents: ledgerSummary.totalRefundedCents,
+            ledgerRefundedCents: ledgerSummary.ledgerRefundedCents,
+            legacyRefundedCents: ledgerSummary.legacyRefundedCents,
             remainingRefundableCents: ledgerSummary.remainingRefundableCents,
             paymentRefundStatus: ledgerSummary.paymentRefundStatus,
             hasPendingRefund: ledgerSummary.hasPendingRefund,

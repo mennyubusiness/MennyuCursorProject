@@ -17,10 +17,11 @@ describe("AdminPaymentsRefundsPanel clawback UI", () => {
     expect(panelSrc).not.toMatch(/Vendor clawback not needed/);
   });
 
-  it("offers prepare action for missing clawback rows", () => {
-    expect(panelSrc).toMatch(/Prepare vendor reversal/);
+  it("offers prepare only when reversalPrepare.canPrepare is true", () => {
+    expect(panelSrc).toMatch(/v\.reversalPrepare\.canPrepare/);
     expect(panelSrc).toMatch(/adminPrepareMissingTransferReversalAction/);
-    expect(panelSrc).toMatch(/Manual review required/);
+    expect(panelSrc).toMatch(/formatPrepareMissingReversalError/);
+    expect(panelSrc).toMatch(/Refund total exists, but no refund ledger entry was found/);
   });
 
   it("shows Stripe reversal verification copy and id when recovered", () => {

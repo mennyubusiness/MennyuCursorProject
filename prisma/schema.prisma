@@ -966,6 +966,11 @@ model VendorPayoutTransfer {
   failureMessage       String?
   submittedAt          DateTime?
   failedAt             DateTime?
+  /// Admin legacy clawback queue: reviewed | deferred (null = open / not yet triaged).
+  legacyClawbackReviewStatus String?
+  legacyClawbackReviewNote   String?
+  legacyClawbackReviewedAt   DateTime?
+  legacyClawbackReviewedBy   String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
@@ -977,6 +982,7 @@ model VendorPayoutTransfer {
   @@index([status])
   @@index([batchKey])
   @@index([vendorId])
+  @@index([legacyClawbackReviewStatus])
 }
 
 /// Stripe Connect transfer reversal execution (pull funds back from connected account after platform refund).

@@ -29,6 +29,11 @@ import {
   VENDOR_CLAWBACK_PENDING_ATTENTION_MINUTES,
 } from "@/lib/vendor-clawback-status";
 import { computeVendorOrderRefundedCents } from "@/domain/order-refund";
+import {
+  assessRefundEvidenceForReversalPrep,
+  prepareMissingReversalBlockMessage,
+} from "@/lib/admin-refund-evidence";
+import { isLegacyClawbackReviewClosed, LEGACY_CLAWBACK_REVIEW_EXPLANATION } from "@/lib/legacy-clawback-review";
 import { VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS } from "@/services/vendor-payout-transfer-reversal.service";
 import {
   canManualRecoverVendorOrder,
@@ -122,6 +127,11 @@ export interface AdminAttentionItem {
   stripeTransferId?: string | null;
   stripeTransferReversalId?: string | null;
   paymentRefundStatus?: string | null;
+  vendorPayoutTransferId?: string | null;
+  /** Legacy financial review: how refund was detected when ledger linkage is unsafe. */
+  legacyRefundDetectedCents?: number;
+  legacyRefundSource?: string | null;
+  legacyUnsafeReversalDetail?: string | null;
 
   order?: {
     id: string;
@@ -405,7 +415,7 @@ function reasonToLabel(
     case "vendor_clawback_missing":
       return "Vendor clawback missing — prepare vendor reversal";
     case "legacy_clawback_review":
-      return "Historical clawback needs manual review";
+      return LEGACY_CLAWBACK_REVIEW_EXPLANATION.slice(0, 120);
     case "manual_recovery_required":
       return "Manual recovery required";
     case "financial_resolution":
@@ -945,13 +955,30 @@ async function fetchStalePendingVendorClawbackAttentionItems(now: Date): Promise
     .map((row) => mapClawbackReversalAttentionItem(row, now, "vendor_clawback_pending"));
 }
 
+function legacyRefundSourceLabel(input: {
+  denormalizedOnly: boolean;
+  inconsistentLedger: boolean;
+  hasSucceededLegacyAttemptOnly: boolean;
+}): string {
+  if (input.inconsistentLedger) return "Inconsistent refund ledger";
+  if (input.denormalizedOnly) return "Denormalized order refund total";
+  if (input.hasSucceededLegacyAttemptOnly) return "Legacy refund attempt (unlinked)";
+  return "Incomplete refund linkage";
+}
+
 async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<AdminAttentionItem[]> {
   const candidates = await prisma.vendorPayoutTransfer.findMany({
     where: {
       status: "paid",
       stripeTransferId: { not: null },
     },
-    include: {
+    select: {
+      id: true,
+      status: true,
+      amountCents: true,
+      stripeTransferId: true,
+      updatedAt: true,
+      legacyClawbackReviewStatus: true,
       vendorOrder: {
         select: {
           id: true,
@@ -963,6 +990,8 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
               id: true,
               customerPhone: true,
               paymentRefundStatus: true,
+              totalCents: true,
+              totalRefundedCents: true,
               pod: { select: { id: true, name: true } },
               orderRefunds: {
                 select: {
@@ -972,6 +1001,8 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
                   status: true,
                   refundScope: true,
                   refundAttemptId: true,
+                  stripeRefundId: true,
+                  refundAttempt: { select: { status: true } },
                 },
               },
               refundAttempts: {
@@ -980,6 +1011,8 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
                   vendorOrderId: true,
                   amountCents: true,
                   status: true,
+                  stripeRefundId: true,
+                  dismissedAsLegacyAt: true,
                 },
               },
             },
@@ -1012,9 +1045,12 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
         .filter((id): id is string => Boolean(id))
     );
     const legacyAttempts = vo.order.refundAttempts.map((a) => ({
+      id: a.id,
       vendorOrderId: a.vendorOrderId,
       amountCents: a.amountCents,
       status: a.status,
+      stripeRefundId: a.stripeRefundId,
+      dismissedAsLegacyAt: a.dismissedAsLegacyAt,
       hasLinkedOrderRefund: linkedAttemptIds.has(a.id),
     }));
     const orderRefundsForAllocation = vo.order.orderRefunds.map((r) => ({
@@ -1023,41 +1059,90 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
       status: r.status,
       refundScope: r.refundScope,
     }));
+    const ledgerRefundedCents = vo.order.orderRefunds
+      .filter((r) => r.status === "succeeded")
+      .reduce((s, r) => s + r.amountCents, 0);
+    const legacyRefundedCents = legacyAttempts
+      .filter((a) => a.status === "succeeded" && !a.hasLinkedOrderRefund && !a.dismissedAsLegacyAt)
+      .reduce((s, a) => s + a.amountCents, 0);
+    const refundEvidence = assessRefundEvidenceForReversalPrep({
+      orderId: vo.order.id,
+      orderTotalCents: vo.order.totalCents,
+      denormalizedOrderRefundedCents: vo.order.totalRefundedCents,
+      ledgerRefundedCents,
+      legacyRefundedCents,
+      vendorOrderId: vo.id,
+      vendorOrderTotalCents: vo.totalCents,
+      orderRefunds: vo.order.orderRefunds.map((r) => ({
+        id: r.id,
+        vendorOrderId: r.vendorOrderId,
+        amountCents: r.amountCents,
+        status: r.status,
+        refundScope: r.refundScope,
+        refundAttemptId: r.refundAttemptId,
+        refundAttemptStatus: r.refundAttempt?.status ?? null,
+        stripeRefundId: r.stripeRefundId,
+      })),
+      legacyAttempts,
+    });
     const effectiveVendorOrderRefundedCents = computeVendorOrderRefundedCents({
       vendorOrderId: vo.id,
       vendorOrderTotalCents: vo.totalCents,
       orderRefunds: orderRefundsForAllocation,
       legacyAttempts,
     });
+    const vendorRefundedForClawback =
+      refundEvidence.inconsistentLedger || refundEvidence.denormalizedOnlyRefund
+        ? Math.max(vo.order.totalRefundedCents, effectiveVendorOrderRefundedCents)
+        : effectiveVendorOrderRefundedCents;
     const clawback = computeVendorClawbackSummary({
       transferStatus: vpt.status,
       stripeTransferId: vpt.stripeTransferId,
       transferAmountCents: vpt.amountCents,
       vendorOrderTotalCents: vo.totalCents,
-      vendorOrderRefundedCents: effectiveVendorOrderRefundedCents,
+      vendorOrderRefundedCents: vendorRefundedForClawback,
       reversals: vpt.reversals,
     });
 
-    if (!clawback.hasMissingReversalSetup) continue;
-    if (effectiveVendorOrderRefundedCents < vo.totalCents) continue;
+    const missingSetup =
+      clawback.hasMissingReversalSetup ||
+      ((refundEvidence.inconsistentLedger || refundEvidence.denormalizedOnlyRefund) &&
+        vendorRefundedForClawback > 0 &&
+        vpt.reversals.length === 0);
+    if (!missingSetup) continue;
+    if (
+      !refundEvidence.hasSafeFullScopeSucceededRefund &&
+      vendorRefundedForClawback < vo.totalCents &&
+      vo.order.totalRefundedCents < vo.order.totalCents
+    ) {
+      continue;
+    }
 
-    const succeededAttemptIds = new Set(
-      vo.order.refundAttempts.filter((a) => a.status === "succeeded").map((a) => a.id)
-    );
-    const hasSafeLinkedFullScopeRefund = vo.order.orderRefunds.some((r) => {
-      if (r.status !== "succeeded" || !r.refundAttemptId || !succeededAttemptIds.has(r.refundAttemptId)) {
-        return false;
-      }
-      if ((r.refundScope === "full_order" || r.refundScope === "system_cancel") && !r.vendorOrderId) {
-        return true;
-      }
-      return r.refundScope === "full_vendor_order" && r.vendorOrderId === vo.id;
-    });
     const reason: Extract<
       AdminAttentionReason,
       "vendor_clawback_missing" | "legacy_clawback_review"
-    > = hasSafeLinkedFullScopeRefund ? "vendor_clawback_missing" : "legacy_clawback_review";
+    > = refundEvidence.hasSafeFullScopeSucceededRefund
+      ? "vendor_clawback_missing"
+      : "legacy_clawback_review";
+
+    if (reason === "legacy_clawback_review" && isLegacyClawbackReviewClosed(vpt.legacyClawbackReviewStatus)) {
+      continue;
+    }
+
     const ageMinutes = ageMinutesUtil(vpt.updatedAt, now.getTime());
+    const legacyRefundSource =
+      reason === "legacy_clawback_review"
+        ? legacyRefundSourceLabel({
+            denormalizedOnly: refundEvidence.denormalizedOnlyRefund,
+            inconsistentLedger: refundEvidence.inconsistentLedger,
+            hasSucceededLegacyAttemptOnly: refundEvidence.hasSucceededLegacyAttemptOnly,
+          })
+        : null;
+    const legacyUnsafeDetail =
+      reason === "legacy_clawback_review" && refundEvidence.prepareBlockReason
+        ? prepareMissingReversalBlockMessage(refundEvidence.prepareBlockReason)
+        : null;
+
     items.push({
       id: `${reason === "vendor_clawback_missing" ? "vendor_clawback" : "legacy_clawback"}:missing:${vpt.id}`,
       scope: "vendor_order",
@@ -1066,13 +1151,17 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
       severity: reason === "legacy_clawback_review" ? "low" : ageMinutes > 120 ? "high" : "medium",
       ageMinutes,
       recommendedAction: reasonToRecommendedAction(reason),
-      reasonLabel: reasonToLabel(reason),
+      reasonLabel:
+        reason === "legacy_clawback_review"
+          ? LEGACY_CLAWBACK_REVIEW_EXPLANATION
+          : reasonToLabel(reason),
       currentStatus:
         reason === "legacy_clawback_review"
           ? "Paid vendor transfer · no reversal row · unsafe legacy linkage"
           : "Paid vendor transfer · no reversal row",
       orderId: vo.orderId,
       vendorOrderId: vo.id,
+      vendorPayoutTransferId: vpt.id,
       primaryEntityHref: paymentsRefundsHref(vo.orderId),
       order: {
         id: vo.order.id,
@@ -1081,10 +1170,16 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
       },
       vendor: vo.vendor ? { name: vo.vendor.name } : undefined,
       paymentRefundStatus: vo.order.paymentRefundStatus ?? null,
-      clawbackStatus: "manual_review",
+      clawbackStatus: reason === "legacy_clawback_review" ? "manual_review" : "missing",
       clawbackAmountCents: vpt.amountCents,
       stripeTransferId: vpt.stripeTransferId,
       failureMessage: null,
+      legacyRefundDetectedCents:
+        reason === "legacy_clawback_review"
+          ? Math.max(vo.order.totalRefundedCents, vendorRefundedForClawback)
+          : undefined,
+      legacyRefundSource,
+      legacyUnsafeReversalDetail: legacyUnsafeDetail,
     });
     if (items.length >= TAKE_VENDOR_CLAWBACK_ATTENTION) break;
   }
@@ -1187,6 +1282,23 @@ export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
   ];
   /** Newest / most recent queue entries first (smaller age = order created more recently). */
   return all.sort((a, b) => a.ageMinutes - b.ageMinutes);
+}
+
+/** Split operational queue from historical legacy clawback review (reviewed legacy are omitted upstream). */
+export function partitionAttentionItemsForWorkbench(items: AdminAttentionItem[]): {
+  currentNeedsAttention: AdminAttentionItem[];
+  legacyFinancialReview: AdminAttentionItem[];
+} {
+  const currentNeedsAttention: AdminAttentionItem[] = [];
+  const legacyFinancialReview: AdminAttentionItem[] = [];
+  for (const item of items) {
+    if (item.reason === "legacy_clawback_review") {
+      legacyFinancialReview.push(item);
+    } else {
+      currentNeedsAttention.push(item);
+    }
+  }
+  return { currentNeedsAttention, legacyFinancialReview };
 }
 
 /**

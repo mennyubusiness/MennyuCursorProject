@@ -20,6 +20,11 @@ import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 import { env } from "@/lib/env";
 import { VENDOR_PAYOUT_TRANSFER_STATUS } from "@/services/vendor-payout-transfer.service";
+import {
+  assessRefundEvidenceForReversalPrep,
+  orderRefundAppliesToVendorTransfer,
+  type PrepareMissingReversalBlockReason,
+} from "@/lib/admin-refund-evidence";
 
 export const VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS = {
   pending: "pending",
@@ -126,28 +131,8 @@ export type PrepareMissingTransferReversalResult =
         | "skipped_ineligible"
         | "duplicate_existing_reversal"
         | "not_found";
-      reason: string;
+      reason: PrepareMissingReversalBlockReason;
     };
-
-function orderRefundAppliesToTransfer(input: {
-  refund: {
-    vendorOrderId: string | null;
-    amountCents: number;
-    refundScope: string;
-  };
-  orderTotalCents: number;
-  vendorOrderId: string;
-  vendorOrderTotalCents: number;
-}): boolean {
-  const scope = input.refund.refundScope;
-  if ((scope === "full_order" || scope === "system_cancel") && !input.refund.vendorOrderId) {
-    return input.refund.amountCents === input.orderTotalCents;
-  }
-  if (scope === "full_vendor_order" && input.refund.vendorOrderId === input.vendorOrderId) {
-    return input.refund.amountCents === input.vendorOrderTotalCents;
-  }
-  return false;
-}
 
 /**
  * Safe admin repair for historical full-order/full-vendor refunds where the customer refund
@@ -166,7 +151,13 @@ export async function prepareMissingTransferReversalForRefund(input: {
           id: true,
           orderId: true,
           totalCents: true,
-          order: { select: { id: true, totalCents: true } },
+          order: {
+            select: {
+              id: true,
+              totalCents: true,
+              totalRefundedCents: true,
+            },
+          },
         },
       },
       reversals: {
@@ -205,29 +196,89 @@ export async function prepareMissingTransferReversalForRefund(input: {
     return { ok: false, outcome: "skipped_ineligible", reason: "unsafe_reversal_amount" };
   }
 
-  const refunds = await prisma.orderRefund.findMany({
-    where: {
-      orderId: input.orderId,
-      ...(input.orderRefundId ? { id: input.orderRefundId } : {}),
-      status: "succeeded",
-      refundScope: { in: ["full_order", "system_cancel", "full_vendor_order"] },
-    },
-    select: {
-      id: true,
-      vendorOrderId: true,
-      amountCents: true,
-      refundScope: true,
-      refundAttemptId: true,
-      refundAttempt: { select: { id: true, status: true } },
-    },
-    orderBy: { createdAt: "desc" },
+  const [orderRefunds, refundAttempts, ledgerSummary] = await Promise.all([
+    prisma.orderRefund.findMany({
+      where: {
+        orderId: input.orderId,
+        ...(input.orderRefundId ? { id: input.orderRefundId } : {}),
+      },
+      select: {
+        id: true,
+        vendorOrderId: true,
+        amountCents: true,
+        refundScope: true,
+        status: true,
+        refundAttemptId: true,
+        stripeRefundId: true,
+        refundAttempt: { select: { id: true, status: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.refundAttempt.findMany({
+      where: { orderId: input.orderId },
+      select: {
+        id: true,
+        vendorOrderId: true,
+        amountCents: true,
+        status: true,
+        stripeRefundId: true,
+        dismissedAsLegacyAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.order.findUnique({
+      where: { id: input.orderId },
+      select: { totalRefundedCents: true },
+    }),
+  ]);
+
+  const linkedAttemptIds = new Set(
+    orderRefunds.map((r) => r.refundAttemptId).filter((id): id is string => Boolean(id))
+  );
+  const legacyAttempts = refundAttempts.map((a) => ({
+    id: a.id,
+    vendorOrderId: a.vendorOrderId,
+    amountCents: a.amountCents,
+    status: a.status,
+    stripeRefundId: a.stripeRefundId,
+    hasLinkedOrderRefund: linkedAttemptIds.has(a.id),
+    dismissedAsLegacyAt: a.dismissedAsLegacyAt,
+  }));
+
+  const ledgerRefundedCents = orderRefunds
+    .filter((r) => r.status === "succeeded")
+    .reduce((s, r) => s + r.amountCents, 0);
+  const legacyRefundedCents = legacyAttempts
+    .filter((a) => a.status === "succeeded" && !a.hasLinkedOrderRefund && !a.dismissedAsLegacyAt)
+    .reduce((s, a) => s + a.amountCents, 0);
+
+  const evidence = assessRefundEvidenceForReversalPrep({
+    orderId: input.orderId,
+    orderTotalCents: vpt.vendorOrder.order.totalCents,
+    denormalizedOrderRefundedCents:
+      ledgerSummary?.totalRefundedCents ?? vpt.vendorOrder.order.totalRefundedCents,
+    ledgerRefundedCents,
+    legacyRefundedCents,
+    vendorOrderId: vpt.vendorOrderId,
+    vendorOrderTotalCents: vpt.vendorOrder.totalCents,
+    orderRefunds: orderRefunds.map((r) => ({
+      id: r.id,
+      vendorOrderId: r.vendorOrderId,
+      amountCents: r.amountCents,
+      status: r.status,
+      refundScope: r.refundScope,
+      refundAttemptId: r.refundAttemptId,
+      refundAttemptStatus: r.refundAttempt?.status ?? null,
+      stripeRefundId: r.stripeRefundId,
+    })),
+    legacyAttempts,
   });
 
-  const safeRefund = refunds.find((refund) => {
-    if (!refund.refundAttemptId || refund.refundAttempt?.status !== "succeeded") {
+  const safeRefund = orderRefunds.find((refund) => {
+    if (refund.status !== "succeeded" || !refund.refundAttemptId || refund.refundAttempt?.status !== "succeeded") {
       return false;
     }
-    return orderRefundAppliesToTransfer({
+    return orderRefundAppliesToVendorTransfer({
       refund,
       orderTotalCents: vpt.vendorOrder.order.totalCents,
       vendorOrderId: vpt.vendorOrderId,
@@ -235,30 +286,70 @@ export async function prepareMissingTransferReversalForRefund(input: {
     });
   });
 
-  if (!safeRefund) {
-    const hasRefundWithoutAttempt = refunds.some((refund) =>
-      orderRefundAppliesToTransfer({
-        refund,
-        orderTotalCents: vpt.vendorOrder.order.totalCents,
-        vendorOrderId: vpt.vendorOrderId,
-        vendorOrderTotalCents: vpt.vendorOrder.totalCents,
-      })
-    );
+  let refundAttemptId = safeRefund?.refundAttemptId ?? evidence.safeRefundAttemptId;
+
+  if (!refundAttemptId) {
+    for (const attempt of refundAttempts) {
+      if (attempt.status !== "succeeded" || attempt.dismissedAsLegacyAt) continue;
+      const eligibility = await evaluateTransferReversalEligibilityForRefundAttempt({
+        orderId: input.orderId,
+        vendorOrderId: attempt.vendorOrderId,
+        amountCents: attempt.amountCents,
+      });
+      if (!eligibility.eligible) continue;
+      const prep = await prepareTransferReversalsForRefundAttempt(attempt.id);
+      if (prep.outcome === "created_pending" || prep.outcome === "idempotent_noop") {
+        const row = await prisma.vendorPayoutTransferReversal.findUnique({
+          where: {
+            refundAttemptId_vendorPayoutTransferId: {
+              refundAttemptId: attempt.id,
+              vendorPayoutTransferId: vpt.id,
+            },
+          },
+          select: { id: true, amountCents: true },
+        });
+        if (row) {
+          return {
+            ok: true,
+            outcome: prep.outcome === "created_pending" ? "created_pending" : "idempotent_noop",
+            reversalId: row.id,
+            refundAttemptId: attempt.id,
+            vendorPayoutTransferId: vpt.id,
+            amountCents: row.amountCents,
+          };
+        }
+      }
+    }
+
     return {
       ok: false,
       outcome: "manual_review",
-      reason: hasRefundWithoutAttempt
-        ? "matching_refund_missing_succeeded_refund_attempt_link"
-        : "no_safe_full_scope_succeeded_refund",
+      reason:
+        evidence.prepareBlockReason ??
+        ("no_succeeded_order_refund" as PrepareMissingReversalBlockReason),
     };
   }
-  const refundAttemptId = safeRefund.refundAttemptId;
-  if (!refundAttemptId) {
-    return {
-      ok: false,
-      outcome: "manual_review",
-      reason: "matching_refund_missing_succeeded_refund_attempt_link",
-    };
+
+  if (!safeRefund) {
+    const existing = await prisma.vendorPayoutTransferReversal.findUnique({
+      where: {
+        refundAttemptId_vendorPayoutTransferId: {
+          refundAttemptId,
+          vendorPayoutTransferId: vpt.id,
+        },
+      },
+      select: { id: true, amountCents: true },
+    });
+    if (existing) {
+      return {
+        ok: true,
+        outcome: "idempotent_noop",
+        reversalId: existing.id,
+        refundAttemptId,
+        vendorPayoutTransferId: vpt.id,
+        amountCents: existing.amountCents,
+      };
+    }
   }
 
   const idempotencyKey = stableTransferReversalIdempotencyKey(refundAttemptId, vpt.id);
@@ -307,7 +398,11 @@ export async function prepareMissingTransferReversalForRefund(input: {
           amountCents: existing.amountCents,
         };
       }
-      return { ok: false, outcome: "duplicate_existing_reversal", reason: "duplicate_reversal_key" };
+      return {
+        ok: false,
+        outcome: "duplicate_existing_reversal",
+        reason: "duplicate_existing_reversal",
+      };
     }
     throw e;
   }

@@ -429,7 +429,7 @@ export function PayoutTransfersDashboard({
       }
       setBatchMsg(
         r.summary.examined === 0
-          ? "No prepared reversals are pending. Missing clawbacks must be prepared from the affected order first."
+          ? "No prepared vendor reversals are pending. For missing clawbacks, prepare a vendor reversal from the affected order first."
           : `Reversal batch: examined ${r.summary.examined}, reversed ${r.summary.reversed}, skipped ${r.summary.skipped}, failed ${r.summary.failed}.`
       );
       startTransition(() => router.refresh());
@@ -665,7 +665,7 @@ export function PayoutTransfersDashboard({
             onClick={() => void runReversalBatch()}
             title={
               preparedPendingReversalCount === 0
-                ? "Missing clawbacks must be prepared from the affected order first."
+                ? "For missing clawbacks, prepare a vendor reversal from the affected order first. Prepare is blocked when the refund ledger is incomplete."
                 : undefined
             }
             className="rounded-lg border border-oo-light-stone bg-oo-cream px-4 py-2 text-sm font-semibold text-oo-charcoal shadow-sm hover:bg-oo-warm-white disabled:opacity-50"
@@ -940,7 +940,10 @@ export function PayoutTransfersDashboard({
         </p>
         {reversalGroups.length === 0 ? (
           <div className="rounded-lg border border-dashed border-oo-light-stone bg-oo-warm-white p-8 text-center text-oo-stone-gray">
-            <p>No prepared reversals are pending. Missing clawbacks must be prepared from the affected order first.</p>
+            <p>
+              No prepared vendor reversals are pending. For missing clawbacks, prepare a vendor reversal from
+              the affected order first.
+            </p>
             <Link
               href="/admin/exceptions?reason=vendor_clawback_missing"
               className="mt-2 inline-block text-sm font-semibold text-oo-charcoal underline"

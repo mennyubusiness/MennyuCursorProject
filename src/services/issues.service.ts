@@ -143,7 +143,7 @@ export async function getOrderIdsWithOpenIssues(): Promise<string[]> {
 /** Read-only admin history: resolved OrderIssue + VendorOrderIssue rows (for Issues page “Resolved” tab). */
 export type AdminResolvedIssueHistoryRow = {
   id: string;
-  kind: "order_issue" | "vendor_order_issue";
+  kind: "order_issue" | "vendor_order_issue" | "legacy_clawback_review";
   orderId: string;
   resolvedAt: string;
   type: string;

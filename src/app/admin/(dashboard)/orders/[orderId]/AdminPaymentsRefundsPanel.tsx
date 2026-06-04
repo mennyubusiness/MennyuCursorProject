@@ -15,7 +15,13 @@ import {
 import type {
   AdminOrderPaymentSummary,
   AdminOrderPaymentSummaryRefund,
+  AdminOrderRefundLedgerRow,
 } from "@/services/admin-order-payment-summary.service";
+import { formatPrepareMissingReversalError } from "@/lib/admin-refund-prepare-ui";
+import {
+  legacyClawbackReviewStatusLabel,
+  type LegacyClawbackReviewStatus,
+} from "@/lib/legacy-clawback-review";
 import { StripeMoneyMovementBreakdown } from "@/components/admin/StripeMoneyMovementBreakdown";
 import { adminVendorConnectTransferStatusLabel } from "@/lib/stripe-money-movement";
 import { vendorClawbackStatusBadgeClass } from "@/lib/vendor-clawback-status";
@@ -28,6 +34,140 @@ import type { LinkedIssueRefundContext } from "@/lib/admin-order-issue-refund-li
 import { adminPrepareMissingTransferReversalAction } from "@/actions/admin-payout-transfer-reversal.actions";
 
 type ModalKind = AdminRefundScopeKey | null;
+
+function LegacyClawbackReviewActions({
+  vendorPayoutTransferId,
+  stripeTransferId,
+  needsReview,
+  review,
+  onComplete,
+}: {
+  vendorPayoutTransferId: string;
+  stripeTransferId: string | null;
+  needsReview: boolean;
+  review: {
+    status: string | null;
+    note: string | null;
+    reviewedAt: string | null;
+    reviewedBy: string | null;
+  };
+  onComplete: () => void;
+}) {
+  const [note, setNote] = useState(review.note ?? "");
+  const [pendingStatus, setPendingStatus] = useState<LegacyClawbackReviewStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(status: LegacyClawbackReviewStatus) {
+    const trimmed = note.trim();
+    if (!trimmed) {
+      setError("An admin note is required.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/vendor-payout-transfers/${vendorPayoutTransferId}/legacy-clawback-review`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status, note: trimmed }),
+        }
+      );
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || data.ok === false) {
+        setError(data.error ?? "Could not save legacy review.");
+        return;
+      }
+      setPendingStatus(null);
+      onComplete();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!needsReview && review.status) {
+    return (
+      <div className="mt-1 rounded border border-violet-200 bg-violet-50/80 px-2 py-1.5 text-[10px] text-violet-950">
+        <p className="font-semibold">
+          Legacy clawback {legacyClawbackReviewStatusLabel(review.status).toLowerCase()}
+          {review.reviewedAt ? ` · ${new Date(review.reviewedAt).toLocaleString()}` : ""}
+        </p>
+        {review.note ? <p className="mt-0.5 leading-snug">{review.note}</p> : null}
+      </div>
+    );
+  }
+
+  if (!needsReview) return null;
+
+  return (
+    <div className="mt-1.5 space-y-1.5 rounded border border-violet-200 bg-violet-50/80 px-2 py-2 text-[10px] text-violet-950">
+      <p className="font-semibold">Legacy clawback review required</p>
+      <p className="leading-snug">
+        Refund evidence is incomplete, so Open Order cannot safely prepare an automatic vendor reversal.
+      </p>
+      {stripeTransferId ? (
+        <p className="font-mono text-[9px] text-violet-900">Stripe transfer {shortenId(stripeTransferId)}</p>
+      ) : null}
+      {pendingStatus ? (
+        <>
+          <textarea
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Admin note (required) — what you verified in Stripe"
+            className="w-full rounded border border-violet-200 bg-white px-2 py-1 text-[10px] text-oo-charcoal"
+          />
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void submit(pendingStatus)}
+              className="rounded border border-violet-400 bg-violet-200 px-2 py-0.5 font-semibold disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setPendingStatus(null)}
+              className="rounded border border-violet-200 px-2 py-0.5"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setPendingStatus("reviewed")}
+            className="rounded border border-violet-400 bg-violet-200 px-2 py-0.5 font-semibold disabled:opacity-50"
+          >
+            Mark reviewed
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setPendingStatus("deferred")}
+            className="rounded border border-violet-200 bg-white px-2 py-0.5 font-semibold disabled:opacity-50"
+          >
+            Defer
+          </button>
+          <Link
+            href="/admin/exceptions"
+            className="rounded border border-violet-200 bg-white px-2 py-0.5 font-semibold text-violet-950 underline"
+          >
+            Issues queue
+          </Link>
+        </div>
+      )}
+      {error ? <p className="text-red-800">{error}</p> : null}
+    </div>
+  );
+}
 
 function shortenId(id: string | null | undefined): string {
   if (!id) return "—";
@@ -783,32 +923,57 @@ function RefundModal({
   );
 }
 
-function RefundsTable({ rows }: { rows: AdminOrderPaymentSummaryRefund[] }) {
+function RefundsTable({
+  rows,
+  inconsistentLedger,
+}: {
+  rows: AdminOrderRefundLedgerRow[];
+  inconsistentLedger: boolean;
+}) {
   if (rows.length === 0) {
+    if (inconsistentLedger) {
+      return (
+        <p className="mt-2 rounded border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-950">
+          Refund total exists, but no refund ledger entry was found. This may be legacy or inconsistent
+          data.
+        </p>
+      );
+    }
     return <p className="mt-2 text-sm text-oo-stone-gray">No refunds recorded yet.</p>;
   }
   return (
     <div className="mt-3 overflow-x-auto">
+      {inconsistentLedger ? (
+        <p className="mb-2 rounded border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-950">
+          Order totals show a refund, but ledger rows may be incomplete. Review before preparing vendor
+          reversal.
+        </p>
+      ) : null}
       <table className="w-full min-w-[640px] text-left text-sm">
         <thead>
           <tr className="border-b border-oo-light-stone text-xs uppercase tracking-wide text-oo-stone-gray">
             <th className="px-2 py-2">Date</th>
+            <th className="px-2 py-2">Source</th>
             <th className="px-2 py-2">Scope</th>
             <th className="px-2 py-2">Vendor</th>
             <th className="px-2 py-2">Amount</th>
             <th className="px-2 py-2">Status</th>
-            <th className="px-2 py-2">Initiated</th>
             <th className="px-2 py-2">Stripe</th>
-            <th className="px-2 py-2">Notes</th>
+            <th className="px-2 py-2">Refund attempt</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.id} className="border-b border-oo-light-stone/80">
               <td className="px-2 py-2 text-xs text-oo-stone-gray">
-                {new Date(r.createdAt).toLocaleString()}
+                {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}
               </td>
-              <td className="px-2 py-2">{refundScopeLabel(r.refundScope)}</td>
+              <td className="px-2 py-2 text-xs">
+                {r.source === "legacy_refund_attempt" ? "Legacy attempt" : "Ledger"}
+              </td>
+              <td className="px-2 py-2">
+                {r.refundScope ? refundScopeLabel(r.refundScope) : "—"}
+              </td>
               <td className="px-2 py-2">{r.vendorName ?? "—"}</td>
               <td className="px-2 py-2 tabular-nums">{formatAdminMoney(r.amountCents)}</td>
               <td className="px-2 py-2">
@@ -825,23 +990,13 @@ function RefundsTable({ rows }: { rows: AdminOrderPaymentSummaryRefund[] }) {
                 >
                   {refundStatusLabel(r.status)}
                 </span>
-                {r.failureMessage && (
-                  <p className="mt-0.5 text-xs text-red-700">{r.failureMessage.slice(0, 80)}</p>
-                )}
               </td>
-              <td className="px-2 py-2 text-xs">{r.initiatedByRole}</td>
               <td className="px-2 py-2 font-mono text-xs">{shortenId(r.stripeRefundId)}</td>
-              <td className="px-2 py-2 text-xs">
-                {r.adminNote ? (
-                  <span title={r.adminNote}>Admin note</span>
-                ) : (
-                  "—"
-                )}
-                {r.refundAttemptStatus && (
-                  <span className="block text-oo-stone-gray">
-                    Attempt: {r.refundAttemptStatus}
-                  </span>
-                )}
+              <td className="px-2 py-2 font-mono text-xs">
+                {r.refundAttemptId ? shortenId(r.refundAttemptId) : "—"}
+                {r.refundAttemptStatus ? (
+                  <span className="block text-oo-stone-gray">{r.refundAttemptStatus}</span>
+                ) : null}
               </td>
             </tr>
           ))}
@@ -1021,11 +1176,7 @@ export function AdminPaymentsRefundsPanel({
         vendorPayoutTransferId,
       });
       if (!result.ok) {
-        setPrepareError(
-          result.error === "matching_refund_missing_succeeded_refund_attempt_link"
-            ? "Manual review required: this refund is missing a safe succeeded refund-attempt link."
-            : result.error.replace(/_/g, " ")
-        );
+        setPrepareError(formatPrepareMissingReversalError(result.error));
         return;
       }
       setPrepareMessage("Vendor transfer reversal prepared. Run the reversal batch to submit it to Stripe.");
@@ -1166,8 +1317,14 @@ export function AdminPaymentsRefundsPanel({
         <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
           <p className="text-xs text-oo-stone-gray">Refunded</p>
           <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
-            {formatAdminMoney(summary.order.totalRefundedCents)}
+            {formatAdminMoney(summary.refundDisplay.refundedCents)}
           </p>
+          {summary.refundDisplay.inconsistentLedger ? (
+            <p className="mt-0.5 text-[10px] text-violet-900">
+              Denormalized total {formatAdminMoney(summary.refundDisplay.denormalizedRefundedCents)} ·
+              no ledger rows
+            </p>
+          ) : null}
         </div>
         <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
           <p className="text-xs text-oo-stone-gray">Customer refund status</p>
@@ -1405,7 +1562,7 @@ export function AdminPaymentsRefundsPanel({
                             : "Run reversal batch"}
                         </Link>
                       )}
-                      {v.clawback.hasMissingReversalSetup && v.vendorPayoutTransferId ? (
+                      {v.reversalPrepare.canPrepare && v.vendorPayoutTransferId ? (
                         canExecuteRefunds ? (
                           <button
                             type="button"
@@ -1422,6 +1579,19 @@ export function AdminPaymentsRefundsPanel({
                             Manual review required: platform-admin access is needed to prepare a reversal.
                           </p>
                         )
+                      ) : v.reversalPrepare.blockReason ? (
+                        <p className="text-[10px] leading-snug text-violet-950">
+                          {formatPrepareMissingReversalError(v.reversalPrepare.blockReason)}
+                        </p>
+                      ) : null}
+                      {v.vendorPayoutTransferId && v.legacyClawbackReview ? (
+                        <LegacyClawbackReviewActions
+                          vendorPayoutTransferId={v.vendorPayoutTransferId}
+                          stripeTransferId={v.stripeTransferId}
+                          needsReview={v.legacyClawbackReview.needsReview}
+                          review={v.legacyClawbackReview}
+                          onComplete={() => router.refresh()}
+                        />
                       ) : null}
                       {v.clawback.clawbackStatus === "recovered" && v.reversals.some((r) => r.stripeTransferReversalId) ? (
                         <p className="text-[10px] leading-snug text-emerald-900">
@@ -1462,7 +1632,10 @@ export function AdminPaymentsRefundsPanel({
       {/* Refunds ledger */}
       <div className="mt-6">
         <h3 className="font-medium text-oo-charcoal">Refund ledger</h3>
-        <RefundsTable rows={summary.orderRefunds} />
+        <RefundsTable
+          rows={summary.refundLedgerRows}
+          inconsistentLedger={summary.refundDisplay.inconsistentLedger}
+        />
       </div>
 
       {modal && (

@@ -88,8 +88,8 @@ describe("admin vendor transfers page terminology", () => {
       join(root, "src/app/admin/(dashboard)/payout-transfers/PayoutTransfersDashboard.tsx"),
       "utf8"
     );
-    expect(dashboardSrc).toMatch(/No prepared reversals are pending/);
-    expect(dashboardSrc).toMatch(/Missing clawbacks must be prepared from the affected order first/);
+    expect(dashboardSrc).toMatch(/No prepared vendor reversals are pending/);
+    expect(dashboardSrc).toMatch(/prepare a vendor reversal from the affected order first/);
     expect(dashboardSrc).toMatch(/preparedPendingReversalCount === 0/);
   });
 });

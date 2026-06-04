@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockVptFindUnique = vi.fn();
 const mockOrderRefundFindMany = vi.fn();
+const mockRefundAttemptFindMany = vi.fn();
+const mockOrderFindUnique = vi.fn();
 const mockReversalCreate = vi.fn();
 const mockReversalFindUnique = vi.fn();
 
@@ -12,6 +14,12 @@ vi.mock("@/lib/db", () => ({
     },
     orderRefund: {
       findMany: (...args: unknown[]) => mockOrderRefundFindMany(...args),
+    },
+    refundAttempt: {
+      findMany: (...args: unknown[]) => mockRefundAttemptFindMany(...args),
+    },
+    order: {
+      findUnique: (...args: unknown[]) => mockOrderFindUnique(...args),
     },
     vendorPayoutTransferReversal: {
       create: (...args: unknown[]) => mockReversalCreate(...args),
@@ -47,7 +55,7 @@ function paidTransfer(overrides: Record<string, unknown> = {}) {
       id: "vo_1",
       orderId: "order_1",
       totalCents: 2408,
-      order: { id: "order_1", totalCents: 2408 },
+      order: { id: "order_1", totalCents: 2408, totalRefundedCents: 2408 },
     },
     ...overrides,
   };
@@ -68,6 +76,8 @@ describe("prepareMissingTransferReversalForRefund", () => {
         refundAttempt: { id: "ra_1", status: "succeeded" },
       },
     ]);
+    mockRefundAttemptFindMany.mockResolvedValue([]);
+    mockOrderFindUnique.mockResolvedValue({ totalRefundedCents: 2408 });
     mockReversalCreate.mockResolvedValue({ id: "rev_1" });
     mockReversalFindUnique.mockResolvedValue(null);
   });
@@ -95,6 +105,7 @@ describe("prepareMissingTransferReversalForRefund", () => {
 
   it("refuses partial/custom refunds by requiring safe full-scope refund rows", async () => {
     mockOrderRefundFindMany.mockResolvedValue([]);
+    mockOrderFindUnique.mockResolvedValue({ totalRefundedCents: 0 });
     const result = await prepareMissingTransferReversalForRefund({
       orderId: "order_1",
       vendorPayoutTransferId: "vpt_1",
@@ -102,7 +113,7 @@ describe("prepareMissingTransferReversalForRefund", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.reason).toBe("no_safe_full_scope_succeeded_refund");
+      expect(result.reason).toBe("no_succeeded_order_refund");
     }
     expect(mockReversalCreate).not.toHaveBeenCalled();
   });
