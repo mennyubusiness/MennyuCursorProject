@@ -18,6 +18,7 @@ import {
   hasActiveExploreFilters,
   shouldHidePodSectionForSearchOnly,
 } from "@/lib/explore-discovery";
+import { buildExplorePodFilterUrl } from "@/lib/explore-pod-filter-url";
 import { cn } from "@/lib/cn";
 
 type ExploreDiscoveryProps = {
@@ -116,17 +117,7 @@ export function ExploreDiscovery({ pods }: ExploreDiscoveryProps) {
 
   const setPodFilter = useCallback(
     (podId: string | null) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (podId) {
-        params.set("pod", podId);
-      } else {
-        params.delete("pod");
-      }
-      const qs = params.toString();
-      router.push(qs ? `/explore?${qs}` : "/explore", { scroll: false });
-      requestAnimationFrame(() => {
-        document.getElementById("explore-vendors")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
+      router.push(buildExplorePodFilterUrl(searchParams, podId), { scroll: false });
     },
     [router, searchParams]
   );
@@ -209,12 +200,7 @@ export function ExploreDiscovery({ pods }: ExploreDiscoveryProps) {
                   <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 xl:grid-cols-4">
                     {matchingPodsByName.map((pod) => (
                       <div key={pod.id} className="w-[min(85vw,320px)] shrink-0 sm:w-auto">
-                        <PodCard
-                          pod={pod}
-                          variant="compact"
-                          onSelectPod={setPodFilter}
-                          isSelected={selectedPodId === pod.id}
-                        />
+                        <PodCard pod={pod} variant="compact" />
                       </div>
                     ))}
                   </div>
@@ -229,12 +215,7 @@ export function ExploreDiscovery({ pods }: ExploreDiscoveryProps) {
               >
                 {podsForMainGrid.map((pod) => (
                   <div key={pod.id} className="w-[min(85vw,320px)] shrink-0 sm:w-auto">
-                    <PodCard
-                      pod={pod}
-                      variant="compact"
-                      onSelectPod={setPodFilter}
-                      isSelected={selectedPodId === pod.id}
-                    />
+                    <PodCard pod={pod} variant="compact" />
                   </div>
                 ))}
               </div>
