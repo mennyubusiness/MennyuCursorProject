@@ -1,5 +1,6 @@
 "use client";
 
+import { AwaitCartNavigationLink } from "@/components/cart/AwaitCartNavigationLink";
 import Link from "next/link";
 import {
   createContext,
@@ -15,8 +16,14 @@ import type { Cart } from "@/domain/types";
 import {
   CART_UPDATED_EVENT,
   cartSnapshotAppliesToContext,
+  shouldApplyCartSnapshot,
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
+import {
+  flushCartMutations,
+  hasPendingCartMutations,
+  subscribeCartMutationPending,
+} from "@/lib/cart-mutation-queue";
 import {
   buildErrorByCartItemId,
   cartMutationFingerprint,
@@ -37,6 +44,7 @@ type CartPageMutationContextValue = {
   canCheckout: boolean;
   showValidationWarning: boolean;
   isRevalidating: boolean;
+  isSyncingCart: boolean;
 };
 
 const CartPageMutationContext = createContext<CartPageMutationContextValue | null>(null);
@@ -66,6 +74,9 @@ export function CartPageMutationProvider({
   const [cart, setCart] = useState(initialCart);
   const [serverValidation, setServerValidation] = useState(initialValidation);
   const [isRevalidating, setIsRevalidating] = useState(false);
+  const [isSyncingCart, setIsSyncingCart] = useState(
+    () => hasPendingCartMutations(cartId)
+  );
   const revalidateSeqRef = useRef(0);
   const skipRevalidateForFingerprintRef = useRef(
     cartMutationFingerprint(initialCart.items)
@@ -80,12 +91,44 @@ export function CartPageMutationProvider({
   useEffect(() => {
     const onUpdate = (event: Event) => {
       const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
-      if (detail?.source !== "cart-page") return;
-      if (!detail.cart || !cartSnapshotAppliesToContext(detail.cart, { cartId, podId })) return;
+      if (!shouldApplyCartSnapshot(detail, "cart-page", { cartId, podId })) return;
+      if (!detail?.cart) return;
       setCart(detail.cart);
+      skipRevalidateForFingerprintRef.current = cartMutationFingerprint(detail.cart.items);
     };
     window.addEventListener(CART_UPDATED_EVENT, onUpdate);
     return () => window.removeEventListener(CART_UPDATED_EVENT, onUpdate);
+  }, [cartId, podId]);
+
+  useEffect(() => {
+    return subscribeCartMutationPending(() => {
+      setIsSyncingCart(hasPendingCartMutations(cartId));
+    });
+  }, [cartId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsSyncingCart(hasPendingCartMutations(cartId));
+    void flushCartMutations(cartId).then(async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(`/api/cart?cartId=${encodeURIComponent(cartId)}`, {
+          credentials: "same-origin",
+        });
+        if (!res.ok || cancelled) return;
+        const fresh = (await res.json()) as Cart;
+        if (!cartSnapshotAppliesToContext(fresh, { cartId, podId })) return;
+        setCart(fresh);
+        skipRevalidateForFingerprintRef.current = cartMutationFingerprint(fresh.items);
+      } catch {
+        /* keep SSR cart */
+      } finally {
+        if (!cancelled) setIsSyncingCart(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [cartId, podId]);
 
   const cartFingerprint = useMemo(() => cartMutationFingerprint(cart.items), [cart.items]);
@@ -167,11 +210,22 @@ export function CartPageMutationProvider({
       canCheckout: checkoutState.canCheckout,
       showValidationWarning: checkoutState.showWarning,
       isRevalidating,
+      isSyncingCart,
     };
-  }, [cart, cartId, podId, errorByCartItemId, checkoutState, isRevalidating]);
+  }, [cart, cartId, podId, errorByCartItemId, checkoutState, isRevalidating, isSyncingCart]);
 
   return (
     <CartPageMutationContext.Provider value={value}>{children}</CartPageMutationContext.Provider>
+  );
+}
+
+export function CartPageLiveSyncBanner() {
+  const { isSyncingCart } = useCartPageMutation();
+  if (!isSyncingCart) return null;
+  return (
+    <p className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-700" role="status">
+      Syncing your cart…
+    </p>
   );
 }
 
@@ -317,10 +371,13 @@ export function CartPageLiveCheckoutActions({
   myParticipantSubtotalCents?: number;
   totalCentsFallback: number;
 }) {
-  const { cartId, canCheckout, isRevalidating } = useCartPageMutation();
-  const checkoutEnabled = canCheckout && !isRevalidating;
-  const blockedLabel =
-    !canCheckout && isRevalidating ? "Checking cart…" : "Fix items above to continue";
+  const { cartId, canCheckout, isRevalidating, isSyncingCart } = useCartPageMutation();
+  const checkoutEnabled = canCheckout && !isRevalidating && !isSyncingCart;
+  const blockedLabel = isSyncingCart
+    ? "Syncing your cart…"
+    : !canCheckout && isRevalidating
+      ? "Checking cart…"
+      : "Fix items above to continue";
 
   return (
     <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:items-end">
@@ -351,12 +408,13 @@ export function CartPageLiveCheckoutActions({
           )}
         </div>
       ) : checkoutEnabled ? (
-        <Link
+        <AwaitCartNavigationLink
+          cartId={cartId}
           href={`/checkout?cartId=${cartId}`}
           className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-900 px-8 py-3.5 text-center text-base font-bold text-white shadow-md transition duration-200 hover:bg-stone-800 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98] sm:min-w-[14rem] sm:w-auto"
         >
           Continue to checkout
-        </Link>
+        </AwaitCartNavigationLink>
       ) : (
         <span
           className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-500 sm:w-auto"

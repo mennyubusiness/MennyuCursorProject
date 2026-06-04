@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
+import { flushCartMutations } from "@/lib/cart-mutation-queue";
 import { useVendorMenuCartOptional } from "@/components/vendor-menu/VendorMenuCartContext";
 import { cn } from "@/lib/cn";
 import { mobileStickyCartBarFixedClass } from "@/lib/mobile-sticky-cart-bar-classes";
@@ -23,7 +24,10 @@ export function VendorMenuMobileCartBar({ className }: VendorMenuMobileCartBarPr
       quickCart.openCart();
       return;
     }
-    window.location.href = "/cart";
+    const cartId = displayCart?.id;
+    void flushCartMutations(cartId).then(() => {
+      window.location.href = "/cart";
+    });
   };
 
   return (

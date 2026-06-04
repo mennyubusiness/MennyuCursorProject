@@ -23,10 +23,17 @@ import {
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
 import {
+  enqueueCartMutation,
+  markCartSnapshotCommitted,
+} from "@/lib/cart-mutation-queue";
+import {
   optimisticPendingModifierLine,
   optimisticSimpleAdd,
   type OptimisticSimpleAddParams,
 } from "@/lib/cart-optimistic";
+
+export const CART_MUTATION_ERROR_MESSAGE =
+  "We couldn't update your cart. Please try again.";
 
 export type CartMutationError = {
   message: string;
@@ -50,7 +57,6 @@ type VendorMenuCartContextValue = {
   cartMutationError: CartMutationError | null;
   clearCartMutationError: () => void;
   applyServerCart: (cart: Cart) => void;
-  /** Optimistic simple add; runs server action; rolls back on failure. */
   runSimpleAddToCart: (
     params: OptimisticSimpleAddParams & {
       add: () => Promise<
@@ -63,7 +69,6 @@ type VendorMenuCartContextValue = {
     | { success: false; error: string; code?: string }
   >;
   applyServerCartFromMutation: (cart: Cart) => void;
-  /** Close modal first, then optimistic add + server action in background. */
   runModifierAddInBackground: (params: {
     optimistic: ModifierAddOptimisticParams;
     add: () => Promise<
@@ -86,8 +91,11 @@ export function VendorMenuCartProvider({
 }) {
   const [cart, setCart] = useState<Cart>(initialCart);
   const [cartMutationError, setCartMutationError] = useState<CartMutationError | null>(null);
+  const cartRef = useRef<Cart>(initialCart);
   const syncedInitialRef = useRef(false);
-  const modifierAddInFlightRef = useRef(false);
+
+  cartRef.current = cart;
+
   const snapshotContext = useMemo(
     () => ({ cartId: cart.id, podId: cart.podId }),
     [cart.id, cart.podId]
@@ -130,18 +138,24 @@ export function VendorMenuCartProvider({
     [cart.items, vendorId]
   );
 
-  const applyServerCart = useCallback(
+  const publishCart = useCallback(
     (next: Cart) => {
       const normalized = ensureCartSnapshotScalars(next, {
-        id: cart.id,
-        podId: cart.podId,
-        sessionId: cart.sessionId,
+        id: cartRef.current.id,
+        podId: cartRef.current.podId,
+        sessionId: cartRef.current.sessionId,
       });
+      cartRef.current = normalized;
       setCart(normalized);
+      markCartSnapshotCommitted(normalized.id);
       dispatchCartUpdated({ cart: normalized, source: "vendor-menu" });
     },
-    [cart.id, cart.podId, cart.sessionId]
+    []
   );
+
+  const applyServerCart = useCallback((next: Cart) => {
+    publishCart(next);
+  }, [publishCart]);
 
   const applyServerCartFromMutation = applyServerCart;
 
@@ -150,7 +164,10 @@ export function VendorMenuCartProvider({
   }, []);
 
   const reportCartMutationError = useCallback((error: CartMutationError) => {
-    setCartMutationError(error);
+    setCartMutationError({
+      message: error.message || CART_MUTATION_ERROR_MESSAGE,
+      code: error.code,
+    });
   }, []);
 
   const runModifierAddInBackground = useCallback(
@@ -164,41 +181,39 @@ export function VendorMenuCartProvider({
         | { success: false; error: string; code?: string }
       >;
     }) => {
-      if (modifierAddInFlightRef.current) return;
-      modifierAddInFlightRef.current = true;
+      const cartId = cartRef.current.id;
+      void enqueueCartMutation(cartId, async () => {
+        const snapshot = cartRef.current;
+        const optimisticCart = ensureCartSnapshotScalars(
+          optimisticPendingModifierLine(snapshot, optimistic),
+          { id: snapshot.id, podId: snapshot.podId, sessionId: snapshot.sessionId }
+        );
+        cartRef.current = optimisticCart;
+        setCart(optimisticCart);
+        dispatchCartUpdated({ cart: optimisticCart, source: "vendor-menu" });
 
-      const snapshot = cart;
-      const optimisticCart = ensureCartSnapshotScalars(
-        optimisticPendingModifierLine(snapshot, optimistic),
-        { id: cart.id, podId: cart.podId, sessionId: cart.sessionId }
-      );
-      setCart(optimisticCart);
-      dispatchCartUpdated({ cart: optimisticCart, source: "vendor-menu" });
-
-      void (async () => {
         try {
           const result = await add();
           if (result.success) {
             setCartMutationError(null);
-            setCart(result.cart);
-            dispatchCartUpdated({ cart: result.cart, source: "vendor-menu" });
+            publishCart(result.cart);
           } else {
+            cartRef.current = snapshot;
             setCart(snapshot);
             dispatchCartUpdated({ cart: snapshot, source: "vendor-menu" });
             reportCartMutationError({ message: result.error, code: result.code });
           }
         } catch (e) {
+          cartRef.current = snapshot;
           setCart(snapshot);
           dispatchCartUpdated({ cart: snapshot, source: "vendor-menu" });
           reportCartMutationError({
-            message: e instanceof Error ? e.message : "Could not add to cart",
+            message: e instanceof Error ? e.message : CART_MUTATION_ERROR_MESSAGE,
           });
-        } finally {
-          modifierAddInFlightRef.current = false;
         }
-      })();
+      });
     },
-    [cart, reportCartMutationError]
+    [publishCart, reportCartMutationError]
   );
 
   const runSimpleAddToCart = useCallback(
@@ -211,34 +226,38 @@ export function VendorMenuCartProvider({
         | { success: false; error: string; code?: string }
       >;
     }) => {
-      const snapshot = cart;
-      const optimisticRaw = optimisticSimpleAdd(snapshot, optimisticParams);
-      const optimistic = optimisticRaw
-        ? ensureCartSnapshotScalars(optimisticRaw, {
-            id: cart.id,
-            podId: cart.podId,
-            sessionId: cart.sessionId,
-          })
-        : null;
-      if (optimistic) {
-        setCart(optimistic);
-        dispatchCartUpdated({ cart: optimistic, source: "vendor-menu" });
-      }
+      const cartId = cartRef.current.id;
+      return enqueueCartMutation(cartId, async () => {
+        const snapshot = cartRef.current;
+        const optimisticRaw = optimisticSimpleAdd(snapshot, optimisticParams);
+        const optimisticCart = optimisticRaw
+          ? ensureCartSnapshotScalars(optimisticRaw, {
+              id: snapshot.id,
+              podId: snapshot.podId,
+              sessionId: snapshot.sessionId,
+            })
+          : null;
+        if (optimisticCart) {
+          cartRef.current = optimisticCart;
+          setCart(optimisticCart);
+          dispatchCartUpdated({ cart: optimisticCart, source: "vendor-menu" });
+        }
 
-      const result = await add();
-      if (result.success) {
-        setCartMutationError(null);
-        setCart(result.cart);
-        dispatchCartUpdated({ cart: result.cart, source: "vendor-menu" });
+        const result = await add();
+        if (result.success) {
+          setCartMutationError(null);
+          publishCart(result.cart);
+          return result;
+        }
+
+        cartRef.current = snapshot;
+        setCart(snapshot);
+        dispatchCartUpdated({ cart: snapshot, source: "vendor-menu" });
+        reportCartMutationError({ message: result.error, code: result.code });
         return result;
-      }
-
-      setCart(snapshot);
-      dispatchCartUpdated({ cart: snapshot, source: "vendor-menu" });
-      reportCartMutationError({ message: result.error, code: result.code });
-      return result;
+      });
     },
-    [cart, reportCartMutationError]
+    [publishCart, reportCartMutationError]
   );
 
   const value = useMemo(

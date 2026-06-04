@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateCartItemAction, removeFromCartAction } from "@/actions/cart.actions";
 import { dispatchCartUpdated } from "@/lib/cart-client-sync";
+import { enqueueCartMutation } from "@/lib/cart-mutation-queue";
 import type { Cart } from "@/domain/types";
 import { ModifierModal } from "@/components/ModifierModal";
 import type { ModifierConfigForUI } from "@/lib/modifier-config";
@@ -64,7 +65,9 @@ export function CartItemActions({
     setError(null);
     setLoading(true);
     try {
-      const result = await updateCartItemAction(cartId, cartItemId, q, specialInstructions ?? null);
+      const result = await enqueueCartMutation(cartId, () =>
+        updateCartItemAction(cartId, cartItemId, q, specialInstructions ?? null)
+      );
       if (result?.success) {
         publishCartPageMutation(result.cart);
       } else if (result && !result.success) setError(result.error);
@@ -80,7 +83,9 @@ export function CartItemActions({
     setLoading(true);
     try {
       const value = editInstructions.trim() || null;
-      const result = await updateCartItemAction(cartId, cartItemId, quantity, value);
+      const result = await enqueueCartMutation(cartId, () =>
+        updateCartItemAction(cartId, cartItemId, quantity, value)
+      );
       if (result?.success) {
         setEditing(false);
         publishCartPageMutation(result.cart);
@@ -96,7 +101,9 @@ export function CartItemActions({
     setError(null);
     setLoading(true);
     try {
-      const cart = await removeFromCartAction(cartId, cartItemId);
+      const cart = await enqueueCartMutation(cartId, () =>
+        removeFromCartAction(cartId, cartItemId)
+      );
       publishCartPageMutation(cart);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Remove failed");

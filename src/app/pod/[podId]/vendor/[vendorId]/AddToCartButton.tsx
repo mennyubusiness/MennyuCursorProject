@@ -7,6 +7,7 @@ import { useVendorMenuModifier } from "@/components/vendor-menu/VendorMenuModifi
 import { useVendorMenuCart } from "@/components/vendor-menu/VendorMenuCartContext";
 import type { Cart, CartItem } from "@/domain/types";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
+import { enqueueCartMutation } from "@/lib/cart-mutation-queue";
 
 function CartLineQtyControls({
   cartId,
@@ -31,7 +32,9 @@ function CartLineQtyControls({
     setLoading(true);
     const before = snapshot;
     try {
-      const result = await updateCartItemAction(cartId, line.id, next, undefined, undefined);
+      const result = await enqueueCartMutation(cartId, () =>
+        updateCartItemAction(cartId, line.id, next, undefined, undefined)
+      );
       if (result?.success) {
         applyServerCart(result.cart);
         onUpdated(result.cart);

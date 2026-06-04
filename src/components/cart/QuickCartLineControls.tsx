@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateCartItemAction, removeFromCartAction } from "@/actions/cart.actions";
 import { notifyQuickCartUpdated } from "@/components/cart/QuickCartContext";
+import { enqueueCartMutation } from "@/lib/cart-mutation-queue";
 
 type QuickCartLineControlsProps = {
   cartId: string;
@@ -23,12 +24,16 @@ export function QuickCartLineControls({
     setLoading(true);
     try {
       if (next <= 0) {
-        const removed = await removeFromCartAction(cartId, cartItemId);
+        const removed = await enqueueCartMutation(cartId, () =>
+          removeFromCartAction(cartId, cartItemId)
+        );
         notifyQuickCartUpdated(removed);
         await onUpdated(removed);
         return;
       }
-      const result = await updateCartItemAction(cartId, cartItemId, next, null);
+      const result = await enqueueCartMutation(cartId, () =>
+        updateCartItemAction(cartId, cartItemId, next, null)
+      );
       if (result?.success && result.cart) {
         notifyQuickCartUpdated(result.cart);
         await onUpdated(result.cart);

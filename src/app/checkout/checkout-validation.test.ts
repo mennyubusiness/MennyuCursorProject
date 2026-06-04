@@ -29,8 +29,13 @@ describe("checkout cart validation gate", () => {
 });
 
 describe("cart live checkout gate", () => {
-  it("blocks continue while revalidation is pending", () => {
-    expect(cartMutationSrc).toMatch(/checkoutEnabled = canCheckout && !isRevalidating/);
+  it("applies vendor-menu and quick-cart snapshots on the cart page", () => {
+    expect(cartMutationSrc).toMatch(/shouldApplyCartSnapshot\(detail, "cart-page"/);
+    expect(cartMutationSrc).not.toMatch(/detail\?\.source !== "cart-page"/);
+  });
+
+  it("blocks continue while revalidation or cart sync is pending", () => {
+    expect(cartMutationSrc).toMatch(/checkoutEnabled = canCheckout && !isRevalidating && !isSyncingCart/);
   });
 
   it("marks cart invalid when revalidation fails", () => {

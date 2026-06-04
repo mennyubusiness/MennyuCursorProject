@@ -34,6 +34,7 @@ import {
   CartPageLiveLineShell,
   CartPageLiveLineTotal,
   CartPageLiveQuantity,
+  CartPageLiveSyncBanner,
   CartPageLiveValidationBanner,
   CartPageLiveVendorLineCountLabel,
   CartPageLiveVendorSection,
@@ -435,6 +436,7 @@ export default async function CartPage({
         initialCart={initialCartSnapshot}
         initialValidation={initialValidation}
       >
+      <CartPageLiveSyncBanner />
       <CartPageLiveValidationBanner />
       <CartPageLiveEmptyNotice />
 

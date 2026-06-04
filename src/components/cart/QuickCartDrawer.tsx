@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useQuickCart } from "@/components/cart/QuickCartContext";
+import { AwaitCartNavigationLink } from "@/components/cart/AwaitCartNavigationLink";
 import { QuickCartLineControls } from "@/components/cart/QuickCartLineControls";
 import { ButtonLink } from "@/components/ui/button";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
@@ -142,19 +143,23 @@ export function QuickCartDrawer() {
               </p>
             </>
           )}
-          <ButtonLink
+          <AwaitCartNavigationLink
+            cartId={cart?.id}
             href="/cart"
-            className="mt-4 w-full"
-            size="md"
-            variant={cart && cart.items.length > 0 ? "primary" : "outline"}
+            className="mt-4 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-hover"
             onClick={closeCart}
           >
             {cart && cart.items.length > 0 ? "Review cart & checkout" : "Go to cart"}
-          </ButtonLink>
+          </AwaitCartNavigationLink>
           <p className="mt-2 text-center text-[11px] text-oo-stone-gray">
-            <Link href="/cart" className="font-medium text-oo-charcoal hover:underline" onClick={closeCart}>
+            <AwaitCartNavigationLink
+              cartId={cart?.id}
+              href="/cart"
+              className="font-medium text-oo-charcoal hover:underline"
+              onClick={closeCart}
+            >
               Open full cart page
-            </Link>
+            </AwaitCartNavigationLink>
           </p>
         </footer>
       </aside>
