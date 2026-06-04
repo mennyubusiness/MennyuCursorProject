@@ -16,6 +16,7 @@ function formatMoney(cents: number, currency = "usd") {
 export type VendorTransferRowDetailsProps = {
   currency: string;
   status: string;
+  destinationAccountId?: string | null;
   failureMessage: string | null;
   blockedReason: string | null;
   idempotencyKey: string | null;
@@ -38,6 +39,7 @@ export type VendorTransferRowDetailsProps = {
 export function VendorTransferRowDetails({
   currency,
   status,
+  destinationAccountId,
   failureMessage,
   blockedReason,
   idempotencyKey,
@@ -110,6 +112,22 @@ export function VendorTransferRowDetails({
           <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-3">
             <dt className="text-oo-stone-gray">Reconciliation result</dt>
             <dd className="text-right text-oo-charcoal">{reconcileNote.trim()}</dd>
+          </div>
+        ) : null}
+        {destinationAccountId?.trim() ? (
+          <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-3">
+            <dt className="text-oo-stone-gray">Destination account</dt>
+            <dd className="break-all font-mono text-[10px] text-oo-charcoal sm:max-w-md sm:text-right">
+              {destinationAccountId.trim()}
+            </dd>
+          </div>
+        ) : null}
+        {stripeTransferId?.trim() ? (
+          <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-3">
+            <dt className="text-oo-stone-gray">Stripe transfer ID</dt>
+            <dd className="break-all font-mono text-[10px] text-oo-charcoal sm:max-w-md sm:text-right">
+              {stripeTransferId.trim()}
+            </dd>
           </div>
         ) : null}
         {idempotencyKey?.trim() ? (

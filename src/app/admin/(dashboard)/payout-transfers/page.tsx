@@ -146,7 +146,10 @@ export default async function AdminPayoutTransfersPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-oo-charcoal">Vendor Transfers</h1>
-        <p className="mt-1 max-w-3xl text-sm text-oo-stone-gray">{ADMIN_VENDOR_TRANSFERS_PAGE_INTRO}</p>
+        <p className="mt-1 max-w-3xl text-sm text-oo-stone-gray">
+          Send vendor Connect transfers and monitor vendor clawbacks after refunds.
+        </p>
+        <p className="mt-1 max-w-3xl text-xs text-oo-stone-gray">{ADMIN_VENDOR_TRANSFERS_PAGE_INTRO}</p>
       </div>
 
       <PayoutTransfersDashboard
