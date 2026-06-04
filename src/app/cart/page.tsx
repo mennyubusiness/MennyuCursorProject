@@ -44,10 +44,10 @@ import {
 import { CheckoutProgress } from "../checkout/CheckoutProgress";
 import { GROUP_ORDER_JOIN_TOKEN_COOKIE } from "@/lib/group-order-cookies";
 import {
-  unlockGroupCheckoutAction,
-  getGroupOrderStateAction,
-  startGroupOrderFromCartAction,
-} from "@/actions/group-order.actions";
+  getGroupOrderStateForCartPage,
+  startGroupOrderForCartPage,
+  unlockGroupCheckoutForCartPage,
+} from "@/lib/group-order-cart-page";
 import { GroupOrderCartPanel } from "./GroupOrderCartPanel";
 import { GroupOrderCartPoll } from "./GroupOrderCartPoll";
 import { GroupOrderLockedBanner } from "./GroupOrderLockedBanner";
@@ -120,8 +120,8 @@ export default async function CartPage({
   const preferredPodId = startGroupOrder && targetPodForGroup ? targetPodForGroup : currentPodId;
   const perfT0 = cartPagePerfNow();
   let cart = await loadActiveDisplayCartForSession(sessionId, preferredPodId, joinTok);
-  if (params.groupUnlock === "1" && cart?.id) {
-    await unlockGroupCheckoutAction(cart.id);
+  if (params.groupUnlock === "1" && cart?.id && authSession?.user?.id) {
+    await unlockGroupCheckoutForCartPage(cart.id, authSession.user.id);
     redirect("/cart");
   }
 
@@ -132,11 +132,17 @@ export default async function CartPage({
     targetPodForGroup &&
     cart.podId === targetPodForGroup
   ) {
-    const goExisting = await getGroupOrderStateAction(cart.id);
+    const goExisting = await getGroupOrderStateForCartPage(cart.id);
     if (goExisting.active) {
       redirect("/cart");
     }
-    const startRes = await startGroupOrderFromCartAction(cart.id, targetPodForGroup);
+    const hostName = authSession.user.name?.trim() || "Host";
+    const startRes = await startGroupOrderForCartPage(
+      cart.id,
+      targetPodForGroup,
+      authSession.user.id,
+      hostName
+    );
     if (startRes.success) {
       redirect("/cart");
     }
@@ -182,7 +188,7 @@ export default async function CartPage({
   }
 
   if (cart.items.length === 0) {
-    const goEmpty = await getGroupOrderStateAction(cart.id);
+    const goEmpty = await getGroupOrderStateForCartPage(cart.id);
     if (!goEmpty.active) {
     return (
       <div className="mx-auto max-w-lg px-2 py-12">
@@ -323,7 +329,7 @@ export default async function CartPage({
     itemCount: cart.items.length,
     perfLogEnabled: CART_PAGE_PERF_LOG,
   });
-  const goState = await getGroupOrderStateAction(cart.id);
+  const goState = await getGroupOrderStateForCartPage(cart.id);
   const groupActor = goState.active
     ? await resolveActorForGroupCart(cart.id, {
         hostUserId: authSession?.user?.id ?? null,

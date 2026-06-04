@@ -13,14 +13,16 @@ import {
 } from "@/lib/rate-limit";
 import { getClientIpFromHeaders } from "@/lib/rate-limit-http";
 import {
-  startGroupOrderSession,
   joinGroupOrderSession,
   leaveGroupOrderAsParticipant,
   endGroupOrderAsHost,
   unlockGroupOrderSessionFromCheckout,
-  findSessionByCartId,
 } from "@/services/group-order.service";
 import { getCartById } from "@/services/cart.service";
+import {
+  getGroupOrderStateForCartPage,
+  startGroupOrderForCartPage,
+} from "@/lib/group-order-cart-page";
 
 export async function startGroupOrderFormAction(formData: FormData) {
   const cartId = String(formData.get("cartId") ?? "").trim();
@@ -41,29 +43,12 @@ export async function startGroupOrderFromCartAction(cartId: string, podId: strin
     return { success: false as const, error: "Sign in to start a group order." };
   }
   const name = session.user.name?.trim() || "Host";
-  try {
-    const { sessionId, joinCode } = await startGroupOrderSession({
-      hostUserId: session.user.id,
-      cartId,
-      podId,
-      hostDisplayName: name,
-    });
+  const result = await startGroupOrderForCartPage(cartId, podId, session.user.id, name);
+  if (result.success) {
     revalidatePath("/cart");
     revalidatePath(`/pod/${podId}`, "layout");
-    return { success: true as const, sessionId, joinCode };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg === "GROUP_ORDER_SESSION_EXISTS") {
-      return { success: false as const, error: "This cart already has a group order." };
-    }
-    if (msg === "CART_POD_MISMATCH") {
-      return { success: false as const, error: "This cart does not match that kiosk." };
-    }
-    if (msg.includes("Unique constraint") || msg.includes("P2002")) {
-      return { success: false as const, error: "Could not start group order. Refresh the page and try again." };
-    }
-    return { success: false as const, error: msg };
   }
+  return result;
 }
 
 export async function joinGroupOrderFormAction(formData: FormData) {
@@ -172,24 +157,7 @@ export async function unlockGroupCheckoutAction(cartId: string) {
 }
 
 export async function getGroupOrderStateAction(cartId: string) {
-  const authSession = await auth();
-  const hostId = authSession?.user?.id ?? null;
-  const s = await findSessionByCartId(cartId);
-  if (!s) return { active: false as const };
-  /** Single query — same payload as former findSession + listParticipantsPublicForHost. */
-  return {
-    active: true as const,
-    sessionId: s.id,
-    joinCode: s.joinCode,
-    status: s.status,
-    podId: s.podId,
-    participants: s.participants.map((p) => ({
-      id: p.id,
-      displayName: p.displayName,
-      isHost: p.role === "host",
-    })),
-    isHost: Boolean(hostId && s.hostUserId === hostId),
-  };
+  return getGroupOrderStateForCartPage(cartId);
 }
 
 export async function getCartForGroupOrderAction(cartId: string) {
