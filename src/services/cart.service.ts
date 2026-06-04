@@ -78,6 +78,7 @@ export const CART_SESSION_FULL_INCLUDE = {
     },
   },
   pod: true,
+  groupOrderSession: { select: { status: true } },
 } satisfies Prisma.CartInclude;
 
 function isPodSessionCartUniqueViolation(error: unknown): boolean {
