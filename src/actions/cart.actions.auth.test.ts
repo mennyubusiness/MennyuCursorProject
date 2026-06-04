@@ -260,15 +260,18 @@ describe("cart server actions session ownership", () => {
         isGroupOrder: true,
       });
       mockUpdateCartItem.mockRejectedValue(
-        new CartValidationError("GROUP_ORDER_LINE_NOT_YOURS", "You can only edit your own items.")
+        new CartValidationError(
+          "GROUP_ORDER_ITEM_NOT_OWNED",
+          "You can only change your own items in this group order."
+        )
       );
 
       const result = await updateCartItemAction(CART_ID, "line_other", 2);
 
       expect(result).toEqual({
         success: false,
-        error: "You can only edit your own items.",
-        code: "GROUP_ORDER_LINE_NOT_YOURS",
+        error: "You can only change your own items in this group order.",
+        code: "GROUP_ORDER_ITEM_NOT_OWNED",
       });
     });
 

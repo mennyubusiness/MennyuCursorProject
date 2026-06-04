@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       mode: "read",
     });
     if (!access.ok) return denyCartAccess(access);
-    const cart = await getCartById(cartId);
+    const cart = await getCartById(cartId, groupOrderActor);
     if (!cart) {
       return NextResponse.json({ error: "Cart not found or access denied" }, { status: 403 });
     }

@@ -371,7 +371,7 @@ export function CartPageLiveCheckoutActions({
   myParticipantSubtotalCents?: number;
   totalCentsFallback: number;
 }) {
-  const { cartId, canCheckout, isRevalidating, isSyncingCart } = useCartPageMutation();
+  const { cartId, podId, canCheckout, isRevalidating, isSyncingCart } = useCartPageMutation();
   const checkoutEnabled = canCheckout && !isRevalidating && !isSyncingCart;
   const blockedLabel = isSyncingCart
     ? "Syncing your cart…"
@@ -388,24 +388,15 @@ export function CartPageLiveCheckoutActions({
       )}
       {showParticipantTotalsOnly ? (
         <div className="w-full text-center sm:text-right">
-          {!checkoutEnabled ? (
-            <p className="text-xs text-amber-900">
-              Some items need attention before checkout — only the host can complete fixes for the whole
-              group.
-            </p>
-          ) : (
-            <>
-              <p className="text-xs text-stone-500">
-                The host completes payment for the full order — you won&apos;t be charged here.
-              </p>
-              <span
-                className="mt-2 inline-flex min-h-[48px] w-full cursor-not-allowed items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-600 sm:min-w-[14rem] sm:w-auto"
-                aria-disabled
-              >
-                Host checks out
-              </span>
-            </>
-          )}
+          <p className="text-xs text-stone-500">
+            The host will review and place the order. You won&apos;t be charged here.
+          </p>
+          <Link
+            href={`/pod/${podId}`}
+            className="mt-2 inline-flex min-h-[48px] w-full items-center justify-center rounded-xl border-2 border-stone-300 bg-white px-8 py-3.5 text-center text-base font-semibold text-stone-900 transition hover:bg-stone-50 sm:min-w-[14rem] sm:w-auto"
+          >
+            Back to pod
+          </Link>
         </div>
       ) : checkoutEnabled ? (
         <AwaitCartNavigationLink

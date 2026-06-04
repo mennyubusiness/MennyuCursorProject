@@ -7,6 +7,7 @@ import "server-only";
 import { auth } from "@/auth";
 import {
   findSessionByCartId,
+  resolveActorForGroupCart,
   startGroupOrderSession,
   unlockGroupOrderSessionFromCheckout,
 } from "@/services/group-order.service";
@@ -15,21 +16,70 @@ export type GroupOrderStateForCartPage =
   | { active: false }
   | {
       active: true;
+      view: "host";
       sessionId: string;
       joinCode: string;
       status: string;
       podId: string;
       participants: Array<{ id: string; displayName: string; isHost: boolean }>;
-      isHost: boolean;
+      isHost: true;
+    }
+  | {
+      active: true;
+      view: "participant";
+      status: string;
+      podId: string;
+      viewerDisplayName: string;
+      isHost: false;
+    }
+  | {
+      active: true;
+      view: "unknown";
+      status: string;
+      podId: string;
+      isHost: false;
     };
 
-export async function getGroupOrderStateForCartPage(cartId: string): Promise<GroupOrderStateForCartPage> {
+export async function getGroupOrderStateForCartPage(
+  cartId: string,
+  opts?: { joinTokenFromCookie?: string | null }
+): Promise<GroupOrderStateForCartPage> {
   const authSession = await auth();
   const hostId = authSession?.user?.id ?? null;
   const s = await findSessionByCartId(cartId);
   if (!s) return { active: false };
+
+  const actor = await resolveActorForGroupCart(cartId, {
+    hostUserId: hostId,
+    joinTokenFromCookie: opts?.joinTokenFromCookie ?? null,
+  });
+
+  if (actor?.role === "participant") {
+    const self = s.participants.find((p) => p.id === actor.participantId);
+    return {
+      active: true,
+      view: "participant",
+      status: s.status,
+      podId: s.podId,
+      viewerDisplayName: self?.displayName ?? "Guest",
+      isHost: false,
+    };
+  }
+
+  const isHost = Boolean(hostId && s.hostUserId === hostId);
+  if (!isHost) {
+    return {
+      active: true,
+      view: "unknown",
+      status: s.status,
+      podId: s.podId,
+      isHost: false,
+    };
+  }
+
   return {
     active: true,
+    view: "host",
     sessionId: s.id,
     joinCode: s.joinCode,
     status: s.status,
@@ -39,7 +89,7 @@ export async function getGroupOrderStateForCartPage(cartId: string): Promise<Gro
       displayName: p.displayName,
       isHost: p.role === "host",
     })),
-    isHost: Boolean(hostId && s.hostUserId === hostId),
+    isHost: true,
   };
 }
 

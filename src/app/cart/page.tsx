@@ -54,9 +54,12 @@ import { GroupOrderLockedBanner } from "./GroupOrderLockedBanner";
 import { ParticipantGroupOrderSummary } from "./ParticipantGroupOrderSummary";
 import { resolveActorForGroupCart } from "@/services/group-order.service";
 import {
+  buildGroupOrderViewerContext,
+  filterCartLinesForViewer,
+} from "@/lib/group-order-viewer-context";
+import {
   buildGroupOrderCartReadModel,
   canEditGroupCartLine,
-  effectiveLineParticipantId,
   findParticipantRow,
 } from "@/lib/group-order-cart-read-model";
 import { shouldPollCollaborativeGroupCart } from "@/lib/collaborative-cart-freshness";
@@ -152,6 +155,17 @@ export default async function CartPage({
   cartPagePerfMark("load_active_display_cart", perfT0, {
     itemCount: cart?.items.length ?? 0,
   });
+
+  const groupActor = cart
+    ? await resolveActorForGroupCart(cart.id, {
+        hostUserId: authSession?.user?.id ?? null,
+        joinTokenFromCookie: joinTok,
+      })
+    : null;
+  const viewerCtx = cart ? await buildGroupOrderViewerContext(cart.id, groupActor) : null;
+  const displayItems =
+    cart && viewerCtx ? filterCartLinesForViewer(cart.items, viewerCtx) : cart?.items ?? [];
+
   if (!cart) {
     return (
       <div className="mx-auto max-w-lg px-2 py-12">
@@ -187,41 +201,80 @@ export default async function CartPage({
     );
   }
 
-  if (cart.items.length === 0) {
-    const goEmpty = await getGroupOrderStateForCartPage(cart.id);
-    if (!goEmpty.active) {
-    return (
-      <div className="mx-auto max-w-lg px-2 py-12">
-        <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
-          <div
-            className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-xs font-medium text-stone-400"
-            aria-hidden
-          >
-            Cart
-          </div>
-          <h1 className="mt-5 text-2xl font-semibold text-stone-900">Your cart is empty</h1>
-          <p className="mt-3 text-stone-600">
-            Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen prepares
-            its part of your order.
-          </p>
-          <div className="mt-8 text-left">
-            <JoinGroupOrderByCodeForm />
-          </div>
-          <Link
-            href="/explore"
-            className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:bg-stone-800 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98]"
-          >
-            Browse pods
-          </Link>
-          <p className="mt-6 text-sm text-stone-500">
-            Already ordered?{" "}
-            <Link href="/orders" className="font-medium text-stone-900 hover:underline">
-              View orders and order again
+  const goState = await getGroupOrderStateForCartPage(cart.id, { joinTokenFromCookie: joinTok });
+
+  if (displayItems.length === 0) {
+    const isParticipantView = goState.active && goState.view === "participant";
+    if (isParticipantView) {
+      return (
+        <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+          <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
+          <GroupOrderCartPanel
+            cartId={cart.id}
+            podId={cart.podId}
+            goState={goState}
+            canStartGroup={Boolean(authSession?.user?.id)}
+            readModel={null}
+            locked={goState.status === "locked_checkout"}
+          />
+          <header className="border-b border-stone-200/90 pb-8">
+            <h1 className="text-3xl font-bold tracking-tight text-stone-900">Group order</h1>
+            <p className="mt-3 text-base text-stone-600">
+              <span className="font-semibold text-stone-800">{cart.pod.name}</span>
+            </p>
+            <p className="mt-2 text-sm text-stone-500">
+              You&apos;re adding your items to this group order. Only the host can see and checkout the
+              full group cart.
+            </p>
+          </header>
+          <div className="mt-10 rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+            <h2 className="text-xl font-semibold text-stone-900">Your group cart is empty</h2>
+            <p className="mt-3 text-sm text-stone-600">
+              Add items from vendors in this pod. The host will review and place the order.
+            </p>
+            <Link
+              href={`/pod/${cart.podId}`}
+              className="mt-8 inline-flex min-h-[48px] items-center justify-center rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-stone-800"
+            >
+              Browse vendors
             </Link>
-          </p>
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+    if (!goState.active) {
+      return (
+        <div className="mx-auto max-w-lg px-2 py-12">
+          <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+            <div
+              className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-xs font-medium text-stone-400"
+              aria-hidden
+            >
+              Cart
+            </div>
+            <h1 className="mt-5 text-2xl font-semibold text-stone-900">Your cart is empty</h1>
+            <p className="mt-3 text-stone-600">
+              Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen prepares
+              its part of your order.
+            </p>
+            <div className="mt-8 text-left">
+              <JoinGroupOrderByCodeForm />
+            </div>
+            <Link
+              href="/explore"
+              className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:bg-stone-800 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98]"
+            >
+              Browse pods
+            </Link>
+            <p className="mt-6 text-sm text-stone-500">
+              Already ordered?{" "}
+              <Link href="/orders" className="font-medium text-stone-900 hover:underline">
+                View orders and order again
+              </Link>
+            </p>
+          </div>
+        </div>
+      );
     }
   }
 
@@ -229,7 +282,7 @@ export default async function CartPage({
     string,
     { name: string; items: typeof cart.items; subtotalCents: number }
   >();
-  for (const item of cart.items) {
+  for (const item of displayItems) {
     const sub = item.priceCents * item.quantity;
     const existing = byVendor.get(item.vendorId);
     if (existing) {
@@ -250,7 +303,7 @@ export default async function CartPage({
     id: cart.id,
     podId: cart.podId,
     sessionId: cart.sessionId ?? "",
-    items: cart.items.map((i) => ({
+    items: displayItems.map((i) => ({
       id: i.id,
       menuItemId: i.menuItemId,
       vendorId: i.vendorId,
@@ -276,7 +329,7 @@ export default async function CartPage({
 
   const tEdit = cartPagePerfNow();
   const cartEditModifierByItemId = await loadCartEditModifierPayloadsForCartPage(
-    cart.items.map((item) => ({
+    displayItems.map((item) => ({
       cartItemId: item.id,
       menuItemId: item.menuItemId,
       persistedSelections:
@@ -292,19 +345,19 @@ export default async function CartPage({
   });
 
   const tShell = cartPagePerfNow();
-  const parentShellByVendorParentPlu = await getParentShellInfoByVendorParentPlu(cart.items);
+  const parentShellByVendorParentPlu = await getParentShellInfoByVendorParentPlu(displayItems);
   cartPagePerfMark("parent_shell_batch", tShell);
 
   const tVar = cartPagePerfNow();
   const variantDisplayNames = await getVariantOptionDisplayNamesForLeafLines(
-    cart.items.map((item) => ({
+    displayItems.map((item) => ({
       vendorId: item.vendorId,
       deliverectVariantParentPlu: item.menuItem.deliverectVariantParentPlu,
       deliverectPlu: item.menuItem.deliverectPlu,
     }))
   );
   const variantSizeLabelByCartItemId = new Map<string, string | null>();
-  for (const item of cart.items) {
+  for (const item of displayItems) {
     const pplu = item.menuItem.deliverectVariantParentPlu?.trim();
     if (!pplu) {
       variantSizeLabelByCartItemId.set(item.id, null);
@@ -320,7 +373,7 @@ export default async function CartPage({
   cartPagePerfMark("variant_size_labels_batch", tVar);
 
   const tVal = cartPagePerfNow();
-  const cartForValidation = buildCartForValidationFromDisplayCart(cart);
+  const cartForValidation = buildCartForValidationFromDisplayCart({ ...cart, items: displayItems });
   const initialValidation = await validateCartItemsForDisplay(cartForValidation);
   cartPagePerfMark("validate_cart_items_for_display", tVal, {
     itemCount: cart.items.length,
@@ -329,43 +382,46 @@ export default async function CartPage({
     itemCount: cart.items.length,
     perfLogEnabled: CART_PAGE_PERF_LOG,
   });
-  const goState = await getGroupOrderStateForCartPage(cart.id);
-  const groupActor = goState.active
-    ? await resolveActorForGroupCart(cart.id, {
-        hostUserId: authSession?.user?.id ?? null,
-        joinTokenFromCookie: joinTok,
-      })
-    : null;
-
-  const groupReadModel = goState.active
-    ? buildGroupOrderCartReadModel(
-        cart.items.map((i) => ({
-          id: i.id,
-          priceCents: i.priceCents,
-          quantity: i.quantity,
-          groupOrderParticipantId: i.groupOrderParticipantId ?? null,
-        })),
-        goState.participants.map((p) => ({
+  const hostParticipantId = viewerCtx?.hostParticipantId ?? "";
+  const participantsForReadModel =
+    goState.active && goState.view === "host"
+      ? goState.participants.map((p) => ({
           id: p.id,
           displayName: p.displayName,
           isHost: p.isHost,
         }))
-      )
-    : null;
+      : goState.active &&
+          goState.view === "participant" &&
+          viewerCtx?.viewerParticipantId &&
+          viewerCtx.hostParticipantId
+        ? [
+            { id: viewerCtx.hostParticipantId, displayName: "Host", isHost: true },
+            {
+              id: viewerCtx.viewerParticipantId,
+              displayName: goState.viewerDisplayName,
+              isHost: false,
+            },
+          ]
+        : [];
+
+  const linesForReadModel = viewerCtx?.canViewAllLines ? cart.items : displayItems;
+
+  const groupReadModel =
+    goState.active && participantsForReadModel.length > 0
+      ? buildGroupOrderCartReadModel(
+          linesForReadModel.map((i) => ({
+            id: i.id,
+            priceCents: i.priceCents,
+            quantity: i.quantity,
+            groupOrderParticipantId: i.groupOrderParticipantId ?? null,
+          })),
+          participantsForReadModel
+        )
+      : null;
 
   const sessionLocked = goState.active && goState.status === "locked_checkout";
   const viewerIsHost = groupActor?.role === "host";
   const viewerParticipantId = groupActor?.participantId ?? null;
-  const hostParticipantId = groupReadModel?.hostParticipantId ?? "";
-
-  const nameByParticipantId = new Map(
-    goState.active ? goState.participants.map((p) => [p.id, p.displayName] as const) : []
-  );
-
-  function lineOwnerLabel(lineParticipantId: string | null): string {
-    const eff = effectiveLineParticipantId(lineParticipantId, hostParticipantId);
-    return nameByParticipantId.get(eff) ?? "Host";
-  }
 
   const showParticipantTotalsOnly = Boolean(goState.active && groupActor?.role === "participant");
   const pollGroupCart = shouldPollCollaborativeGroupCart({
@@ -405,7 +461,8 @@ export default async function CartPage({
           {goState.active ? (
             showParticipantTotalsOnly ? (
               <>
-                Group order for this pod only. Add items from vendors here — the host pays once at checkout.
+                You&apos;re adding your items to this group order. Only the host can see and checkout the
+                full group cart.
               </>
             ) : (
               <>

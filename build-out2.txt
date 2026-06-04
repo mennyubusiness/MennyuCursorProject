@@ -6,7 +6,7 @@
    - Environments: .env
 
    Creating an optimized production build ...
- Γ£ô Compiled successfully in 12.2s
+ Γ£ô Compiled successfully in 18.1s
    Skipping linting
    Checking validity of types ...
    Collecting page data ...
@@ -14,158 +14,184 @@
    Generating static pages (15/61) 
    Generating static pages (30/61) 
    Generating static pages (45/61) 
+prisma:error 
+Invalid `prisma.vendorPayoutTransferReversal.findMany()` invocation:
+
+
+Timed out fetching a new connection from the connection pool. More info: http://pris.ly/d/connection-pool (Current connection pool timeout: 10, connection limit: 1)
+prisma:error 
+Invalid `prisma.vendorPayoutTransfer.findMany()` invocation:
+
+
+Timed out fetching a new connection from the connection pool. More info: http://pris.ly/d/connection-pool (Current connection pool timeout: 10, connection limit: 1)
+prisma:error 
+Invalid `prisma.pod.findMany()` invocation:
+
+
+Timed out fetching a new connection from the connection pool. More info: http://pris.ly/d/connection-pool (Current connection pool timeout: 10, connection limit: 1)
+prisma:error 
+Invalid `prisma.vendor.findMany()` invocation:
+
+
+Timed out fetching a new connection from the connection pool. More info: http://pris.ly/d/connection-pool (Current connection pool timeout: 10, connection limit: 1)
+prisma:error 
+Invalid `prisma.pricingConfig.findMany()` invocation:
+
+
+Timed out fetching a new connection from the connection pool. More info: http://pris.ly/d/connection-pool (Current connection pool timeout: 10, connection limit: 1)
  Γ£ô Generating static pages (61/61)
    Finalizing page optimization ...
    Collecting build traces ...
 
-Route (app)                                                                 Size  First Load JS
-Γöî ╞Æ /                                                                     6.2 kB         117 kB
-Γö£ ╞Æ /_not-found                                                            998 B         103 kB
-Γö£ ╞Æ /account                                                             4.23 kB         110 kB
-Γö£ ╞Æ /account/role                                                        20.6 kB         123 kB
-Γö£ ╞Æ /account/setup/customer                                              1.27 kB         104 kB
-Γö£ ╞Æ /account/setup/pod                                                   1.39 kB         104 kB
-Γö£ ╞Æ /account/setup/vendor                                                1.68 kB         104 kB
-Γö£ ╞Æ /admin                                                                 185 B         106 kB
-Γö£ ╞Æ /admin/access-denied                                                 2.48 kB         113 kB
-Γö£ ╞Æ /admin/analytics                                                       185 B         106 kB
-Γö£ ╞Æ /admin/deliverect-channel-registrations                              2.34 kB         108 kB
-Γö£ ╞Æ /admin/deliverect-webhook-incidents                                    185 B         106 kB
-Γö£ ╞Æ /admin/exceptions                                                    5.37 kB         113 kB
-Γö£ ╞Æ /admin/menu-imports                                                    363 B         103 kB
-Γö£ ╞Æ /admin/menu-imports/[jobId]                                            128 B         109 kB
-Γö£ ╞Æ /admin/orders                                                          185 B         106 kB
-Γö£ ╞Æ /admin/orders/[orderId]                                              16.6 kB         125 kB
-Γö£ ╞Æ /admin/payout-transfers                                              9.34 kB         115 kB
-Γö£ ╞Æ /admin/pods                                                          2.25 kB         108 kB
-Γö£ ╞Æ /admin/pods/[podId]                                                    752 B         106 kB
-Γö£ ╞Æ /admin/pods/[podId]/qr                                                 636 B         106 kB
-Γö£ ╞Æ /admin/pricing                                                       1.42 kB         104 kB
-Γö£ ╞Æ /admin/vendors                                                       2.46 kB         108 kB
-Γö£ ╞Æ /admin/vendors/[vendorId]                                              757 B         106 kB
-Γö£ ╞Æ /admin/vendors/[vendorId]/deliverect-mapping                         3.15 kB         109 kB
-Γö£ ╞Æ /admin/vendors/[vendorId]/menu-history                               3.75 kB         109 kB
-Γö£ ╞Æ /api/admin/access                                                      363 B         103 kB
-Γö£ ╞Æ /api/admin/menu-imports/[jobId]/discard-draft                          363 B         103 kB
-Γö£ ╞Æ /api/admin/menu-imports/[jobId]/publish                                363 B         103 kB
-Γö£ ╞Æ /api/admin/order-issues/[issueId]                                      363 B         103 kB
-Γö£ ╞Æ /api/admin/orders/[orderId]/refunds                                    363 B         103 kB
-Γö£ ╞Æ /api/admin/orders/[orderId]/refunds/preview                            363 B         103 kB
-Γö£ ╞Æ /api/admin/orders/[orderId]/resolution-notes                           363 B         103 kB
-Γö£ ╞Æ /api/admin/payout-transfers                                            363 B         103 kB
-Γö£ ╞Æ /api/admin/payout-transfers/[id]/reconcile                             363 B         103 kB
-Γö£ ╞Æ /api/admin/payout-transfers/batch                                      363 B         103 kB
-Γö£ ╞Æ /api/admin/payout-transfers/reconcile                                  363 B         103 kB
-Γö£ ╞Æ /api/admin/payout-transfers/reversals/batch                            363 B         103 kB
-Γö£ ╞Æ /api/admin/platform-admin/bootstrap                                    363 B         103 kB
-Γö£ ╞Æ /api/admin/pods/[podId]/active                                         363 B         103 kB
-Γö£ ╞Æ /api/admin/refund-attempts/[refundAttemptId]/dismiss-legacy            363 B         103 kB
-Γö£ ╞Æ /api/admin/vendor-order-issues/[issueId]                               363 B         103 kB
-Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/deliverect-recheck            363 B         103 kB
-Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/deliverect-sync               363 B         103 kB
-Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/manual-recovery               363 B         103 kB
-Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/retry-routing                 363 B         103 kB
-Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/simulate-deliverect-status    363 B         103 kB
-Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/simulate-routing-failure      363 B         103 kB
-Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/transition                    363 B         103 kB
-Γö£ ╞Æ /api/admin/vendor-orders/stalled-pos                                   363 B         103 kB
-Γö£ ╞Æ /api/admin/vendor-users                                                363 B         103 kB
-Γö£ ╞Æ /api/admin/vendors/[vendorId]/active                                   363 B         103 kB
-Γö£ ╞Æ /api/admin/vendors/[vendorId]/dashboard-access-link                    363 B         103 kB
-Γö£ ╞Æ /api/admin/vendors/[vendorId]/dashboard-token                          363 B         103 kB
-Γö£ ╞Æ /api/admin/vendors/[vendorId]/menu-import/deliverect-pull              363 B         103 kB
-Γö£ ╞Æ /api/admin/vendors/[vendorId]/menu-versions/rollback                   363 B         103 kB
-Γö£ ╞Æ /api/auth/[...nextauth]                                                363 B         103 kB
-Γö£ ╞Æ /api/cart                                                              363 B         103 kB
-Γö£ ╞Æ /api/cart/clear                                                        363 B         103 kB
-Γö£ ╞Æ /api/cart/group-order-fingerprint                                      363 B         103 kB
-Γö£ ╞Æ /api/checkout                                                          363 B         103 kB
-Γö£ ╞Æ /api/customer/account/link                                             363 B         103 kB
-Γö£ ╞Æ /api/customer/phone/send-code                                          363 B         103 kB
-Γö£ ╞Æ /api/customer/phone/verify-code                                        363 B         103 kB
-Γö£ ╞Æ /api/customer/session/clear                                            363 B         103 kB
-Γö£ ╞Æ /api/dev/orders/[orderId]/deliverect-payload                           363 B         103 kB
-Γö£ ╞Æ /api/dev/simulate-order-status                                         363 B         103 kB
-Γö£ ╞Æ /api/internal/jobs/deliverect-reconciliation-fallback                  363 B         103 kB
-Γö£ ╞Æ /api/order/[orderId]/cancel                                            363 B         103 kB
-Γö£ ╞Æ /api/order/[orderId]/issues                                            363 B         103 kB
-Γö£ ╞Æ /api/order/[orderId]/vendor-orders/[vendorOrderId]/cancel              363 B         103 kB
-Γö£ ╞Æ /api/orders                                                            363 B         103 kB
-Γö£ ╞Æ /api/orders/[orderId]/access                                           363 B         103 kB
-Γö£ ╞Æ /api/orders/[orderId]/post-checkout-sync                               363 B         103 kB
-Γö£ ╞Æ /api/orders/[orderId]/status                                           363 B         103 kB
-Γö£ ╞Æ /api/orders/clear-phone                                                363 B         103 kB
-Γö£ ╞Æ /api/orders/set-phone                                                  363 B         103 kB
-Γö£ ╞Æ /api/orders/set-pod                                                    363 B         103 kB
-Γö£ ╞Æ /api/pod/[podId]/membership-requests                                   363 B         103 kB
-Γö£ ╞Æ /api/pod/[podId]/membership-requests/[requestId]/accept                363 B         103 kB
-Γö£ ╞Æ /api/pod/[podId]/membership-requests/[requestId]/cancel                363 B         103 kB
-Γö£ ╞Æ /api/pod/[podId]/vendors                                               363 B         103 kB
-Γö£ ╞Æ /api/pod/[podId]/vendors/[vendorId]                                    363 B         103 kB
-Γö£ ╞Æ /api/twilio/inbound-sms                                                363 B         103 kB
-Γö£ ╞Æ /api/twilio/sms-status                                                 363 B         103 kB
-Γö£ ╞Æ /api/upload/brand-image                                                363 B         103 kB
-Γö£ ╞Æ /api/vendor/[vendorId]/membership-requests                             363 B         103 kB
-Γö£ ╞Æ /api/vendor/[vendorId]/membership-requests/[requestId]/accept          363 B         103 kB
-Γö£ ╞Æ /api/vendor/[vendorId]/membership-requests/[requestId]/decline         363 B         103 kB
-Γö£ ╞Æ /api/vendor/[vendorId]/menu-imports/[jobId]/discard-draft              363 B         103 kB
-Γö£ ╞Æ /api/vendor/[vendorId]/menu-imports/[jobId]/publish                    363 B         103 kB
-Γö£ ╞Æ /api/vendor/[vendorId]/order-issues                                    363 B         103 kB
-Γö£ ╞Æ /api/vendor/[vendorId]/order-issues/[issueId]                          363 B         103 kB
-Γö£ ╞Æ /api/vendor/[vendorId]/orders                                          363 B         103 kB
-Γö£ ╞Æ /api/vendor/[vendorId]/pause                                           363 B         103 kB
-Γö£ ╞Æ /api/vendor/[vendorId]/session/grant                                   363 B         103 kB
-Γö£ ╞Æ /api/vendor/orders/[vendorOrderId]/status                              363 B         103 kB
-Γö£ ╞Æ /api/webhooks/deliverect                                               363 B         103 kB
-Γö£ ╞Æ /api/webhooks/deliverect/busy-mode                                     363 B         103 kB
-Γö£ ╞Æ /api/webhooks/deliverect/channel-registration                          363 B         103 kB
-Γö£ ╞Æ /api/webhooks/deliverect/courier                                       363 B         103 kB
-Γö£ ╞Æ /api/webhooks/deliverect/menu                                          363 B         103 kB
-Γö£ ╞Æ /api/webhooks/deliverect/payment                                       363 B         103 kB
-Γö£ ╞Æ /api/webhooks/deliverect/prep-time                                     363 B         103 kB
-Γö£ ╞Æ /api/webhooks/deliverect/snooze                                        363 B         103 kB
-Γö£ ╞Æ /api/webhooks/stripe                                                   363 B         103 kB
-Γö£ Γùï /apple-icon.png                                                          0 B            0 B
-Γö£ ╞Æ /cart                                                                5.19 kB         124 kB
-Γö£ ╞Æ /checkout                                                            6.85 kB         112 kB
-Γö£ ╞Æ /dev/orders/[orderId]                                                1.06 kB         107 kB
-Γö£ ╞Æ /explore                                                             7.78 kB         119 kB
-Γö£ ╞Æ /forgot-password                                                     2.23 kB         113 kB
-Γö£ ╞Æ /group-order/join                                                      185 B         106 kB
-Γö£ Γùï /icon.png                                                                0 B            0 B
-Γö£ ╞Æ /login                                                               2.88 kB         117 kB
-Γö£ Γùï /opengraph-image.png                                                     0 B            0 B
-Γö£ ╞Æ /order/[orderId]                                                       17 kB         123 kB
-Γö£ ╞Æ /orders                                                              1.09 kB         107 kB
-Γö£ ╞Æ /pod/[podId]                                                         3.72 kB         115 kB
-Γö£ ╞Æ /pod/[podId]/analytics                                                 363 B         103 kB
-Γö£ ╞Æ /pod/[podId]/dashboard                                               19.2 kB         130 kB
-Γö£ ╞Æ /pod/[podId]/settings                                                3.13 kB         109 kB
-Γö£ ╞Æ /pod/[podId]/vendor/[vendorId]                                       8.29 kB         127 kB
-Γö£ ╞Æ /pod/dashboard                                                         363 B         103 kB
-Γö£ ╞Æ /privacy                                                               169 B         106 kB
-Γö£ ╞Æ /register                                                            2.87 kB         117 kB
-Γö£ ╞Æ /reset-password                                                      2.61 kB         113 kB
-Γö£ ╞Æ /terms                                                                 169 B         106 kB
-Γö£ ╞Æ /vendor/[vendorId]                                                     363 B         103 kB
-Γö£ ╞Æ /vendor/[vendorId]/analytics                                           363 B         103 kB
-Γö£ ╞Æ /vendor/[vendorId]/connect-pos                                       4.72 kB         110 kB
-Γö£ ╞Æ /vendor/[vendorId]/dashboard                                           363 B         103 kB
-Γö£ ╞Æ /vendor/[vendorId]/issues                                            2.13 kB         104 kB
-Γö£ ╞Æ /vendor/[vendorId]/menu                                              1.06 kB         112 kB
-Γö£ ╞Æ /vendor/[vendorId]/menu-imports                                        185 B         106 kB
-Γö£ ╞Æ /vendor/[vendorId]/menu-imports/[jobId]                                128 B         109 kB
-Γö£ ╞Æ /vendor/[vendorId]/orders                                            6.78 kB         112 kB
-Γö£ ╞Æ /vendor/[vendorId]/settings                                          6.94 kB         113 kB
-Γö£ ╞Æ /vendor/dashboard                                                      363 B         103 kB
-Γöö ╞Æ /vendor/select                                                         185 B         106 kB
-+ First Load JS shared by all                                             102 kB
-  Γö£ chunks/1255-5fe68596fe147850.js                                        46 kB
-  Γö£ chunks/4bd1b696-f785427dddbba9fb.js                                  54.2 kB
-  Γöö other shared chunks (total)                                          2.05 kB
+Route (app)                                                                                Size  First Load JS
+Γöî ╞Æ /                                                                                    6.2 kB         117 kB
+Γö£ ╞Æ /_not-found                                                                           998 B         103 kB
+Γö£ ╞Æ /account                                                                            4.23 kB         110 kB
+Γö£ ╞Æ /account/role                                                                       20.7 kB         123 kB
+Γö£ ╞Æ /account/setup/customer                                                             1.27 kB         104 kB
+Γö£ ╞Æ /account/setup/pod                                                                  1.39 kB         104 kB
+Γö£ ╞Æ /account/setup/vendor                                                               1.68 kB         104 kB
+Γö£ ╞Æ /admin                                                                                185 B         106 kB
+Γö£ ╞Æ /admin/access-denied                                                                2.48 kB         113 kB
+Γö£ ╞Æ /admin/analytics                                                                      185 B         106 kB
+Γö£ ╞Æ /admin/deliverect-channel-registrations                                             2.34 kB         108 kB
+Γö£ ╞Æ /admin/deliverect-webhook-incidents                                                   185 B         106 kB
+Γö£ ╞Æ /admin/exceptions                                                                   8.22 kB         114 kB
+Γö£ ╞Æ /admin/menu-imports                                                                   365 B         103 kB
+Γö£ ╞Æ /admin/menu-imports/[jobId]                                                           128 B         109 kB
+Γö£ ╞Æ /admin/orders                                                                         185 B         106 kB
+Γö£ ╞Æ /admin/orders/[orderId]                                                             17.3 kB         127 kB
+Γö£ ╞Æ /admin/payout-transfers                                                              9.1 kB         119 kB
+Γö£ ╞Æ /admin/pods                                                                         2.25 kB         108 kB
+Γö£ ╞Æ /admin/pods/[podId]                                                                   752 B         106 kB
+Γö£ ╞Æ /admin/pods/[podId]/qr                                                                636 B         106 kB
+Γö£ ╞Æ /admin/pricing                                                                      1.42 kB         104 kB
+Γö£ ╞Æ /admin/vendors                                                                      2.46 kB         108 kB
+Γö£ ╞Æ /admin/vendors/[vendorId]                                                             757 B         106 kB
+Γö£ ╞Æ /admin/vendors/[vendorId]/deliverect-mapping                                        3.15 kB         109 kB
+Γö£ ╞Æ /admin/vendors/[vendorId]/menu-history                                              3.75 kB         109 kB
+Γö£ ╞Æ /api/admin/access                                                                     365 B         103 kB
+Γö£ ╞Æ /api/admin/menu-imports/[jobId]/discard-draft                                         365 B         103 kB
+Γö£ ╞Æ /api/admin/menu-imports/[jobId]/publish                                               365 B         103 kB
+Γö£ ╞Æ /api/admin/order-issues/[issueId]                                                     365 B         103 kB
+Γö£ ╞Æ /api/admin/orders/[orderId]/refunds                                                   365 B         103 kB
+Γö£ ╞Æ /api/admin/orders/[orderId]/refunds/preview                                           365 B         103 kB
+Γö£ ╞Æ /api/admin/orders/[orderId]/resolution-notes                                          365 B         103 kB
+Γö£ ╞Æ /api/admin/payout-transfers                                                           365 B         103 kB
+Γö£ ╞Æ /api/admin/payout-transfers/[id]/reconcile                                            365 B         103 kB
+Γö£ ╞Æ /api/admin/payout-transfers/batch                                                     365 B         103 kB
+Γö£ ╞Æ /api/admin/payout-transfers/reconcile                                                 365 B         103 kB
+Γö£ ╞Æ /api/admin/payout-transfers/reversals/batch                                           365 B         103 kB
+Γö£ ╞Æ /api/admin/platform-admin/bootstrap                                                   365 B         103 kB
+Γö£ ╞Æ /api/admin/pods/[podId]/active                                                        365 B         103 kB
+Γö£ ╞Æ /api/admin/refund-attempts/[refundAttemptId]/dismiss-legacy                           365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-order-issues/[issueId]                                              365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/deliverect-recheck                           365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/deliverect-sync                              365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/manual-recovery                              365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/retry-routing                                365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/simulate-deliverect-status                   365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/simulate-routing-failure                     365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-orders/[vendorOrderId]/transition                                   365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-orders/stalled-pos                                                  365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-payout-transfers/[vendorPayoutTransferId]/legacy-clawback-review    365 B         103 kB
+Γö£ ╞Æ /api/admin/vendor-users                                                               365 B         103 kB
+Γö£ ╞Æ /api/admin/vendors/[vendorId]/active                                                  365 B         103 kB
+Γö£ ╞Æ /api/admin/vendors/[vendorId]/dashboard-access-link                                   365 B         103 kB
+Γö£ ╞Æ /api/admin/vendors/[vendorId]/dashboard-token                                         365 B         103 kB
+Γö£ ╞Æ /api/admin/vendors/[vendorId]/menu-import/deliverect-pull                             365 B         103 kB
+Γö£ ╞Æ /api/admin/vendors/[vendorId]/menu-versions/rollback                                  365 B         103 kB
+Γö£ ╞Æ /api/auth/[...nextauth]                                                               365 B         103 kB
+Γö£ ╞Æ /api/cart                                                                             365 B         103 kB
+Γö£ ╞Æ /api/cart/clear                                                                       365 B         103 kB
+Γö£ ╞Æ /api/cart/group-order-fingerprint                                                     365 B         103 kB
+Γö£ ╞Æ /api/checkout                                                                         365 B         103 kB
+Γö£ ╞Æ /api/customer/account/link                                                            365 B         103 kB
+Γö£ ╞Æ /api/customer/phone/send-code                                                         365 B         103 kB
+Γö£ ╞Æ /api/customer/phone/verify-code                                                       365 B         103 kB
+Γö£ ╞Æ /api/customer/session/clear                                                           365 B         103 kB
+Γö£ ╞Æ /api/dev/orders/[orderId]/deliverect-payload                                          365 B         103 kB
+Γö£ ╞Æ /api/dev/simulate-order-status                                                        365 B         103 kB
+Γö£ ╞Æ /api/internal/jobs/deliverect-reconciliation-fallback                                 365 B         103 kB
+Γö£ ╞Æ /api/order/[orderId]/cancel                                                           365 B         103 kB
+Γö£ ╞Æ /api/order/[orderId]/issues                                                           365 B         103 kB
+Γö£ ╞Æ /api/order/[orderId]/vendor-orders/[vendorOrderId]/cancel                             365 B         103 kB
+Γö£ ╞Æ /api/orders                                                                           365 B         103 kB
+Γö£ ╞Æ /api/orders/[orderId]/access                                                          365 B         103 kB
+Γö£ ╞Æ /api/orders/[orderId]/post-checkout-sync                                              365 B         103 kB
+Γö£ ╞Æ /api/orders/[orderId]/status                                                          365 B         103 kB
+Γö£ ╞Æ /api/orders/clear-phone                                                               365 B         103 kB
+Γö£ ╞Æ /api/orders/set-phone                                                                 365 B         103 kB
+Γö£ ╞Æ /api/orders/set-pod                                                                   365 B         103 kB
+Γö£ ╞Æ /api/pod/[podId]/membership-requests                                                  365 B         103 kB
+Γö£ ╞Æ /api/pod/[podId]/membership-requests/[requestId]/accept                               365 B         103 kB
+Γö£ ╞Æ /api/pod/[podId]/membership-requests/[requestId]/cancel                               365 B         103 kB
+Γö£ ╞Æ /api/pod/[podId]/vendors                                                              365 B         103 kB
+Γö£ ╞Æ /api/pod/[podId]/vendors/[vendorId]                                                   365 B         103 kB
+Γö£ ╞Æ /api/twilio/inbound-sms                                                               365 B         103 kB
+Γö£ ╞Æ /api/twilio/sms-status                                                                365 B         103 kB
+Γö£ ╞Æ /api/upload/brand-image                                                               365 B         103 kB
+Γö£ ╞Æ /api/vendor/[vendorId]/membership-requests                                            365 B         103 kB
+Γö£ ╞Æ /api/vendor/[vendorId]/membership-requests/[requestId]/accept                         365 B         103 kB
+Γö£ ╞Æ /api/vendor/[vendorId]/membership-requests/[requestId]/decline                        365 B         103 kB
+Γö£ ╞Æ /api/vendor/[vendorId]/menu-imports/[jobId]/discard-draft                             365 B         103 kB
+Γö£ ╞Æ /api/vendor/[vendorId]/menu-imports/[jobId]/publish                                   365 B         103 kB
+Γö£ ╞Æ /api/vendor/[vendorId]/order-issues                                                   365 B         103 kB
+Γö£ ╞Æ /api/vendor/[vendorId]/order-issues/[issueId]                                         365 B         103 kB
+Γö£ ╞Æ /api/vendor/[vendorId]/orders                                                         365 B         103 kB
+Γö£ ╞Æ /api/vendor/[vendorId]/pause                                                          365 B         103 kB
+Γö£ ╞Æ /api/vendor/[vendorId]/session/grant                                                  365 B         103 kB
+Γö£ ╞Æ /api/vendor/orders/[vendorOrderId]/status                                             365 B         103 kB
+Γö£ ╞Æ /api/webhooks/deliverect                                                              365 B         103 kB
+Γö£ ╞Æ /api/webhooks/deliverect/busy-mode                                                    365 B         103 kB
+Γö£ ╞Æ /api/webhooks/deliverect/channel-registration                                         365 B         103 kB
+Γö£ ╞Æ /api/webhooks/deliverect/courier                                                      365 B         103 kB
+Γö£ ╞Æ /api/webhooks/deliverect/menu                                                         365 B         103 kB
+Γö£ ╞Æ /api/webhooks/deliverect/payment                                                      365 B         103 kB
+Γö£ ╞Æ /api/webhooks/deliverect/prep-time                                                    365 B         103 kB
+Γö£ ╞Æ /api/webhooks/deliverect/snooze                                                       365 B         103 kB
+Γö£ ╞Æ /api/webhooks/stripe                                                                  365 B         103 kB
+Γö£ Γùï /apple-icon.png                                                                         0 B            0 B
+Γö£ ╞Æ /cart                                                                               5.45 kB         124 kB
+Γö£ ╞Æ /checkout                                                                           7.04 kB         113 kB
+Γö£ ╞Æ /dev/orders/[orderId]                                                               1.06 kB         107 kB
+Γö£ ╞Æ /explore                                                                            9.04 kB         120 kB
+Γö£ ╞Æ /forgot-password                                                                    2.23 kB         113 kB
+Γö£ ╞Æ /group-order/join                                                                     185 B         106 kB
+Γö£ Γùï /icon.png                                                                               0 B            0 B
+Γö£ ╞Æ /login                                                                              2.88 kB         117 kB
+Γö£ Γùï /opengraph-image.png                                                                    0 B            0 B
+Γö£ ╞Æ /order/[orderId]                                                                      17 kB         123 kB
+Γö£ ╞Æ /orders                                                                             1.09 kB         107 kB
+Γö£ ╞Æ /pod/[podId]                                                                        3.72 kB         115 kB
+Γö£ ╞Æ /pod/[podId]/analytics                                                                365 B         103 kB
+Γö£ ╞Æ /pod/[podId]/dashboard                                                              19.2 kB         130 kB
+Γö£ ╞Æ /pod/[podId]/settings                                                               3.13 kB         109 kB
+Γö£ ╞Æ /pod/[podId]/vendor/[vendorId]                                                      8.32 kB         127 kB
+Γö£ ╞Æ /pod/dashboard                                                                        365 B         103 kB
+Γö£ ╞Æ /privacy                                                                              169 B         106 kB
+Γö£ ╞Æ /register                                                                           2.87 kB         117 kB
+Γö£ ╞Æ /reset-password                                                                     2.61 kB         113 kB
+Γö£ ╞Æ /terms                                                                                169 B         106 kB
+Γö£ ╞Æ /vendor/[vendorId]                                                                    365 B         103 kB
+Γö£ ╞Æ /vendor/[vendorId]/analytics                                                          365 B         103 kB
+Γö£ ╞Æ /vendor/[vendorId]/connect-pos                                                      4.72 kB         110 kB
+Γö£ ╞Æ /vendor/[vendorId]/dashboard                                                          365 B         103 kB
+Γö£ ╞Æ /vendor/[vendorId]/issues                                                           2.13 kB         104 kB
+Γö£ ╞Æ /vendor/[vendorId]/menu                                                             1.06 kB         112 kB
+Γö£ ╞Æ /vendor/[vendorId]/menu-imports                                                       185 B         106 kB
+Γö£ ╞Æ /vendor/[vendorId]/menu-imports/[jobId]                                               128 B         109 kB
+Γö£ ╞Æ /vendor/[vendorId]/orders                                                           6.78 kB         112 kB
+Γö£ ╞Æ /vendor/[vendorId]/settings                                                         6.94 kB         113 kB
+Γö£ ╞Æ /vendor/dashboard                                                                     365 B         103 kB
+Γöö ╞Æ /vendor/select                                                                        185 B         106 kB
++ First Load JS shared by all                                                            102 kB
+  Γö£ chunks/1255-5fe68596fe147850.js                                                       46 kB
+  Γö£ chunks/4bd1b696-f785427dddbba9fb.js                                                 54.2 kB
+  Γöö other shared chunks (total)                                                         2.05 kB
 
 
-╞Æ Middleware                                                             34.4 kB
+╞Æ Middleware                                                                            34.4 kB
 
 Γùï  (Static)   prerendered as static content
 ╞Æ  (Dynamic)  server-rendered on demand

@@ -15,8 +15,7 @@ export function ParticipantGroupOrderSummary({
     <div className="rounded-2xl border-2 border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-6 shadow-sm sm:p-8">
       <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Your part</h2>
       <p className="mt-2 text-sm text-stone-600">
-        The host completes payment for everyone. You won&apos;t see the full order total — only your own food and
-        your share of the tip (example below).
+        This is your portion of the group order. The host pays for everyone at checkout.
       </p>
       <dl className="mt-5 space-y-3">
         <div className="flex items-baseline justify-between gap-4 border-b border-stone-100 pb-3">

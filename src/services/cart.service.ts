@@ -21,8 +21,14 @@ import {
   shellBasePriceCentsForMenuItem,
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartValidationError } from "@/services/cart-validation-error";
-import type { ResolvedGroupCartActor } from "@/services/group-order.service";
-import { enforceGroupOrderCartMutation } from "@/services/group-order.service";
+import {
+  enforceGroupOrderCartMutation,
+  type ResolvedGroupCartActor,
+} from "@/services/group-order.service";
+import {
+  applyGroupOrderVisibilityToCart,
+  buildGroupOrderViewerContext,
+} from "@/lib/group-order-viewer-context";
 
 export { CartValidationError } from "@/services/cart-validation-error";
 
@@ -177,16 +183,44 @@ export async function getOrCreateCartForVendorMenuPage(
   return toCartWithGroups(cart);
 }
 
-export async function getCartByIdForMutation(cartId: string): Promise<Cart | null> {
+type CartRowForGrouping = Parameters<typeof toCartWithGroups>[0];
+
+function cartLineParticipantMap(
+  items: Array<{ id: string; groupOrderParticipantId?: string | null }>
+): Map<string, string | null> {
+  return new Map(items.map((i) => [i.id, i.groupOrderParticipantId ?? null]));
+}
+
+async function scopeCartForGroupViewer(
+  raw: CartRowForGrouping,
+  cartId: string,
+  groupOrderActor?: ResolvedGroupCartActor | null
+): Promise<Cart> {
+  const ctx = await buildGroupOrderViewerContext(cartId, groupOrderActor ?? null);
+  const full = toCartWithGroups(raw);
+  const map = cartLineParticipantMap(
+    raw.items as Array<{ id: string; groupOrderParticipantId?: string | null }>
+  );
+  return applyGroupOrderVisibilityToCart(full, ctx, map);
+}
+
+export async function getCartByIdForMutation(
+  cartId: string,
+  groupOrderActor?: ResolvedGroupCartActor | null
+): Promise<Cart | null> {
   const cart = await prisma.cart.findUnique({
     where: { id: cartId },
     include: CART_MUTATION_CART_INCLUDE,
   });
-  return cart ? toCartWithGroups(cart) : null;
+  if (!cart) return null;
+  return scopeCartForGroupViewer(cart, cartId, groupOrderActor);
 }
 
-async function getCartByIdForMutationOrThrow(cartId: string): Promise<Cart> {
-  const cart = await getCartByIdForMutation(cartId);
+async function getCartByIdForMutationOrThrow(
+  cartId: string,
+  groupOrderActor?: ResolvedGroupCartActor | null
+): Promise<Cart> {
+  const cart = await getCartByIdForMutation(cartId, groupOrderActor);
   if (!cart) throw new Error("Cart not found");
   return cart;
 }
@@ -470,7 +504,7 @@ export async function addCartItem(
     console.log("[addCartItem] write complete, loading cart via getCartByIdForMutation");
   }
 
-  return getCartByIdForMutationOrThrow(cartId);
+  return getCartByIdForMutationOrThrow(cartId, groupOrderActor);
 }
 
 export async function updateCartItem(
@@ -487,7 +521,7 @@ export async function updateCartItem(
       cartItemId,
     });
     await prisma.cartItem.deleteMany({ where: { id: cartItemId, cartId } });
-    return getCartByIdForMutationOrThrow(cartId);
+    return getCartByIdForMutationOrThrow(cartId, groupOrderActor);
   }
   const existingItem = await prisma.cartItem.findFirst({
     where: { id: cartItemId, cartId },
@@ -496,7 +530,7 @@ export async function updateCartItem(
       selections: { include: { modifierOption: true } },
     },
   });
-  if (!existingItem) return getCartByIdForMutationOrThrow(cartId);
+  if (!existingItem) return getCartByIdForMutationOrThrow(cartId, groupOrderActor);
 
   await enforceGroupOrderCartMutation(cartId, groupOrderActor ?? null, {
     kind: "mutate",
@@ -630,7 +664,7 @@ export async function updateCartItem(
         ...(specialInstructions !== undefined ? { specialInstructions: specialInstructions === "" ? null : specialInstructions } : {}),
       },
     });
-    return getCartByIdForMutationOrThrow(cartId);
+    return getCartByIdForMutationOrThrow(cartId, groupOrderActor);
   }
 
   // Quantity / notes-only updates must still enforce current menu + modifier availability (re-publish / snooze).
@@ -683,7 +717,7 @@ export async function updateCartItem(
     where: { id: cartItemId, cartId },
     data,
   });
-  return getCartByIdForMutationOrThrow(cartId);
+  return getCartByIdForMutationOrThrow(cartId, groupOrderActor);
 }
 
 export async function removeCartItem(
@@ -696,7 +730,7 @@ export async function removeCartItem(
     cartItemId,
   });
   await prisma.cartItem.deleteMany({ where: { id: cartItemId, cartId } });
-  return getCartByIdForMutationOrThrow(cartId);
+  return getCartByIdForMutationOrThrow(cartId, groupOrderActor);
 }
 
 /**
@@ -884,7 +918,10 @@ export async function loadActiveDisplayCartForSession(
   return selectCartForSessionAndPod(rows, preferredPodId);
 }
 
-export async function getCartById(cartId: string): Promise<Cart | null> {
+export async function getCartById(
+  cartId: string,
+  groupOrderActor?: ResolvedGroupCartActor | null
+): Promise<Cart | null> {
   const cart = await prisma.cart.findUnique({
     where: { id: cartId },
     include: {
@@ -898,7 +935,8 @@ export async function getCartById(cartId: string): Promise<Cart | null> {
       pod: true,
     },
   });
-  return cart ? toCartWithGroups(cart) : null;
+  if (!cart) return null;
+  return scopeCartForGroupViewer(cart, cartId, groupOrderActor);
 }
 function toCartWithGroups(
   cart: {

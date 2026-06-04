@@ -13,6 +13,7 @@ vi.mock("@/auth", () => ({
 
 vi.mock("@/services/group-order.service", () => ({
   findSessionByCartId: (...args: unknown[]) => mockFindSessionByCartId(...args),
+  resolveActorForGroupCart: vi.fn().mockResolvedValue(null),
   startGroupOrderSession: (...args: unknown[]) => mockStartGroupOrderSession(...args),
   unlockGroupOrderSessionFromCheckout: (...args: unknown[]) => mockUnlock(...args),
 }));
@@ -35,7 +36,7 @@ describe("group-order-cart-page (server render helpers)", () => {
     const { getGroupOrderStateForCartPage } = await import("./group-order-cart-page");
     const state = await getGroupOrderStateForCartPage("cart_1");
     expect(state.active).toBe(true);
-    if (state.active) {
+    if (state.active && state.view === "host") {
       expect(state.joinCode).toBe("123456");
       expect(state.isHost).toBe(true);
     }

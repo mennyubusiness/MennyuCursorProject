@@ -6,7 +6,7 @@
    - Environments: .env
 
    Creating an optimized production build ...
- Γ£ô Compiled successfully in 13.8s
+ Γ£ô Compiled successfully in 17.1s
    Skipping linting
    Checking validity of types ...
 

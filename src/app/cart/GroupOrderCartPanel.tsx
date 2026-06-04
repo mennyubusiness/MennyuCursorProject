@@ -1,19 +1,8 @@
 import Link from "next/link";
 import { startGroupOrderFormAction, leaveGroupOrderFormAction, endGroupOrderHostFormAction } from "@/actions/group-order.actions";
 import type { GroupOrderCartReadModel } from "@/lib/group-order-cart-read-model";
+import type { GroupOrderStateForCartPage } from "@/lib/group-order-cart-page";
 import { HostParticipantBreakdown } from "./HostParticipantBreakdown";
-
-type GoState =
-  | { active: false }
-  | {
-      active: true;
-      sessionId: string;
-      joinCode: string;
-      status: string;
-      podId: string;
-      participants: Array<{ id: string; displayName: string; isHost: boolean }>;
-      isHost: boolean;
-    };
 
 export async function GroupOrderCartPanel({
   cartId,
@@ -25,7 +14,7 @@ export async function GroupOrderCartPanel({
 }: {
   cartId: string;
   podId: string;
-  goState: GoState;
+  goState: GroupOrderStateForCartPage;
   canStartGroup: boolean;
   readModel: GroupOrderCartReadModel | null;
   locked: boolean;
@@ -53,26 +42,42 @@ export async function GroupOrderCartPanel({
     );
   }
 
-  const joinUrl = `/group-order/join?session=${goState.sessionId}`;
-  const isParticipantOnly = goState.active && !goState.isHost;
+  const isHost = goState.view === "host";
+  const isParticipant = goState.view === "participant";
+  const isUnknown = goState.view === "unknown";
 
   return (
     <section className="mb-6 rounded-xl border border-stone-200 bg-white p-4 text-sm shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-medium text-stone-900">Group order · {locked ? "locked" : "open"}</p>
-          <p className="mt-1 font-mono text-xs text-stone-600">
-            Code: <span className="font-semibold">{goState.joinCode}</span>
-          </p>
-          <p className="mt-1 text-xs text-stone-600">
-            <Link href={joinUrl} className="text-stone-900 underline">
-              Join link
-            </Link>
-            <span className="text-stone-400"> · </span>
-            <span>Same link works for QR.</span>
-          </p>
+          {isUnknown && (
+            <p className="mt-1 text-xs text-stone-600">
+              Join with the host&apos;s code or link to add your items. You won&apos;t see other people&apos;s lines
+              until you join.
+            </p>
+          )}
+          {isHost && (
+            <>
+              <p className="mt-1 font-mono text-xs text-stone-600">
+                Code: <span className="font-semibold">{goState.joinCode}</span>
+              </p>
+              <p className="mt-1 text-xs text-stone-600">
+                <Link href={`/group-order/join?session=${goState.sessionId}`} className="text-stone-900 underline">
+                  Join link
+                </Link>
+                <span className="text-stone-400"> · </span>
+                <span>Same link works for QR.</span>
+              </p>
+            </>
+          )}
+          {isParticipant && (
+            <p className="mt-1 text-xs text-stone-600">
+              Signed in as <span className="font-medium text-stone-800">{goState.viewerDisplayName}</span>
+            </p>
+          )}
         </div>
-        {goState.isHost && (
+        {isHost && (
           <form action={endGroupOrderHostFormAction} className="shrink-0">
             <input type="hidden" name="cartId" value={cartId} />
             <button
@@ -83,7 +88,7 @@ export async function GroupOrderCartPanel({
             </button>
           </form>
         )}
-        {isParticipantOnly && (
+        {isParticipant && (
           <form action={leaveGroupOrderFormAction} className="shrink-0">
             <button
               type="submit"
@@ -95,28 +100,28 @@ export async function GroupOrderCartPanel({
         )}
       </div>
 
-      {goState.isHost && (
+      {isHost && (
         <p className="mt-3 text-stone-600">
           You&apos;re the host — you&apos;ll pay for everyone at checkout. Participants can add or change their own
           items until you start checkout (then the cart locks).
         </p>
       )}
-      {isParticipantOnly && (
+      {isParticipant && (
         <p className="mt-3 text-stone-600">
-          The host completes payment for this order. You can edit your own items until checkout begins. You won&apos;t
-          see the full order total — only your food and your share of the tip (shown below).
+          You&apos;re adding items to this group order. Only you can see your lines here — the host reviews the full
+          cart and completes payment.
         </p>
       )}
 
       {locked && (
         <p className="mt-3 rounded-lg border border-sky-100 bg-sky-50/80 px-3 py-2 text-xs text-sky-950">
-          {goState.isHost
+          {isHost
             ? "Checkout in progress — the cart is locked for everyone until you finish or return from checkout."
             : "Checkout in progress — editing is paused until the host finishes or comes back."}
         </p>
       )}
 
-      {goState.isHost && readModel && <HostParticipantBreakdown model={readModel} />}
+      {isHost && readModel && <HostParticipantBreakdown model={readModel} />}
     </section>
   );
 }

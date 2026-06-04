@@ -287,7 +287,10 @@ export function assertCanMutateCartItem(args: {
   }
   if (args.actor.role === "host") return;
   if (!args.itemParticipantId || args.itemParticipantId !== args.actor.participantId) {
-    throw new CartValidationError("You can only edit your own items in this group order.", "GROUP_ORDER_ITEM_NOT_OWNED");
+    throw new CartValidationError(
+      "You can only change your own items in this group order.",
+      "GROUP_ORDER_ITEM_NOT_OWNED"
+    );
   }
 }
 
