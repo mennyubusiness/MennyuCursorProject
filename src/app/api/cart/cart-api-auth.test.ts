@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 const mockAssertCartSessionAccess = vi.fn();
 const mockResolveGroupOrderActorFromRequest = vi.fn();
-const mockGetActiveScopedCartForPod = vi.fn();
+const mockGetQuickCartPayload = vi.fn();
 const mockAuth = vi.fn();
 const mockGetCartById = vi.fn();
 const mockAddCartItem = vi.fn();
@@ -20,8 +20,16 @@ vi.mock("@/auth", () => ({
   auth: () => mockAuth(),
 }));
 
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    cartItem: {
+      count: vi.fn().mockResolvedValue(0),
+    },
+  },
+}));
+
 vi.mock("@/services/cart.service", () => ({
-  getActiveScopedCartForPod: (...args: unknown[]) => mockGetActiveScopedCartForPod(...args),
+  getQuickCartPayload: (...args: unknown[]) => mockGetQuickCartPayload(...args),
   getCartById: (...args: unknown[]) => mockGetCartById(...args),
   addCartItem: (...args: unknown[]) => mockAddCartItem(...args),
   updateCartItem: (...args: unknown[]) => mockUpdateCartItem(...args),
@@ -45,7 +53,15 @@ describe("/api/cart session ownership", () => {
     vi.clearAllMocks();
     mockResolveGroupOrderActorFromRequest.mockResolvedValue(null);
     mockAuth.mockResolvedValue(null);
-    mockGetActiveScopedCartForPod.mockResolvedValue({ id: "cart_new", podId: "pod_1", items: [] });
+    mockGetQuickCartPayload.mockResolvedValue({
+      scope: "neutral",
+      cart: null,
+      browsingPodId: null,
+      browsingPodName: null,
+      assignedPodId: null,
+      assignedPodName: null,
+      requiresClearToSwitchPod: false,
+    });
   });
 
   describe("GET ?cartId=", () => {
@@ -83,23 +99,23 @@ describe("/api/cart session ownership", () => {
     });
   });
 
-  describe("GET ?podId=", () => {
-    it("loads group-aware scoped cart for pod", async () => {
+  describe("GET ?browsePodId=", () => {
+    it("loads quick cart payload without creating a cart", async () => {
       const res = await GET(
-        requestWithSession("http://localhost/api/cart?podId=pod_1", SESSION_A)
+        requestWithSession("http://localhost/api/cart?browsePodId=pod_1", SESSION_A)
       );
 
       expect(res.status).toBe(200);
-      expect(mockGetActiveScopedCartForPod).toHaveBeenCalledWith("pod_1", SESSION_A, {
+      expect(mockGetQuickCartPayload).toHaveBeenCalledWith(SESSION_A, "pod_1", {
         markers: { participantId: null, legacyJoinToken: null },
         hostUserId: null,
       });
       expect(mockAssertCartSessionAccess).not.toHaveBeenCalled();
     });
 
-    it("passes participant id cookie into scoped pod cart load", async () => {
+    it("passes participant id cookie into quick cart load", async () => {
       const res = await GET(
-        new NextRequest("http://localhost/api/cart?podId=pod_1", {
+        new NextRequest("http://localhost/api/cart?browsePodId=pod_1", {
           headers: {
             cookie: `mennyu_session=${SESSION_A}; mennyu_go_participant=part_abc`,
           },
@@ -107,7 +123,7 @@ describe("/api/cart session ownership", () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockGetActiveScopedCartForPod).toHaveBeenCalledWith("pod_1", SESSION_A, {
+      expect(mockGetQuickCartPayload).toHaveBeenCalledWith(SESSION_A, "pod_1", {
         markers: { participantId: "part_abc", legacyJoinToken: null },
         hostUserId: null,
       });

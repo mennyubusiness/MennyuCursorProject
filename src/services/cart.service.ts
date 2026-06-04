@@ -5,7 +5,7 @@
  */
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import type { Cart, CartGroup, CartItem } from "@/domain/types";
+import type { Cart, CartGroup, CartItem, CartPodScope, QuickCartApiResponse } from "@/domain/types";
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
 import { validateCartItemModifiers } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
@@ -34,6 +34,10 @@ import {
   buildGroupOrderViewerContext,
 } from "@/lib/group-order-viewer-context";
 import { attachQuickCartDisplay } from "@/lib/quick-cart-display";
+import { isCartRowAssigned } from "@/lib/cart-pod-context";
+import { assertSessionAllowsAddToCart } from "@/lib/cart-pod-guard";
+
+export { assertSessionAllowsAddToCart } from "@/lib/cart-pod-guard";
 
 export { CartValidationError } from "@/services/cart-validation-error";
 
@@ -198,10 +202,45 @@ function cartLineParticipantMap(
 
 type CartRowWithPod = CartRowForGrouping & { pod?: { name: string } | null };
 
+const ACTIVE_GROUP_SESSION_STATUSES = ["active", "locked_checkout"] as const;
+
+type SessionCartPick = {
+  id: string;
+  podId: string;
+  sessionId: string;
+  updatedAt: Date;
+  pod: { name: string };
+  items: Array<{ id: string }>;
+  groupOrderSession?: { status: string } | null;
+};
+
+function inferCartScopeFromViewer(cart: Cart, ctx: Awaited<ReturnType<typeof buildGroupOrderViewerContext>>): CartPodScope {
+  if (ctx.isGroupOrder && ctx.viewerRole !== "solo") return "group_order";
+  if (cart.items.length > 0) return "assigned_pod";
+  return "neutral";
+}
+
+function selectAssignedSessionCart<T extends SessionCartPick>(rows: T[]): T | null {
+  const assigned = rows.filter((r) =>
+    isCartRowAssigned({
+      itemCount: r.items.length,
+      hasActiveGroupSession: Boolean(
+        r.groupOrderSession &&
+          ACTIVE_GROUP_SESSION_STATUSES.includes(
+            r.groupOrderSession.status as (typeof ACTIVE_GROUP_SESSION_STATUSES)[number]
+          )
+      ),
+    })
+  );
+  if (assigned.length === 0) return null;
+  return assigned.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0] ?? null;
+}
+
 async function scopeCartForGroupViewer(
   raw: CartRowWithPod,
   cartId: string,
-  groupOrderActor?: ResolvedGroupCartActor | null
+  groupOrderActor?: ResolvedGroupCartActor | null,
+  displayScope?: CartPodScope
 ): Promise<Cart> {
   const ctx = await buildGroupOrderViewerContext(cartId, groupOrderActor ?? null);
   const full = toCartWithGroups(raw);
@@ -209,7 +248,8 @@ async function scopeCartForGroupViewer(
     raw.items as Array<{ id: string; groupOrderParticipantId?: string | null }>
   );
   const scoped = applyGroupOrderVisibilityToCart(full, ctx, map);
-  return attachQuickCartDisplay(scoped, ctx, raw.pod?.name ?? null);
+  const scope = displayScope ?? inferCartScopeFromViewer(scoped, ctx);
+  return attachQuickCartDisplay(scoped, ctx, raw.pod?.name ?? null, scope);
 }
 
 export async function getCartByIdForMutation(
@@ -312,6 +352,7 @@ export async function addCartItem(
     include: { items: true },
   });
   if (!cart) throw new Error("Cart not found");
+  await assertSessionAllowsAddToCart(cart.sessionId, cartId, cart.podId);
   if (groupOrderActor && cart.podId !== groupOrderActor.podId) {
     throw new CartValidationError(
       "This item isn’t available for the pod your group order is using.",
@@ -811,6 +852,7 @@ export const CART_DISPLAY_SESSION_CART_INCLUDE = {
     },
   },
   pod: true,
+  groupOrderSession: { select: { status: true } },
 } satisfies Prisma.CartInclude;
 
 /**
@@ -921,27 +963,132 @@ export async function loadActiveDisplayCartForSession(
     include: CART_DISPLAY_SESSION_CART_INCLUDE,
     orderBy: { updatedAt: "desc" },
   });
-  return selectCartForSessionAndPod(rows, preferredPodId);
+  const assigned = selectAssignedSessionCart(rows);
+  if (assigned) return assigned;
+  return undefined;
 }
 
-/** Pod-scoped cart for Quick Cart / API: group cart when participant or host markers apply. */
+/**
+ * Quick Cart read model: never creates a cart row; separates browsing pod from assigned cart.
+ */
+export async function getQuickCartPayload(
+  sessionId: string,
+  browsePodId: string | null,
+  opts: { markers: GroupOrderParticipantMarkers; hostUserId: string | null }
+): Promise<QuickCartApiResponse> {
+  const neutral: QuickCartApiResponse = {
+    scope: "neutral",
+    cart: null,
+    browsingPodId: null,
+    browsingPodName: null,
+    assignedPodId: null,
+    assignedPodName: null,
+    requiresClearToSwitchPod: false,
+  };
+
+  const groupCartId = await resolveGroupCartIdFromParticipantMarkers(opts.markers);
+  if (groupCartId) {
+    const row = await prisma.cart.findUnique({
+      where: { id: groupCartId },
+      include: CART_SESSION_FULL_INCLUDE,
+    });
+    if (row) {
+      const actor = await resolveActorForGroupCart(groupCartId, {
+        hostUserId: opts.hostUserId,
+        participantIdFromCookie: opts.markers.participantId,
+        joinTokenFromCookie: opts.markers.legacyJoinToken,
+      });
+      const scoped = await scopeCartForGroupViewer(row, groupCartId, actor, "group_order");
+      return {
+        scope: "group_order",
+        cart: scoped,
+        browsingPodId: browsePodId,
+        browsingPodName: browsePodId
+          ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ?? null
+          : null,
+        assignedPodId: scoped.podId,
+        assignedPodName: scoped.podName ?? null,
+        requiresClearToSwitchPod: false,
+      };
+    }
+  }
+
+  const sessionRows = await prisma.cart.findMany({
+    where: { sessionId },
+    include: CART_SESSION_FULL_INCLUDE,
+    orderBy: { updatedAt: "desc" },
+  });
+  const assignedRow = selectAssignedSessionCart(sessionRows);
+
+  if (assignedRow) {
+    const actor = await resolveActorForGroupCart(assignedRow.id, {
+      hostUserId: opts.hostUserId,
+      participantIdFromCookie: opts.markers.participantId,
+      joinTokenFromCookie: opts.markers.legacyJoinToken,
+    });
+    const scope: CartPodScope = assignedRow.groupOrderSession ? "group_order" : "assigned_pod";
+    const cart = await scopeCartForGroupViewer(assignedRow, assignedRow.id, actor, scope);
+    const requiresClearToSwitchPod = Boolean(
+      browsePodId && browsePodId !== assignedRow.podId
+    );
+    return {
+      scope,
+      cart,
+      browsingPodId: browsePodId,
+      browsingPodName: browsePodId
+        ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ?? null
+        : null,
+      assignedPodId: assignedRow.podId,
+      assignedPodName: assignedRow.pod.name,
+      requiresClearToSwitchPod,
+    };
+  }
+
+  if (!browsePodId) {
+    return neutral;
+  }
+
+  const browsePod = await prisma.pod.findUnique({
+    where: { id: browsePodId, isActive: true },
+    select: { id: true, name: true },
+  });
+  if (!browsePod) {
+    return neutral;
+  }
+
+  const browseRow = sessionRows.find((r) => r.podId === browsePodId);
+  if (browseRow) {
+    const cart = await scopeCartForGroupViewer(browseRow, browseRow.id, null, "browsing_pod");
+    return {
+      scope: "browsing_pod",
+      cart,
+      browsingPodId: browsePod.id,
+      browsingPodName: browsePod.name,
+      assignedPodId: null,
+      assignedPodName: null,
+      requiresClearToSwitchPod: false,
+    };
+  }
+
+  return {
+    scope: "browsing_pod",
+    cart: null,
+    browsingPodId: browsePod.id,
+    browsingPodName: browsePod.name,
+    assignedPodId: null,
+    assignedPodName: null,
+    requiresClearToSwitchPod: false,
+  };
+}
+
+/** @deprecated Use getQuickCartPayload — read-only, no cart creation. */
 export async function getActiveScopedCartForPod(
   podId: string,
   sessionId: string,
   opts: { markers: GroupOrderParticipantMarkers; hostUserId: string | null }
 ): Promise<Cart> {
-  const sharedCartId = await resolveActiveGroupCartIdForPod(podId, opts);
-  if (sharedCartId) {
-    const actor = await resolveActorForGroupCart(sharedCartId, {
-      hostUserId: opts.hostUserId,
-      participantIdFromCookie: opts.markers.participantId,
-      joinTokenFromCookie: opts.markers.legacyJoinToken,
-    });
-    if (actor) {
-      const cart = await getCartById(sharedCartId, actor);
-      if (cart) return cart;
-    }
-  }
+  const payload = await getQuickCartPayload(sessionId, podId, opts);
+  if (payload.cart) return payload.cart;
   return getOrCreateCart(podId, sessionId);
 }
 

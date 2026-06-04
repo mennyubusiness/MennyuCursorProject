@@ -1,25 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import {
-  quickCartPodLinkLabel,
-  quickCartSubtitle,
-  type QuickCartPodContext,
-} from "@/lib/quick-cart-display";
-import type { CartGroupOrderDisplay } from "@/domain/types";
+import { quickCartPodLinkLabel, quickCartSubtitle } from "@/lib/quick-cart-display";
+import type { CartPodContext } from "@/lib/cart-pod-context";
 
 type Props = {
-  pod: QuickCartPodContext;
-  groupOrder?: CartGroupOrderDisplay;
+  podContext: CartPodContext;
   onClose: () => void;
   onNavigate?: () => void;
 };
 
-export function QuickCartHeader({ pod, groupOrder, onClose, onNavigate }: Props) {
-  const subtitle = quickCartSubtitle({
-    podName: pod.podName,
-    groupRole: groupOrder?.role,
-  });
+export function QuickCartHeader({ podContext, onClose, onNavigate }: Props) {
+  const subtitle = quickCartSubtitle(podContext);
+  const linkPodId = podContext.cartPodId ?? podContext.browsingPodId;
 
   return (
     <header className="flex items-start justify-between gap-3 border-b border-oo-light-stone px-4 py-4 sm:px-5">
@@ -28,13 +21,13 @@ export function QuickCartHeader({ pod, groupOrder, onClose, onNavigate }: Props)
           Your cart
         </h2>
         <p className="mt-0.5 text-xs text-oo-stone-gray">{subtitle}</p>
-        {pod.podId ? (
+        {linkPodId ? (
           <Link
-            href={`/pod/${pod.podId}`}
+            href={`/pod/${linkPodId}`}
             onClick={onNavigate}
             className="mt-2 inline-block text-xs font-semibold text-brand hover:underline"
           >
-            {quickCartPodLinkLabel(pod.podName)}
+            {quickCartPodLinkLabel(podContext)}
           </Link>
         ) : (
           <Link

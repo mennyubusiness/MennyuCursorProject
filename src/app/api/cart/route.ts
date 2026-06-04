@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import {
-  getActiveScopedCartForPod,
+  getQuickCartPayload,
   getCartById,
   addCartItem,
   updateCartItem,
   removeCartItem,
   CartValidationError,
 } from "@/services/cart.service";
+import { prisma } from "@/lib/db";
+import { buildCurrentPodCookieHeader } from "@/lib/session";
 import {
   assertCartSessionAccess,
   resolveGroupOrderActorFromRequest,
@@ -26,7 +28,7 @@ async function denyCartAccess(
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const podId = searchParams.get("podId");
+  const browsePodId = searchParams.get("browsePodId") ?? searchParams.get("podId");
   const cartId = searchParams.get("cartId");
   if (cartId) {
     const sessionId = getSessionIdFromRequest(request);
@@ -42,19 +44,16 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json(cart);
   }
-  if (!podId) {
-    return NextResponse.json({ error: "podId or cartId required" }, { status: 400 });
-  }
   const { sessionId, isNew } = getOrSetSessionId(request);
   const authSession = await auth();
-  const cart = await getActiveScopedCartForPod(podId, sessionId, {
+  const payload = await getQuickCartPayload(sessionId, browsePodId?.trim() || null, {
     markers: {
       participantId: request.cookies.get(GROUP_ORDER_PARTICIPANT_ID_COOKIE)?.value ?? null,
       legacyJoinToken: request.cookies.get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null,
     },
     hostUserId: authSession?.user?.id ?? null,
   });
-  const res = NextResponse.json(cart);
+  const res = NextResponse.json(payload);
   if (isNew) res.headers.set("Set-Cookie", buildSessionCookieHeader(sessionId));
   return res;
 }
@@ -75,6 +74,7 @@ export async function POST(request: NextRequest) {
   if (!access.ok) return denyCartAccess(access);
 
   try {
+    const itemsBefore = await prisma.cartItem.count({ where: { cartId } });
     const cart = await addCartItem(
       cartId,
       menuItemId,
@@ -83,7 +83,11 @@ export async function POST(request: NextRequest) {
       selections ?? null,
       groupOrderActor
     );
-    return NextResponse.json(cart);
+    const res = NextResponse.json(cart);
+    if (itemsBefore === 0 && cart.items.length > 0) {
+      res.headers.append("Set-Cookie", buildCurrentPodCookieHeader(cart.podId));
+    }
+    return res;
   } catch (e) {
     if (e instanceof CartValidationError) {
       return NextResponse.json(

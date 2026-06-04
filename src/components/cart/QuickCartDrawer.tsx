@@ -9,15 +9,20 @@ import { QuickCartHeader } from "@/components/cart/QuickCartHeader";
 import { QuickCartGroupSection } from "@/components/cart/QuickCartGroupSection";
 import { ButtonLink } from "@/components/ui/button";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
-import { getCurrentPodIdFromClient } from "@/lib/quick-cart-pod";
-import {
-  quickCartFooterCtaLabel,
-  resolveQuickCartPodContext,
-} from "@/lib/quick-cart-display";
+import { quickCartEmptyTitle, quickCartFooterCtaLabel } from "@/lib/quick-cart-display";
 
 export function QuickCartDrawer() {
-  const { enabled, isOpen, closeCart, cart, loading, applyCartSnapshot, refreshCart, hasServerSession } =
-    useQuickCart();
+  const {
+    enabled,
+    isOpen,
+    closeCart,
+    cart,
+    podContext,
+    loading,
+    applyCartSnapshot,
+    refreshCart,
+    hasServerSession,
+  } = useQuickCart();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -26,9 +31,6 @@ export function QuickCartDrawer() {
 
   if (!enabled || !mounted || !isOpen) return null;
 
-  const clientPodId = getCurrentPodIdFromClient();
-  const pod = resolveQuickCartPodContext(cart, clientPodId);
-  const hasPod = Boolean(pod.podId);
   const groupOrder = cart?.groupOrder;
   const canCheckout = groupOrder?.canCheckout ?? true;
   const isParticipant = groupOrder?.role === "participant";
@@ -38,7 +40,11 @@ export function QuickCartDrawer() {
     hasItems,
     groupRole: groupOrder?.role,
     canCheckout,
+    cartScope: podContext.cartScope,
   });
+  const showNeutralEmpty = podContext.cartScope === "neutral" && !hasItems;
+  const showBrowsingEmpty =
+    podContext.cartScope === "browsing_pod" && !hasItems && !podContext.requiresClearToSwitchPod;
 
   return createPortal(
     <div className="fixed inset-0 z-[110]" role="presentation">
@@ -54,39 +60,32 @@ export function QuickCartDrawer() {
         aria-modal="true"
         aria-labelledby="quick-cart-title"
       >
-        <QuickCartHeader
-          pod={pod}
-          groupOrder={groupOrder}
-          onClose={closeCart}
-          onNavigate={closeCart}
-        />
+        <QuickCartHeader podContext={podContext} onClose={closeCart} onNavigate={closeCart} />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
           <QuickCartGroupSection
             cart={cart}
-            podId={pod.podId}
+            podContext={podContext}
             hasServerSession={hasServerSession}
             onNavigate={closeCart}
           />
 
-          {loading && !cart ? (
+          {loading && !cart && podContext.cartScope === "neutral" ? (
             <p className="text-sm text-oo-stone-gray">Loading cart…</p>
-          ) : !hasPod ? (
+          ) : showNeutralEmpty ? (
             <div className="oo-empty-state px-6 py-10">
               <p className="font-semibold text-oo-charcoal">Your cart is empty</p>
-              <p className="mt-2 text-sm text-oo-stone-gray">
-                Start with a food pod or vendor to begin ordering.
-              </p>
+              <p className="mt-2 text-sm text-oo-stone-gray">{quickCartEmptyTitle(podContext)}</p>
               <ButtonLink href="/explore" variant="secondary" size="sm" className="mt-6">
                 Explore pods
               </ButtonLink>
             </div>
-          ) : cart && cart.items.length === 0 ? (
+          ) : showBrowsingEmpty ? (
             <div className="oo-empty-state px-6 py-10">
               <p className="font-semibold text-oo-charcoal">Your cart is empty</p>
-              <p className="mt-2 text-sm text-oo-stone-gray">Add items from a vendor in this pod.</p>
+              <p className="mt-2 text-sm text-oo-stone-gray">{quickCartEmptyTitle(podContext)}</p>
             </div>
-          ) : cart ? (
+          ) : cart && hasItems ? (
             <ul className="space-y-5">
               {cart.groups.map((group) => (
                 <li key={group.vendorId}>
@@ -147,14 +146,27 @@ export function QuickCartDrawer() {
               </p>
             </>
           )}
-          <AwaitCartNavigationLink
-            cartId={cart?.id}
-            href="/cart"
-            className="mt-4 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-hover"
-            onClick={closeCart}
-          >
-            {footerCta}
-          </AwaitCartNavigationLink>
+          {(hasItems || podContext.cartScope !== "neutral") && (
+            <AwaitCartNavigationLink
+              cartId={cart?.id}
+              href="/cart"
+              className="mt-4 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-hover"
+              onClick={closeCart}
+            >
+              {footerCta}
+            </AwaitCartNavigationLink>
+          )}
+          {showNeutralEmpty && (
+            <ButtonLink
+              href="/explore"
+              variant="primary"
+              size="sm"
+              className="mt-4 w-full justify-center"
+              onClick={closeCart}
+            >
+              Explore pods
+            </ButtonLink>
+          )}
         </footer>
       </aside>
     </div>,

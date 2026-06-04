@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import {
-  COOKIE_NAME,
-  SESSION_HEADER,
-  buildSessionCookieHeader,
-  buildCurrentPodCookieHeader,
-  createMennyuSessionId,
-} from "@/lib/session";
+import { COOKIE_NAME, SESSION_HEADER, buildSessionCookieHeader, createMennyuSessionId } from "@/lib/session";
 
 export function middleware(request: NextRequest) {
   let response: NextResponse;
@@ -25,10 +19,6 @@ export function middleware(request: NextRequest) {
     requestHeaders.set(SESSION_HEADER, sessionId);
     response = NextResponse.next({ request: { headers: requestHeaders } });
     response.headers.set("Set-Cookie", buildSessionCookieHeader(sessionId));
-  }
-  const podMatch = request.nextUrl.pathname.match(/^\/pod\/([^/]+)/);
-  if (podMatch) {
-    response.headers.append("Set-Cookie", buildCurrentPodCookieHeader(podMatch[1]));
   }
   return response;
 }

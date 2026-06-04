@@ -3,13 +3,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   attachQuickCartDisplay,
+  quickCartEmptyTitle,
   quickCartFooterCtaLabel,
   quickCartPodLinkLabel,
   quickCartSubtitle,
-  resolveQuickCartPodContext,
+  buildCartPodContextForDisplay,
 } from "./quick-cart-display";
 import type { Cart } from "@/domain/types";
 import type { GroupOrderViewerContext } from "./group-order-viewer-context";
+import { getCartPodContext } from "./cart-pod-context";
 
 const soloCtx: GroupOrderViewerContext = {
   isGroupOrder: false,
@@ -34,70 +36,105 @@ const baseCart: Cart = {
 };
 
 describe("quick-cart-display", () => {
-  it("attachQuickCartDisplay adds podName and solo groupOrder", () => {
-    const out = attachQuickCartDisplay(baseCart, soloCtx, "Riverside Pod");
+  it("attachQuickCartDisplay sets cartScope", () => {
+    const out = attachQuickCartDisplay(baseCart, soloCtx, "Riverside Pod", "browsing_pod");
     expect(out.podName).toBe("Riverside Pod");
-    expect(out.groupOrder?.role).toBe("solo");
-    expect(out.groupOrder?.canCheckout).toBe(true);
+    expect(out.cartScope).toBe("browsing_pod");
     expect(out.groupOrder?.joinCode).toBeUndefined();
-  });
-
-  it("host attach includes joinCode and session id, never joinToken field", () => {
-    const hostCtx: GroupOrderViewerContext = {
-      ...soloCtx,
-      isGroupOrder: true,
-      groupOrderSessionId: "gos_1",
-      viewerRole: "host",
-      joinCode: "654321",
-    };
-    const out = attachQuickCartDisplay(baseCart, hostCtx, "Pod");
-    expect(out.groupOrder?.joinCode).toBe("654321");
-    expect(out.groupOrder?.groupOrderSessionId).toBe("gos_1");
     expect("joinToken" in (out.groupOrder ?? {})).toBe(false);
   });
 
-  it("resolveQuickCartPodContext prefers cart pod over client", () => {
-    expect(
-      resolveQuickCartPodContext(
-        { ...baseCart, podId: "pod_cart", podName: "Cart Pod" },
-        "pod_client"
-      )
-    ).toEqual({ podId: "pod_cart", podName: "Cart Pod" });
-    expect(resolveQuickCartPodContext(null, "pod_client")).toEqual({
-      podId: "pod_client",
-      podName: null,
+  it("neutral subtitle does not show pod name", () => {
+    const ctx = getCartPodContext({
+      cart: null,
+      browsingPodId: null,
+      browsingPodName: null,
+      assignedPodId: null,
+      assignedPodName: null,
+      requiresClearToSwitchPod: false,
     });
+    expect(quickCartSubtitle(ctx)).toBe("Choose a pod to start an order");
+    expect(quickCartEmptyTitle(ctx)).toContain("Find a food pod");
   });
 
-  it("subtitle reflects group roles and pod", () => {
-    expect(quickCartSubtitle({ podName: "Pod A", groupRole: "solo" })).toBe("For Pod A");
-    expect(quickCartSubtitle({ podName: "Pod A", groupRole: "host" })).toBe("Group order · Pod A");
-    expect(quickCartSubtitle({ podName: "Pod A", groupRole: "participant" })).toBe(
-      "Your items · Pod A"
-    );
-    expect(quickCartSubtitle({ podName: null, groupRole: "solo" })).toBe(
-      "Multi-vendor · one checkout"
-    );
+  it("browsing subtitle uses Browsing prefix not For", () => {
+    const ctx = getCartPodContext({
+      cart: { ...baseCart, podName: "Downtown" },
+      browsingPodId: "pod_a",
+      browsingPodName: "Downtown",
+      assignedPodId: null,
+      assignedPodName: null,
+      requiresClearToSwitchPod: false,
+    });
+    expect(quickCartSubtitle(ctx)).toBe("Browsing Downtown");
   });
 
-  it("footer CTA labels differ for participant vs host vs solo checkout", () => {
+  it("assigned subtitle uses For prefix", () => {
+    const ctx = getCartPodContext({
+      cart: {
+        ...baseCart,
+        podName: "Downtown",
+        items: [
+          {
+            id: "l1",
+            menuItemId: "m1",
+            vendorId: "v1",
+            quantity: 1,
+            priceCents: 100,
+            specialInstructions: null,
+          },
+        ],
+      },
+      browsingPodId: "pod_a",
+      browsingPodName: "Downtown",
+      assignedPodId: "pod_a",
+      assignedPodName: "Downtown",
+      requiresClearToSwitchPod: false,
+    });
+    expect(quickCartSubtitle(ctx)).toBe("For Downtown");
+  });
+
+  it("footer CTA labels differ by scope", () => {
     expect(
-      quickCartFooterCtaLabel({ hasItems: true, groupRole: "participant", canCheckout: false })
-    ).toBe("View my items");
+      quickCartFooterCtaLabel({
+        hasItems: false,
+        groupRole: "solo",
+        canCheckout: true,
+        cartScope: "neutral",
+      })
+    ).toBe("Go to cart");
     expect(
-      quickCartFooterCtaLabel({ hasItems: false, groupRole: "participant", canCheckout: false })
-    ).toBe("View group cart");
-    expect(
-      quickCartFooterCtaLabel({ hasItems: true, groupRole: "host", canCheckout: true })
-    ).toBe("Go to group cart");
-    expect(
-      quickCartFooterCtaLabel({ hasItems: true, groupRole: "solo", canCheckout: true })
+      quickCartFooterCtaLabel({
+        hasItems: true,
+        groupRole: "solo",
+        canCheckout: true,
+        cartScope: "assigned_pod",
+      })
     ).toBe("Review cart & checkout");
   });
 
-  it("pod link label uses pod name when known", () => {
-    expect(quickCartPodLinkLabel("Riverside")).toBe("Back to Riverside");
-    expect(quickCartPodLinkLabel(null)).toBe("Browse this pod");
+  it("buildCartPodContextForDisplay matches getCartPodContext", () => {
+    const built = buildCartPodContextForDisplay({
+      cart: null,
+      browsingPodId: null,
+      browsingPodName: null,
+      assignedPodId: null,
+      assignedPodName: null,
+      requiresClearToSwitchPod: false,
+    });
+    expect(built.cartScope).toBe("neutral");
+  });
+
+  it("neutral pod link goes to explore", () => {
+    const ctx = getCartPodContext({
+      cart: null,
+      browsingPodId: null,
+      browsingPodName: null,
+      assignedPodId: null,
+      assignedPodName: null,
+      requiresClearToSwitchPod: false,
+    });
+    expect(quickCartPodLinkLabel(ctx)).toBe("Explore pods");
   });
 });
 
@@ -115,11 +152,10 @@ describe("QuickCartDrawer source", () => {
     expect(drawerSrc).not.toContain("Open full cart page");
   });
 
-  it("shows group start/join actions and pod header helpers", () => {
-    expect(groupSrc).toContain("Start group order");
+  it("neutral group section has Join with code without for this pod", () => {
     expect(groupSrc).toContain("Join with code");
-    expect(drawerSrc).toContain("QuickCartHeader");
-    expect(drawerSrc).toContain("QuickCartGroupSection");
+    expect(groupSrc).toMatch(/Have a group code/);
+    expect(groupSrc).not.toMatch(/for this pod/);
   });
 
   it("does not expose joinToken in quick cart components", () => {

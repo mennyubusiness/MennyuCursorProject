@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
-import type { Cart, CartGroupOrderDisplay } from "@/domain/types";
+import type { Cart } from "@/domain/types";
+import type { CartPodContext } from "@/lib/cart-pod-context";
 import { ButtonLink } from "@/components/ui/button";
 
 type Props = {
   cart: Cart | null;
-  podId: string | null;
+  podContext: CartPodContext;
   hasServerSession: boolean;
   onNavigate?: () => void;
 };
@@ -17,9 +18,35 @@ function startGroupOrderHref(podId: string, hasServerSession: boolean): string {
   return hasServerSession ? dest : buildLoginHrefWithReturn(dest);
 }
 
-export function QuickCartGroupSection({ cart, podId, hasServerSession, onNavigate }: Props) {
+export function QuickCartGroupSection({
+  cart,
+  podContext,
+  hasServerSession,
+  onNavigate,
+}: Props) {
   const group = cart?.groupOrder;
   const role = group?.role ?? "solo";
+  const browsePodId = podContext.browsingPodId;
+  const browsePodName = podContext.browsingPodName;
+
+  if (podContext.requiresClearToSwitchPod && podContext.assignedPodId != null) {
+    return (
+      <section className="mb-4 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-3 text-sm text-amber-950">
+        <p className="font-semibold">Your cart is for another pod</p>
+        <p className="mt-1 text-xs">
+          Clear your current cart on the full cart page before ordering from{" "}
+          {browsePodName ?? "this pod"}.
+        </p>
+        <Link
+          href="/cart"
+          onClick={onNavigate}
+          className="mt-3 inline-block text-xs font-semibold underline"
+        >
+          Go to cart
+        </Link>
+      </section>
+    );
+  }
 
   if (role === "host" && group?.joinCode) {
     const inviteHref = group.groupOrderSessionId
@@ -88,32 +115,56 @@ export function QuickCartGroupSection({ cart, podId, hasServerSession, onNavigat
     );
   }
 
-  return (
-    <section className="mb-4 rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/60 px-3 py-3 text-sm">
-      <p className="font-semibold text-oo-charcoal">Order with a group</p>
-      <p className="mt-1 text-xs text-oo-stone-gray">
-        {podId
-          ? "Ordering with friends? Start or join a group order for this pod."
-          : "Have a group code? Join a shared order from any pod."}
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {podId ? (
+  if (podContext.cartScope === "neutral") {
+    return (
+      <section className="mb-4 rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/60 px-3 py-3 text-sm">
+        <p className="font-semibold text-oo-charcoal">Group order</p>
+        <p className="mt-1 text-xs text-oo-stone-gray">
+          Have a group code? Join a shared order.
+        </p>
+        <ButtonLink
+          href="/group-order/join"
+          variant="secondary"
+          size="sm"
+          className="mt-3"
+          onClick={onNavigate}
+        >
+          Join with code
+        </ButtonLink>
+      </section>
+    );
+  }
+
+  if (podContext.cartScope === "browsing_pod" && browsePodId) {
+    return (
+      <section className="mb-4 rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/60 px-3 py-3 text-sm">
+        <p className="font-semibold text-oo-charcoal">Order with a group</p>
+        <p className="mt-1 text-xs text-oo-stone-gray">
+          {browsePodName
+            ? `Start or join a group order for ${browsePodName}.`
+            : "Start or join a group order here."}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {podContext.canStartOrderHere ? (
+            <Link
+              href={startGroupOrderHref(browsePodId, hasServerSession)}
+              onClick={onNavigate}
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream"
+            >
+              Start group order
+            </Link>
+          ) : null}
           <Link
-            href={startGroupOrderHref(podId, hasServerSession)}
+            href="/group-order/join"
             onClick={onNavigate}
             className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream"
           >
-            Start group order
+            Join with code
           </Link>
-        ) : null}
-        <Link
-          href="/group-order/join"
-          onClick={onNavigate}
-          className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream"
-        >
-          Join with code
-        </Link>
-      </div>
-    </section>
-  );
+        </div>
+      </section>
+    );
+  }
+
+  return null;
 }

@@ -10,7 +10,10 @@
 import { NextRequest } from "next/server";
 
 export const COOKIE_NAME = "mennyu_session";
-/** Cookie storing the last-visited pod so /cart can show the correct cart when multiple exist per session. */
+/**
+ * Cookie storing the assigned-order pod (set on first cart item, group join, reorder — not on passive pod visits).
+ * Used by /cart to prefer the committed cart when a session has multiple empty pod rows.
+ */
 export const CURRENT_POD_COOKIE = "mennyu_current_pod";
 /** Legacy cookie for SMS order-access bootstrap (single-order access only; not used for /orders history). */
 export const CUSTOMER_PHONE_COOKIE = "mennyu_customer_phone";

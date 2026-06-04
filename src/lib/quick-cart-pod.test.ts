@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { resolveCurrentPodId } from "./quick-cart-pod";
+import {
+  getBrowsingPodIdFromClient,
+  resolveBrowsingPodId,
+  resolveCurrentPodId,
+} from "./quick-cart-pod";
 
-describe("resolveCurrentPodId", () => {
-  it("prefers route pod over cookie", () => {
+describe("resolveBrowsingPodId", () => {
+  it("uses route pod only", () => {
+    expect(resolveBrowsingPodId({ routePodId: "pod_b" })).toBe("pod_b");
+    expect(resolveBrowsingPodId({ routePodId: null })).toBeNull();
+  });
+});
+
+describe("resolveCurrentPodId (legacy)", () => {
+  it("prefers route pod over cookie when both provided", () => {
     expect(
       resolveCurrentPodId({ routePodId: "pod_b", cookiePodId: "pod_a" })
     ).toBe("pod_b");
@@ -13,8 +24,10 @@ describe("resolveCurrentPodId", () => {
       "pod_a"
     );
   });
+});
 
-  it("returns null when neither route nor cookie is set", () => {
-    expect(resolveCurrentPodId({ routePodId: null, cookiePodId: null })).toBeNull();
+describe("getBrowsingPodIdFromClient", () => {
+  it("does not read cookie (neutral cart without visiting a pod route)", () => {
+    expect(getBrowsingPodIdFromClient()).toBeNull();
   });
 });

@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
-import type { Cart } from "@/domain/types";
+import type { Cart, QuickCartApiResponse } from "@/domain/types";
 import {
   CART_CLEARED_EVENT,
   CART_UPDATED_EVENT,
@@ -23,7 +23,20 @@ import {
   type CartClearedDetail,
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
-import { getCurrentPodIdFromClient } from "@/lib/quick-cart-pod";
+import { getBrowsingPodIdFromClient } from "@/lib/quick-cart-pod";
+import { buildCartPodContextForDisplay } from "@/lib/quick-cart-display";
+import type { CartPodContext } from "@/lib/cart-pod-context";
+
+const NEUTRAL_POD_CONTEXT: CartPodContext = {
+  cartScope: "neutral",
+  cartPodId: null,
+  cartPodName: null,
+  browsingPodId: null,
+  browsingPodName: null,
+  assignedPodId: null,
+  canStartOrderHere: false,
+  requiresClearToSwitchPod: false,
+};
 
 type QuickCartContextValue = {
   enabled: boolean;
@@ -32,6 +45,7 @@ type QuickCartContextValue = {
   openCart: () => void;
   closeCart: () => void;
   cart: Cart | null;
+  podContext: CartPodContext;
   loading: boolean;
   itemCount: number;
   refreshCart: () => Promise<void>;
@@ -40,6 +54,17 @@ type QuickCartContextValue = {
 };
 
 const QuickCartContext = createContext<QuickCartContextValue | null>(null);
+
+function podContextFromPayload(payload: QuickCartApiResponse): CartPodContext {
+  return buildCartPodContextForDisplay({
+    cart: payload.cart,
+    browsingPodId: payload.browsingPodId,
+    browsingPodName: payload.browsingPodName,
+    assignedPodId: payload.assignedPodId,
+    assignedPodName: payload.assignedPodName,
+    requiresClearToSwitchPod: payload.requiresClearToSwitchPod,
+  });
+}
 
 export function QuickCartProvider({
   children,
@@ -53,10 +78,11 @@ export function QuickCartProvider({
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [cart, setCart] = useState<Cart | null>(null);
+  const [podContext, setPodContext] = useState<CartPodContext>(NEUTRAL_POD_CONTEXT);
   const [loading, setLoading] = useState(false);
   const cartRef = useRef<Cart | null>(null);
   const snapshotGenerationRef = useRef(0);
-  const activePodRef = useRef<string | null>(null);
+  const activeBrowsePodRef = useRef<string | null>(null);
 
   cartRef.current = cart;
 
@@ -65,24 +91,43 @@ export function QuickCartProvider({
     [cart]
   );
 
+  const applyPayload = useCallback((payload: QuickCartApiResponse) => {
+    setCart(payload.cart);
+    setPodContext(podContextFromPayload(payload));
+    setLoading(false);
+  }, []);
+
   const applyCartSnapshot = useCallback((next: Cart | null) => {
     snapshotGenerationRef.current += 1;
     setCart(next);
+    if (!next) {
+      setPodContext(NEUTRAL_POD_CONTEXT);
+    } else {
+      setPodContext(
+        buildCartPodContextForDisplay({
+          cart: next,
+          browsingPodId: getBrowsingPodIdFromClient(),
+          browsingPodName: null,
+          assignedPodId: next.cartScope === "assigned_pod" || next.cartScope === "group_order" ? next.podId : null,
+          assignedPodName: next.podName ?? null,
+          requiresClearToSwitchPod: false,
+        })
+      );
+    }
     setLoading(false);
   }, []);
 
   const refreshCart = useCallback(async () => {
     if (!enabled) return;
-    const podId = getCurrentPodIdFromClient();
-    if (!podId) {
-      setCart(null);
-      return;
-    }
+    const browsePodId = getBrowsingPodIdFromClient();
     const generationAtStart = snapshotGenerationRef.current;
-    const podAtStart = podId;
+    const podAtStart = browsePodId;
     setLoading(true);
     try {
-      const res = await fetch(`/api/cart?podId=${encodeURIComponent(podId)}`, {
+      const qs = browsePodId
+        ? `?browsePodId=${encodeURIComponent(browsePodId)}`
+        : "";
+      const res = await fetch(`/api/cart${qs}`, {
         credentials: "same-origin",
       });
       if (
@@ -90,37 +135,39 @@ export function QuickCartProvider({
           generationAtStart,
           currentGeneration: snapshotGenerationRef.current,
           podAtStart,
-          currentPodId: getCurrentPodIdFromClient(),
+          currentPodId: getBrowsingPodIdFromClient(),
         })
       ) {
         return;
       }
       if (!res.ok) {
         setCart(null);
+        setPodContext(NEUTRAL_POD_CONTEXT);
         return;
       }
-      const data = (await res.json()) as Cart;
+      const data = (await res.json()) as QuickCartApiResponse;
       if (
         !shouldApplyCartFetchResult({
           generationAtStart,
           currentGeneration: snapshotGenerationRef.current,
           podAtStart,
-          currentPodId: getCurrentPodIdFromClient(),
+          currentPodId: getBrowsingPodIdFromClient(),
         })
       ) {
         return;
       }
-      setCart(data);
+      applyPayload(data);
     } catch {
       if (
         shouldApplyCartFetchResult({
           generationAtStart,
           currentGeneration: snapshotGenerationRef.current,
           podAtStart,
-          currentPodId: getCurrentPodIdFromClient(),
+          currentPodId: getBrowsingPodIdFromClient(),
         })
       ) {
         setCart(null);
+        setPodContext(NEUTRAL_POD_CONTEXT);
       }
     } finally {
       if (
@@ -128,21 +175,19 @@ export function QuickCartProvider({
           generationAtStart,
           currentGeneration: snapshotGenerationRef.current,
           podAtStart,
-          currentPodId: getCurrentPodIdFromClient(),
+          currentPodId: getBrowsingPodIdFromClient(),
         })
       ) {
         setLoading(false);
       }
     }
-  }, [enabled]);
+  }, [enabled, applyPayload]);
 
   const openCart = useCallback(() => {
     if (!enabled) return;
     setIsOpen(true);
-    if (!cart) {
-      void refreshCart();
-    }
-  }, [enabled, cart, refreshCart]);
+    void refreshCart();
+  }, [enabled, refreshCart]);
 
   const closeCart = useCallback(() => {
     setIsOpen(false);
@@ -150,13 +195,14 @@ export function QuickCartProvider({
 
   useEffect(() => {
     if (!enabled) return;
-    const podId = getCurrentPodIdFromClient();
-    const prevPod = activePodRef.current;
-    if (prevPod && podId && prevPod !== podId) {
+    const browsePodId = getBrowsingPodIdFromClient();
+    const prevPod = activeBrowsePodRef.current;
+    if (prevPod && browsePodId && prevPod !== browsePodId) {
       snapshotGenerationRef.current += 1;
       setCart(null);
+      setPodContext(NEUTRAL_POD_CONTEXT);
     }
-    activePodRef.current = podId;
+    activeBrowsePodRef.current = browsePodId;
     void refreshCart();
   }, [enabled, pathname, refreshCart]);
 
@@ -169,7 +215,7 @@ export function QuickCartProvider({
           !shouldQuickCartApplyCartSnapshot(
             detail,
             cartRef.current,
-            getCurrentPodIdFromClient()
+            getBrowsingPodIdFromClient()
           )
         ) {
           return;
@@ -184,7 +230,7 @@ export function QuickCartProvider({
     const onCartCleared = (event: Event) => {
       const detail = (event as CustomEvent<CartClearedDetail>).detail;
       const local = cartRef.current;
-      const currentPodId = getCurrentPodIdFromClient() ?? local?.podId ?? "";
+      const currentPodId = getBrowsingPodIdFromClient() ?? local?.podId ?? "";
       const ctx = {
         cartId: local?.id ?? detail?.cartId ?? "",
         podId: currentPodId || detail?.podId || "",
@@ -229,6 +275,7 @@ export function QuickCartProvider({
       openCart,
       closeCart,
       cart,
+      podContext,
       loading,
       itemCount,
       refreshCart,
@@ -242,6 +289,7 @@ export function QuickCartProvider({
       openCart,
       closeCart,
       cart,
+      podContext,
       loading,
       itemCount,
       refreshCart,

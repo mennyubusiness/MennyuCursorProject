@@ -118,6 +118,20 @@ export interface CartGroup {
   subtotalCents: number;
 }
 
+/** How the customer cart relates to a pod (browsing ≠ assigned). */
+export type CartPodScope = "neutral" | "browsing_pod" | "assigned_pod" | "group_order";
+
+/** GET /api/cart quick-cart payload (not used for cartId mutations). */
+export type QuickCartApiResponse = {
+  scope: CartPodScope;
+  cart: Cart | null;
+  browsingPodId: string | null;
+  browsingPodName: string | null;
+  assignedPodId: string | null;
+  assignedPodName: string | null;
+  requiresClearToSwitchPod: boolean;
+};
+
 /** Client-safe group-order summary on cart API responses (never includes joinToken). */
 export type CartGroupOrderDisplay = {
   role: "solo" | "host" | "participant" | "unknown";
@@ -139,6 +153,8 @@ export interface Cart {
   podName?: string | null;
   /** Group-order role and host invite metadata for customer UI. */
   groupOrder?: CartGroupOrderDisplay;
+  /** Pod scope for Quick Cart / display (from server). */
+  cartScope?: CartPodScope;
 }
 
 // ---- Order (parent) ----
