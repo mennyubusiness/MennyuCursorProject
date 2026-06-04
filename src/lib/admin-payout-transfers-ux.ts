@@ -3,6 +3,11 @@
  * Presentation only — does not change transfer/reversal execution logic.
  */
 import type { TransferClawbackBadgeKind } from "@/lib/admin-payout-transfer-clawback-badge";
+import { isLegacyClawbackReviewClosed } from "@/lib/legacy-clawback-review";
+import {
+  financialReviewIssueLabel,
+  financialReviewIssueSubcopy,
+} from "@/lib/clawback-financial-review";
 import {
   isIdempotencyMismatchTransfer,
   isInsufficientBalanceTransfer,
@@ -28,6 +33,8 @@ export type PayoutTransferRowLike = {
   blockedReason: string | null;
   failureMessage: string | null;
   clawbackBadge: TransferClawbackBadgeKind | null;
+  legacyClawbackReviewStatus?: string | null;
+  financialReviewKind?: "manual" | "legacy" | null;
 };
 
 export type TransferReversalRowLike = {
@@ -42,12 +49,23 @@ export function clawbackBadgeNeedsAction(kind: TransferClawbackBadgeKind | null)
     kind === "missing" ||
     kind === "failed" ||
     kind === "pending" ||
+    kind === "manual_review" ||
     kind === "legacy_review"
   );
 }
 
+export function transferShowsFinancialReviewActions(row: PayoutTransferRowLike): boolean {
+  if (row.clawbackBadge !== "manual_review" && row.clawbackBadge !== "legacy_review") {
+    return false;
+  }
+  return !isLegacyClawbackReviewClosed(row.legacyClawbackReviewStatus);
+}
+
 export function transferNeedsAction(row: PayoutTransferRowLike): boolean {
   if (isCancelledDueToRefundTransfer(row)) return false;
+  if (row.clawbackBadge === "manual_review" || row.clawbackBadge === "legacy_review") {
+    return transferShowsFinancialReviewActions(row);
+  }
   if (clawbackBadgeNeedsAction(row.clawbackBadge)) return true;
   if (row.status === "pending" || row.status === "submitted") return true;
   if (isInsufficientBalanceTransfer(row)) return true;
@@ -75,8 +93,10 @@ export function transferIssueLabel(row: PayoutTransferRowLike): string {
         return "Clawback failed";
       case "pending":
         return "Clawback pending";
+      case "manual_review":
+        return financialReviewIssueLabel(row.financialReviewKind ?? "manual");
       case "legacy_review":
-        return "Legacy review";
+        return financialReviewIssueLabel("legacy");
       default:
         break;
     }
@@ -96,7 +116,9 @@ export function transferRecommendedAction(row: PayoutTransferRowLike): string {
   if (row.clawbackBadge === "missing") return "Prepare vendor reversal on order";
   if (row.clawbackBadge === "failed") return "Retry reversal";
   if (row.clawbackBadge === "pending") return "Run reversal batch";
-  if (row.clawbackBadge === "legacy_review") return "Review manually";
+  if (row.clawbackBadge === "manual_review" || row.clawbackBadge === "legacy_review") {
+    return financialReviewIssueSubcopy(row.financialReviewKind ?? "manual");
+  }
   if (row.status === "pending" || row.status === "submitted") return "Run vendor transfer batch";
   if (isInsufficientBalanceTransfer(row)) return "Wait for available balance or refresh";
   if (isIdempotencyMismatchTransfer(row)) return "Reconcile with Stripe, then retry";

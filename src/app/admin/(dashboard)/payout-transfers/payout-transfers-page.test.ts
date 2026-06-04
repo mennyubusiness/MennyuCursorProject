@@ -97,6 +97,13 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).toMatch(/subtleClawback/);
   });
 
+  it("shows financial review actions on needs action rows", () => {
+    expect(dashboardSrc).toMatch(/VendorClawbackReviewActions/);
+    expect(dashboardSrc).toMatch(/preferFinancialReview/);
+    expect(dashboardSrc).toMatch(/transferShowsFinancialReviewActions/);
+    expect(dashboardSrc).toMatch(/View order/);
+  });
+
   it("does not use payout terminology for vendor transfers", () => {
     expect(dashboardSrc).toMatch(/Run vendor transfer batch/);
     expect(dashboardSrc).not.toMatch(/Run payout batch/);

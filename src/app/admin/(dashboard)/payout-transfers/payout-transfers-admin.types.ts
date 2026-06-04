@@ -22,6 +22,11 @@ export type AdminPayoutTransferRow = {
   vendorOrder: { id: string; orderId: string };
   /** Compact admin clawback state when refund/reversal applies (null = no badge). */
   clawbackBadge: TransferClawbackBadgeKind | null;
+  legacyClawbackReviewStatus: string | null;
+  legacyClawbackReviewNote: string | null;
+  legacyClawbackReviewedAt: string | null;
+  legacyClawbackReviewedBy: string | null;
+  financialReviewKind: "manual" | "legacy" | null;
   moneyMovement: {
     customerPaymentCents: number;
     stripeProcessingFeeCents: number | null;

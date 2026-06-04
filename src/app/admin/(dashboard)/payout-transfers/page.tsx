@@ -40,6 +40,9 @@ export default async function AdminPayoutTransfersPage() {
         submittedAt: true,
         failedAt: true,
         legacyClawbackReviewStatus: true,
+        legacyClawbackReviewNote: true,
+        legacyClawbackReviewedAt: true,
+        legacyClawbackReviewedBy: true,
         vendor: { select: { id: true, name: true } },
         vendorOrder: { select: { id: true, orderId: true, totalCents: true } },
         paymentAllocation: {
@@ -120,6 +123,16 @@ export default async function AdminPayoutTransfersPage() {
       vendor: t.vendor,
       vendorOrder: { id: t.vendorOrder.id, orderId: t.vendorOrder.orderId },
       clawbackBadge: clawbackBadgeByTransferId.get(t.id) ?? null,
+      legacyClawbackReviewStatus: t.legacyClawbackReviewStatus,
+      legacyClawbackReviewNote: t.legacyClawbackReviewNote,
+      legacyClawbackReviewedAt: t.legacyClawbackReviewedAt?.toISOString() ?? null,
+      legacyClawbackReviewedBy: t.legacyClawbackReviewedBy,
+      financialReviewKind:
+        clawbackBadgeByTransferId.get(t.id) === "legacy_review"
+          ? "legacy"
+          : clawbackBadgeByTransferId.get(t.id) === "manual_review"
+            ? "manual"
+            : null,
       moneyMovement: {
         customerPaymentCents: ctx.customerPaymentCents,
         stripeProcessingFeeCents: ctx.stripeProcessingFeeCents,

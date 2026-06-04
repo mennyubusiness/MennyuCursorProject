@@ -51,18 +51,34 @@ describe("admin-payout-transfer-clawback-badge", () => {
     expect(transferClawbackBadgeClass("pending")).toMatch(/amber/);
   });
 
-  it("shows missing badge when reversal setup is missing", () => {
+  it("shows manual review badge for partial refund manual review", () => {
     expect(
       transferClawbackBadgeFromSummary({
         clawback: summary({
           clawbackStatus: "manual_review",
           hasMissingReversalSetup: true,
-          adminLabel: "Vendor clawback missing",
+          recommendedAction: "manual_review",
+          adminLabel: "Vendor clawback manual review",
         }),
         legacyClawbackReviewStatus: null,
         unsafeLegacyRefundLinkage: false,
       })
-    ).toBe("missing");
+    ).toBe("manual_review");
+    expect(transferClawbackBadgeLabel("manual_review")).toBe("Manual review");
+  });
+
+  it("shows missing badge when reversal setup is missing and status is not manual_review", () => {
+    expect(
+      transferClawbackBadgeFromSummary({
+        clawback: summary({
+          clawbackStatus: "failed",
+          hasFailedReversal: false,
+          hasMissingReversalSetup: true,
+        }),
+        legacyClawbackReviewStatus: null,
+        unsafeLegacyRefundLinkage: false,
+      })
+    ).toBe("failed");
   });
 
   it("shows legacy review for unsafe linkage until reviewed", () => {

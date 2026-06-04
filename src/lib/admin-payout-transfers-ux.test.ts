@@ -5,6 +5,7 @@ import {
   isRecentlySentTransfer,
   reversalIsRecoveredHistory,
   reversalNeedsAction,
+  transferIssueLabel,
   transferNeedsAction,
 } from "./admin-payout-transfers-ux";
 
@@ -63,6 +64,25 @@ describe("admin-payout-transfers-ux", () => {
         [{ id: "r1", status: "failed", amountCents: 1, createdAt: "" }]
       )
     ).toBe(2);
+  });
+
+  it("manual-review badge needs action until reviewed", () => {
+    const row = {
+      id: "t1",
+      status: "paid",
+      amountCents: 1000,
+      createdAt: "",
+      submittedAt: null,
+      stripeTransferId: "tr_1",
+      destinationAccountId: "acct",
+      blockedReason: null,
+      failureMessage: null,
+      clawbackBadge: "manual_review" as const,
+      legacyClawbackReviewStatus: null,
+      financialReviewKind: "manual" as const,
+    };
+    expect(transferNeedsAction(row)).toBe(true);
+    expect(transferIssueLabel(row)).toBe("Manual review");
   });
 
   it("counts retryable failed transfers", () => {

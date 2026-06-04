@@ -13,12 +13,26 @@ export type AdminOrderHealthAction = {
   primary?: boolean;
 };
 
+export type AdminOrderFinancialReviewContext = {
+  vendorPayoutTransferId: string;
+  stripeTransferId: string | null;
+  reviewKind: "manual" | "legacy";
+  review: {
+    status: string | null;
+    note: string | null;
+    reviewedAt: string | null;
+    reviewedBy: string | null;
+    needsReview: boolean;
+  };
+};
+
 export type AdminOrderHealthState = {
   status: "ok" | "attention";
   title: string;
   explanation: string;
   actions: AdminOrderHealthAction[];
   secondaryNotes?: string[];
+  financialReview?: AdminOrderFinancialReviewContext;
 };
 
 type CustomerIssueInput = {
@@ -42,10 +56,16 @@ type VendorOrderInput = {
   fulfillmentStatus: string;
 };
 
+function vendorNeedsOpenFinancialReview(
+  v: AdminOrderPaymentSummary["vendorOrders"][number]
+): boolean {
+  return Boolean(v.legacyClawbackReview?.needsReview);
+}
+
 export function orderHasUnresolvedClawback(summary: AdminOrderPaymentSummary | null): boolean {
   if (!summary) return false;
   return summary.vendorOrders.some((v) => {
-    if (v.legacyClawbackReview?.needsReview) return true;
+    if (vendorNeedsOpenFinancialReview(v)) return true;
     if (v.clawback.clawbackStatus === "failed") return true;
     if (v.clawback.clawbackStatus === "pending") return true;
     if (v.clawback.hasMissingReversalSetup && v.reversalPrepare.canPrepare) return true;
@@ -99,7 +119,11 @@ function summarizeClawbackForHeader(summary: AdminOrderPaymentSummary | null): s
     return "Vendor clawback recovered";
   }
   if (rows.some((v) => v.legacyClawbackReview?.needsReview)) {
-    return "Legacy clawback review";
+    const manual = rows.some((v) => v.legacyClawbackReview?.kind === "manual");
+    return manual ? "Manual financial review" : "Legacy clawback review";
+  }
+  if (rows.some((v) => v.clawback.clawbackStatus === "manual_review")) {
+    return "Manual financial review";
   }
   if (rows.some((v) => v.clawback.clawbackStatus === "failed")) {
     return "Vendor clawback failed";
@@ -180,26 +204,45 @@ export function buildAdminOrderHealth(input: {
     }
   }
 
+  if (input.paymentSummary) {
+    const financialReviewVendor = input.paymentSummary.vendorOrders.find((v) =>
+      vendorNeedsOpenFinancialReview(v)
+    );
+    if (financialReviewVendor?.legacyClawbackReview?.needsReview) {
+      const kind = financialReviewVendor.legacyClawbackReview.kind ?? "manual";
+      const isLegacy = kind === "legacy";
+      return {
+        status: "attention",
+        title: isLegacy ? "Legacy clawback review required" : "Manual financial review needed",
+        explanation: isLegacy
+          ? "The customer appears refunded and the vendor was paid, but refund records are incomplete. Review Stripe manually before preparing a transfer reversal."
+          : "This order has a partial or non-standard refund after the vendor was paid. Automatic vendor reversal is not supported for this case. Review manually.",
+        actions: [
+          { label: "Open Vendor Transfers", href: "/admin/payout-transfers", primary: true },
+          { label: "Review payments & refunds", href: "#payments-refunds" },
+        ],
+        financialReview: {
+          vendorPayoutTransferId: financialReviewVendor.vendorPayoutTransferId!,
+          stripeTransferId: financialReviewVendor.stripeTransferId,
+          reviewKind: kind,
+          review: {
+            status: financialReviewVendor.legacyClawbackReview.status,
+            note: financialReviewVendor.legacyClawbackReview.note,
+            reviewedAt: financialReviewVendor.legacyClawbackReview.reviewedAt,
+            reviewedBy: financialReviewVendor.legacyClawbackReview.reviewedBy,
+            needsReview: true,
+          },
+        },
+      };
+    }
+  }
+
   if (input.paymentSummary && orderHasUnresolvedClawback(input.paymentSummary)) {
-    const legacy = input.paymentSummary.vendorOrders.some((v) => v.legacyClawbackReview?.needsReview);
     const missing = input.paymentSummary.vendorOrders.some(
       (v) => v.reversalPrepare.canPrepare || v.clawback.hasMissingReversalSetup
     );
     const failed = input.paymentSummary.vendorOrders.some((v) => v.clawback.clawbackStatus === "failed");
     const pending = input.paymentSummary.vendorOrders.some((v) => v.clawback.clawbackStatus === "pending");
-
-    if (legacy) {
-      return {
-        status: "attention",
-        title: "Legacy clawback review required",
-        explanation:
-          "The customer appears refunded and the vendor was paid, but refund records are incomplete. Review Stripe manually before preparing a transfer reversal.",
-        actions: [
-          { label: "Review payments & refunds", href: "#payments-refunds", primary: true },
-          { label: "Open Vendor Transfers", href: "/admin/payout-transfers" },
-        ],
-      };
-    }
 
     if (failed) {
       return {
@@ -275,10 +318,13 @@ export function buildAdminOrderHealth(input: {
   }
 
   if (input.orderStatus === "completed") {
+    const hasOpenFinancialReview = input.paymentSummary?.vendorOrders.some((v) =>
+      vendorNeedsOpenFinancialReview(v)
+    );
     const allDone = input.paymentSummary?.vendorOrders.every(
       (v) => fulfillmentStatusBadge(v.fulfillmentStatus).label === "Completed"
     );
-    if (allDone !== false) {
+    if (allDone !== false && !hasOpenFinancialReview) {
       return {
         status: "ok",
         title: "No action needed",

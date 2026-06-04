@@ -9,6 +9,7 @@ export type TransferClawbackBadgeKind =
   | "failed"
   | "missing"
   | "recovered"
+  | "manual_review"
   | "legacy_review";
 
 export function transferClawbackBadgeLabel(kind: TransferClawbackBadgeKind): string {
@@ -21,6 +22,8 @@ export function transferClawbackBadgeLabel(kind: TransferClawbackBadgeKind): str
       return "Clawback missing";
     case "recovered":
       return "Clawback recovered";
+    case "manual_review":
+      return "Manual review";
     case "legacy_review":
       return "Legacy review";
   }
@@ -35,6 +38,7 @@ export function transferClawbackBadgeClass(kind: TransferClawbackBadgeKind): str
       return "bg-red-100 text-red-900 ring-red-200";
     case "recovered":
       return "bg-emerald-100 text-emerald-900 ring-emerald-200";
+    case "manual_review":
     case "legacy_review":
       return "bg-violet-100 text-violet-950 ring-violet-200";
   }
@@ -50,6 +54,8 @@ export function transferClawbackBadgeTitle(kind: TransferClawbackBadgeKind): str
       return "Customer refund requires vendor transfer reversal.";
     case "recovered":
       return "Vendor clawback recovered via Stripe transfer reversal.";
+    case "manual_review":
+      return "Partial or non-standard refund after vendor was paid. Automatic vendor reversal is not supported — review manually.";
     case "legacy_review":
       return "Historical refund linkage is incomplete. Review Stripe records manually before clawback action.";
   }
@@ -68,9 +74,13 @@ export function transferClawbackBadgeFromSummary(input: {
     return null;
   }
 
+  if (clawback.clawbackStatus === "manual_review") {
+    return unsafeLegacyRefundLinkage ? "legacy_review" : "manual_review";
+  }
+
   if (
     unsafeLegacyRefundLinkage &&
-    (clawback.hasMissingReversalSetup || clawback.clawbackStatus === "manual_review")
+    clawback.hasMissingReversalSetup
   ) {
     return "legacy_review";
   }
@@ -93,10 +103,6 @@ export function transferClawbackBadgeFromSummary(input: {
 
   if (clawback.hasMissingReversalSetup) {
     return "missing";
-  }
-
-  if (clawback.clawbackStatus === "manual_review") {
-    return unsafeLegacyRefundLinkage ? "legacy_review" : "missing";
   }
 
   return null;

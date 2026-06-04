@@ -18,10 +18,8 @@ import type {
   AdminOrderRefundLedgerRow,
 } from "@/services/admin-order-payment-summary.service";
 import { formatPrepareMissingReversalError } from "@/lib/admin-refund-prepare-ui";
-import {
-  legacyClawbackReviewStatusLabel,
-  type LegacyClawbackReviewStatus,
-} from "@/lib/legacy-clawback-review";
+import { legacyClawbackReviewStatusLabel } from "@/lib/legacy-clawback-review";
+import { VendorClawbackReviewActions } from "@/components/admin/VendorClawbackReviewActions";
 import { StripeMoneyMovementBreakdown } from "@/components/admin/StripeMoneyMovementBreakdown";
 import { adminVendorConnectTransferStatusLabel } from "@/lib/stripe-money-movement";
 import { vendorClawbackStatusBadgeClass } from "@/lib/vendor-clawback-status";
@@ -35,140 +33,6 @@ import { adminPrepareMissingTransferReversalAction } from "@/actions/admin-payou
 import { orderHasUnresolvedClawback } from "@/lib/admin-order-health";
 
 type ModalKind = AdminRefundScopeKey | null;
-
-function LegacyClawbackReviewActions({
-  vendorPayoutTransferId,
-  stripeTransferId,
-  needsReview,
-  review,
-  onComplete,
-}: {
-  vendorPayoutTransferId: string;
-  stripeTransferId: string | null;
-  needsReview: boolean;
-  review: {
-    status: string | null;
-    note: string | null;
-    reviewedAt: string | null;
-    reviewedBy: string | null;
-  };
-  onComplete: () => void;
-}) {
-  const [note, setNote] = useState(review.note ?? "");
-  const [pendingStatus, setPendingStatus] = useState<LegacyClawbackReviewStatus | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit(status: LegacyClawbackReviewStatus) {
-    const trimmed = note.trim();
-    if (!trimmed) {
-      setError("An admin note is required.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/admin/vendor-payout-transfers/${vendorPayoutTransferId}/legacy-clawback-review`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status, note: trimmed }),
-        }
-      );
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (!res.ok || data.ok === false) {
-        setError(data.error ?? "Could not save legacy review.");
-        return;
-      }
-      setPendingStatus(null);
-      onComplete();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (!needsReview && review.status) {
-    return (
-      <div className="mt-1 rounded border border-violet-200 bg-violet-50/80 px-2 py-1.5 text-[10px] text-violet-950">
-        <p className="font-semibold">
-          Legacy clawback {legacyClawbackReviewStatusLabel(review.status).toLowerCase()}
-          {review.reviewedAt ? ` · ${new Date(review.reviewedAt).toLocaleString()}` : ""}
-        </p>
-        {review.note ? <p className="mt-0.5 leading-snug">{review.note}</p> : null}
-      </div>
-    );
-  }
-
-  if (!needsReview) return null;
-
-  return (
-    <div className="mt-1.5 space-y-1.5 rounded border border-violet-200 bg-violet-50/80 px-2 py-2 text-[10px] text-violet-950">
-      <p className="font-semibold">Legacy clawback review required</p>
-      <p className="leading-snug">
-        Refund evidence is incomplete, so Open Order cannot safely prepare an automatic vendor reversal.
-      </p>
-      {stripeTransferId ? (
-        <p className="font-mono text-[9px] text-violet-900">Stripe transfer {shortenId(stripeTransferId)}</p>
-      ) : null}
-      {pendingStatus ? (
-        <>
-          <textarea
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Admin note (required) — what you verified in Stripe"
-            className="w-full rounded border border-violet-200 bg-white px-2 py-1 text-[10px] text-oo-charcoal"
-          />
-          <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void submit(pendingStatus)}
-              className="rounded border border-violet-400 bg-violet-200 px-2 py-0.5 font-semibold disabled:opacity-50"
-            >
-              {busy ? "Saving…" : "Save"}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setPendingStatus(null)}
-              className="rounded border border-violet-200 px-2 py-0.5"
-            >
-              Cancel
-            </button>
-          </div>
-        </>
-      ) : (
-        <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setPendingStatus("reviewed")}
-            className="rounded border border-violet-400 bg-violet-200 px-2 py-0.5 font-semibold disabled:opacity-50"
-          >
-            Mark reviewed
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setPendingStatus("deferred")}
-            className="rounded border border-violet-200 bg-white px-2 py-0.5 font-semibold disabled:opacity-50"
-          >
-            Defer
-          </button>
-          <Link
-            href="/admin/exceptions"
-            className="rounded border border-violet-200 bg-white px-2 py-0.5 font-semibold text-violet-950 underline"
-          >
-            Issues queue
-          </Link>
-        </div>
-      )}
-      {error ? <p className="text-red-800">{error}</p> : null}
-    </div>
-  );
-}
 
 function shortenId(id: string | null | undefined): string {
   if (!id) return "—";
@@ -1630,11 +1494,13 @@ export function AdminPaymentsRefundsPanel({
                         </p>
                       ) : null}
                       {v.vendorPayoutTransferId && v.legacyClawbackReview ? (
-                        <LegacyClawbackReviewActions
+                        <VendorClawbackReviewActions
                           vendorPayoutTransferId={v.vendorPayoutTransferId}
                           stripeTransferId={v.stripeTransferId}
                           needsReview={v.legacyClawbackReview.needsReview}
                           review={v.legacyClawbackReview}
+                          reviewKind={v.legacyClawbackReview.kind ?? "legacy"}
+                          compact
                           onComplete={() => router.refresh()}
                         />
                       ) : null}

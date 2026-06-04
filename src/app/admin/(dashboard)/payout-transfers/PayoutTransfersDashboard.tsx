@@ -64,8 +64,10 @@ import {
   transferMatchesQuickFilter,
   transferNeedsAction,
   transferRecommendedAction,
+  transferShowsFinancialReviewActions,
   type SectionQuickFilter,
 } from "@/lib/admin-payout-transfers-ux";
+import { VendorClawbackReviewActions } from "@/components/admin/VendorClawbackReviewActions";
 import type { StripePlatformBalanceSnapshot } from "@/services/stripe-balance.service";
 
 import type {
@@ -624,6 +626,42 @@ export function PayoutTransfersDashboard({
     );
   }
 
+  function renderTransferActionCell(
+    t: AdminPayoutTransferRow,
+    opts?: { preferFinancialReview?: boolean }
+  ) {
+    if (
+      opts?.preferFinancialReview &&
+      transferShowsFinancialReviewActions(t)
+    ) {
+      return (
+        <div className="min-w-[11rem] space-y-2">
+          <VendorClawbackReviewActions
+            vendorPayoutTransferId={t.id}
+            stripeTransferId={t.stripeTransferId}
+            needsReview
+            review={{
+              status: t.legacyClawbackReviewStatus,
+              note: t.legacyClawbackReviewNote,
+              reviewedAt: t.legacyClawbackReviewedAt,
+              reviewedBy: t.legacyClawbackReviewedBy,
+            }}
+            reviewKind={t.financialReviewKind ?? "manual"}
+            compact
+            onComplete={() => startTransition(() => router.refresh())}
+          />
+          <Link
+            href={`/admin/orders/${t.vendorOrder.orderId}`}
+            className="block text-center text-xs font-semibold text-oo-charcoal underline"
+          >
+            View order
+          </Link>
+        </div>
+      );
+    }
+    return renderTransferActions(t);
+  }
+
   function renderTransferActions(t: AdminPayoutTransferRow) {
     const retryable = isRetryablePayoutTransfer(t);
     const reconcilable = isReconcilablePayoutTransfer(t);
@@ -706,7 +744,7 @@ export function PayoutTransfersDashboard({
 
   function renderSimplifiedTransferRows(
     rows: AdminPayoutTransferRow[],
-    opts: { showIssue?: boolean; subtleClawback?: boolean }
+    opts: { showIssue?: boolean; subtleClawback?: boolean; preferFinancialReview?: boolean }
   ) {
     const colSpan = opts.showIssue ? 7 : 6;
     return rows.map((t) => {
@@ -744,7 +782,11 @@ export function PayoutTransfersDashboard({
             <td className="whitespace-nowrap px-3 py-2 text-xs text-oo-stone-gray">
               {(t.submittedAt ?? t.createdAt).slice(0, 19).replace("T", " ")}Z
             </td>
-            <td className="px-3 py-2">{renderTransferActions(t)}</td>
+            <td className="px-3 py-2">
+              {renderTransferActionCell(t, {
+                preferFinancialReview: opts.preferFinancialReview,
+              })}
+            </td>
           </tr>
           {renderTransferDetailsRow(t, rowTint, colSpan)}
         </Fragment>
@@ -1002,7 +1044,10 @@ export function PayoutTransfersDashboard({
                 </tr>
               </thead>
               <tbody className="divide-y divide-oo-light-stone">
-                {renderSimplifiedTransferRows(sectionData.needsActionTransfers, { showIssue: true })}
+                {renderSimplifiedTransferRows(sectionData.needsActionTransfers, {
+                  showIssue: true,
+                  preferFinancialReview: true,
+                })}
                 {sectionData.needsActionReversals.map((r) => (
                   <tr key={r.id} className={r.status === "failed" ? "bg-red-50/70" : "bg-amber-50/30"}>
                     <td className="px-3 py-2 font-medium text-oo-charcoal">{r.vendor.name}</td>

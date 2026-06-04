@@ -228,6 +228,7 @@ export type AdminOrderPaymentSummaryVendorOrder = {
     reviewedAt: string | null;
     reviewedBy: string | null;
     needsReview: boolean;
+    kind: "manual" | "legacy" | null;
   } | null;
 };
 
@@ -617,6 +618,21 @@ export async function fetchAdminOrderPaymentSummary(
           voReversals.length === 0 &&
           !isLegacyClawbackReviewClosed(vpt?.legacyClawbackReviewStatus);
 
+        const needsManualFinancialReview =
+          Boolean(vpt?.stripeTransferId?.trim()) &&
+          transferStatus === VENDOR_PAYOUT_TRANSFER_STATUS.paid &&
+          clawback.clawbackStatus === "manual_review" &&
+          !reversalPrepare.canPrepare &&
+          !needsLegacyClawbackReview &&
+          !isLegacyClawbackReviewClosed(vpt?.legacyClawbackReviewStatus);
+
+        const needsFinancialReview = needsLegacyClawbackReview || needsManualFinancialReview;
+        const financialReviewKind = needsLegacyClawbackReview
+          ? ("legacy" as const)
+          : needsManualFinancialReview
+            ? ("manual" as const)
+            : null;
+
         if (vpt && isLegacyClawbackReviewClosed(vpt.legacyClawbackReviewStatus)) {
           clawback = {
             ...clawback,
@@ -685,7 +701,8 @@ export async function fetchAdminOrderPaymentSummary(
                 note: vpt.legacyClawbackReviewNote,
                 reviewedAt: vpt.legacyClawbackReviewedAt?.toISOString() ?? null,
                 reviewedBy: vpt.legacyClawbackReviewedBy,
-                needsReview: needsLegacyClawbackReview,
+                needsReview: needsFinancialReview,
+                kind: financialReviewKind,
               }
             : null,
         };

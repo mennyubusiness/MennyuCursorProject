@@ -1,8 +1,13 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { AdminOrderHealthState } from "@/lib/admin-order-health";
 import { ADMIN_SECTION_CARD } from "@/lib/admin-order-detail-ui";
+import { VendorClawbackReviewActions } from "@/components/admin/VendorClawbackReviewActions";
 
 export function AdminOrderAttentionCard({ health }: { health: AdminOrderHealthState }) {
+  const router = useRouter();
   const isOk = health.status === "ok";
 
   return (
@@ -24,6 +29,18 @@ export function AdminOrderAttentionCard({ health }: { health: AdminOrderHealthSt
           {note}
         </p>
       ))}
+      {health.financialReview ? (
+        <div className="mt-4 max-w-xl">
+          <VendorClawbackReviewActions
+            vendorPayoutTransferId={health.financialReview.vendorPayoutTransferId}
+            stripeTransferId={health.financialReview.stripeTransferId}
+            needsReview={health.financialReview.review.needsReview}
+            review={health.financialReview.review}
+            reviewKind={health.financialReview.reviewKind}
+            onComplete={() => router.refresh()}
+          />
+        </div>
+      ) : null}
       {health.actions.length > 0 ? (
         <div className="mt-4 flex flex-wrap gap-2">
           {health.actions.map((action) => (

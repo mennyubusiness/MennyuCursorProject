@@ -53,7 +53,7 @@ function vendorRow(
     lineItems: [],
     reversals: [],
     reversalPrepare: { canPrepare: false, blockReason: null },
-    legacyClawbackReview: null,
+    legacyClawbackReview: null as AdminOrderPaymentSummary["vendorOrders"][number]["legacyClawbackReview"],
     clawback: {
       clawbackStatus: "not_needed",
       clawbackRequiredCents: 0,
@@ -80,6 +80,90 @@ describe("admin-order-health", () => {
       vendorRecoveryContexts: [],
     });
     expect(health.status).toBe("ok");
+    expect(health.title).toBe("No action needed");
+  });
+
+  it("manual financial review shows attention card not no action needed", () => {
+    const summary = minimalPaymentSummary({
+      order: {
+        id: "ord_1",
+        totalCents: 1000,
+        serviceFeeCents: 0,
+        taxCents: 0,
+        tipCents: 0,
+        paymentRefundStatus: "partially_refunded",
+        remainingRefundableCents: 500,
+        stripePaymentIntentId: null,
+      },
+      vendorOrders: [
+        vendorRow({
+          clawback: {
+            clawbackStatus: "manual_review",
+            clawbackRequiredCents: 500,
+            clawbackRecoveredCents: 0,
+            hasMissingReversalSetup: false,
+            adminLabel: "Vendor clawback manual review",
+            adminDetail:
+              "Only a partial or non-standard refund was found. Proportional vendor reversal preparation is not automated — manual review is required.",
+            adminWarning: null,
+            recommendedAction: "manual_review",
+          },
+          reversalPrepare: { canPrepare: false, blockReason: "partial_refund_manual_review" },
+          legacyClawbackReview: {
+            status: null,
+            note: null,
+            reviewedAt: null,
+            reviewedBy: null,
+            needsReview: true,
+            kind: "manual",
+          },
+        }),
+      ],
+    });
+    const health = buildAdminOrderHealth({
+      orderStatus: "completed",
+      paymentRefundStatus: "partially_refunded",
+      paymentSummary: summary,
+      customerSupportIssues: [],
+      vendorRecoveryContexts: [],
+    });
+    expect(health.title).toBe("Manual financial review needed");
+    expect(health.financialReview?.reviewKind).toBe("manual");
+    expect(health.status).toBe("attention");
+  });
+
+  it("returns no action needed after manual review is reviewed", () => {
+    const summary = minimalPaymentSummary({
+      vendorOrders: [
+        vendorRow({
+          clawback: {
+            clawbackStatus: "manual_review",
+            clawbackRequiredCents: 500,
+            clawbackRecoveredCents: 0,
+            hasMissingReversalSetup: false,
+            adminLabel: "Manual review reviewed",
+            adminDetail: "Done",
+            adminWarning: null,
+            recommendedAction: "manual_review",
+          },
+          legacyClawbackReview: {
+            status: "reviewed",
+            note: "Checked Stripe",
+            reviewedAt: "2026-06-01T00:00:00.000Z",
+            reviewedBy: "admin@test",
+            needsReview: false,
+            kind: "manual",
+          },
+        }),
+      ],
+    });
+    const health = buildAdminOrderHealth({
+      orderStatus: "completed",
+      paymentRefundStatus: "partially_refunded",
+      paymentSummary: summary,
+      customerSupportIssues: [],
+      vendorRecoveryContexts: [],
+    });
     expect(health.title).toBe("No action needed");
   });
 
