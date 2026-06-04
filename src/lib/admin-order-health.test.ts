@@ -229,6 +229,75 @@ describe("admin-order-health", () => {
     expect(health.actions[0]?.href).toBe("#notes-issues");
   });
 
+  it("pending vendor transfer shows pending not blocked when vendor is still owed", () => {
+    const health = buildAdminOrderHealth({
+      orderStatus: "completed",
+      paymentRefundStatus: "none",
+      paymentSummary: minimalPaymentSummary({
+        vendorOrders: [
+          vendorRow({
+            transferStatus: "pending",
+            stripeTransferId: null,
+            vendorStillOwedCents: 870,
+            clawback: {
+              clawbackStatus: "not_needed",
+              clawbackRequiredCents: 0,
+              clawbackRecoveredCents: 0,
+              hasMissingReversalSetup: false,
+              adminLabel: "Not needed",
+              adminDetail: null,
+              adminWarning: null,
+              recommendedAction: null,
+            },
+          }),
+        ],
+      }),
+      customerSupportIssues: [],
+      vendorRecoveryContexts: [],
+    });
+    expect(health.title).toBe("Vendor transfer pending");
+    expect(health.explanation).not.toMatch(/could not be sent/i);
+    expect(health.tone).toBe("neutral");
+  });
+
+  it("paid transfer with clawback still shows clawback attention not blocked", () => {
+    const health = buildAdminOrderHealth({
+      orderStatus: "completed",
+      paymentRefundStatus: "fully_refunded",
+      paymentSummary: minimalPaymentSummary({
+        vendorOrders: [
+          vendorRow({
+            transferStatus: "paid",
+            stripeTransferId: "tr_1",
+            vendorStillOwedCents: 0,
+            clawback: {
+              clawbackStatus: "manual_review",
+              clawbackRequiredCents: 500,
+              clawbackRecoveredCents: 0,
+              hasMissingReversalSetup: false,
+              adminLabel: "Vendor clawback manual review",
+              adminDetail: null,
+              adminWarning: null,
+              recommendedAction: "manual_review",
+            },
+            legacyClawbackReview: {
+              status: null,
+              note: null,
+              reviewedAt: null,
+              reviewedBy: null,
+              needsReview: true,
+              kind: "manual",
+            },
+          }),
+        ],
+      }),
+      customerSupportIssues: [],
+      vendorRecoveryContexts: [],
+    });
+    expect(health.title).toBe("Manual financial review needed");
+    expect(health.title).not.toBe("Vendor transfer blocked");
+  });
+
   it("routing failure recommends vendor order review", () => {
     const health = buildAdminOrderHealth({
       orderStatus: "paid",

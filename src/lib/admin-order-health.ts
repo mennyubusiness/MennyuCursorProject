@@ -6,6 +6,7 @@ import { isActiveOrderIssueStatus, customerSupportIssueTypeLabel } from "@/domai
 import type { ExceptionType } from "@/lib/admin-exceptions";
 import { fulfillmentStatusBadge, paymentChipLabel } from "@/lib/admin-order-detail-ui";
 import type { AdminOrderPaymentSummary } from "@/services/admin-order-payment-summary.service";
+import { buildVendorTransferAttentionState } from "@/lib/admin-vendor-transfer-health";
 
 export type AdminOrderHealthAction = {
   label: string;
@@ -26,8 +27,12 @@ export type AdminOrderFinancialReviewContext = {
   };
 };
 
+export type AdminOrderHealthTone = "urgent" | "neutral";
+
 export type AdminOrderHealthState = {
   status: "ok" | "attention";
+  /** Visual emphasis: neutral for informational transfer states (e.g. pending). */
+  tone?: AdminOrderHealthTone;
   title: string;
   explanation: string;
   actions: AdminOrderHealthAction[];
@@ -284,20 +289,15 @@ export function buildAdminOrderHealth(input: {
     }
   }
 
-  const blockedTransfer = input.paymentSummary?.vendorOrders.some(
-    (v) => v.transferStatus === "blocked" || (v.vendorStillOwedCents ?? 0) > 0
-  );
-  if (blockedTransfer) {
-    return {
-      status: "attention",
-      title: "Vendor transfer blocked",
-      explanation:
-        "At least one vendor transfer could not be sent. Review vendor Connect setup or reconciliation.",
-      actions: [
-        { label: "Review payments & refunds", href: "#payments-refunds", primary: true },
-        { label: "Open Vendor Transfers", href: "/admin/payout-transfers" },
-      ],
-    };
+  if (input.paymentSummary) {
+    const vendorTransferAttention = buildVendorTransferAttentionState(
+      input.paymentSummary.vendorOrders.map((v) => ({
+        transferStatus: v.transferStatus,
+        stripeTransferId: v.stripeTransferId,
+        vendorName: v.vendorName,
+      }))
+    );
+    if (vendorTransferAttention) return vendorTransferAttention;
   }
 
   const allRecovered =

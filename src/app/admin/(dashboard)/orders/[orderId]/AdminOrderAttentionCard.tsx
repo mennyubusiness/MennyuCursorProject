@@ -9,18 +9,27 @@ import { VendorClawbackReviewActions } from "@/components/admin/VendorClawbackRe
 export function AdminOrderAttentionCard({ health }: { health: AdminOrderHealthState }) {
   const router = useRouter();
   const isOk = health.status === "ok";
+  const isNeutral = !isOk && health.tone === "neutral";
 
   return (
     <section
       className={`${ADMIN_SECTION_CARD} ${
-        isOk ? "border-emerald-200/80 bg-emerald-50/30" : "border-amber-300/80 bg-amber-50/40"
+        isOk
+          ? "border-emerald-200/80 bg-emerald-50/30"
+          : isNeutral
+            ? "border-sky-200/80 bg-sky-50/30"
+            : "border-amber-300/80 bg-amber-50/40"
       }`}
       aria-labelledby="order-attention-heading"
     >
       <h2 id="order-attention-heading" className="text-sm font-semibold text-oo-charcoal">
         What needs attention?
       </h2>
-      <p className={`mt-2 text-base font-semibold ${isOk ? "text-emerald-950" : "text-amber-950"}`}>
+      <p
+        className={`mt-2 text-base font-semibold ${
+          isOk ? "text-emerald-950" : isNeutral ? "text-sky-950" : "text-amber-950"
+        }`}
+      >
         {health.title}
       </p>
       <p className="mt-1 max-w-3xl text-sm leading-relaxed text-oo-charcoal">{health.explanation}</p>
