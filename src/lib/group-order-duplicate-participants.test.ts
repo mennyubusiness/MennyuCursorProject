@@ -10,7 +10,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-describe("findDuplicateGroupOrderParticipantsByPhone", () => {
+describe("findDuplicateGroupOrderParticipantsByPhone (merge module)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -38,7 +38,7 @@ describe("findDuplicateGroupOrderParticipantsByPhone", () => {
     ]);
 
     const { findDuplicateGroupOrderParticipantsByPhone } = await import(
-      "./group-order-duplicate-participants"
+      "./group-order-participant-merge"
     );
     const dupes = await findDuplicateGroupOrderParticipantsByPhone();
     expect(dupes).toHaveLength(1);
@@ -63,7 +63,7 @@ describe("findDuplicateGroupOrderParticipantsByPhone", () => {
     ]);
 
     const { findDuplicateGroupOrderParticipantsByPhone } = await import(
-      "./group-order-duplicate-participants"
+      "./group-order-participant-merge"
     );
     expect(await findDuplicateGroupOrderParticipantsByPhone()).toEqual([]);
   });

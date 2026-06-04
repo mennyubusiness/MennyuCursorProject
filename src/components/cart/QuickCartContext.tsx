@@ -11,10 +11,11 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
-import type { Cart, QuickCartApiResponse } from "@/domain/types";
+import type { ActiveCartRecovery, Cart, QuickCartApiResponse } from "@/domain/types";
 import {
   CART_CLEARED_EVENT,
   CART_UPDATED_EVENT,
+  dispatchCartCleared,
   dispatchCartUpdated,
   emptyCartSnapshot,
   shouldQuickCartApplyCartSnapshot,
@@ -26,6 +27,9 @@ import {
 import { getBrowsingPodIdFromClient } from "@/lib/quick-cart-pod";
 import { buildCartPodContextForDisplay } from "@/lib/quick-cart-display";
 import type { CartPodContext } from "@/lib/cart-pod-context";
+import {
+  shouldShowActiveRecovery,
+} from "@/lib/quick-cart-active-recovery";
 
 const NEUTRAL_POD_CONTEXT: CartPodContext = {
   cartScope: "neutral",
@@ -46,11 +50,15 @@ type QuickCartContextValue = {
   closeCart: () => void;
   cart: Cart | null;
   podContext: CartPodContext;
+  activeCartRecovery: ActiveCartRecovery | null;
+  showActiveRecovery: boolean;
   loading: boolean;
   itemCount: number;
   refreshCart: () => Promise<void>;
   setCart: (cart: Cart | null) => void;
   applyCartSnapshot: (cart: Cart | null) => void;
+  clearActiveSoloCart: () => Promise<void>;
+  clearAndSwitchSoloCart: () => Promise<void>;
 };
 
 const QuickCartContext = createContext<QuickCartContextValue | null>(null);
@@ -79,21 +87,34 @@ export function QuickCartProvider({
   const [isOpen, setIsOpen] = useState(false);
   const [cart, setCart] = useState<Cart | null>(null);
   const [podContext, setPodContext] = useState<CartPodContext>(NEUTRAL_POD_CONTEXT);
+  const [activeCartRecovery, setActiveCartRecovery] = useState<ActiveCartRecovery | null>(null);
+  const [showActiveRecovery, setShowActiveRecovery] = useState(false);
   const [loading, setLoading] = useState(false);
   const cartRef = useRef<Cart | null>(null);
+  const activeCartRecoveryRef = useRef<ActiveCartRecovery | null>(null);
   const snapshotGenerationRef = useRef(0);
   const activeBrowsePodRef = useRef<string | null>(null);
 
   cartRef.current = cart;
+  activeCartRecoveryRef.current = activeCartRecovery;
 
-  const itemCount = useMemo(
-    () => cart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0,
-    [cart]
-  );
+  const itemCount = useMemo(() => {
+    const fromCart = cart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0;
+    if (fromCart > 0) return fromCart;
+    return activeCartRecovery?.itemCount ?? 0;
+  }, [cart, activeCartRecovery]);
 
   const applyPayload = useCallback((payload: QuickCartApiResponse) => {
     setCart(payload.cart);
     setPodContext(podContextFromPayload(payload));
+    setActiveCartRecovery(payload.activeCartRecovery ?? null);
+    setShowActiveRecovery(
+      shouldShowActiveRecovery(
+        payload.activeCartRecovery,
+        payload.scope,
+        payload.requiresClearToSwitchPod
+      )
+    );
     setLoading(false);
   }, []);
 
@@ -102,6 +123,8 @@ export function QuickCartProvider({
     setCart(next);
     if (!next) {
       setPodContext(NEUTRAL_POD_CONTEXT);
+      setActiveCartRecovery(null);
+      setShowActiveRecovery(false);
     } else {
       setPodContext(
         buildCartPodContextForDisplay({
@@ -143,6 +166,8 @@ export function QuickCartProvider({
       if (!res.ok) {
         setCart(null);
         setPodContext(NEUTRAL_POD_CONTEXT);
+        setActiveCartRecovery(null);
+        setShowActiveRecovery(false);
         return;
       }
       const data = (await res.json()) as QuickCartApiResponse;
@@ -168,6 +193,8 @@ export function QuickCartProvider({
       ) {
         setCart(null);
         setPodContext(NEUTRAL_POD_CONTEXT);
+        setActiveCartRecovery(null);
+        setShowActiveRecovery(false);
       }
     } finally {
       if (
@@ -201,6 +228,8 @@ export function QuickCartProvider({
       snapshotGenerationRef.current += 1;
       setCart(null);
       setPodContext(NEUTRAL_POD_CONTEXT);
+      setActiveCartRecovery(null);
+      setShowActiveRecovery(false);
     }
     activeBrowsePodRef.current = browsePodId;
     void refreshCart();
@@ -253,6 +282,52 @@ export function QuickCartProvider({
     };
   }, [enabled, applyCartSnapshot, refreshCart]);
 
+  const clearActiveSoloCart = useCallback(async () => {
+    const recovery = activeCartRecoveryRef.current;
+    if (!recovery || recovery.kind !== "solo_cart") {
+      throw new Error("No solo cart to clear.");
+    }
+    const res = await fetch("/api/cart/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ cartId: recovery.cartId }),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error ?? "Could not clear cart.");
+    }
+    dispatchCartCleared({
+      cartId: recovery.cartId,
+      podId: recovery.podId,
+      source: "quick-cart",
+    });
+    await refreshCart();
+  }, [refreshCart]);
+
+  const clearAndSwitchSoloCart = useCallback(async () => {
+    const recovery = activeCartRecoveryRef.current;
+    if (!recovery || recovery.kind !== "solo_cart") {
+      throw new Error("Only solo carts can be cleared to switch pods.");
+    }
+    const res = await fetch("/api/cart/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ cartId: recovery.cartId, switchPod: true }),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error ?? "Could not clear cart.");
+    }
+    dispatchCartCleared({
+      cartId: recovery.cartId,
+      podId: recovery.podId,
+      source: "quick-cart",
+    });
+    await refreshCart();
+  }, [refreshCart]);
+
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -276,11 +351,15 @@ export function QuickCartProvider({
       closeCart,
       cart,
       podContext,
+      activeCartRecovery,
+      showActiveRecovery,
       loading,
       itemCount,
       refreshCart,
       setCart,
       applyCartSnapshot,
+      clearActiveSoloCart,
+      clearAndSwitchSoloCart,
     }),
     [
       enabled,
@@ -290,10 +369,14 @@ export function QuickCartProvider({
       closeCart,
       cart,
       podContext,
+      activeCartRecovery,
+      showActiveRecovery,
       loading,
       itemCount,
       refreshCart,
       applyCartSnapshot,
+      clearActiveSoloCart,
+      clearAndSwitchSoloCart,
     ]
   );
 

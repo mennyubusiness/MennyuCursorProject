@@ -7,7 +7,9 @@ import { AwaitCartNavigationLink } from "@/components/cart/AwaitCartNavigationLi
 import { QuickCartLineControls } from "@/components/cart/QuickCartLineControls";
 import { QuickCartHeader } from "@/components/cart/QuickCartHeader";
 import { QuickCartGroupSection } from "@/components/cart/QuickCartGroupSection";
+import { QuickCartActiveRecoverySection } from "@/components/cart/QuickCartActiveRecoverySection";
 import { ButtonLink } from "@/components/ui/button";
+import { shouldSuppressNeutralGroupPromo } from "@/lib/quick-cart-active-recovery";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
 import { quickCartEmptyTitle, quickCartFooterCtaLabel } from "@/lib/quick-cart-display";
 
@@ -18,10 +20,14 @@ export function QuickCartDrawer() {
     closeCart,
     cart,
     podContext,
+    activeCartRecovery,
+    showActiveRecovery,
     loading,
     applyCartSnapshot,
     refreshCart,
     hasServerSession,
+    clearActiveSoloCart,
+    clearAndSwitchSoloCart,
   } = useQuickCart();
   const [mounted, setMounted] = useState(false);
 
@@ -42,9 +48,15 @@ export function QuickCartDrawer() {
     canCheckout,
     cartScope: podContext.cartScope,
   });
-  const showNeutralEmpty = podContext.cartScope === "neutral" && !hasItems;
+  const showNeutralEmpty =
+    podContext.cartScope === "neutral" && !hasItems && !showActiveRecovery;
   const showBrowsingEmpty =
-    podContext.cartScope === "browsing_pod" && !hasItems && !podContext.requiresClearToSwitchPod;
+    podContext.cartScope === "browsing_pod" &&
+    !hasItems &&
+    !podContext.requiresClearToSwitchPod &&
+    !showActiveRecovery;
+  const suppressNeutralGroupPromo =
+    showActiveRecovery && shouldSuppressNeutralGroupPromo(activeCartRecovery);
 
   return createPortal(
     <div className="fixed inset-0 z-[110]" role="presentation">
@@ -63,14 +75,29 @@ export function QuickCartDrawer() {
         <QuickCartHeader podContext={podContext} onClose={closeCart} onNavigate={closeCart} />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          {showActiveRecovery && activeCartRecovery ? (
+            <QuickCartActiveRecoverySection
+              recovery={activeCartRecovery}
+              browsingPodName={podContext.browsingPodName}
+              onNavigate={closeCart}
+              onClearAndSwitch={
+                activeCartRecovery.kind === "solo_cart" ? clearAndSwitchSoloCart : undefined
+              }
+              onClearCart={
+                activeCartRecovery.kind === "solo_cart" ? clearActiveSoloCart : undefined
+              }
+            />
+          ) : null}
+
           <QuickCartGroupSection
             cart={cart}
             podContext={podContext}
             hasServerSession={hasServerSession}
+            suppressNeutralGroupPromo={suppressNeutralGroupPromo}
             onNavigate={closeCart}
           />
 
-          {loading && !cart && podContext.cartScope === "neutral" ? (
+          {loading && !cart && !showActiveRecovery ? (
             <p className="text-sm text-oo-stone-gray">Loading cart…</p>
           ) : showNeutralEmpty ? (
             <div className="oo-empty-state px-6 py-10">
@@ -146,9 +173,9 @@ export function QuickCartDrawer() {
               </p>
             </>
           )}
-          {(hasItems || podContext.cartScope !== "neutral") && (
+          {hasItems && cart && (
             <AwaitCartNavigationLink
-              cartId={cart?.id}
+              cartId={cart.id}
               href="/cart"
               className="mt-4 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-hover"
               onClick={closeCart}

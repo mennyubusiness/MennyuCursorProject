@@ -24,11 +24,16 @@ import { CartValidationError } from "@/services/cart-validation-error";
 import type { GroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
 import {
   enforceGroupOrderCartMutation,
+  findSessionByCartId,
   resolveActiveGroupCartIdForPod,
   resolveActorForGroupCart,
   resolveGroupCartIdFromParticipantMarkers,
   type ResolvedGroupCartActor,
 } from "@/services/group-order.service";
+import {
+  buildActiveCartRecovery,
+  isActiveGroupSessionStatus,
+} from "@/lib/quick-cart-active-recovery";
 import {
   applyGroupOrderVisibilityToCart,
   buildGroupOrderViewerContext,
@@ -969,6 +974,91 @@ export async function loadActiveDisplayCartForSession(
   return undefined;
 }
 
+async function hostParticipantCount(cartId: string): Promise<number | undefined> {
+  const session = await findSessionByCartId(cartId);
+  return session?.participants.length;
+}
+
+async function packageQuickCartForActiveAssignment(params: {
+  assignedPodId: string;
+  assignedPodName: string;
+  cart: Cart;
+  scope: CartPodScope;
+  browsePodId: string | null;
+  browsePodName: string | null;
+}): Promise<QuickCartApiResponse> {
+  const requiresClearToSwitchPod = Boolean(
+    params.browsePodId && params.browsePodId !== params.assignedPodId
+  );
+  const showFullCartInDrawer = Boolean(
+    params.browsePodId && params.browsePodId === params.assignedPodId
+  );
+  const participantCount =
+    params.cart.groupOrder?.role === "host"
+      ? await hostParticipantCount(params.cart.id)
+      : undefined;
+  const activeCartRecovery = buildActiveCartRecovery({
+    cart: params.cart,
+    browsePodId: params.browsePodId,
+    browsePodName: params.browsePodName,
+    participantCount,
+  });
+
+  if (showFullCartInDrawer) {
+    return {
+      scope: params.scope,
+      cart: params.cart,
+      browsingPodId: params.browsePodId,
+      browsingPodName: params.browsePodName,
+      assignedPodId: params.assignedPodId,
+      assignedPodName: params.assignedPodName,
+      requiresClearToSwitchPod: false,
+      activeCartRecovery,
+    };
+  }
+
+  return {
+    scope: requiresClearToSwitchPod ? "browsing_pod" : "neutral",
+    cart: null,
+    browsingPodId: params.browsePodId,
+    browsingPodName: params.browsePodName,
+    assignedPodId: params.assignedPodId,
+    assignedPodName: params.assignedPodName,
+    requiresClearToSwitchPod,
+    activeCartRecovery,
+  };
+}
+
+/**
+ * Clear solo cart lines so the user can order from another pod. Refuses active group orders.
+ */
+export async function clearActiveSoloCartForSessionSwitch(
+  cartId: string,
+  sessionId: string
+): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  const cart = await prisma.cart.findUnique({
+    where: { id: cartId },
+    select: {
+      id: true,
+      sessionId: true,
+      groupOrderSession: { select: { status: true } },
+    },
+  });
+  if (!cart || cart.sessionId !== sessionId) {
+    return { ok: false, code: "NOT_FOUND", message: "Cart not found or access denied." };
+  }
+  if (isActiveGroupSessionStatus(cart.groupOrderSession?.status)) {
+    return {
+      ok: false,
+      code: "GROUP_ORDER_ACTIVE",
+      message:
+        "Leave or finish your group order before starting a new pod order.",
+    };
+  }
+  await prisma.cartItem.deleteMany({ where: { cartId } });
+  return { ok: true };
+}
+
 /**
  * Quick Cart read model: never creates a cart row; separates browsing pod from assigned cart.
  */
@@ -1000,17 +1090,17 @@ export async function getQuickCartPayload(
         joinTokenFromCookie: opts.markers.legacyJoinToken,
       });
       const scoped = await scopeCartForGroupViewer(row, groupCartId, actor, "group_order");
-      return {
-        scope: "group_order",
-        cart: scoped,
-        browsingPodId: browsePodId,
-        browsingPodName: browsePodId
-          ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ?? null
-          : null,
+      const browsePodName = browsePodId
+        ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ?? null
+        : null;
+      return packageQuickCartForActiveAssignment({
         assignedPodId: scoped.podId,
-        assignedPodName: scoped.podName ?? null,
-        requiresClearToSwitchPod: false,
-      };
+        assignedPodName: scoped.podName ?? row.pod.name,
+        cart: scoped,
+        scope: "group_order",
+        browsePodId,
+        browsePodName,
+      });
     }
   }
 
@@ -1029,20 +1119,17 @@ export async function getQuickCartPayload(
     });
     const scope: CartPodScope = assignedRow.groupOrderSession ? "group_order" : "assigned_pod";
     const cart = await scopeCartForGroupViewer(assignedRow, assignedRow.id, actor, scope);
-    const requiresClearToSwitchPod = Boolean(
-      browsePodId && browsePodId !== assignedRow.podId
-    );
-    return {
-      scope,
-      cart,
-      browsingPodId: browsePodId,
-      browsingPodName: browsePodId
-        ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ?? null
-        : null,
+    const browsePodName = browsePodId
+      ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ?? null
+      : null;
+    return packageQuickCartForActiveAssignment({
       assignedPodId: assignedRow.podId,
       assignedPodName: assignedRow.pod.name,
-      requiresClearToSwitchPod,
-    };
+      cart,
+      scope,
+      browsePodId,
+      browsePodName,
+    });
   }
 
   if (!browsePodId) {

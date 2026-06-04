@@ -1,0 +1,187 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildActiveCartRecovery,
+  recoveryItemCountLabel,
+  shouldShowActiveRecovery,
+  shouldShowActiveRecoverySection,
+  shouldSuppressNeutralGroupPromo,
+} from "./quick-cart-active-recovery";
+import type { Cart, QuickCartApiResponse } from "@/domain/types";
+
+const soloCart: Cart = {
+  id: "cart_1",
+  podId: "pod_a",
+  sessionId: "sess_1",
+  podName: "Downtown",
+  items: [
+    {
+      id: "l1",
+      menuItemId: "m1",
+      vendorId: "v1",
+      quantity: 2,
+      priceCents: 500,
+      specialInstructions: null,
+    },
+  ],
+  groups: [],
+  subtotalCents: 1000,
+  groupOrder: { role: "solo", canCheckout: true },
+};
+
+describe("buildActiveCartRecovery", () => {
+  it("builds solo recovery with item count", () => {
+    const r = buildActiveCartRecovery({
+      cart: soloCart,
+      browsePodId: null,
+      browsePodName: null,
+    });
+    expect(r.kind).toBe("solo_cart");
+    expect(r.podName).toBe("Downtown");
+    expect(r.itemCount).toBe(2);
+    expect(r.isConflictingWithBrowsePod).toBe(false);
+    expect("joinToken" in r).toBe(false);
+  });
+
+  it("flags browse conflict when pods differ", () => {
+    const r = buildActiveCartRecovery({
+      cart: soloCart,
+      browsePodId: "pod_b",
+      browsePodName: "Uptown",
+    });
+    expect(r.isConflictingWithBrowsePod).toBe(true);
+    expect(r.isCurrentContext).toBe(false);
+  });
+
+  it("host recovery includes group code but not joinToken", () => {
+    const r = buildActiveCartRecovery({
+      cart: {
+        ...soloCart,
+        groupOrder: {
+          role: "host",
+          canCheckout: true,
+          joinCode: "123456",
+          groupOrderSessionId: "gos_1",
+        },
+      },
+      browsePodId: null,
+      browsePodName: null,
+      participantCount: 3,
+    });
+    expect(r.kind).toBe("group_host");
+    expect(r.groupCode).toBe("123456");
+    expect(r.participantCount).toBe(3);
+    expect("joinToken" in r).toBe(false);
+  });
+
+  it("participant recovery has no group code", () => {
+    const r = buildActiveCartRecovery({
+      cart: {
+        ...soloCart,
+        groupOrder: { role: "participant", canCheckout: false },
+      },
+      browsePodId: null,
+      browsePodName: null,
+    });
+    expect(r.kind).toBe("group_participant");
+    expect(r.groupCode).toBeUndefined();
+  });
+});
+
+describe("shouldShowActiveRecoverySection", () => {
+  const base: QuickCartApiResponse = {
+    scope: "neutral",
+    cart: null,
+    browsingPodId: null,
+    browsingPodName: null,
+    assignedPodId: "pod_a",
+    assignedPodName: "Downtown",
+    requiresClearToSwitchPod: false,
+    activeCartRecovery: buildActiveCartRecovery({
+      cart: soloCart,
+      browsePodId: null,
+      browsePodName: null,
+    }),
+  };
+
+  it("shows on neutral with active recovery", () => {
+    expect(shouldShowActiveRecoverySection(base)).toBe(true);
+  });
+
+  it("shows on browse conflict", () => {
+    expect(
+      shouldShowActiveRecoverySection({
+        ...base,
+        scope: "browsing_pod",
+        requiresClearToSwitchPod: true,
+        browsingPodId: "pod_b",
+        browsingPodName: "Uptown",
+      })
+    ).toBe(true);
+  });
+
+  it("hides when assigned cart is current context in drawer", () => {
+    expect(
+      shouldShowActiveRecoverySection({
+        ...base,
+        scope: "assigned_pod",
+        cart: soloCart,
+        activeCartRecovery: buildActiveCartRecovery({
+          cart: soloCart,
+          browsePodId: "pod_a",
+          browsePodName: "Downtown",
+        }),
+      })
+    ).toBe(false);
+  });
+});
+
+describe("recoveryItemCountLabel", () => {
+  it("pluralizes items", () => {
+    expect(recoveryItemCountLabel(1)).toBe("1 item");
+    expect(recoveryItemCountLabel(3)).toBe("3 items");
+  });
+});
+
+describe("shouldShowActiveRecovery", () => {
+  const recovery = buildActiveCartRecovery({
+    cart: soloCart,
+    browsePodId: "pod_b",
+    browsePodName: "Uptown",
+  });
+
+  it("shows for browse conflict", () => {
+    expect(shouldShowActiveRecovery(recovery, "browsing_pod", true)).toBe(true);
+  });
+
+  it("hides when full cart is in drawer", () => {
+    expect(shouldShowActiveRecovery(recovery, "assigned_pod", false)).toBe(false);
+  });
+});
+
+describe("shouldSuppressNeutralGroupPromo", () => {
+  it("suppresses for group host and participant recovery", () => {
+    expect(
+      shouldSuppressNeutralGroupPromo(
+        buildActiveCartRecovery({
+          cart: { ...soloCart, groupOrder: { role: "host", canCheckout: true, joinCode: "111111" } },
+          browsePodId: null,
+          browsePodName: null,
+        })
+      )
+    ).toBe(true);
+    expect(
+      shouldSuppressNeutralGroupPromo(
+        buildActiveCartRecovery({
+          cart: { ...soloCart, groupOrder: { role: "participant", canCheckout: false } },
+          browsePodId: null,
+          browsePodName: null,
+        })
+      )
+    ).toBe(true);
+    expect(
+      shouldSuppressNeutralGroupPromo(
+        buildActiveCartRecovery({ cart: soloCart, browsePodId: null, browsePodName: null })
+      )
+    ).toBe(false);
+  });
+});

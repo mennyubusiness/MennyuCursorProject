@@ -121,6 +121,24 @@ export interface CartGroup {
 /** How the customer cart relates to a pod (browsing ≠ assigned). */
 export type CartPodScope = "neutral" | "browsing_pod" | "assigned_pod" | "group_order";
 
+/** Display-safe active cart hint for Quick Cart recovery (never includes joinToken). */
+export type ActiveCartRecovery = {
+  kind: "solo_cart" | "group_host" | "group_participant";
+  cartId: string;
+  podId: string;
+  podName: string;
+  itemCount?: number;
+  subtotalCents?: number;
+  /** Host only — 6-digit invite code. */
+  groupCode?: string;
+  /** Host only — active participants in session. */
+  participantCount?: number;
+  /** Host only — public join link target. */
+  groupOrderSessionId?: string;
+  isCurrentContext: boolean;
+  isConflictingWithBrowsePod: boolean;
+};
+
 /** GET /api/cart quick-cart payload (not used for cartId mutations). */
 export type QuickCartApiResponse = {
   scope: CartPodScope;
@@ -130,6 +148,7 @@ export type QuickCartApiResponse = {
   assignedPodId: string | null;
   assignedPodName: string | null;
   requiresClearToSwitchPod: boolean;
+  activeCartRecovery?: ActiveCartRecovery | null;
 };
 
 /** Client-safe group-order summary on cart API responses (never includes joinToken). */
