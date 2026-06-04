@@ -1,6 +1,10 @@
 import Link from "next/link";
 import type { AdminOrderDetail } from "@/lib/admin-order-detail-query";
 import { fulfillmentStatusBadge, formatAdminMoney, ADMIN_SECTION_CARD } from "@/lib/admin-order-detail-ui";
+import {
+  adminGroupOrderLineAttributionLabel,
+  type AdminOrderGroupContext,
+} from "@/lib/admin-order-group-context";
 import { AdminVendorOrderOperationalPanel } from "./AdminVendorOrderOperationalPanel";
 import { AdminVendorOrderTechnicalRoutingDetails } from "./AdminDeliverectDiagnosticsPanel";
 import { AdminVendorOrderTransition } from "./AdminVendorOrderTransition";
@@ -15,6 +19,7 @@ export function AdminVendorOrderCard({
   progressionTargetsFiltered,
   showRecheck,
   refundAttempts,
+  groupOrderContext,
 }: {
   vo: VoRow;
   showRecoveredBadge: boolean;
@@ -22,6 +27,7 @@ export function AdminVendorOrderCard({
   progressionTargetsFiltered: string[];
   showRecheck: boolean;
   refundAttempts: RefundAttempt[];
+  groupOrderContext?: AdminOrderGroupContext | null;
 }) {
   const fulfillment = fulfillmentStatusBadge(vo.fulfillmentStatus);
 
@@ -97,7 +103,11 @@ export function AdminVendorOrderCard({
       <div className="mt-4">
         <h4 className="text-xs font-semibold text-oo-charcoal">Items</h4>
         <ul className="mt-2 space-y-2">
-          {vo.lineItems.map((line) => (
+          {vo.lineItems.map((line) => {
+            const attributionLabel = groupOrderContext
+              ? adminGroupOrderLineAttributionLabel(line.groupOrderParticipantId, groupOrderContext)
+              : null;
+            return (
             <li
               key={line.id}
               className="flex flex-wrap items-baseline justify-between gap-2 border-b border-oo-light-stone/80 pb-2 text-sm last:border-0"
@@ -106,6 +116,9 @@ export function AdminVendorOrderCard({
                 <span className="font-medium text-oo-charcoal">
                   {line.name} × {line.quantity}
                 </span>
+                {attributionLabel ? (
+                  <p className="text-xs text-oo-stone-gray">{attributionLabel}</p>
+                ) : null}
                 {line.specialInstructions && (
                   <p className="text-xs text-amber-800">Note: {line.specialInstructions}</p>
                 )}
@@ -121,7 +134,8 @@ export function AdminVendorOrderCard({
                 {formatAdminMoney(line.priceCents * line.quantity)}
               </span>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </div>
 

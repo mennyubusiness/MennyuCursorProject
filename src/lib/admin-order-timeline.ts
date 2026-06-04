@@ -50,6 +50,34 @@ export function buildAdminOrderTimeline(detail: AdminOrderDetail): AdminOrderTim
     detail.vendorOrders.find((vo) => vo.id === vendorOrderId)?.vendor.name ?? null;
 
   const rows: AdminOrderTimelineEntry[] = [];
+  const groupSession = detail.groupOrderSession;
+
+  if (detail.groupOrderSessionId && groupSession) {
+    rows.push({
+      id: `group-started-${groupSession.id}`,
+      at: groupSession.createdAt,
+      title: `Group order started — code ${groupSession.joinCode}`,
+      sourceLabel: "System",
+    });
+    if (groupSession.lockedAt) {
+      rows.push({
+        id: `group-locked-${groupSession.id}`,
+        at: groupSession.lockedAt,
+        title: "Host started checkout (group cart locked)",
+        sourceLabel: "System",
+      });
+    }
+    const submittedAt =
+      groupSession.status === "submitted" ? detail.createdAt : null;
+    if (submittedAt) {
+      rows.push({
+        id: `group-submitted-${groupSession.id}`,
+        at: submittedAt,
+        title: "Group order submitted — host checked out",
+        sourceLabel: "System",
+      });
+    }
+  }
 
   for (const h of detail.statusHistory) {
     rows.push({

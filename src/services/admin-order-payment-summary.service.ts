@@ -178,6 +178,8 @@ export type AdminOrderPaymentSummaryLineItem = {
   name: string;
   quantity: number;
   priceCents: number;
+  /** Internal group-order attribution (admin display only). */
+  groupOrderParticipantId: string | null;
 };
 
 export type AdminOrderPaymentSummaryVendorOrder = {
@@ -396,7 +398,13 @@ export async function fetchAdminOrderPaymentSummary(
             vendor: { select: { name: true } },
             lineItems: {
               orderBy: { createdAt: "asc" },
-              select: { id: true, name: true, quantity: true, priceCents: true },
+              select: {
+                id: true,
+                name: true,
+                quantity: true,
+                priceCents: true,
+                groupOrderParticipantId: true,
+              },
             },
           },
         },
@@ -664,6 +672,7 @@ export async function fetchAdminOrderPaymentSummary(
             name: li.name,
             quantity: li.quantity,
             priceCents: li.priceCents,
+            groupOrderParticipantId: li.groupOrderParticipantId ?? null,
           })),
           routingStatus: vo.routingStatus,
           fulfillmentStatus: vo.fulfillmentStatus,

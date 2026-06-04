@@ -4,6 +4,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import type { AdminRefundScopeKey } from "@/lib/admin-refund-idempotency";
 import type { LinkedIssueRefundContext } from "@/lib/admin-order-issue-refund-link";
 import type { AdminOrderPaymentSummary } from "@/services/admin-order-payment-summary.service";
+import type { AdminOrderGroupContext } from "@/lib/admin-order-group-context";
 import { customerSupportIssueTypeLabel } from "@/domain/order-support-issue";
 import { AdminPaymentsRefundsPanel } from "./AdminPaymentsRefundsPanel";
 import { AdminOrderIssuesPanel, type VendorRecoveryContext } from "./AdminOrderIssuesPanel";
@@ -24,6 +25,7 @@ export function AdminOrderDetailClientLayout({
   issuesPanel,
   vendorRecoveryContexts,
   routingAvailable,
+  groupOrderContext,
   children,
 }: {
   paymentSummary: AdminOrderPaymentSummary | null;
@@ -32,6 +34,7 @@ export function AdminOrderDetailClientLayout({
   issuesPanel: IssuesPanelProps;
   vendorRecoveryContexts: VendorRecoveryContext[];
   routingAvailable: boolean;
+  groupOrderContext?: AdminOrderGroupContext | null;
   children: ReactNode;
 }) {
   const [linkedIssue, setLinkedIssue] = useState<LinkedIssueRefundContext | null>(null);
@@ -98,6 +101,7 @@ export function AdminOrderDetailClientLayout({
           linkedIssue={linkedIssue}
           openRefundModal={openRefundModal}
           onRefundModalClosed={clearLinkedIssue}
+          groupOrderContext={groupOrderContext}
         />
       ) : null}
 

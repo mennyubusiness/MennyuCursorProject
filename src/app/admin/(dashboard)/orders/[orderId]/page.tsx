@@ -14,6 +14,8 @@ import { getAdminActionState } from "@/lib/admin-actions";
 import { isManuallyRecovered } from "@/lib/admin-manual-recovery";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import { buildAdminOrderTimeline } from "@/lib/admin-order-timeline";
+import { buildAdminOrderGroupContext } from "@/lib/admin-order-group-context";
+import { AdminOrderGroupOrderPanel } from "./AdminOrderGroupOrderPanel";
 import { canShowAdminTestToolsUi } from "@/lib/admin-test-tools";
 import { buildAdminOrderHealth } from "@/lib/admin-order-health";
 import { ADMIN_SECTION_CARD } from "@/lib/admin-order-detail-ui";
@@ -62,6 +64,7 @@ export default async function AdminOrderDetailPage({
 
   const routingAvailable = isRoutingRetryAvailable();
   const showAdminTestTools = await canShowAdminTestToolsUi();
+  const groupOrderContext = buildAdminOrderGroupContext(adminOrder);
   const timeline = buildAdminOrderTimeline(adminOrder);
 
   const customerSupportForHealth = adminOrder.issues
@@ -129,6 +132,7 @@ export default async function AdminOrderDetailPage({
         totalCents={adminOrder.totalCents}
         paymentRefundStatus={paymentSummary?.order.paymentRefundStatus}
         paymentSummary={paymentSummary}
+        groupOrderContext={groupOrderContext}
       />
 
       <AdminOrderAttentionCard health={orderHealthWithRecovery} />
@@ -136,7 +140,10 @@ export default async function AdminOrderDetailPage({
       <AdminOrderBasicsCard
         adminOrder={adminOrder}
         paymentRefundStatus={paymentSummary?.order.paymentRefundStatus}
+        groupOrderContext={groupOrderContext}
       />
+
+      {groupOrderContext ? <AdminOrderGroupOrderPanel context={groupOrderContext} /> : null}
 
       <AdminOrderDetailClientLayout
         paymentSummary={paymentSummary}
@@ -144,6 +151,7 @@ export default async function AdminOrderDetailPage({
         canExecuteRefunds={canExecuteRefunds}
         routingAvailable={routingAvailable}
         vendorRecoveryContexts={vendorRecoveryContexts}
+        groupOrderContext={groupOrderContext}
         issuesPanel={{
           orderId: adminOrder.id,
           initialResolutionNotes: adminOrder.adminResolutionNotes ?? null,
@@ -216,6 +224,7 @@ export default async function AdminOrderDetailPage({
                     progressionTargetsFiltered={progressionTargetsFiltered}
                     showRecheck={showRecheck}
                     refundAttempts={adminOrder.refundAttempts}
+                    groupOrderContext={groupOrderContext}
                   />
                 </div>
               )
@@ -230,6 +239,7 @@ export default async function AdminOrderDetailPage({
         adminOrder={adminOrder}
         paymentSummary={paymentSummary}
         showAdminTestTools={showAdminTestTools}
+        groupOrderContext={groupOrderContext}
       />
     </div>
   );

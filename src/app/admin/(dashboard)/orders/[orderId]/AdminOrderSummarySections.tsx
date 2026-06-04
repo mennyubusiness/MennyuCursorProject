@@ -14,6 +14,10 @@ import {
 import type { AdminOrderDetail } from "@/lib/admin-order-detail-query";
 import type { AdminOrderPaymentSummary } from "@/services/admin-order-payment-summary.service";
 import { vendorClawbackStatusBadgeClass } from "@/lib/vendor-clawback-status";
+import {
+  formatAdminGroupOrderStatus,
+  type AdminOrderGroupContext,
+} from "@/lib/admin-order-group-context";
 
 function clawbackHeaderChip(summary: AdminOrderPaymentSummary | null): {
   label: string;
@@ -42,6 +46,7 @@ export function AdminOrderDetailHeader({
   totalCents,
   paymentRefundStatus,
   paymentSummary,
+  groupOrderContext,
 }: {
   orderId: string;
   createdAt: Date;
@@ -50,6 +55,7 @@ export function AdminOrderDetailHeader({
   totalCents: number;
   paymentRefundStatus?: string | null;
   paymentSummary?: AdminOrderPaymentSummary | null;
+  groupOrderContext?: AdminOrderGroupContext | null;
 }) {
   const shortId = orderId.slice(-8).toUpperCase();
   const statusLabel = parentStatusDisplay(status, vendorOrders);
@@ -76,9 +82,22 @@ export function AdminOrderDetailHeader({
             >
               {statusLabel}
             </span>
+            {groupOrderContext ? (
+              <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-950 ring-1 ring-sky-200/80">
+                Group order
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 text-sm text-oo-stone-gray">{formatAdminOrderDate(createdAt)}</p>
-          <p className="mt-1 text-sm text-oo-stone-gray">{subtitle}</p>
+          <p className="mt-1 text-sm text-oo-stone-gray">
+            {groupOrderContext ? (
+              <>
+                Group order · Host paid
+                <span className="text-oo-stone-gray"> · </span>
+              </>
+            ) : null}
+            {subtitle}
+          </p>
         </div>
         <Link
           href={`/order/${orderId}`}
@@ -115,9 +134,11 @@ export function AdminOrderDetailHeader({
 export function AdminOrderBasicsCard({
   adminOrder,
   paymentRefundStatus,
+  groupOrderContext,
 }: {
   adminOrder: AdminOrderDetail;
   paymentRefundStatus?: string | null;
+  groupOrderContext?: AdminOrderGroupContext | null;
 }) {
   const pickupCode = getPickupCode(adminOrder.id);
   const paymentLabel = paymentChipLabel(adminOrder.status, paymentRefundStatus);
@@ -157,6 +178,39 @@ export function AdminOrderBasicsCard({
           <dt className="text-oo-stone-gray">Refund status</dt>
           <dd className="text-oo-charcoal sm:mt-0.5">{paymentLabel}</dd>
         </div>
+        {groupOrderContext ? (
+          <>
+            <div className="flex justify-between gap-4 sm:block">
+              <dt className="text-oo-stone-gray">Group code</dt>
+              <dd className="font-mono font-semibold tracking-wider text-oo-charcoal sm:mt-0.5">
+                {groupOrderContext.joinCode}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4 sm:block">
+              <dt className="text-oo-stone-gray">Group host</dt>
+              <dd className="text-oo-charcoal sm:mt-0.5">
+                {groupOrderContext.hostDisplayName}
+                {groupOrderContext.hostUserEmail ? (
+                  <span className="block text-xs text-oo-stone-gray">
+                    {groupOrderContext.hostUserEmail}
+                  </span>
+                ) : null}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4 sm:block">
+              <dt className="text-oo-stone-gray">Group participants</dt>
+              <dd className="text-oo-charcoal sm:mt-0.5">
+                {groupOrderContext.activeParticipantCount} active
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4 sm:block">
+              <dt className="text-oo-stone-gray">Group status</dt>
+              <dd className="text-oo-charcoal sm:mt-0.5">
+                {formatAdminGroupOrderStatus(groupOrderContext.status)}
+              </dd>
+            </div>
+          </>
+        ) : null}
         {adminOrder.orderNotes ? (
           <div className="sm:col-span-2">
             <dt className="text-oo-stone-gray">Checkout notes</dt>

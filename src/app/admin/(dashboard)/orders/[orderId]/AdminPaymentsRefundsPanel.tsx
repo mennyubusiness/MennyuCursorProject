@@ -31,6 +31,10 @@ import {
 import type { LinkedIssueRefundContext } from "@/lib/admin-order-issue-refund-link";
 import { adminPrepareMissingTransferReversalAction } from "@/actions/admin-payout-transfer-reversal.actions";
 import { orderHasUnresolvedClawback } from "@/lib/admin-order-health";
+import {
+  adminGroupOrderRefundLineDescription,
+  type AdminOrderGroupContext,
+} from "@/lib/admin-order-group-context";
 
 type ModalKind = AdminRefundScopeKey | null;
 
@@ -268,6 +272,7 @@ function RefundModal({
   initialVendorOrderId,
   initialOrderLineItemId,
   linkedIssue,
+  groupOrderContext,
   onClose,
 }: {
   orderId: string;
@@ -276,6 +281,7 @@ function RefundModal({
   initialVendorOrderId?: string;
   initialOrderLineItemId?: string;
   linkedIssue?: LinkedIssueRefundContext | null;
+  groupOrderContext?: AdminOrderGroupContext | null;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -552,7 +558,13 @@ function RefundModal({
               >
                 {selectedVo.lineItems.map((li) => (
                   <option key={li.id} value={li.id}>
-                    {li.name} × {li.quantity} @ {formatAdminMoney(li.priceCents)} each
+                    {adminGroupOrderRefundLineDescription(
+                      li.name,
+                      li.quantity,
+                      li.groupOrderParticipantId,
+                      groupOrderContext
+                    )}{" "}
+                    @ {formatAdminMoney(li.priceCents)} each
                   </option>
                 ))}
               </select>
@@ -988,6 +1000,7 @@ export function AdminPaymentsRefundsPanel({
   linkedIssue,
   openRefundModal,
   onRefundModalClosed,
+  groupOrderContext,
 }: {
   summary: AdminOrderPaymentSummary;
   canExecuteRefunds: boolean;
@@ -998,6 +1011,7 @@ export function AdminPaymentsRefundsPanel({
     orderLineItemId?: string;
   } | null;
   onRefundModalClosed?: () => void;
+  groupOrderContext?: AdminOrderGroupContext | null;
 }) {
   const router = useRouter();
   const [modal, setModal] = useState<{
@@ -1363,7 +1377,12 @@ export function AdminPaymentsRefundsPanel({
                         {v.lineItems.map((li) => (
                           <li key={li.id} className="flex flex-wrap items-center gap-1">
                             <span>
-                              {li.name} × {li.quantity}
+                              {adminGroupOrderRefundLineDescription(
+                                li.name,
+                                li.quantity,
+                                li.groupOrderParticipantId,
+                                groupOrderContext
+                              )}
                             </span>
                             {canExecuteRefunds && v.remainingRefundableCents > 0 && (
                               <button
@@ -1556,6 +1575,7 @@ export function AdminPaymentsRefundsPanel({
           initialVendorOrderId={modal.vendorOrderId}
           initialOrderLineItemId={modal.orderLineItemId}
           linkedIssue={linkedIssue}
+          groupOrderContext={groupOrderContext}
           onClose={() => {
             setModal(null);
             onRefundModalClosed?.();

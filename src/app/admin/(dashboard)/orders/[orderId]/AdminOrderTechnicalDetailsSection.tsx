@@ -1,16 +1,19 @@
 import type { AdminOrderDetail } from "@/lib/admin-order-detail-query";
 import type { AdminOrderPaymentSummary } from "@/services/admin-order-payment-summary.service";
-import { ADMIN_DETAILS_SECTION } from "@/lib/admin-order-detail-ui";
+import { ADMIN_DETAILS_SECTION, formatAdminOrderDate } from "@/lib/admin-order-detail-ui";
+import type { AdminOrderGroupContext } from "@/lib/admin-order-group-context";
 import { AdminOrderQaToolsSection } from "./AdminOrderQaToolsSection";
 
 export function AdminOrderTechnicalDetailsSection({
   adminOrder,
   paymentSummary,
   showAdminTestTools,
+  groupOrderContext,
 }: {
   adminOrder: AdminOrderDetail;
   paymentSummary: AdminOrderPaymentSummary | null;
   showAdminTestTools: boolean;
+  groupOrderContext?: AdminOrderGroupContext | null;
 }) {
   const payment = paymentSummary?.payment;
 
@@ -45,6 +48,26 @@ export function AdminOrderTechnicalDetailsSection({
           <p className="text-oo-stone-gray">Order ID</p>
           <p className="break-all">{adminOrder.id}</p>
         </div>
+        {groupOrderContext ? (
+          <dl className="grid gap-2 font-mono text-xs sm:grid-cols-2">
+            <div>
+              <dt className="text-oo-stone-gray">Group order session</dt>
+              <dd className="break-all">{groupOrderContext.sessionId}</dd>
+            </div>
+            <div>
+              <dt className="text-oo-stone-gray">Group join code</dt>
+              <dd>{groupOrderContext.joinCode}</dd>
+            </div>
+            <div>
+              <dt className="text-oo-stone-gray">Group status</dt>
+              <dd>{groupOrderContext.status}</dd>
+            </div>
+            <div>
+              <dt className="text-oo-stone-gray">Session expires</dt>
+              <dd>{formatAdminOrderDate(groupOrderContext.expiresAt)}</dd>
+            </div>
+          </dl>
+        ) : null}
         {payment && (
           <dl className="grid gap-2 font-mono text-xs sm:grid-cols-2">
             <div>
