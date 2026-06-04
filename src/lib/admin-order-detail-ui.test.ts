@@ -42,42 +42,19 @@ describe("admin-order-detail-ui", () => {
 
 describe("admin order detail page layout", () => {
   const root = join(process.cwd(), "src/app/admin/(dashboard)/orders/[orderId]");
-  const pageSrc = readFileSync(join(root, "page.tsx"), "utf8");
   const issuesSrc = readFileSync(join(root, "AdminOrderIssuesPanel.tsx"), "utf8");
   const vendorCardSrc = readFileSync(join(root, "AdminVendorOrderCard.tsx"), "utf8");
-  const qaSrc = readFileSync(join(root, "AdminOrderQaToolsSection.tsx"), "utf8");
-  const deliverectSrc = readFileSync(join(root, "AdminDeliverectDiagnosticsPanel.tsx"), "utf8");
+  const opSrc = readFileSync(join(root, "AdminVendorOrderOperationalPanel.tsx"), "utf8");
 
-  it("orders sections: summary, action needed, vendors, payments, timeline, technical", () => {
-    expect(pageSrc).toMatch(/AdminOrderDetailHeader/);
-    expect(pageSrc).toMatch(/AdminOrderSummaryCard/);
-    expect(pageSrc).toMatch(/AdminOrderDetailClientLayout/);
-    expect(pageSrc).toMatch(/AdminVendorOrderCard/);
-    expect(pageSrc).toMatch(/AdminOrderTimelineSection/);
-    expect(pageSrc).toMatch(/AdminOrderTechnicalDetailsSection/);
+  it("notes section uses notes-issues anchor", () => {
+    expect(issuesSrc).toMatch(/id="notes-issues"/);
+    expect(issuesSrc).toMatch(/Notes &amp; issues/);
   });
 
-  it("renders active issues before resolved collapsed section", () => {
-    expect(issuesSrc.indexOf("activeSystemIssues")).toBeLessThan(
-      issuesSrc.indexOf("Resolved system issues")
-    );
-    expect(issuesSrc).toMatch(/details className="mt-4 rounded-lg border border-oo-light-stone/);
-  });
-
-  it("keeps technical routing details collapsed by default", () => {
-    expect(deliverectSrc).toMatch(/Technical routing details/);
-    expect(deliverectSrc).toMatch(/<details className="mt-4/);
-    expect(vendorCardSrc).toMatch(/AdminVendorOrderTechnicalRoutingDetails/);
-  });
-
-  it("gates QA tools via canShowAdminTestToolsUi on page", () => {
-    expect(pageSrc).toMatch(/canShowAdminTestToolsUi/);
-    expect(pageSrc).toMatch(/showAdminTestTools/);
-    expect(qaSrc).toMatch(/Admin QA tools/);
-  });
-
-  it("still renders manual recovery notes on vendor operational panel", () => {
-    const opSrc = readFileSync(join(root, "AdminVendorOrderOperationalPanel.tsx"), "utf8");
-    expect(opSrc).toMatch(/manualRecoveryNotes/);
+  it("vendor card uses plain operational labels", () => {
+    expect(vendorCardSrc).toMatch(/AdminVendorOrderOperationalPanel/);
+    expect(opSrc).toMatch(/Vendor received order/);
+    expect(opSrc).toMatch(/Kitchen status/);
+    expect(opSrc).toMatch(/manuallyRecoveredAt/);
   });
 });

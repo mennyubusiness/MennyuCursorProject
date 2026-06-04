@@ -75,14 +75,6 @@ export function AdminOrderDetailClientLayout({
 
   return (
     <>
-      <AdminOrderIssuesPanel
-        {...issuesPanel}
-        vendorRecoveryContexts={vendorRecoveryContexts}
-        routingAvailable={routingAvailable}
-        canExecuteRefunds={canExecuteRefunds}
-        onRefundFromIssue={canExecuteRefunds ? handleRefundFromIssue : undefined}
-      />
-
       {children}
 
       {paymentSummaryError ? (
@@ -108,6 +100,14 @@ export function AdminOrderDetailClientLayout({
           onRefundModalClosed={clearLinkedIssue}
         />
       ) : null}
+
+      <AdminOrderIssuesPanel
+        {...issuesPanel}
+        vendorRecoveryContexts={vendorRecoveryContexts}
+        routingAvailable={routingAvailable}
+        canExecuteRefunds={canExecuteRefunds}
+        onRefundFromIssue={canExecuteRefunds ? handleRefundFromIssue : undefined}
+      />
     </>
   );
 }

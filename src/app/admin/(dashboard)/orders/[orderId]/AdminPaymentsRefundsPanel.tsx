@@ -32,6 +32,7 @@ import {
 } from "@/lib/admin-refund-error-messages";
 import type { LinkedIssueRefundContext } from "@/lib/admin-order-issue-refund-link";
 import { adminPrepareMissingTransferReversalAction } from "@/actions/admin-payout-transfer-reversal.actions";
+import { orderHasUnresolvedClawback } from "@/lib/admin-order-health";
 
 type ModalKind = AdminRefundScopeKey | null;
 
@@ -1165,6 +1166,7 @@ export function AdminPaymentsRefundsPanel({
   const pendingClawbackCount = summary.vendorOrders.filter(
     (v) => v.clawback.clawbackStatus === "pending"
   ).length;
+  const highlightTransferBreakdown = orderHasUnresolvedClawback(summary);
 
   async function prepareMissingReversal(vendorPayoutTransferId: string) {
     setPrepareBusyId(vendorPayoutTransferId);
@@ -1195,13 +1197,13 @@ export function AdminPaymentsRefundsPanel({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
-            Payments &amp; Refunds
-          </h2>
+          <h2 className="text-sm font-semibold text-oo-charcoal">Payments &amp; refunds</h2>
           <p className="mt-1 text-sm text-oo-stone-gray">
-            Customer refunds debit the platform PaymentIntent. Vendor clawback uses a separate{" "}
+            Customer refund = money returned to the customer. Vendor transfer = money sent to the
+            vendor&apos;s Stripe account. Vendor clawback = funds recovered from the vendor after a
+            refund. Run transfer reversals from{" "}
             <Link href="/admin/payout-transfers" className="font-medium text-oo-charcoal underline">
-              vendor transfer reversals workflow
+              Vendor Transfers
             </Link>
             .
           </p>
@@ -1292,28 +1294,11 @@ export function AdminPaymentsRefundsPanel({
         )}
       </div>
 
-      {/* Order payment summary — compact top row */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
           <p className="text-xs text-oo-stone-gray">Customer paid</p>
           <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
             {formatAdminMoney(payment?.amountCents ?? summary.order.totalCents)}
-          </p>
-        </div>
-        <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
-          <p className="text-xs text-oo-stone-gray">Stripe processing fee</p>
-          <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
-            {payment?.stripeProcessingFeeCents != null
-              ? formatAdminMoney(payment.stripeProcessingFeeCents)
-              : "—"}
-          </p>
-        </div>
-        <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
-          <p className="text-xs text-oo-stone-gray">Stripe net to platform</p>
-          <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
-            {orderMoneyMovement?.stripeNetToPlatformCents != null
-              ? formatAdminMoney(orderMoneyMovement.stripeNetToPlatformCents)
-              : "—"}
           </p>
         </div>
         <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
@@ -1329,7 +1314,7 @@ export function AdminPaymentsRefundsPanel({
           ) : null}
         </div>
         <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
-          <p className="text-xs text-oo-stone-gray">Customer refund status</p>
+          <p className="text-xs text-oo-stone-gray">Refund status</p>
           <p className="mt-0.5 text-sm font-semibold text-oo-charcoal">
             {paymentRefundStatusLabel(summary.order.paymentRefundStatus)}
           </p>
@@ -1342,41 +1327,67 @@ export function AdminPaymentsRefundsPanel({
         </div>
       </div>
 
-      {orderMoneyMovement && primaryVendor && (
-        <div className="mt-4 rounded-lg border border-oo-light-stone bg-oo-cream/30 p-4">
-          <h3 className="text-sm font-semibold text-oo-charcoal">Stripe money movement</h3>
-          <div className="mt-3">
-            <StripeMoneyMovementBreakdown
-              customerPaymentCents={orderMoneyMovement.customerPaymentCents}
-              stripeProcessingFeeCents={orderMoneyMovement.stripeProcessingFeeCents}
-              stripeNetToPlatformCents={orderMoneyMovement.stripeNetToPlatformCents}
-              platformPayout={orderMoneyMovement.platformPayout}
-              vendorConnectTransferOwedCents={
-                primaryVendor.netVendorTransferCents ?? primaryVendor.transferAmountCents ?? 0
-              }
-              vendorConnectTransferStatus={primaryVendor.transferStatus ?? "missing"}
-              vendorStillOwedCents={summary.vendorOrders.reduce(
-                (sum, v) => sum + v.vendorStillOwedCents,
-                0
-              )}
-              openOrderRetainedCents={orderMoneyMovement.openOrderRetainedCents}
-              stripeTransferId={primaryVendor.stripeTransferId}
-              showBlockedNote={summary.vendorOrders.some((v) => v.vendorStillOwedCents > 0)}
-            />
-          </div>
-        </div>
-      )}
+      {summary.vendorOrders.length > 0 ? (
+        <ul className="mt-4 space-y-2">
+          {summary.vendorOrders.map((v) => (
+            <li
+              key={v.id}
+              className="rounded-lg border border-oo-light-stone bg-oo-cream/30 px-3 py-2 text-sm"
+            >
+              <p className="font-medium text-oo-charcoal">{v.vendorName}</p>
+              <p className="mt-0.5 text-xs text-oo-stone-gray">
+                Vendor transfer:{" "}
+                <span className="font-medium text-oo-charcoal">
+                  {adminVendorConnectTransferStatusLabel(v.transferStatus ?? "missing")}
+                </span>
+                {v.clawback.clawbackStatus !== "not_needed" ? (
+                  <>
+                    {" · "}
+                    Vendor clawback:{" "}
+                    <span className="font-medium text-oo-charcoal">{v.clawback.adminLabel}</span>
+                  </>
+                ) : null}
+              </p>
+              {v.clawback.adminDetail ? (
+                <p className="mt-0.5 text-xs leading-snug text-oo-stone-gray">{v.clawback.adminDetail}</p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
-      <details className="mt-3 rounded-lg border border-oo-light-stone bg-oo-cream/30 px-3 py-2">
-        <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
-          Payment breakdown &amp; Stripe IDs
+      <details className="mt-4 rounded-lg border border-oo-light-stone bg-oo-cream/30 px-3 py-2">
+        <summary className="cursor-pointer text-sm font-medium text-oo-charcoal hover:text-brand">
+          Show Stripe details
         </summary>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2 text-sm">
-          <dl className="space-y-1">
-            <div className="flex justify-between gap-2">
-              <dt className="text-oo-stone-gray">Refund status</dt>
-              <dd>{paymentRefundStatusLabel(summary.order.paymentRefundStatus)}</dd>
+        {orderMoneyMovement && primaryVendor ? (
+          <div className="mt-3 border-t border-oo-light-stone pt-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
+              Stripe money movement
+            </h3>
+            <div className="mt-2">
+              <StripeMoneyMovementBreakdown
+                customerPaymentCents={orderMoneyMovement.customerPaymentCents}
+                stripeProcessingFeeCents={orderMoneyMovement.stripeProcessingFeeCents}
+                stripeNetToPlatformCents={orderMoneyMovement.stripeNetToPlatformCents}
+                platformPayout={orderMoneyMovement.platformPayout}
+                vendorConnectTransferOwedCents={
+                  primaryVendor.netVendorTransferCents ?? primaryVendor.transferAmountCents ?? 0
+                }
+                vendorConnectTransferStatus={primaryVendor.transferStatus ?? "missing"}
+                vendorStillOwedCents={summary.vendorOrders.reduce(
+                  (sum, v) => sum + v.vendorStillOwedCents,
+                  0
+                )}
+                openOrderRetainedCents={orderMoneyMovement.openOrderRetainedCents}
+                stripeTransferId={primaryVendor.stripeTransferId}
+                showBlockedNote={summary.vendorOrders.some((v) => v.vendorStillOwedCents > 0)}
+              />
             </div>
+          </div>
+        ) : null}
+        <div className="mt-3 grid gap-4 border-t border-oo-light-stone pt-3 sm:grid-cols-2 text-sm">
+          <dl className="space-y-1">
             <div className="flex justify-between gap-2">
               <dt className="text-oo-stone-gray">Service fee</dt>
               <dd className="tabular-nums">{formatAdminMoney(summary.order.serviceFeeCents)}</dd>
@@ -1389,6 +1400,20 @@ export function AdminPaymentsRefundsPanel({
               <dt className="text-oo-stone-gray">Tip</dt>
               <dd className="tabular-nums">{formatAdminMoney(summary.order.tipCents)}</dd>
             </div>
+            {payment?.stripeProcessingFeeCents != null ? (
+              <div className="flex justify-between gap-2">
+                <dt className="text-oo-stone-gray">Stripe processing fee</dt>
+                <dd className="tabular-nums">{formatAdminMoney(payment.stripeProcessingFeeCents)}</dd>
+              </div>
+            ) : null}
+            {orderMoneyMovement?.stripeNetToPlatformCents != null ? (
+              <div className="flex justify-between gap-2">
+                <dt className="text-oo-stone-gray">Stripe net to platform</dt>
+                <dd className="tabular-nums">
+                  {formatAdminMoney(orderMoneyMovement.stripeNetToPlatformCents)}
+                </dd>
+              </div>
+            ) : null}
           </dl>
           <dl className="space-y-2 text-xs">
             <div>
@@ -1413,11 +1438,16 @@ export function AdminPaymentsRefundsPanel({
         </div>
       </details>
 
-      {/* Vendor breakdown */}
-      <div className="mt-6">
-        <h3 className="font-medium text-oo-charcoal">Vendor Connect transfer breakdown</h3>
-        <p className="text-xs text-oo-stone-gray">
-          PaymentAllocation is the source of truth for net vendor Connect transfer amounts.
+      <details
+        className="mt-4 rounded-lg border border-oo-light-stone bg-oo-cream/30 px-3 py-2"
+        open={highlightTransferBreakdown}
+      >
+        <summary className="cursor-pointer text-sm font-medium text-oo-charcoal hover:text-brand">
+          Show vendor transfer accounting
+        </summary>
+        <p className="mt-2 text-xs text-oo-stone-gray">
+          Full allocation table (gross payable, fee allocation, net transfer). Use Vendor Transfers
+          to prepare or run reversals.
         </p>
         <div className="mt-3 overflow-x-auto rounded-lg border border-oo-light-stone">
           <table className="w-full min-w-[900px] text-left text-sm">
@@ -1642,11 +1672,10 @@ export function AdminPaymentsRefundsPanel({
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
 
-      {/* Refunds ledger */}
       <div className="mt-6">
-        <h3 className="font-medium text-oo-charcoal">Refund ledger</h3>
+        <h3 className="text-sm font-medium text-oo-charcoal">Refund ledger</h3>
         <RefundsTable
           rows={summary.refundLedgerRows}
           inconsistentLedger={summary.refundDisplay.inconsistentLedger}

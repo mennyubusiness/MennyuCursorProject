@@ -389,21 +389,21 @@ export function AdminOrderIssuesPanel({
     : `${ADMIN_SECTION_CARD} scroll-mt-4 py-4`;
 
   return (
-    <section id="order-issues" className={sectionClass}>
+    <section id="notes-issues" className={sectionClass}>
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
-          Action needed
-        </h2>
+        <h2 className="text-sm font-semibold text-oo-charcoal">Notes &amp; issues</h2>
         {hasActiveWork ? (
           <p className="mt-1 text-sm text-oo-charcoal">
-            Resolve routing failures and customer reports. Refunds are in{" "}
+            Customer reports and vendor routing recovery. Refunds are in{" "}
             <Link href="#payments-refunds" className="underline">
-              Payments &amp; Refunds
+              Payments &amp; refunds
             </Link>
             .
           </p>
         ) : (
-          <p className="mt-1 text-xs text-oo-stone-gray">No open issues — order is operating normally.</p>
+          <p className="mt-1 text-xs text-oo-stone-gray">
+            No open issues. Use this section for resolution notes and history.
+          </p>
         )}
       </div>
 

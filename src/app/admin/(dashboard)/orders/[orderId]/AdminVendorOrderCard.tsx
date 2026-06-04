@@ -1,12 +1,6 @@
 import Link from "next/link";
 import type { AdminOrderDetail } from "@/lib/admin-order-detail-query";
-import {
-  fulfillmentStatusBadge,
-  formatAdminMoney,
-  providerLabel,
-  routingStatusBadge,
-  ADMIN_SECTION_CARD,
-} from "@/lib/admin-order-detail-ui";
+import { fulfillmentStatusBadge, formatAdminMoney, ADMIN_SECTION_CARD } from "@/lib/admin-order-detail-ui";
 import { AdminVendorOrderOperationalPanel } from "./AdminVendorOrderOperationalPanel";
 import { AdminVendorOrderTechnicalRoutingDetails } from "./AdminDeliverectDiagnosticsPanel";
 import { AdminVendorOrderTransition } from "./AdminVendorOrderTransition";
@@ -29,9 +23,7 @@ export function AdminVendorOrderCard({
   showRecheck: boolean;
   refundAttempts: RefundAttempt[];
 }) {
-  const routing = routingStatusBadge(vo.routingStatus);
   const fulfillment = fulfillmentStatusBadge(vo.fulfillmentStatus);
-  const provider = providerLabel(vo);
 
   const voRefunds = refundAttempts.filter((ra) => ra.vendorOrderId === vo.id);
   const latestRefund = voRefunds.length > 0 ? voRefunds[voRefunds.length - 1] : null;
@@ -55,14 +47,8 @@ export function AdminVendorOrderCard({
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${routing.className}`}>
-            {routing.label}
-          </span>
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${fulfillment.className}`}>
             {fulfillment.label}
-          </span>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${provider.className}`}>
-            {provider.label}
           </span>
           {showRecoveredBadge && (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
@@ -109,7 +95,7 @@ export function AdminVendorOrderCard({
       )}
 
       <div className="mt-4">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Line items</h4>
+        <h4 className="text-xs font-semibold text-oo-charcoal">Items</h4>
         <ul className="mt-2 space-y-2">
           {vo.lineItems.map((line) => (
             <li

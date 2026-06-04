@@ -5,18 +5,14 @@ export function AdminOrderTimelineSection({ timeline }: { timeline: AdminOrderTi
   if (timeline.length === 0) return null;
 
   const latest = timeline[timeline.length - 1]!;
-  const defaultOpen = timeline.length <= 4;
-
   return (
-    <details className={`${ADMIN_DETAILS_SECTION} px-5 py-4`} open={defaultOpen ? true : undefined}>
+    <details id="order-timeline" className={`${ADMIN_DETAILS_SECTION} scroll-mt-4 px-5 py-4`}>
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-semibold text-oo-charcoal">Order timeline</h2>
-          {!defaultOpen && (
-            <span className="text-xs text-oo-stone-gray">
-              Latest: {latest.title} · {formatAdminOrderDate(latest.at)}
-            </span>
-          )}
+          <span className="text-xs text-oo-stone-gray">
+            Latest: {latest.title} · {formatAdminOrderDate(latest.at)}
+          </span>
         </div>
         <p className="mt-0.5 text-xs text-oo-stone-gray">
           {timeline.length} event{timeline.length === 1 ? "" : "s"} — parent, vendors, issues, refunds

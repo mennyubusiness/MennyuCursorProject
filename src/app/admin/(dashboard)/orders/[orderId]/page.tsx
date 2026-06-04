@@ -15,10 +15,11 @@ import { isManuallyRecovered } from "@/lib/admin-manual-recovery";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import { buildAdminOrderTimeline } from "@/lib/admin-order-timeline";
 import { canShowAdminTestToolsUi } from "@/lib/admin-test-tools";
+import { buildAdminOrderHealth } from "@/lib/admin-order-health";
 import { ADMIN_SECTION_CARD } from "@/lib/admin-order-detail-ui";
-import { AdminOrderDetailHeader, AdminOrderSummaryCard } from "./AdminOrderSummarySections";
+import { AdminOrderAttentionCard } from "./AdminOrderAttentionCard";
+import { AdminOrderDetailHeader, AdminOrderBasicsCard } from "./AdminOrderSummarySections";
 import { AdminVendorOrderCard } from "./AdminVendorOrderCard";
-import { AdminOrderQaToolsSection } from "./AdminOrderQaToolsSection";
 import { AdminOrderTimelineSection } from "./AdminOrderTimelineSection";
 import { AdminOrderTechnicalDetailsSection } from "./AdminOrderTechnicalDetailsSection";
 import type { VendorRecoveryContext } from "./AdminOrderIssuesPanel";
@@ -63,6 +64,16 @@ export default async function AdminOrderDetailPage({
   const showAdminTestTools = await canShowAdminTestToolsUi();
   const timeline = buildAdminOrderTimeline(adminOrder);
 
+  const customerSupportForHealth = adminOrder.issues
+    .filter((i) => i.submittedByRole === "customer")
+    .map((i) => ({
+      id: i.id,
+      issueType: i.type,
+      status: i.status,
+      customerMessage: i.customerMessage,
+      vendorName: i.vendorOrder?.vendor.name ?? null,
+    }));
+
   const vendorContexts = adminOrder.vendorOrders.map((vo) => {
     const exceptionType = getExceptionType(vo);
     const actionState = getAdminActionState(vo, routingAvailable);
@@ -100,6 +111,14 @@ export default async function AdminOrderDetailPage({
       canCancel: actionState.showCancel,
     }));
 
+  const orderHealthWithRecovery = buildAdminOrderHealth({
+    orderStatus: adminOrder.status,
+    paymentRefundStatus: paymentSummary?.order.paymentRefundStatus ?? null,
+    paymentSummary,
+    customerSupportIssues: customerSupportForHealth,
+    vendorRecoveryContexts,
+  });
+
   return (
     <div className="space-y-6 pb-8">
       <AdminOrderDetailHeader
@@ -109,9 +128,12 @@ export default async function AdminOrderDetailPage({
         vendorOrders={adminOrder.vendorOrders}
         totalCents={adminOrder.totalCents}
         paymentRefundStatus={paymentSummary?.order.paymentRefundStatus}
+        paymentSummary={paymentSummary}
       />
 
-      <AdminOrderSummaryCard
+      <AdminOrderAttentionCard health={orderHealthWithRecovery} />
+
+      <AdminOrderBasicsCard
         adminOrder={adminOrder}
         paymentRefundStatus={paymentSummary?.order.paymentRefundStatus}
       />
@@ -179,11 +201,9 @@ export default async function AdminOrderDetailPage({
         }}
       >
         <section className={ADMIN_SECTION_CARD}>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
-            Vendor orders
-          </h2>
-          <p className="mt-1 text-sm text-oo-stone-gray">
-            Fulfillment status per vendor — expand technical routing details when debugging.
+          <h2 className="text-sm font-semibold text-oo-charcoal">Vendors &amp; items</h2>
+          <p className="mt-0.5 text-xs text-oo-stone-gray">
+            Modify refunds per vendor or item. Expand technical routing details only when debugging.
           </p>
           <div className="mt-4 space-y-4">
             {vendorContexts.map(
@@ -202,18 +222,15 @@ export default async function AdminOrderDetailPage({
             )}
           </div>
         </section>
-
-        {showAdminTestTools && (
-          <AdminOrderQaToolsSection
-            orderStatus={adminOrder.status}
-            vendorOrders={adminOrder.vendorOrders}
-          />
-        )}
       </AdminOrderDetailClientLayout>
 
       <AdminOrderTimelineSection timeline={timeline} />
 
-      <AdminOrderTechnicalDetailsSection adminOrder={adminOrder} paymentSummary={paymentSummary} />
+      <AdminOrderTechnicalDetailsSection
+        adminOrder={adminOrder}
+        paymentSummary={paymentSummary}
+        showAdminTestTools={showAdminTestTools}
+      />
     </div>
   );
 }
