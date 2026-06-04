@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mockAssertCartSessionAccess = vi.fn();
-const mockAssertCustomerSession = vi.fn();
+const mockResolveCheckoutPhoneVerification = vi.fn();
+const mockCreateCustomerSessionCookieForAccount = vi.fn();
 const mockAuth = vi.fn();
 const mockCreateOrderFromCart = vi.fn();
 const mockCreatePaymentIntent = vi.fn();
@@ -15,8 +16,11 @@ vi.mock("@/lib/cart-session-access", () => ({
   assertCartSessionAccess: (...args: unknown[]) => mockAssertCartSessionAccess(...args),
 }));
 
-vi.mock("@/lib/customer-session", () => ({
-  assertCustomerSession: (...args: unknown[]) => mockAssertCustomerSession(...args),
+vi.mock("@/lib/customer-checkout-phone-verification", () => ({
+  resolveCheckoutPhoneVerification: (...args: unknown[]) =>
+    mockResolveCheckoutPhoneVerification(...args),
+  createCustomerSessionCookieForAccount: (...args: unknown[]) =>
+    mockCreateCustomerSessionCookieForAccount(...args),
 }));
 
 vi.mock("@/lib/customer-order-access-token", () => ({
@@ -30,6 +34,10 @@ vi.mock("@/services/order.service", () => ({
 
 vi.mock("@/services/payment.service", () => ({
   createPaymentIntent: (...args: unknown[]) => mockCreatePaymentIntent(...args),
+}));
+
+vi.mock("@/services/customer-account-link.service", () => ({
+  linkCheckoutCustomerAccountToUser: vi.fn().mockResolvedValue({ ok: true, alreadyLinked: true }),
 }));
 
 import { POST } from "./route";
@@ -73,10 +81,11 @@ describe("POST /api/checkout customer session", () => {
   });
 
   it("rejects checkout without verified customer session", async () => {
-    mockAssertCustomerSession.mockResolvedValue({
+    mockResolveCheckoutPhoneVerification.mockResolvedValue({
       ok: false,
       status: 401,
       error: "Verify your phone before checkout.",
+      code: "CUSTOMER_SESSION_REQUIRED",
     });
 
     const res = await POST(checkoutRequest(SESSION_A));
@@ -88,10 +97,11 @@ describe("POST /api/checkout customer session", () => {
   });
 
   it("rejects checkout when submitted phone does not match verified account", async () => {
-    mockAssertCustomerSession.mockResolvedValue({
-      ok: true,
-      customerAccountId: "acct_1",
-      phoneE164: "+15559999999",
+    mockResolveCheckoutPhoneVerification.mockResolvedValue({
+      ok: false,
+      status: 403,
+      error: "Phone must match your verified number. Verify your phone again if you changed it.",
+      code: "PHONE_MISMATCH",
     });
 
     const res = await POST(checkoutRequest(SESSION_A, "tok"));
@@ -103,7 +113,7 @@ describe("POST /api/checkout customer session", () => {
   });
 
   it("checks out with verified customer session and sets customerAccountId", async () => {
-    mockAssertCustomerSession.mockResolvedValue({
+    mockResolveCheckoutPhoneVerification.mockResolvedValue({
       ok: true,
       customerAccountId: "acct_1",
       phoneE164: "+15551234567",
@@ -128,13 +138,44 @@ describe("POST /api/checkout customer session", () => {
       })
     );
   });
+
+  it("checks out for signed-in user via linked account phone without customer session cookie", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user_1", email: "a@b.com" } });
+    mockResolveCheckoutPhoneVerification.mockResolvedValue({
+      ok: true,
+      customerAccountId: "acct_linked",
+      phoneE164: "+15551234567",
+      establishCustomerSession: true,
+    });
+    mockCreateCustomerSessionCookieForAccount.mockResolvedValue("session_tok");
+    mockCreateOrderFromCart.mockResolvedValue({
+      order: { id: "ord_1", totalCents: 1000, customerPhone: "+15551234567" },
+    });
+    mockCreatePaymentIntent.mockResolvedValue({
+      clientSecret: "cs_test",
+      paymentIntentId: "pi_test",
+    });
+
+    const res = await POST(checkoutRequest(SESSION_A));
+    const setCookie = res.headers.getSetCookie?.() ?? [res.headers.get("Set-Cookie") ?? ""];
+
+    expect(res.status).toBe(200);
+    expect(mockCreateOrderFromCart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerAccountId: "acct_linked",
+        customerPhone: "+15551234567",
+      })
+    );
+    const cookieBlob = Array.isArray(setCookie) ? setCookie.join(";") : String(setCookie);
+    expect(cookieBlob).toContain("mennyu_customer=");
+  });
 });
 
 describe("POST /api/checkout cart session ownership", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue(null);
-    mockAssertCustomerSession.mockResolvedValue({
+    mockResolveCheckoutPhoneVerification.mockResolvedValue({
       ok: true,
       customerAccountId: "acct_1",
       phoneE164: "+15551234567",

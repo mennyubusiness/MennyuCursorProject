@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { SmsConsentNotice } from "@/components/legal/SmsConsentNotice";
+import { normalizePhoneToE164US } from "@/lib/phone-e164";
 
 type CheckoutPhoneVerificationProps = {
   phone: string;
@@ -11,6 +12,9 @@ type CheckoutPhoneVerificationProps = {
   verifiedPhoneE164: string | null;
   onVerified: (phoneE164: string) => void;
   onResetVerification: () => void;
+  /** Signed-in user with a linked verified phone on file (E.164). */
+  accountVerifiedPhoneE164?: string | null;
+  isSignedIn?: boolean;
 };
 
 export function CheckoutPhoneVerification({
@@ -20,6 +24,8 @@ export function CheckoutPhoneVerification({
   verifiedPhoneE164,
   onVerified,
   onResetVerification,
+  accountVerifiedPhoneE164 = null,
+  isSignedIn = false,
 }: CheckoutPhoneVerificationProps) {
   const [otpCode, setOtpCode] = useState("");
   const [otpSending, setOtpSending] = useState(false);
@@ -90,7 +96,23 @@ export function CheckoutPhoneVerification({
     }
   }
 
+  function matchesAccountVerifiedPhone(value: string): string | null {
+    if (!isSignedIn || !accountVerifiedPhoneE164) return null;
+    const normalized = normalizePhoneToE164US(value);
+    if (!normalized.ok || normalized.e164 !== accountVerifiedPhoneE164) return null;
+    return normalized.e164;
+  }
+
   function handlePhoneInputChange(value: string) {
+    const accountMatch = matchesAccountVerifiedPhone(value);
+    if (accountMatch) {
+      onPhoneChange(value);
+      onVerified(accountMatch);
+      setOtpCode("");
+      setOtpMessage(null);
+      setOtpError(null);
+      return;
+    }
     if (phoneVerified && verifiedPhoneE164) {
       onResetVerification();
       setOtpCode("");
@@ -99,6 +121,8 @@ export function CheckoutPhoneVerification({
     }
     onPhoneChange(value);
   }
+
+  const showOtpPanel = !phoneVerified;
 
   return (
     <div className="mt-4 space-y-4">
@@ -120,16 +144,26 @@ export function CheckoutPhoneVerification({
       </div>
 
       {phoneVerified ? (
-        <p className="flex items-center gap-2 text-sm font-medium text-emerald-700" role="status">
-          <span aria-hidden="true">✓</span>
-          Phone verified for order updates
-        </p>
-      ) : (
-        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-          <p className="text-sm font-medium text-stone-900">Verify your phone for order updates</p>
+        <div role="status">
+          <p className="flex items-center gap-2 text-sm font-medium text-emerald-700">
+            <span aria-hidden="true">✓</span>
+            Phone verified
+          </p>
           <p className="mt-1 text-sm text-stone-600">
-            We&apos;ll text you a code to confirm it&apos;s you. This is for order updates at
-            checkout — not for creating an account.
+            We&apos;ll text order updates to this number.
+          </p>
+        </div>
+      ) : showOtpPanel ? (
+        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+          <p className="text-sm font-medium text-stone-900">
+            {isSignedIn
+              ? "Verify this new phone number to receive order updates."
+              : "Verify your phone number to receive order updates."}
+          </p>
+          <p className="mt-1 text-sm text-stone-600">
+            {isSignedIn
+              ? "We&apos;ll text you a code to confirm this number."
+              : "We&apos;ll text you a code to confirm it&apos;s you."}
           </p>
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <button
@@ -176,7 +210,7 @@ export function CheckoutPhoneVerification({
             </p>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

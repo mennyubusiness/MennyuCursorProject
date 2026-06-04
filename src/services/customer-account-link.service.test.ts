@@ -19,7 +19,42 @@ vi.mock("@/services/customer-account-orders.service", () => ({
   attachLegacyOrdersToCustomerAccount: (...args: unknown[]) => mockAttachLegacy(...args),
 }));
 
-import { linkCheckoutCustomerAccountToUser } from "./customer-account-link.service";
+import {
+  linkCheckoutCustomerAccountToUser,
+  linkVerifiedPhoneToUserAfterOtp,
+} from "./customer-account-link.service";
+
+describe("linkVerifiedPhoneToUserAfterOtp", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAttachLegacy.mockResolvedValue(0);
+    mockFindFirst.mockResolvedValue(null);
+  });
+
+  it("unlinks prior user phone before linking new verified phone", async () => {
+    mockFindUnique.mockResolvedValue({
+      id: "ca_new",
+      phoneE164: "+15559876543",
+      userId: null,
+      phoneVerifiedAt: new Date("2026-01-01"),
+    });
+    mockUpdateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
+    mockAttachLegacy.mockResolvedValue(0);
+
+    await linkVerifiedPhoneToUserAfterOtp({
+      userId: "user_1",
+      customerAccountId: "ca_new",
+      phoneE164: "+15559876543",
+    });
+
+    expect(mockUpdateMany).toHaveBeenNthCalledWith(1, {
+      where: { userId: "user_1", id: { not: "ca_new" } },
+      data: { userId: null },
+    });
+  });
+});
 
 describe("linkCheckoutCustomerAccountToUser", () => {
   beforeEach(() => {

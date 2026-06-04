@@ -20,3 +20,12 @@ export function normalizePhoneToE164US(input: string): PhoneNormalizeResult {
   }
   return { ok: false, error: "Enter a valid 10-digit US mobile number." };
 }
+
+/** US display format for verified account phone prefill, e.g. (503) 348-6843 */
+export function formatUsPhoneDisplayFromE164(e164: string): string {
+  const digits = e164.replace(/\D/g, "");
+  const ten =
+    digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits.length === 10 ? digits : null;
+  if (!ten) return e164;
+  return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
+}

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { auth } from "@/auth";
 import { buildCustomerSessionCookieHeader } from "@/lib/customer-session";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
+import { linkVerifiedPhoneToUserAfterOtp } from "@/services/customer-account-link.service";
 import { RATE_LIMITS, rateLimitKeys } from "@/lib/rate-limit";
 import { applyRateLimits, getClientIp } from "@/lib/rate-limit-http";
 import { verifyPhoneVerificationCode } from "@/services/customer-phone-otp.service";
@@ -38,10 +40,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
+  const authSession = await auth();
+  if (authSession?.user?.id) {
+    await linkVerifiedPhoneToUserAfterOtp({
+      userId: authSession.user.id,
+      customerAccountId: result.customerAccountId,
+      phoneE164: result.phoneE164,
+    }).catch(() => undefined);
+  }
+
   const response = NextResponse.json({
     ok: true,
     phoneVerified: true,
     phoneE164: result.phoneE164,
+    linkedToAccount: Boolean(authSession?.user?.id),
   });
   response.headers.set("Set-Cookie", buildCustomerSessionCookieHeader(result.sessionToken));
   return response;

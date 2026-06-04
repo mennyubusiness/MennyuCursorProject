@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
-import { assertCustomerSession } from "@/lib/customer-session";
+import { buildCustomerSessionCookieHeader } from "@/lib/customer-session";
 import { createCustomerOrderAccessToken } from "@/lib/customer-order-access-token";
+import {
+  createCustomerSessionCookieForAccount,
+  resolveCheckoutPhoneVerification,
+} from "@/lib/customer-checkout-phone-verification";
 import { linkCheckoutCustomerAccountToUser } from "@/services/customer-account-link.service";
-import { normalizePhoneToE164US } from "@/lib/phone-e164";
 import { buildOrderAccessCookieHeader, getSessionIdFromRequest } from "@/lib/session";
 import { RATE_LIMITS, rateLimitKeys } from "@/lib/rate-limit";
 import { applyRateLimits, getClientIp } from "@/lib/rate-limit-http";
@@ -87,31 +90,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: access.error, code }, { status: access.status });
   }
 
-  const customerSession = await assertCustomerSession(request);
-  if (!customerSession.ok) {
+  const phoneVerification = await resolveCheckoutPhoneVerification(
+    request,
+    authSession?.user?.id ?? null,
+    customerPhone
+  );
+  if (!phoneVerification.ok) {
     return NextResponse.json(
-      { error: customerSession.error, code: "CUSTOMER_SESSION_REQUIRED" },
-      { status: customerSession.status }
+      { error: phoneVerification.error, code: phoneVerification.code },
+      { status: phoneVerification.status }
     );
   }
-
-  const normalizedPhone = normalizePhoneToE164US(customerPhone);
-  if (!normalizedPhone.ok || normalizedPhone.e164 !== customerSession.phoneE164) {
-    return NextResponse.json(
-      {
-        error: "Phone must match your verified number. Verify your phone again if you changed it.",
-        code: "PHONE_MISMATCH",
-      },
-      { status: 403 }
-    );
-  }
-  const submittedPhoneE164 = normalizedPhone.e164;
+  const submittedPhoneE164 = phoneVerification.phoneE164;
 
   if (authSession?.user?.id) {
     await linkCheckoutCustomerAccountToUser({
       userId: authSession.user.id,
-      customerAccountId: customerSession.customerAccountId,
-      phoneE164: customerSession.phoneE164,
+      customerAccountId: phoneVerification.customerAccountId,
+      phoneE164: submittedPhoneE164,
     }).catch(() => undefined);
   }
 
@@ -130,7 +126,7 @@ export async function POST(request: NextRequest) {
       scheduledPickupTime,
       groupOrderHostUserId,
       mennyuSessionId: sessionId,
-      customerAccountId: customerSession.customerAccountId,
+      customerAccountId: phoneVerification.customerAccountId,
     });
   } catch (err) {
     if (err instanceof OrderValidationError) {
@@ -168,5 +164,11 @@ export async function POST(request: NextRequest) {
     orderAccessToken,
   });
   response.headers.append("Set-Cookie", buildOrderAccessCookieHeader(orderAccessToken));
+  if (phoneVerification.establishCustomerSession) {
+    const sessionToken = await createCustomerSessionCookieForAccount(
+      phoneVerification.customerAccountId
+    );
+    response.headers.append("Set-Cookie", buildCustomerSessionCookieHeader(sessionToken));
+  }
   return response;
 }

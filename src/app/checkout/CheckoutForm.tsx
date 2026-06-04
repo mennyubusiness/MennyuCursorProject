@@ -35,6 +35,10 @@ interface CheckoutFormProps {
   pickupTimezoneLabel: string;
   defaultScheduledDate: string;
   defaultScheduledTime: string;
+  isSignedIn?: boolean;
+  /** Linked verified phone (E.164) for signed-in customers — skips OTP when checkout phone matches. */
+  accountVerifiedPhoneE164?: string | null;
+  initialPhone?: string;
 }
 
 type Step = "form" | "payment";
@@ -68,8 +72,12 @@ export function CheckoutForm({
   pickupTimezoneLabel,
   defaultScheduledDate,
   defaultScheduledTime,
+  isSignedIn = false,
+  accountVerifiedPhoneE164 = null,
+  initialPhone = "",
 }: CheckoutFormProps) {
   const router = useRouter();
+  const accountPhoneReady = Boolean(isSignedIn && accountVerifiedPhoneE164);
   const [step, setStep] = useState<Step>("form");
   const [paymentData, setPaymentData] = useState<{
     orderId: string;
@@ -77,10 +85,12 @@ export function CheckoutForm({
     paymentIntentId: string;
     orderAccessToken: string;
   } | null>(null);
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(initialPhone);
   const [email, setEmail] = useState("");
-  const [phoneVerified, setPhoneVerified] = useState(false);
-  const [verifiedPhoneE164, setVerifiedPhoneE164] = useState<string | null>(null);
+  const [phoneVerified, setPhoneVerified] = useState(accountPhoneReady);
+  const [verifiedPhoneE164, setVerifiedPhoneE164] = useState<string | null>(
+    accountPhoneReady ? accountVerifiedPhoneE164 : null
+  );
   /** 15 | 20 | 25 when a preset is active; custom otherwise */
   const [tipPresetPercent, setTipPresetPercent] = useState<number | null>(20);
   const defaultTipCents = tipCentsForPercent(subtotalCents, 20);
@@ -304,6 +314,8 @@ export function CheckoutForm({
           onPhoneChange={setPhone}
           phoneVerified={phoneVerified}
           verifiedPhoneE164={verifiedPhoneE164}
+          isSignedIn={isSignedIn}
+          accountVerifiedPhoneE164={accountVerifiedPhoneE164}
           onVerified={(phoneE164) => {
             setPhoneVerified(true);
             setVerifiedPhoneE164(phoneE164);

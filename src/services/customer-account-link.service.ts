@@ -20,6 +20,25 @@ export type LinkCheckoutPhoneResult =
  * Links a verified checkout CustomerAccount (from CustomerSession) to a signed-in User.
  * Also attaches legacy orders with matching phone and no customerAccountId.
  */
+/**
+ * Links OTP-verified phone to signed-in User. If the user already had a different phone linked,
+ * unlinks the prior CustomerAccount so the new verified number becomes the account phone.
+ */
+export async function linkVerifiedPhoneToUserAfterOtp(params: {
+  userId: string;
+  customerAccountId: string;
+  phoneE164: string;
+}): Promise<LinkCheckoutPhoneResult> {
+  await prisma.customerAccount.updateMany({
+    where: {
+      userId: params.userId,
+      id: { not: params.customerAccountId },
+    },
+    data: { userId: null },
+  });
+  return linkCheckoutCustomerAccountToUser(params);
+}
+
 export async function linkCheckoutCustomerAccountToUser(params: {
   userId: string;
   customerAccountId: string;

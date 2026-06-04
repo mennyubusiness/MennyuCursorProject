@@ -10,6 +10,8 @@ import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutProgress } from "./CheckoutProgress";
 import { computeOrderPricing } from "@/domain/fees";
 import { getActivePricingRatesSnapshot } from "@/services/pricing-config.service";
+import { getUserLinkedVerifiedPhoneAccount } from "@/lib/customer-checkout-phone-verification";
+import { formatUsPhoneDisplayFromE164 } from "@/lib/phone-e164";
 import { getCheckoutDefaultScheduledPickup, validateCartItemsForDisplay } from "@/services/order.service";
 import {
   getParentShellInfoByVendorParentPlu,
@@ -127,6 +129,15 @@ export default async function CheckoutPage({
   const vendorCount = byVendor.size;
   const scheduledDefaults = getCheckoutDefaultScheduledPickup(cart.pod);
 
+  const signedInUserId = authSession?.user?.id ?? null;
+  const linkedVerifiedPhone = signedInUserId
+    ? await getUserLinkedVerifiedPhoneAccount(signedInUserId)
+    : null;
+  const accountVerifiedPhoneE164 = linkedVerifiedPhone?.phoneE164 ?? null;
+  const initialPhone = accountVerifiedPhoneE164
+    ? formatUsPhoneDisplayFromE164(accountVerifiedPhoneE164)
+    : "";
+
   if (process.env.NODE_ENV === "development") {
     console.log("[checkout-load]", {
       cartId: cart.id,
@@ -228,6 +239,9 @@ export default async function CheckoutPage({
         pickupTimezoneLabel={scheduledDefaults.timezone}
         defaultScheduledDate={scheduledDefaults.date}
         defaultScheduledTime={scheduledDefaults.time}
+        isSignedIn={Boolean(signedInUserId)}
+        accountVerifiedPhoneE164={accountVerifiedPhoneE164}
+        initialPhone={initialPhone}
       />
     </div>
   );
