@@ -15,7 +15,7 @@ function ExploreVendorStatusBadge({ status }: { status: VendorAvailabilityStatus
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/45 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
         <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" aria-hidden />
-        Open
+        Open now
       </span>
     );
   }
@@ -72,7 +72,13 @@ function ExploreVendorCardMedia({
 }
 
 /** Image-forward vendor card for Explore discovery. */
-export function ExploreVendorResultRow({ hit }: { hit: ExploreVendorHit }) {
+export function ExploreVendorResultRow({
+  hit,
+  showPodContext = true,
+}: {
+  hit: ExploreVendorHit;
+  showPodContext?: boolean;
+}) {
   const menuHref = `/pod/${hit.podId}/vendor/${hit.vendorId}`;
   const cuisine = hit.cuisineCategory?.trim();
   const matchedMenuCategory = hit.matchedMenuCategory?.trim();
@@ -97,7 +103,7 @@ export function ExploreVendorResultRow({ hit }: { hit: ExploreVendorHit }) {
             "bg-[#F97316] transition hover:bg-[#EA580C] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           )}
         >
-          Start order →
+          Start order
         </Link>
       </div>
 
@@ -106,14 +112,18 @@ export function ExploreVendorResultRow({ hit }: { hit: ExploreVendorHit }) {
           {hit.vendorName}
         </h3>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-oo-stone-gray">
-          <span>
-            At <span className="text-oo-charcoal">{hit.podName}</span>
-          </span>
+          {showPodContext && (
+            <span>
+              At <span className="text-oo-charcoal">{hit.podName}</span>
+            </span>
+          )}
           {cuisine && (
             <>
-              <span aria-hidden className="text-oo-light-stone">
-                ·
-              </span>
+              {showPodContext && (
+                <span aria-hidden className="text-oo-light-stone">
+                  ·
+                </span>
+              )}
               <span>{cuisine}</span>
             </>
           )}

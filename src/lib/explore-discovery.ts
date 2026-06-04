@@ -155,6 +155,19 @@ export function filterMatchingPodsByName(pods: PodCardPod[], query: string): Pod
 export function filterExploreVendors(
   pods: PodCardPod[],
   query: string,
+  cuisineId: string,
+  selectedPodId?: string | null
+): ExploreVendorHit[] {
+  const scoped =
+    selectedPodId != null && selectedPodId.length > 0
+      ? pods.filter((p) => p.id === selectedPodId)
+      : pods;
+  return filterExploreVendorsScoped(scoped, query, cuisineId);
+}
+
+function filterExploreVendorsScoped(
+  pods: PodCardPod[],
+  query: string,
   cuisineId: string
 ): ExploreVendorHit[] {
   const q = normalizeExploreQuery(query);
@@ -176,6 +189,176 @@ export function getAvailableCuisineChips(pods: PodCardPod[]): ExploreCuisineChip
   );
 }
 
-export function hasActiveExploreFilters(query: string, cuisineId: string): boolean {
-  return normalizeExploreQuery(query).length > 0 || cuisineId !== "all";
+export function hasActiveExploreFilters(
+  query: string,
+  cuisineId: string,
+  selectedPodId?: string | null
+): boolean {
+  return (
+    normalizeExploreQuery(query).length > 0 ||
+    cuisineId !== "all" ||
+    Boolean(selectedPodId?.trim())
+  );
+}
+
+export type PodVendorCounts = {
+  total: number;
+  open: number;
+};
+
+export function getPodVendorCounts(pod: PodCardPod): PodVendorCounts {
+  let open = 0;
+  for (const pv of pod.vendors) {
+    const status = getVendorAvailabilityStatus({
+      isActive: pv.vendor.isActive,
+      mennyuOrdersPaused: pv.vendor.mennyuOrdersPaused,
+    });
+    if (status === "open") open += 1;
+  }
+  return { total: pod.vendors.length, open };
+}
+
+/** Unique cuisine labels for pod card preview (max count). */
+export function getPodCuisinePreview(pod: PodCardPod, maxItems = 4): string[] {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const pv of pod.vendors) {
+    const raw = pv.vendor.cuisineCategory?.trim();
+    if (!raw) continue;
+    const key = raw.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    labels.push(raw);
+    if (labels.length >= maxItems) break;
+  }
+  return labels;
+}
+
+export function formatPodVendorCountLine(counts: PodVendorCounts): string {
+  if (counts.total === 0) return "No vendors listed";
+  if (counts.open === counts.total) {
+    return `${counts.open} of ${counts.total} vendor${counts.total === 1 ? "" : "s"} open`;
+  }
+  return `${counts.open} of ${counts.total} vendor${counts.total === 1 ? "" : "s"} open`;
+}
+
+export function formatPodCuisinePreviewLine(pod: PodCardPod): string | null {
+  const cuisines = getPodCuisinePreview(pod);
+  if (cuisines.length === 0) return null;
+  return cuisines.join(" · ");
+}
+
+/** Pods to show in the default "Choose a pod" section (all pods, search-ranked when filtering). */
+export function getExplorePodsToDisplay(
+  pods: PodCardPod[],
+  query: string,
+  cuisineId: string,
+  selectedPodId: string | null
+): PodCardPod[] {
+  if (selectedPodId) {
+    const selected = pods.find((p) => p.id === selectedPodId);
+    return selected ? [selected] : [];
+  }
+
+  const q = normalizeExploreQuery(query);
+  const hasVendorFilters = q.length > 0 || cuisineId !== "all";
+
+  if (!hasVendorFilters) {
+    return [...pods].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const nameMatches = new Set(filterMatchingPodsByName(pods, query).map((p) => p.id));
+  const vendorHits = filterExploreVendors(pods, query, cuisineId);
+  const podsWithMatchingVendors = new Set(vendorHits.map((h) => h.podId));
+
+  const ranked = pods
+    .map((pod) => {
+      const nameRank = nameMatches.has(pod.id) ? 0 : 1;
+      const vendorRank = podsWithMatchingVendors.has(pod.id) ? 0 : 1;
+      return { pod, rank: nameRank * 2 + vendorRank };
+    })
+    .filter(({ rank }) => rank < 2 || !hasVendorFilters)
+    .sort((a, b) => a.rank - b.rank || a.pod.name.localeCompare(b.pod.name));
+
+  const result = ranked.map((r) => r.pod);
+  if (result.length > 0) return result;
+
+  return [...pods].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function shouldHidePodSectionForSearchOnly(
+  pods: PodCardPod[],
+  query: string,
+  cuisineId: string
+): boolean {
+  const q = normalizeExploreQuery(query);
+  if (!q) return false;
+  const nameMatches = filterMatchingPodsByName(pods, query);
+  const vendorHits = filterExploreVendors(pods, query, cuisineId);
+  return nameMatches.length === 0 && vendorHits.length > 0 && cuisineId === "all";
+}
+
+export function getExploreVendorSectionTitle(input: {
+  query: string;
+  cuisineId: string;
+  selectedPodId: string | null;
+  selectedPodName: string | null;
+}): { title: string; subtitle: string } {
+  const q = input.query.trim();
+  const cuisineChip = EXPLORE_CUISINE_CHIPS.find((c) => c.id === input.cuisineId);
+
+  if (input.selectedPodId && input.selectedPodName) {
+    if (q) {
+      return {
+        title: `Matching vendors`,
+        subtitle: `At ${input.selectedPodName} for “${q}”`,
+      };
+    }
+    if (input.cuisineId !== "all" && cuisineChip) {
+      return {
+        title: `${cuisineChip.label} vendors`,
+        subtitle: `At ${input.selectedPodName}`,
+      };
+    }
+    return {
+      title: `Vendors at ${input.selectedPodName}`,
+      subtitle: "Order from one or more vendors in this pod",
+    };
+  }
+
+  if (q) {
+    return {
+      title: "Matching vendors",
+      subtitle: "Vendors that match your search",
+    };
+  }
+
+  if (input.cuisineId !== "all" && cuisineChip) {
+    return {
+      title: `${cuisineChip.label} vendors`,
+      subtitle: "Filtered by cuisine",
+    };
+  }
+
+  return {
+    title: "Browse vendors",
+    subtitle: "Discover vendors across all pods",
+  };
+}
+
+export function getExploreSearchEmptyMessage(
+  query: string,
+  cuisineId: string,
+  selectedPodId: string | null
+): { title: string; description: string } {
+  if (selectedPodId) {
+    return {
+      title: "No vendors match",
+      description: "No vendors are open at this pod right now, or nothing matched your search.",
+    };
+  }
+  return {
+    title: "No vendors or pods matched this search",
+    description: "Try a cuisine or pod name.",
+  };
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { prisma } from "@/lib/db";
 import { ExploreHero } from "@/components/explore/ExploreHero";
 import { ExploreDiscovery } from "@/components/explore/ExploreDiscovery";
@@ -92,7 +93,20 @@ export default async function ExplorePage() {
 
       <PageSection className="!py-10 sm:!py-14">
         <PageShell>
-          <ExploreDiscovery pods={podCards} />
+          <Suspense
+            fallback={
+              <div className="space-y-8 py-8" aria-busy="true" aria-label="Loading explore">
+                <div className="h-14 animate-pulse rounded-2xl bg-oo-light-stone/60" />
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-oo-light-stone/50" />
+                  ))}
+                </div>
+              </div>
+            }
+          >
+            <ExploreDiscovery pods={podCards} />
+          </Suspense>
         </PageShell>
       </PageSection>
     </div>
