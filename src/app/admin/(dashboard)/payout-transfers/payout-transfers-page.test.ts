@@ -82,4 +82,14 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).toMatch(/Vendor clawbacks \/ transfer reversals/);
     expect(dashboardSrc).toMatch(/clawback failed/);
   });
+
+  it("explains missing clawbacks must be prepared before reversal batch can run", () => {
+    const dashboardSrc = readFileSync(
+      join(root, "src/app/admin/(dashboard)/payout-transfers/PayoutTransfersDashboard.tsx"),
+      "utf8"
+    );
+    expect(dashboardSrc).toMatch(/No prepared reversals are pending/);
+    expect(dashboardSrc).toMatch(/Missing clawbacks must be prepared from the affected order first/);
+    expect(dashboardSrc).toMatch(/preparedPendingReversalCount === 0/);
+  });
 });

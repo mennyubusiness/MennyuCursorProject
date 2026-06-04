@@ -55,6 +55,7 @@ export type AdminAttentionReason =
   | "vendor_clawback_failed"
   | "vendor_clawback_pending"
   | "vendor_clawback_missing"
+  | "legacy_clawback_review"
   | "manual_recovery_required"
   | "financial_resolution"
   | "unknown_attention_needed";
@@ -70,6 +71,10 @@ export type AdminRecommendedAction =
   | "cancel_vendor_order"
   | "resolve_issue"
   | "view_order"
+  | "prepare_vendor_reversal"
+  | "run_reversal_batch"
+  | "retry_reversal"
+  | "review_manually"
   | "investigate";
 
 export type AdminAttentionSeverity = "critical" | "high" | "medium" | "low";
@@ -261,6 +266,7 @@ function reasonToBucket(reason: AdminAttentionReason): AdminAttentionBucket {
     case "vendor_clawback_failed":
     case "vendor_clawback_pending":
     case "vendor_clawback_missing":
+    case "legacy_clawback_review":
     case "financial_resolution":
       return "financial_resolution";
     default:
@@ -293,10 +299,15 @@ function reasonToRecommendedAction(
       return "resolve_issue";
     case "refund_failed":
     case "refund_review_required":
-    case "vendor_clawback_failed":
-    case "vendor_clawback_pending":
-    case "vendor_clawback_missing":
       return "view_order";
+    case "vendor_clawback_failed":
+      return "retry_reversal";
+    case "vendor_clawback_pending":
+      return "run_reversal_batch";
+    case "vendor_clawback_missing":
+      return "prepare_vendor_reversal";
+    case "legacy_clawback_review":
+      return "review_manually";
     case "financial_resolution":
       return "view_order";
     default:
@@ -392,7 +403,9 @@ function reasonToLabel(
     case "vendor_clawback_pending":
       return `Vendor clawback pending for ${VENDOR_CLAWBACK_PENDING_ATTENTION_MINUTES}+ min`;
     case "vendor_clawback_missing":
-      return "Vendor clawback setup missing after customer refund";
+      return "Vendor clawback missing — prepare vendor reversal";
+    case "legacy_clawback_review":
+      return "Historical clawback needs manual review";
     case "manual_recovery_required":
       return "Manual recovery required";
     case "financial_resolution":
@@ -953,6 +966,7 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
               pod: { select: { id: true, name: true } },
               orderRefunds: {
                 select: {
+                  id: true,
                   vendorOrderId: true,
                   amountCents: true,
                   status: true,
@@ -1027,17 +1041,36 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
     if (!clawback.hasMissingReversalSetup) continue;
     if (effectiveVendorOrderRefundedCents < vo.totalCents) continue;
 
+    const succeededAttemptIds = new Set(
+      vo.order.refundAttempts.filter((a) => a.status === "succeeded").map((a) => a.id)
+    );
+    const hasSafeLinkedFullScopeRefund = vo.order.orderRefunds.some((r) => {
+      if (r.status !== "succeeded" || !r.refundAttemptId || !succeededAttemptIds.has(r.refundAttemptId)) {
+        return false;
+      }
+      if ((r.refundScope === "full_order" || r.refundScope === "system_cancel") && !r.vendorOrderId) {
+        return true;
+      }
+      return r.refundScope === "full_vendor_order" && r.vendorOrderId === vo.id;
+    });
+    const reason: Extract<
+      AdminAttentionReason,
+      "vendor_clawback_missing" | "legacy_clawback_review"
+    > = hasSafeLinkedFullScopeRefund ? "vendor_clawback_missing" : "legacy_clawback_review";
     const ageMinutes = ageMinutesUtil(vpt.updatedAt, now.getTime());
     items.push({
-      id: `vendor_clawback:missing:${vpt.id}`,
+      id: `${reason === "vendor_clawback_missing" ? "vendor_clawback" : "legacy_clawback"}:missing:${vpt.id}`,
       scope: "vendor_order",
-      reason: "vendor_clawback_missing",
-      bucket: reasonToBucket("vendor_clawback_missing"),
-      severity: ageMinutes > 120 ? "high" : "medium",
+      reason,
+      bucket: reasonToBucket(reason),
+      severity: reason === "legacy_clawback_review" ? "low" : ageMinutes > 120 ? "high" : "medium",
       ageMinutes,
-      recommendedAction: reasonToRecommendedAction("vendor_clawback_missing"),
-      reasonLabel: reasonToLabel("vendor_clawback_missing"),
-      currentStatus: "Paid vendor transfer · no reversal row",
+      recommendedAction: reasonToRecommendedAction(reason),
+      reasonLabel: reasonToLabel(reason),
+      currentStatus:
+        reason === "legacy_clawback_review"
+          ? "Paid vendor transfer · no reversal row · unsafe legacy linkage"
+          : "Paid vendor transfer · no reversal row",
       orderId: vo.orderId,
       vendorOrderId: vo.id,
       primaryEntityHref: paymentsRefundsHref(vo.orderId),

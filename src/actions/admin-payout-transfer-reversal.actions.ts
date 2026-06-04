@@ -4,6 +4,7 @@ import type { AdminTransferReversalRow } from "@/app/admin/(dashboard)/payout-tr
 import { isAdminDashboardLayoutAuthorized } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import {
+  prepareMissingTransferReversalForRefund,
   retryFailedVendorPayoutTransferReversal,
   runPendingTransferReversalBatch,
 } from "@/services/vendor-payout-transfer-reversal.service";
@@ -56,6 +57,35 @@ export async function adminRetryTransferReversalAction(reversalId: string) {
   return {
     ok: true as const,
     result: r,
+    reversal: JSON.parse(JSON.stringify(reversal)) as AdminTransferReversalRow,
+  };
+}
+
+export async function adminPrepareMissingTransferReversalAction(input: {
+  orderId: string;
+  vendorPayoutTransferId: string;
+  orderRefundId?: string | null;
+}) {
+  const ok = await isAdminDashboardLayoutAuthorized();
+  if (!ok) {
+    return { ok: false as const, error: "Unauthorized" };
+  }
+  const result = await prepareMissingTransferReversalForRefund(input);
+  if (!result.ok) {
+    return { ok: false as const, error: result.reason, result };
+  }
+
+  const reversal = await prisma.vendorPayoutTransferReversal.findUnique({
+    where: { id: result.reversalId },
+    select: reversalSelect,
+  });
+  if (!reversal) {
+    return { ok: false as const, error: "Prepared reversal row was not found after creation." };
+  }
+
+  return {
+    ok: true as const,
+    result,
     reversal: JSON.parse(JSON.stringify(reversal)) as AdminTransferReversalRow,
   };
 }

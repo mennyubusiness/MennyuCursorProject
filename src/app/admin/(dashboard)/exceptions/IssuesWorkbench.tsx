@@ -22,6 +22,7 @@ const STATUS_OPTIONS: { value: AdminAttentionReason | "all"; label: string }[] =
   { value: "vendor_clawback_failed", label: "Vendor clawback failed" },
   { value: "vendor_clawback_pending", label: "Vendor clawback pending" },
   { value: "vendor_clawback_missing", label: "Vendor clawback missing" },
+  { value: "legacy_clawback_review", label: "Historical clawback review" },
   { value: "financial_resolution", label: "Financial resolution" },
   { value: "unknown_attention_needed", label: "Other" },
 ];
@@ -54,6 +55,8 @@ function issueTitle(reason: AdminAttentionReason): string {
       return "Vendor clawback pending";
     case "vendor_clawback_missing":
       return "Vendor clawback setup missing";
+    case "legacy_clawback_review":
+      return "Historical clawback review";
     case "financial_resolution":
       return "Financial resolution";
     default:
@@ -557,10 +560,20 @@ export function IssuesWorkbench({
                         </Link>
                         {isVendorClawbackAttentionReason(item.reason) && (
                           <Link
-                            href="/admin/payout-transfers"
+                            href={
+                              item.reason === "vendor_clawback_pending" || item.reason === "vendor_clawback_failed"
+                                ? "/admin/payout-transfers"
+                                : `/admin/orders/${item.orderId}#payments-refunds`
+                            }
                             className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm font-medium text-oo-charcoal hover:bg-oo-cream"
                           >
-                            Retry reversal
+                            {item.reason === "vendor_clawback_missing"
+                              ? "Prepare vendor reversal"
+                              : item.reason === "vendor_clawback_pending"
+                                ? "Run reversal batch"
+                                : item.reason === "legacy_clawback_review"
+                                  ? "Review manually"
+                                  : "Retry reversal"}
                           </Link>
                         )}
                         {showRetry && item.vendorOrderId && (

@@ -16,4 +16,15 @@ describe("AdminPaymentsRefundsPanel clawback UI", () => {
   it("does not hardcode Vendor clawback not needed in vendor table cells", () => {
     expect(panelSrc).not.toMatch(/Vendor clawback not needed/);
   });
+
+  it("offers prepare action for missing clawback rows", () => {
+    expect(panelSrc).toMatch(/Prepare vendor reversal/);
+    expect(panelSrc).toMatch(/adminPrepareMissingTransferReversalAction/);
+    expect(panelSrc).toMatch(/Manual review required/);
+  });
+
+  it("shows Stripe reversal verification copy and id when recovered", () => {
+    expect(panelSrc).toMatch(/Vendor clawback recovered via Stripe reversal/);
+    expect(panelSrc).toMatch(/check its Reversals section/);
+  });
 });

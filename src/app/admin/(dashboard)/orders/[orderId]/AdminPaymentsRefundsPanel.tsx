@@ -25,6 +25,7 @@ import {
   formatAdminRefundCapErrorMessage,
 } from "@/lib/admin-refund-error-messages";
 import type { LinkedIssueRefundContext } from "@/lib/admin-order-issue-refund-link";
+import { adminPrepareMissingTransferReversalAction } from "@/actions/admin-payout-transfer-reversal.actions";
 
 type ModalKind = AdminRefundScopeKey | null;
 
@@ -978,11 +979,15 @@ export function AdminPaymentsRefundsPanel({
   } | null;
   onRefundModalClosed?: () => void;
 }) {
+  const router = useRouter();
   const [modal, setModal] = useState<{
     kind: AdminRefundScopeKey;
     vendorOrderId?: string;
     orderLineItemId?: string;
   } | null>(null);
+  const [prepareBusyId, setPrepareBusyId] = useState<string | null>(null);
+  const [prepareMessage, setPrepareMessage] = useState<string | null>(null);
+  const [prepareError, setPrepareError] = useState<string | null>(null);
 
   useEffect(() => {
     if (openRefundModal) {
@@ -1005,6 +1010,30 @@ export function AdminPaymentsRefundsPanel({
   const pendingClawbackCount = summary.vendorOrders.filter(
     (v) => v.clawback.clawbackStatus === "pending"
   ).length;
+
+  async function prepareMissingReversal(vendorPayoutTransferId: string) {
+    setPrepareBusyId(vendorPayoutTransferId);
+    setPrepareMessage(null);
+    setPrepareError(null);
+    try {
+      const result = await adminPrepareMissingTransferReversalAction({
+        orderId: summary.order.id,
+        vendorPayoutTransferId,
+      });
+      if (!result.ok) {
+        setPrepareError(
+          result.error === "matching_refund_missing_succeeded_refund_attempt_link"
+            ? "Manual review required: this refund is missing a safe succeeded refund-attempt link."
+            : result.error.replace(/_/g, " ")
+        );
+        return;
+      }
+      setPrepareMessage("Vendor transfer reversal prepared. Run the reversal batch to submit it to Stripe.");
+      router.refresh();
+    } finally {
+      setPrepareBusyId(null);
+    }
+  }
 
   return (
     <section
@@ -1046,6 +1075,16 @@ export function AdminPaymentsRefundsPanel({
               or review in Needs Attention.
             </p>
           )}
+          {prepareMessage ? (
+            <p className="mt-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+              {prepareMessage}
+            </p>
+          ) : null}
+          {prepareError ? (
+            <p className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-950" role="alert">
+              {prepareError}
+            </p>
+          ) : null}
         </div>
         <StaleRefundAttemptBanner
           attempts={summary.ledgerSummary?.staleBlockingRefundAttempts ?? []}
@@ -1366,6 +1405,36 @@ export function AdminPaymentsRefundsPanel({
                             : "Run reversal batch"}
                         </Link>
                       )}
+                      {v.clawback.hasMissingReversalSetup && v.vendorPayoutTransferId ? (
+                        canExecuteRefunds ? (
+                          <button
+                            type="button"
+                            disabled={prepareBusyId !== null}
+                            onClick={() => void prepareMissingReversal(v.vendorPayoutTransferId!)}
+                            className="inline-block rounded border border-oo-light-stone bg-oo-cream px-2 py-1 text-[10px] font-semibold text-oo-charcoal hover:bg-oo-warm-white disabled:opacity-50"
+                          >
+                            {prepareBusyId === v.vendorPayoutTransferId
+                              ? "Preparing..."
+                              : "Prepare vendor reversal"}
+                          </button>
+                        ) : (
+                          <p className="text-[10px] text-oo-stone-gray">
+                            Manual review required: platform-admin access is needed to prepare a reversal.
+                          </p>
+                        )
+                      ) : null}
+                      {v.clawback.clawbackStatus === "recovered" && v.reversals.some((r) => r.stripeTransferReversalId) ? (
+                        <p className="text-[10px] leading-snug text-emerald-900">
+                          Vendor clawback recovered via Stripe reversal{" "}
+                          {shortenId(v.reversals.find((r) => r.stripeTransferReversalId)?.stripeTransferReversalId)}.
+                          Open the original Stripe transfer {shortenId(v.stripeTransferId)} and check its Reversals section.
+                        </p>
+                      ) : v.stripeTransferId && v.clawback.clawbackStatus !== "not_needed" ? (
+                        <p className="text-[10px] leading-snug text-oo-stone-gray">
+                          To verify a successful clawback in Stripe, open the original Stripe transfer{" "}
+                          {shortenId(v.stripeTransferId)} and check its Reversals section.
+                        </p>
+                      ) : null}
                       {v.clawback.clawbackStatus !== "not_needed" && v.reversals.length > 0 && (
                         <ul className="text-[10px] text-oo-stone-gray">
                           {v.reversals.map((rev) => (

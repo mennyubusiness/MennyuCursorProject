@@ -85,8 +85,9 @@ describe("computeVendorClawbackSummary", () => {
     expect(s.clawbackStatus).toBe("manual_review");
     expect(s.adminLabel).toBe("Vendor clawback missing");
     expect(s.adminDetail).toMatch(
-      /Customer was refunded after this vendor was paid\. Vendor transfer reversal is required\./
+      /Customer was refunded after this vendor was paid\. Prepare a vendor transfer reversal, then run the reversal batch\./
     );
+    expect(s.recommendedAction).toBe("prepare_reversal");
     expect(s.hasMissingReversalSetup).toBe(true);
     expect(s.clawbackRequiredCents).toBe(1500);
   });

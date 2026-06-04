@@ -305,6 +305,10 @@ export function PayoutTransfersDashboard({
   }, [reversals, datePreset, vendorId, statusFilter]);
 
   const liabilityTotals = useMemo(() => computeVendorLiabilityTotals(transfers), [transfers]);
+  const preparedPendingReversalCount = useMemo(
+    () => reversals.filter((r) => r.status === "pending").length,
+    [reversals]
+  );
 
   const transferGroups = useMemo(() => {
     const map = new Map<string, AdminPayoutTransferRow[]>();
@@ -424,7 +428,9 @@ export function PayoutTransfersDashboard({
         return;
       }
       setBatchMsg(
-        `Reversal batch: examined ${r.summary.examined}, reversed ${r.summary.reversed}, skipped ${r.summary.skipped}, failed ${r.summary.failed}.`
+        r.summary.examined === 0
+          ? "No prepared reversals are pending. Missing clawbacks must be prepared from the affected order first."
+          : `Reversal batch: examined ${r.summary.examined}, reversed ${r.summary.reversed}, skipped ${r.summary.skipped}, failed ${r.summary.failed}.`
       );
       startTransition(() => router.refresh());
     } catch (e) {
@@ -655,8 +661,13 @@ export function PayoutTransfersDashboard({
           </button>
           <button
             type="button"
-            disabled={actionLocked}
+            disabled={actionLocked || preparedPendingReversalCount === 0}
             onClick={() => void runReversalBatch()}
+            title={
+              preparedPendingReversalCount === 0
+                ? "Missing clawbacks must be prepared from the affected order first."
+                : undefined
+            }
             className="rounded-lg border border-oo-light-stone bg-oo-cream px-4 py-2 text-sm font-semibold text-oo-charcoal shadow-sm hover:bg-oo-warm-white disabled:opacity-50"
           >
             {batchBusy === "reversal" ? "Running…" : "Run reversal batch"}
@@ -928,9 +939,15 @@ export function PayoutTransfersDashboard({
           already been paid via Connect. Customer refund success does not imply vendor clawback success.
         </p>
         {reversalGroups.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-oo-light-stone bg-oo-warm-white p-8 text-center text-oo-stone-gray">
-            No reversals match filters.
-          </p>
+          <div className="rounded-lg border border-dashed border-oo-light-stone bg-oo-warm-white p-8 text-center text-oo-stone-gray">
+            <p>No prepared reversals are pending. Missing clawbacks must be prepared from the affected order first.</p>
+            <Link
+              href="/admin/exceptions?reason=vendor_clawback_missing"
+              className="mt-2 inline-block text-sm font-semibold text-oo-charcoal underline"
+            >
+              View missing clawbacks
+            </Link>
+          </div>
         ) : (
           reversalGroups.map(([gKey, rows]) => {
             const open = isGroupOpen(gKey, expandedRevGroups);

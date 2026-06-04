@@ -110,6 +110,209 @@ export type PrepareTransferReversalsResult = {
   transferIds: string[];
 };
 
+export type PrepareMissingTransferReversalResult =
+  | {
+      ok: true;
+      outcome: "created_pending" | "idempotent_noop";
+      reversalId: string;
+      refundAttemptId: string;
+      vendorPayoutTransferId: string;
+      amountCents: number;
+    }
+  | {
+      ok: false;
+      outcome:
+        | "manual_review"
+        | "skipped_ineligible"
+        | "duplicate_existing_reversal"
+        | "not_found";
+      reason: string;
+    };
+
+function orderRefundAppliesToTransfer(input: {
+  refund: {
+    vendorOrderId: string | null;
+    amountCents: number;
+    refundScope: string;
+  };
+  orderTotalCents: number;
+  vendorOrderId: string;
+  vendorOrderTotalCents: number;
+}): boolean {
+  const scope = input.refund.refundScope;
+  if ((scope === "full_order" || scope === "system_cancel") && !input.refund.vendorOrderId) {
+    return input.refund.amountCents === input.orderTotalCents;
+  }
+  if (scope === "full_vendor_order" && input.refund.vendorOrderId === input.vendorOrderId) {
+    return input.refund.amountCents === input.vendorOrderTotalCents;
+  }
+  return false;
+}
+
+/**
+ * Safe admin repair for historical full-order/full-vendor refunds where the customer refund
+ * succeeded but the transfer reversal row was never prepared.
+ */
+export async function prepareMissingTransferReversalForRefund(input: {
+  orderId: string;
+  vendorPayoutTransferId: string;
+  orderRefundId?: string | null;
+}): Promise<PrepareMissingTransferReversalResult> {
+  const vpt = await prisma.vendorPayoutTransfer.findUnique({
+    where: { id: input.vendorPayoutTransferId },
+    include: {
+      vendorOrder: {
+        select: {
+          id: true,
+          orderId: true,
+          totalCents: true,
+          order: { select: { id: true, totalCents: true } },
+        },
+      },
+      reversals: {
+        select: {
+          id: true,
+          status: true,
+          refundAttemptId: true,
+          amountCents: true,
+        },
+      },
+    },
+  });
+
+  if (!vpt || vpt.vendorOrder.orderId !== input.orderId) {
+    return { ok: false, outcome: "not_found", reason: "vendor_payout_transfer_not_found_for_order" };
+  }
+
+  if (vpt.reversals.length > 0) {
+    const existing = vpt.reversals[0];
+    return {
+      ok: true,
+      outcome: "idempotent_noop",
+      reversalId: existing.id,
+      refundAttemptId: existing.refundAttemptId,
+      vendorPayoutTransferId: vpt.id,
+      amountCents: existing.amountCents,
+    };
+  }
+
+  if (vpt.status !== VENDOR_PAYOUT_TRANSFER_STATUS.paid || !vpt.stripeTransferId?.trim()) {
+    return { ok: false, outcome: "skipped_ineligible", reason: "transfer_not_paid_via_connect" };
+  }
+
+  const reversalAmountCents = getVendorTransferReversalAmountCents(vpt);
+  if (reversalAmountCents <= 0 || reversalAmountCents > vpt.amountCents) {
+    return { ok: false, outcome: "skipped_ineligible", reason: "unsafe_reversal_amount" };
+  }
+
+  const refunds = await prisma.orderRefund.findMany({
+    where: {
+      orderId: input.orderId,
+      ...(input.orderRefundId ? { id: input.orderRefundId } : {}),
+      status: "succeeded",
+      refundScope: { in: ["full_order", "system_cancel", "full_vendor_order"] },
+    },
+    select: {
+      id: true,
+      vendorOrderId: true,
+      amountCents: true,
+      refundScope: true,
+      refundAttemptId: true,
+      refundAttempt: { select: { id: true, status: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const safeRefund = refunds.find((refund) => {
+    if (!refund.refundAttemptId || refund.refundAttempt?.status !== "succeeded") {
+      return false;
+    }
+    return orderRefundAppliesToTransfer({
+      refund,
+      orderTotalCents: vpt.vendorOrder.order.totalCents,
+      vendorOrderId: vpt.vendorOrderId,
+      vendorOrderTotalCents: vpt.vendorOrder.totalCents,
+    });
+  });
+
+  if (!safeRefund) {
+    const hasRefundWithoutAttempt = refunds.some((refund) =>
+      orderRefundAppliesToTransfer({
+        refund,
+        orderTotalCents: vpt.vendorOrder.order.totalCents,
+        vendorOrderId: vpt.vendorOrderId,
+        vendorOrderTotalCents: vpt.vendorOrder.totalCents,
+      })
+    );
+    return {
+      ok: false,
+      outcome: "manual_review",
+      reason: hasRefundWithoutAttempt
+        ? "matching_refund_missing_succeeded_refund_attempt_link"
+        : "no_safe_full_scope_succeeded_refund",
+    };
+  }
+  const refundAttemptId = safeRefund.refundAttemptId;
+  if (!refundAttemptId) {
+    return {
+      ok: false,
+      outcome: "manual_review",
+      reason: "matching_refund_missing_succeeded_refund_attempt_link",
+    };
+  }
+
+  const idempotencyKey = stableTransferReversalIdempotencyKey(refundAttemptId, vpt.id);
+  try {
+    const created = await prisma.vendorPayoutTransferReversal.create({
+      data: {
+        vendorPayoutTransferId: vpt.id,
+        vendorOrderId: vpt.vendorOrderId,
+        orderId: input.orderId,
+        refundAttemptId,
+        vendorId: vpt.vendorId,
+        amountCents: reversalAmountCents,
+        currency: vpt.currency ?? "usd",
+        status: VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS.pending,
+        idempotencyKey,
+      },
+      select: { id: true },
+    });
+    return {
+      ok: true,
+      outcome: "created_pending",
+      reversalId: created.id,
+      refundAttemptId,
+      vendorPayoutTransferId: vpt.id,
+      amountCents: reversalAmountCents,
+    };
+  } catch (e: unknown) {
+    const code = e && typeof e === "object" && "code" in e ? (e as { code?: string }).code : "";
+    if (code === "P2002") {
+      const existing = await prisma.vendorPayoutTransferReversal.findUnique({
+        where: {
+          refundAttemptId_vendorPayoutTransferId: {
+            refundAttemptId,
+            vendorPayoutTransferId: vpt.id,
+          },
+        },
+        select: { id: true, amountCents: true },
+      });
+      if (existing) {
+        return {
+          ok: true,
+          outcome: "idempotent_noop",
+          reversalId: existing.id,
+          refundAttemptId,
+          vendorPayoutTransferId: vpt.id,
+          amountCents: existing.amountCents,
+        };
+      }
+      return { ok: false, outcome: "duplicate_existing_reversal", reason: "duplicate_reversal_key" };
+    }
+    throw e;
+  }
+}
+
 /**
  * Idempotent: creates pending VendorPayoutTransferReversal rows for each paid transfer affected by this refund.
  * Safe to call multiple times; duplicate (refundAttempt × transfer) rows are prevented by unique constraint.

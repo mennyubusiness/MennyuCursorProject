@@ -24,6 +24,7 @@ export type VendorClawbackRecommendedAction =
   | "none"
   | "retry_reversal"
   | "run_reversal_batch"
+  | "prepare_reversal"
   | "manual_review"
   | "view_payout_transfers";
 
@@ -100,11 +101,16 @@ export function vendorClawbackStatusBadgeClass(status: VendorClawbackStatus): st
 
 export function isVendorClawbackAttentionReason(
   reason: string
-): reason is "vendor_clawback_failed" | "vendor_clawback_pending" | "vendor_clawback_missing" {
+): reason is
+  | "vendor_clawback_failed"
+  | "vendor_clawback_pending"
+  | "vendor_clawback_missing"
+  | "legacy_clawback_review" {
   return (
     reason === "vendor_clawback_failed" ||
     reason === "vendor_clawback_pending" ||
-    reason === "vendor_clawback_missing"
+    reason === "vendor_clawback_missing" ||
+    reason === "legacy_clawback_review"
   );
 }
 
@@ -176,11 +182,11 @@ export function computeVendorClawbackSummary(input: VendorClawbackInput): Vendor
         : "Vendor clawback missing",
       adminDetail: isPartialVendorRefund
         ? "Partial customer refund on a paid vendor Connect transfer. Proportional reversal is not automated — review manually."
-        : "Customer was refunded after this vendor was paid. Vendor transfer reversal is required.",
+        : "Customer was refunded after this vendor was paid. Prepare a vendor transfer reversal, then run the reversal batch.",
       adminWarning:
-        "Customer was refunded, but Open Order has not recovered this vendor's transferred funds. Retry the transfer reversal or handle manually.",
+        "Customer was refunded, but Open Order has not recovered this vendor's transferred funds. Prepare a transfer reversal or handle manually.",
       hasMissingReversalSetup: true,
-      recommendedAction: "manual_review",
+      recommendedAction: isPartialVendorRefund ? "manual_review" : "prepare_reversal",
     });
   }
 
