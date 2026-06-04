@@ -1,89 +1,16 @@
-import { cache } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
-import {
-  isDeliverectVendorOrderRoutingDegraded,
-  shouldOmitVendorOrderFromDeliverectDashboard,
-} from "@/lib/vendor-deliverect-dashboard-visibility";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
+import {
+  getVendorOrdersBoardData,
+  serializeVendorOrdersForBoard,
+} from "@/lib/vendor-orders-board-data";
 import { VendorOrdersOperationsBar } from "../dashboard/VendorOrdersOperationsBar";
 import { VendorDashboardLiveOrders } from "../dashboard/VendorDashboardLiveOrders";
 import { VendorOrdersSetupBanner } from "../dashboard/VendorOrdersSetupBanner";
 import { VendorOrdersSystemStatusStrip } from "../dashboard/VendorOrdersSystemStatusStrip";
-
-const getVendorOrdersPageData = cache(async (vendorId: string) => {
-  const vendor = await prisma.vendor.findUnique({
-    where: { id: vendorId },
-    select: {
-      id: true,
-      name: true,
-      mennyuOrdersPaused: true,
-      deliverectChannelLinkId: true,
-      deliverectLocationId: true,
-      posConnectionStatus: true,
-      pendingDeliverectConnectionKey: true,
-      deliverectAutoMapLastOutcome: true,
-      deliverectAutoMapLastAt: true,
-      stripeConnectedAccountId: true,
-      stripeChargesEnabled: true,
-      stripePayoutsEnabled: true,
-    },
-  });
-  if (!vendor) return null;
-  const hasUnmatchedChannelRegistration = await hasUnmatchedChannelRegistrationForVendorById(vendorId);
-  const vendorOrders = await prisma.vendorOrder.findMany({
-    where: {
-      vendorId,
-      order: { status: { not: "pending_payment" } },
-    },
-    select: {
-      id: true,
-      orderId: true,
-      routingStatus: true,
-      fulfillmentStatus: true,
-      manuallyRecoveredAt: true,
-      totalCents: true,
-      tipCents: true,
-      order: {
-        select: {
-          id: true,
-          orderNotes: true,
-          customerPhone: true,
-          createdAt: true,
-          updatedAt: true,
-          _count: { select: { vendorOrders: true } },
-        },
-      },
-      deliverectAttempts: true,
-      deliverectChannelLinkId: true,
-      statusAuthority: true,
-      lastExternalStatus: true,
-      lastExternalStatusAt: true,
-      lineItems: {
-        select: {
-          id: true,
-          name: true,
-          quantity: true,
-          priceCents: true,
-          specialInstructions: true,
-          selections: {
-            select: {
-              nameSnapshot: true,
-              quantity: true,
-              modifierOption: { select: { name: true } },
-            },
-          },
-        },
-      },
-      statusHistory: { orderBy: { createdAt: "asc" }, select: { source: true, fulfillmentStatus: true, createdAt: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-  return { vendor, vendorOrders, hasUnmatchedChannelRegistration };
-});
 
 export default async function VendorOrdersPage({
   params,
@@ -92,10 +19,14 @@ export default async function VendorOrdersPage({
 }) {
   const { vendorId } = await params;
 
-  const data = await getVendorOrdersPageData(vendorId);
+  const data = await getVendorOrdersBoardData(vendorId);
   if (!data) notFound();
-  const { vendor, vendorOrders, hasUnmatchedChannelRegistration } = data;
+  const { vendor, vendorOrders } = data;
   const isDeliverectLive = isRoutingRetryAvailable();
+
+  const hasUnmatchedChannelRegistration = await hasUnmatchedChannelRegistrationForVendorById(
+    vendorId
+  );
 
   const posUi = deriveVendorPosUiState({
     deliverectChannelLinkId: vendor.deliverectChannelLinkId,
@@ -116,30 +47,11 @@ export default async function VendorOrdersPage({
   );
 
   const initialNowMs = Date.now();
-  const visibleVendorOrders = vendorOrders.filter(
-    (vo) =>
-      !shouldOmitVendorOrderFromDeliverectDashboard(vo, vendor, isDeliverectLive, initialNowMs)
+  const initialVendorOrdersForClient = serializeVendorOrdersForBoard(
+    vendorOrders,
+    vendor,
+    initialNowMs
   );
-
-  const initialVendorOrdersForClient = visibleVendorOrders.map((vo) => ({
-    ...vo,
-    manuallyRecoveredAt: vo.manuallyRecoveredAt?.toISOString() ?? null,
-    lastExternalStatusAt: vo.lastExternalStatusAt?.toISOString() ?? null,
-    order: {
-      ...vo.order,
-      createdAt: vo.order.createdAt.toISOString(),
-    },
-    statusHistory: vo.statusHistory.map((h) => ({
-      ...h,
-      createdAt: h.createdAt.toISOString(),
-    })),
-    deliverectRoutingDegraded: isDeliverectVendorOrderRoutingDegraded(
-      vo,
-      vendor,
-      isDeliverectLive,
-      initialNowMs
-    ),
-  }));
 
   const setupBannerVisible = !posConnected || !payoutsReady;
 
@@ -151,12 +63,20 @@ export default async function VendorOrdersPage({
           <p className="mt-1 text-sm text-oo-stone-gray">Live queue — newest actions first</p>
           <p className="mt-3 text-sm text-oo-stone-gray">{posSyncLine}</p>
         </div>
-        <VendorOrdersSystemStatusStrip
-          vendorId={vendor.id}
-          posConnected={posConnected}
-          payoutsReady={payoutsReady}
-          ordersPaused={vendor.mennyuOrdersPaused ?? false}
-        />
+        <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
+          <Link
+            href={`/vendor/${vendor.id}/kitchen`}
+            className="inline-flex items-center justify-center rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-brand-hover"
+          >
+            Kitchen Mode
+          </Link>
+          <VendorOrdersSystemStatusStrip
+            vendorId={vendor.id}
+            posConnected={posConnected}
+            payoutsReady={payoutsReady}
+            ordersPaused={vendor.mennyuOrdersPaused ?? false}
+          />
+        </div>
       </header>
 
       <VendorOrdersSetupBanner vendorId={vendor.id} show={setupBannerVisible} />

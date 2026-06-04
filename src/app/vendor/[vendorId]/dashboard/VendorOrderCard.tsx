@@ -14,6 +14,10 @@ import {
 } from "@/lib/vendor-order-operating-mode";
 import { isVendorOrderManuallyRecovered } from "@/lib/vendor-order-effective-state";
 import { canVendorRejectVendorOrder } from "@/lib/cancel-eligibility";
+import {
+  formatVendorCustomerPhone,
+  getVendorOrderNextAction,
+} from "@/lib/vendor-order-next-action";
 import type { VendorOrderStatusAuthority } from "@/domain/status-authority";
 import {
   isDeliverectAuthoritativeVendorOrder,
@@ -53,34 +57,6 @@ type VendorOrderForCard = {
   }>;
 };
 
-/**
- * Next action: Accept/Deny when POS/Open Order has routed (sent/confirmed). Confirm only when not live Deliverect (e.g. mock) or as explicit fallback elsewhere.
- */
-function getNextAction(
-  routingStatus: string,
-  fulfillmentStatus: string,
-  isDeliverectLive: boolean
-): { targetState: string; label: string } | null {
-  if (fulfillmentStatus === "pending") {
-    if (routingStatus === "sent" || routingStatus === "confirmed") {
-      return { targetState: "accepted", label: "Accept order" };
-    }
-    if (routingStatus === "pending" && !isDeliverectLive) {
-      return { targetState: "confirmed", label: "Confirm order" };
-    }
-  }
-  if (fulfillmentStatus === "accepted") {
-    return { targetState: "preparing", label: "Start preparing" };
-  }
-  if (fulfillmentStatus === "preparing") {
-    return { targetState: "ready", label: "Mark ready" };
-  }
-  if (fulfillmentStatus === "ready") {
-    return { targetState: "completed", label: "Mark completed" };
-  }
-  return null;
-}
-
 const URGENCY_INLINE_CLASS: Record<VendorUrgencyLevel, string> = {
   new: "text-emerald-800",
   aging: "text-amber-800",
@@ -98,13 +74,6 @@ const BEHIND_SIBLING_CLASS: Record<BehindSiblingEscalation, string> = {
   strong: "text-amber-900 font-semibold",
   red: "text-red-700 font-semibold",
 };
-
-function formatCustomerPhone(phone: string | null): string | null {
-  if (!phone || !phone.trim()) return null;
-  const d = phone.replace(/\D/g, "");
-  if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
-  return phone.trim();
-}
 
 export function VendorOrderCard({
   vendorId,
@@ -168,7 +137,11 @@ export function VendorOrderCard({
 
   const nextAction = deliverectAuthoritative
     ? null
-    : getNextAction(vendorOrder.routingStatus, vendorOrder.fulfillmentStatus, isDeliverectLive);
+    : getVendorOrderNextAction(
+        vendorOrder.routingStatus,
+        vendorOrder.fulfillmentStatus,
+        isDeliverectLive
+      );
   const showManualConfirmFallback =
     deliverectRoutingDegraded === true &&
     vendorOrder.routingStatus === "pending" &&
@@ -292,10 +265,10 @@ export function VendorOrderCard({
         </div>
       </div>
 
-      {formatCustomerPhone(vendorOrder.order.customerPhone) && (
+      {formatVendorCustomerPhone(vendorOrder.order.customerPhone) && (
         <p className="mt-1 text-xs text-oo-stone-gray">
           <span className="font-medium text-oo-charcoal">Customer:</span>{" "}
-          {formatCustomerPhone(vendorOrder.order.customerPhone)}
+          {formatVendorCustomerPhone(vendorOrder.order.customerPhone)}
         </p>
       )}
 

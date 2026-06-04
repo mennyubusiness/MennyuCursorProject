@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { getVendorOrderEffectiveDisplayState } from "@/lib/vendor-order-effective-state";
+import { useState, useEffect, useRef } from "react";
+import {
+  getVendorOrderBoardGroupKey,
+  groupVendorOrdersForBoard,
+  type VendorOrdersBoardGroup,
+} from "@/lib/vendor-orders-board";
+import { useVendorOrdersPoll } from "@/hooks/useVendorOrdersPoll";
 import {
   getVendorOrderOperatingMode,
   type VendorOrderOperatingMode,
@@ -17,23 +22,7 @@ import { VendorOrderCard } from "./VendorOrderCard";
 import { NewOrderSoundAlert } from "./NewOrderSoundAlert";
 import { VendorOrdersSummaryStrip } from "./VendorOrdersSummaryStrip";
 
-type GroupKey = "new" | "preparing" | "ready" | "completed" | "cancelled_failed";
-
-/** Group by effective state so recoverable failures stay in "new" and manually recovered in "preparing". */
-function groupKey(vo: {
-  routingStatus: string;
-  fulfillmentStatus: string;
-  manuallyRecoveredAt?: string | null;
-  statusHistory?: Array<{ source?: string | null }>;
-}): GroupKey {
-  const effective = getVendorOrderEffectiveDisplayState(vo, vo.statusHistory);
-  if (effective === "cancelled" || effective === "terminal_failed") return "cancelled_failed";
-  if (effective === "completed") return "completed";
-  if (effective === "ready") return "ready";
-  if (effective === "recovered" || effective === "active") return "preparing";
-  if (effective === "needs_attention") return "new";
-  return "new";
-}
+type GroupKey = VendorOrdersBoardGroup;
 
 const GROUP_LABELS: Record<GroupKey, string> = {
   new: "Needs action",
@@ -94,10 +83,6 @@ function completedTransitionTimeMs(vo: VendorOrderFromApi): number | null {
   return null;
 }
 
-const POLL_INTERVAL_MS = 5000;
-
-const AGE_UPDATE_INTERVAL_MS = 60_000;
-
 export function VendorDashboardLiveOrders({
   vendorId,
   vendorDeliverectChannelLinkId = null,
@@ -113,14 +98,16 @@ export function VendorDashboardLiveOrders({
   /** Pass from server (e.g. isRoutingRetryAvailable()) so POS vs Open Order mode is correct. */
   isDeliverectLive?: boolean;
 }) {
-  const [vendorOrders, setVendorOrders] = useState<VendorOrderFromApi[]>(initialVendorOrders);
-  const [nowMs, setNowMs] = useState(initialNowMs);
+  const { vendorOrders, nowMs, onStatusSuccess } = useVendorOrdersPoll({
+    vendorId,
+    initialOrders: initialVendorOrders,
+    initialNowMs,
+  });
   const seenOrderIdsRef = useRef<Set<string>>(new Set(initialVendorOrders.map((vo) => vo.id)));
   /** Vendor order id → highlight ring expires at this timestamp (ms). ~60s from first seen via poll. */
   const [highlightExpireAtById, setHighlightExpireAtById] = useState<Record<string, number>>({});
   /** Periodic tick so highlight rings clear without full page refresh. */
   const [, setHighlightTick] = useState(0);
-  const [isVisible, setIsVisible] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showCancelledFailed, setShowCancelledFailed] = useState(false);
 
@@ -129,75 +116,21 @@ export function VendorDashboardLiveOrders({
     return () => clearInterval(id);
   }, []);
 
-  const onStatusSuccess = useCallback(
-    (vendorOrderId: string, update: { routingStatus: string; fulfillmentStatus: string }) => {
-      setVendorOrders((prev) =>
-        prev.map((vo) =>
-          vo.id === vendorOrderId
-            ? { ...vo, routingStatus: update.routingStatus, fulfillmentStatus: update.fulfillmentStatus }
-            : vo
-        )
-      );
-    },
-    []
-  );
-
   useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), AGE_UPDATE_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, []);
+    const seen = seenOrderIdsRef.current;
+    const newIds = vendorOrders.filter((vo) => !seen.has(vo.id)).map((vo) => vo.id);
+    newIds.forEach((id) => seen.add(id));
+    if (newIds.length > 0) {
+      const exp = Date.now() + 60_000;
+      setHighlightExpireAtById((prev) => {
+        const next = { ...prev };
+        for (const id of newIds) next[id] = exp;
+        return next;
+      });
+    }
+  }, [vendorOrders]);
 
-  useEffect(() => {
-    const onVisibility = () => setIsVisible(document.visibilityState === "visible");
-    document.addEventListener("visibilitychange", onVisibility);
-    onVisibility();
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, []);
-
-  useEffect(() => {
-    if (!isVisible) return;
-    const ac = new AbortController();
-    const fetchOrders = async () => {
-      try {
-        const res = await fetch(`/api/vendor/${vendorId}/orders`, { signal: ac.signal });
-        if (!res.ok) return;
-        const data = await res.json();
-        const list: VendorOrderFromApi[] = data.vendorOrders ?? [];
-        setVendorOrders(list);
-
-        const currentIds = new Set(list.map((vo: VendorOrderFromApi) => vo.id));
-        const seen = seenOrderIdsRef.current;
-        const newIds = list.filter((vo: VendorOrderFromApi) => !seen.has(vo.id)).map((vo: VendorOrderFromApi) => vo.id);
-        newIds.forEach((id: string) => seen.add(id));
-        if (newIds.length > 0) {
-          const exp = Date.now() + 60_000;
-          setHighlightExpireAtById((prev) => {
-            const next = { ...prev };
-            for (const id of newIds) next[id] = exp;
-            return next;
-          });
-        }
-      } catch {
-        // ignore (e.g. aborted when effect re-runs)
-      }
-    };
-
-    const id = setInterval(fetchOrders, POLL_INTERVAL_MS);
-    return () => {
-      ac.abort();
-      clearInterval(id);
-    };
-  }, [vendorId, isVisible]);
-
-  const grouped = vendorOrders.reduce<Record<GroupKey, VendorOrderFromApi[]>>(
-    (acc, vo) => {
-      const key = groupKey(vo);
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(vo);
-      return acc;
-    },
-    { new: [], preparing: [], ready: [], completed: [], cancelled_failed: [] }
-  );
+  const grouped = groupVendorOrdersForBoard(vendorOrders);
 
   const order: GroupKey[] = ["new", "preparing", "ready", "completed", "cancelled_failed"];
 
@@ -212,7 +145,7 @@ export function VendorDashboardLiveOrders({
     return d.getTime();
   })();
   const completedTodayCount = vendorOrders.filter((vo) => {
-    if (groupKey(vo) !== "completed") return false;
+    if (getVendorOrderBoardGroupKey(vo) !== "completed") return false;
     const t = completedTransitionTimeMs(vo);
     return t != null && t >= startOfTodayMs;
   }).length;

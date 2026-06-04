@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canAccessVendorDashboard, isVendorDashboardDevOpen } from "@/lib/vendor-dashboard-auth";
-import { VendorAreaNav } from "./VendorAreaNav";
+import { VendorLayoutChrome } from "./VendorLayoutChrome";
 
 export default async function VendorAreaLayout({
   params,
@@ -35,14 +35,8 @@ export default async function VendorAreaLayout({
   }
 
   return (
-    <div className="oo-dash">
-      <header className="oo-dash-titlebar">
-        <div className="mx-auto max-w-2xl px-4 pb-2 pt-4">
-          <h1 className="oo-dash-titlebar-heading">{vendor.name}</h1>
-        </div>
-        <VendorAreaNav vendorId={vendor.id} />
-      </header>
-      <main className="mx-auto max-w-2xl p-4">{children}</main>
-    </div>
+    <VendorLayoutChrome vendorId={vendor.id} vendorName={vendor.name}>
+      {children}
+    </VendorLayoutChrome>
   );
 }

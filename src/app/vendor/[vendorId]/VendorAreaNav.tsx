@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
   { href: "orders", label: "Orders" },
+  { href: "kitchen", label: "Kitchen" },
   { href: "issues", label: "Issues" },
   { href: "menu", label: "Menu" },
   { href: "analytics", label: "Analytics" },
@@ -15,6 +16,9 @@ function navLinkIsActive(pathname: string, base: string, href: string): boolean 
   const path = `${base}/${href}`;
   if (href === "orders") {
     return pathname === path || pathname === base;
+  }
+  if (href === "kitchen") {
+    return pathname === path || pathname.startsWith(`${path}/`);
   }
   if (href === "menu") {
     return pathname === path;

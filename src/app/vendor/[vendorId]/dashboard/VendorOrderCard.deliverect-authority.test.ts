@@ -18,7 +18,7 @@ describe("VendorOrderCard Deliverect authority UI", () => {
   });
 
   it("suppresses next action when Deliverect-authoritative", () => {
-    expect(src).toMatch(/deliverectAuthoritative\s*\?\s*null\s*:\s*getNextAction/);
+    expect(src).toMatch(/deliverectAuthoritative\s*\?\s*null\s*:\s*getVendorOrderNextAction/);
   });
 
   it("blocks deny when Deliverect-authoritative via canVendorReject", () => {
