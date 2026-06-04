@@ -17,8 +17,9 @@ import type { AddToCartResult, UpdateCartItemResult, CartItemSelectionInput } fr
 import { revalidatePath } from "next/cache";
 import { getMennyuSessionIdForRequest, getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
-import { GROUP_ORDER_JOIN_TOKEN_COOKIE } from "@/lib/group-order-cookies";
-import { resolveSharedGroupCartIdForPod } from "@/services/group-order.service";
+import { readGroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
+import { resolveActiveGroupCartIdForPod } from "@/services/group-order.service";
+import { auth } from "@/auth";
 import type { ResolvedGroupCartActor } from "@/services/group-order.service";
 import { resolveGroupOrderActorForCartMutation } from "@/actions/group-order-context";
 
@@ -53,12 +54,16 @@ async function assertCartAccessForAction(
 
 export async function getOrCreateCartForVendorMenuAction(podId: string) {
   const store = await cookies();
-  const join = store.get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null;
-  const sharedCartId = await resolveSharedGroupCartIdForPod(podId, join);
+  const markers = readGroupOrderParticipantMarkers(store);
+  const authSession = await auth();
+  const sharedCartId = await resolveActiveGroupCartIdForPod(podId, {
+    markers,
+    hostUserId: authSession?.user?.id ?? null,
+  });
   if (sharedCartId) {
     const access = await assertCartAccessForAction(sharedCartId, "read");
     if (access.ok) {
-      const cart = await getCartByIdForMutation(sharedCartId);
+      const cart = await getCartByIdForMutation(sharedCartId, access.actor);
       if (cart) return cart;
     }
   }
@@ -68,12 +73,16 @@ export async function getOrCreateCartForVendorMenuAction(podId: string) {
 
 export async function getOrCreateCartAction(podId: string) {
   const store = await cookies();
-  const join = store.get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null;
-  const sharedCartId = await resolveSharedGroupCartIdForPod(podId, join);
+  const markers = readGroupOrderParticipantMarkers(store);
+  const authSession = await auth();
+  const sharedCartId = await resolveActiveGroupCartIdForPod(podId, {
+    markers,
+    hostUserId: authSession?.user?.id ?? null,
+  });
   if (sharedCartId) {
     const access = await assertCartAccessForAction(sharedCartId, "read");
     if (access.ok) {
-      const cart = await getCartById(sharedCartId);
+      const cart = await getCartById(sharedCartId, access.actor);
       if (cart) return cart;
     }
   }

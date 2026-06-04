@@ -21,14 +21,19 @@ import {
   shellBasePriceCentsForMenuItem,
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartValidationError } from "@/services/cart-validation-error";
+import type { GroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
 import {
   enforceGroupOrderCartMutation,
+  resolveActiveGroupCartIdForPod,
+  resolveActorForGroupCart,
+  resolveGroupCartIdFromParticipantMarkers,
   type ResolvedGroupCartActor,
 } from "@/services/group-order.service";
 import {
   applyGroupOrderVisibilityToCart,
   buildGroupOrderViewerContext,
 } from "@/lib/group-order-viewer-context";
+import { attachQuickCartDisplay } from "@/lib/quick-cart-display";
 
 export { CartValidationError } from "@/services/cart-validation-error";
 
@@ -111,7 +116,7 @@ export async function getOrCreateCart(podId: string, sessionId: string): Promise
 
   await unlinkCompletedCheckoutOrdersFromCart(cart.id);
 
-  return toCartWithGroups(cart);
+  return scopeCartForGroupViewer(cart, cart.id, null);
 }
 
 export type CartItemSelectionInput = { modifierOptionId: string; quantity: number };
@@ -191,8 +196,10 @@ function cartLineParticipantMap(
   return new Map(items.map((i) => [i.id, i.groupOrderParticipantId ?? null]));
 }
 
+type CartRowWithPod = CartRowForGrouping & { pod?: { name: string } | null };
+
 async function scopeCartForGroupViewer(
-  raw: CartRowForGrouping,
+  raw: CartRowWithPod,
   cartId: string,
   groupOrderActor?: ResolvedGroupCartActor | null
 ): Promise<Cart> {
@@ -201,7 +208,8 @@ async function scopeCartForGroupViewer(
   const map = cartLineParticipantMap(
     raw.items as Array<{ id: string; groupOrderParticipantId?: string | null }>
   );
-  return applyGroupOrderVisibilityToCart(full, ctx, map);
+  const scoped = applyGroupOrderVisibilityToCart(full, ctx, map);
+  return attachQuickCartDisplay(scoped, ctx, raw.pod?.name ?? null);
 }
 
 export async function getCartByIdForMutation(
@@ -892,12 +900,11 @@ export async function discardStaleCheckoutCartsForSession(sessionId: string): Pr
 export async function loadActiveDisplayCartForSession(
   sessionId: string,
   preferredPodId: string | null,
-  /** Joiner participant token — loads the shared group cart for this pod when present. */
-  groupJoinToken?: string | null
+  /** Active group participant markers — loads shared group cart before solo fallback. */
+  participantMarkers?: GroupOrderParticipantMarkers | null
 ) {
-  if (groupJoinToken && preferredPodId) {
-    const { resolveSharedGroupCartIdForPod } = await import("@/services/group-order.service");
-    const gid = await resolveSharedGroupCartIdForPod(preferredPodId, groupJoinToken);
+  if (participantMarkers && (participantMarkers.participantId || participantMarkers.legacyJoinToken)) {
+    const gid = await resolveGroupCartIdFromParticipantMarkers(participantMarkers);
     if (gid) {
       const row = await prisma.cart.findUnique({
         where: { id: gid },
@@ -905,7 +912,6 @@ export async function loadActiveDisplayCartForSession(
       });
       if (row) {
         await unlinkCompletedCheckoutOrdersFromCart(row.id);
-        /** Same shape as `selectCartForSessionAndPod` below — /cart needs full vendor/menuItem on each line. */
         return row;
       }
     }
@@ -918,22 +924,34 @@ export async function loadActiveDisplayCartForSession(
   return selectCartForSessionAndPod(rows, preferredPodId);
 }
 
+/** Pod-scoped cart for Quick Cart / API: group cart when participant or host markers apply. */
+export async function getActiveScopedCartForPod(
+  podId: string,
+  sessionId: string,
+  opts: { markers: GroupOrderParticipantMarkers; hostUserId: string | null }
+): Promise<Cart> {
+  const sharedCartId = await resolveActiveGroupCartIdForPod(podId, opts);
+  if (sharedCartId) {
+    const actor = await resolveActorForGroupCart(sharedCartId, {
+      hostUserId: opts.hostUserId,
+      participantIdFromCookie: opts.markers.participantId,
+      joinTokenFromCookie: opts.markers.legacyJoinToken,
+    });
+    if (actor) {
+      const cart = await getCartById(sharedCartId, actor);
+      if (cart) return cart;
+    }
+  }
+  return getOrCreateCart(podId, sessionId);
+}
+
 export async function getCartById(
   cartId: string,
   groupOrderActor?: ResolvedGroupCartActor | null
 ): Promise<Cart | null> {
   const cart = await prisma.cart.findUnique({
     where: { id: cartId },
-    include: {
-      items: {
-        include: {
-          menuItem: true,
-          vendor: true,
-          selections: { include: { modifierOption: true } },
-        },
-      },
-      pod: true,
-    },
+    include: CART_SESSION_FULL_INCLUDE,
   });
   if (!cart) return null;
   return scopeCartForGroupViewer(cart, cartId, groupOrderActor);

@@ -42,7 +42,8 @@ import {
   CartPageMutationProvider,
 } from "./CartPageMutationSync";
 import { CheckoutProgress } from "../checkout/CheckoutProgress";
-import { GROUP_ORDER_JOIN_TOKEN_COOKIE } from "@/lib/group-order-cookies";
+import { readGroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
+import { resolveGroupCartIdFromParticipantMarkers } from "@/services/group-order.service";
 import {
   getGroupOrderStateForCartPage,
   startGroupOrderForCartPage,
@@ -98,7 +99,8 @@ export default async function CartPage({
   const reorderAdded = params.reorder_added ? parseInt(params.reorder_added, 10) : 0;
   const checkoutErrorCode = params.error ? decodeURIComponent(params.error) : null;
   const groupStartError = params.groupError ? decodeURIComponent(params.groupError) : null;
-  const joinTok = (await cookies()).get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null;
+  const cookieStore = await cookies();
+  const participantMarkers = readGroupOrderParticipantMarkers(cookieStore);
   const authSession = await auth();
 
   const startGroupOrder = params.startGroupOrder === "1";
@@ -122,7 +124,14 @@ export default async function CartPage({
 
   const preferredPodId = startGroupOrder && targetPodForGroup ? targetPodForGroup : currentPodId;
   const perfT0 = cartPagePerfNow();
-  let cart = await loadActiveDisplayCartForSession(sessionId, preferredPodId, joinTok);
+  let cart = await loadActiveDisplayCartForSession(sessionId, preferredPodId, participantMarkers);
+  if (cart && (participantMarkers.participantId || participantMarkers.legacyJoinToken)) {
+    const groupCartId = await resolveGroupCartIdFromParticipantMarkers(participantMarkers);
+    if (groupCartId && groupCartId !== cart.id) {
+      const groupRow = await loadActiveDisplayCartForSession(sessionId, null, participantMarkers);
+      if (groupRow) cart = groupRow;
+    }
+  }
   if (params.groupUnlock === "1" && cart?.id && authSession?.user?.id) {
     await unlockGroupCheckoutForCartPage(cart.id, authSession.user.id);
     redirect("/cart");
@@ -159,7 +168,8 @@ export default async function CartPage({
   const groupActor = cart
     ? await resolveActorForGroupCart(cart.id, {
         hostUserId: authSession?.user?.id ?? null,
-        joinTokenFromCookie: joinTok,
+        participantIdFromCookie: participantMarkers.participantId,
+        joinTokenFromCookie: participantMarkers.legacyJoinToken,
       })
     : null;
   const viewerCtx = cart ? await buildGroupOrderViewerContext(cart.id, groupActor) : null;
@@ -201,7 +211,7 @@ export default async function CartPage({
     );
   }
 
-  const goState = await getGroupOrderStateForCartPage(cart.id, { joinTokenFromCookie: joinTok });
+  const goState = await getGroupOrderStateForCartPage(cart.id, { participantMarkers });
 
   if (displayItems.length === 0) {
     const isParticipantView = goState.active && goState.view === "participant";

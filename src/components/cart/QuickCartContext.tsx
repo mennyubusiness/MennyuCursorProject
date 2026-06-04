@@ -27,6 +27,7 @@ import { getCurrentPodIdFromClient } from "@/lib/quick-cart-pod";
 
 type QuickCartContextValue = {
   enabled: boolean;
+  hasServerSession: boolean;
   isOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
@@ -43,9 +44,11 @@ const QuickCartContext = createContext<QuickCartContextValue | null>(null);
 export function QuickCartProvider({
   children,
   enabled = true,
+  hasServerSession = false,
 }: {
   children: ReactNode;
   enabled?: boolean;
+  hasServerSession?: boolean;
 }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
@@ -221,6 +224,7 @@ export function QuickCartProvider({
   const value = useMemo(
     () => ({
       enabled,
+      hasServerSession,
       isOpen,
       openCart,
       closeCart,
@@ -233,6 +237,7 @@ export function QuickCartProvider({
     }),
     [
       enabled,
+      hasServerSession,
       isOpen,
       openCart,
       closeCart,

@@ -112,27 +112,61 @@ export async function startGroupOrderSession(args: {
   return { sessionId: s.id, joinCode: s.joinCode };
 }
 
-/** When a joiner has a participant cookie, resolve the shared cart for this pod (if session still active). */
+const ACTIVE_GROUP_SESSION_STATUSES: GroupOrderSessionStatus[] = ["active", "locked_checkout"];
+
+export type GroupOrderActorResolveOpts = {
+  hostUserId: string | null;
+  participantIdFromCookie?: string | null;
+  /** @deprecated Legacy HttpOnly join token cookie — prefer participant id. */
+  joinTokenFromCookie?: string | null;
+};
+
+/** Active group cart for participant markers (cart page — pod cookie optional). */
+export async function resolveGroupCartIdFromParticipantMarkers(
+  markers: import("@/lib/group-order-participant-cookie").GroupOrderParticipantMarkers
+): Promise<string | null> {
+  const { resolveActiveGroupParticipantBinding } = await import(
+    "@/lib/group-order-participant-resolve"
+  );
+  const binding = await resolveActiveGroupParticipantBinding(markers);
+  return binding?.cartId ?? null;
+}
+
+/** Shared cart for this pod when participant markers match the pod. */
 export async function resolveSharedGroupCartIdForPod(
   podId: string,
-  joinTokenFromCookie: string | null
+  markers: import("@/lib/group-order-participant-cookie").GroupOrderParticipantMarkers
 ): Promise<string | null> {
-  const t = joinTokenFromCookie?.trim();
-  if (!t) return null;
-  const p = await prisma.groupOrderParticipant.findFirst({
+  const { resolveActiveGroupParticipantBinding } = await import(
+    "@/lib/group-order-participant-resolve"
+  );
+  const binding = await resolveActiveGroupParticipantBinding(markers);
+  if (!binding || binding.podId !== podId) return null;
+  return binding.cartId;
+}
+
+/** Active group cart for a pod: participant markers or signed-in host. */
+export async function resolveActiveGroupCartIdForPod(
+  podId: string,
+  opts: {
+    markers: import("@/lib/group-order-participant-cookie").GroupOrderParticipantMarkers;
+    hostUserId: string | null;
+  }
+): Promise<string | null> {
+  const byParticipant = await resolveSharedGroupCartIdForPod(podId, opts.markers);
+  if (byParticipant) return byParticipant;
+  const hostId = opts.hostUserId?.trim();
+  if (!hostId) return null;
+  const session = await prisma.groupOrderSession.findFirst({
     where: {
-      joinToken: t,
-      leftAt: null,
-      role: "participant",
-      groupOrderSession: {
-        podId,
-        status: { in: ["active", "locked_checkout"] },
-        expiresAt: { gt: new Date() },
-      },
+      podId,
+      hostUserId: hostId,
+      status: { in: ACTIVE_GROUP_SESSION_STATUSES },
+      expiresAt: { gt: new Date() },
     },
-    select: { groupOrderSession: { select: { cartId: true } } },
+    select: { cartId: true },
   });
-  return p?.groupOrderSession.cartId ?? null;
+  return session?.cartId ?? null;
 }
 
 export async function findSessionByCartId(cartId: string) {
@@ -172,7 +206,153 @@ export type JoinGroupOrderInput = {
   groupOrderSessionId: string;
   displayName: string;
   phoneRaw: string;
+  participantIdFromCookie?: string | null;
+  joinTokenFromCookie?: string | null;
+  joinAttemptKey?: string | null;
+  userId?: string | null;
 };
+
+type JoinParticipantRow = {
+  id: string;
+  joinToken: string;
+  leftAt: Date | null;
+};
+
+function isPrismaUniqueViolation(e: unknown): boolean {
+  return Boolean(e && typeof e === "object" && "code" in e && (e as { code: string }).code === "P2002");
+}
+
+function normalizeJoinAttemptKey(raw: string | null | undefined): string | null {
+  const key = raw?.trim();
+  if (!key || key.length > 64) return null;
+  return key;
+}
+
+/** Resolve an existing participant for idempotent join (cookie, user, attempt key, then phone). */
+export async function findExistingParticipantForJoin(
+  groupOrderSessionId: string,
+  opts: {
+    participantIdFromCookie: string | null;
+    joinTokenFromCookie: string | null;
+    joinAttemptKey: string | null;
+    userId: string | null;
+    phoneE164: string;
+  }
+): Promise<JoinParticipantRow | null> {
+  const participantId = opts.participantIdFromCookie?.trim();
+  if (participantId) {
+    const byId = await prisma.groupOrderParticipant.findFirst({
+      where: {
+        id: participantId,
+        groupOrderSessionId,
+        role: "participant",
+      },
+      select: { id: true, joinToken: true, leftAt: true },
+    });
+    if (byId) return byId;
+  }
+
+  const token = opts.joinTokenFromCookie?.trim();
+  if (token) {
+    const byToken = await prisma.groupOrderParticipant.findFirst({
+      where: {
+        joinToken: token,
+        groupOrderSessionId,
+        role: "participant",
+      },
+      select: { id: true, joinToken: true, leftAt: true },
+    });
+    if (byToken) return byToken;
+  }
+
+  if (opts.userId) {
+    const byUser = await prisma.groupOrderParticipant.findFirst({
+      where: {
+        groupOrderSessionId,
+        userId: opts.userId,
+        role: "participant",
+      },
+      select: { id: true, joinToken: true, leftAt: true },
+    });
+    if (byUser) return byUser;
+  }
+
+  const attemptKey = opts.joinAttemptKey;
+  if (attemptKey) {
+    const byAttempt = await prisma.groupOrderParticipant.findFirst({
+      where: {
+        groupOrderSessionId,
+        joinAttemptKey: attemptKey,
+        role: "participant",
+      },
+      select: { id: true, joinToken: true, leftAt: true },
+    });
+    if (byAttempt) return byAttempt;
+  }
+
+  return prisma.groupOrderParticipant.findFirst({
+    where: {
+      groupOrderSessionId,
+      phoneE164: opts.phoneE164,
+      role: "participant",
+    },
+    select: { id: true, joinToken: true, leftAt: true },
+  });
+}
+
+async function resolveParticipantAfterUniqueConflict(
+  groupOrderSessionId: string,
+  opts: {
+    joinAttemptKey: string | null;
+    phoneE164: string;
+  }
+): Promise<JoinParticipantRow | null> {
+  if (opts.joinAttemptKey) {
+    const byAttempt = await prisma.groupOrderParticipant.findFirst({
+      where: {
+        groupOrderSessionId,
+        joinAttemptKey: opts.joinAttemptKey,
+        role: "participant",
+      },
+      select: { id: true, joinToken: true, leftAt: true },
+    });
+    if (byAttempt) return byAttempt;
+  }
+
+  return prisma.groupOrderParticipant.findFirst({
+    where: {
+      groupOrderSessionId,
+      phoneE164: opts.phoneE164,
+      role: "participant",
+    },
+    select: { id: true, joinToken: true, leftAt: true },
+  });
+}
+
+async function finalizeParticipantJoin(
+  participant: JoinParticipantRow,
+  session: { cartId: string; podId: string },
+  displayName: string,
+  phoneE164: string,
+  userId: string | null
+): Promise<{ participantId: string; joinToken: string; cartId: string; podId: string }> {
+  await prisma.groupOrderParticipant.update({
+    where: { id: participant.id },
+    data: {
+      leftAt: null,
+      displayName: displayName.slice(0, 120),
+      phoneE164,
+      ...(userId ? { userId } : {}),
+    },
+  });
+
+  return {
+    participantId: participant.id,
+    joinToken: participant.joinToken,
+    cartId: session.cartId,
+    podId: session.podId,
+  };
+}
 
 export async function joinGroupOrderSession(
   input: JoinGroupOrderInput
@@ -197,29 +377,53 @@ export async function joinGroupOrderSession(
     throw new Error("This group order is no longer open.");
   }
 
-  const joinToken = newJoinToken();
-  const participant = await prisma.groupOrderParticipant.create({
-    data: {
-      groupOrderSessionId: session.id,
-      userId: null,
-      role: "participant",
-      displayName: name,
-      phoneE164: phone.e164,
-      joinToken,
-    },
-  });
+  const joinAttemptKey = normalizeJoinAttemptKey(input.joinAttemptKey);
+  const userId = input.userId?.trim() || null;
 
-  return {
-    participantId: participant.id,
-    joinToken,
-    cartId: session.cartId,
-    podId: session.podId,
-  };
+  const existing = await findExistingParticipantForJoin(session.id, {
+    participantIdFromCookie: input.participantIdFromCookie ?? null,
+    joinTokenFromCookie: input.joinTokenFromCookie ?? null,
+    joinAttemptKey,
+    userId,
+    phoneE164: phone.e164,
+  });
+  if (existing) {
+    return finalizeParticipantJoin(existing, session, name, phone.e164, userId);
+  }
+
+  const joinToken = newJoinToken();
+  try {
+    const participant = await prisma.groupOrderParticipant.create({
+      data: {
+        groupOrderSessionId: session.id,
+        userId,
+        role: "participant",
+        displayName: name,
+        phoneE164: phone.e164,
+        joinAttemptKey,
+        joinToken,
+      },
+    });
+    return {
+      participantId: participant.id,
+      joinToken,
+      cartId: session.cartId,
+      podId: session.podId,
+    };
+  } catch (e) {
+    if (!isPrismaUniqueViolation(e)) throw e;
+    const raced = await resolveParticipantAfterUniqueConflict(session.id, {
+      joinAttemptKey,
+      phoneE164: phone.e164,
+    });
+    if (!raced) throw e;
+    return finalizeParticipantJoin(raced, session, name, phone.e164, userId);
+  }
 }
 
 export async function resolveActorForGroupCart(
   cartId: string,
-  opts: { hostUserId: string | null; joinTokenFromCookie: string | null }
+  opts: GroupOrderActorResolveOpts
 ): Promise<ResolvedGroupCartActor | null> {
   const session = await prisma.groupOrderSession.findUnique({
     where: { cartId },
@@ -233,17 +437,31 @@ export async function resolveActorForGroupCart(
     return null;
   }
 
+  const actorBase = {
+    sessionId: session.id,
+    sessionStatus: session.status,
+    cartId: session.cartId,
+    podId: session.podId,
+  };
+
   if (opts.hostUserId && opts.hostUserId === session.hostUserId) {
     const hostP = session.participants.find((p) => p.role === "host" && !p.leftAt);
     if (!hostP) return null;
     return {
-      sessionId: session.id,
-      sessionStatus: session.status,
-      cartId: session.cartId,
-      podId: session.podId,
+      ...actorBase,
       participantId: hostP.id,
       role: "host",
     };
+  }
+
+  const participantId = opts.participantIdFromCookie?.trim();
+  if (participantId) {
+    const p = session.participants.find(
+      (x) => x.id === participantId && !x.leftAt && x.role === "participant"
+    );
+    if (p) {
+      return { ...actorBase, participantId: p.id, role: "participant" };
+    }
   }
 
   const token = opts.joinTokenFromCookie?.trim();
@@ -252,14 +470,17 @@ export async function resolveActorForGroupCart(
       (x) => x.joinToken === token && !x.leftAt && x.role === "participant"
     );
     if (p) {
-      return {
-        sessionId: session.id,
-        sessionStatus: session.status,
-        cartId: session.cartId,
-        podId: session.podId,
-        participantId: p.id,
-        role: "participant",
-      };
+      return { ...actorBase, participantId: p.id, role: "participant" };
+    }
+  }
+
+  const uid = opts.hostUserId?.trim();
+  if (uid) {
+    const p = session.participants.find(
+      (x) => x.userId === uid && !x.leftAt && x.role === "participant"
+    );
+    if (p) {
+      return { ...actorBase, participantId: p.id, role: "participant" };
     }
   }
 

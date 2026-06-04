@@ -42,16 +42,20 @@ export type GroupOrderStateForCartPage =
 
 export async function getGroupOrderStateForCartPage(
   cartId: string,
-  opts?: { joinTokenFromCookie?: string | null }
+  opts?: {
+    participantMarkers?: import("@/lib/group-order-participant-cookie").GroupOrderParticipantMarkers | null;
+  }
 ): Promise<GroupOrderStateForCartPage> {
   const authSession = await auth();
   const hostId = authSession?.user?.id ?? null;
   const s = await findSessionByCartId(cartId);
   if (!s) return { active: false };
 
+  const markers = opts?.participantMarkers ?? { participantId: null, legacyJoinToken: null };
   const actor = await resolveActorForGroupCart(cartId, {
     hostUserId: hostId,
-    joinTokenFromCookie: opts?.joinTokenFromCookie ?? null,
+    participantIdFromCookie: markers.participantId,
+    joinTokenFromCookie: markers.legacyJoinToken,
   });
 
   if (actor?.role === "participant") {

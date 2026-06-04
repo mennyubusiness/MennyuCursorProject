@@ -71,7 +71,7 @@ export default async function RootLayout({
         )}
       >
         <AuthSessionProvider session={session} hasServerSession={hasServerSession}>
-          <CustomerQuickCartShell enabled={quickCartEnabled}>
+          <CustomerQuickCartShell enabled={quickCartEnabled} hasServerSession={hasServerSession}>
           <header className="sticky top-0 z-50 border-b border-oo-light-stone/20 bg-oo-charcoal/95 backdrop-blur-md">
             <PageShell className="flex h-16 items-center justify-between gap-4 sm:h-[4.25rem]">
               <OpenOrderLogo variant="header" priority />

@@ -118,6 +118,16 @@ export interface CartGroup {
   subtotalCents: number;
 }
 
+/** Client-safe group-order summary on cart API responses (never includes joinToken). */
+export type CartGroupOrderDisplay = {
+  role: "solo" | "host" | "participant" | "unknown";
+  canCheckout: boolean;
+  /** Present for host when a group session is active. */
+  joinCode?: string;
+  /** Present for host — used for invite link (`/group-order/join?session=…`). */
+  groupOrderSessionId?: string;
+};
+
 export interface Cart {
   id: string;
   podId: string;
@@ -125,6 +135,10 @@ export interface Cart {
   items: CartItem[];
   groups: CartGroup[];
   subtotalCents: number;
+  /** Pod display name when known (Quick Cart / API). */
+  podName?: string | null;
+  /** Group-order role and host invite metadata for customer UI. */
+  groupOrder?: CartGroupOrderDisplay;
 }
 
 // ---- Order (parent) ----

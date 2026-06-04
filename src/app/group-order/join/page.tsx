@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { findActiveSessionByJoinCode, findSessionByIdForJoin } from "@/services/group-order.service";
-import { joinGroupOrderFormAction } from "@/actions/group-order.actions";
+import { GroupOrderJoinForm } from "./GroupOrderJoinForm";
 
 export default async function GroupOrderJoinPage({
   searchParams,
@@ -35,45 +35,7 @@ export default async function GroupOrderJoinPage({
           {decodeURIComponent(error)}
         </p>
       )}
-      <form action={joinGroupOrderFormAction} className="mt-6 space-y-4">
-        <input type="hidden" name="groupOrderSessionId" value={session.id} />
-        <div>
-          <label htmlFor="displayName" className="block text-sm font-medium text-stone-800">
-            Display name
-          </label>
-          <input
-            id="displayName"
-            name="displayName"
-            required
-            maxLength={120}
-            className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
-            placeholder="How you appear in the group cart"
-          />
-        </div>
-        <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-stone-800">
-            Mobile number
-          </label>
-          <input
-            id="phone"
-            name="phone"
-            type="tel"
-            required
-            autoComplete="tel"
-            className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
-            placeholder="For order-ready texts (not shown to others)"
-          />
-          <p className="mt-1 text-xs text-stone-500">
-            Used to notify you when your items are ready. Not shared with the host or vendors.
-          </p>
-        </div>
-        <button
-          type="submit"
-          className="w-full rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white hover:bg-stone-800"
-        >
-          Join &amp; continue
-        </button>
-      </form>
+      <GroupOrderJoinForm groupOrderSessionId={session.id} />
     </div>
   );
 }

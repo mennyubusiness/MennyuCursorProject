@@ -19,6 +19,7 @@ const hostCtx: GroupOrderViewerContext = {
   canViewAllLines: true,
   canEditAllLines: true,
   canCheckout: true,
+  joinCode: "123456",
 };
 
 const participantCtx: GroupOrderViewerContext = {
@@ -31,6 +32,7 @@ const participantCtx: GroupOrderViewerContext = {
   canViewAllLines: false,
   canEditAllLines: false,
   canCheckout: false,
+  joinCode: null,
 };
 
 describe("group-order-viewer-context", () => {

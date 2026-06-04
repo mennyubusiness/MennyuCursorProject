@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import {
-  getOrCreateCart,
+  getActiveScopedCartForPod,
   getCartById,
   addCartItem,
   updateCartItem,
@@ -11,6 +12,10 @@ import {
   assertCartSessionAccess,
   resolveGroupOrderActorFromRequest,
 } from "@/lib/cart-session-access";
+import {
+  GROUP_ORDER_PARTICIPANT_ID_COOKIE,
+  GROUP_ORDER_JOIN_TOKEN_COOKIE,
+} from "@/lib/group-order-cookies";
 import { getOrSetSessionId, buildSessionCookieHeader, getSessionIdFromRequest } from "@/lib/session";
 
 async function denyCartAccess(
@@ -41,7 +46,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "podId or cartId required" }, { status: 400 });
   }
   const { sessionId, isNew } = getOrSetSessionId(request);
-  const cart = await getOrCreateCart(podId, sessionId);
+  const authSession = await auth();
+  const cart = await getActiveScopedCartForPod(podId, sessionId, {
+    markers: {
+      participantId: request.cookies.get(GROUP_ORDER_PARTICIPANT_ID_COOKIE)?.value ?? null,
+      legacyJoinToken: request.cookies.get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null,
+    },
+    hostUserId: authSession?.user?.id ?? null,
+  });
   const res = NextResponse.json(cart);
   if (isNew) res.headers.set("Set-Cookie", buildSessionCookieHeader(sessionId));
   return res;

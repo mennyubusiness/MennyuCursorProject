@@ -6,13 +6,15 @@ import { QuickCartDrawer } from "@/components/cart/QuickCartDrawer";
 
 export function CustomerQuickCartShell({
   enabled,
+  hasServerSession = false,
   children,
 }: {
   enabled: boolean;
+  hasServerSession?: boolean;
   children: ReactNode;
 }) {
   return (
-    <QuickCartProvider enabled={enabled}>
+    <QuickCartProvider enabled={enabled} hasServerSession={hasServerSession}>
       {children}
       {enabled ? <QuickCartDrawer /> : null}
     </QuickCartProvider>

@@ -3,7 +3,10 @@ import "server-only";
 import type { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { GROUP_ORDER_JOIN_TOKEN_COOKIE } from "@/lib/group-order-cookies";
+import {
+  GROUP_ORDER_JOIN_TOKEN_COOKIE,
+  GROUP_ORDER_PARTICIPANT_ID_COOKIE,
+} from "@/lib/group-order-cookies";
 import {
   resolveActorForGroupCart,
   type ResolvedGroupCartActor,
@@ -104,9 +107,11 @@ export async function resolveGroupOrderActorFromRequest(
   cartId: string
 ): Promise<ResolvedGroupCartActor | null> {
   const authSession = await auth();
-  const joinToken = request.cookies.get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null;
+  const participantId = request.cookies.get(GROUP_ORDER_PARTICIPANT_ID_COOKIE)?.value ?? null;
+  const legacyJoinToken = request.cookies.get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null;
   return resolveActorForGroupCart(cartId, {
     hostUserId: authSession?.user?.id ?? null,
-    joinTokenFromCookie: joinToken,
+    participantIdFromCookie: participantId,
+    joinTokenFromCookie: legacyJoinToken,
   });
 }

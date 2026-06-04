@@ -21,6 +21,8 @@ export type GroupOrderViewerContext = {
   canViewAllLines: boolean;
   canEditAllLines: boolean;
   canCheckout: boolean;
+  /** Host-only invite code from the active session. */
+  joinCode: string | null;
 };
 
 const SOLO_VIEWER: GroupOrderViewerContext = {
@@ -33,6 +35,7 @@ const SOLO_VIEWER: GroupOrderViewerContext = {
   canViewAllLines: true,
   canEditAllLines: true,
   canCheckout: true,
+  joinCode: null,
 };
 
 export async function buildGroupOrderViewerContext(
@@ -56,6 +59,7 @@ export async function buildGroupOrderViewerContext(
       canViewAllLines: false,
       canEditAllLines: false,
       canCheckout: false,
+      joinCode: null,
     };
   }
 
@@ -70,6 +74,7 @@ export async function buildGroupOrderViewerContext(
       canViewAllLines: true,
       canEditAllLines: true,
       canCheckout: true,
+      joinCode: session.joinCode,
     };
   }
 
@@ -83,6 +88,7 @@ export async function buildGroupOrderViewerContext(
     canViewAllLines: false,
     canEditAllLines: false,
     canCheckout: false,
+    joinCode: null,
   };
 }
 

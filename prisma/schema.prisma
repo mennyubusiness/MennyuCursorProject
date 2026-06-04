@@ -626,6 +626,8 @@ model GroupOrderParticipant {
   displayName           String
   /// E.164; stored privately for future SMS. Required for participants; may be null for host.
   phoneE164             String?
+  /// Client-generated idempotency key for join form (prevents double-submit duplicates).
+  joinAttemptKey        String?
   joinToken             String                   @unique
   leftAt                DateTime?
   createdAt             DateTime                 @default(now())
@@ -636,6 +638,8 @@ model GroupOrderParticipant {
   cartItems             CartItem[]
   orderLineItems        OrderLineItem[]
 
+  @@unique([groupOrderSessionId, phoneE164])
+  @@unique([groupOrderSessionId, joinAttemptKey])
   @@index([groupOrderSessionId])
   @@index([joinToken])
 }

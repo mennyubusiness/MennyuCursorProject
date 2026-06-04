@@ -2,9 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { auth } from "@/auth";
-import { GROUP_ORDER_JOIN_TOKEN_COOKIE, GROUP_ORDER_JOIN_COOKIE_MAX_AGE_SEC } from "@/lib/group-order-cookies";
+import {
+  readGroupOrderParticipantMarkers,
+  setGroupOrderParticipantCookies,
+  clearGroupOrderParticipantCookies,
+} from "@/lib/group-order-participant-cookie";
 import {
   RATE_LIMITS,
   RATE_LIMIT_ERROR_MESSAGE,
@@ -55,9 +59,10 @@ export async function joinGroupOrderFormAction(formData: FormData) {
   const groupOrderSessionId = String(formData.get("groupOrderSessionId") ?? "").trim();
   const displayName = String(formData.get("displayName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const res = await joinGroupOrderAction({ groupOrderSessionId, displayName, phone });
+  const joinAttemptKey = String(formData.get("joinAttemptKey") ?? "").trim();
+  const res = await joinGroupOrderAction({ groupOrderSessionId, displayName, phone, joinAttemptKey });
   if (res.success) {
-    redirect(`/pod/${res.podId}`);
+    redirect(`/pod/${res.podId}`, RedirectType.replace);
   }
   redirect(`/group-order/join?session=${encodeURIComponent(groupOrderSessionId)}&error=${encodeURIComponent(res.error)}`);
 }
@@ -66,9 +71,13 @@ export async function joinGroupOrderAction(input: {
   groupOrderSessionId: string;
   displayName: string;
   phone: string;
+  joinAttemptKey?: string;
 }) {
   const headersList = await headers();
   const ip = getClientIpFromHeaders(headersList);
+  const authSession = await auth();
+  const store = await cookies();
+  const markers = readGroupOrderParticipantMarkers(store);
   const limited = enforceRateLimits([
     {
       key: rateLimitKeys.groupJoinIp(ip),
@@ -88,14 +97,14 @@ export async function joinGroupOrderAction(input: {
       groupOrderSessionId: input.groupOrderSessionId,
       displayName: input.displayName,
       phoneRaw: input.phone,
+      participantIdFromCookie: markers.participantId,
+      joinTokenFromCookie: markers.legacyJoinToken,
+      joinAttemptKey: input.joinAttemptKey || null,
+      userId: authSession?.user?.id ?? null,
     });
-    const store = await cookies();
-    store.set(GROUP_ORDER_JOIN_TOKEN_COOKIE, result.joinToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: GROUP_ORDER_JOIN_COOKIE_MAX_AGE_SEC,
-      secure: process.env.NODE_ENV === "production",
+    setGroupOrderParticipantCookies(store, {
+      participantId: result.participantId,
+      podId: result.podId,
     });
     revalidatePath("/cart");
     revalidatePath(`/pod/${result.podId}`, "layout");
@@ -107,16 +116,14 @@ export async function joinGroupOrderAction(input: {
 
 export async function leaveGroupOrderAction() {
   const store = await cookies();
-  const token = store.get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value;
-  if (!token) return { success: false as const, error: "Not in a group order." };
-  const { prisma } = await import("@/lib/db");
-  const p = await prisma.groupOrderParticipant.findFirst({
-    where: { joinToken: token, leftAt: null, role: "participant" },
-    select: { id: true },
-  });
-  if (!p) return { success: false as const, error: "Not in a group order." };
-  await leaveGroupOrderAsParticipant(p.id);
-  store.delete(GROUP_ORDER_JOIN_TOKEN_COOKIE);
+  const markers = readGroupOrderParticipantMarkers(store);
+  const { resolveActiveGroupParticipantBinding } = await import(
+    "@/lib/group-order-participant-resolve"
+  );
+  const binding = await resolveActiveGroupParticipantBinding(markers);
+  if (!binding) return { success: false as const, error: "Not in a group order." };
+  await leaveGroupOrderAsParticipant(binding.participantId);
+  clearGroupOrderParticipantCookies(store);
   revalidatePath("/cart");
   return { success: true as const };
 }

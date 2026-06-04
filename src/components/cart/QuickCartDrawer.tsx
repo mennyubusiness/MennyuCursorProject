@@ -2,16 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { useQuickCart } from "@/components/cart/QuickCartContext";
 import { AwaitCartNavigationLink } from "@/components/cart/AwaitCartNavigationLink";
 import { QuickCartLineControls } from "@/components/cart/QuickCartLineControls";
+import { QuickCartHeader } from "@/components/cart/QuickCartHeader";
+import { QuickCartGroupSection } from "@/components/cart/QuickCartGroupSection";
 import { ButtonLink } from "@/components/ui/button";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
-import { cn } from "@/lib/cn";
+import { getCurrentPodIdFromClient } from "@/lib/quick-cart-pod";
+import {
+  quickCartFooterCtaLabel,
+  resolveQuickCartPodContext,
+} from "@/lib/quick-cart-display";
 
 export function QuickCartDrawer() {
-  const { enabled, isOpen, closeCart, cart, loading, applyCartSnapshot, refreshCart } = useQuickCart();
+  const { enabled, isOpen, closeCart, cart, loading, applyCartSnapshot, refreshCart, hasServerSession } =
+    useQuickCart();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -20,8 +26,19 @@ export function QuickCartDrawer() {
 
   if (!enabled || !mounted || !isOpen) return null;
 
+  const clientPodId = getCurrentPodIdFromClient();
+  const pod = resolveQuickCartPodContext(cart, clientPodId);
+  const hasPod = Boolean(pod.podId);
+  const groupOrder = cart?.groupOrder;
+  const canCheckout = groupOrder?.canCheckout ?? true;
+  const isParticipant = groupOrder?.role === "participant";
   const itemCount = cart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0;
-  const hasPod = Boolean(cart?.podId);
+  const hasItems = Boolean(cart && cart.items.length > 0);
+  const footerCta = quickCartFooterCtaLabel({
+    hasItems,
+    groupRole: groupOrder?.role,
+    canCheckout,
+  });
 
   return createPortal(
     <div className="fixed inset-0 z-[110]" role="presentation">
@@ -37,26 +54,21 @@ export function QuickCartDrawer() {
         aria-modal="true"
         aria-labelledby="quick-cart-title"
       >
-        <header className="flex items-start justify-between gap-3 border-b border-oo-light-stone px-4 py-4 sm:px-5">
-          <div>
-            <h2 id="quick-cart-title" className="text-lg font-bold text-oo-charcoal">
-              Your cart
-            </h2>
-            <p className="mt-0.5 text-xs text-oo-stone-gray">Multi-vendor · one checkout</p>
-          </div>
-          <button
-            type="button"
-            onClick={closeCart}
-            className="rounded-lg p-2 text-oo-stone-gray transition hover:bg-oo-cream hover:text-oo-charcoal"
-            aria-label="Close"
-          >
-            <span className="text-xl leading-none" aria-hidden>
-              ×
-            </span>
-          </button>
-        </header>
+        <QuickCartHeader
+          pod={pod}
+          groupOrder={groupOrder}
+          onClose={closeCart}
+          onNavigate={closeCart}
+        />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          <QuickCartGroupSection
+            cart={cart}
+            podId={pod.podId}
+            hasServerSession={hasServerSession}
+            onNavigate={closeCart}
+          />
+
           {loading && !cart ? (
             <p className="text-sm text-oo-stone-gray">Loading cart…</p>
           ) : !hasPod ? (
@@ -72,20 +84,7 @@ export function QuickCartDrawer() {
           ) : cart && cart.items.length === 0 ? (
             <div className="oo-empty-state px-6 py-10">
               <p className="font-semibold text-oo-charcoal">Your cart is empty</p>
-              <p className="mt-2 text-sm text-oo-stone-gray">Start with a food pod or vendor.</p>
-              {cart.podId && (
-                <ButtonLink
-                  href={`/pod/${cart.podId}`}
-                  variant="secondary"
-                  size="sm"
-                  className="mt-4"
-                >
-                  Browse this pod
-                </ButtonLink>
-              )}
-              <ButtonLink href="/explore" variant="outline" size="sm" className="mt-2">
-                Explore pods
-              </ButtonLink>
+              <p className="mt-2 text-sm text-oo-stone-gray">Add items from a vendor in this pod.</p>
             </div>
           ) : cart ? (
             <ul className="space-y-5">
@@ -130,16 +129,21 @@ export function QuickCartDrawer() {
         </div>
 
         <footer className="border-t border-oo-light-stone bg-oo-warm-white px-4 py-4 sm:px-5">
-          {cart && cart.items.length > 0 && (
+          {cart && hasItems && (
             <>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-oo-stone-gray">Subtotal</span>
+                <span className="text-oo-stone-gray">{isParticipant ? "Your subtotal" : "Subtotal"}</span>
                 <span className="text-base font-bold tabular-nums text-oo-charcoal">
                   ${(cart.subtotalCents / 100).toFixed(2)}
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-oo-stone-gray">
-                {itemCount} item{itemCount === 1 ? "" : "s"} · tax & fees at checkout
+                {itemCount} item{itemCount === 1 ? "" : "s"}
+                {isParticipant
+                  ? " · host checks out for the group"
+                  : canCheckout
+                    ? " · tax & fees at checkout"
+                    : ""}
               </p>
             </>
           )}
@@ -149,18 +153,8 @@ export function QuickCartDrawer() {
             className="mt-4 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-hover"
             onClick={closeCart}
           >
-            {cart && cart.items.length > 0 ? "Review cart & checkout" : "Go to cart"}
+            {footerCta}
           </AwaitCartNavigationLink>
-          <p className="mt-2 text-center text-[11px] text-oo-stone-gray">
-            <AwaitCartNavigationLink
-              cartId={cart?.id}
-              href="/cart"
-              className="font-medium text-oo-charcoal hover:underline"
-              onClick={closeCart}
-            >
-              Open full cart page
-            </AwaitCartNavigationLink>
-          </p>
         </footer>
       </aside>
     </div>,
