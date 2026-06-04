@@ -50,6 +50,7 @@ describe("admin-attention legacy clawback", () => {
   });
 
   it("workbench shows separate legacy financial review section", () => {
+    expect(workbenchSrc).toMatch(/legacyItems\.length > 0/);
     expect(workbenchSrc).toMatch(/Legacy financial review/i);
     expect(workbenchSrc).toMatch(/Current needs attention/i);
     expect(workbenchSrc).toMatch(/Mark reviewed/);

@@ -1179,7 +1179,9 @@ export function AdminPaymentsRefundsPanel({
         setPrepareError(formatPrepareMissingReversalError(result.error));
         return;
       }
-      setPrepareMessage("Vendor transfer reversal prepared. Run the reversal batch to submit it to Stripe.");
+      setPrepareMessage(
+        "Vendor transfer reversal prepared. Run it from Vendor Transfers to submit it to Stripe."
+      );
       router.refresh();
     } finally {
       setPrepareBusyId(null);
@@ -1552,14 +1554,27 @@ export function AdminPaymentsRefundsPanel({
                         </p>
                       ) : null}
                       {(v.clawback.recommendedAction === "retry_reversal" ||
-                        v.clawback.recommendedAction === "run_reversal_batch") && (
+                        v.clawback.recommendedAction === "run_reversal_batch" ||
+                        v.clawback.clawbackStatus === "pending") && (
+                        <p className="text-[10px] leading-snug text-oo-stone-gray">
+                          {v.reversals.some(
+                            (r) => r.status === "pending" || r.status === "submitted"
+                          )
+                            ? "Prepared reversal pending. Run it from Vendor Transfers."
+                            : v.clawback.recommendedAction === "retry_reversal"
+                              ? "Retry the transfer reversal from Vendor Transfers."
+                              : "Manage vendor clawback on Vendor Transfers."}
+                        </p>
+                      )}
+                      {(v.clawback.recommendedAction === "retry_reversal" ||
+                        v.clawback.recommendedAction === "run_reversal_batch" ||
+                        v.clawback.clawbackStatus === "pending" ||
+                        v.clawback.clawbackStatus === "failed") && (
                         <Link
                           href="/admin/payout-transfers"
                           className="inline-block text-[10px] font-semibold text-oo-charcoal underline"
                         >
-                          {v.clawback.recommendedAction === "retry_reversal"
-                            ? "Retry reversal"
-                            : "Run reversal batch"}
+                          Open Vendor Transfers
                         </Link>
                       )}
                       {v.reversalPrepare.canPrepare && v.vendorPayoutTransferId ? (

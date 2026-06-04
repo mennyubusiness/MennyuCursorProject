@@ -17,6 +17,11 @@ describe("AdminPaymentsRefundsPanel clawback UI", () => {
     expect(panelSrc).not.toMatch(/Vendor clawback not needed/);
   });
 
+  it("does not offer global Run reversal batch on order detail", () => {
+    expect(panelSrc).not.toMatch(/Run reversal batch/);
+    expect(panelSrc).toMatch(/Open Vendor Transfers/);
+  });
+
   it("offers prepare only when reversalPrepare.canPrepare is true", () => {
     expect(panelSrc).toMatch(/v\.reversalPrepare\.canPrepare/);
     expect(panelSrc).toMatch(/adminPrepareMissingTransferReversalAction/);

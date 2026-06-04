@@ -7,6 +7,7 @@ import type {
   AdminTransferReversalRow,
   AdminVendorOption,
 } from "./payout-transfers-admin.types";
+import { clawbackBadgesForPayoutTransfers } from "@/services/admin-payout-transfer-list.service";
 import { PayoutTransfersDashboard } from "./PayoutTransfersDashboard";
 
 const TRANSFER_TAKE = 400;
@@ -38,8 +39,9 @@ export default async function AdminPayoutTransfersPage() {
         createdAt: true,
         submittedAt: true,
         failedAt: true,
+        legacyClawbackReviewStatus: true,
         vendor: { select: { id: true, name: true } },
-        vendorOrder: { select: { id: true, orderId: true } },
+        vendorOrder: { select: { id: true, orderId: true, totalCents: true } },
         paymentAllocation: {
           select: {
             netVendorTransferCents: true,
@@ -82,6 +84,8 @@ export default async function AdminPayoutTransfersPage() {
     fetchStripePlatformBalance("usd"),
   ]);
 
+  const clawbackBadgeByTransferId = await clawbackBadgesForPayoutTransfers(transfers, reversals);
+
   const initialTransfers: AdminPayoutTransferRow[] = transfers.map((t) => {
     const pa = t.paymentAllocation;
     const payment = pa.payment;
@@ -114,7 +118,8 @@ export default async function AdminPayoutTransfersPage() {
       submittedAt: t.submittedAt?.toISOString() ?? null,
       failedAt: t.failedAt?.toISOString() ?? null,
       vendor: t.vendor,
-      vendorOrder: t.vendorOrder,
+      vendorOrder: { id: t.vendorOrder.id, orderId: t.vendorOrder.orderId },
+      clawbackBadge: clawbackBadgeByTransferId.get(t.id) ?? null,
       moneyMovement: {
         customerPaymentCents: ctx.customerPaymentCents,
         stripeProcessingFeeCents: ctx.stripeProcessingFeeCents,

@@ -41,6 +41,11 @@ import {
   PARTIAL_REFUND_MANUAL_REVIEW_STATUS,
 } from "@/lib/vendor-payout-transfer-refund-eligibility";
 import { VendorTransferRowDetails } from "@/components/admin/VendorTransferRowDetails";
+import {
+  transferClawbackBadgeClass,
+  transferClawbackBadgeLabel,
+  transferClawbackBadgeTitle,
+} from "@/lib/admin-payout-transfer-clawback-badge";
 import type { StripePlatformBalanceSnapshot } from "@/services/stripe-balance.service";
 
 import type {
@@ -819,11 +824,21 @@ export function PayoutTransfersDashboard({
                                 {formatMoney(t.amountCents, t.currency)}
                               </td>
                               <td className="px-3 py-2">
-                                <span
-                                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${statusBadgeClass(t.status)}`}
-                                >
-                                  {statusLabel(t.status)}
-                                </span>
+                                <div className="flex flex-wrap items-center gap-1">
+                                  <span
+                                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${statusBadgeClass(t.status)}`}
+                                  >
+                                    {statusLabel(t.status)}
+                                  </span>
+                                  {t.clawbackBadge ? (
+                                    <span
+                                      title={transferClawbackBadgeTitle(t.clawbackBadge)}
+                                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${transferClawbackBadgeClass(t.clawbackBadge)}`}
+                                    >
+                                      {transferClawbackBadgeLabel(t.clawbackBadge)}
+                                    </span>
+                                  ) : null}
+                                </div>
                               </td>
                               <td className="px-3 py-2 text-xs text-oo-charcoal">
                                 <PayoutFailureCell row={t} />

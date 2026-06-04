@@ -1218,9 +1218,12 @@ export async function getAttentionItems(): Promise<AdminAttentionItem[]> {
     ...refundReviewItems,
   ];
   const orderIdsWithVoItems = new Set(voItems.map((i) => i.orderId));
+  const customerIssueOrderIds = new Set(customerIssueItems.map((i) => i.orderId));
 
   const openIssueOrderIds = await getOrderIdsWithOpenIssues();
-  const orderIdsNeedingOrderLevelItem = openIssueOrderIds.filter((id) => !orderIdsWithVoItems.has(id));
+  const orderIdsNeedingOrderLevelItem = openIssueOrderIds.filter(
+    (id) => !orderIdsWithVoItems.has(id) && !customerIssueOrderIds.has(id)
+  );
 
   let orderLevelItems: AdminAttentionItem[] = [];
   if (orderIdsNeedingOrderLevelItem.length > 0) {

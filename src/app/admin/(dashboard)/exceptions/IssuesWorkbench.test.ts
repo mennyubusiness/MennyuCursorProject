@@ -74,6 +74,7 @@ describe("admin attention queue", () => {
   });
 
   it("separates legacy financial review from urgent current queue", () => {
+    expect(workbenchSrc).toMatch(/legacyItems\.length > 0/);
     expect(workbenchSrc).toMatch(/Legacy financial review/i);
     expect(workbenchSrc).toMatch(/initialLegacyItems/);
     expect(workbenchSrc).toMatch(/Mark reviewed/);

@@ -83,6 +83,16 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).toMatch(/clawback failed/);
   });
 
+  it("shows compact clawback badge on vendor transfer rows when relevant", () => {
+    const dashboardSrc = readFileSync(
+      join(root, "src/app/admin/(dashboard)/payout-transfers/PayoutTransfersDashboard.tsx"),
+      "utf8"
+    );
+    expect(dashboardSrc).toMatch(/t\.clawbackBadge/);
+    expect(dashboardSrc).toMatch(/transferClawbackBadgeLabel/);
+    expect(dashboardSrc).toMatch(/transferClawbackBadgeTitle/);
+  });
+
   it("explains missing clawbacks must be prepared before reversal batch can run", () => {
     const dashboardSrc = readFileSync(
       join(root, "src/app/admin/(dashboard)/payout-transfers/PayoutTransfersDashboard.tsx"),

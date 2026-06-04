@@ -1,4 +1,5 @@
 import type { PlatformPayoutDisplayStatus } from "@/lib/stripe-money-movement";
+import type { TransferClawbackBadgeKind } from "@/lib/admin-payout-transfer-clawback-badge";
 
 export type AdminPayoutTransferRow = {
   id: string;
@@ -19,6 +20,8 @@ export type AdminPayoutTransferRow = {
   failedAt: string | null;
   vendor: { id: string; name: string };
   vendorOrder: { id: string; orderId: string };
+  /** Compact admin clawback state when refund/reversal applies (null = no badge). */
+  clawbackBadge: TransferClawbackBadgeKind | null;
   moneyMovement: {
     customerPaymentCents: number;
     stripeProcessingFeeCents: number | null;
