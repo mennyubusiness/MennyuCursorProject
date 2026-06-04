@@ -24,6 +24,7 @@ export function toAdminRefundPreviewPayload(
     hasPendingRefund: plan.hasPendingRefund,
     inFlightRefundReservedCents: plan.inFlightRefundReservedCents,
     staleBlockingRefundAttempts: plan.staleBlockingRefundAttempts,
+    inFlightRefundBlockers: plan.inFlightRefundBlockers,
   };
   if (plan.lineItem) {
     base.lineItem = {

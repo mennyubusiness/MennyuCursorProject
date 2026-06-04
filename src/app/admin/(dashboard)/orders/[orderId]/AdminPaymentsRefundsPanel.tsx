@@ -34,6 +34,29 @@ function shortenId(id: string | null | undefined): string {
   return `${id.slice(0, 14)}…${id.slice(-4)}`;
 }
 
+function InFlightRefundBlockersPanel({
+  blockers,
+}: {
+  blockers: AdminRefundPreviewPayload["inFlightRefundBlockers"];
+}) {
+  if (blockers.length === 0) return null;
+  return (
+    <div className="rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-950">
+      <p className="font-semibold">Refund in progress</p>
+      <ul className="mt-1 space-y-1">
+        {blockers.map((b) => (
+          <li key={`${b.source}:${b.id}`}>
+            {b.source === "order_refund" ? "Refund ledger entry is pending" : "Refund attempt in flight"} ·{" "}
+            {formatAdminMoney(b.amountCents)} · {b.status} · id {shortenId(b.id)}
+            {b.stripeRefundId ? ` · Stripe ${shortenId(b.stripeRefundId)}` : " · no Stripe refund ID"}
+            {b.createdAt ? ` · ${new Date(b.createdAt).toLocaleString()}` : ""}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function PreviewBlock({ preview }: { preview: AdminRefundPreviewPayload }) {
   return (
     <div className="mt-4 space-y-3 rounded-lg border border-oo-light-stone bg-oo-cream/60 p-3 text-sm">
@@ -171,6 +194,10 @@ function PreviewBlock({ preview }: { preview: AdminRefundPreviewPayload }) {
             )}
           </dl>
         </div>
+      )}
+
+      {preview.inFlightRefundBlockers.length > 0 && (
+        <InFlightRefundBlockersPanel blockers={preview.inFlightRefundBlockers} />
       )}
 
       {preview.staleBlockingRefundAttempts.length > 0 && (
@@ -396,6 +423,7 @@ function RefundModal({
                   hasPendingRefund: false,
                   inFlightRefundReservedCents: 0,
                   staleBlockingRefundAttempts: [],
+                  inFlightRefundBlockers: [],
                 }
           );
         }
@@ -833,12 +861,14 @@ function StaleRefundAttemptBanner({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   if (attempts.length === 0) return null;
 
   async function dismiss(refundAttemptId: string) {
     setBusyId(refundAttemptId);
     setError(null);
+    setSuccess(null);
     try {
       const res = await fetch(`/api/admin/refund-attempts/${refundAttemptId}/dismiss-legacy`, {
         method: "POST",
@@ -849,6 +879,7 @@ function StaleRefundAttemptBanner({
         return;
       }
       setConfirmId(null);
+      setSuccess("Stale refund attempt dismissed. Preview the refund again.");
       router.refresh();
     } finally {
       setBusyId(null);
@@ -919,6 +950,11 @@ function StaleRefundAttemptBanner({
       {error && (
         <p className="mt-2 text-xs text-red-800" role="alert">
           {error}
+        </p>
+      )}
+      {success && (
+        <p className="mt-2 text-xs text-emerald-900" role="status">
+          {success}
         </p>
       )}
     </div>
@@ -1015,6 +1051,13 @@ export function AdminPaymentsRefundsPanel({
           attempts={summary.ledgerSummary?.staleBlockingRefundAttempts ?? []}
           canDismiss={canExecuteRefunds}
         />
+        {(summary.ledgerSummary?.inFlightRefundBlockers.length ?? 0) > 0 && (
+          <div className="mt-3">
+            <InFlightRefundBlockersPanel
+              blockers={summary.ledgerSummary?.inFlightRefundBlockers ?? []}
+            />
+          </div>
+        )}
         {canExecuteRefunds && hasRemaining && (
           <div className="flex flex-wrap gap-2">
             <button

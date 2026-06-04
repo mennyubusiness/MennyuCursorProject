@@ -123,3 +123,16 @@ export function findStaleBlockingRefundAttempts(
 ): RefundAttemptBlockingContext[] {
   return attempts.filter((a) => isStaleBlockingRefundAttempt(a, orderRefunds));
 }
+
+/** Confirm-time block for an existing RefundAttempt on the same idempotency key. */
+export function getExistingAttemptConfirmBlock(
+  attempt: RefundAttemptBlockingContext,
+  orderRefunds: OrderRefundLinkContext[]
+): "STALE_REFUND_ATTEMPT_BLOCKS_REFUND" | "REFUND_IN_PROGRESS" | null {
+  if (isRefundAttemptDismissed(attempt)) return null;
+  if (attempt.status !== "attempted") return null;
+  if (isStaleBlockingRefundAttempt(attempt, orderRefunds)) {
+    return "STALE_REFUND_ATTEMPT_BLOCKS_REFUND";
+  }
+  return "REFUND_IN_PROGRESS";
+}

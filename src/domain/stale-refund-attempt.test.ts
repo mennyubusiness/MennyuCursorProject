@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canDismissStaleRefundAttempt,
+  getExistingAttemptConfirmBlock,
   isRealInFlightRefundAttempt,
   isStaleBlockingRefundAttempt,
   STALE_REFUND_ATTEMPT_GRACE_MS,
@@ -85,5 +86,20 @@ describe("stale-refund-attempt domain", () => {
         []
       )
     ).toBe(false);
+  });
+
+  it("getExistingAttemptConfirmBlock returns null for dismissed attempted attempt", () => {
+    expect(
+      getExistingAttemptConfirmBlock(
+        { ...baseAttempt, status: "attempted", dismissedAsLegacyAt: new Date() },
+        []
+      )
+    ).toBeNull();
+  });
+
+  it("getExistingAttemptConfirmBlock returns stale for orphan attempted", () => {
+    expect(getExistingAttemptConfirmBlock({ ...baseAttempt, status: "attempted" }, [])).toBe(
+      "STALE_REFUND_ATTEMPT_BLOCKS_REFUND"
+    );
   });
 });

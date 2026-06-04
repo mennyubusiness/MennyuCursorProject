@@ -112,6 +112,7 @@ describe("admin-refund.service", () => {
     mockOrderRefundFindMany.mockResolvedValue([]);
     mockRefundAttemptFindUnique.mockResolvedValue(null);
     mockRefundAttemptCreate.mockResolvedValue({ id: "ra_1" });
+    mockRefundAttemptUpdate.mockResolvedValue({ id: "ra_1" });
     mockRecordPending.mockResolvedValue({ id: "or_1", created: true });
     mockOrderRefundUpdate.mockResolvedValue({ id: "or_1" });
     mockLinkLedger.mockResolvedValue("or_1");
@@ -421,6 +422,7 @@ describe("admin-refund.service", () => {
       paymentAmountCents: 2408,
       hasPendingRefund: false,
       staleBlockingRefundAttempts: [],
+      inFlightRefundBlockers: [],
     });
     await expect(
       executeAdminFullOrderRefund({
@@ -444,6 +446,7 @@ describe("admin-refund.service", () => {
       paymentAmountCents: 2408,
       hasPendingRefund: true,
       staleBlockingRefundAttempts: [],
+      inFlightRefundBlockers: [],
     });
     await expect(
       executeAdminFullOrderRefund({
@@ -496,6 +499,38 @@ describe("admin-refund.service", () => {
       })
     ).rejects.toMatchObject({ code: "REFUND_IN_PROGRESS" });
     expect(mockRecordPending).not.toHaveBeenCalled();
+  });
+
+  it("allows confirm after stale RefundAttempt was dismissed as legacy", async () => {
+    mockRefundAttemptFindUnique.mockResolvedValue({
+      id: "ra_dismissed",
+      status: "attempted",
+      stripeRefundId: null,
+      amountCents: 2000,
+      dismissedAsLegacyAt: new Date("2026-06-03T23:34:36.855Z"),
+      idempotencyKey: "admin:full_order:ord_1:_:2000",
+      failureCode: null,
+      failureMessage: "Dismissed stale orphan attempt",
+      createdAt: new Date("2026-06-03T22:50:02.533Z"),
+      orderRefund: null,
+    });
+    const result = await executeAdminFullOrderRefund({
+      orderId: "ord_1",
+      adminUserId: "admin_1",
+      reason: "test",
+    });
+    expect(result.success).toBe(true);
+    expect(mockRecordPending).toHaveBeenCalled();
+    expect(mockRefundAttemptUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ra_dismissed" },
+        data: expect.objectContaining({
+          dismissedAsLegacyAt: null,
+          dismissedAsLegacyBy: null,
+          status: "attempted",
+        }),
+      })
+    );
   });
 
   it("blocks confirm with stale message for orphaned attempted RefundAttempt", async () => {

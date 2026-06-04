@@ -24,7 +24,7 @@ import {
   recordPendingRefund,
 } from "@/services/refund-ledger.service";
 import { formatAdminRefundCapErrorMessage } from "@/lib/admin-refund-error-messages";
-import { isStaleBlockingRefundAttempt } from "@/domain/stale-refund-attempt";
+import { getExistingAttemptConfirmBlock } from "@/domain/stale-refund-attempt";
 import {
   executeStripeRefundForAdmin,
   type RefundResult,
@@ -333,25 +333,27 @@ async function runAdminRefundExecution(args: {
       where: { orderId: plan.orderId },
       select: { refundAttemptId: true, status: true },
     });
-    if (
-      isStaleBlockingRefundAttempt(
-        {
-          ...existingAttempt,
-          hasLinkedOrderRefund: existingAttempt.orderRefund != null,
-        },
-        orderRefunds
-      )
-    ) {
+    const confirmBlock = getExistingAttemptConfirmBlock(
+      {
+        ...existingAttempt,
+        hasLinkedOrderRefund: existingAttempt.orderRefund != null,
+      },
+      orderRefunds
+    );
+    if (confirmBlock === "STALE_REFUND_ATTEMPT_BLOCKS_REFUND") {
       throw new AdminRefundError(
         "STALE_REFUND_ATTEMPT_BLOCKS_REFUND",
         formatAdminRefundCapErrorMessage({ code: "STALE_REFUND_ATTEMPT_BLOCKS_REFUND" }),
         ["stale_refund_attempt_blocks_refund"]
       );
     }
-    throw new AdminRefundError(
-      "REFUND_IN_PROGRESS",
-      formatAdminRefundCapErrorMessage({ code: "REFUND_IN_PROGRESS" })
-    );
+    if (confirmBlock === "REFUND_IN_PROGRESS") {
+      throw new AdminRefundError(
+        "REFUND_IN_PROGRESS",
+        formatAdminRefundCapErrorMessage({ code: "REFUND_IN_PROGRESS" }),
+        ["refund_already_in_progress"]
+      );
+    }
   }
 
   let orderRefundId: string;
@@ -383,6 +385,8 @@ async function runAdminRefundExecution(args: {
         status: "attempted",
         failureCode: null,
         failureMessage: null,
+        dismissedAsLegacyAt: null,
+        dismissedAsLegacyBy: null,
         updatedAt: new Date(),
       },
     });
@@ -407,10 +411,10 @@ async function runAdminRefundExecution(args: {
       if (!isUnique) throw e;
       const again = await prisma.refundAttempt.findUnique({
         where: { idempotencyKey },
-        select: { id: true, status: true },
+        select: { id: true, status: true, dismissedAsLegacyAt: true },
       });
       if (!again) throw e;
-      if (again.status === "attempted") {
+      if (again.status === "attempted" && again.dismissedAsLegacyAt == null) {
         throw new AdminRefundError(
           "REFUND_IN_PROGRESS",
           formatAdminRefundCapErrorMessage({ code: "REFUND_IN_PROGRESS" })

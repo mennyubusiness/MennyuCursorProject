@@ -72,6 +72,14 @@ export type RefundCalculationPreview = {
   hasPendingRefund: boolean;
   inFlightRefundReservedCents: number;
   staleBlockingRefundAttempts: StaleRefundAttemptSummary[];
+  inFlightRefundBlockers: Array<{
+    source: "order_refund" | "refund_attempt";
+    id: string;
+    amountCents: number;
+    status: string;
+    stripeRefundId: string | null;
+    createdAt: string | null;
+  }>;
 };
 
 export type AssertRefundAllowedInput = {
@@ -247,6 +255,7 @@ async function buildPreviewBase(input: {
   const remainingOrder = refundSummary?.remainingRefundableCents ?? 0;
   const hasPendingRefund = refundSummary?.hasPendingRefund ?? false;
   const staleBlockingRefundAttempts = refundSummary?.staleBlockingRefundAttempts ?? [];
+  const inFlightRefundBlockers = refundSummary?.inFlightRefundBlockers ?? [];
   const inFlightRefundReservedCents = (refundSummary?.refunds ?? [])
     .filter((r) => r.status === "pending" || r.status === "requires_action")
     .reduce((sum, r) => sum + r.amountCents, 0);
@@ -457,6 +466,7 @@ async function buildPreviewBase(input: {
     hasPendingRefund,
     inFlightRefundReservedCents,
     staleBlockingRefundAttempts,
+    inFlightRefundBlockers,
   };
 }
 

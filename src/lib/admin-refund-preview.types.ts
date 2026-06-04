@@ -47,6 +47,14 @@ export type AdminRefundPreviewPayload = {
     dismissible: boolean;
     dismissBlockReason: string | null;
   }>;
+  inFlightRefundBlockers: Array<{
+    source: "order_refund" | "refund_attempt";
+    id: string;
+    amountCents: number;
+    status: string;
+    stripeRefundId: string | null;
+    createdAt: string | null;
+  }>;
   lineItem?: {
     orderLineItemId: string;
     itemName: string;

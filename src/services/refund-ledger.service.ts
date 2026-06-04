@@ -28,6 +28,15 @@ import {
 import type { StaleRefundAttemptSummary } from "@/services/stale-refund-attempt.service";
 import { syncVendorTransferEligibilityAfterRefundSuccess } from "@/services/vendor-payout-transfer-refund-eligibility.service";
 
+export type InFlightRefundBlockerSummary = {
+  source: "order_refund" | "refund_attempt";
+  id: string;
+  amountCents: number;
+  status: string;
+  stripeRefundId: string | null;
+  createdAt: string | null;
+};
+
 export type OrderRefundSummary = {
   orderId: string;
   paymentAmountCents: number;
@@ -37,6 +46,7 @@ export type OrderRefundSummary = {
   remainingRefundableCents: number;
   paymentRefundStatus: PaymentRefundStatusLabel;
   hasPendingRefund: boolean;
+  inFlightRefundBlockers: InFlightRefundBlockerSummary[];
   staleBlockingRefundAttempts: StaleRefundAttemptSummary[];
   refunds: Array<{
     id: string;
@@ -93,6 +103,7 @@ async function loadRefundContext(orderId: string) {
           vendorOrderId: true,
           stripeRefundId: true,
           refundAttemptId: true,
+          createdAt: true,
         },
       },
       refundAttempts: {
@@ -121,6 +132,45 @@ async function loadRefundContext(orderId: string) {
     hasLinkedOrderRefund: linkedAttemptIds.has(a.id),
   }));
   return { order, payment, legacyAttempts };
+}
+
+function buildInFlightRefundBlockers(
+  orderRefunds: Array<{
+    id: string;
+    amountCents: number;
+    status: string;
+    stripeRefundId: string | null;
+    createdAt: Date;
+  }>,
+  attempts: RefundAttemptBlockingContext[],
+  orderRefundLinks: Array<{ refundAttemptId: string | null; status: string }>
+): InFlightRefundBlockerSummary[] {
+  const blockers: InFlightRefundBlockerSummary[] = [];
+  for (const r of orderRefunds) {
+    if (r.status === "pending" || r.status === "requires_action") {
+      blockers.push({
+        source: "order_refund",
+        id: r.id,
+        amountCents: r.amountCents,
+        status: r.status,
+        stripeRefundId: r.stripeRefundId,
+        createdAt: r.createdAt.toISOString(),
+      });
+    }
+  }
+  for (const a of attempts) {
+    if (isRealInFlightRefundAttempt(a, orderRefundLinks)) {
+      blockers.push({
+        source: "refund_attempt",
+        id: a.id,
+        amountCents: a.amountCents,
+        status: a.status,
+        stripeRefundId: a.stripeRefundId,
+        createdAt: a.createdAt.toISOString(),
+      });
+    }
+  }
+  return blockers;
 }
 
 function buildStaleBlockingSummaries(
@@ -210,6 +260,11 @@ export async function getOrderRefundSummary(orderId: string): Promise<OrderRefun
     attemptContexts,
     orderRefundLinks
   );
+  const inFlightRefundBlockers = buildInFlightRefundBlockers(
+    ctx.order.orderRefunds,
+    attemptContexts,
+    orderRefundLinks
+  );
 
   return {
     orderId,
@@ -230,6 +285,7 @@ export async function getOrderRefundSummary(orderId: string): Promise<OrderRefun
       hasPendingRefund,
     }),
     hasPendingRefund,
+    inFlightRefundBlockers,
     staleBlockingRefundAttempts,
     refunds: buildRefundRows(ctx.order.orderRefunds, ctx.legacyAttempts),
   };
@@ -353,6 +409,7 @@ async function loadRefundContextInTx(tx: Prisma.TransactionClient, orderId: stri
           vendorOrderId: true,
           stripeRefundId: true,
           refundAttemptId: true,
+          createdAt: true,
         },
       },
       refundAttempts: {

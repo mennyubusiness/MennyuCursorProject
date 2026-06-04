@@ -122,4 +122,33 @@ describe("refund-ledger.service", () => {
     mockOrderFindUnique.mockResolvedValue(null);
     expect(await getOrderRefundSummary("missing")).toBeNull();
   });
+
+  it("dismissed attempted RefundAttempt does not set hasPendingRefund", async () => {
+    mockOrderFindUnique.mockResolvedValue({
+      id: "ord_1",
+      totalCents: 2408,
+      payments: [{ amountCents: 2408 }],
+      orderRefunds: [],
+      refundAttempts: [
+        {
+          id: "ra_1",
+          amountCents: 2408,
+          status: "attempted",
+          vendorOrderId: null,
+          stripeRefundId: null,
+          dismissedAsLegacyAt: new Date("2026-06-03T23:34:36.855Z"),
+          idempotencyKey: "admin:full_order:ord_1:_:2408",
+          failureCode: null,
+          failureMessage: "Dismissed",
+          createdAt: new Date("2026-06-03T22:50:02.533Z"),
+        },
+      ],
+    });
+
+    const summary = await getOrderRefundSummary("ord_1");
+    expect(summary?.hasPendingRefund).toBe(false);
+    expect(summary?.staleBlockingRefundAttempts).toEqual([]);
+    expect(summary?.inFlightRefundBlockers).toEqual([]);
+    expect(summary?.remainingRefundableCents).toBe(2408);
+  });
 });

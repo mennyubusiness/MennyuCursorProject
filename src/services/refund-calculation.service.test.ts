@@ -91,6 +91,7 @@ describe("refund-calculation.service", () => {
       remainingRefundableCents: 2000,
       hasPendingRefund: false,
       staleBlockingRefundAttempts: [],
+      inFlightRefundBlockers: [],
       refunds: [],
     });
     mockGetRemainingOrder.mockResolvedValue(2000);
@@ -105,6 +106,7 @@ describe("refund-calculation.service", () => {
       remainingRefundableCents: 1500,
       hasPendingRefund: false,
       staleBlockingRefundAttempts: [],
+      inFlightRefundBlockers: [],
       refunds: [],
     });
     mockGetRemainingOrder.mockResolvedValue(1500);
@@ -410,6 +412,7 @@ describe("refund-calculation.service", () => {
           dismissBlockReason: null,
         },
       ],
+      inFlightRefundBlockers: [],
       refunds: [],
     });
     const preview = await previewFullOrderRefund("ord_1");
@@ -422,6 +425,7 @@ describe("refund-calculation.service", () => {
       remainingRefundableCents: 2408,
       hasPendingRefund: false,
       staleBlockingRefundAttempts: [],
+      inFlightRefundBlockers: [],
       refunds: [],
     });
     const preview = await previewFullOrderRefund("ord_1");

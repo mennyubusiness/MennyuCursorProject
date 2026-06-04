@@ -264,6 +264,14 @@ export type AdminOrderPaymentSummary = {
       dismissible: boolean;
       dismissBlockReason: string | null;
     }>;
+    inFlightRefundBlockers: Array<{
+      source: "order_refund" | "refund_attempt";
+      id: string;
+      amountCents: number;
+      status: string;
+      stripeRefundId: string | null;
+      createdAt: string | null;
+    }>;
   } | null;
   moneyMovement: {
     customerPaymentCents: number;
@@ -561,6 +569,7 @@ export async function fetchAdminOrderPaymentSummary(
             paymentRefundStatus: ledgerSummary.paymentRefundStatus,
             hasPendingRefund: ledgerSummary.hasPendingRefund,
             staleBlockingRefundAttempts: ledgerSummary.staleBlockingRefundAttempts,
+            inFlightRefundBlockers: ledgerSummary.inFlightRefundBlockers,
           }
         : null,
       moneyMovement: payment
