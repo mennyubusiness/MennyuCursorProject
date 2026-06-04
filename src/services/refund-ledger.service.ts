@@ -101,6 +101,7 @@ async function loadRefundContext(orderId: string) {
           amountCents: true,
           status: true,
           vendorOrderId: true,
+          refundScope: true,
           stripeRefundId: true,
           refundAttemptId: true,
           createdAt: true,
@@ -305,11 +306,13 @@ export async function getVendorOrderRefundSummary(
 
   const totalRefundedCents = computeVendorOrderRefundedCents({
     vendorOrderId,
+    vendorOrderTotalCents: vo.totalCents,
     orderRefunds: ctx.order.orderRefunds,
     legacyAttempts: ctx.legacyAttempts,
   });
   const committedCents = computeVendorOrderRefundedCents({
     vendorOrderId,
+    vendorOrderTotalCents: vo.totalCents,
     orderRefunds: ctx.order.orderRefunds,
     legacyAttempts: ctx.legacyAttempts,
     committed: true,
@@ -364,26 +367,19 @@ async function refreshOrderRefundDenormalized(
     },
   });
 
-  const vendorIds = [
-    ...new Set(
-      ctx.order.orderRefunds
-        .map((r) => r.vendorOrderId)
-        .filter((id): id is string => Boolean(id))
-    ),
-  ];
-  for (const vid of vendorIds) {
-    const voTotal = await tx.vendorOrder.findUnique({
-      where: { id: vid },
-      select: { totalCents: true },
-    });
-    if (!voTotal) continue;
+  const vendorOrders = await tx.vendorOrder.findMany({
+    where: { orderId },
+    select: { id: true, totalCents: true },
+  });
+  for (const vo of vendorOrders) {
     const voRefunded = computeVendorOrderRefundedCents({
-      vendorOrderId: vid,
+      vendorOrderId: vo.id,
+      vendorOrderTotalCents: vo.totalCents,
       orderRefunds: ctx.order.orderRefunds,
       legacyAttempts: ctx.legacyAttempts,
     });
     await tx.vendorOrder.update({
-      where: { id: vid },
+      where: { id: vo.id },
       data: { totalRefundedCents: voRefunded },
     });
   }
@@ -407,6 +403,7 @@ async function loadRefundContextInTx(tx: Prisma.TransactionClient, orderId: stri
           amountCents: true,
           status: true,
           vendorOrderId: true,
+          refundScope: true,
           stripeRefundId: true,
           refundAttemptId: true,
           createdAt: true,
@@ -471,6 +468,7 @@ export async function recordPendingRefund(
     vendorOrderTotalCents = vo.totalCents;
     vendorOrderRefundedCents = computeVendorOrderRefundedCents({
       vendorOrderId: input.vendorOrderId,
+      vendorOrderTotalCents: vo.totalCents,
       orderRefunds: ctx.order.orderRefunds,
       legacyAttempts: ctx.legacyAttempts.filter((a) => !a.dismissedAsLegacyAt),
       committed: true,

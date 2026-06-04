@@ -1366,7 +1366,7 @@ export function AdminPaymentsRefundsPanel({
                             : "Run reversal batch"}
                         </Link>
                       )}
-                      {v.reversals.length > 0 && (
+                      {v.clawback.clawbackStatus !== "not_needed" && v.reversals.length > 0 && (
                         <ul className="text-[10px] text-oo-stone-gray">
                           {v.reversals.map((rev) => (
                             <li key={rev.id}>

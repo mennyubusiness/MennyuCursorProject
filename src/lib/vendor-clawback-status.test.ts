@@ -83,7 +83,72 @@ describe("computeVendorClawbackSummary", () => {
       reversals: [],
     });
     expect(s.clawbackStatus).toBe("manual_review");
+    expect(s.adminLabel).toBe("Vendor clawback missing");
+    expect(s.adminDetail).toMatch(
+      /Customer was refunded after this vendor was paid\. Vendor transfer reversal is required\./
+    );
     expect(s.hasMissingReversalSetup).toBe(true);
+    expect(s.clawbackRequiredCents).toBe(1500);
+  });
+
+  it("does not say clawback not needed when full-order refund applies via vendorOrderRefundedCents", () => {
+    const s = computeVendorClawbackSummary({
+      ...paidBase,
+      vendorOrderRefundedCents: 2000,
+      reversals: [],
+    });
+    expect(s.clawbackStatus).not.toBe("not_needed");
+    expect(s.adminLabel).not.toBe("Vendor clawback not needed");
+  });
+
+  it("full-order refund + paid transfer + pending reversal → pending", () => {
+    const s = computeVendorClawbackSummary({
+      ...paidBase,
+      reversals: [{ status: "submitted", amountCents: 1500 }],
+    });
+    expect(s.clawbackStatus).toBe("pending");
+  });
+
+  it("full-order refund + paid transfer + reversed reversal → recovered", () => {
+    const s = computeVendorClawbackSummary({
+      ...paidBase,
+      reversals: [{ status: "reversed", amountCents: 1500 }],
+    });
+    expect(s.clawbackStatus).toBe("recovered");
+    expect(s.adminLabel).toBe("Vendor clawback recovered");
+  });
+
+  it("full-order refund + paid transfer + failed reversal → failed", () => {
+    const s = computeVendorClawbackSummary({
+      ...paidBase,
+      reversals: [{ status: "failed", amountCents: 1500 }],
+    });
+    expect(s.clawbackStatus).toBe("failed");
+  });
+
+  it("unsent vendor transfer after full-order refund → not needed", () => {
+    const s = computeVendorClawbackSummary({
+      transferStatus: "cancelled_due_to_refund",
+      stripeTransferId: null,
+      transferAmountCents: 1500,
+      vendorOrderTotalCents: 2000,
+      vendorOrderRefundedCents: 2000,
+      reversals: [],
+    });
+    expect(s.clawbackStatus).toBe("not_needed");
+    expect(s.adminLabel).toMatch(/cancelled due to refund/i);
+  });
+
+  it("does not require clawback when transfer was never paid via Connect", () => {
+    const s = computeVendorClawbackSummary({
+      transferStatus: "pending",
+      stripeTransferId: null,
+      transferAmountCents: null,
+      vendorOrderTotalCents: 2000,
+      vendorOrderRefundedCents: 2000,
+      reversals: [],
+    });
+    expect(s.clawbackStatus).toBe("not_needed");
   });
 
   it("returns manual_review for partial refund on paid transfer", () => {

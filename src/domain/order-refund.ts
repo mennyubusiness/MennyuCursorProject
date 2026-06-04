@@ -5,6 +5,12 @@ import type { OrderRefundScope, OrderRefundStatus } from "@prisma/client";
 
 export const ORDER_REFUND_SUCCEEDED_STATUS: OrderRefundStatus = "succeeded";
 
+/** Order-level refund scopes with no vendorOrderId — apply to every vendor order on the order. */
+export const ORDER_LEVEL_REFUND_SCOPES: ReadonlySet<OrderRefundScope> = new Set([
+  "full_order",
+  "system_cancel",
+]);
+
 export const COMMITTED_ORDER_REFUND_STATUSES: OrderRefundStatus[] = [
   "succeeded",
   "pending",
@@ -58,9 +64,25 @@ export function computeCommittedRefundCents(input: {
   return ledger + legacy;
 }
 
+export function orderLevelRefundAppliesToAllVendorOrders(refund: {
+  vendorOrderId: string | null;
+  refundScope: string;
+}): boolean {
+  return (
+    !refund.vendorOrderId &&
+    ORDER_LEVEL_REFUND_SCOPES.has(refund.refundScope as OrderRefundScope)
+  );
+}
+
 export function computeVendorOrderRefundedCents(input: {
   vendorOrderId: string;
-  orderRefunds: Array<{ vendorOrderId: string | null; amountCents: number; status: string }>;
+  vendorOrderTotalCents: number;
+  orderRefunds: Array<{
+    vendorOrderId: string | null;
+    amountCents: number;
+    status: string;
+    refundScope: string;
+  }>;
   legacyAttempts: Array<{
     vendorOrderId: string | null;
     amountCents: number;
@@ -88,6 +110,15 @@ export function computeVendorOrderRefundedCents(input: {
         a.vendorOrderId === input.vendorOrderId
     )
     .reduce((s, a) => s + a.amountCents, 0);
+
+  const hasOrderLevelRefund = input.orderRefunds.some(
+    (r) => ledgerFilter(r.status) && orderLevelRefundAppliesToAllVendorOrders(r)
+  );
+
+  if (hasOrderLevelRefund) {
+    return Math.max(fromLedger + fromLegacy, input.vendorOrderTotalCents);
+  }
+
   return fromLedger + fromLegacy;
 }
 

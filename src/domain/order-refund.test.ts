@@ -29,9 +29,20 @@ describe("order-refund domain", () => {
   it("computes vendor-order refunded cents from ledger + legacy", () => {
     const total = computeVendorOrderRefundedCents({
       vendorOrderId: "vo_1",
+      vendorOrderTotalCents: 1000,
       orderRefunds: [
-        { vendorOrderId: "vo_1", amountCents: 400, status: "succeeded" },
-        { vendorOrderId: "vo_2", amountCents: 100, status: "succeeded" },
+        {
+          vendorOrderId: "vo_1",
+          amountCents: 400,
+          status: "succeeded",
+          refundScope: "full_vendor_order",
+        },
+        {
+          vendorOrderId: "vo_2",
+          amountCents: 100,
+          status: "succeeded",
+          refundScope: "full_vendor_order",
+        },
       ],
       legacyAttempts: [
         {
@@ -43,6 +54,83 @@ describe("order-refund domain", () => {
       ],
     });
     expect(total).toBe(550);
+  });
+
+  it("treats full-order succeeded refund as refunding every vendor order", () => {
+    const voTotal = 2408;
+    expect(
+      computeVendorOrderRefundedCents({
+        vendorOrderId: "vo_a",
+        vendorOrderTotalCents: voTotal,
+        orderRefunds: [
+          {
+            vendorOrderId: null,
+            amountCents: 2408,
+            status: "succeeded",
+            refundScope: "full_order",
+          },
+        ],
+        legacyAttempts: [],
+      })
+    ).toBe(voTotal);
+  });
+
+  it("full-order refund does not apply to unrelated vendor when only vendor-order refund exists", () => {
+    expect(
+      computeVendorOrderRefundedCents({
+        vendorOrderId: "vo_a",
+        vendorOrderTotalCents: 1500,
+        orderRefunds: [
+          {
+            vendorOrderId: "vo_b",
+            amountCents: 800,
+            status: "succeeded",
+            refundScope: "full_vendor_order",
+          },
+        ],
+        legacyAttempts: [],
+      })
+    ).toBe(0);
+    expect(
+      computeVendorOrderRefundedCents({
+        vendorOrderId: "vo_b",
+        vendorOrderTotalCents: 800,
+        orderRefunds: [
+          {
+            vendorOrderId: "vo_b",
+            amountCents: 800,
+            status: "succeeded",
+            refundScope: "full_vendor_order",
+          },
+        ],
+        legacyAttempts: [],
+      })
+    ).toBe(800);
+  });
+
+  it("multi-vendor full-order refund applies to each vendor order total", () => {
+    const fullOrderRefund = {
+      vendorOrderId: null,
+      amountCents: 5000,
+      status: "succeeded",
+      refundScope: "full_order",
+    };
+    expect(
+      computeVendorOrderRefundedCents({
+        vendorOrderId: "vo_a",
+        vendorOrderTotalCents: 3000,
+        orderRefunds: [fullOrderRefund],
+        legacyAttempts: [],
+      })
+    ).toBe(3000);
+    expect(
+      computeVendorOrderRefundedCents({
+        vendorOrderId: "vo_b",
+        vendorOrderTotalCents: 2000,
+        orderRefunds: [fullOrderRefund],
+        legacyAttempts: [],
+      })
+    ).toBe(2000);
   });
 
   it("remaining refundable is non-negative", () => {

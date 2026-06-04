@@ -24,9 +24,11 @@ import {
 import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
 import { ageMinutes as ageMinutesUtil } from "@/lib/date-utils";
 import {
+  computeVendorClawbackSummary,
   isReversalPendingAttentionStale,
   VENDOR_CLAWBACK_PENDING_ATTENTION_MINUTES,
 } from "@/lib/vendor-clawback-status";
+import { computeVendorOrderRefundedCents } from "@/domain/order-refund";
 import { VENDOR_PAYOUT_TRANSFER_REVERSAL_STATUS } from "@/services/vendor-payout-transfer-reversal.service";
 import {
   canManualRecoverVendorOrder,
@@ -935,7 +937,6 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
     where: {
       status: "paid",
       stripeTransferId: { not: null },
-      vendorOrder: { totalRefundedCents: { gt: 0 } },
     },
     include: {
       vendorOrder: {
@@ -943,7 +944,6 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
           id: true,
           orderId: true,
           totalCents: true,
-          totalRefundedCents: true,
           vendor: { select: { name: true } },
           order: {
             select: {
@@ -951,22 +951,81 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
               customerPhone: true,
               paymentRefundStatus: true,
               pod: { select: { id: true, name: true } },
+              orderRefunds: {
+                select: {
+                  vendorOrderId: true,
+                  amountCents: true,
+                  status: true,
+                  refundScope: true,
+                  refundAttemptId: true,
+                },
+              },
+              refundAttempts: {
+                select: {
+                  id: true,
+                  vendorOrderId: true,
+                  amountCents: true,
+                  status: true,
+                },
+              },
             },
           },
         },
       },
-      reversals: { select: { id: true } },
+      reversals: {
+        select: {
+          id: true,
+          status: true,
+          amountCents: true,
+          failureMessage: true,
+          createdAt: true,
+          submittedAt: true,
+        },
+      },
     },
     orderBy: { updatedAt: "desc" },
-    take: TAKE_VENDOR_CLAWBACK_ATTENTION,
+    take: TAKE_VENDOR_CLAWBACK_ATTENTION * 4,
   });
 
   const items: AdminAttentionItem[] = [];
   for (const vpt of candidates) {
     const vo = vpt.vendorOrder;
-    if (!vo) continue;
-    if (vpt.reversals.length > 0) continue;
-    if (vo.totalRefundedCents < vo.totalCents) continue;
+    if (!vo?.order) continue;
+
+    const linkedAttemptIds = new Set(
+      vo.order.orderRefunds
+        .map((r) => r.refundAttemptId)
+        .filter((id): id is string => Boolean(id))
+    );
+    const legacyAttempts = vo.order.refundAttempts.map((a) => ({
+      vendorOrderId: a.vendorOrderId,
+      amountCents: a.amountCents,
+      status: a.status,
+      hasLinkedOrderRefund: linkedAttemptIds.has(a.id),
+    }));
+    const orderRefundsForAllocation = vo.order.orderRefunds.map((r) => ({
+      vendorOrderId: r.vendorOrderId,
+      amountCents: r.amountCents,
+      status: r.status,
+      refundScope: r.refundScope,
+    }));
+    const effectiveVendorOrderRefundedCents = computeVendorOrderRefundedCents({
+      vendorOrderId: vo.id,
+      vendorOrderTotalCents: vo.totalCents,
+      orderRefunds: orderRefundsForAllocation,
+      legacyAttempts,
+    });
+    const clawback = computeVendorClawbackSummary({
+      transferStatus: vpt.status,
+      stripeTransferId: vpt.stripeTransferId,
+      transferAmountCents: vpt.amountCents,
+      vendorOrderTotalCents: vo.totalCents,
+      vendorOrderRefundedCents: effectiveVendorOrderRefundedCents,
+      reversals: vpt.reversals,
+    });
+
+    if (!clawback.hasMissingReversalSetup) continue;
+    if (effectiveVendorOrderRefundedCents < vo.totalCents) continue;
 
     const ageMinutes = ageMinutesUtil(vpt.updatedAt, now.getTime());
     items.push({
@@ -982,20 +1041,19 @@ async function fetchMissingVendorClawbackAttentionItems(now: Date): Promise<Admi
       orderId: vo.orderId,
       vendorOrderId: vo.id,
       primaryEntityHref: paymentsRefundsHref(vo.orderId),
-      order: vo.order
-        ? {
-            id: vo.order.id,
-            customerPhone: vo.order.customerPhone,
-            pod: vo.order.pod ?? undefined,
-          }
-        : undefined,
+      order: {
+        id: vo.order.id,
+        customerPhone: vo.order.customerPhone,
+        pod: vo.order.pod ?? undefined,
+      },
       vendor: vo.vendor ? { name: vo.vendor.name } : undefined,
-      paymentRefundStatus: vo.order?.paymentRefundStatus ?? null,
+      paymentRefundStatus: vo.order.paymentRefundStatus ?? null,
       clawbackStatus: "manual_review",
       clawbackAmountCents: vpt.amountCents,
       stripeTransferId: vpt.stripeTransferId,
       failureMessage: null,
     });
+    if (items.length >= TAKE_VENDOR_CLAWBACK_ATTENTION) break;
   }
   return items;
 }

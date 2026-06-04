@@ -64,4 +64,34 @@ describe("admin-order-payment-summary.service", () => {
     });
     expect(s.adminLabel).toBe("Vendor clawback pending");
   });
+
+  it("full-order refund + paid transfer yields clawback missing when wired through vendor order refunded cents", async () => {
+    const { computeVendorOrderRefundedCents } = await import("@/domain/order-refund");
+    const { computeVendorClawbackSummary } = await import("@/lib/vendor-clawback-status");
+    const vendorOrderTotalCents = 2240;
+    const refunded = computeVendorOrderRefundedCents({
+      vendorOrderId: "vo_1",
+      vendorOrderTotalCents,
+      orderRefunds: [
+        {
+          vendorOrderId: null,
+          amountCents: 2408,
+          status: "succeeded",
+          refundScope: "full_order",
+        },
+      ],
+      legacyAttempts: [],
+    });
+    expect(refunded).toBe(vendorOrderTotalCents);
+    const clawback = computeVendorClawbackSummary({
+      transferStatus: "paid",
+      stripeTransferId: "tr_test",
+      transferAmountCents: 2240,
+      vendorOrderTotalCents,
+      vendorOrderRefundedCents: refunded,
+      reversals: [],
+    });
+    expect(clawback.adminLabel).not.toBe("Vendor clawback not needed");
+    expect(clawback.hasMissingReversalSetup).toBe(true);
+  });
 });

@@ -22,6 +22,7 @@ import {
   computeVendorClawbackSummary,
   type VendorClawbackSummary,
 } from "@/lib/vendor-clawback-status";
+import { computeVendorOrderRefundedCents } from "@/domain/order-refund";
 import {
   openOrderRetainedFromPayment,
   openOrderRetainedFromVendorSlice,
@@ -423,6 +424,24 @@ export async function fetchAdminOrderPaymentSummary(
       reversalsByVo.set(r.vendorOrderId, list);
     }
 
+    const linkedAttemptIds = new Set(
+      order.orderRefunds
+        .map((r) => r.refundAttemptId)
+        .filter((id): id is string => Boolean(id))
+    );
+    const legacyAttempts = order.refundAttempts.map((a) => ({
+      vendorOrderId: a.vendorOrderId,
+      amountCents: a.amountCents,
+      status: a.status,
+      hasLinkedOrderRefund: linkedAttemptIds.has(a.id),
+    }));
+    const orderRefundsForAllocation = order.orderRefunds.map((r) => ({
+      vendorOrderId: r.vendorOrderId,
+      amountCents: r.amountCents,
+      status: r.status,
+      refundScope: r.refundScope,
+    }));
+
     const [remainingOrder, ledgerSummary] = await Promise.all([
       getRemainingOrderRefundableCents(orderId),
       getOrderRefundSummary(orderId),
@@ -448,12 +467,18 @@ export async function fetchAdminOrderPaymentSummary(
           vpt != null &&
           getVendorTransferReversalAmountCents(vpt) > 0;
         const netTransfer = alloc?.netVendorTransferCents ?? vpt?.amountCents ?? 0;
+        const effectiveVendorOrderRefundedCents = computeVendorOrderRefundedCents({
+          vendorOrderId: vo.id,
+          vendorOrderTotalCents: vo.totalCents,
+          orderRefunds: orderRefundsForAllocation,
+          legacyAttempts,
+        });
         const clawback = computeVendorClawbackSummary({
           transferStatus,
           stripeTransferId: vpt?.stripeTransferId ?? null,
           transferAmountCents: vpt?.amountCents ?? null,
           vendorOrderTotalCents: vo.totalCents,
-          vendorOrderRefundedCents: vo.totalRefundedCents,
+          vendorOrderRefundedCents: effectiveVendorOrderRefundedCents,
           reversals: voReversals,
         });
 
@@ -474,7 +499,7 @@ export async function fetchAdminOrderPaymentSummary(
           tipCents: vo.tipCents,
           serviceFeeCents: vo.serviceFeeCents,
           totalCents: vo.totalCents,
-          totalRefundedCents: vo.totalRefundedCents,
+          totalRefundedCents: effectiveVendorOrderRefundedCents,
           remainingRefundableCents: remainingVo,
           grossVendorPayableCents: alloc?.grossVendorPayableCents ?? null,
           allocatedProcessingFeeCents: alloc?.allocatedProcessingFeeCents ?? null,

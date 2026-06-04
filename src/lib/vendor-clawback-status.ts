@@ -173,10 +173,10 @@ export function computeVendorClawbackSummary(input: VendorClawbackInput): Vendor
       clawbackStatus: "manual_review",
       adminLabel: isPartialVendorRefund
         ? "Vendor clawback manual review"
-        : "Vendor clawback setup missing",
+        : "Vendor clawback missing",
       adminDetail: isPartialVendorRefund
         ? "Partial customer refund on a paid vendor Connect transfer. Proportional reversal is not automated — review manually."
-        : "Customer was refunded but no transfer reversal row exists. Prepare or execute a reversal manually.",
+        : "Customer was refunded after this vendor was paid. Vendor transfer reversal is required.",
       adminWarning:
         "Customer was refunded, but Open Order has not recovered this vendor's transferred funds. Retry the transfer reversal or handle manually.",
       hasMissingReversalSetup: true,

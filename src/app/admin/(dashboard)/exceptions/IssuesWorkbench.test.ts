@@ -56,7 +56,11 @@ describe("admin attention queue", () => {
 
   it("surfaces vendor clawback reversal problems in attention queue", () => {
     expect(attentionSrc).toMatch(/vendor_clawback_failed/);
+    expect(attentionSrc).toMatch(/vendor_clawback_missing/);
     expect(attentionSrc).toMatch(/fetchFailedVendorClawbackAttentionItems/);
     expect(attentionSrc).toMatch(/fetchStalePendingVendorClawbackAttentionItems/);
+    expect(attentionSrc).toMatch(/fetchMissingVendorClawbackAttentionItems/);
+    expect(attentionSrc).toMatch(/computeVendorOrderRefundedCents/);
+    expect(attentionSrc).toMatch(/computeVendorClawbackSummary/);
   });
 });
