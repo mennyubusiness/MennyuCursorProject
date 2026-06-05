@@ -1,4 +1,7 @@
-import { getVendorOrderEffectiveDisplayState } from "@/lib/vendor-order-effective-state";
+import {
+  isVendorOrderManuallyRecovered,
+  isVendorOrderRecoverableFailure,
+} from "@/lib/vendor-order-effective-state";
 
 /** Active kitchen / live board columns (excludes terminal groups). */
 export type VendorOrdersActiveBoardGroup = "new" | "preparing" | "ready";
@@ -16,17 +19,49 @@ export type VendorOrderBoardRow = {
 };
 
 /**
+ * True when the vendor/POS has acknowledged the order (kitchen may start work).
+ * Routing alone (sent/confirmed) is not acknowledgment — fulfillment must progress.
+ */
+export function isVendorOrderAcknowledgedForBoard(vo: VendorOrderBoardRow): boolean {
+  if (vo.fulfillmentStatus === "accepted" || vo.fulfillmentStatus === "preparing") {
+    return true;
+  }
+  if (
+    isVendorOrderManuallyRecovered(vo, vo.statusHistory) &&
+    (vo.fulfillmentStatus === "accepted" || vo.fulfillmentStatus === "preparing")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Group vendor orders for dashboard and kitchen boards.
- * Recoverable failures stay in "new"; manually recovered in "preparing".
+ * New = unacknowledged or needs vendor action; Preparing = accepted+ in progress.
  */
 export function getVendorOrderBoardGroupKey(vo: VendorOrderBoardRow): VendorOrdersBoardGroup {
-  const effective = getVendorOrderEffectiveDisplayState(vo, vo.statusHistory);
-  if (effective === "cancelled" || effective === "terminal_failed") return "cancelled_failed";
-  if (effective === "completed") return "completed";
-  if (effective === "ready") return "ready";
-  if (effective === "recovered" || effective === "active") return "preparing";
-  if (effective === "needs_attention") return "new";
-  return "new";
+  const { routingStatus, fulfillmentStatus } = vo;
+
+  if (fulfillmentStatus === "cancelled") return "cancelled_failed";
+  if (fulfillmentStatus === "completed") return "completed";
+  if (fulfillmentStatus === "ready") return "ready";
+
+  if (
+    isVendorOrderRecoverableFailure(vo) &&
+    !isVendorOrderManuallyRecovered(vo, vo.statusHistory)
+  ) {
+    return "new";
+  }
+
+  if (routingStatus === "failed" && fulfillmentStatus === "pending") {
+    return "new";
+  }
+
+  if (!isVendorOrderAcknowledgedForBoard(vo)) {
+    return "new";
+  }
+
+  return "preparing";
 }
 
 export const VENDOR_ORDERS_ACTIVE_BOARD_GROUPS: VendorOrdersActiveBoardGroup[] = [

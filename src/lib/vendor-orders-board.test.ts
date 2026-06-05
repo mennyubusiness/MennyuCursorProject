@@ -3,19 +3,58 @@ import {
   countActiveBoardGroups,
   getVendorOrderBoardGroupKey,
   groupVendorOrdersForBoard,
+  isVendorOrderAcknowledgedForBoard,
 } from "./vendor-orders-board";
 
+describe("isVendorOrderAcknowledgedForBoard", () => {
+  it("is false for sent with pending fulfillment", () => {
+    expect(
+      isVendorOrderAcknowledgedForBoard({
+        routingStatus: "sent",
+        fulfillmentStatus: "pending",
+      })
+    ).toBe(false);
+  });
+
+  it("is true for accepted fulfillment", () => {
+    expect(
+      isVendorOrderAcknowledgedForBoard({
+        routingStatus: "sent",
+        fulfillmentStatus: "accepted",
+      })
+    ).toBe(true);
+  });
+});
+
 describe("getVendorOrderBoardGroupKey", () => {
-  it("groups routed sent pending as preparing (active)", () => {
+  it("groups Deliverect sent + fulfillment pending as New", () => {
     expect(
       getVendorOrderBoardGroupKey({
         routingStatus: "sent",
         fulfillmentStatus: "pending",
       })
-    ).toBe("preparing");
+    ).toBe("new");
   });
 
-  it("groups routing failure pending as new (needs attention)", () => {
+  it("groups Deliverect confirmed + fulfillment pending as New", () => {
+    expect(
+      getVendorOrderBoardGroupKey({
+        routingStatus: "confirmed",
+        fulfillmentStatus: "pending",
+      })
+    ).toBe("new");
+  });
+
+  it("groups manual routing pending + fulfillment pending as New", () => {
+    expect(
+      getVendorOrderBoardGroupKey({
+        routingStatus: "pending",
+        fulfillmentStatus: "pending",
+      })
+    ).toBe("new");
+  });
+
+  it("groups routing failure pending as New", () => {
     expect(
       getVendorOrderBoardGroupKey({
         routingStatus: "failed",
@@ -24,7 +63,25 @@ describe("getVendorOrderBoardGroupKey", () => {
     ).toBe("new");
   });
 
-  it("groups accepted as preparing", () => {
+  it("groups Deliverect sent + accepted as Preparing", () => {
+    expect(
+      getVendorOrderBoardGroupKey({
+        routingStatus: "sent",
+        fulfillmentStatus: "accepted",
+      })
+    ).toBe("preparing");
+  });
+
+  it("groups Deliverect sent + preparing as Preparing", () => {
+    expect(
+      getVendorOrderBoardGroupKey({
+        routingStatus: "sent",
+        fulfillmentStatus: "preparing",
+      })
+    ).toBe("preparing");
+  });
+
+  it("groups manual accepted as Preparing", () => {
     expect(
       getVendorOrderBoardGroupKey({
         routingStatus: "confirmed",
@@ -33,7 +90,16 @@ describe("getVendorOrderBoardGroupKey", () => {
     ).toBe("preparing");
   });
 
-  it("groups ready as ready", () => {
+  it("groups manual preparing as Preparing", () => {
+    expect(
+      getVendorOrderBoardGroupKey({
+        routingStatus: "confirmed",
+        fulfillmentStatus: "preparing",
+      })
+    ).toBe("preparing");
+  });
+
+  it("groups ready as Ready", () => {
     expect(
       getVendorOrderBoardGroupKey({
         routingStatus: "confirmed",
@@ -42,7 +108,7 @@ describe("getVendorOrderBoardGroupKey", () => {
     ).toBe("ready");
   });
 
-  it("excludes completed from active columns", () => {
+  it("groups completed as terminal completed", () => {
     expect(
       getVendorOrderBoardGroupKey({
         routingStatus: "confirmed",
@@ -51,7 +117,7 @@ describe("getVendorOrderBoardGroupKey", () => {
     ).toBe("completed");
   });
 
-  it("excludes cancelled from active columns", () => {
+  it("groups cancelled as terminal cancelled_failed", () => {
     expect(
       getVendorOrderBoardGroupKey({
         routingStatus: "failed",
@@ -59,12 +125,22 @@ describe("getVendorOrderBoardGroupKey", () => {
       })
     ).toBe("cancelled_failed");
   });
+
+  it("groups manually recovered accepted as Preparing", () => {
+    expect(
+      getVendorOrderBoardGroupKey({
+        routingStatus: "failed",
+        fulfillmentStatus: "accepted",
+        manuallyRecoveredAt: "2026-01-01T00:00:00.000Z",
+      })
+    ).toBe("preparing");
+  });
 });
 
 describe("groupVendorOrdersForBoard", () => {
-  it("counts active kitchen columns", () => {
+  it("counts active kitchen columns with unacknowledged in New", () => {
     const grouped = groupVendorOrdersForBoard([
-      { routingStatus: "failed", fulfillmentStatus: "pending" },
+      { routingStatus: "sent", fulfillmentStatus: "pending" },
       { routingStatus: "confirmed", fulfillmentStatus: "preparing" },
       { routingStatus: "confirmed", fulfillmentStatus: "ready" },
       { routingStatus: "confirmed", fulfillmentStatus: "completed" },
