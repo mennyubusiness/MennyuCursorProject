@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
+import { buildGroupOrderJoinPath } from "@/lib/group-order-invite-url";
 import type { Cart } from "@/domain/types";
 import type { CartPodContext } from "@/lib/cart-pod-context";
 import { ButtonLink } from "@/components/ui/button";
@@ -33,9 +34,7 @@ export function QuickCartGroupSection({
   const browsePodName = podContext.browsingPodName;
 
   if (role === "host" && group?.joinCode) {
-    const inviteHref = group.groupOrderSessionId
-      ? `/group-order/join?session=${encodeURIComponent(group.groupOrderSessionId)}`
-      : "/group-order/join";
+    const inviteHref = buildGroupOrderJoinPath(group.joinCode);
 
     return (
       <section className="mb-4 rounded-xl border border-oo-light-stone bg-oo-cream/80 px-3 py-3 text-sm">

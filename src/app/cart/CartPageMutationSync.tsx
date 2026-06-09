@@ -296,8 +296,9 @@ export function CartPageLiveLineError({ cartItemId }: { cartItemId: string }) {
   return <p className="mt-2 text-sm font-medium text-amber-900">{message}</p>;
 }
 
-export function CartPageLiveEmptyNotice() {
+export function CartPageLiveEmptyNotice({ hideWhenGroupActive = false }: { hideWhenGroupActive?: boolean }) {
   const { cart } = useCartPageMutation();
+  if (hideWhenGroupActive) return null;
   if (cart.items.length > 0) return null;
   return (
     <p className="mt-10 rounded-xl border border-stone-200 bg-stone-50 p-6 text-center text-stone-700">

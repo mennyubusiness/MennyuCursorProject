@@ -46,10 +46,16 @@ import { readGroupOrderParticipantMarkers } from "@/lib/group-order-participant-
 import { resolveGroupCartIdFromParticipantMarkers } from "@/services/group-order.service";
 import {
   getGroupOrderStateForCartPage,
+  loadHostGroupCartRowForCartPage,
   startGroupOrderForCartPage,
   unlockGroupCheckoutForCartPage,
 } from "@/lib/group-order-cart-page";
-import { GroupOrderCartPanel } from "./GroupOrderCartPanel";
+import { resolveGroupCartEmptyState, shouldShowJoinGroupOrderForm } from "@/lib/group-order-cart-empty-state";
+import { GroupOrderCartPanel, GROUP_INVITE_SECTION_ID } from "./GroupOrderCartPanel";
+import {
+  GroupOrderHostEmptyCartState,
+  GroupOrderParticipantEmptyCartState,
+} from "./GroupOrderEmptyCartStates";
 import { GroupOrderCartPoll } from "./GroupOrderCartPoll";
 import { GroupOrderLockedBanner } from "./GroupOrderLockedBanner";
 import { ParticipantGroupOrderSummary } from "./ParticipantGroupOrderSummary";
@@ -126,6 +132,9 @@ export default async function CartPage({
   const preferredPodId = startGroupOrder && targetPodForGroup ? targetPodForGroup : currentPodId;
   const perfT0 = cartPagePerfNow();
   let cart = await loadActiveDisplayCartForSession(sessionId, preferredPodId, participantMarkers);
+  if (!cart && authSession?.user?.id) {
+    cart = (await loadHostGroupCartRowForCartPage(authSession.user.id)) ?? undefined;
+  }
   if (cart && (participantMarkers.participantId || participantMarkers.legacyJoinToken)) {
     const groupCartId = await resolveGroupCartIdFromParticipantMarkers(participantMarkers);
     if (groupCartId && groupCartId !== cart.id) {
@@ -214,80 +223,92 @@ export default async function CartPage({
   }
 
   const goState = await getGroupOrderStateForCartPage(cart.id, { participantMarkers });
+  const emptyStateKind = resolveGroupCartEmptyState({
+    displayItemCount: displayItems.length,
+    goStateActive: goState.active,
+    goView: goState.active ? goState.view : null,
+  });
+  const showJoinCodeForm = shouldShowJoinGroupOrderForm({ goStateActive: goState.active });
 
-  if (displayItems.length === 0) {
-    const isParticipantView = goState.active && goState.view === "participant";
-    if (isParticipantView) {
-      return (
-        <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
-          <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
-          <GroupOrderCartPanel
-            cartId={cart.id}
-            podId={cart.podId}
-            goState={goState}
-            canStartGroup={Boolean(authSession?.user?.id)}
-            readModel={null}
-            locked={goState.status === "locked_checkout"}
-          />
-          <header className="border-b border-stone-200/90 pb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-stone-900">Group order</h1>
-            <p className="mt-3 text-base text-stone-600">
-              <span className="font-semibold text-stone-800">{cart.pod.name}</span>
-            </p>
-            <p className="mt-2 text-sm text-stone-500">
-              You&apos;re adding your items to this group order. Only the host can see and checkout the
-              full group cart.
-            </p>
-          </header>
-          <div className="mt-10 rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
-            <h2 className="text-xl font-semibold text-stone-900">Your group cart is empty</h2>
-            <p className="mt-3 text-sm text-stone-600">
-              Add items from vendors in this pod. The host will review and place the order.
-            </p>
-            <Link
-              href={`/pod/${cart.podId}`}
-              className="mt-8 inline-flex min-h-[48px] items-center justify-center rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-stone-800"
-            >
-              Browse vendors
-            </Link>
+  if (emptyStateKind === "host_group_empty") {
+    return (
+      <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+        <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
+        <GroupOrderCartPanel
+          cartId={cart.id}
+          podId={cart.podId}
+          podName={cart.pod.name}
+          goState={goState}
+          canStartGroup={Boolean(authSession?.user?.id)}
+          readModel={null}
+          locked={goState.active ? goState.status === "locked_checkout" : false}
+        />
+        <GroupOrderHostEmptyCartState
+          podId={cart.podId}
+          podName={cart.pod.name}
+          onInviteClickId={GROUP_INVITE_SECTION_ID}
+        />
+      </div>
+    );
+  }
+
+  if (emptyStateKind === "participant_group_empty") {
+    return (
+      <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+        <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
+        <GroupOrderCartPanel
+          cartId={cart.id}
+          podId={cart.podId}
+          podName={cart.pod.name}
+          goState={goState}
+          canStartGroup={Boolean(authSession?.user?.id)}
+          readModel={null}
+          locked={goState.active ? goState.status === "locked_checkout" : false}
+        />
+        <header className="border-b border-stone-200/90 pb-8">
+          <h1 className="text-3xl font-bold tracking-tight text-stone-900">Group order</h1>
+          <p className="mt-3 text-base text-stone-600">
+            <span className="font-semibold text-stone-800">{cart.pod.name}</span>
+          </p>
+        </header>
+        <GroupOrderParticipantEmptyCartState podId={cart.podId} />
+      </div>
+    );
+  }
+
+  if (emptyStateKind === "solo_empty") {
+    return (
+      <div className="mx-auto max-w-lg px-2 py-12">
+        <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+          <div
+            className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-xs font-medium text-stone-400"
+            aria-hidden
+          >
+            Cart
           </div>
-        </div>
-      );
-    }
-    if (!goState.active) {
-      return (
-        <div className="mx-auto max-w-lg px-2 py-12">
-          <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
-            <div
-              className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-xs font-medium text-stone-400"
-              aria-hidden
-            >
-              Cart
-            </div>
-            <h1 className="mt-5 text-2xl font-semibold text-stone-900">Your cart is empty</h1>
-            <p className="mt-3 text-stone-600">
-              Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen prepares
-              its part of your order.
-            </p>
-            <div className="mt-8 text-left">
-              <JoinGroupOrderByCodeForm />
-            </div>
-            <Link
-              href="/explore"
-              className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:bg-stone-800 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98]"
-            >
-              Browse pods
-            </Link>
-            <p className="mt-6 text-sm text-stone-500">
-              Already ordered?{" "}
-              <Link href="/orders" className="font-medium text-stone-900 hover:underline">
-                View orders and order again
-              </Link>
-            </p>
+          <h1 className="mt-5 text-2xl font-semibold text-stone-900">Your cart is empty</h1>
+          <p className="mt-3 text-stone-600">
+            Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen prepares
+            its part of your order.
+          </p>
+          <div className="mt-8 text-left">
+            <JoinGroupOrderByCodeForm />
           </div>
+          <Link
+            href="/explore"
+            className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:bg-stone-800 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98]"
+          >
+            Browse pods
+          </Link>
+          <p className="mt-6 text-sm text-stone-500">
+            Already ordered?{" "}
+            <Link href="/orders" className="font-medium text-stone-900 hover:underline">
+              View orders and order again
+            </Link>
+          </p>
         </div>
-      );
-    }
+      </div>
+    );
   }
 
   const byVendor = new Map<
@@ -453,10 +474,11 @@ export default async function CartPage({
     <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
       <GroupOrderCartPoll enabled={pollGroupCart} cartId={pollGroupCart ? cart.id : null} />
       <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
-      <JoinGroupOrderByCodeForm visible={!goState.active} className="mb-4" />
+      <JoinGroupOrderByCodeForm visible={showJoinCodeForm} className="mb-4" />
       <GroupOrderCartPanel
         cartId={cart.id}
         podId={cart.podId}
+        podName={cart.pod.name}
         goState={goState}
         canStartGroup={Boolean(authSession?.user?.id)}
         readModel={groupReadModel}
@@ -521,7 +543,7 @@ export default async function CartPage({
       >
       <CartPageLiveSyncBanner />
       <CartPageLiveValidationBanner />
-      <CartPageLiveEmptyNotice />
+      <CartPageLiveEmptyNotice hideWhenGroupActive={goState.active} />
 
       <div className="mt-10 space-y-10">
         {Array.from(byVendor.entries()).map(([vendorId, group]) => (

@@ -1,8 +1,27 @@
 import Link from "next/link";
+import QRCode from "qrcode";
 import { startGroupOrderFormAction, leaveGroupOrderFormAction, endGroupOrderHostFormAction } from "@/actions/group-order.actions";
 import type { GroupOrderCartReadModel } from "@/lib/group-order-cart-read-model";
 import type { GroupOrderStateForCartPage } from "@/lib/group-order-cart-page";
+import { buildGroupOrderJoinAbsoluteUrl } from "@/lib/group-order-invite-url";
+import { getPublicSiteOrigin } from "@/lib/public-site-url";
 import { HostParticipantBreakdown } from "./HostParticipantBreakdown";
+import { GroupOrderInviteShareControls } from "./GroupOrderInviteShareControls";
+
+const GROUP_INVITE_SECTION_ID = "group-order-invite";
+
+async function buildGroupInviteQrDataUrl(inviteAbsoluteUrl: string): Promise<string> {
+  try {
+    return await QRCode.toDataURL(inviteAbsoluteUrl, {
+      width: 400,
+      margin: 2,
+      errorCorrectionLevel: "M",
+      color: { dark: "#1c1917ff", light: "#ffffffff" },
+    });
+  } catch {
+    return "";
+  }
+}
 
 function ClosedGroupOrderPanel({
   title,
@@ -30,6 +49,7 @@ function ClosedGroupOrderPanel({
 export async function GroupOrderCartPanel({
   cartId,
   podId,
+  podName,
   goState,
   canStartGroup,
   readModel,
@@ -37,6 +57,7 @@ export async function GroupOrderCartPanel({
 }: {
   cartId: string;
   podId: string;
+  podName: string;
   goState: GroupOrderStateForCartPage;
   canStartGroup: boolean;
   readModel: GroupOrderCartReadModel | null;
@@ -76,6 +97,21 @@ export async function GroupOrderCartPanel({
     "submittedOrderId" in goState && goState.submittedOrderId
       ? `/order/${goState.submittedOrderId}`
       : null;
+
+  let hostInviteProps: {
+    joinCode: string;
+    inviteAbsoluteUrl: string;
+    qrDataUrl: string;
+  } | null = null;
+  if (isHost && goState.view === "host" && "joinCode" in goState) {
+    const origin = await getPublicSiteOrigin();
+    const inviteAbsoluteUrl = buildGroupOrderJoinAbsoluteUrl(origin, goState.joinCode);
+    hostInviteProps = {
+      joinCode: goState.joinCode,
+      inviteAbsoluteUrl,
+      qrDataUrl: await buildGroupInviteQrDataUrl(inviteAbsoluteUrl),
+    };
+  }
 
   if (isEnded) {
     return (
@@ -142,26 +178,12 @@ export async function GroupOrderCartPanel({
           <p className="font-medium text-stone-900">
             Group order · {isLockedCheckout ? "checkout in progress" : "open"}
           </p>
-          {isUnknown && (
+          {isHost && hostInviteProps ? null : isUnknown ? (
             <p className="mt-1 text-xs text-stone-600">
               Join with the host&apos;s code or link to add your items. You won&apos;t see other people&apos;s lines
               until you join.
             </p>
-          )}
-          {isHost && (
-            <>
-              <p className="mt-1 font-mono text-xs text-stone-600">
-                Code: <span className="font-semibold">{goState.joinCode}</span>
-              </p>
-              <p className="mt-1 text-xs text-stone-600">
-                <Link href={`/group-order/join?session=${goState.sessionId}`} className="text-stone-900 underline">
-                  Join link
-                </Link>
-                <span className="text-stone-400"> · </span>
-                <span>Same link works for QR.</span>
-              </p>
-            </>
-          )}
+          ) : null}
           {isParticipant && (
             <p className="mt-1 text-xs text-stone-600">
               Signed in as <span className="font-medium text-stone-800">{goState.viewerDisplayName}</span>
@@ -212,7 +234,20 @@ export async function GroupOrderCartPanel({
         </p>
       )}
 
+      {isHost && hostInviteProps ? (
+        <div id={GROUP_INVITE_SECTION_ID}>
+          <GroupOrderInviteShareControls
+            joinCode={hostInviteProps.joinCode}
+            inviteAbsoluteUrl={hostInviteProps.inviteAbsoluteUrl}
+            podName={podName}
+            qrDataUrl={hostInviteProps.qrDataUrl}
+          />
+        </div>
+      ) : null}
+
       {isHost && readModel && <HostParticipantBreakdown model={readModel} />}
     </section>
   );
 }
+
+export { GROUP_INVITE_SECTION_ID };

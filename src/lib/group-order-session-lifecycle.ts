@@ -5,13 +5,11 @@ import "server-only";
 
 import type { GroupOrderSessionStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { normalizeGroupOrderJoinCode } from "@/lib/group-order-join-code";
 
 const EXPIRABLE_STATUSES: GroupOrderSessionStatus[] = ["active", "locked_checkout"];
 
-/** Normalize user-entered join code to six digits. */
-export function normalizeGroupOrderJoinCode(raw: string): string {
-  return raw.replace(/\D/g, "").slice(0, 6).padStart(6, "0");
-}
+export { normalizeGroupOrderJoinCode };
 
 /**
  * Mark all stale open sessions as expired. Safe to run repeatedly.

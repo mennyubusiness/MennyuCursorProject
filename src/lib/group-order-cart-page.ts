@@ -10,12 +10,33 @@ import {
   resolveGroupParticipantForSession,
 } from "@/lib/group-participant-order-access";
 import { expireGroupOrderSessionIfStale } from "@/lib/group-order-session-lifecycle";
+import { prisma } from "@/lib/db";
+import { CART_DISPLAY_SESSION_CART_INCLUDE } from "@/services/cart.service";
 import {
   findSessionByCartId,
   resolveActorForGroupCart,
   startGroupOrderSession,
   unlockGroupOrderSessionFromCheckout,
 } from "@/services/group-order.service";
+
+const HOST_GROUP_CART_STATUSES = ["active", "locked_checkout", "submitted"] as const;
+
+/** Load host's latest open group cart when session cart selection misses it (e.g. pod cookie mismatch). */
+export async function loadHostGroupCartRowForCartPage(hostUserId: string) {
+  const session = await prisma.groupOrderSession.findFirst({
+    where: {
+      hostUserId,
+      status: { in: [...HOST_GROUP_CART_STATUSES] },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { cartId: true },
+  });
+  if (!session) return null;
+  return prisma.cart.findUnique({
+    where: { id: session.cartId },
+    include: CART_DISPLAY_SESSION_CART_INCLUDE,
+  });
+}
 
 export type GroupOrderStateForCartPage =
   | { active: false }

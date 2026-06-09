@@ -2,6 +2,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+vi.mock("react", () => ({
+  cache: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+}));
+
 const mockAuth = vi.fn();
 const mockFindSessionByCartId = vi.fn();
 const mockStartGroupOrderSession = vi.fn();
@@ -9,6 +13,17 @@ const mockUnlock = vi.fn();
 
 vi.mock("@/auth", () => ({
   auth: () => mockAuth(),
+}));
+
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    groupOrderSession: { findFirst: vi.fn() },
+    cart: { findUnique: vi.fn() },
+  },
+}));
+
+vi.mock("@/services/cart.service", () => ({
+  CART_DISPLAY_SESSION_CART_INCLUDE: {},
 }));
 
 vi.mock("@/services/group-order.service", () => ({
