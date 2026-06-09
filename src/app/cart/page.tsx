@@ -50,6 +50,10 @@ import {
   startGroupOrderForCartPage,
   unlockGroupCheckoutForCartPage,
 } from "@/lib/group-order-cart-page";
+import {
+  loadParticipantGroupCartRowForCartPage,
+  resolveSubmittedGroupOrderForParticipantCart,
+} from "@/lib/group-participant-submitted-cart";
 import { resolveGroupCartEmptyState, shouldShowJoinGroupOrderForm } from "@/lib/group-order-cart-empty-state";
 import { GroupOrderCartPanel, GROUP_INVITE_SECTION_ID } from "./GroupOrderCartPanel";
 import {
@@ -57,6 +61,8 @@ import {
   GroupOrderParticipantEmptyCartState,
 } from "./GroupOrderEmptyCartStates";
 import { GroupOrderCartPoll } from "./GroupOrderCartPoll";
+import { GroupOrderSubmittedRedirect } from "./GroupOrderSubmittedRedirect";
+import { ParticipantSubmittedTrackingPage } from "./ParticipantSubmittedTrackingPage";
 import { GroupOrderLockedBanner } from "./GroupOrderLockedBanner";
 import { ParticipantGroupOrderSummary } from "./ParticipantGroupOrderSummary";
 import { resolveActorForGroupCart } from "@/services/group-order.service";
@@ -110,6 +116,15 @@ export default async function CartPage({
   const participantMarkers = readGroupOrderParticipantMarkers(cookieStore);
   const authSession = await auth();
 
+  const submittedParticipantResolution =
+    await resolveSubmittedGroupOrderForParticipantCart(participantMarkers);
+  if (
+    submittedParticipantResolution.kind === "submitted" &&
+    submittedParticipantResolution.orderId
+  ) {
+    redirect(`/order/${submittedParticipantResolution.orderId}`);
+  }
+
   const startGroupOrder = params.startGroupOrder === "1";
   const podIdRaw = params.podId;
   const podIdFromQuery =
@@ -134,6 +149,13 @@ export default async function CartPage({
   let cart = await loadActiveDisplayCartForSession(sessionId, preferredPodId, participantMarkers);
   if (!cart && authSession?.user?.id) {
     cart = (await loadHostGroupCartRowForCartPage(authSession.user.id)) ?? undefined;
+  }
+  if (
+    !cart &&
+    (participantMarkers.participantId || participantMarkers.legacyJoinToken)
+  ) {
+    cart =
+      (await loadParticipantGroupCartRowForCartPage(participantMarkers)) ?? undefined;
   }
   if (cart && (participantMarkers.participantId || participantMarkers.legacyJoinToken)) {
     const groupCartId = await resolveGroupCartIdFromParticipantMarkers(participantMarkers);
@@ -223,12 +245,33 @@ export default async function CartPage({
   }
 
   const goState = await getGroupOrderStateForCartPage(cart.id, { participantMarkers });
+  const showJoinCodeForm = shouldShowJoinGroupOrderForm({ goStateActive: goState.active });
+
+  if (
+    goState.active &&
+    goState.view === "participant" &&
+    goState.status === "submitted"
+  ) {
+    if (goState.submittedOrderId) {
+      redirect(`/order/${goState.submittedOrderId}`);
+    }
+    return (
+      <ParticipantSubmittedTrackingPage
+        cartId={cart.id}
+        podId={cart.podId}
+        podName={cart.pod.name}
+        goState={goState}
+        canStartGroup={Boolean(authSession?.user?.id)}
+        submittedOrderId={goState.submittedOrderId ?? null}
+      />
+    );
+  }
+
   const emptyStateKind = resolveGroupCartEmptyState({
     displayItemCount: displayItems.length,
     goStateActive: goState.active,
     goView: goState.active ? goState.view : null,
   });
-  const showJoinCodeForm = shouldShowJoinGroupOrderForm({ goStateActive: goState.active });
 
   if (emptyStateKind === "host_group_empty") {
     return (
@@ -255,6 +298,15 @@ export default async function CartPage({
   if (emptyStateKind === "participant_group_empty") {
     return (
       <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+        <GroupOrderSubmittedRedirect
+          enabled={
+            goState.active &&
+            (goState.status === "active" || goState.status === "locked_checkout")
+          }
+          cartId={cart.id}
+          initialSessionStatus={goState.active ? goState.status : "active"}
+          initialSubmittedOrderId={null}
+        />
         <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
         <GroupOrderCartPanel
           cartId={cart.id}
@@ -470,8 +522,19 @@ export default async function CartPage({
       ? findParticipantRow(groupReadModel, viewerParticipantId)
       : undefined;
 
+  const participantSubmissionPoll =
+    goState.active &&
+    goState.view === "participant" &&
+    (goState.status === "active" || goState.status === "locked_checkout");
+
   return (
     <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+      <GroupOrderSubmittedRedirect
+        enabled={participantSubmissionPoll}
+        cartId={cart.id}
+        initialSessionStatus={goState.active ? goState.status : "active"}
+        initialSubmittedOrderId={submittedOrderId}
+      />
       <GroupOrderCartPoll enabled={pollGroupCart} cartId={pollGroupCart ? cart.id : null} />
       <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
       <JoinGroupOrderByCodeForm visible={showJoinCodeForm} className="mb-4" />
