@@ -78,6 +78,7 @@ export default async function CartPage({
     reorder_added?: string;
     error?: string;
     groupUnlock?: string;
+    groupReview?: string;
     groupError?: string;
     startGroupOrder?: string;
     podId?: string | string[];
@@ -134,8 +135,9 @@ export default async function CartPage({
   }
   if (params.groupUnlock === "1" && cart?.id && authSession?.user?.id) {
     await unlockGroupCheckoutForCartPage(cart.id, authSession.user.id);
-    redirect("/cart");
+    redirect("/cart?groupReview=1");
   }
+  const showGroupReviewHint = params.groupReview === "1";
 
   if (
     startGroupOrder &&
@@ -430,6 +432,10 @@ export default async function CartPage({
       : null;
 
   const sessionLocked = goState.active && goState.status === "locked_checkout";
+  const sessionSubmitted = goState.active && goState.status === "submitted";
+  const cartEditingDisabled = sessionLocked || sessionSubmitted;
+  const submittedOrderId =
+    goState.active && "submittedOrderId" in goState ? goState.submittedOrderId ?? null : null;
   const viewerIsHost = groupActor?.role === "host";
   const viewerParticipantId = groupActor?.participantId ?? null;
 
@@ -456,7 +462,11 @@ export default async function CartPage({
         readModel={groupReadModel}
         locked={sessionLocked}
       />
-      <GroupOrderLockedBanner locked={sessionLocked} viewerIsHost={Boolean(viewerIsHost)} />
+      <GroupOrderLockedBanner
+        locked={sessionLocked}
+        viewerIsHost={Boolean(viewerIsHost)}
+        showReviewHint={showGroupReviewHint && Boolean(viewerIsHost)}
+      />
       <header className="border-b border-stone-200/90 pb-8">
         <h1 className="text-3xl font-bold tracking-tight text-stone-900">
           {goState.active ? "Group order" : "Your cart"}
@@ -542,8 +552,13 @@ export default async function CartPage({
                 const lineInteraction =
                   !goState.active
                     ? { disabled: false as const, reason: null as string | null }
-                    : sessionLocked
-                      ? { disabled: true as const, reason: "Checkout in progress — cart is locked." }
+                    : cartEditingDisabled
+                      ? {
+                          disabled: true as const,
+                          reason: sessionSubmitted
+                            ? "This group order has been placed."
+                            : "Checkout in progress — cart is locked.",
+                        }
                       : !groupActor
                         ? {
                             disabled: true as const,
@@ -551,7 +566,7 @@ export default async function CartPage({
                               "Join this group order (or sign in as the host) to add or change items.",
                           }
                         : canEditGroupCartLine({
-                            sessionLocked,
+                            sessionLocked: cartEditingDisabled,
                             viewerIsHost: Boolean(viewerIsHost),
                             viewerParticipantId,
                             hostParticipantId,
@@ -739,6 +754,8 @@ export default async function CartPage({
               showParticipantTotalsOnly={showParticipantTotalsOnly}
               myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
               totalCentsFallback={totalCents}
+              groupSubmitted={sessionSubmitted}
+              submittedOrderId={submittedOrderId}
             />
           </div>
         </div>

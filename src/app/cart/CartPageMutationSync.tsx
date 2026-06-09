@@ -31,9 +31,11 @@ import {
   pruneValidationForCart,
   type CartPageValidationSnapshot,
 } from "@/lib/cart-page-validation";
+import { buildCartValidationVendorGroups } from "@/lib/cart-validation-vendor-groups";
 
 type CartPageMutationContextValue = {
   cart: Cart;
+  liveValidation: CartPageValidationSnapshot;
   cartId: string;
   podId: string;
   itemById: (cartItemId: string) => Cart["items"][number] | undefined;
@@ -173,8 +175,7 @@ export function CartPageMutationProvider({
   }, [cartFingerprint, cartId, cart.items.length]);
 
   const liveValidation = useMemo(
-    () =>
-      pruneValidationForCart(serverValidation, cart.items),
+    () => pruneValidationForCart(serverValidation, cart.items),
     [serverValidation, cart.items]
   );
 
@@ -196,6 +197,7 @@ export function CartPageMutationProvider({
     const itemById = (cartItemId: string) => cart.items.find((i) => i.id === cartItemId);
     return {
       cart,
+      liveValidation,
       cartId,
       podId,
       itemById,
@@ -212,7 +214,7 @@ export function CartPageMutationProvider({
       isRevalidating,
       isSyncingCart,
     };
-  }, [cart, cartId, podId, errorByCartItemId, checkoutState, isRevalidating, isSyncingCart]);
+  }, [cart, liveValidation, cartId, podId, errorByCartItemId, checkoutState, isRevalidating, isSyncingCart]);
 
   return (
     <CartPageMutationContext.Provider value={value}>{children}</CartPageMutationContext.Provider>
@@ -230,13 +232,43 @@ export function CartPageLiveSyncBanner() {
 }
 
 export function CartPageLiveValidationBanner() {
-  const { showValidationWarning } = useCartPageMutation();
+  const { showValidationWarning, cart, liveValidation } = useCartPageMutation();
+  const vendorGroups = useMemo(
+    () =>
+      showValidationWarning
+        ? buildCartValidationVendorGroups(cart, liveValidation.errors)
+        : [],
+    [showValidationWarning, cart, liveValidation.errors]
+  );
+
   if (!showValidationWarning) return null;
+
   return (
-    <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
-      <span className="font-medium">Some items can&apos;t be ordered as shown.</span> Update or remove
-      highlighted lines, then continue.
-    </p>
+    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+      <p className="font-semibold">Some items need attention before checkout</p>
+      <p className="mt-1 text-amber-900/90">
+        Update or remove highlighted lines below, then continue.
+      </p>
+      {vendorGroups.length > 0 && (
+        <ul className="mt-3 space-y-3">
+          {vendorGroups.map((group) => (
+            <li key={group.vendorId}>
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-950/80">
+                {group.vendorName}
+              </p>
+              <ul className="mt-1 space-y-1">
+                {group.issues.map((issue) => (
+                  <li key={issue.cartItemId} className="text-sm">
+                    <span className="font-medium">{issue.itemName}</span>
+                    <span className="text-amber-900/90"> — {issue.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -366,13 +398,17 @@ export function CartPageLiveCheckoutActions({
   showParticipantTotalsOnly,
   myParticipantSubtotalCents,
   totalCentsFallback,
+  groupSubmitted = false,
+  submittedOrderId = null,
 }: {
   showParticipantTotalsOnly: boolean;
   myParticipantSubtotalCents?: number;
   totalCentsFallback: number;
+  groupSubmitted?: boolean;
+  submittedOrderId?: string | null;
 }) {
   const { cartId, podId, canCheckout, isRevalidating, isSyncingCart } = useCartPageMutation();
-  const checkoutEnabled = canCheckout && !isRevalidating && !isSyncingCart;
+  const checkoutEnabled = canCheckout && !isRevalidating && !isSyncingCart && !groupSubmitted;
   const blockedLabel = isSyncingCart
     ? "Syncing your cart…"
     : !canCheckout && isRevalidating
@@ -386,7 +422,14 @@ export function CartPageLiveCheckoutActions({
           Secure checkout with Stripe · Each vendor is notified after you pay
         </p>
       )}
-      {showParticipantTotalsOnly ? (
+      {groupSubmitted && submittedOrderId ? (
+        <Link
+          href={`/order/${submittedOrderId}`}
+          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-emerald-900 px-8 py-3.5 text-center text-base font-bold text-white shadow-md transition hover:bg-emerald-800 sm:min-w-[14rem] sm:w-auto"
+        >
+          Track order
+        </Link>
+      ) : showParticipantTotalsOnly ? (
         <div className="w-full text-center sm:text-right">
           <p className="text-xs text-stone-500">
             The host will review and place the order. You won&apos;t be charged here.

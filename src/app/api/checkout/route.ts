@@ -25,6 +25,7 @@ const bodySchema = z
     pickupMode: z.enum(["asap", "scheduled"]).optional().default("asap"),
     scheduledPickupDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     scheduledPickupTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    groupCheckoutFingerprint: z.string().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.pickupMode === "scheduled") {
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
     pickupMode,
     scheduledPickupDate,
     scheduledPickupTime,
+    groupCheckoutFingerprint,
   } = parsed.data;
 
   const sessionId = getSessionIdFromRequest(request);
@@ -88,6 +90,16 @@ export async function POST(request: NextRequest) {
           ? "SESSION_REQUIRED"
           : "CART_ACCESS_DENIED";
     return NextResponse.json({ error: access.error, code }, { status: access.status });
+  }
+
+  if (access.isGroupOrder && !groupCheckoutFingerprint?.trim()) {
+    return NextResponse.json(
+      {
+        error: "Group checkout expired. Return to cart and try checkout again.",
+        code: "GROUP_CHECKOUT_FINGERPRINT_REQUIRED",
+      },
+      { status: 400 }
+    );
   }
 
   const phoneVerification = await resolveCheckoutPhoneVerification(
@@ -124,6 +136,7 @@ export async function POST(request: NextRequest) {
       pickupMode,
       scheduledPickupDate,
       scheduledPickupTime,
+      groupCheckoutFingerprint: groupCheckoutFingerprint?.trim() ?? null,
       groupOrderHostUserId,
       mennyuSessionId: sessionId,
       customerAccountId: phoneVerification.customerAccountId,

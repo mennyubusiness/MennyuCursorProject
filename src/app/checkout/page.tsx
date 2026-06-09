@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 import { prisma } from "@/lib/db";
-import { lockGroupOrderSessionForCheckout } from "@/services/group-order.service";
+import { prepareGroupOrderCheckoutForHost } from "@/services/group-order.service";
 import { CART_DISPLAY_SESSION_CART_INCLUDE, CHECKOUT_SUMMARY_CART_INCLUDE } from "@/services/cart.service";
 import { buildCartForValidationFromDisplayCart } from "@/lib/cart-for-validation";
 import { CheckoutForm } from "./CheckoutForm";
@@ -29,26 +29,36 @@ export default async function CheckoutPage({
   const { cartId } = await searchParams;
   if (!cartId) redirect("/cart");
 
-  const [sessionId, cart, authSession] = await Promise.all([
+  const [sessionId, authSession] = await Promise.all([
     getMennyuSessionIdForRequest(),
-    prisma.cart.findUnique({
-      where: { id: cartId },
-      include: CHECKOUT_SUMMARY_CART_INCLUDE,
-    }),
     auth(),
   ]);
-  if (!cart || cart.items.length === 0) redirect("/cart");
 
-  const groupSession = await prisma.groupOrderSession.findUnique({
-    where: { cartId: cart.id },
+  const groupSessionMeta = await prisma.groupOrderSession.findUnique({
+    where: { cartId },
     select: { id: true, hostUserId: true, status: true },
   });
-  if (groupSession) {
-    if (authSession?.user?.id !== groupSession.hostUserId) {
+
+  let groupCheckoutFingerprint: string | undefined;
+
+  if (groupSessionMeta) {
+    if (authSession?.user?.id !== groupSessionMeta.hostUserId) {
       redirect("/cart?error=group_checkout_host_only");
     }
-    await lockGroupOrderSessionForCheckout(cart.id, groupSession.hostUserId);
-  } else if (cart.sessionId !== (sessionId ?? "")) {
+    const lockResult = await prepareGroupOrderCheckoutForHost(cartId, groupSessionMeta.hostUserId);
+    if (!lockResult.ok) {
+      redirect(`/cart?error=${encodeURIComponent(lockResult.code)}`);
+    }
+    groupCheckoutFingerprint = lockResult.checkoutFingerprint;
+  }
+
+  let cart = await prisma.cart.findUnique({
+    where: { id: cartId },
+    include: CHECKOUT_SUMMARY_CART_INCLUDE,
+  });
+  if (!cart || cart.items.length === 0) redirect("/cart");
+
+  if (!groupSessionMeta && cart.sessionId !== (sessionId ?? "")) {
     redirect("/cart");
   }
 
@@ -151,7 +161,7 @@ export default async function CheckoutPage({
       <CheckoutProgress activeStep={2} className="pt-3 sm:pt-4" />
       <div className="mb-2">
         <Link
-          href={groupSession ? "/cart?groupUnlock=1" : "/cart"}
+          href={groupSessionMeta ? "/cart?groupUnlock=1" : "/cart"}
           className="text-sm font-medium text-stone-600 hover:text-stone-900 hover:underline"
         >
           ← Back to cart
@@ -159,6 +169,11 @@ export default async function CheckoutPage({
       </div>
       <header className="border-b border-stone-200 pb-4">
         <h1 className="text-2xl font-semibold text-stone-900">Checkout</h1>
+        {groupSessionMeta ? (
+          <p className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">
+            Group checkout is locked while you pay. Return to cart to make changes.
+          </p>
+        ) : null}
         <p className="mt-1 text-stone-600">
           <span className="font-medium text-stone-800">{cart.pod.name}</span>
           {vendorCount > 1 && (
@@ -242,6 +257,7 @@ export default async function CheckoutPage({
         isSignedIn={Boolean(signedInUserId)}
         accountVerifiedPhoneE164={accountVerifiedPhoneE164}
         initialPhone={initialPhone}
+        groupCheckoutFingerprint={groupCheckoutFingerprint}
       />
     </div>
   );

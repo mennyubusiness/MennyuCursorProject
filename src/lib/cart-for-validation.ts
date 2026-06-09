@@ -1,5 +1,13 @@
 import type { CartForValidation } from "@/services/order.service";
 
+/**
+ * POS open/closed is not wired for customer cart/checkout validation yet: Vendor has no
+ * persisted posOpen field, and Deliverect busy-mode uses mennyuOrdersPaused instead.
+ * VENDOR_CLOSED in order.service applies only when vendor.posOpen === false is supplied.
+ * Do not show customer copy implying POS-hours blocking until that field is sourced.
+ */
+const POS_OPEN_FOR_VALIDATION: boolean | undefined = undefined;
+
 /** Display-cart row shape used by /cart SSR and revalidation (CART_DISPLAY_SESSION_CART_INCLUDE). */
 export type DisplayCartRowForValidation = {
   podId: string;
@@ -55,7 +63,7 @@ export function buildCartForValidationFromDisplayCart(
       vendor: {
         isActive: i.vendor.isActive,
         mennyuOrdersPaused: i.vendor.mennyuOrdersPaused ?? undefined,
-        posOpen: undefined,
+        posOpen: POS_OPEN_FOR_VALIDATION,
         deliverectChannelLinkId: i.vendor.deliverectChannelLinkId ?? null,
       },
       selections: i.selections?.map((s) => ({

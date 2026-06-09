@@ -4,6 +4,10 @@ import { cookies, headers } from "next/headers";
 import { auth } from "@/auth";
 import { assertCustomerOrderAccess } from "@/lib/customer-order-access";
 import { userCanAccessOrder } from "@/lib/user-order-access";
+import {
+  getHostParticipantIdForGroupSession,
+} from "@/lib/group-participant-order-access";
+import { filterOrderForGroupParticipantView } from "@/lib/group-participant-order-view";
 import { prisma } from "@/lib/db";
 import { getOrderWithUnifiedStatus } from "@/services/order-status.service";
 import { getOrdersForSignedInUser } from "@/services/customer-account-orders.service";
@@ -15,7 +19,14 @@ import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 export async function getOrderStatusAction(orderId: string) {
   const access = await assertCustomerOrderAccess(orderId);
   if (!access.ok) return null;
-  return getOrderWithUnifiedStatus(orderId);
+  const order = await getOrderWithUnifiedStatus(orderId);
+  if (!order || access.viewerRole !== "participant" || !access.groupParticipantId) {
+    return order;
+  }
+  const hostParticipantId = order.groupOrderSessionId
+    ? await getHostParticipantIdForGroupSession(order.groupOrderSessionId)
+    : null;
+  return filterOrderForGroupParticipantView(order, access.groupParticipantId, hostParticipantId);
 }
 
 export async function reconcilePaymentIfSucceededAction(orderId: string) {
@@ -117,4 +128,4 @@ export async function reorderFromOrderAction(
   }
   return result;
 }
-
+

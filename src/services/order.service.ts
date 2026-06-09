@@ -4,6 +4,7 @@
  */
 import { type OrderStatus } from "@prisma/client";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
+import { groupCheckoutFingerprintsMatch } from "@/services/group-order-checkout-fingerprint.service";
 import { prisma } from "@/lib/db";
 import { computeOrderPricing } from "@/domain/fees";
 import { getActivePricingRatesSnapshot } from "@/services/pricing-config.service";
@@ -503,6 +504,11 @@ export function getCartValidationMessage(code: string): string {
     DELIVERECT_SUBITEMS_NESTING_LIMIT:
       "An item exceeds Deliverect’s limit for nested menu levels on online orders (top-level variant groups only — not add-ons). Update the cart or contact the restaurant.",
     GROUP_ORDER_LOCKED: "This cart is locked while the host checks out.",
+    GROUP_ORDER_LOCKED_FOR_CHECKOUT: "The host is checking out. The group cart is locked.",
+    GROUP_CART_CHANGED_DURING_CHECKOUT:
+      "The group cart changed while you were checking out. Review the latest cart before continuing.",
+    GROUP_CHECKOUT_FINGERPRINT_REQUIRED:
+      "Group checkout expired. Return to cart and try checkout again.",
     GROUP_ORDER_AUTH_REQUIRED: "Join this group order to add or change items.",
     GROUP_ORDER_ITEM_NOT_OWNED: "You can only edit your own items in this group order.",
     GROUP_ORDER_CLOSED: "This group order is closed.",
@@ -525,18 +531,6 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
     };
   }
 
-  /** One unpaid checkout per cart — reuse existing pending order instead of duplicating. */
-  const pendingFromSameCart = await prisma.order.findFirst({
-    where: { sourceCartId: input.cartId, status: "pending_payment" },
-    include: { vendorOrders: true },
-  });
-  if (pendingFromSameCart) {
-    return {
-      order: toOrder(pendingFromSameCart),
-      vendorOrders: pendingFromSameCart.vendorOrders.map(toVendorOrder),
-    };
-  }
-
   const access = await assertCartSessionAccess(input.cartId, input.mennyuSessionId ?? null, {
     authUserId: input.groupOrderHostUserId ?? null,
     mode: "checkout",
@@ -554,9 +548,44 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
   const groupSession = access.isGroupOrder
     ? await prisma.groupOrderSession.findUnique({
         where: { cartId: input.cartId },
-        select: { id: true },
+        select: { id: true, status: true },
       })
     : null;
+
+  if (groupSession) {
+    const fingerprint = input.groupCheckoutFingerprint?.trim();
+    if (!fingerprint) {
+      throw new OrderValidationError(
+        "GROUP_CHECKOUT_FINGERPRINT_REQUIRED",
+        "Group checkout expired. Return to cart and try checkout again."
+      );
+    }
+    const matches = await groupCheckoutFingerprintsMatch(input.cartId, fingerprint);
+    if (!matches) {
+      throw new OrderValidationError(
+        "GROUP_CART_CHANGED_DURING_CHECKOUT",
+        "The group cart changed while you were checking out. Review the latest cart before continuing."
+      );
+    }
+    if (groupSession.status !== "locked_checkout") {
+      throw new OrderValidationError(
+        "GROUP_ORDER_LOCKED_FOR_CHECKOUT",
+        "Group checkout is not locked. Return to cart and start checkout again."
+      );
+    }
+  }
+
+  /** One unpaid checkout per cart — reuse existing pending order instead of duplicating. */
+  const pendingFromSameCart = await prisma.order.findFirst({
+    where: { sourceCartId: input.cartId, status: "pending_payment" },
+    include: { vendorOrders: true },
+  });
+  if (pendingFromSameCart) {
+    return {
+      order: toOrder(pendingFromSameCart),
+      vendorOrders: pendingFromSameCart.vendorOrders.map(toVendorOrder),
+    };
+  }
 
   const cart = await prisma.cart.findUnique({
     where: { id: input.cartId },

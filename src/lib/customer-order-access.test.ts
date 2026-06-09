@@ -23,6 +23,19 @@ vi.mock("@/lib/user-order-access", () => ({
   userCanAccessOrder: vi.fn().mockResolvedValue(false),
 }));
 
+vi.mock("@/lib/group-participant-order-access", () => ({
+  readGroupOrderParticipantMarkersFromRequest: vi.fn(() => ({
+    participantId: null,
+    legacyJoinToken: null,
+  })),
+  resolveGroupParticipantOrderAccess: vi.fn().mockResolvedValue(null),
+}));
+
+import {
+  readGroupOrderParticipantMarkersFromRequest,
+  resolveGroupParticipantOrderAccess,
+} from "@/lib/group-participant-order-access";
+
 vi.mock("@/lib/session", () => ({
   CUSTOMER_PHONE_COOKIE: "mennyu_customer_phone",
   ORDER_ACCESS_COOKIE: "mennyu_order_access",
@@ -66,6 +79,7 @@ describe("assertCustomerOrderAccess", () => {
       customerPhone: "+15551234567",
       customerAccountId: null,
       customerEmail: null,
+      groupOrderSessionId: null,
     } as never);
   });
 
@@ -98,6 +112,50 @@ describe("assertCustomerOrderAccess", () => {
     vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(null);
     const r = await assertCustomerOrderAccess("ord_1", new Headers(), token);
     expect(r.ok).toBe(true);
+    if (r.ok) expect(r.viewerRole).toBe("host");
+  });
+
+  it("allows group participant cookie on submitted group order", async () => {
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
+    vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(null);
+    vi.mocked(prisma.order.findUnique).mockResolvedValue({
+      id: "ord_go",
+      customerPhone: "+15551230000",
+      customerAccountId: null,
+      customerEmail: null,
+      groupOrderSessionId: "gos_1",
+    } as never);
+    vi.mocked(resolveGroupParticipantOrderAccess).mockResolvedValue({
+      orderId: "ord_go",
+      customerPhone: "+15551230000",
+      participantId: "part_alex",
+      participantDisplayName: "Alex",
+      groupOrderSessionId: "gos_1",
+    });
+
+    const r = await assertCustomerOrderAccess("ord_go", new Headers());
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.viewerRole).toBe("participant");
+      expect(r.groupParticipantId).toBe("part_alex");
+    }
+  });
+
+  it("denies guessed group order id without participant or host credentials", async () => {
+    vi.mocked(getCustomerPhoneFromHeaders).mockReturnValue(null);
+    vi.mocked(getCustomerOrderAccessTokenFromHeaders).mockReturnValue(null);
+    vi.mocked(resolveGroupParticipantOrderAccess).mockResolvedValue(null);
+    vi.mocked(prisma.order.findUnique).mockResolvedValue({
+      id: "ord_go",
+      customerPhone: "+15551230000",
+      customerAccountId: null,
+      customerEmail: null,
+      groupOrderSessionId: "gos_1",
+    } as never);
+
+    const r = await assertCustomerOrderAccess("ord_go", new Headers());
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(401);
   });
 
   it("allows access token from cookie", async () => {

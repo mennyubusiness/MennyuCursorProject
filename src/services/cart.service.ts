@@ -28,6 +28,7 @@ import {
   resolveActiveGroupCartIdForPod,
   resolveActorForGroupCart,
   resolveGroupCartIdFromParticipantMarkers,
+  assertGroupCartUnlockedForMutation,
   type ResolvedGroupCartActor,
 } from "@/services/group-order.service";
 import {
@@ -502,6 +503,8 @@ export async function addCartItem(
   }
 
   await prisma.$transaction(async (tx) => {
+    await assertGroupCartUnlockedForMutation(tx, cartId, groupOrderActor ?? null);
+
     const candidates = await tx.cartItem.findMany({
       where: { cartId, menuItemId: resolvedMenuItemId },
       include: { selections: true },

@@ -5,6 +5,10 @@ import { getCustomerSessionFromRequest } from "@/lib/customer-session";
 import { userCanAccessOrder } from "@/lib/user-order-access";
 import { verifyCustomerOrderAccessToken } from "@/lib/customer-order-access-token";
 import {
+  readGroupOrderParticipantMarkersFromRequest,
+  resolveGroupParticipantOrderAccess,
+} from "@/lib/group-participant-order-access";
+import {
   CUSTOMER_PHONE_COOKIE,
   getCustomerOrderAccessTokenFromHeaders,
   getCustomerPhoneFromHeaders,
@@ -14,8 +18,17 @@ import {
   buildOrderAccessCookieHeader,
 } from "@/lib/session";
 
+export type CustomerOrderViewerRole = "host" | "participant";
+
 export type CustomerOrderAccessResult =
-  | { ok: true; orderId: string; customerPhone: string }
+  | {
+      ok: true;
+      orderId: string;
+      customerPhone: string;
+      viewerRole: CustomerOrderViewerRole;
+      groupParticipantId?: string;
+      groupParticipantDisplayName?: string;
+    }
   | { ok: false; status: 401 | 403 | 404; error: string };
 
 function resolveAccessToken(
@@ -42,16 +55,27 @@ export async function assertCustomerOrderAccess(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, customerPhone: true, customerAccountId: true, customerEmail: true },
+    select: {
+      id: true,
+      customerPhone: true,
+      customerAccountId: true,
+      customerEmail: true,
+      groupOrderSessionId: true,
+    },
   });
   if (!order) {
     return { ok: false, status: 404, error: "Order not found" };
   }
 
   const orderPhone = order.customerPhone.trim();
+  const hostAccessBase = {
+    orderId: order.id,
+    customerPhone: orderPhone,
+    viewerRole: "host" as const,
+  };
 
   if (token && verifyCustomerOrderAccessToken(orderId, token)) {
-    return { ok: true, orderId: order.id, customerPhone: orderPhone };
+    return { ok: true, ...hostAccessBase };
   }
 
   const session = await auth();
@@ -59,7 +83,7 @@ export async function assertCustomerOrderAccess(
     session?.user?.id &&
     (await userCanAccessOrder(session.user.id, session.user.email, order))
   ) {
-    return { ok: true, orderId: order.id, customerPhone: orderPhone };
+    return { ok: true, ...hostAccessBase };
   }
 
   const customerSession = await getCustomerSessionFromRequest(h);
@@ -68,7 +92,33 @@ export async function assertCustomerOrderAccess(
     order.customerAccountId &&
     customerSession.customerAccountId === order.customerAccountId
   ) {
-    return { ok: true, orderId: order.id, customerPhone: orderPhone };
+    return { ok: true, ...hostAccessBase };
+  }
+
+  const cookieHeader = h.get("cookie");
+  let cookieStore: Awaited<ReturnType<typeof cookies>> | null = null;
+  try {
+    cookieStore = await cookies();
+  } catch {
+    cookieStore = null;
+  }
+  const participantMarkers = readGroupOrderParticipantMarkersFromRequest(
+    cookieStore,
+    cookieHeader
+  );
+  const participantAccess = await resolveGroupParticipantOrderAccess({
+    orderId,
+    markers: participantMarkers,
+  });
+  if (participantAccess) {
+    return {
+      ok: true,
+      orderId: order.id,
+      customerPhone: orderPhone,
+      viewerRole: "participant",
+      groupParticipantId: participantAccess.participantId,
+      groupParticipantDisplayName: participantAccess.participantDisplayName,
+    };
   }
 
   // Legacy migration fallback: mennyu_customer_phone cookie (forgeable — not used for /orders history).
@@ -85,7 +135,7 @@ export async function assertCustomerOrderAccess(
     return { ok: false, status: 403, error: "This order does not belong to you." };
   }
 
-  return { ok: true, orderId: order.id, customerPhone: orderPhone };
+  return { ok: true, ...hostAccessBase };
 }
 
 export type CustomerOrderAccessBootstrapResult = CustomerOrderAccessResult;
@@ -109,7 +159,12 @@ export async function resolveCustomerOrderAccessBootstrap(
     return { ok: false, status: 404, error: "Order not found" };
   }
 
-  return { ok: true, orderId: order.id, customerPhone: order.customerPhone.trim() };
+  return {
+    ok: true,
+    orderId: order.id,
+    customerPhone: order.customerPhone.trim(),
+    viewerRole: "host",
+  };
 }
 
 /** HttpOnly Set-Cookie header values for order access bootstrap (route handlers only). */

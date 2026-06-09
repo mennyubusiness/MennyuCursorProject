@@ -284,6 +284,8 @@ export interface CheckoutInput {
   scheduledPickupTime?: string;
   /** When the cart is a group order, must be the host user id (verified in checkout API). */
   groupOrderHostUserId?: string | null;
+  /** Server-derived group cart snapshot from checkout lock; required for group-order checkout. */
+  groupCheckoutFingerprint?: string | null;
   /** Mennyu anonymous session id — required for solo-cart checkout authorization. */
   mennyuSessionId?: string | null;
   /** Verified phone-first customer account from checkout OTP session. */

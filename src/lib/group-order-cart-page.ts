@@ -6,6 +6,10 @@ import "server-only";
 
 import { auth } from "@/auth";
 import {
+  findOrderIdForGroupOrderSession,
+  resolveGroupParticipantForSession,
+} from "@/lib/group-participant-order-access";
+import {
   findSessionByCartId,
   resolveActorForGroupCart,
   startGroupOrderSession,
@@ -23,6 +27,7 @@ export type GroupOrderStateForCartPage =
       podId: string;
       participants: Array<{ id: string; displayName: string; isHost: boolean }>;
       isHost: true;
+      submittedOrderId?: string | null;
     }
   | {
       active: true;
@@ -31,6 +36,8 @@ export type GroupOrderStateForCartPage =
       podId: string;
       viewerDisplayName: string;
       isHost: false;
+      participantId: string;
+      submittedOrderId?: string | null;
     }
   | {
       active: true;
@@ -38,6 +45,7 @@ export type GroupOrderStateForCartPage =
       status: string;
       podId: string;
       isHost: false;
+      submittedOrderId?: string | null;
     };
 
 export async function getGroupOrderStateForCartPage(
@@ -52,6 +60,42 @@ export async function getGroupOrderStateForCartPage(
   if (!s) return { active: false };
 
   const markers = opts?.participantMarkers ?? { participantId: null, legacyJoinToken: null };
+  const submittedOrderId =
+    s.status === "submitted" ? await findOrderIdForGroupOrderSession(s.id) : null;
+
+  const isHost = Boolean(hostId && s.hostUserId === hostId);
+  if (isHost) {
+    return {
+      active: true,
+      view: "host",
+      sessionId: s.id,
+      joinCode: s.joinCode,
+      status: s.status,
+      podId: s.podId,
+      participants: s.participants.map((p) => ({
+        id: p.id,
+        displayName: p.displayName,
+        isHost: p.role === "host",
+      })),
+      isHost: true,
+      submittedOrderId,
+    };
+  }
+
+  const participant = await resolveGroupParticipantForSession(s.id, markers);
+  if (participant?.role === "participant") {
+    return {
+      active: true,
+      view: "participant",
+      status: s.status,
+      podId: s.podId,
+      viewerDisplayName: participant.displayName,
+      isHost: false,
+      participantId: participant.id,
+      submittedOrderId,
+    };
+  }
+
   const actor = await resolveActorForGroupCart(cartId, {
     hostUserId: hostId,
     participantIdFromCookie: markers.participantId,
@@ -67,33 +111,18 @@ export async function getGroupOrderStateForCartPage(
       podId: s.podId,
       viewerDisplayName: self?.displayName ?? "Guest",
       isHost: false,
-    };
-  }
-
-  const isHost = Boolean(hostId && s.hostUserId === hostId);
-  if (!isHost) {
-    return {
-      active: true,
-      view: "unknown",
-      status: s.status,
-      podId: s.podId,
-      isHost: false,
+      participantId: actor.participantId,
+      submittedOrderId,
     };
   }
 
   return {
     active: true,
-    view: "host",
-    sessionId: s.id,
-    joinCode: s.joinCode,
+    view: "unknown",
     status: s.status,
     podId: s.podId,
-    participants: s.participants.map((p) => ({
-      id: p.id,
-      displayName: p.displayName,
-      isHost: p.role === "host",
-    })),
-    isHost: true,
+    isHost: false,
+    submittedOrderId,
   };
 }
 

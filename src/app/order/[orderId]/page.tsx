@@ -57,6 +57,8 @@ export default async function OrderStatusPage({
       initialOrder={order}
       orderId={orderId}
       from={from}
+      viewerRole={accessCheck.viewerRole}
+      participantDisplayName={accessCheck.groupParticipantDisplayName}
     />
   );
 }

@@ -3,10 +3,11 @@
  * See prisma GroupOrderSession / GroupOrderParticipant.
  */
 import { randomBytes, randomInt } from "crypto";
-import type { GroupOrderSessionStatus } from "@prisma/client";
+import type { GroupOrderSessionStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CartValidationError } from "@/services/cart-validation-error";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
+import { computeGroupCheckoutFingerprint } from "@/services/group-order-checkout-fingerprint.service";
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_JOIN_CODE_ATTEMPTS = 30;
@@ -198,6 +199,22 @@ export async function findSessionByIdForJoin(sessionId: string) {
       status: "active",
       expiresAt: { gt: new Date() },
     },
+    include: { pod: { select: { id: true, name: true } } },
+  });
+}
+
+/** Join/tracking page: active sessions or submitted orders still on the same session row. */
+export async function findSessionByIdForJoinOrTracking(sessionId: string) {
+  return prisma.groupOrderSession.findFirst({
+    where: { id: sessionId },
+    include: { pod: { select: { id: true, name: true } } },
+  });
+}
+
+export async function findSessionByJoinCodeForJoinOrTracking(joinCode: string) {
+  const code = joinCode.replace(/\D/g, "").slice(0, 6).padStart(6, "0");
+  return prisma.groupOrderSession.findFirst({
+    where: { joinCode: code },
     include: { pod: { select: { id: true, name: true } } },
   });
 }
@@ -487,13 +504,38 @@ export async function resolveActorForGroupCart(
   return null;
 }
 
+export function groupOrderLockedForCheckoutMessage(role: GroupOrderActorRole): string {
+  return role === "host"
+    ? "Checkout is in progress. Return to cart to make changes."
+    : "The host is checking out. The group cart is locked.";
+}
+
 export function assertGroupCartNotLocked(actor: ResolvedGroupCartActor | null, sessionStatus: GroupOrderSessionStatus) {
   if (sessionStatus === "locked_checkout") {
+    const role = actor?.role ?? "participant";
     throw new CartValidationError(
-      "This cart is locked while the host checks out.",
-      "GROUP_ORDER_LOCKED"
+      groupOrderLockedForCheckoutMessage(role),
+      "GROUP_ORDER_LOCKED_FOR_CHECKOUT"
     );
   }
+}
+
+/** Re-check lock inside cart write transactions (closes pre-lock in-flight mutation races). */
+export async function assertGroupCartUnlockedForMutation(
+  tx: Prisma.TransactionClient,
+  cartId: string,
+  actor: ResolvedGroupCartActor | null
+): Promise<void> {
+  const gos = await tx.groupOrderSession.findUnique({
+    where: { cartId },
+    select: { status: true },
+  });
+  if (!gos || gos.status !== "locked_checkout") return;
+  const role = actor?.role ?? "participant";
+  throw new CartValidationError(
+    groupOrderLockedForCheckoutMessage(role),
+    "GROUP_ORDER_LOCKED_FOR_CHECKOUT"
+  );
 }
 
 export function assertCanMutateCartItem(args: {
@@ -502,8 +544,8 @@ export function assertCanMutateCartItem(args: {
 }): void {
   if (args.actor.sessionStatus === "locked_checkout") {
     throw new CartValidationError(
-      "This cart is locked while the host checks out.",
-      "GROUP_ORDER_LOCKED"
+      groupOrderLockedForCheckoutMessage(args.actor.role),
+      "GROUP_ORDER_LOCKED_FOR_CHECKOUT"
     );
   }
   if (args.actor.role === "host") return;
@@ -518,8 +560,8 @@ export function assertCanMutateCartItem(args: {
 export function assertCanAddLine(actor: ResolvedGroupCartActor): void {
   if (actor.sessionStatus === "locked_checkout") {
     throw new CartValidationError(
-      "This cart is locked while the host checks out.",
-      "GROUP_ORDER_LOCKED"
+      groupOrderLockedForCheckoutMessage(actor.role),
+      "GROUP_ORDER_LOCKED_FOR_CHECKOUT"
     );
   }
 }
@@ -556,14 +598,78 @@ export async function enforceGroupOrderCartMutation(
   });
 }
 
-export async function lockGroupOrderSessionForCheckout(cartId: string, hostUserId: string): Promise<void> {
-  const s = await prisma.groupOrderSession.findUnique({ where: { cartId } });
-  if (!s || s.hostUserId !== hostUserId) return;
-  if (s.status !== "active") return;
-  await prisma.groupOrderSession.update({
-    where: { id: s.id },
-    data: { status: "locked_checkout", lockedAt: new Date() },
+export type PrepareGroupOrderCheckoutResult =
+  | { ok: true; checkoutFingerprint: string; sessionId: string }
+  | { ok: false; code: string; message: string };
+
+const GROUP_CHECKOUT_BLOCKED_STATUSES: GroupOrderSessionStatus[] = ["submitted", "ended", "expired"];
+
+/**
+ * Lock group cart for host checkout and return a server-derived cart fingerprint snapshot.
+ * Idempotent for the same host when already locked_checkout (refreshes fingerprint).
+ */
+export async function prepareGroupOrderCheckoutForHost(
+  cartId: string,
+  hostUserId: string
+): Promise<PrepareGroupOrderCheckoutResult> {
+  const lockResult = await prisma.$transaction(async (tx) => {
+    const s = await tx.groupOrderSession.findUnique({ where: { cartId } });
+    if (!s) {
+      return { ok: false as const, code: "NOT_GROUP_ORDER", message: "This cart is not a group order." };
+    }
+    if (s.hostUserId !== hostUserId) {
+      return {
+        ok: false as const,
+        code: "GROUP_ORDER_HOST_CHECKOUT",
+        message: "Only the host can check out a group order.",
+      };
+    }
+    if (GROUP_CHECKOUT_BLOCKED_STATUSES.includes(s.status)) {
+      return {
+        ok: false as const,
+        code: "GROUP_ORDER_CLOSED",
+        message: "This group order is closed.",
+      };
+    }
+    if (s.expiresAt <= new Date()) {
+      return {
+        ok: false as const,
+        code: "GROUP_ORDER_CLOSED",
+        message: "This group order has expired.",
+      };
+    }
+    if (s.status === "active") {
+      await tx.groupOrderSession.update({
+        where: { id: s.id },
+        data: { status: "locked_checkout", lockedAt: new Date() },
+      });
+    } else if (s.status !== "locked_checkout") {
+      return {
+        ok: false as const,
+        code: "GROUP_ORDER_CLOSED",
+        message: "This group order is not open for checkout.",
+      };
+    }
+    return { ok: true as const, sessionId: s.id };
   });
+
+  if (!lockResult.ok) return lockResult;
+
+  const checkoutFingerprint = await computeGroupCheckoutFingerprint(cartId);
+  if (!checkoutFingerprint) {
+    return {
+      ok: false,
+      code: "GROUP_CHECKOUT_FINGERPRINT_FAILED",
+      message: "Could not capture group cart for checkout. Refresh and try again.",
+    };
+  }
+
+  return { ok: true, checkoutFingerprint, sessionId: lockResult.sessionId };
+}
+
+/** @deprecated Prefer prepareGroupOrderCheckoutForHost (returns fingerprint snapshot). */
+export async function lockGroupOrderSessionForCheckout(cartId: string, hostUserId: string): Promise<void> {
+  await prepareGroupOrderCheckoutForHost(cartId, hostUserId);
 }
 
 export async function unlockGroupOrderSessionFromCheckout(cartId: string, hostUserId: string): Promise<void> {

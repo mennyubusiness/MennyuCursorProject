@@ -45,6 +45,43 @@ export async function GroupOrderCartPanel({
   const isHost = goState.view === "host";
   const isParticipant = goState.view === "participant";
   const isUnknown = goState.view === "unknown";
+  const isSubmitted = goState.status === "submitted";
+  const trackHref =
+    "submittedOrderId" in goState && goState.submittedOrderId
+      ? `/order/${goState.submittedOrderId}`
+      : null;
+
+  if (isSubmitted) {
+    return (
+      <section className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm text-emerald-950 shadow-sm">
+        <p className="font-semibold text-emerald-950">
+          {isHost ? "You placed this group order." : "The host placed this group order."}
+        </p>
+        <p className="mt-1 text-emerald-900/90">
+          {isParticipant
+            ? "You can track the order status now. You're viewing your items in this group order."
+            : isHost
+              ? "Track pickup and vendor status for everyone in this group order."
+              : "This group order has already been placed."}
+        </p>
+        {trackHref ? (
+          <Link
+            href={trackHref}
+            className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
+          >
+            Track order
+          </Link>
+        ) : (
+          <p className="mt-3 text-xs text-emerald-900/80">Ask the host for the tracking link.</p>
+        )}
+        {!trackHref && !isHost && (
+          <p className="mt-2 text-xs text-emerald-900/80">
+            Join with the same device you used when adding items to open tracking.
+          </p>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section className="mb-6 rounded-xl border border-stone-200 bg-white p-4 text-sm shadow-sm">

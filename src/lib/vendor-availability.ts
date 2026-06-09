@@ -4,7 +4,9 @@
  *
  * Sources (evaluation order):
  * 1. Vendor active state (isActive)
- * 2. POS / Deliverect open-closed state (posOpen; future webhook-driven)
+ * 2. POS / Deliverect open-closed state (posOpen) — reserved; not persisted on Vendor yet.
+ *    Deliverect busy-mode PAUSED maps to mennyuOrdersPaused, not posOpen. Until a stored
+ *    open/closed signal exists, posOpen should stay undefined and VENDOR_CLOSED is inactive.
  * 3. Mennyu pause state (mennyuOrdersPaused)
  *
  * UI wording is not defined here; callers map status to copy and error codes.

@@ -83,11 +83,16 @@ export function OrderPageContent({
   initialOrder,
   orderId,
   from,
+  viewerRole = "host",
+  participantDisplayName,
 }: {
   initialOrder: NonNullable<OrderFromApi>;
   orderId: string;
   from?: string;
+  viewerRole?: "host" | "participant";
+  participantDisplayName?: string;
 }) {
+  const isParticipantView = viewerRole === "participant";
   const [order, setOrder] = useState<NonNullable<OrderFromApi>>(() =>
     normalizeOrderDates(initialOrder)
   );
@@ -116,7 +121,15 @@ export function OrderPageContent({
         const next = (await res.json()) as NonNullable<OrderFromApi>;
         let becameTerminal = false;
         setOrder((prev) => {
-          const merged = mergeCustomerOrderPollPatch(prev, next);
+          let merged = mergeCustomerOrderPollPatch(prev, next);
+          if (isParticipantView) {
+            merged = {
+              ...merged,
+              refundAttempts: [],
+              orderRefunds: [],
+              issues: [],
+            };
+          }
           const fp = orderStatusFingerprint(merged);
           if (fp === lastFingerprintRef.current) return prev;
           lastFingerprintRef.current = fp;
@@ -148,7 +161,7 @@ export function OrderPageContent({
       document.removeEventListener("visibilitychange", onVisibilityChange);
       clearPoll();
     };
-  }, [orderId]); // intentionally not depending on order so we keep polling until terminal
+  }, [orderId, isParticipantView]); // intentionally not depending on order so we keep polling until terminal
 
   const derivedStatus = order.derivedStatus ?? order.status;
   const failedButRecoverable =
@@ -184,12 +197,22 @@ export function OrderPageContent({
   });
   const isMultiVendor = order.vendorOrders.length > 1;
   const isOrderCancelled = derivedStatus === "cancelled";
-  const refundMessage = refundDisplayMessage({
-    refundAttempts: order.refundAttempts,
-    orderRefunds: order.orderRefunds,
-    totalCents: order.totalCents,
-    totalRefundedCents: order.totalRefundedCents,
-  });
+  const refundMessage = isParticipantView
+    ? null
+    : refundDisplayMessage({
+        refundAttempts: order.refundAttempts,
+        orderRefunds: order.orderRefunds,
+        totalCents: order.totalCents,
+        totalRefundedCents: order.totalRefundedCents,
+      });
+  const participantSubtotalCents =
+    isParticipantView && "participantSubtotalCents" in order
+      ? (order.participantSubtotalCents as number)
+      : null;
+  const hasOtherGroupItems =
+    isParticipantView && "hasOtherGroupItems" in order
+      ? Boolean(order.hasOtherGroupItems)
+      : false;
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -200,12 +223,27 @@ export function OrderPageContent({
       />
 
       <header className="mb-6">
-        {from === "cart" && (
+        {from === "cart" && !isParticipantView && (
           <p className="mb-4 rounded-lg border border-stone-200 bg-stone-100 px-4 py-2 text-sm text-stone-700">
             You already have an active order. Here&apos;s your order status.
           </p>
         )}
-        <h1 className="text-2xl font-semibold text-stone-900 sm:text-3xl">Your order</h1>
+        {isParticipantView && (
+          <div className="mb-4 space-y-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+            <p className="font-semibold">The host placed the group order.</p>
+            <p>
+              You&apos;re viewing your items in this group order
+              {participantDisplayName ? ` (${participantDisplayName})` : ""}. Host paid for this
+              order.
+            </p>
+            <p className="text-xs text-sky-900/90">
+              Order status updates come from the vendor/POS.
+            </p>
+          </div>
+        )}
+        <h1 className="text-2xl font-semibold text-stone-900 sm:text-3xl">
+          {isParticipantView ? "Group order tracking" : "Your order"}
+        </h1>
         <p className="mt-1 text-stone-600">Order #{order.id.slice(-8).toUpperCase()}</p>
         <p className="mt-3 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-800">
           {pickupLine}
@@ -223,7 +261,9 @@ export function OrderPageContent({
               {pickupCode}
             </p>
             <p className="mt-3 text-sm text-stone-600">
-              Show this code at pickup. Give it to the vendor when you collect your order.
+              {isParticipantView
+                ? "Show this code at pickup for the group order."
+                : "Show this code at pickup. Give it to the vendor when you collect your order."}
             </p>
           </section>
 
@@ -254,7 +294,14 @@ export function OrderPageContent({
                 times.
               </p>
             ) : (
-              <p className="mt-1 text-sm text-stone-500">Your items from this vendor</p>
+              <p className="mt-1 text-sm text-stone-500">
+                {isParticipantView ? "Your items from this vendor" : "Your items from this vendor"}
+              </p>
+            )}
+            {hasOtherGroupItems && (
+              <p className="mt-2 text-sm text-stone-600">
+                This group order includes other items you cannot see here.
+              </p>
             )}
             <div className="mt-4 space-y-4">
               {order.vendorOrders.map((vo) => {
@@ -287,9 +334,14 @@ export function OrderPageContent({
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <h3 className="text-base font-semibold text-stone-900">{vo.vendor.name}</h3>
-                        {showVendorSubtotal && (
+                        {showVendorSubtotal && !isParticipantView && (
                           <p className="mt-0.5 text-sm tabular-nums text-stone-600">
                             Subtotal ${(vo.totalCents / 100).toFixed(2)}
+                          </p>
+                        )}
+                        {isParticipantView && vo.lineItems.length === 0 && (
+                          <p className="mt-1 text-xs text-stone-500">
+                            Other group order items at this vendor
                           </p>
                         )}
                       </div>
@@ -364,9 +416,25 @@ export function OrderPageContent({
               {isMultiVendor && (
                 <li>Items from different vendors may be ready at different times.</li>
               )}
+              {isParticipantView && (
+                <li>Host paid for this group order — payment details are not shown here.</li>
+              )}
             </ul>
           </div>
 
+          {isParticipantView && participantSubtotalCents != null ? (
+            <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Your items
+              </h3>
+              <p className="mt-1 text-xs text-stone-500">
+                Subtotal for your lines only (host paid the full order).
+              </p>
+              <p className="mt-3 text-2xl font-bold tabular-nums text-stone-900">
+                ${(participantSubtotalCents / 100).toFixed(2)}
+              </p>
+            </div>
+          ) : !isParticipantView ? (
           <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
               Order total
@@ -407,7 +475,9 @@ export function OrderPageContent({
               </div>
             </dl>
           </div>
+          ) : null}
 
+          {!isParticipantView && (
           <OrderHelpSection
             orderId={orderId}
             vendorOrders={order.vendorOrders.map((vo) => ({
@@ -419,6 +489,7 @@ export function OrderPageContent({
               })),
             }))}
           />
+          )}
         </aside>
 
         {timelineEvents.length > 0 && (

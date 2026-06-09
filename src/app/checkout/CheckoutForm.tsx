@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   clearCartOnServerAndNotifyClient,
@@ -39,6 +40,8 @@ interface CheckoutFormProps {
   /** Linked verified phone (E.164) for signed-in customers — skips OTP when checkout phone matches. */
   accountVerifiedPhoneE164?: string | null;
   initialPhone?: string;
+  /** Server snapshot from group checkout lock; required when checking out a group order. */
+  groupCheckoutFingerprint?: string;
 }
 
 type Step = "form" | "payment";
@@ -75,6 +78,7 @@ export function CheckoutForm({
   isSignedIn = false,
   accountVerifiedPhoneE164 = null,
   initialPhone = "",
+  groupCheckoutFingerprint,
 }: CheckoutFormProps) {
   const router = useRouter();
   const accountPhoneReady = Boolean(isSignedIn && accountVerifiedPhoneE164);
@@ -103,6 +107,7 @@ export function CheckoutForm({
   const [scheduledDate, setScheduledDate] = useState(defaultScheduledDate);
   const [scheduledTime, setScheduledTime] = useState(defaultScheduledTime);
   const [pickupFieldError, setPickupFieldError] = useState<string | null>(null);
+  const [groupCartChanged, setGroupCartChanged] = useState(false);
 
   const idempotencyKeyRef = useRef(crypto.randomUUID());
   const totalWithTip = totalCents + tipCents;
@@ -167,6 +172,7 @@ export function CheckoutForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setGroupCartChanged(false);
     setPickupFieldError(null);
     if (pickupMode === "scheduled") {
       if (!scheduledDate.trim() || !scheduledTime.trim()) {
@@ -200,6 +206,7 @@ export function CheckoutForm({
           tipCents,
           idempotencyKey,
           pickupMode,
+          ...(groupCheckoutFingerprint ? { groupCheckoutFingerprint } : {}),
           ...(pickupMode === "scheduled"
             ? { scheduledPickupDate: scheduledDate, scheduledPickupTime: scheduledTime }
             : {}),
@@ -217,7 +224,19 @@ export function CheckoutForm({
           })()) ??
         {};
       if (!res.ok) {
-        setError(data.error?.message ?? data.error ?? "Checkout failed");
+        if (data.code === "GROUP_CART_CHANGED_DURING_CHECKOUT") {
+          setGroupCartChanged(true);
+          setError(
+            data.error ??
+              "The group cart changed while you were checking out. Review the latest cart before continuing."
+          );
+          return;
+        }
+        setError(
+          typeof data.error === "string"
+            ? data.error
+            : (data.error?.message ?? data.message ?? "Checkout failed")
+        );
         return;
       }
       const { orderId, clientSecret, paymentIntentId, orderAccessToken } = data;
@@ -505,9 +524,20 @@ export function CheckoutForm({
       </section>
 
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
-          {error}
-        </p>
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          role="alert"
+        >
+          <p>{error}</p>
+          {groupCartChanged ? (
+            <Link
+              href="/cart?groupUnlock=1"
+              className="mt-2 inline-flex font-semibold text-red-900 underline hover:no-underline"
+            >
+              Review group cart
+            </Link>
+          ) : null}
+        </div>
       )}
 
       <p className="mx-auto max-w-lg text-center text-sm leading-relaxed text-stone-600">
