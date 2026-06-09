@@ -21,7 +21,7 @@ import { readGroupOrderParticipantMarkers } from "@/lib/group-order-participant-
 import { resolveActiveGroupCartIdForPod } from "@/services/group-order.service";
 import { auth } from "@/auth";
 import type { ResolvedGroupCartActor } from "@/services/group-order.service";
-import { resolveGroupOrderActorForCartMutation } from "@/actions/group-order-context";
+import { resolveGroupOrderActorForCartMutation, resolveGroupOrderActorForCartRead } from "@/actions/group-order-context";
 import {
   diagnoseCartMutationAccess,
   logCartMutationAccessDenied,
@@ -43,7 +43,10 @@ async function assertCartAccessForAction(
   mode: "read" | "mutate"
 ): Promise<{ ok: true; actor: ResolvedGroupCartActor | null } | CartActionAccessDenied> {
   const sessionId = await getMennyuSessionIdForRequest();
-  const actor = await resolveGroupOrderActorForCartMutation(cartId);
+  const actor =
+    mode === "read"
+      ? await resolveGroupOrderActorForCartRead(cartId)
+      : await resolveGroupOrderActorForCartMutation(cartId);
   const access = await assertCartSessionAccess(cartId, sessionId, {
     groupOrderActor: actor,
     mode,

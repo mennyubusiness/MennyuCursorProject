@@ -78,6 +78,7 @@ export function quickCartFooterCtaLabel(params: {
     return hasItems ? "View my items" : "View group cart";
   }
   if (groupRole === "host" || cartScope === "group_order") {
+    if (groupRole === "host" && !hasItems) return "Open group cart";
     return hasItems ? "Go to group cart" : "Go to cart";
   }
   if (!canCheckout) {

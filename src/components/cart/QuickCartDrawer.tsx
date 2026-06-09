@@ -48,13 +48,16 @@ export function QuickCartDrawer() {
     canCheckout,
     cartScope: podContext.cartScope,
   });
+  const showHostGroupEmpty =
+    Boolean(cart && groupOrder?.role === "host" && groupOrder.joinCode && !hasItems);
   const showNeutralEmpty =
-    podContext.cartScope === "neutral" && !hasItems && !showActiveRecovery;
+    podContext.cartScope === "neutral" && !hasItems && !showActiveRecovery && !showHostGroupEmpty;
   const showBrowsingEmpty =
     podContext.cartScope === "browsing_pod" &&
     !hasItems &&
     !podContext.requiresClearToSwitchPod &&
-    !showActiveRecovery;
+    !showActiveRecovery &&
+    !showHostGroupEmpty;
   const suppressNeutralGroupPromo =
     showActiveRecovery && shouldSuppressNeutralGroupPromo(activeCartRecovery);
 
@@ -152,11 +155,18 @@ export function QuickCartDrawer() {
                 </li>
               ))}
             </ul>
+          ) : showHostGroupEmpty && cart ? (
+            <div className="oo-empty-state px-2 py-4">
+              <p className="text-sm text-oo-stone-gray">
+                Your group cart is ready. Add items from a vendor or open the full cart to invite
+                friends.
+              </p>
+            </div>
           ) : null}
         </div>
 
         <footer className="border-t border-oo-light-stone bg-oo-warm-white px-4 py-4 sm:px-5">
-          {cart && hasItems && (
+          {hasItems && cart && (
             <>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-oo-stone-gray">{isParticipant ? "Your subtotal" : "Subtotal"}</span>
@@ -174,7 +184,7 @@ export function QuickCartDrawer() {
               </p>
             </>
           )}
-          {hasItems && cart && (
+          {((cart && hasItems) || showHostGroupEmpty) && cart && (
             <AwaitCartNavigationLink
               cartId={cart.id}
               href="/cart"
@@ -184,6 +194,9 @@ export function QuickCartDrawer() {
               {footerCta}
             </AwaitCartNavigationLink>
           )}
+          {!hasItems && showHostGroupEmpty ? (
+            <p className="mt-1 text-[11px] text-oo-stone-gray">Group order · host pays at checkout</p>
+          ) : null}
           {showNeutralEmpty && (
             <ButtonLink
               href="/explore"

@@ -9,6 +9,7 @@ import {
 } from "@/lib/group-order-cookies";
 import {
   resolveActorForGroupCart,
+  resolveGroupCartActorForRead,
   type ResolvedGroupCartActor,
 } from "@/services/group-order.service";
 
@@ -104,14 +105,19 @@ export async function assertCartSessionAccess(
 /** Resolve group-order host/participant actor from route handler cookies + auth session. */
 export async function resolveGroupOrderActorFromRequest(
   request: NextRequest,
-  cartId: string
+  cartId: string,
+  mode: "read" | "mutate" = "mutate"
 ): Promise<ResolvedGroupCartActor | null> {
   const authSession = await auth();
   const participantId = request.cookies.get(GROUP_ORDER_PARTICIPANT_ID_COOKIE)?.value ?? null;
   const legacyJoinToken = request.cookies.get(GROUP_ORDER_JOIN_TOKEN_COOKIE)?.value ?? null;
-  return resolveActorForGroupCart(cartId, {
+  const opts = {
     hostUserId: authSession?.user?.id ?? null,
     participantIdFromCookie: participantId,
     joinTokenFromCookie: legacyJoinToken,
-  });
+  };
+  if (mode === "read") {
+    return resolveGroupCartActorForRead(cartId, opts);
+  }
+  return resolveActorForGroupCart(cartId, opts);
 }

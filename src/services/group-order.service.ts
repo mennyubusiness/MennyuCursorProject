@@ -573,6 +573,60 @@ export async function resolveActorForGroupCart(
   return null;
 }
 
+/**
+ * Read paths (Quick Cart, vendor menu SSR): infer signed-in host on active sessions when
+ * participant cookies are stale. Mutations must use resolveActorForGroupCart only.
+ */
+export async function resolveGroupCartActorForRead(
+  cartId: string,
+  opts: GroupOrderActorResolveOpts
+): Promise<ResolvedGroupCartActor | null> {
+  const actor = await resolveActorForGroupCart(cartId, opts);
+  if (actor) return actor;
+
+  const hostId = opts.hostUserId?.trim();
+  if (!hostId) return null;
+
+  const session = await prisma.groupOrderSession.findUnique({
+    where: { cartId },
+    select: {
+      id: true,
+      cartId: true,
+      podId: true,
+      hostUserId: true,
+      status: true,
+      expiresAt: true,
+    },
+  });
+  if (!session || session.hostUserId !== hostId) return null;
+  if (
+    !ACTIVE_GROUP_SESSION_STATUSES.includes(
+      session.status as (typeof ACTIVE_GROUP_SESSION_STATUSES)[number]
+    )
+  ) {
+    return null;
+  }
+  if (session.expiresAt <= new Date()) {
+    await expireGroupOrderSessionIfStale(session.id);
+    return null;
+  }
+
+  const hostP = await prisma.groupOrderParticipant.findFirst({
+    where: { groupOrderSessionId: session.id, role: "host", leftAt: null },
+    select: { id: true },
+  });
+  if (!hostP) return null;
+
+  return {
+    sessionId: session.id,
+    sessionStatus: session.status,
+    cartId: session.cartId,
+    podId: session.podId,
+    participantId: hostP.id,
+    role: "host",
+  };
+}
+
 export function groupOrderLockedForCheckoutMessage(role: GroupOrderActorRole): string {
   return role === "host"
     ? "Checkout is in progress. Return to checkout or unlock to edit."

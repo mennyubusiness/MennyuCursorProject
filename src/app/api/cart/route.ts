@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   const cartId = searchParams.get("cartId");
   if (cartId) {
     const sessionId = getSessionIdFromRequest(request);
-    const groupOrderActor = await resolveGroupOrderActorFromRequest(request, cartId);
+    const groupOrderActor = await resolveGroupOrderActorFromRequest(request, cartId, "read");
     const access = await assertCartSessionAccess(cartId, sessionId, {
       groupOrderActor,
       mode: "read",

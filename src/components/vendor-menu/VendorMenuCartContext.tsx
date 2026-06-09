@@ -110,6 +110,14 @@ export function VendorMenuCartProvider({
   useEffect(() => {
     const onCartUpdated = (event: Event) => {
       const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
+      if (detail?.cart && detail.source === "group-order-start") {
+        if (detail.cart.podId !== cartRef.current.podId) return;
+        const normalized = ensureCartSnapshotScalars(detail.cart);
+        cartRef.current = normalized;
+        setCart(normalized);
+        markCartSnapshotCommitted(normalized.id);
+        return;
+      }
       if (!shouldApplyCartSnapshot(detail, "vendor-menu", snapshotContext)) return;
       setCart(detail!.cart!);
     };

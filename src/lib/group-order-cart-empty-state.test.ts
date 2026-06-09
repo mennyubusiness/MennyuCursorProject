@@ -65,14 +65,19 @@ describe("cart page wiring", () => {
     expect(panel).toMatch(/buildGroupOrderJoinAbsoluteUrl/);
   });
 
-  it("Quick Cart uses code-based invite path", () => {
+  it("Quick Cart uses host invite controls", () => {
     const { readFileSync } = require("node:fs");
     const { join } = require("node:path");
-    const src = readFileSync(
+    const groupSrc = readFileSync(
       join(process.cwd(), "src/components/cart/QuickCartGroupSection.tsx"),
       "utf8"
     );
-    expect(src).toMatch(/buildGroupOrderJoinPath/);
-    expect(src).not.toMatch(/group-order\/join\?session=/);
+    const hostControls = readFileSync(
+      join(process.cwd(), "src/components/cart/QuickCartHostGroupControls.tsx"),
+      "utf8"
+    );
+    expect(groupSrc).toMatch(/QuickCartHostGroupControls/);
+    expect(hostControls).toMatch(/Copy code/);
+    expect(hostControls).not.toMatch(/group-order\/join\?session=/);
   });
 });

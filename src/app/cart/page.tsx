@@ -56,6 +56,8 @@ import {
 } from "@/lib/group-participant-submitted-cart";
 import { resolveGroupCartEmptyState, shouldShowJoinGroupOrderForm } from "@/lib/group-order-cart-empty-state";
 import { GroupOrderCartPanel, GROUP_INVITE_SECTION_ID } from "./GroupOrderCartPanel";
+import { GroupOrderStartCartSync } from "@/components/cart/GroupOrderStartCartSync";
+import { buildHostGroupCartClientSnapshot } from "@/lib/group-order-start-sync";
 import {
   GroupOrderHostEmptyCartState,
   GroupOrderParticipantEmptyCartState,
@@ -209,7 +211,7 @@ export default async function CartPage({
         activeSessionId: startRes.sessionId,
         activeSessionCartId: cart.id,
       });
-      redirect("/cart");
+      redirect("/cart?groupStarted=1");
     }
     redirect(`/cart?groupError=${encodeURIComponent(startRes.error)}`);
   }
@@ -293,9 +295,24 @@ export default async function CartPage({
     goView: goState.active ? goState.view : null,
   });
 
+  const hostGroupStartSyncCart =
+    goState.active &&
+    goState.view === "host" &&
+    (goState.status === "active" || goState.status === "locked_checkout")
+      ? buildHostGroupCartClientSnapshot({
+          cartId: cart.id,
+          podId: cart.podId,
+          podName: cart.pod.name,
+          sessionId: cart.sessionId,
+          joinCode: goState.joinCode,
+          groupOrderSessionId: goState.sessionId,
+        })
+      : null;
+
   if (emptyStateKind === "host_group_empty") {
     return (
       <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+        {hostGroupStartSyncCart ? <GroupOrderStartCartSync cart={hostGroupStartSyncCart} /> : null}
         <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
         <GroupOrderCartPanel
           cartId={cart.id}
@@ -624,6 +641,7 @@ export default async function CartPage({
         initialCart={initialCartSnapshot}
         initialValidation={initialValidation}
       >
+      {hostGroupStartSyncCart ? <GroupOrderStartCartSync cart={hostGroupStartSyncCart} /> : null}
       <CartPageLiveSyncBanner />
       <CartPageLiveValidationBanner />
       <CartPageLiveEmptyNotice hideWhenGroupActive={goState.active} />

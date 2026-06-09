@@ -154,7 +154,7 @@ describe("QuickCartDrawer source", () => {
 
   it("neutral group section has Join with code without for this pod", () => {
     expect(groupSrc).toContain("Join with code");
-    expect(groupSrc).toMatch(/Have a group code/);
+    expect(groupSrc).toMatch(/Ordering with friends/);
     expect(groupSrc).not.toMatch(/for this pod/);
   });
 

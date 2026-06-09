@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
-import { buildGroupOrderJoinPath } from "@/lib/group-order-invite-url";
 import type { Cart } from "@/domain/types";
 import type { CartPodContext } from "@/lib/cart-pod-context";
 import { ButtonLink } from "@/components/ui/button";
+import { QuickCartHostGroupControls } from "@/components/cart/QuickCartHostGroupControls";
+import { StartGroupOrderButton } from "@/components/cart/StartGroupOrderButton";
+import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
 
 type Props = {
   cart: Cart | null;
@@ -28,45 +30,36 @@ export function QuickCartGroupSection({
   suppressNeutralGroupPromo = false,
   onNavigate,
 }: Props) {
+  const quickCart = useQuickCartOptional();
   const group = cart?.groupOrder;
   const role = group?.role ?? "solo";
   const browsePodId = podContext.browsingPodId;
   const browsePodName = podContext.browsingPodName;
+  const podName = cart?.podName ?? browsePodName ?? podContext.cartPodName;
 
-  if (role === "host" && group?.joinCode) {
-    const inviteHref = buildGroupOrderJoinPath(group.joinCode);
+  const onGroupStarted = () => {
+    void quickCart?.refreshCart();
+    onNavigate?.();
+  };
 
+  if (role === "host" && group?.joinCode && cart) {
     return (
-      <section className="mb-4 rounded-xl border border-oo-light-stone bg-oo-cream/80 px-3 py-3 text-sm">
-        <p className="font-semibold text-oo-charcoal">Group order active</p>
-        <p className="mt-1 font-mono text-xs text-oo-stone-gray">
-          Code: <span className="font-semibold text-oo-charcoal">{group.joinCode}</span>
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link
-            href={inviteHref}
-            onClick={onNavigate}
-            className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream"
-          >
-            Invite others
-          </Link>
-          <Link
-            href="/cart"
-            onClick={onNavigate}
-            className="rounded-lg border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/15"
-          >
-            Go to group cart
-          </Link>
-        </div>
-      </section>
+      <QuickCartHostGroupControls
+        joinCode={group.joinCode}
+        podId={cart.podId}
+        podName={podName}
+        onNavigate={onNavigate}
+      />
     );
   }
 
   if (role === "participant") {
     return (
       <section className="mb-4 rounded-xl border border-oo-light-stone bg-oo-cream/80 px-3 py-3 text-sm">
-        <p className="font-semibold text-oo-charcoal">You&apos;re in a group order</p>
-        <p className="mt-1 text-xs text-oo-stone-gray">The host will place the order.</p>
+        <p className="font-semibold text-oo-charcoal">You joined this group order</p>
+        <p className="mt-1 text-xs text-oo-stone-gray">
+          Add your items before the host checks out.
+        </p>
         <Link
           href="/cart"
           onClick={onNavigate}
@@ -78,22 +71,29 @@ export function QuickCartGroupSection({
     );
   }
 
-  if (role === "unknown") {
+  if (role === "unknown" && podContext.cartScope === "group_order") {
     return (
       <section className="mb-4 rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/60 px-3 py-3 text-sm">
         <p className="font-semibold text-oo-charcoal">Group order</p>
         <p className="mt-1 text-xs text-oo-stone-gray">
-          Join with the host&apos;s code to add your items to this cart.
+          This shared cart is not open for your account. Join with a code or start your own group.
         </p>
-        <ButtonLink
-          href="/group-order/join"
-          variant="secondary"
-          size="sm"
-          className="mt-3"
-          onClick={onNavigate}
-        >
-          Join with code
-        </ButtonLink>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {browsePodId && hasServerSession ? (
+            <StartGroupOrderButton podId={browsePodId} onStarted={onGroupStarted} />
+          ) : browsePodId ? (
+            <Link
+              href={startGroupOrderHref(browsePodId, false)}
+              onClick={onNavigate}
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream"
+            >
+              Start group order
+            </Link>
+          ) : null}
+          <ButtonLink href="/group-order/join" variant="secondary" size="sm" onClick={onNavigate}>
+            Join with code
+          </ButtonLink>
+        </div>
       </section>
     );
   }
@@ -101,19 +101,24 @@ export function QuickCartGroupSection({
   if (podContext.cartScope === "neutral" && !suppressNeutralGroupPromo) {
     return (
       <section className="mb-4 rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/60 px-3 py-3 text-sm">
-        <p className="font-semibold text-oo-charcoal">Group order</p>
+        <p className="font-semibold text-oo-charcoal">Ordering with friends?</p>
         <p className="mt-1 text-xs text-oo-stone-gray">
-          Have a group code? Join a shared order.
+          Start a group order as host or join with a code.
         </p>
         <ButtonLink
-          href="/group-order/join"
+          href="/explore"
           variant="secondary"
           size="sm"
           className="mt-3"
           onClick={onNavigate}
         >
-          Join with code
+          Choose a pod first
         </ButtonLink>
+        <div className="mt-2">
+          <ButtonLink href="/group-order/join" variant="secondary" size="sm" onClick={onNavigate}>
+            Join with code
+          </ButtonLink>
+        </div>
       </section>
     );
   }
@@ -121,7 +126,7 @@ export function QuickCartGroupSection({
   if (podContext.cartScope === "browsing_pod" && browsePodId) {
     return (
       <section className="mb-4 rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/60 px-3 py-3 text-sm">
-        <p className="font-semibold text-oo-charcoal">Order with a group</p>
+        <p className="font-semibold text-oo-charcoal">Ordering with friends?</p>
         <p className="mt-1 text-xs text-oo-stone-gray">
           {browsePodName
             ? `Start or join a group order for ${browsePodName}.`
@@ -129,13 +134,17 @@ export function QuickCartGroupSection({
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {podContext.canStartOrderHere ? (
-            <Link
-              href={startGroupOrderHref(browsePodId, hasServerSession)}
-              onClick={onNavigate}
-              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream"
-            >
-              Start group order
-            </Link>
+            hasServerSession ? (
+              <StartGroupOrderButton podId={browsePodId} onStarted={onGroupStarted} />
+            ) : (
+              <Link
+                href={startGroupOrderHref(browsePodId, false)}
+                onClick={onNavigate}
+                className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream"
+              >
+                Start group order
+              </Link>
+            )
           ) : null}
           <Link
             href="/group-order/join"

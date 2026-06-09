@@ -39,6 +39,8 @@ vi.mock("@/auth", () => ({
 vi.mock("@/actions/group-order-context", () => ({
   resolveGroupOrderActorForCartMutation: (...args: unknown[]) =>
     mockResolveGroupOrderActor(...args),
+  resolveGroupOrderActorForCartRead: (...args: unknown[]) =>
+    mockResolveGroupOrderActor(...args),
 }));
 
 vi.mock("@/lib/session-request", () => ({

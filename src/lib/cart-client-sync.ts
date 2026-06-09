@@ -4,7 +4,13 @@ export const CART_UPDATED_EVENT = "mennyu:cart-updated";
 export const CART_CLEARED_EVENT = "mennyu:cart-cleared";
 export const PENDING_CART_CLEAR_STORAGE_KEY = "mennyu:pending-cart-clear";
 
-export type CartUpdateSource = "vendor-menu" | "quick-cart" | "cart-page" | "checkout" | "order-page";
+export type CartUpdateSource =
+  | "vendor-menu"
+  | "quick-cart"
+  | "cart-page"
+  | "checkout"
+  | "order-page"
+  | "group-order-start";
 
 export type CartClearSource = "checkout" | "order-page" | CartUpdateSource;
 
@@ -83,6 +89,9 @@ export function shouldApplyCartSnapshot(
 ): boolean {
   if (!detail || detail.cart === undefined) return false;
   if (detail.source === listenerSource) return false;
+  if (detail.source === "group-order-start") {
+    return Boolean(detail.cart?.podId && detail.cart.podId === ctx.podId);
+  }
   return cartSnapshotAppliesToContext(detail.cart, ctx);
 }
 
@@ -97,6 +106,10 @@ export function shouldQuickCartApplyCartSnapshot(
 ): boolean {
   if (!detail || detail.cart === undefined) return false;
   if (detail.source === "quick-cart") return false;
+  if (detail.source === "group-order-start") {
+    const started = detail.cart;
+    return Boolean(started && currentPodId && started.podId === currentPodId);
+  }
 
   const incoming = detail.cart;
   if (incoming && currentPodId && incoming.podId && incoming.podId !== currentPodId) {

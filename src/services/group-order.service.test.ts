@@ -278,6 +278,40 @@ describe("resolveActiveGroupCartIdForPod", () => {
   });
 });
 
+describe("resolveGroupCartActorForRead", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("infers host actor for active session when strict resolution fails", async () => {
+    mockFindUniqueSession.mockImplementation(
+      async ({ where }: { where: Record<string, string> }) => {
+        if (where.cartId === "cart_1") {
+          return {
+            id: "gos_1",
+            cartId: "cart_1",
+            podId: "pod_1",
+            hostUserId: "host_1",
+            status: "active",
+            expiresAt: new Date(Date.now() + 60_000),
+            participants: [],
+          };
+        }
+        return null;
+      }
+    );
+    mockFindFirstParticipant.mockResolvedValueOnce({ id: "part_host" });
+
+    const { resolveGroupCartActorForRead } = await import("./group-order.service");
+    const actor = await resolveGroupCartActorForRead("cart_1", {
+      hostUserId: "host_1",
+      participantIdFromCookie: "stale_part",
+    });
+
+    expect(actor).toMatchObject({ role: "host", cartId: "cart_1", participantId: "part_host" });
+  });
+});
+
 describe("startGroupOrderSession", () => {
   beforeEach(() => {
     vi.clearAllMocks();

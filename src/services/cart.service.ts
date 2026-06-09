@@ -27,6 +27,7 @@ import {
   findSessionByCartId,
   resolveActiveGroupCartIdForPod,
   resolveActorForGroupCart,
+  resolveGroupCartActorForRead,
   resolveGroupCartIdFromParticipantMarkers,
   assertGroupCartUnlockedForMutation,
   type ResolvedGroupCartActor,
@@ -1093,7 +1094,7 @@ export async function getQuickCartPayload(
       include: CART_SESSION_FULL_INCLUDE,
     });
     if (row) {
-      const actor = await resolveActorForGroupCart(groupCartIdFromContext, {
+      const actor = await resolveGroupCartActorForRead(groupCartIdFromContext, {
         hostUserId: opts.hostUserId,
         participantIdFromCookie: opts.markers.participantId,
         joinTokenFromCookie: opts.markers.legacyJoinToken,
@@ -1121,7 +1122,7 @@ export async function getQuickCartPayload(
   const assignedRow = selectAssignedSessionCart(sessionRows);
 
   if (assignedRow) {
-    const actor = await resolveActorForGroupCart(assignedRow.id, {
+    const actor = await resolveGroupCartActorForRead(assignedRow.id, {
       hostUserId: opts.hostUserId,
       participantIdFromCookie: opts.markers.participantId,
       joinTokenFromCookie: opts.markers.legacyJoinToken,
@@ -1155,6 +1156,32 @@ export async function getQuickCartPayload(
 
   const browseRow = sessionRows.find((r) => r.podId === browsePodId);
   if (browseRow) {
+    const browseGroupCartId = await resolveActiveGroupCartIdForPod(browsePodId, {
+      markers: opts.markers,
+      hostUserId: opts.hostUserId,
+    });
+    if (browseGroupCartId) {
+      const groupRow = await prisma.cart.findUnique({
+        where: { id: browseGroupCartId },
+        include: CART_SESSION_FULL_INCLUDE,
+      });
+      if (groupRow) {
+        const actor = await resolveGroupCartActorForRead(browseGroupCartId, {
+          hostUserId: opts.hostUserId,
+          participantIdFromCookie: opts.markers.participantId,
+          joinTokenFromCookie: opts.markers.legacyJoinToken,
+        });
+        const scoped = await scopeCartForGroupViewer(groupRow, browseGroupCartId, actor, "group_order");
+        return packageQuickCartForActiveAssignment({
+          assignedPodId: scoped.podId,
+          assignedPodName: scoped.podName ?? groupRow.pod.name,
+          cart: scoped,
+          scope: "group_order",
+          browsePodId: browsePod.id,
+          browsePodName: browsePod.name,
+        });
+      }
+    }
     const cart = await scopeCartForGroupViewer(browseRow, browseRow.id, null, "browsing_pod");
     return {
       scope: "browsing_pod",

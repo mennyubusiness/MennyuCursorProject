@@ -22,11 +22,22 @@ import {
   endGroupOrderAsHost,
   unlockGroupOrderSessionFromCheckout,
 } from "@/services/group-order.service";
-import { getCartById } from "@/services/cart.service";
+import {
+  getCartById,
+  getCartByIdForMutation,
+  getOrCreateCart,
+} from "@/services/cart.service";
 import {
   getGroupOrderStateForCartPage,
   startGroupOrderForCartPage,
 } from "@/lib/group-order-cart-page";
+import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
+import { resolveGroupOrderActorForCartRead } from "@/actions/group-order-context";
+import type { Cart } from "@/domain/types";
+
+export type StartGroupOrderActionResult =
+  | { success: true; sessionId: string; joinCode: string; cart: Cart }
+  | { success: false; error: string };
 
 export async function startGroupOrderFormAction(formData: FormData) {
   const cartId = String(formData.get("cartId") ?? "").trim();
@@ -38,10 +49,13 @@ export async function startGroupOrderFormAction(formData: FormData) {
   if (!result.success) {
     redirect(`/cart?groupError=${encodeURIComponent(result.error)}`);
   }
-  redirect("/cart");
+  redirect("/cart?groupStarted=1");
 }
 
-export async function startGroupOrderFromCartAction(cartId: string, podId: string) {
+export async function startGroupOrderFromCartAction(
+  cartId: string,
+  podId: string
+): Promise<StartGroupOrderActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false as const, error: "Sign in to start a group order." };
@@ -58,10 +72,31 @@ export async function startGroupOrderFromCartAction(cartId: string, podId: strin
       activeSessionId: result.sessionId,
       activeSessionCartId: cartId,
     });
+    const actor = await resolveGroupOrderActorForCartRead(cartId);
+    const cart = await getCartByIdForMutation(cartId, actor);
+    if (!cart) {
+      return { success: false, error: "Group order started but cart could not be loaded. Refresh and try again." };
+    }
     revalidatePath("/cart");
     revalidatePath(`/pod/${podId}`, "layout");
+    return { success: true, sessionId: result.sessionId, joinCode: result.joinCode, cart };
   }
   return result;
+}
+
+/** Start (or restart) a host group order for a pod and return the authoritative cart snapshot. */
+export async function startGroupOrderForPodAction(podId: string): Promise<StartGroupOrderActionResult> {
+  const trimmedPod = podId?.trim();
+  if (!trimmedPod) {
+    return { success: false, error: "Missing pod." };
+  }
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: "Sign in to start a group order." };
+  }
+  const sessionId = await getOrCreateMennyuSessionIdForCart();
+  const cartRow = await getOrCreateCart(trimmedPod, sessionId);
+  return startGroupOrderFromCartAction(cartRow.id, trimmedPod);
 }
 
 export async function joinGroupOrderFormAction(formData: FormData) {
