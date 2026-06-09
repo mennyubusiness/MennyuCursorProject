@@ -301,6 +301,48 @@ function blockedForActiveGroupAccess(
   };
 }
 
+export function logGroupOrderClosedMutation(params: {
+  action: "addToCart" | "updateCartItem" | "removeFromCart" | "addCartItem";
+  requestedCartId: string;
+  podIdHint?: string | null;
+  menuItemId?: string | null;
+  cartItemId?: string | null;
+  authUserId: string | null;
+  requestSessionPresent: boolean;
+  staleParticipantCookiePresent: boolean;
+  resolvedGroupSessionId: string | null;
+  resolvedGroupSessionStatus: string | null;
+  resolvedGroupSessionPodId: string | null;
+  resolvedGroupSessionHostUserId: string | null;
+  resolvedActorRole: string | null;
+  recoveryPath: string;
+}): void {
+  if (!DEBUG_CART_MUTATION_ACCESS) return;
+  console.warn("[group-order-mutation] closed", {
+    action: params.action,
+    requestedCartId: params.requestedCartId,
+    podIdHint: params.podIdHint ?? null,
+    menuItemId: params.menuItemId ?? null,
+    cartItemId: params.cartItemId ?? null,
+    authUserId: params.authUserId,
+    requestSessionPresent: params.requestSessionPresent,
+    staleParticipantCookiePresent: params.staleParticipantCookiePresent,
+    resolvedGroupSessionId: params.resolvedGroupSessionId,
+    resolvedGroupSessionStatus: params.resolvedGroupSessionStatus,
+    resolvedGroupSessionPodId: params.resolvedGroupSessionPodId,
+    resolvedGroupSessionHostUserId: params.resolvedGroupSessionHostUserId,
+    resolvedActorRole: params.resolvedActorRole,
+    recoveryPath: params.recoveryPath,
+  });
+}
+
+async function loadGroupSessionSummary(cartId: string) {
+  return prisma.groupOrderSession.findUnique({
+    where: { cartId },
+    select: { id: true, status: true, podId: true, hostUserId: true },
+  });
+}
+
 /**
  * Recover solo/group cart for a pod when menu item id is unavailable (update/remove).
  * Never falls back to solo cart while an active group order applies.
@@ -351,7 +393,7 @@ export async function tryRecoverCartForPodMutation(params: {
 
   const requestedGroup = await prisma.groupOrderSession.findUnique({
     where: { cartId: params.requestedCartId },
-    select: { status: true },
+    select: { id: true, status: true, hostUserId: true, podId: true },
   });
 
   if (requestedGroup) {
@@ -360,6 +402,46 @@ export async function tryRecoverCartForPodMutation(params: {
         requestedGroup.status as (typeof TERMINAL_GROUP_STATUSES)[number]
       )
     ) {
+      if (params.authUserId) {
+        const hostActive = await prisma.groupOrderSession.findFirst({
+          where: {
+            podId,
+            hostUserId: params.authUserId,
+            status: { in: [...ACTIVE_GROUP_STATUSES] },
+            expiresAt: { gt: new Date() },
+          },
+          orderBy: { updatedAt: "desc" },
+          select: { cartId: true },
+        });
+        if (hostActive && hostActive.cartId !== params.requestedCartId) {
+          const access = await checkCartMutationAccess(hostActive.cartId);
+          if (access.ok) {
+            return {
+              kind: "use_cart",
+              cartId: hostActive.cartId,
+              recovered: true,
+              actor: access.actor,
+            };
+          }
+        }
+      }
+
+      logGroupOrderClosedMutation({
+        action: "addToCart",
+        requestedCartId: params.requestedCartId,
+        podIdHint: params.podIdHint,
+        authUserId: params.authUserId,
+        requestSessionPresent: Boolean(params.requestSessionId?.trim()),
+        staleParticipantCookiePresent: Boolean(
+          params.markers.participantId || params.markers.legacyJoinToken
+        ),
+        resolvedGroupSessionId: requestedGroup.id,
+        resolvedGroupSessionStatus: requestedGroup.status,
+        resolvedGroupSessionPodId: requestedGroup.podId,
+        resolvedGroupSessionHostUserId: requestedGroup.hostUserId,
+        resolvedActorRole: null,
+        recoveryPath: "terminal_requested_cart_no_host_active",
+      });
       return { kind: "blocked", error: "This group order is closed.", code: "GROUP_ORDER_CLOSED" };
     }
     if (

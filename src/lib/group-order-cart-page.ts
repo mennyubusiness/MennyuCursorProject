@@ -14,19 +14,38 @@ import { prisma } from "@/lib/db";
 import { CART_DISPLAY_SESSION_CART_INCLUDE } from "@/services/cart.service";
 import {
   findSessionByCartId,
+  resolveActiveGroupCartIdForPod,
   resolveActorForGroupCart,
   startGroupOrderSession,
   unlockGroupOrderSessionFromCheckout,
 } from "@/services/group-order.service";
 
-const HOST_GROUP_CART_STATUSES = ["active", "locked_checkout", "submitted"] as const;
+const HOST_ACTIVE_GROUP_CART_STATUSES = ["active", "locked_checkout"] as const;
 
-/** Load host's latest open group cart when session cart selection misses it (e.g. pod cookie mismatch). */
+/** Host's active group cart for a pod — wins over stale participant markers. */
+export async function loadHostGroupCartRowForPod(
+  hostUserId: string,
+  podId: string,
+  markers?: import("@/lib/group-order-participant-cookie").GroupOrderParticipantMarkers | null
+) {
+  const cartId = await resolveActiveGroupCartIdForPod(podId, {
+    markers: markers ?? { participantId: null, legacyJoinToken: null },
+    hostUserId,
+  });
+  if (!cartId) return null;
+  return prisma.cart.findUnique({
+    where: { id: cartId },
+    include: CART_DISPLAY_SESSION_CART_INCLUDE,
+  });
+}
+
+/** Load host's active group cart for cart page / vendor menu resolution. */
 export async function loadHostGroupCartRowForCartPage(hostUserId: string) {
   const session = await prisma.groupOrderSession.findFirst({
     where: {
       hostUserId,
-      status: { in: [...HOST_GROUP_CART_STATUSES] },
+      status: { in: [...HOST_ACTIVE_GROUP_CART_STATUSES] },
+      expiresAt: { gt: new Date() },
     },
     orderBy: { updatedAt: "desc" },
     select: { cartId: true },

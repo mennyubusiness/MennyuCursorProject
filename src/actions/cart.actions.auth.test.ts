@@ -322,6 +322,39 @@ describe("cart server actions session ownership", () => {
       );
     });
 
+    it("recovers stale submitted cart to active host group cart on add", async () => {
+      const STALE_SUBMITTED = "cart_submitted";
+      const ACTIVE_HOST = "cart_active";
+      mockAssertCartSessionAccess.mockResolvedValue({
+        ok: false,
+        status: 403,
+        error: "Cart not found or access denied",
+      });
+      mockTryRecoverCartForMutation.mockResolvedValue({
+        kind: "use_cart",
+        cartId: ACTIVE_HOST,
+        recovered: true,
+        actor: hostActor,
+      });
+      mockAddCartItem.mockResolvedValue({ id: ACTIVE_HOST, items: [{ id: "line_1" }] });
+
+      const result = await addToCartAction(STALE_SUBMITTED, "item_1", 1, undefined, undefined, "pod_1");
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.cart.id).toBe(ACTIVE_HOST);
+        expect(result.recoveredCart).toBe(true);
+      }
+      expect(mockAddCartItem).toHaveBeenCalledWith(
+        ACTIVE_HOST,
+        "item_1",
+        1,
+        undefined,
+        undefined,
+        hostActor
+      );
+    });
+
     it("rejects mutation without group actor access", async () => {
       mockResolveGroupOrderActor.mockResolvedValue(null);
       mockAssertCartSessionAccess.mockResolvedValue({

@@ -7,9 +7,14 @@ const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockFindFirstParticipant = vi.fn();
 const mockExpireOne = vi.fn();
+const mockCartFindUnique = vi.fn();
+const mockParticipantUpdateMany = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
+    cart: {
+      findUnique: (...args: unknown[]) => mockCartFindUnique(...args),
+    },
     groupOrderSession: {
       findFirst: (...args: unknown[]) => mockFindFirstSession(...args),
       findUnique: (...args: unknown[]) => mockFindUniqueSession(...args),
@@ -19,6 +24,7 @@ vi.mock("@/lib/db", () => ({
       findFirst: (...args: unknown[]) => mockFindFirstParticipant(...args),
       create: (...args: unknown[]) => mockCreate(...args),
       update: (...args: unknown[]) => mockUpdate(...args),
+      updateMany: (...args: unknown[]) => mockParticipantUpdateMany(...args),
     },
     cartItem: {
       findFirst: vi.fn().mockResolvedValue(null),
@@ -243,6 +249,83 @@ describe("unlockGroupOrderSessionFromCheckout", () => {
         data: { status: "active", lockedAt: null },
       })
     );
+  });
+});
+
+describe("resolveActiveGroupCartIdForPod", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns host active cart before participant markers", async () => {
+    mockFindFirstSession.mockResolvedValueOnce({ cartId: "cart_host" });
+
+    const { resolveActiveGroupCartIdForPod } = await import("./group-order.service");
+    const cartId = await resolveActiveGroupCartIdForPod("pod_1", {
+      markers: { participantId: "part_stale", legacyJoinToken: null },
+      hostUserId: "host_1",
+    });
+
+    expect(cartId).toBe("cart_host");
+    expect(mockFindFirstSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          podId: "pod_1",
+          hostUserId: "host_1",
+        }),
+      })
+    );
+  });
+});
+
+describe("startGroupOrderSession", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCartFindUnique.mockResolvedValue({ id: "cart_1", podId: "pod_1" });
+    mockParticipantUpdateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("reactivates submitted session for the same host", async () => {
+    let cartLookupCount = 0;
+    mockFindUniqueSession.mockImplementation(
+      async ({ where }: { where: Record<string, string> }) => {
+        if ("joinCode" in where) return null;
+        if (where.cartId === "cart_1" || where.id === "gos_1") {
+          cartLookupCount += 1;
+          if (cartLookupCount === 1) {
+            return {
+              id: "gos_1",
+              joinCode: "111111",
+              hostUserId: "host_1",
+              podId: "pod_1",
+            };
+          }
+          if (cartLookupCount === 2) {
+            return { id: "gos_1", joinCode: "111111", status: "submitted" };
+          }
+        }
+        return null;
+      }
+    );
+    mockSessionUpdate.mockResolvedValue({});
+
+    const { startGroupOrderSession } = await import("./group-order.service");
+    const res = await startGroupOrderSession({
+      hostUserId: "host_1",
+      cartId: "cart_1",
+      podId: "pod_1",
+      hostDisplayName: "Sam",
+    });
+
+    expect(res.sessionId).toBe("gos_1");
+    expect(res.joinCode).toMatch(/^\d{6}$/);
+    expect(mockSessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "gos_1" },
+        data: expect.objectContaining({ status: "active" }),
+      })
+    );
+    expect(mockParticipantUpdateMany).toHaveBeenCalled();
   });
 });
 

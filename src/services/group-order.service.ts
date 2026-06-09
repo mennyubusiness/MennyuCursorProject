@@ -74,7 +74,17 @@ export async function startGroupOrderSession(args: {
     });
     if (!full) throw new Error("GROUP_ORDER_CREATE_FAILED");
     if (full.status === "submitted") {
-      return { sessionId: full.id, joinCode: full.joinCode };
+      const joinCode = await generateUniqueJoinCode();
+      const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+      await prisma.groupOrderSession.update({
+        where: { id: full.id },
+        data: { status: "active", joinCode, expiresAt, lockedAt: null },
+      });
+      await prisma.groupOrderParticipant.updateMany({
+        where: { groupOrderSessionId: full.id, role: "host" },
+        data: { leftAt: null },
+      });
+      return { sessionId: full.id, joinCode };
     }
     if (full.status === "ended" || full.status === "expired") {
       const joinCode = await generateUniqueJoinCode();
@@ -180,7 +190,7 @@ export async function resolveSharedGroupCartIdForPod(
   return binding.cartId;
 }
 
-/** Active group cart for a pod: participant markers or signed-in host. */
+/** Active group cart for a pod: signed-in host wins over stale participant markers. */
 export async function resolveActiveGroupCartIdForPod(
   podId: string,
   opts: {
@@ -188,20 +198,25 @@ export async function resolveActiveGroupCartIdForPod(
     hostUserId: string | null;
   }
 ): Promise<string | null> {
+  const hostId = opts.hostUserId?.trim();
+  if (hostId) {
+    const hostSession = await prisma.groupOrderSession.findFirst({
+      where: {
+        podId,
+        hostUserId: hostId,
+        status: { in: ACTIVE_GROUP_SESSION_STATUSES },
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { updatedAt: "desc" },
+      select: { cartId: true },
+    });
+    if (hostSession) return hostSession.cartId;
+  }
+
   const byParticipant = await resolveSharedGroupCartIdForPod(podId, opts.markers);
   if (byParticipant) return byParticipant;
-  const hostId = opts.hostUserId?.trim();
-  if (!hostId) return null;
-  const session = await prisma.groupOrderSession.findFirst({
-    where: {
-      podId,
-      hostUserId: hostId,
-      status: { in: ACTIVE_GROUP_SESSION_STATUSES },
-      expiresAt: { gt: new Date() },
-    },
-    select: { cartId: true },
-  });
-  return session?.cartId ?? null;
+
+  return null;
 }
 
 export async function findSessionByCartId(cartId: string) {

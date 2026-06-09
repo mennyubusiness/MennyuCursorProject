@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 
 const mockCartFindUnique = vi.fn();
 const mockGroupOrderSessionFindUnique = vi.fn();
+const mockGroupOrderSessionFindFirst = vi.fn();
 const mockMenuItemFindUnique = vi.fn();
 const mockPodVendorFindUnique = vi.fn();
 const mockPodVendorFindFirst = vi.fn();
@@ -15,6 +16,7 @@ vi.mock("@/lib/db", () => ({
     cart: { findUnique: (...args: unknown[]) => mockCartFindUnique(...args) },
     groupOrderSession: {
       findUnique: (...args: unknown[]) => mockGroupOrderSessionFindUnique(...args),
+      findFirst: (...args: unknown[]) => mockGroupOrderSessionFindFirst(...args),
     },
     menuItem: { findUnique: (...args: unknown[]) => mockMenuItemFindUnique(...args) },
     podVendor: {
@@ -69,6 +71,7 @@ import {
 const STALE_CART = "cart_stale";
 const CURRENT_CART = "cart_current";
 const GROUP_CART = "cart_group";
+const ACTIVE_HOST_CART = "cart_active_host";
 const POD_A = "pod_a";
 const MENU_ITEM = "item_1";
 const SESSION = "sess_current";
@@ -80,6 +83,7 @@ describe("cart-mutation-access-recovery", () => {
     mockGetOrCreateMennyuSessionIdForCart.mockResolvedValue(SESSION);
     mockResolveGroupOrderActor.mockResolvedValue(null);
     mockResolveActiveGroupCartIdForPod.mockResolvedValue(null);
+    mockGroupOrderSessionFindFirst.mockResolvedValue(null);
     mockMenuItemFindUnique.mockResolvedValue({ vendorId: "vendor_1" });
     mockPodVendorFindUnique.mockResolvedValue({ podId: POD_A });
     mockPodVendorFindFirst.mockResolvedValue({ podId: POD_A });
@@ -89,6 +93,9 @@ describe("cart-mutation-access-recovery", () => {
       }
       if (where.id === CURRENT_CART) {
         return { id: CURRENT_CART, sessionId: SESSION, podId: POD_A };
+      }
+      if (where.id === ACTIVE_HOST_CART) {
+        return { id: ACTIVE_HOST_CART, sessionId: SESSION, podId: POD_A };
       }
       return null;
     });
@@ -244,7 +251,14 @@ describe("cart-mutation-access-recovery", () => {
     it("blocks mutation for submitted group cart without solo fallback", async () => {
       mockGroupOrderSessionFindUnique.mockImplementation(
         async ({ where }: { where: { cartId: string } }) => {
-          if (where.cartId === STALE_CART) return { status: "submitted" };
+          if (where.cartId === STALE_CART) {
+            return {
+              id: "gos_submitted",
+              status: "submitted",
+              hostUserId: "user_old",
+              podId: POD_A,
+            };
+          }
           return null;
         }
       );
@@ -264,6 +278,104 @@ describe("cart-mutation-access-recovery", () => {
         code: "GROUP_ORDER_CLOSED",
       });
       expect(mockGetOrCreateCartForVendorMenuPage).not.toHaveBeenCalled();
+    });
+
+    it("recovers stale terminal cart to host active group cart on same pod", async () => {
+      const hostActor = {
+        sessionId: "gos_active",
+        sessionStatus: "active" as const,
+        cartId: ACTIVE_HOST_CART,
+        podId: POD_A,
+        participantId: "part_host",
+        role: "host" as const,
+      };
+
+      mockGroupOrderSessionFindUnique.mockImplementation(
+        async ({ where }: { where: { cartId: string } }) => {
+          if (where.cartId === STALE_CART) {
+            return {
+              id: "gos_submitted",
+              status: "submitted",
+              hostUserId: "user_host",
+              podId: POD_A,
+            };
+          }
+          if (where.cartId === ACTIVE_HOST_CART) {
+            return { status: "active", hostUserId: "user_host" };
+          }
+          return null;
+        }
+      );
+      mockGroupOrderSessionFindFirst.mockResolvedValue({ cartId: ACTIVE_HOST_CART });
+      mockResolveGroupOrderActor.mockResolvedValue(hostActor);
+      mockAssertCartSessionAccess.mockImplementation(
+        async (
+          cartId: string,
+          sessionId: string | null,
+          options?: { groupOrderActor?: unknown }
+        ) => {
+          if (cartId === STALE_CART) {
+            return { ok: false, status: 403, error: "Cart not found or access denied" };
+          }
+          if (cartId === ACTIVE_HOST_CART && options?.groupOrderActor) {
+            return {
+              ok: true,
+              cartId: ACTIVE_HOST_CART,
+              sessionId: "gos_active",
+              podId: POD_A,
+              isGroupOrder: true,
+            };
+          }
+          return { ok: false, status: 403, error: "Cart not found or access denied" };
+        }
+      );
+
+      const result = await tryRecoverCartForMutation({
+        requestedCartId: STALE_CART,
+        menuItemId: MENU_ITEM,
+        podIdHint: POD_A,
+        requestSessionId: SESSION,
+        authUserId: "user_host",
+        markers: { participantId: "part_stale", legacyJoinToken: null },
+      });
+
+      expect(result).toEqual({
+        kind: "use_cart",
+        cartId: ACTIVE_HOST_CART,
+        recovered: true,
+        actor: hostActor,
+      });
+    });
+
+    it("still blocks terminal cart for participant without new host session", async () => {
+      mockGroupOrderSessionFindUnique.mockImplementation(
+        async ({ where }: { where: { cartId: string } }) => {
+          if (where.cartId === STALE_CART) {
+            return {
+              id: "gos_submitted",
+              status: "submitted",
+              hostUserId: "user_host",
+              podId: POD_A,
+            };
+          }
+          return null;
+        }
+      );
+
+      const result = await tryRecoverCartForMutation({
+        requestedCartId: STALE_CART,
+        menuItemId: MENU_ITEM,
+        podIdHint: POD_A,
+        requestSessionId: SESSION,
+        authUserId: null,
+        markers: { participantId: "part_old", legacyJoinToken: null },
+      });
+
+      expect(result).toEqual({
+        kind: "blocked",
+        error: "This group order is closed.",
+        code: "GROUP_ORDER_CLOSED",
+      });
     });
 
     it("rejects pod hint mismatch to avoid cross-pod recovery", async () => {

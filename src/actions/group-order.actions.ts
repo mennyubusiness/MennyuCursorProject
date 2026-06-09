@@ -49,6 +49,15 @@ export async function startGroupOrderFromCartAction(cartId: string, podId: strin
   const name = session.user.name?.trim() || "Host";
   const result = await startGroupOrderForCartPage(cartId, podId, session.user.id, name);
   if (result.success) {
+    const store = await cookies();
+    const { clearStaleGroupParticipantCookiesForNewHostGroup } = await import(
+      "@/lib/group-order-host-cookie-cleanup"
+    );
+    await clearStaleGroupParticipantCookiesForNewHostGroup(store, {
+      hostUserId: session.user.id,
+      activeSessionId: result.sessionId,
+      activeSessionCartId: cartId,
+    });
     revalidatePath("/cart");
     revalidatePath(`/pod/${podId}`, "layout");
   }

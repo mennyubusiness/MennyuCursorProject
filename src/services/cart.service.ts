@@ -1080,19 +1080,25 @@ export async function getQuickCartPayload(
     requiresClearToSwitchPod: false,
   };
 
-  const groupCartId = await resolveGroupCartIdFromParticipantMarkers(opts.markers);
-  if (groupCartId) {
+  const groupCartIdFromContext = browsePodId
+    ? await resolveActiveGroupCartIdForPod(browsePodId, {
+        markers: opts.markers,
+        hostUserId: opts.hostUserId,
+      })
+    : await resolveGroupCartIdFromParticipantMarkers(opts.markers);
+
+  if (groupCartIdFromContext) {
     const row = await prisma.cart.findUnique({
-      where: { id: groupCartId },
+      where: { id: groupCartIdFromContext },
       include: CART_SESSION_FULL_INCLUDE,
     });
     if (row) {
-      const actor = await resolveActorForGroupCart(groupCartId, {
+      const actor = await resolveActorForGroupCart(groupCartIdFromContext, {
         hostUserId: opts.hostUserId,
         participantIdFromCookie: opts.markers.participantId,
         joinTokenFromCookie: opts.markers.legacyJoinToken,
       });
-      const scoped = await scopeCartForGroupViewer(row, groupCartId, actor, "group_order");
+      const scoped = await scopeCartForGroupViewer(row, groupCartIdFromContext, actor, "group_order");
       const browsePodName = browsePodId
         ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ?? null
         : null;

@@ -43,10 +43,10 @@ import {
 } from "./CartPageMutationSync";
 import { CheckoutProgress } from "../checkout/CheckoutProgress";
 import { readGroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
-import { resolveGroupCartIdFromParticipantMarkers } from "@/services/group-order.service";
 import {
   getGroupOrderStateForCartPage,
   loadHostGroupCartRowForCartPage,
+  loadHostGroupCartRowForPod,
   startGroupOrderForCartPage,
   unlockGroupCheckoutForCartPage,
 } from "@/lib/group-order-cart-page";
@@ -146,7 +146,19 @@ export default async function CartPage({
 
   const preferredPodId = startGroupOrder && targetPodForGroup ? targetPodForGroup : currentPodId;
   const perfT0 = cartPagePerfNow();
-  let cart = await loadActiveDisplayCartForSession(sessionId, preferredPodId, participantMarkers);
+  let cart =
+    authSession?.user?.id && preferredPodId
+      ? (await loadHostGroupCartRowForPod(
+          authSession.user.id,
+          preferredPodId,
+          participantMarkers
+        )) ?? undefined
+      : undefined;
+  if (!cart) {
+    cart =
+      (await loadActiveDisplayCartForSession(sessionId, preferredPodId, participantMarkers)) ??
+      undefined;
+  }
   if (!cart && authSession?.user?.id) {
     cart = (await loadHostGroupCartRowForCartPage(authSession.user.id)) ?? undefined;
   }
@@ -156,13 +168,6 @@ export default async function CartPage({
   ) {
     cart =
       (await loadParticipantGroupCartRowForCartPage(participantMarkers)) ?? undefined;
-  }
-  if (cart && (participantMarkers.participantId || participantMarkers.legacyJoinToken)) {
-    const groupCartId = await resolveGroupCartIdFromParticipantMarkers(participantMarkers);
-    if (groupCartId && groupCartId !== cart.id) {
-      const groupRow = await loadActiveDisplayCartForSession(sessionId, null, participantMarkers);
-      if (groupRow) cart = groupRow;
-    }
   }
   if (params.groupUnlock === "1" && cart?.id && authSession?.user?.id) {
     await unlockGroupCheckoutForCartPage(cart.id, authSession.user.id);
@@ -178,7 +183,13 @@ export default async function CartPage({
     cart.podId === targetPodForGroup
   ) {
     const goExisting = await getGroupOrderStateForCartPage(cart.id);
-    if (goExisting.active) {
+    const hostCanRestart =
+      goExisting.active &&
+      goExisting.view === "host" &&
+      (goExisting.status === "submitted" ||
+        goExisting.status === "ended" ||
+        goExisting.status === "expired");
+    if (goExisting.active && !hostCanRestart) {
       redirect("/cart");
     }
     const hostName = authSession.user.name?.trim() || "Host";
@@ -189,6 +200,15 @@ export default async function CartPage({
       hostName
     );
     if (startRes.success) {
+      const store = await cookies();
+      const { clearStaleGroupParticipantCookiesForNewHostGroup } = await import(
+        "@/lib/group-order-host-cookie-cleanup"
+      );
+      await clearStaleGroupParticipantCookiesForNewHostGroup(store, {
+        hostUserId: authSession.user.id,
+        activeSessionId: startRes.sessionId,
+        activeSessionCartId: cart.id,
+      });
       redirect("/cart");
     }
     redirect(`/cart?groupError=${encodeURIComponent(startRes.error)}`);
