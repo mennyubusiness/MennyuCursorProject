@@ -9,6 +9,7 @@ vi.mock("react", () => ({
 const mockCartFindUnique = vi.fn();
 const mockCartCreate = vi.fn();
 const mockOrderUpdateMany = vi.fn();
+const mockGroupOrderSessionFindUnique = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -18,6 +19,9 @@ vi.mock("@/lib/db", () => ({
     },
     order: {
       updateMany: (...args: unknown[]) => mockOrderUpdateMany(...args),
+    },
+    groupOrderSession: {
+      findUnique: (...args: unknown[]) => mockGroupOrderSessionFindUnique(...args),
     },
   },
 }));
@@ -57,6 +61,7 @@ describe("findOrCreateCartForPodSession", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockOrderUpdateMany.mockResolvedValue({ count: 0 });
+    mockGroupOrderSessionFindUnique.mockResolvedValue(null);
   });
 
   it("returns existing cart without creating when row already exists", async () => {
@@ -135,6 +140,7 @@ describe("getOrCreateCartForVendorMenuPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockOrderUpdateMany.mockResolvedValue({ count: 0 });
+    mockGroupOrderSessionFindUnique.mockResolvedValue(null);
   });
 
   it("uses lean vendor-menu include and survives P2002 race", async () => {
@@ -167,6 +173,7 @@ describe("getOrCreateCart", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockOrderUpdateMany.mockResolvedValue({ count: 0 });
+    mockGroupOrderSessionFindUnique.mockResolvedValue(null);
   });
 
   it("returns mapped cart from existing row without create", async () => {

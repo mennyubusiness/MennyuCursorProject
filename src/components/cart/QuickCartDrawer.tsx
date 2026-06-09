@@ -138,6 +138,7 @@ export function QuickCartDrawer() {
                         </div>
                         <QuickCartLineControls
                           cartId={cart.id}
+                          podId={cart.podId}
                           cartItemId={line.id}
                           quantity={line.quantity}
                           onUpdated={async (next) => {

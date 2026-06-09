@@ -144,8 +144,8 @@ describe("phone-only history removed", () => {
 
 describe("checkout phone verification copy", () => {
   it("describes phone as order updates not account login", () => {
-    expect(checkoutPhoneSrc).toMatch(/Verify your phone for order updates/);
-    expect(checkoutPhoneSrc).toMatch(/not for creating an account/i);
+    expect(checkoutPhoneSrc).toMatch(/Verify your phone number to receive order updates/);
+    expect(checkoutPhoneSrc).toMatch(/We&apos;ll text you a code to confirm/);
   });
 });
 

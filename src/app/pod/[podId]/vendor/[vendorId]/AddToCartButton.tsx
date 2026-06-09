@@ -11,6 +11,7 @@ import { enqueueCartMutation } from "@/lib/cart-mutation-queue";
 
 function CartLineQtyControls({
   cartId,
+  podId,
   line,
   orderingDisabled,
   onUpdated,
@@ -18,6 +19,7 @@ function CartLineQtyControls({
   overlay = false,
 }: {
   cartId: string;
+  podId: string;
   line: CartItem;
   orderingDisabled: boolean;
   onUpdated: (cart: Cart) => void;
@@ -33,11 +35,17 @@ function CartLineQtyControls({
     const before = snapshot;
     try {
       const result = await enqueueCartMutation(cartId, () =>
-        updateCartItemAction(cartId, line.id, next, undefined, undefined)
+        updateCartItemAction(cartId, line.id, next, undefined, undefined, podId)
       );
       if (result?.success) {
         applyServerCart(result.cart);
         onUpdated(result.cart);
+      } else if (result && !result.success) {
+        if (result.cart) {
+          applyServerCart(result.cart);
+        } else {
+          applyServerCart(before);
+        }
       }
     } catch {
       applyServerCart(before);
@@ -123,12 +131,12 @@ export function AddToCartButton({
   const isCardOverlay = displayMode === "card-overlay";
   const isCard = displayMode === "card" || isCardOverlay;
   const { openModifier } = useVendorMenuModifier();
-  const { vendorCartItems, runSimpleAddToCart } = useVendorMenuCart();
+  const { cartId: liveCartId, vendorCartItems, runSimpleAddToCart } = useVendorMenuCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasModifiers = Boolean(modifierConfig && modifierConfig.groups.length > 0);
-  const buttonDisabled = loading || !cartId || orderingDisabled;
+  const buttonDisabled = loading || !liveCartId || orderingDisabled;
 
   const linesForThisItem = useMemo(() => {
     const shellPlu = shellDeliverectPlu?.trim();
@@ -150,7 +158,7 @@ export function AddToCartButton({
         menuItemName,
         unitPriceCents,
         shellDeliverectPlu,
-        add: () => addToCartAction(cartId, menuItemId, 1),
+        add: () => addToCartAction(liveCartId, menuItemId, 1, undefined, undefined, podId),
       });
       if (!result.success) {
         setError(result.error);
@@ -167,7 +175,7 @@ export function AddToCartButton({
     if (hasModifiers && modifierConfig) {
       openModifier({
         modifierConfig,
-        cartId,
+        cartId: liveCartId,
         podId,
         vendorId,
         vendorUsesDeliverect,
@@ -182,10 +190,10 @@ export function AddToCartButton({
 
   function openCustomizeAnother() {
     if (!modifierConfig) return;
-    openModifier({
-      modifierConfig,
-      cartId,
-      podId,
+      openModifier({
+        modifierConfig,
+        cartId: liveCartId,
+        podId,
       vendorId,
       vendorUsesDeliverect,
       menuItemDeliverectVariantParentPlu,
@@ -270,7 +278,8 @@ export function AddToCartButton({
                 </span>
               )}
               <CartLineQtyControls
-                cartId={cartId}
+                cartId={liveCartId}
+                podId={podId}
                 line={line}
                 orderingDisabled={orderingDisabled}
                 onUpdated={() => {}}
@@ -304,7 +313,8 @@ export function AddToCartButton({
                 </p>
               )}
               <CartLineQtyControls
-                cartId={cartId}
+                cartId={liveCartId}
+                podId={podId}
                 line={line}
                 orderingDisabled={orderingDisabled}
                 onUpdated={() => {}}

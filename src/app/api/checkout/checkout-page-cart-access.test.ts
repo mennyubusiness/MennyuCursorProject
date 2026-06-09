@@ -14,7 +14,7 @@ describe("checkout SSR and API cart access alignment", () => {
   });
 
   it("checkout page restricts group checkout to host user", () => {
-    expect(checkoutPageSrc).toMatch(/groupSession\.hostUserId/);
+    expect(checkoutPageSrc).toMatch(/groupSessionMeta\.hostUserId/);
   });
 
   it("checkout API uses assertCartSessionAccess before createOrderFromCart", () => {

@@ -41,6 +41,10 @@ describe("admin test tools gating", () => {
       join(root, "src/app/admin/(dashboard)/orders/[orderId]/page.tsx"),
       "utf8"
     );
+    const technicalSrc = readFileSync(
+      join(root, "src/app/admin/(dashboard)/orders/[orderId]/AdminOrderTechnicalDetailsSection.tsx"),
+      "utf8"
+    );
     const qaSrc = readFileSync(
       join(root, "src/app/admin/(dashboard)/orders/[orderId]/AdminOrderQaToolsSection.tsx"),
       "utf8"
@@ -51,7 +55,7 @@ describe("admin test tools gating", () => {
     );
     expect(pageSrc).toMatch(/canShowAdminTestToolsUi/);
     expect(pageSrc).toMatch(/showAdminTestTools/);
-    expect(pageSrc).toMatch(/AdminOrderQaToolsSection/);
+    expect(technicalSrc).toMatch(/AdminOrderQaToolsSection/);
     expect(qaSrc).toMatch(/AdminSimulateRoutingFailureButton/);
     expect(qaSrc).toMatch(/AdminSimulateDeliverectStatusButton/);
     expect(buttonSrc).toMatch(/Simulate routing failure/);

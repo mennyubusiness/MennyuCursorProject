@@ -13,7 +13,7 @@ import {
   removeCartItem,
   CartValidationError,
 } from "@/services/cart.service";
-import type { AddToCartResult, UpdateCartItemResult, CartItemSelectionInput } from "./cart.actions.types";
+import type { AddToCartResult, UpdateCartItemResult, RemoveFromCartResult, CartItemSelectionInput } from "./cart.actions.types";
 import { revalidatePath } from "next/cache";
 import { getMennyuSessionIdForRequest, getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
@@ -22,6 +22,12 @@ import { resolveActiveGroupCartIdForPod } from "@/services/group-order.service";
 import { auth } from "@/auth";
 import type { ResolvedGroupCartActor } from "@/services/group-order.service";
 import { resolveGroupOrderActorForCartMutation } from "@/actions/group-order-context";
+import {
+  diagnoseCartMutationAccess,
+  logCartMutationAccessDenied,
+  resolveCartItemMutationAccess,
+  tryRecoverCartForMutation,
+} from "@/lib/cart-mutation-access-recovery";
 
 /** TEMP: set false to silence add-to-cart trace logs */
 const DEBUG_ADD_TO_CART_TRACE = true;
@@ -50,6 +56,58 @@ async function assertCartAccessForAction(
     };
   }
   return { ok: true, actor };
+}
+
+async function prepareCartItemMutation(
+  cartId: string,
+  cartItemId: string,
+  action: "updateCartItem" | "removeFromCart",
+  podId?: string | null
+): Promise<
+  | { ok: true; cartId: string; cartItemId: string; actor: ResolvedGroupCartActor | null; recovered: boolean }
+  | { ok: false; result: UpdateCartItemResult | RemoveFromCartResult }
+> {
+  const requestSessionId = await getMennyuSessionIdForRequest();
+  const authSession = await auth();
+  const store = await cookies();
+  const markers = readGroupOrderParticipantMarkers(store);
+
+  const resolved = await resolveCartItemMutationAccess({
+    requestedCartId: cartId,
+    cartItemId,
+    podIdHint: podId,
+    requestSessionId,
+    authUserId: authSession?.user?.id ?? null,
+    markers,
+    action,
+  });
+
+  if (resolved.status === "ready") {
+    return {
+      ok: true,
+      cartId: resolved.cartId,
+      cartItemId: resolved.cartItemId,
+      actor: resolved.actor,
+      recovered: resolved.recovered,
+    };
+  }
+
+  if (resolved.status === "sync_required" || resolved.status === "item_gone") {
+    return {
+      ok: false,
+      result: {
+        success: false,
+        error: resolved.error,
+        code: resolved.code,
+        cart: resolved.cart,
+      },
+    };
+  }
+
+  return {
+    ok: false,
+    result: { success: false, error: resolved.error, code: resolved.code },
+  };
 }
 
 export async function getOrCreateCartForVendorMenuAction(podId: string) {
@@ -101,7 +159,8 @@ export async function addToCartAction(
   menuItemId: string,
   quantity: number = 1,
   specialInstructions?: string | null,
-  selections?: CartItemSelectionInput[] | null
+  selections?: CartItemSelectionInput[] | null,
+  podId?: string | null
 ): Promise<AddToCartResult> {
   if (DEBUG_ADD_TO_CART_TRACE) {
     console.log("[addToCartAction] enter", {
@@ -109,15 +168,57 @@ export async function addToCartAction(
       menuItemId,
       quantity,
       hasSelections: Boolean(selections?.length),
+      podId: podId ?? null,
     });
   }
-  const access = await assertCartAccessForAction(cartId, "mutate");
+
+  let effectiveCartId = cartId;
+  let recoveredCart = false;
+  let access = await assertCartAccessForAction(effectiveCartId, "mutate");
+
   if (!access.ok) {
-    return { success: false, error: access.error, code: access.code };
+    const requestSessionId = await getMennyuSessionIdForRequest();
+    const authSession = await auth();
+    const store = await cookies();
+    const markers = readGroupOrderParticipantMarkers(store);
+    const actor = await resolveGroupOrderActorForCartMutation(effectiveCartId);
+    const diagnostic = await diagnoseCartMutationAccess({
+      cartId: effectiveCartId,
+      requestSessionId,
+      groupOrderActor: actor,
+    });
+    logCartMutationAccessDenied({
+      action: "addToCart",
+      cartId: effectiveCartId,
+      menuItemId,
+      derivedPodId: podId?.trim() ?? diagnostic.cartPodId,
+      requestSessionPresent: Boolean(requestSessionId?.trim()),
+      authUserId: authSession?.user?.id ?? null,
+      diagnostic,
+      accessCode: access.code,
+    });
+
+    const recovery = await tryRecoverCartForMutation({
+      requestedCartId: effectiveCartId,
+      menuItemId,
+      podIdHint: podId,
+      requestSessionId,
+      authUserId: authSession?.user?.id ?? null,
+      markers,
+    });
+
+    if (recovery.kind === "use_cart") {
+      effectiveCartId = recovery.cartId;
+      recoveredCart = recovery.recovered;
+      access = { ok: true, actor: recovery.actor };
+    } else {
+      return { success: false, error: recovery.error, code: recovery.code };
+    }
   }
+
   try {
     const cart = await addCartItem(
-      cartId,
+      effectiveCartId,
       menuItemId,
       quantity,
       specialInstructions,
@@ -129,10 +230,11 @@ export async function addToCartAction(
         cartId: cart.id,
         podId: cart.podId,
         itemCount: cart.items.length,
+        recoveredCart,
       });
     }
     revalidatePath("/cart");
-    return { success: true, cart };
+    return { success: true, cart, ...(recoveredCart ? { recoveredCart: true } : {}) };
   } catch (e) {
     if (e instanceof CartValidationError) {
       if (DEBUG_ADD_TO_CART_TRACE) {
@@ -161,24 +263,30 @@ export async function updateCartItemAction(
   cartItemId: string,
   quantity: number,
   specialInstructions?: string | null,
-  selections?: CartItemSelectionInput[] | null
+  selections?: CartItemSelectionInput[] | null,
+  podId?: string | null
 ): Promise<UpdateCartItemResult | null> {
-  const access = await assertCartAccessForAction(cartId, "mutate");
-  if (!access.ok) {
-    return { success: false, error: access.error, code: access.code };
+  const prepared = await prepareCartItemMutation(cartId, cartItemId, "updateCartItem", podId);
+  if (!prepared.ok) {
+    return prepared.result as UpdateCartItemResult;
   }
+
   try {
     const cart = await updateCartItem(
-      cartId,
-      cartItemId,
+      prepared.cartId,
+      prepared.cartItemId,
       quantity,
       specialInstructions,
       selections,
-      access.actor
+      prepared.actor
     );
     if (cart) {
       revalidatePath("/cart");
-      return { success: true, cart };
+      return {
+        success: true,
+        cart,
+        ...(prepared.recovered ? { recoveredCart: true } : {}),
+      };
     }
     return null;
   } catch (e) {
@@ -194,10 +302,28 @@ export async function updateCartItemAction(
   }
 }
 
-export async function removeFromCartAction(cartId: string, cartItemId: string) {
-  const access = await assertCartAccessForAction(cartId, "mutate");
-  if (!access.ok) return null;
-  await removeCartItem(cartId, cartItemId, access.actor);
-  revalidatePath("/cart");
-  return getCartById(cartId);
+export async function removeFromCartAction(
+  cartId: string,
+  cartItemId: string,
+  podId?: string | null
+): Promise<RemoveFromCartResult> {
+  const prepared = await prepareCartItemMutation(cartId, cartItemId, "removeFromCart", podId);
+  if (!prepared.ok) {
+    return prepared.result as RemoveFromCartResult;
+  }
+
+  try {
+    const cart = await removeCartItem(prepared.cartId, prepared.cartItemId, prepared.actor);
+    revalidatePath("/cart");
+    return {
+      success: true,
+      cart,
+      ...(prepared.recovered ? { recoveredCart: true } : {}),
+    };
+  } catch (e) {
+    if (e instanceof CartValidationError) {
+      return { success: false, error: e.message, code: e.code };
+    }
+    throw e;
+  }
 }

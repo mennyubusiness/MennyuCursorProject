@@ -316,7 +316,8 @@ export function ModifierModal({
             displayConfig.menuItemId,
             1,
             specialInstructions.trim() || null,
-            selectionsList
+            selectionsList,
+            podId
           ),
       });
       return;
@@ -339,7 +340,8 @@ export function ModifierModal({
         cartItemId,
         editQuantity,
         specialInstructions.trim() || null,
-        selectionsList
+        selectionsList,
+        podId
       );
       setLoading(false);
       if (DEBUG_ADD_TO_CART_TRACE) {
@@ -350,9 +352,14 @@ export function ModifierModal({
         onSuccess();
         onClose();
       } else if (result && !result.success) {
-        if (cartSnapshot) commitServerCart(cartSnapshot);
+        if (result.cart) {
+          commitServerCart(result.cart);
+        } else if (cartSnapshot) {
+          commitServerCart(cartSnapshot);
+        }
         setError({ message: result.error, code: result.code });
       }
+      return;
     }
   }
 

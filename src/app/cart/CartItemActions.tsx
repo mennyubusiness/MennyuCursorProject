@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateCartItemAction, removeFromCartAction } from "@/actions/cart.actions";
 import { dispatchCartUpdated } from "@/lib/cart-client-sync";
+import { applyCartMutationClientResult } from "@/lib/cart-mutation-client-result";
 import { enqueueCartMutation } from "@/lib/cart-mutation-queue";
 import type { Cart } from "@/domain/types";
 import { ModifierModal } from "@/components/ModifierModal";
@@ -20,6 +21,7 @@ function publishCartPageMutation(cart: Cart | null | undefined): void {
  */
 export function CartItemActions({
   cartId,
+  podId,
   cartItemId,
   quantity,
   specialInstructions,
@@ -32,6 +34,7 @@ export function CartItemActions({
   interactionDisabledReason,
 }: {
   cartId: string;
+  podId: string;
   cartItemId: string;
   quantity: number;
   specialInstructions?: string | null;
@@ -66,11 +69,13 @@ export function CartItemActions({
     setLoading(true);
     try {
       const result = await enqueueCartMutation(cartId, () =>
-        updateCartItemAction(cartId, cartItemId, q, specialInstructions ?? null)
+        updateCartItemAction(cartId, cartItemId, q, specialInstructions ?? null, undefined, podId)
       );
-      if (result?.success) {
-        publishCartPageMutation(result.cart);
-      } else if (result && !result.success) setError(result.error);
+      applyCartMutationClientResult({
+        result: result ?? undefined,
+        applyCart: publishCartPageMutation,
+        setError,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
     } finally {
@@ -84,12 +89,17 @@ export function CartItemActions({
     try {
       const value = editInstructions.trim() || null;
       const result = await enqueueCartMutation(cartId, () =>
-        updateCartItemAction(cartId, cartItemId, quantity, value)
+        updateCartItemAction(cartId, cartItemId, quantity, value, undefined, podId)
       );
-      if (result?.success) {
+      if (
+        applyCartMutationClientResult({
+          result: result ?? undefined,
+          applyCart: publishCartPageMutation,
+          setError,
+        })
+      ) {
         setEditing(false);
-        publishCartPageMutation(result.cart);
-      } else if (result && !result.success) setError(result.error);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
     } finally {
@@ -101,10 +111,14 @@ export function CartItemActions({
     setError(null);
     setLoading(true);
     try {
-      const cart = await enqueueCartMutation(cartId, () =>
-        removeFromCartAction(cartId, cartItemId)
+      const result = await enqueueCartMutation(cartId, () =>
+        removeFromCartAction(cartId, cartItemId, podId)
       );
-      publishCartPageMutation(cart);
+      applyCartMutationClientResult({
+        result,
+        applyCart: publishCartPageMutation,
+        setError,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Remove failed");
     } finally {

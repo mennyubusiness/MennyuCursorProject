@@ -20,6 +20,22 @@ vi.mock("@/lib/cart-session-access", () => ({
   assertCartSessionAccess: (...args: unknown[]) => mockAssertCartSessionAccess(...args),
 }));
 
+const mockTryRecoverCartForMutation = vi.fn();
+const mockResolveCartItemMutationAccess = vi.fn();
+const mockDiagnoseCartMutationAccess = vi.fn();
+const mockLogCartMutationAccessDenied = vi.fn();
+
+vi.mock("@/lib/cart-mutation-access-recovery", () => ({
+  tryRecoverCartForMutation: (...args: unknown[]) => mockTryRecoverCartForMutation(...args),
+  resolveCartItemMutationAccess: (...args: unknown[]) => mockResolveCartItemMutationAccess(...args),
+  diagnoseCartMutationAccess: (...args: unknown[]) => mockDiagnoseCartMutationAccess(...args),
+  logCartMutationAccessDenied: (...args: unknown[]) => mockLogCartMutationAccessDenied(...args),
+}));
+
+vi.mock("@/auth", () => ({
+  auth: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock("@/actions/group-order-context", () => ({
   resolveGroupOrderActorForCartMutation: (...args: unknown[]) =>
     mockResolveGroupOrderActor(...args),
@@ -84,7 +100,26 @@ describe("cart server actions session ownership", () => {
     mockGetCartById.mockResolvedValue({ id: CART_ID, items: [] });
     mockAddCartItem.mockResolvedValue({ id: CART_ID, items: [{ id: "line_1" }] });
     mockUpdateCartItem.mockResolvedValue({ id: CART_ID, items: [] });
-    mockRemoveCartItem.mockResolvedValue(undefined);
+    mockRemoveCartItem.mockResolvedValue({ id: CART_ID, items: [] });
+    mockResolveCartItemMutationAccess.mockResolvedValue({
+      status: "ready",
+      cartId: CART_ID,
+      cartItemId: "line_1",
+      actor: null,
+      recovered: false,
+    });
+    mockDiagnoseCartMutationAccess.mockResolvedValue({
+      cartExists: true,
+      cartPodId: "pod_1",
+      cartSessionMatchesRequest: false,
+      groupSessionStatus: null,
+      denyReason: "session_mismatch",
+    });
+    mockTryRecoverCartForMutation.mockResolvedValue({
+      kind: "blocked",
+      error: "Cart not found or access denied",
+      code: "CART_ACCESS_DENIED",
+    });
   });
 
   describe("solo cart", () => {
@@ -121,6 +156,7 @@ describe("cart server actions session ownership", () => {
       const result = await addToCartAction(CART_ID, "item_1", 1);
 
       expect(result.success).toBe(true);
+      expect(mockTryRecoverCartForMutation).not.toHaveBeenCalled();
       expect(mockAddCartItem).toHaveBeenCalledWith(
         CART_ID,
         "item_1",
@@ -131,65 +167,114 @@ describe("cart server actions session ownership", () => {
       );
     });
 
-    it("rejects update for wrong session before loading cart lines", async () => {
+    it("recovers stale solo cart id and adds item", async () => {
+      const RECOVERED_CART = "cart_recovered";
       mockAssertCartSessionAccess.mockResolvedValue({
         ok: false,
         status: 403,
         error: "Cart not found or access denied",
       });
+      mockTryRecoverCartForMutation.mockResolvedValue({
+        kind: "use_cart",
+        cartId: RECOVERED_CART,
+        recovered: true,
+        actor: null,
+      });
+      mockAddCartItem.mockResolvedValue({ id: RECOVERED_CART, items: [{ id: "line_1" }] });
 
-      const result = await updateCartItemAction(CART_ID, "line_1", 2);
+      const result = await addToCartAction(CART_ID, "item_1", 1, undefined, undefined, "pod_1");
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.cart.id).toBe(RECOVERED_CART);
+        expect(result.recoveredCart).toBe(true);
+      }
+      expect(mockAddCartItem).toHaveBeenCalledWith(
+        RECOVERED_CART,
+        "item_1",
+        1,
+        undefined,
+        undefined,
+        null
+      );
+      expect(mockLogCartMutationAccessDenied).toHaveBeenCalled();
+    });
+
+    it("rejects update for stale cart with sync-required instead of raw access denied", async () => {
+      mockResolveCartItemMutationAccess.mockResolvedValue({
+        status: "sync_required",
+        cart: { id: "cart_current", podId: "pod_1", items: [], groups: [], subtotalCents: 0, sessionId: SESSION_A },
+        error: "We refreshed your cart. Please try again.",
+        code: "CART_SYNC_REQUIRED",
+      });
+
+      const result = await updateCartItemAction(CART_ID, "line_1", 2, null, undefined, "pod_1");
 
       expect(result).toEqual({
         success: false,
-        error: "Cart not found or access denied",
-        code: "CART_ACCESS_DENIED",
+        error: "We refreshed your cart. Please try again.",
+        code: "CART_SYNC_REQUIRED",
+        cart: expect.objectContaining({ id: "cart_current" }),
       });
       expect(mockUpdateCartItem).not.toHaveBeenCalled();
     });
 
-    it("updates item when session matches", async () => {
-      mockAssertCartSessionAccess.mockResolvedValue({
-        ok: true,
-        cartId: CART_ID,
-        sessionId: SESSION_A,
-        podId: "pod_1",
-        isGroupOrder: false,
+    it("recovers stale solo cart id and updates mapped line", async () => {
+      const RECOVERED_CART = "cart_recovered";
+      mockResolveCartItemMutationAccess.mockResolvedValue({
+        status: "ready",
+        cartId: RECOVERED_CART,
+        cartItemId: "line_mapped",
+        actor: null,
+        recovered: true,
       });
+      mockUpdateCartItem.mockResolvedValue({ id: RECOVERED_CART, items: [{ id: "line_mapped", quantity: 2 }] });
 
+      const result = await updateCartItemAction(CART_ID, "line_1", 2, null, undefined, "pod_1");
+
+      expect(result?.success).toBe(true);
+      if (result?.success) {
+        expect(result.recoveredCart).toBe(true);
+      }
+      expect(mockUpdateCartItem).toHaveBeenCalledWith(
+        RECOVERED_CART,
+        "line_mapped",
+        2,
+        null,
+        undefined,
+        null
+      );
+    });
+
+    it("updates item when session matches", async () => {
       const result = await updateCartItemAction(CART_ID, "line_1", 2);
 
       expect(result?.success).toBe(true);
       expect(mockUpdateCartItem).toHaveBeenCalled();
     });
 
-    it("rejects remove for wrong session before mutating", async () => {
-      mockAssertCartSessionAccess.mockResolvedValue({
-        ok: false,
-        status: 403,
-        error: "Cart not found or access denied",
+    it("rejects remove for blocked group access", async () => {
+      mockResolveCartItemMutationAccess.mockResolvedValue({
+        status: "blocked",
+        error: "Join this group order to change the cart.",
+        code: "GROUP_ORDER_AUTH_REQUIRED",
       });
 
       const result = await removeFromCartAction(CART_ID, "line_1");
 
-      expect(result).toBeNull();
+      expect(result).toEqual({
+        success: false,
+        error: "Join this group order to change the cart.",
+        code: "GROUP_ORDER_AUTH_REQUIRED",
+      });
       expect(mockRemoveCartItem).not.toHaveBeenCalled();
-      expect(mockGetCartById).not.toHaveBeenCalled();
     });
 
-    it("removes item when session matches", async () => {
-      mockAssertCartSessionAccess.mockResolvedValue({
-        ok: true,
-        cartId: CART_ID,
-        sessionId: SESSION_A,
-        podId: "pod_1",
-        isGroupOrder: false,
-      });
+    it("removes item when access resolves", async () => {
+      const result = await removeFromCartAction(CART_ID, "line_1");
 
-      await removeFromCartAction(CART_ID, "line_1");
-
+      expect(result.success).toBe(true);
       expect(mockRemoveCartItem).toHaveBeenCalledWith(CART_ID, "line_1", null);
-      expect(mockGetCartById).toHaveBeenCalledWith(CART_ID);
     });
 
     it("getCartAction rejects wrong session before loading cart", async () => {
@@ -244,20 +329,28 @@ describe("cart server actions session ownership", () => {
         status: 403,
         error: "Cart not found or access denied",
       });
+      mockTryRecoverCartForMutation.mockResolvedValue({
+        kind: "blocked",
+        error: "Join this group order to change the cart.",
+        code: "GROUP_ORDER_AUTH_REQUIRED",
+      });
 
       const result = await addToCartAction(CART_ID, "item_1", 1);
 
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.code).toBe("GROUP_ORDER_AUTH_REQUIRED");
+      }
       expect(mockAddCartItem).not.toHaveBeenCalled();
     });
 
     it("returns validation error when participant cannot edit another line", async () => {
-      mockAssertCartSessionAccess.mockResolvedValue({
-        ok: true,
+      mockResolveCartItemMutationAccess.mockResolvedValue({
+        status: "ready",
         cartId: CART_ID,
-        sessionId: OTHER_SESSION,
-        podId: "pod_1",
-        isGroupOrder: true,
+        cartItemId: "line_other",
+        actor: participantActor,
+        recovered: false,
       });
       mockUpdateCartItem.mockRejectedValue(
         new CartValidationError(
@@ -277,12 +370,12 @@ describe("cart server actions session ownership", () => {
 
     it("host actor can mutate when access passes", async () => {
       mockResolveGroupOrderActor.mockResolvedValue(hostActor);
-      mockAssertCartSessionAccess.mockResolvedValue({
-        ok: true,
+      mockResolveCartItemMutationAccess.mockResolvedValue({
+        status: "ready",
         cartId: CART_ID,
-        sessionId: OTHER_SESSION,
-        podId: "pod_1",
-        isGroupOrder: true,
+        cartItemId: "line_1",
+        actor: hostActor,
+        recovered: false,
       });
 
       const result = await updateCartItemAction(CART_ID, "line_1", 1);

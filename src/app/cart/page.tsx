@@ -725,6 +725,7 @@ export default async function CartPage({
                       </span>
                       <CartItemActions
                         cartId={cart.id}
+                        podId={cart.podId}
                         cartItemId={item.id}
                         quantity={item.quantity}
                         specialInstructions={item.specialInstructions}

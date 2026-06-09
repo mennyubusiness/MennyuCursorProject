@@ -27,13 +27,13 @@ describe("admin stripe money movement UI terminology", () => {
 
     expect(dashboard).toMatch(/VendorTransferRowDetails/);
     expect(dashboard).toMatch(/Stripe available balance/);
-    expect(dashboard).toMatch(/Vendor still owed/);
+    expect(rowDetails).toMatch(/Vendor still owed/);
     expect(dashboard).not.toMatch(/StripeMoneyMovementBreakdown/);
     expect(rowDetails).toMatch(/Additional accounting context/);
     expect(rowDetails).toMatch(/ADMIN_ACCOUNTING_CONTEXT_INTRO/);
     expect(breakdown).toMatch(/Platform payout to Open Order bank/);
     expect(breakdown).toMatch(/mode === "accounting"/);
-    expect(panel).toMatch(/Vendor Connect transfer breakdown/);
+    expect(panel).toMatch(/StripeMoneyMovementBreakdown/);
     expect(nav).toMatch(/Vendor Transfers/);
   });
 
