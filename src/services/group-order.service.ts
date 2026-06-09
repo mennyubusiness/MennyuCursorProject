@@ -5,6 +5,11 @@
 import { randomBytes, randomInt } from "crypto";
 import type { GroupOrderSessionStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import {
+  expireGroupOrderSessionIfStale,
+  expireStaleGroupOrderSessions,
+  normalizeGroupOrderJoinCode,
+} from "@/lib/group-order-session-lifecycle";
 import { CartValidationError } from "@/services/cart-validation-error";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
 import { computeGroupCheckoutFingerprint } from "@/services/group-order-checkout-fingerprint.service";
@@ -23,6 +28,9 @@ export type ResolvedGroupCartActor = {
   role: GroupOrderActorRole;
 };
 
+/**
+ * Long-term: consider archiving/reusing codes or a code+date namespace (global unique constraint).
+ */
 async function generateUniqueJoinCode(): Promise<string> {
   for (let i = 0; i < MAX_JOIN_CODE_ATTEMPTS; i++) {
     const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
@@ -30,6 +38,11 @@ async function generateUniqueJoinCode(): Promise<string> {
     if (!taken) return code;
   }
   throw new Error("Could not allocate join code");
+}
+
+/** @internal Exported for collision-retry tests. */
+export async function generateUniqueJoinCodeForTest(): Promise<string> {
+  return generateUniqueJoinCode();
 }
 
 function newJoinToken(): string {
@@ -55,7 +68,28 @@ export async function startGroupOrderSession(args: {
     if (existing.hostUserId !== args.hostUserId || existing.podId !== args.podId) {
       throw new Error("GROUP_ORDER_SESSION_EXISTS");
     }
-    return { sessionId: existing.id, joinCode: existing.joinCode };
+    const full = await prisma.groupOrderSession.findUnique({
+      where: { id: existing.id },
+      select: { id: true, joinCode: true, status: true },
+    });
+    if (!full) throw new Error("GROUP_ORDER_CREATE_FAILED");
+    if (full.status === "submitted") {
+      return { sessionId: full.id, joinCode: full.joinCode };
+    }
+    if (full.status === "ended" || full.status === "expired") {
+      const joinCode = await generateUniqueJoinCode();
+      const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+      await prisma.groupOrderSession.update({
+        where: { id: full.id },
+        data: { status: "active", joinCode, expiresAt, lockedAt: null },
+      });
+      await prisma.groupOrderParticipant.updateMany({
+        where: { groupOrderSessionId: full.id, role: "host" },
+        data: { leftAt: null },
+      });
+      return { sessionId: full.id, joinCode };
+    }
+    return { sessionId: full.id, joinCode: full.joinCode };
   }
 
   const joinCode = await generateUniqueJoinCode();
@@ -181,7 +215,8 @@ export async function findSessionByCartId(cartId: string) {
 }
 
 export async function findActiveSessionByJoinCode(joinCode: string) {
-  const code = joinCode.replace(/\D/g, "").slice(0, 6).padStart(6, "0");
+  await expireStaleGroupOrderSessions();
+  const code = normalizeGroupOrderJoinCode(joinCode);
   return prisma.groupOrderSession.findFirst({
     where: {
       joinCode: code,
@@ -193,6 +228,7 @@ export async function findActiveSessionByJoinCode(joinCode: string) {
 }
 
 export async function findSessionByIdForJoin(sessionId: string) {
+  await expireGroupOrderSessionIfStale(sessionId);
   return prisma.groupOrderSession.findFirst({
     where: {
       id: sessionId,
@@ -203,8 +239,9 @@ export async function findSessionByIdForJoin(sessionId: string) {
   });
 }
 
-/** Join/tracking page: active sessions or submitted orders still on the same session row. */
+/** Join/tracking page: any session row (caller should use resolveGroupOrderJoinState). */
 export async function findSessionByIdForJoinOrTracking(sessionId: string) {
+  await expireGroupOrderSessionIfStale(sessionId);
   return prisma.groupOrderSession.findFirst({
     where: { id: sessionId },
     include: { pod: { select: { id: true, name: true } } },
@@ -212,11 +249,21 @@ export async function findSessionByIdForJoinOrTracking(sessionId: string) {
 }
 
 export async function findSessionByJoinCodeForJoinOrTracking(joinCode: string) {
-  const code = joinCode.replace(/\D/g, "").slice(0, 6).padStart(6, "0");
-  return prisma.groupOrderSession.findFirst({
+  await expireStaleGroupOrderSessions();
+  const code = normalizeGroupOrderJoinCode(joinCode);
+  const session = await prisma.groupOrderSession.findFirst({
     where: { joinCode: code },
     include: { pod: { select: { id: true, name: true } } },
   });
+  if (session) {
+    await expireGroupOrderSessionIfStale(session.id);
+  }
+  return session
+    ? prisma.groupOrderSession.findFirst({
+        where: { id: session.id },
+        include: { pod: { select: { id: true, name: true } } },
+      })
+    : null;
 }
 
 export type JoinGroupOrderInput = {
@@ -383,15 +430,21 @@ export async function joinGroupOrderSession(
     throw new Error("Enter a display name (1–120 characters).");
   }
 
-  const session = await prisma.groupOrderSession.findFirst({
-    where: {
-      id: input.groupOrderSessionId,
-      status: "active",
-      expiresAt: { gt: new Date() },
-    },
+  await expireGroupOrderSessionIfStale(input.groupOrderSessionId);
+  const session = await prisma.groupOrderSession.findUnique({
+    where: { id: input.groupOrderSessionId },
   });
   if (!session) {
     throw new Error("This group order is no longer open.");
+  }
+  if (session.status === "locked_checkout") {
+    throw new Error("The host is checking out. Joining is paused.");
+  }
+  if (session.status !== "active") {
+    throw new Error("This group order is no longer open.");
+  }
+  if (session.expiresAt <= new Date()) {
+    throw new Error("This group order expired.");
   }
 
   const joinAttemptKey = normalizeJoinAttemptKey(input.joinAttemptKey);
@@ -451,6 +504,7 @@ export async function resolveActorForGroupCart(
     return null;
   }
   if (session.expiresAt <= new Date()) {
+    await expireGroupOrderSessionIfStale(session.id);
     return null;
   }
 
@@ -506,8 +560,8 @@ export async function resolveActorForGroupCart(
 
 export function groupOrderLockedForCheckoutMessage(role: GroupOrderActorRole): string {
   return role === "host"
-    ? "Checkout is in progress. Return to cart to make changes."
-    : "The host is checking out. The group cart is locked.";
+    ? "Checkout is in progress. Return to checkout or unlock to edit."
+    : "The host is checking out. New changes are paused.";
 }
 
 export function assertGroupCartNotLocked(actor: ResolvedGroupCartActor | null, sessionStatus: GroupOrderSessionStatus) {
@@ -632,10 +686,14 @@ export async function prepareGroupOrderCheckoutForHost(
       };
     }
     if (s.expiresAt <= new Date()) {
+      await tx.groupOrderSession.update({
+        where: { id: s.id },
+        data: { status: "expired", lockedAt: null },
+      });
       return {
         ok: false as const,
         code: "GROUP_ORDER_CLOSED",
-        message: "This group order has expired.",
+        message: "This group order expired.",
       };
     }
     if (s.status === "active") {
@@ -701,10 +759,14 @@ export async function leaveGroupOrderAsParticipant(participantId: string): Promi
 export async function endGroupOrderAsHost(cartId: string, hostUserId: string): Promise<void> {
   const s = await prisma.groupOrderSession.findUnique({ where: { cartId } });
   if (!s || s.hostUserId !== hostUserId) return;
+  if (s.status === "submitted") return;
 
   await prisma.$transaction([
     prisma.cartItem.deleteMany({ where: { cartId } }),
-    prisma.groupOrderSession.delete({ where: { id: s.id } }),
+    prisma.groupOrderSession.update({
+      where: { id: s.id },
+      data: { status: "ended", lockedAt: null },
+    }),
   ]);
 }
 

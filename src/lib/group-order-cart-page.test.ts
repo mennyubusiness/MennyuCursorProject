@@ -18,6 +18,10 @@ vi.mock("@/services/group-order.service", () => ({
   unlockGroupOrderSessionFromCheckout: (...args: unknown[]) => mockUnlock(...args),
 }));
 
+vi.mock("@/lib/group-order-session-lifecycle", () => ({
+  expireGroupOrderSessionIfStale: vi.fn().mockResolvedValue("unchanged"),
+}));
+
 describe("group-order-cart-page (server render helpers)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

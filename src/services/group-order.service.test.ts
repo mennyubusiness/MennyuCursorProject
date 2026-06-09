@@ -1,19 +1,35 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFindFirstSession = vi.fn();
+const mockFindUniqueSession = vi.fn();
+const mockSessionUpdate = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockFindFirstParticipant = vi.fn();
+const mockExpireOne = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
-    groupOrderSession: { findFirst: (...args: unknown[]) => mockFindFirstSession(...args) },
+    groupOrderSession: {
+      findFirst: (...args: unknown[]) => mockFindFirstSession(...args),
+      findUnique: (...args: unknown[]) => mockFindUniqueSession(...args),
+      update: (...args: unknown[]) => mockSessionUpdate(...args),
+    },
     groupOrderParticipant: {
       findFirst: (...args: unknown[]) => mockFindFirstParticipant(...args),
       create: (...args: unknown[]) => mockCreate(...args),
       update: (...args: unknown[]) => mockUpdate(...args),
     },
+    cartItem: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
   },
+}));
+
+vi.mock("@/lib/group-order-session-lifecycle", () => ({
+  expireGroupOrderSessionIfStale: (...args: unknown[]) => mockExpireOne(...args),
+  expireStaleGroupOrderSessions: vi.fn().mockResolvedValue(0),
+  normalizeGroupOrderJoinCode: (raw: string) => raw.replace(/\D/g, "").slice(0, 6).padStart(6, "0"),
 }));
 
 vi.mock("@/lib/phone-e164", () => ({
@@ -35,7 +51,8 @@ const SESSION = {
 describe("joinGroupOrderSession", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindFirstSession.mockResolvedValue(SESSION);
+    mockExpireOne.mockResolvedValue("unchanged");
+    mockFindUniqueSession.mockResolvedValue(SESSION);
     mockUpdate.mockResolvedValue({});
   });
 
@@ -129,7 +146,20 @@ describe("joinGroupOrderSession", () => {
   });
 
   it("blocks join when session is locked_checkout", async () => {
-    mockFindFirstSession.mockResolvedValue(null);
+    mockFindUniqueSession.mockResolvedValue({ ...SESSION, status: "locked_checkout" });
+
+    const { joinGroupOrderSession } = await import("./group-order.service");
+    await expect(
+      joinGroupOrderSession({
+        groupOrderSessionId: "gos_1",
+        displayName: "Alex",
+        phoneRaw: "5551234567",
+      })
+    ).rejects.toThrow(/Joining is paused/);
+  });
+
+  it("blocks join when session is expired by status", async () => {
+    mockFindUniqueSession.mockResolvedValue({ ...SESSION, status: "expired" });
 
     const { joinGroupOrderSession } = await import("./group-order.service");
     await expect(
@@ -159,6 +189,70 @@ describe("joinGroupOrderSession", () => {
 
     expect(res.participantId).toBe("part_cookie");
     expect(mockCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("generateUniqueJoinCodeForTest", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("retries join code generation on unique collision", async () => {
+    mockFindUniqueSession
+      .mockResolvedValueOnce({ id: "gos_taken" })
+      .mockResolvedValueOnce({ id: "gos_taken2" })
+      .mockResolvedValueOnce(null);
+
+    const { generateUniqueJoinCodeForTest } = await import("./group-order.service");
+    const code = await generateUniqueJoinCodeForTest();
+    expect(code).toMatch(/^\d{6}$/);
+    expect(mockFindUniqueSession.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("unlockGroupOrderSessionFromCheckout", () => {
+  beforeEach(() => {
+    mockSessionUpdate.mockResolvedValue({});
+  });
+
+  it("does not unlock submitted, ended, or expired sessions", async () => {
+    const { unlockGroupOrderSessionFromCheckout } = await import("./group-order.service");
+    for (const status of ["submitted", "ended", "expired"] as const) {
+      mockSessionUpdate.mockClear();
+      mockFindUniqueSession.mockResolvedValue({
+        id: "gos_1",
+        hostUserId: "host_1",
+        status,
+      });
+      await unlockGroupOrderSessionFromCheckout("cart_1", "host_1");
+      expect(mockSessionUpdate).not.toHaveBeenCalled();
+    }
+  });
+
+  it("unlocks locked_checkout for host", async () => {
+    mockFindUniqueSession.mockResolvedValue({
+      id: "gos_1",
+      hostUserId: "host_1",
+      status: "locked_checkout",
+    });
+    const { unlockGroupOrderSessionFromCheckout } = await import("./group-order.service");
+    await unlockGroupOrderSessionFromCheckout("cart_1", "host_1");
+    expect(mockSessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "gos_1" },
+        data: { status: "active", lockedAt: null },
+      })
+    );
+  });
+});
+
+describe("enforceGroupOrderCartMutation", () => {
+  it("blocks mutations on expired sessions", async () => {
+    mockFindUniqueSession.mockResolvedValue({ status: "expired" });
+    const { enforceGroupOrderCartMutation } = await import("./group-order.service");
+    await expect(
+      enforceGroupOrderCartMutation("cart_1", null, { kind: "add" })
+    ).rejects.toMatchObject({ code: "GROUP_ORDER_CLOSED" });
   });
 });
 

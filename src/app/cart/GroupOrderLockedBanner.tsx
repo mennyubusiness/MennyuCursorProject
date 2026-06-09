@@ -29,12 +29,14 @@ export function GroupOrderLockedBanner({
       role="status"
     >
       <p className="font-semibold">
-        {viewerIsHost ? "Host is checking out" : "The host is checking out. New changes are paused."}
+        {viewerIsHost
+          ? "Checkout is in progress. Return to checkout or unlock to edit."
+          : "The host is checking out. New changes are paused."}
       </p>
       <p className="mt-1 text-sky-900/90">
         {viewerIsHost
-          ? "Checkout is in progress. Return to cart to make changes, or finish paying on checkout."
-          : "The host is checking out. The group cart is locked."}
+          ? "Participants can still view the cart but cannot add or change items."
+          : "The host is checking out. Joining is paused for new guests."}
       </p>
     </div>
   );

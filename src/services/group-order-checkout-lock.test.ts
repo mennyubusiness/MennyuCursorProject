@@ -143,7 +143,7 @@ describe("group order checkout lock helpers", () => {
       expect.unreachable("should throw");
     } catch (e) {
       expect((e as CartValidationError).code).toBe("GROUP_ORDER_LOCKED_FOR_CHECKOUT");
-      expect((e as CartValidationError).message).toMatch(/Return to cart/i);
+      expect((e as CartValidationError).message).toMatch(/Return to checkout/i);
     }
   });
 

@@ -9,6 +9,7 @@ import {
   findOrderIdForGroupOrderSession,
   resolveGroupParticipantForSession,
 } from "@/lib/group-participant-order-access";
+import { expireGroupOrderSessionIfStale } from "@/lib/group-order-session-lifecycle";
 import {
   findSessionByCartId,
   resolveActorForGroupCart,
@@ -56,8 +57,16 @@ export async function getGroupOrderStateForCartPage(
 ): Promise<GroupOrderStateForCartPage> {
   const authSession = await auth();
   const hostId = authSession?.user?.id ?? null;
-  const s = await findSessionByCartId(cartId);
+  let s = await findSessionByCartId(cartId);
   if (!s) return { active: false };
+
+  if (s.status === "active" || s.status === "locked_checkout") {
+    const expired = await expireGroupOrderSessionIfStale(s.id);
+    if (expired === "expired") {
+      s = await findSessionByCartId(cartId);
+      if (!s) return { active: false };
+    }
+  }
 
   const markers = opts?.participantMarkers ?? { participantId: null, legacyJoinToken: null };
   const submittedOrderId =
