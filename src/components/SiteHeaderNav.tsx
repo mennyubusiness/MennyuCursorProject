@@ -52,6 +52,7 @@ export function SiteHeaderNav({
   const isSignedIn = hasServerSession;
   const showCustomerOrdering = navMode === "guest" || navMode === "customer";
   const showCart = showCustomerOrdering || isSignedIn;
+  const canOpenQuickCart = Boolean(quickCart?.enabled || quickCart?.hasActiveGroupOrder);
 
   return (
     <nav className="flex flex-wrap items-center justify-end" aria-label="Site">
@@ -61,10 +62,10 @@ export function SiteHeaderNav({
         </Link>
         {showCart && (
           <>
-            {quickCart?.enabled ? (
+            {canOpenQuickCart ? (
               <button
                 type="button"
-                onClick={quickCart.openCart}
+                onClick={() => quickCart?.openCart()}
                 className={cn(
                   buttonClassName({ variant: "primary", size: "sm" }),
                   "relative ml-0.5 shadow-[0_0_12px_rgba(249,115,22,0.3)]",
@@ -72,13 +73,13 @@ export function SiteHeaderNav({
                 )}
                 title="Open your cart"
                 aria-label={
-                  quickCart.itemCount > 0
+                  quickCart && quickCart.itemCount > 0
                     ? `Open cart, ${quickCart.itemCount} items`
                     : "Open cart"
                 }
               >
                 Cart
-                {quickCart.itemCount > 0 && (
+                {quickCart && quickCart.itemCount > 0 && (
                   <span className="ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none">
                     {quickCart.itemCount > 99 ? "99+" : quickCart.itemCount}
                   </span>

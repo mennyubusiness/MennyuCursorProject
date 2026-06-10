@@ -16,7 +16,7 @@ export function CustomerQuickCartShell({
   return (
     <QuickCartProvider enabled={enabled} hasServerSession={hasServerSession}>
       {children}
-      {enabled ? <QuickCartDrawer /> : null}
+      <QuickCartDrawer />
     </QuickCartProvider>
   );
 }

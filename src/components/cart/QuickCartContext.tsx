@@ -25,7 +25,8 @@ import {
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
 import { getBrowsingPodIdFromClient } from "@/lib/quick-cart-pod";
-import { buildCartPodContextForDisplay } from "@/lib/quick-cart-display";
+import { buildCartPodContextForDisplay, quickCartHasActiveGroupOrder } from "@/lib/quick-cart-display";
+import { isQuickCartEnabledForPath } from "@/lib/quick-cart-enabled";
 import type { CartPodContext } from "@/lib/cart-pod-context";
 import {
   shouldShowActiveRecovery,
@@ -44,6 +45,7 @@ const NEUTRAL_POD_CONTEXT: CartPodContext = {
 
 type QuickCartContextValue = {
   enabled: boolean;
+  hasActiveGroupOrder: boolean;
   hasServerSession: boolean;
   isOpen: boolean;
   openCart: () => void;
@@ -76,14 +78,15 @@ function podContextFromPayload(payload: QuickCartApiResponse): CartPodContext {
 
 export function QuickCartProvider({
   children,
-  enabled = true,
   hasServerSession = false,
 }: {
   children: ReactNode;
+  /** @deprecated Route enablement is resolved client-side from pathname + group state. */
   enabled?: boolean;
   hasServerSession?: boolean;
 }) {
   const pathname = usePathname();
+  const routeQuickCartEnabled = isQuickCartEnabledForPath(pathname);
   const [isOpen, setIsOpen] = useState(false);
   const [cart, setCart] = useState<Cart | null>(null);
   const [podContext, setPodContext] = useState<CartPodContext>(NEUTRAL_POD_CONTEXT);
@@ -103,6 +106,9 @@ export function QuickCartProvider({
     if (fromCart > 0) return fromCart;
     return activeCartRecovery?.itemCount ?? 0;
   }, [cart, activeCartRecovery]);
+
+  const hasActiveGroupOrder = quickCartHasActiveGroupOrder(cart);
+  const enabled = routeQuickCartEnabled || hasActiveGroupOrder;
 
   const applyPayload = useCallback((payload: QuickCartApiResponse) => {
     setCart(payload.cart);
@@ -141,10 +147,11 @@ export function QuickCartProvider({
   }, []);
 
   const refreshCart = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabled && !quickCartHasActiveGroupOrder(cartRef.current)) return;
     const browsePodId = getBrowsingPodIdFromClient();
     const generationAtStart = snapshotGenerationRef.current;
     const podAtStart = browsePodId;
+    const preserveActiveGroup = quickCartHasActiveGroupOrder(cartRef.current);
     setLoading(true);
     try {
       const qs = browsePodId
@@ -164,6 +171,10 @@ export function QuickCartProvider({
         return;
       }
       if (!res.ok) {
+        if (preserveActiveGroup) {
+          setLoading(false);
+          return;
+        }
         setCart(null);
         setPodContext(NEUTRAL_POD_CONTEXT);
         setActiveCartRecovery(null);
@@ -181,6 +192,18 @@ export function QuickCartProvider({
       ) {
         return;
       }
+      if (preserveActiveGroup && !data.cart && quickCartHasActiveGroupOrder(cartRef.current)) {
+        setActiveCartRecovery(data.activeCartRecovery ?? null);
+        setShowActiveRecovery(
+          shouldShowActiveRecovery(
+            data.activeCartRecovery,
+            data.scope,
+            data.requiresClearToSwitchPod
+          )
+        );
+        setLoading(false);
+        return;
+      }
       applyPayload(data);
     } catch {
       if (
@@ -191,10 +214,12 @@ export function QuickCartProvider({
           currentPodId: getBrowsingPodIdFromClient(),
         })
       ) {
-        setCart(null);
-        setPodContext(NEUTRAL_POD_CONTEXT);
-        setActiveCartRecovery(null);
-        setShowActiveRecovery(false);
+        if (!quickCartHasActiveGroupOrder(cartRef.current)) {
+          setCart(null);
+          setPodContext(NEUTRAL_POD_CONTEXT);
+          setActiveCartRecovery(null);
+          setShowActiveRecovery(false);
+        }
       }
     } finally {
       if (
@@ -221,7 +246,7 @@ export function QuickCartProvider({
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!routeQuickCartEnabled && !quickCartHasActiveGroupOrder(cartRef.current)) return;
     const browsePodId = getBrowsingPodIdFromClient();
     const prevPod = activeBrowsePodRef.current;
     if (prevPod && browsePodId && prevPod !== browsePodId) {
@@ -233,10 +258,9 @@ export function QuickCartProvider({
     }
     activeBrowsePodRef.current = browsePodId;
     void refreshCart();
-  }, [enabled, pathname, refreshCart]);
+  }, [routeQuickCartEnabled, pathname, refreshCart]);
 
   useEffect(() => {
-    if (!enabled) return;
     const onCartUpdated = (event: Event) => {
       const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
       if (detail?.cart !== undefined) {
@@ -280,7 +304,7 @@ export function QuickCartProvider({
       window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated);
       window.removeEventListener(CART_CLEARED_EVENT, onCartCleared);
     };
-  }, [enabled, applyCartSnapshot, refreshCart]);
+  }, [applyCartSnapshot, refreshCart]);
 
   const clearActiveSoloCart = useCallback(async () => {
     const recovery = activeCartRecoveryRef.current;
@@ -345,6 +369,7 @@ export function QuickCartProvider({
   const value = useMemo(
     () => ({
       enabled,
+      hasActiveGroupOrder,
       hasServerSession,
       isOpen,
       openCart,
@@ -363,6 +388,7 @@ export function QuickCartProvider({
     }),
     [
       enabled,
+      hasActiveGroupOrder,
       hasServerSession,
       isOpen,
       openCart,

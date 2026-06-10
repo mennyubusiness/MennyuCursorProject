@@ -3,6 +3,10 @@ import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { getPodPageGroupOrderCtaState } from "@/lib/pod-page-group-order-cta";
 import { PageBand, PageShell } from "@/components/layout/page-shell";
 import { ButtonLink } from "@/components/ui/button";
+import {
+  PodPageOpenQuickCartButton,
+  PodPageStartGroupOrderButton,
+} from "@/components/pod/PodPageGroupOrderCtaClient";
 
 export async function PodPageGroupOrderSection({ podId }: { podId: string }) {
   const [session, ctaState] = await Promise.all([auth(), getPodPageGroupOrderCtaState(podId)]);
@@ -24,9 +28,13 @@ export async function PodPageGroupOrderSection({ podId }: { podId: string }) {
                   Start a group order — everyone adds to one shared cart.
                 </p>
               </div>
-              <ButtonLink href={groupOrderHref} size="sm" className="shrink-0 self-start sm:self-center">
-                Start group order
-              </ButtonLink>
+              {session?.user ? (
+                <PodPageStartGroupOrderButton podId={podId} fallbackHref={groupOrderCartUrl} />
+              ) : (
+                <ButtonLink href={groupOrderHref} size="sm" className="shrink-0 self-start sm:self-center">
+                  Start group order
+                </ButtonLink>
+              )}
             </>
           ) : ctaState.kind === "host_active" ? (
             <>
@@ -36,9 +44,7 @@ export async function PodPageGroupOrderSection({ podId }: { podId: string }) {
                   Open Quick Cart to invite friends or add items.
                 </p>
               </div>
-              <ButtonLink href="/cart" size="sm" variant="secondary" className="shrink-0 self-start sm:self-center">
-                Open group cart
-              </ButtonLink>
+              <PodPageOpenQuickCartButton />
             </>
           ) : ctaState.kind === "participant_active" ? (
             <div>

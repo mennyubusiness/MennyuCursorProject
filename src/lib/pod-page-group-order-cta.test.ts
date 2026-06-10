@@ -152,5 +152,6 @@ describe("pod page group CTA wiring", () => {
   it("still shows start CTA when kind is start", () => {
     expect(sectionSrc).toMatch(/Start group order/);
     expect(sectionSrc).toMatch(/kind === "start"/);
+    expect(sectionSrc).toContain("PodPageStartGroupOrderButton");
   });
 });

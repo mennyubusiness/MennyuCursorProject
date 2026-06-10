@@ -38,8 +38,8 @@ export function QuickCartGroupSection({
   const podName = cart?.podName ?? browsePodName ?? podContext.cartPodName;
 
   const onGroupStarted = () => {
+    quickCart?.openCart();
     void quickCart?.refreshCart();
-    onNavigate?.();
   };
 
   if (role === "host" && group?.joinCode && cart) {

@@ -78,6 +78,10 @@ describe("Quick Cart group start wiring", () => {
     expect(groupSrc).not.toMatch(/Join with the host's code to add your items/);
   });
 
+  it("Quick Cart group start opens drawer on success", () => {
+    expect(groupSrc).toContain("quickCart?.openCart()");
+  });
+
   it("does not expose joinToken", () => {
     expect(groupSrc).not.toMatch(/joinToken/i);
     expect(dispatchGroupOrderStartCartSnapshot).toBeDefined();

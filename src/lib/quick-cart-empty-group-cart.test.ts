@@ -114,8 +114,9 @@ describe("empty group cart wiring", () => {
   const cartServiceSrc = readFileSync(join(process.cwd(), "src/services/cart.service.ts"), "utf8");
 
   it("header opens Quick Cart drawer (not item-count gated)", () => {
-    expect(headerSrc).toMatch(/quickCart\.openCart/);
-    expect(headerSrc).not.toMatch(/itemCount\s*>\s*0[\s\S]*openCart/);
+    expect(headerSrc).toMatch(/canOpenQuickCart/);
+    expect(headerSrc).toMatch(/openCart/);
+    expect(headerSrc).not.toMatch(/itemCount\s*>\s*0[\s\S]*canOpenQuickCart/);
   });
 
   it("Quick Cart drawer footer works for empty group carts", () => {
