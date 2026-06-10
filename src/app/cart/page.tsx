@@ -45,15 +45,11 @@ import { CheckoutProgress } from "../checkout/CheckoutProgress";
 import { readGroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
 import {
   getGroupOrderStateForCartPage,
-  loadHostGroupCartRowForCartPage,
-  loadHostGroupCartRowForPod,
+  loadActiveGroupCartForCartPage,
   startGroupOrderForCartPage,
   unlockGroupCheckoutForCartPage,
 } from "@/lib/group-order-cart-page";
-import {
-  loadParticipantGroupCartRowForCartPage,
-  resolveSubmittedGroupOrderForParticipantCart,
-} from "@/lib/group-participant-submitted-cart";
+import { resolveSubmittedGroupOrderForParticipantCart } from "@/lib/group-participant-submitted-cart";
 import { resolveGroupCartEmptyState, shouldShowJoinGroupOrderForm } from "@/lib/group-order-cart-empty-state";
 import { GroupOrderCartPanel, GROUP_INVITE_SECTION_ID } from "./GroupOrderCartPanel";
 import { GroupOrderStartCartSync } from "@/components/cart/GroupOrderStartCartSync";
@@ -151,27 +147,15 @@ export default async function CartPage({
   const preferredPodId = startGroupOrder && targetPodForGroup ? targetPodForGroup : currentPodId;
   const perfT0 = cartPagePerfNow();
   let cart =
-    authSession?.user?.id && preferredPodId
-      ? (await loadHostGroupCartRowForPod(
-          authSession.user.id,
-          preferredPodId,
-          participantMarkers
-        )) ?? undefined
-      : undefined;
+    (await loadActiveGroupCartForCartPage({
+      hostUserId: authSession?.user?.id ?? null,
+      participantMarkers,
+      preferredPodId,
+    })) ?? undefined;
   if (!cart) {
     cart =
       (await loadActiveDisplayCartForSession(sessionId, preferredPodId, participantMarkers)) ??
       undefined;
-  }
-  if (!cart && authSession?.user?.id) {
-    cart = (await loadHostGroupCartRowForCartPage(authSession.user.id)) ?? undefined;
-  }
-  if (
-    !cart &&
-    (participantMarkers.participantId || participantMarkers.legacyJoinToken)
-  ) {
-    cart =
-      (await loadParticipantGroupCartRowForCartPage(participantMarkers)) ?? undefined;
   }
   if (params.groupUnlock === "1" && cart?.id && authSession?.user?.id) {
     await unlockGroupCheckoutForCartPage(cart.id, authSession.user.id);

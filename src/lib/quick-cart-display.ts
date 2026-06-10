@@ -2,6 +2,23 @@ import type { Cart, CartGroupOrderDisplay, CartPodScope } from "@/domain/types";
 import type { GroupOrderViewerContext } from "@/lib/group-order-viewer-context";
 import { getCartPodContext, type CartPodContext } from "@/lib/cart-pod-context";
 
+/** Include full cart in Quick Cart drawer — group orders stay visible even with zero items. */
+export function shouldShowFullCartInQuickCartDrawer(params: {
+  scope: CartPodScope;
+  browsePodId: string | null;
+  assignedPodId: string;
+}): boolean {
+  if (params.scope === "group_order") {
+    return !params.browsePodId || params.browsePodId === params.assignedPodId;
+  }
+  return Boolean(params.browsePodId && params.browsePodId === params.assignedPodId);
+}
+
+export function quickCartHasActiveGroupOrder(cart: Cart | null | undefined): boolean {
+  const role = cart?.groupOrder?.role;
+  return role === "host" || role === "participant";
+}
+
 /** Attach pod + group-order UI fields to a scoped cart (API / mutations). */
 export function attachQuickCartDisplay(
   cart: Cart,

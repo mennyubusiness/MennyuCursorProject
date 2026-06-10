@@ -190,6 +190,22 @@ export async function resolveSharedGroupCartIdForPod(
   return binding.cartId;
 }
 
+/** Host's active group cart id (any pod) — for Quick Cart when not browsing a pod route. */
+export async function resolveHostActiveGroupCartId(hostUserId: string): Promise<string | null> {
+  const hostId = hostUserId.trim();
+  if (!hostId) return null;
+  const session = await prisma.groupOrderSession.findFirst({
+    where: {
+      hostUserId: hostId,
+      status: { in: ACTIVE_GROUP_SESSION_STATUSES },
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { cartId: true },
+  });
+  return session?.cartId ?? null;
+}
+
 /** Active group cart for a pod: signed-in host wins over stale participant markers. */
 export async function resolveActiveGroupCartIdForPod(
   podId: string,

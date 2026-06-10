@@ -9,6 +9,7 @@ import {
   findOrderIdForGroupOrderSession,
   resolveGroupParticipantForSession,
 } from "@/lib/group-participant-order-access";
+import { resolveActiveGroupParticipantBinding } from "@/lib/group-order-participant-resolve";
 import { CART_DISPLAY_SESSION_CART_INCLUDE } from "@/services/cart.service";
 
 export type SubmittedParticipantCartResolution =
@@ -75,6 +76,14 @@ export async function resolveSubmittedGroupOrderForParticipantCart(
 export async function loadParticipantGroupCartRowForCartPage(
   markers: GroupOrderParticipantMarkers
 ) {
+  const binding = await resolveActiveGroupParticipantBinding(markers);
+  if (binding) {
+    return prisma.cart.findUnique({
+      where: { id: binding.cartId },
+      include: CART_DISPLAY_SESSION_CART_INCLUDE,
+    });
+  }
+
   const resolved = await resolveSubmittedGroupOrderForParticipantCart(markers);
   if (resolved.kind !== "submitted") return null;
   return prisma.cart.findUnique({

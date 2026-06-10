@@ -103,8 +103,34 @@ describe("shouldShowActiveRecoverySection", () => {
     }),
   };
 
-  it("shows on neutral with active recovery", () => {
+  it("shows on neutral with solo active recovery", () => {
     expect(shouldShowActiveRecoverySection(base)).toBe(true);
+  });
+
+  it("hides group host recovery on neutral when drawer shows group cart", () => {
+    const groupRecovery = buildActiveCartRecovery({
+      cart: {
+        ...soloCart,
+        items: [],
+        subtotalCents: 0,
+        groupOrder: {
+          role: "host",
+          canCheckout: true,
+          joinCode: "280963",
+          groupOrderSessionId: "gos_1",
+        },
+      },
+      browsePodId: null,
+      browsePodName: null,
+    });
+    expect(
+      shouldShowActiveRecoverySection({
+        ...base,
+        scope: "group_order",
+        cart: soloCart,
+        activeCartRecovery: groupRecovery,
+      })
+    ).toBe(false);
   });
 
   it("shows on browse conflict", () => {
@@ -153,8 +179,16 @@ describe("shouldShowActiveRecovery", () => {
     expect(shouldShowActiveRecovery(recovery, "browsing_pod", true)).toBe(true);
   });
 
-  it("hides when full cart is in drawer", () => {
-    expect(shouldShowActiveRecovery(recovery, "assigned_pod", false)).toBe(false);
+  it("hides group recovery on neutral scope", () => {
+    const groupRecovery = buildActiveCartRecovery({
+      cart: {
+        ...soloCart,
+        groupOrder: { role: "host", canCheckout: true, joinCode: "111111" },
+      },
+      browsePodId: null,
+      browsePodName: null,
+    });
+    expect(shouldShowActiveRecovery(groupRecovery, "neutral", false)).toBe(false);
   });
 });
 

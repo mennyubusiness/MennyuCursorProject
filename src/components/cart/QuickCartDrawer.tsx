@@ -11,7 +11,7 @@ import { QuickCartActiveRecoverySection } from "@/components/cart/QuickCartActiv
 import { ButtonLink } from "@/components/ui/button";
 import { shouldSuppressNeutralGroupPromo } from "@/lib/quick-cart-active-recovery";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
-import { quickCartEmptyTitle, quickCartFooterCtaLabel } from "@/lib/quick-cart-display";
+import { quickCartEmptyTitle, quickCartFooterCtaLabel, quickCartHasActiveGroupOrder } from "@/lib/quick-cart-display";
 
 export function QuickCartDrawer() {
   const {
@@ -42,21 +42,29 @@ export function QuickCartDrawer() {
   const isParticipant = groupOrder?.role === "participant";
   const itemCount = cart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0;
   const hasItems = Boolean(cart && cart.items.length > 0);
+  const hasActiveGroupOrder = quickCartHasActiveGroupOrder(cart);
+  const showHostGroupEmpty =
+    Boolean(cart && groupOrder?.role === "host" && groupOrder.joinCode && !hasItems);
+  const showParticipantGroupEmpty = Boolean(cart && isParticipant && !hasItems);
+  const showGroupOrderFooter = Boolean(cart && (hasItems || showHostGroupEmpty || showParticipantGroupEmpty));
   const footerCta = quickCartFooterCtaLabel({
     hasItems,
     groupRole: groupOrder?.role,
     canCheckout,
     cartScope: podContext.cartScope,
   });
-  const showHostGroupEmpty =
-    Boolean(cart && groupOrder?.role === "host" && groupOrder.joinCode && !hasItems);
   const showNeutralEmpty =
-    podContext.cartScope === "neutral" && !hasItems && !showActiveRecovery && !showHostGroupEmpty;
+    podContext.cartScope === "neutral" &&
+    !hasItems &&
+    !showActiveRecovery &&
+    !hasActiveGroupOrder &&
+    !showHostGroupEmpty;
   const showBrowsingEmpty =
     podContext.cartScope === "browsing_pod" &&
     !hasItems &&
     !podContext.requiresClearToSwitchPod &&
     !showActiveRecovery &&
+    !hasActiveGroupOrder &&
     !showHostGroupEmpty;
   const suppressNeutralGroupPromo =
     showActiveRecovery && shouldSuppressNeutralGroupPromo(activeCartRecovery);
@@ -100,7 +108,7 @@ export function QuickCartDrawer() {
             onNavigate={closeCart}
           />
 
-          {loading && !cart && !showActiveRecovery ? (
+          {loading && !cart && !showActiveRecovery && !hasActiveGroupOrder ? (
             <p className="text-sm text-oo-stone-gray">Loading cart…</p>
           ) : showNeutralEmpty ? (
             <div className="oo-empty-state px-6 py-10">
@@ -155,6 +163,12 @@ export function QuickCartDrawer() {
                 </li>
               ))}
             </ul>
+          ) : showParticipantGroupEmpty && cart ? (
+            <div className="oo-empty-state px-2 py-4">
+              <p className="text-sm text-oo-stone-gray">
+                Add your items before the host checks out.
+              </p>
+            </div>
           ) : showHostGroupEmpty && cart ? (
             <div className="oo-empty-state px-2 py-4">
               <p className="text-sm text-oo-stone-gray">
@@ -184,7 +198,7 @@ export function QuickCartDrawer() {
               </p>
             </>
           )}
-          {((cart && hasItems) || showHostGroupEmpty) && cart && (
+          {((cart && hasItems) || showGroupOrderFooter) && cart && (
             <AwaitCartNavigationLink
               cartId={cart.id}
               href="/cart"
@@ -194,8 +208,10 @@ export function QuickCartDrawer() {
               {footerCta}
             </AwaitCartNavigationLink>
           )}
-          {!hasItems && showHostGroupEmpty ? (
-            <p className="mt-1 text-[11px] text-oo-stone-gray">Group order · host pays at checkout</p>
+          {showGroupOrderFooter && !hasItems ? (
+            <p className="mt-1 text-[11px] text-oo-stone-gray">
+              {isParticipant ? "Group order · host checks out for the group" : "Group order · host pays at checkout"}
+            </p>
           ) : null}
           {showNeutralEmpty && (
             <ButtonLink

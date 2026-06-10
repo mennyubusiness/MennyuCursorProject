@@ -10,6 +10,7 @@ import {
   resolveGroupParticipantForSession,
 } from "@/lib/group-participant-order-access";
 import { expireGroupOrderSessionIfStale } from "@/lib/group-order-session-lifecycle";
+import { resolveActiveGroupParticipantBinding } from "@/lib/group-order-participant-resolve";
 import { prisma } from "@/lib/db";
 import { CART_DISPLAY_SESSION_CART_INCLUDE } from "@/services/cart.service";
 import {
@@ -88,6 +89,38 @@ export type GroupOrderStateForCartPage =
       isHost: false;
       submittedOrderId?: string | null;
     };
+
+/** Load active/locked group cart for cart page before solo fallbacks. */
+export async function loadActiveGroupCartForCartPage(opts: {
+  hostUserId: string | null;
+  participantMarkers: import("@/lib/group-order-participant-cookie").GroupOrderParticipantMarkers;
+  preferredPodId: string | null;
+}) {
+  if (opts.hostUserId && opts.preferredPodId) {
+    const onPod = await loadHostGroupCartRowForPod(
+      opts.hostUserId,
+      opts.preferredPodId,
+      opts.participantMarkers
+    );
+    if (onPod) return onPod;
+  }
+
+  const participantBinding = await resolveActiveGroupParticipantBinding(opts.participantMarkers);
+  if (participantBinding) {
+    const row = await prisma.cart.findUnique({
+      where: { id: participantBinding.cartId },
+      include: CART_DISPLAY_SESSION_CART_INCLUDE,
+    });
+    if (row) return row;
+  }
+
+  if (opts.hostUserId) {
+    const hostRow = await loadHostGroupCartRowForCartPage(opts.hostUserId);
+    if (hostRow) return hostRow;
+  }
+
+  return null;
+}
 
 export async function getGroupOrderStateForCartPage(
   cartId: string,

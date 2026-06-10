@@ -55,6 +55,10 @@ export function shouldShowActiveRecovery(
   requiresClearToSwitchPod: boolean
 ): boolean {
   if (!recovery) return false;
+  if (recovery.isConflictingWithBrowsePod) return true;
+  if (recovery.kind === "group_host" || recovery.kind === "group_participant") {
+    return false;
+  }
   if (scope === "neutral") return true;
   if (requiresClearToSwitchPod) return true;
   return false;

@@ -29,6 +29,7 @@ import {
   resolveActorForGroupCart,
   resolveGroupCartActorForRead,
   resolveGroupCartIdFromParticipantMarkers,
+  resolveHostActiveGroupCartId,
   assertGroupCartUnlockedForMutation,
   type ResolvedGroupCartActor,
 } from "@/services/group-order.service";
@@ -40,7 +41,7 @@ import {
   applyGroupOrderVisibilityToCart,
   buildGroupOrderViewerContext,
 } from "@/lib/group-order-viewer-context";
-import { attachQuickCartDisplay } from "@/lib/quick-cart-display";
+import { attachQuickCartDisplay, shouldShowFullCartInQuickCartDrawer } from "@/lib/quick-cart-display";
 import { isCartRowAssigned } from "@/lib/cart-pod-context";
 import { assertSessionAllowsAddToCart } from "@/lib/cart-pod-guard";
 
@@ -994,9 +995,11 @@ async function packageQuickCartForActiveAssignment(params: {
   const requiresClearToSwitchPod = Boolean(
     params.browsePodId && params.browsePodId !== params.assignedPodId
   );
-  const showFullCartInDrawer = Boolean(
-    params.browsePodId && params.browsePodId === params.assignedPodId
-  );
+  const showFullCartInDrawer = shouldShowFullCartInQuickCartDrawer({
+    scope: params.scope,
+    browsePodId: params.browsePodId,
+    assignedPodId: params.assignedPodId,
+  });
   const participantCount =
     params.cart.groupOrder?.role === "host"
       ? await hostParticipantCount(params.cart.id)
@@ -1086,7 +1089,10 @@ export async function getQuickCartPayload(
         markers: opts.markers,
         hostUserId: opts.hostUserId,
       })
-    : await resolveGroupCartIdFromParticipantMarkers(opts.markers);
+    : ((await resolveGroupCartIdFromParticipantMarkers(opts.markers)) ??
+        (opts.hostUserId
+          ? await resolveHostActiveGroupCartId(opts.hostUserId)
+          : null));
 
   if (groupCartIdFromContext) {
     const row = await prisma.cart.findUnique({
