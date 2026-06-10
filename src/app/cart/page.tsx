@@ -53,7 +53,9 @@ import { resolveSubmittedGroupOrderForParticipantCart } from "@/lib/group-partic
 import { resolveGroupCartEmptyState, shouldShowJoinGroupOrderForm } from "@/lib/group-order-cart-empty-state";
 import { GroupOrderCartPanel, GROUP_INVITE_SECTION_ID } from "./GroupOrderCartPanel";
 import { GroupOrderStartCartSync } from "@/components/cart/GroupOrderStartCartSync";
+import { GroupOrderEndCartSync } from "@/components/cart/GroupOrderEndCartSync";
 import { buildHostGroupCartClientSnapshot } from "@/lib/group-order-start-sync";
+import { buildPostEndCartClientSnapshot } from "@/lib/group-order-end-sync";
 import {
   GroupOrderHostEmptyCartState,
   GroupOrderParticipantEmptyCartState,
@@ -92,6 +94,7 @@ export default async function CartPage({
     groupUnlock?: string;
     groupReview?: string;
     groupError?: string;
+    groupEnded?: string;
     startGroupOrder?: string;
     podId?: string | string[];
   }>;
@@ -112,6 +115,7 @@ export default async function CartPage({
   const reorderAdded = params.reorder_added ? parseInt(params.reorder_added, 10) : 0;
   const checkoutErrorCode = params.error ? decodeURIComponent(params.error) : null;
   const groupStartError = params.groupError ? decodeURIComponent(params.groupError) : null;
+  const groupEnded = params.groupEnded === "1";
   const cookieStore = await cookies();
   const participantMarkers = readGroupOrderParticipantMarkers(cookieStore);
   const authSession = await auth();
@@ -217,9 +221,26 @@ export default async function CartPage({
   const displayItems =
     cart && viewerCtx ? filterCartLinesForViewer(cart.items, viewerCtx) : cart?.items ?? [];
 
+  const groupEndSyncCart = groupEnded
+    ? buildPostEndCartClientSnapshot(
+        cart
+          ? {
+              id: cart.id,
+              podId: cart.podId,
+              podName: cart.pod.name,
+              sessionId: cart.sessionId,
+              items: [],
+              groups: [],
+              subtotalCents: 0,
+            }
+          : null
+      )
+    : null;
+
   if (!cart) {
     return (
       <div className="mx-auto max-w-lg px-2 py-12">
+        {groupEndSyncCart !== null || groupEnded ? <GroupOrderEndCartSync cart={groupEndSyncCart} /> : null}
         <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
           <div
             className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-xs font-medium text-stone-400"
@@ -298,6 +319,7 @@ export default async function CartPage({
   if (emptyStateKind === "host_group_empty") {
     return (
       <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+        {groupEndSyncCart !== null || groupEnded ? <GroupOrderEndCartSync cart={groupEndSyncCart} /> : null}
         {hostGroupStartSyncCart ? <GroupOrderStartCartSync cart={hostGroupStartSyncCart} /> : null}
         <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
         <GroupOrderCartPanel
@@ -636,6 +658,7 @@ export default async function CartPage({
         initialValidation={initialValidation}
         allowCheckout={viewerCanCheckout}
       >
+      {groupEndSyncCart !== null || groupEnded ? <GroupOrderEndCartSync cart={groupEndSyncCart} /> : null}
       {hostGroupStartSyncCart ? <GroupOrderStartCartSync cart={hostGroupStartSyncCart} /> : null}
       <CartPageLiveSyncBanner />
       <CartPageLiveValidationBanner />

@@ -424,6 +424,25 @@ export async function tryRecoverCartForPodMutation(params: {
             };
           }
         }
+
+        if (
+          requestedGroup.hostUserId === params.authUserId &&
+          (requestedGroup.status === "ended" || requestedGroup.status === "expired")
+        ) {
+          const sessionId = params.requestSessionId?.trim()
+            ? params.requestSessionId.trim()
+            : await getOrCreateMennyuSessionIdForCart();
+          const soloCart = await getOrCreateCartForVendorMenuPage(podId, sessionId);
+          const access = await checkCartMutationAccess(soloCart.id);
+          if (access.ok) {
+            return {
+              kind: "use_cart",
+              cartId: soloCart.id,
+              recovered: true,
+              actor: access.actor,
+            };
+          }
+        }
       }
 
       logGroupOrderClosedMutation({

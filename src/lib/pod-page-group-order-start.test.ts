@@ -58,7 +58,7 @@ describe("pod page in-place group order start", () => {
     expect(quickCartSrc).toContain("isQuickCartEnabledForPath(pathname)");
     expect(quickCartSrc).toContain("hasActiveGroupOrder");
     expect(quickCartSrc).toContain("routeQuickCartEnabled || hasActiveGroupOrder");
-    expect(quickCartSrc).toMatch(/preserveActiveGroup/);
+    expect(quickCartSrc).toContain('detail.source === "group-order-ended"');
   });
 
   it("header cart opens Quick Cart when active empty group exists", () => {

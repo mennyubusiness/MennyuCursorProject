@@ -10,7 +10,8 @@ export type CartUpdateSource =
   | "cart-page"
   | "checkout"
   | "order-page"
-  | "group-order-start";
+  | "group-order-start"
+  | "group-order-ended";
 
 export type CartClearSource = "checkout" | "order-page" | CartUpdateSource;
 
@@ -92,6 +93,10 @@ export function shouldApplyCartSnapshot(
   if (detail.source === "group-order-start") {
     return Boolean(detail.cart?.podId && detail.cart.podId === ctx.podId);
   }
+  if (detail.source === "group-order-ended") {
+    if (detail.cart === null) return true;
+    return Boolean(detail.cart.podId && detail.cart.podId === ctx.podId);
+  }
   return cartSnapshotAppliesToContext(detail.cart, ctx);
 }
 
@@ -109,6 +114,11 @@ export function shouldQuickCartApplyCartSnapshot(
   if (detail.source === "group-order-start") {
     const started = detail.cart;
     return Boolean(started && currentPodId && started.podId === currentPodId);
+  }
+  if (detail.source === "group-order-ended") {
+    if (detail.cart === null) return true;
+    const ended = detail.cart;
+    return !currentPodId || !ended?.podId || ended.podId === currentPodId;
   }
 
   const incoming = detail.cart;

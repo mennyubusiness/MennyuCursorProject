@@ -51,6 +51,19 @@ export async function assertCartSessionAccess(
   });
 
   if (groupSession) {
+    if (groupSession.status === "ended" || groupSession.status === "expired") {
+      if (!currentSessionId?.trim() || cart.sessionId !== currentSessionId.trim()) {
+        return { ok: false, status: 403, error: ACCESS_DENIED };
+      }
+      return {
+        ok: true,
+        cartId: cart.id,
+        sessionId: cart.sessionId,
+        podId: cart.podId,
+        isGroupOrder: false,
+      };
+    }
+
     if (mode === "checkout") {
       const uid = options.authUserId?.trim();
       if (!uid || uid !== groupSession.hostUserId) {

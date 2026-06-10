@@ -147,6 +147,9 @@ export async function getGroupOrderStateForCartPage(
 
   const isHost = Boolean(hostId && s.hostUserId === hostId);
   if (isHost) {
+    if (s.status === "ended" || s.status === "expired") {
+      return { active: false };
+    }
     return {
       active: true,
       view: "host",

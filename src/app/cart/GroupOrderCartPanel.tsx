@@ -1,6 +1,7 @@
 import Link from "next/link";
 import QRCode from "qrcode";
 import { startGroupOrderFormAction, leaveGroupOrderFormAction, endGroupOrderHostFormAction } from "@/actions/group-order.actions";
+import { EndGroupOrderHostButton } from "@/components/cart/EndGroupOrderHostButton";
 import type { GroupOrderCartReadModel } from "@/lib/group-order-cart-read-model";
 import type { GroupOrderStateForCartPage } from "@/lib/group-order-cart-page";
 import { buildGroupOrderJoinAbsoluteUrl } from "@/lib/group-order-invite-url";
@@ -191,15 +192,20 @@ export async function GroupOrderCartPanel({
           )}
         </div>
         {isHost && !isLockedCheckout && (
-          <form action={endGroupOrderHostFormAction} className="shrink-0">
-            <input type="hidden" name="cartId" value={cartId} />
-            <button
-              type="submit"
-              className="rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-800 hover:bg-red-50"
-            >
-              End group order
-            </button>
-          </form>
+          <>
+            <EndGroupOrderHostButton cartId={cartId} />
+            <noscript>
+              <form action={endGroupOrderHostFormAction} className="shrink-0">
+                <input type="hidden" name="cartId" value={cartId} />
+                <button
+                  type="submit"
+                  className="rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-800 hover:bg-red-50"
+                >
+                  End group order
+                </button>
+              </form>
+            </noscript>
+          </>
         )}
         {isParticipant && !isLockedCheckout && (
           <form action={leaveGroupOrderFormAction} className="shrink-0">

@@ -33,10 +33,21 @@ import {
 } from "@/lib/group-order-cart-page";
 import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import { resolveGroupOrderActorForCartRead } from "@/actions/group-order-context";
+import { buildPostEndCartClientSnapshot } from "@/lib/group-order-end-sync";
 import type { Cart } from "@/domain/types";
 
 export type StartGroupOrderActionResult =
   | { success: true; sessionId: string; joinCode: string; cart: Cart }
+  | { success: false; error: string };
+
+export type EndGroupOrderActionResult =
+  | {
+      success: true;
+      groupEnded: true;
+      endedSessionId: string;
+      podId: string;
+      cart: Cart | null;
+    }
   | { success: false; error: string };
 
 export async function startGroupOrderFormAction(formData: FormData) {
@@ -187,15 +198,31 @@ export async function endGroupOrderHostFormAction(formData: FormData) {
   if (!r.success) {
     redirect(`/cart?groupError=${encodeURIComponent(r.error ?? "Could not end group order.")}`);
   }
-  redirect("/cart");
+  redirect("/cart?groupEnded=1");
 }
 
-export async function endGroupOrderHostAction(cartId: string) {
+export async function endGroupOrderHostAction(cartId: string): Promise<EndGroupOrderActionResult> {
   const session = await auth();
-  if (!session?.user?.id) return { success: false as const, error: "Unauthorized." };
-  await endGroupOrderAsHost(cartId, session.user.id);
+  if (!session?.user?.id) return { success: false, error: "Unauthorized." };
+  const trimmedCartId = cartId?.trim();
+  if (!trimmedCartId) return { success: false, error: "Missing cart." };
+
+  const endResult = await endGroupOrderAsHost(trimmedCartId, session.user.id);
+  if (!endResult.ended) {
+    return { success: false, error: "Could not end group order." };
+  }
+
+  const postCart = await getCartByIdForMutation(trimmedCartId, null);
   revalidatePath("/cart");
-  return { success: true as const };
+  revalidatePath(`/pod/${endResult.podId}`, "layout");
+
+  return {
+    success: true,
+    groupEnded: true,
+    endedSessionId: endResult.endedSessionId,
+    podId: endResult.podId,
+    cart: buildPostEndCartClientSnapshot(postCart),
+  };
 }
 
 export async function unlockGroupCheckoutAction(cartId: string) {

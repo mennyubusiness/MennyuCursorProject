@@ -118,6 +118,21 @@ export function VendorMenuCartProvider({
         markCartSnapshotCommitted(normalized.id);
         return;
       }
+      if (detail?.cart !== undefined && detail.source === "group-order-ended") {
+        if (detail.cart && detail.cart.podId !== cartRef.current.podId) return;
+        const next =
+          detail.cart ??
+          emptyCartSnapshot({
+            id: snapshotContext.cartId,
+            podId: snapshotContext.podId,
+            sessionId: cart.sessionId,
+          });
+        const normalized = ensureCartSnapshotScalars(next);
+        cartRef.current = normalized;
+        setCart(normalized);
+        markCartSnapshotCommitted(normalized.id);
+        return;
+      }
       if (!shouldApplyCartSnapshot(detail, "vendor-menu", snapshotContext)) return;
       setCart(detail!.cart!);
     };

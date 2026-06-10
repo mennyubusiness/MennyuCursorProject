@@ -716,8 +716,14 @@ export async function enforceGroupOrderCartMutation(
 ): Promise<void> {
   const gos = await prisma.groupOrderSession.findUnique({ where: { cartId }, select: { status: true } });
   if (!gos) return;
-  if (gos.status === "submitted" || gos.status === "ended" || gos.status === "expired") {
+  if (gos.status === "submitted") {
     throw new CartValidationError("This group order is closed.", "GROUP_ORDER_CLOSED");
+  }
+  if (gos.status === "ended" || gos.status === "expired") {
+    if (actor) {
+      throw new CartValidationError("This group order is closed.", "GROUP_ORDER_CLOSED");
+    }
+    return;
   }
   if (!actor) {
     throw new CartValidationError("Join this group order to change the cart.", "GROUP_ORDER_AUTH_REQUIRED");
@@ -841,10 +847,17 @@ export async function leaveGroupOrderAsParticipant(participantId: string): Promi
   ]);
 }
 
-export async function endGroupOrderAsHost(cartId: string, hostUserId: string): Promise<void> {
+export type EndGroupOrderAsHostResult =
+  | { ended: true; endedSessionId: string; podId: string; cartId: string }
+  | { ended: false };
+
+export async function endGroupOrderAsHost(
+  cartId: string,
+  hostUserId: string
+): Promise<EndGroupOrderAsHostResult> {
   const s = await prisma.groupOrderSession.findUnique({ where: { cartId } });
-  if (!s || s.hostUserId !== hostUserId) return;
-  if (s.status === "submitted") return;
+  if (!s || s.hostUserId !== hostUserId) return { ended: false };
+  if (s.status === "submitted") return { ended: false };
 
   await prisma.$transaction([
     prisma.cartItem.deleteMany({ where: { cartId } }),
@@ -853,6 +866,8 @@ export async function endGroupOrderAsHost(cartId: string, hostUserId: string): P
       data: { status: "ended", lockedAt: null },
     }),
   ]);
+
+  return { ended: true, endedSessionId: s.id, podId: s.podId, cartId };
 }
 
 /** Public participant list for host UI — display names only, no phones. */

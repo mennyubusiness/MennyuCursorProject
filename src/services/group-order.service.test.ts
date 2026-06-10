@@ -364,11 +364,27 @@ describe("startGroupOrderSession", () => {
 });
 
 describe("enforceGroupOrderCartMutation", () => {
-  it("blocks mutations on expired sessions", async () => {
-    mockFindUniqueSession.mockResolvedValue({ status: "expired" });
+  it("allows solo mutations on ended sessions when actor is null", async () => {
+    mockFindUniqueSession.mockResolvedValue({ status: "ended" });
     const { enforceGroupOrderCartMutation } = await import("./group-order.service");
     await expect(
       enforceGroupOrderCartMutation("cart_1", null, { kind: "add" })
+    ).resolves.toBeUndefined();
+  });
+
+  it("blocks group actor mutations on expired sessions", async () => {
+    mockFindUniqueSession.mockResolvedValue({ status: "expired" });
+    const { enforceGroupOrderCartMutation } = await import("./group-order.service");
+    const actor = {
+      sessionId: "gos_1",
+      sessionStatus: "expired" as const,
+      cartId: "cart_1",
+      podId: "pod_1",
+      participantId: "part_1",
+      role: "participant" as const,
+    };
+    await expect(
+      enforceGroupOrderCartMutation("cart_1", actor, { kind: "add" })
     ).rejects.toMatchObject({ code: "GROUP_ORDER_CLOSED" });
   });
 });

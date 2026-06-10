@@ -151,7 +151,6 @@ export function QuickCartProvider({
     const browsePodId = getBrowsingPodIdFromClient();
     const generationAtStart = snapshotGenerationRef.current;
     const podAtStart = browsePodId;
-    const preserveActiveGroup = quickCartHasActiveGroupOrder(cartRef.current);
     setLoading(true);
     try {
       const qs = browsePodId
@@ -171,10 +170,6 @@ export function QuickCartProvider({
         return;
       }
       if (!res.ok) {
-        if (preserveActiveGroup) {
-          setLoading(false);
-          return;
-        }
         setCart(null);
         setPodContext(NEUTRAL_POD_CONTEXT);
         setActiveCartRecovery(null);
@@ -192,18 +187,6 @@ export function QuickCartProvider({
       ) {
         return;
       }
-      if (preserveActiveGroup && !data.cart && quickCartHasActiveGroupOrder(cartRef.current)) {
-        setActiveCartRecovery(data.activeCartRecovery ?? null);
-        setShowActiveRecovery(
-          shouldShowActiveRecovery(
-            data.activeCartRecovery,
-            data.scope,
-            data.requiresClearToSwitchPod
-          )
-        );
-        setLoading(false);
-        return;
-      }
       applyPayload(data);
     } catch {
       if (
@@ -214,12 +197,10 @@ export function QuickCartProvider({
           currentPodId: getBrowsingPodIdFromClient(),
         })
       ) {
-        if (!quickCartHasActiveGroupOrder(cartRef.current)) {
-          setCart(null);
-          setPodContext(NEUTRAL_POD_CONTEXT);
-          setActiveCartRecovery(null);
-          setShowActiveRecovery(false);
-        }
+        setCart(null);
+        setPodContext(NEUTRAL_POD_CONTEXT);
+        setActiveCartRecovery(null);
+        setShowActiveRecovery(false);
       }
     } finally {
       if (
@@ -264,6 +245,9 @@ export function QuickCartProvider({
     const onCartUpdated = (event: Event) => {
       const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
       if (detail?.cart !== undefined) {
+        if (detail.source === "group-order-ended") {
+          snapshotGenerationRef.current += 1;
+        }
         if (
           !shouldQuickCartApplyCartSnapshot(
             detail,

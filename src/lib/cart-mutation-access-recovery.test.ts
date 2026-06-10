@@ -347,6 +347,65 @@ describe("cart-mutation-access-recovery", () => {
       });
     });
 
+    it("recovers host solo add after ended group on same pod", async () => {
+      mockCartFindUnique.mockImplementation(async ({ where }: { where: { id: string } }) => {
+        if (where.id === STALE_CART) {
+          return { id: STALE_CART, sessionId: SESSION, podId: POD_A };
+        }
+        return null;
+      });
+      mockGroupOrderSessionFindUnique.mockImplementation(
+        async ({ where }: { where: { cartId: string } }) => {
+          if (where.cartId === STALE_CART) {
+            return {
+              id: "gos_ended",
+              status: "ended",
+              hostUserId: "user_host",
+              podId: POD_A,
+            };
+          }
+          return null;
+        }
+      );
+      mockResolveActiveGroupCartIdForPod.mockResolvedValue(null);
+      mockGetOrCreateCartForVendorMenuPage.mockResolvedValue({
+        id: STALE_CART,
+        podId: POD_A,
+        sessionId: SESSION,
+        items: [],
+        groups: [],
+        subtotalCents: 0,
+      });
+      mockAssertCartSessionAccess.mockImplementation(async (cartId: string, sessionId: string | null) => {
+        if (cartId === STALE_CART && sessionId === SESSION) {
+          return {
+            ok: true,
+            cartId: STALE_CART,
+            sessionId: SESSION,
+            podId: POD_A,
+            isGroupOrder: false,
+          };
+        }
+        return { ok: false, status: 403, error: "Cart not found or access denied" };
+      });
+
+      const result = await tryRecoverCartForMutation({
+        requestedCartId: STALE_CART,
+        menuItemId: MENU_ITEM,
+        podIdHint: POD_A,
+        requestSessionId: SESSION,
+        authUserId: "user_host",
+        markers: { participantId: null, legacyJoinToken: null },
+      });
+
+      expect(result).toEqual({
+        kind: "use_cart",
+        cartId: STALE_CART,
+        recovered: true,
+        actor: null,
+      });
+    });
+
     it("still blocks terminal cart for participant without new host session", async () => {
       mockGroupOrderSessionFindUnique.mockImplementation(
         async ({ where }: { where: { cartId: string } }) => {
