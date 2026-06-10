@@ -1,15 +1,16 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { joinGroupOrderFormAction } from "@/actions/group-order.actions";
+import { SmsConsentCheckbox } from "@/components/legal/SmsConsentCheckbox";
 
-function JoinSubmitButton() {
+function JoinSubmitButton({ disabled = false }: { disabled?: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       aria-busy={pending}
       className="w-full rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
     >
@@ -29,12 +30,21 @@ export function GroupOrderJoinForm({ groupOrderSessionId }: Props) {
       : `join_${Date.now()}_${Math.random().toString(36).slice(2)}`
   );
   const submitGuardRef = useRef(false);
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     if (submitGuardRef.current) {
       e.preventDefault();
       return;
     }
+    if (!smsConsent) {
+      e.preventDefault();
+      setConsentError("Agree to transactional SMS messages before joining the group order.");
+      submitGuardRef.current = false;
+      return;
+    }
+    setConsentError(null);
     submitGuardRef.current = true;
   }
 
@@ -71,8 +81,22 @@ export function GroupOrderJoinForm({ groupOrderSessionId }: Props) {
         <p className="mt-1 text-xs text-stone-500">
           Used to notify you when your items are ready. Not shared with the host or vendors.
         </p>
+        <SmsConsentCheckbox
+          id="group-join-sms-consent"
+          checked={smsConsent}
+          onChange={(checked) => {
+            setSmsConsent(checked);
+            if (checked) setConsentError(null);
+          }}
+          className="mt-3"
+        />
       </div>
-      <JoinSubmitButton />
+      {consentError ? (
+        <p className="text-sm text-red-600" role="alert">
+          {consentError}
+        </p>
+      ) : null}
+      <JoinSubmitButton disabled={!smsConsent} />
     </form>
   );
 }

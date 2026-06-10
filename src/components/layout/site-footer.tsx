@@ -31,6 +31,9 @@ export function SiteFooter() {
           <Link href="/terms" className="transition hover:text-oo-warm-white">
             Terms
           </Link>
+          <Link href="/sms-consent" className="transition hover:text-oo-warm-white">
+            SMS consent
+          </Link>
         </nav>
         <p className="text-xs text-oo-stone-gray/80 sm:text-right">
           © {new Date().getFullYear()} Open Order Co.

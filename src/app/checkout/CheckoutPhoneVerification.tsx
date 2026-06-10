@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { SmsConsentNotice } from "@/components/legal/SmsConsentNotice";
+import { SmsConsentCheckbox } from "@/components/legal/SmsConsentCheckbox";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
 
 type CheckoutPhoneVerificationProps = {
@@ -28,6 +28,7 @@ export function CheckoutPhoneVerification({
   isSignedIn = false,
 }: CheckoutPhoneVerificationProps) {
   const [otpCode, setOtpCode] = useState("");
+  const [smsConsent, setSmsConsent] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpMessage, setOtpMessage] = useState<string | null>(null);
@@ -38,6 +39,10 @@ export function CheckoutPhoneVerification({
     setOtpMessage(null);
     if (!phone.trim()) {
       setOtpError("Enter your mobile number first.");
+      return;
+    }
+    if (!smsConsent) {
+      setOtpError("Agree to transactional SMS messages before we send a verification code.");
       return;
     }
     setOtpSending(true);
@@ -69,6 +74,10 @@ export function CheckoutPhoneVerification({
     setOtpError(null);
     if (!phone.trim() || !otpCode.trim()) {
       setOtpError("Enter your phone and the 6-digit code.");
+      return;
+    }
+    if (!smsConsent) {
+      setOtpError("Agree to transactional SMS messages to verify your phone.");
       return;
     }
     setOtpVerifying(true);
@@ -140,7 +149,12 @@ export function CheckoutPhoneVerification({
           className="mt-1.5 w-full max-w-md rounded-lg border border-stone-300 px-3 py-2.5 text-stone-900"
           placeholder="(555) 123-4567"
         />
-        <SmsConsentNotice className="mt-2 max-w-md" />
+        <SmsConsentCheckbox
+          id="checkout-sms-consent"
+          checked={smsConsent}
+          onChange={setSmsConsent}
+          className="mt-2 max-w-md"
+        />
       </div>
 
       {phoneVerified ? (
@@ -169,7 +183,7 @@ export function CheckoutPhoneVerification({
             <button
               type="button"
               onClick={handleSendCode}
-              disabled={otpSending || !phone.trim()}
+              disabled={otpSending || !phone.trim() || !smsConsent}
               className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-50 disabled:opacity-50"
             >
               {otpSending ? "Sending…" : "Send code"}
@@ -193,7 +207,7 @@ export function CheckoutPhoneVerification({
             <button
               type="button"
               onClick={handleVerifyCode}
-              disabled={otpVerifying || otpCode.length !== 6}
+              disabled={otpVerifying || otpCode.length !== 6 || !smsConsent}
               className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
             >
               {otpVerifying ? "Verifying…" : "Verify"}

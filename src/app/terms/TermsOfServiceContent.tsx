@@ -120,35 +120,37 @@ export function TermsOfServiceContent() {
 
       <LegalSection id="text-messages" title="8. Text Message Notifications">
         <p>
-          If you provide your phone number and opt in to receive text messages, Open Order may send
-          transactional SMS messages related to your account and orders.
-        </p>
-        <p>Messages may include:</p>
-        <LegalList
-          items={[
-            "Phone verification codes",
-            "Order confirmations",
-            "Order status updates",
-            "Pickup-ready alerts",
-            "Cancellation notices",
-            "Order issue notices",
-          ]}
-        />
-        <p>
-          Message frequency varies based on your account and order activity. Message and data rates may
-          apply.
+          By providing your phone number and opting in, you agree to receive transactional SMS messages
+          from OpenOrder. These messages may include verification codes, order confirmations, order status
+          updates, pickup-ready alerts, cancellation notices, and order issue notices.
         </p>
         <p>
-          You may opt out of text messages at any time by replying <strong className="text-oo-charcoal">STOP</strong>.
-          You may request help by replying <strong className="text-oo-charcoal">HELP</strong>.
+          Message frequency varies based on account activity and order activity. Message and data rates
+          may apply.
         </p>
         <p>
-          Consent to receive transactional text messages is not consent to receive marketing messages. Open
-          Order will not send marketing SMS messages unless you separately opt in to marketing communications.
+          You can opt out at any time by replying <strong className="text-oo-charcoal">STOP</strong> to
+          any OpenOrder SMS message. After you opt out, you may no longer receive SMS updates related to
+          your orders unless you opt in again. You can reply{" "}
+          <strong className="text-oo-charcoal">HELP</strong> for help or contact OpenOrder at{" "}
+          <a
+            href={`mailto:${OPEN_ORDER_SUPPORT_EMAIL}`}
+            className="font-semibold text-brand hover:underline"
+          >
+            {OPEN_ORDER_SUPPORT_EMAIL}
+          </a>
+          .
         </p>
         <p className="rounded-lg border border-brand/20 bg-oo-cream/80 px-4 py-3 font-medium text-oo-charcoal">
-          Open Order does not sell or share mobile phone numbers, SMS consent, or text messaging opt-in data
-          with third parties or affiliates for marketing or promotional purposes.
+          OpenOrder does not send marketing or promotional SMS messages under this transactional messaging
+          program.
+        </p>
+        <p>
+          See our{" "}
+          <Link href="/sms-consent" className="font-semibold text-brand hover:underline">
+            SMS Messaging Consent
+          </Link>{" "}
+          page for where customers opt in and the exact consent language used in the app.
         </p>
       </LegalSection>
 

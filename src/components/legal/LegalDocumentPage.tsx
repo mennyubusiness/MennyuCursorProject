@@ -46,10 +46,14 @@ export function LegalDocumentPage({ title, intro, children }: LegalDocumentPageP
               See also{" "}
               <Link href="/terms" className="font-semibold text-brand hover:underline">
                 Terms of Service
-              </Link>{" "}
-              and{" "}
+              </Link>
+              ,{" "}
               <Link href="/privacy" className="font-semibold text-brand hover:underline">
                 Privacy Policy
+              </Link>
+              , and{" "}
+              <Link href="/sms-consent" className="font-semibold text-brand hover:underline">
+                SMS Messaging Consent
               </Link>
               .
             </p>

@@ -118,29 +118,43 @@ export function PrivacyPolicyContent() {
 
       <LegalSection id="text-message-privacy" title="3. Text Message Privacy">
         <p>
-          Open Order sends transactional text messages only to users who provide their phone number and
-          consent to receive order-related SMS notifications.
+          OpenOrder may collect your mobile phone number when you create an account, verify your phone
+          number, place an order, or request transactional order updates.
         </p>
         <p>
-          Message types may include verification codes, order confirmations, order updates, pickup-ready
-          alerts, cancellation notices, and order issue notices.
+          OpenOrder uses mobile phone numbers and SMS consent only to provide transactional messages
+          related to OpenOrder services, including verification codes, order confirmations, order status
+          updates, pickup-ready alerts, cancellation notices, and order issue notices.
         </p>
         <p>
-          Message and data rates may apply. Message frequency varies based on account activity and order
-          activity.
-        </p>
-        <p>
-          You may opt out of text messages at any time by replying <strong className="text-oo-charcoal">STOP</strong>.
-          You may request help by replying <strong className="text-oo-charcoal">HELP</strong>.
+          Message frequency varies. Message and data rates may apply. You may opt out of SMS messages at
+          any time by replying <strong className="text-oo-charcoal">STOP</strong>. You may reply{" "}
+          <strong className="text-oo-charcoal">HELP</strong> for help or contact OpenOrder at{" "}
+          <a
+            href={`mailto:${OPEN_ORDER_SUPPORT_EMAIL}`}
+            className="font-semibold text-brand hover:underline"
+          >
+            {OPEN_ORDER_SUPPORT_EMAIL}
+          </a>
+          .
         </p>
         <p className="rounded-lg border border-brand/20 bg-oo-cream/80 px-4 py-3 font-medium text-oo-charcoal">
-          Open Order does not sell or share mobile phone numbers, SMS consent, or text messaging opt-in data
-          with third parties or affiliates for marketing or promotional purposes.
+          OpenOrder does not sell, rent, share, or transfer mobile phone numbers, SMS opt-in data, or SMS
+          consent information to third parties or affiliates for marketing or promotional purposes. SMS
+          opt-in data and consent are used only to provide transactional messaging related to OpenOrder
+          services.
         </p>
         <p>
           We may share phone numbers with service providers, such as SMS delivery providers, only as
-          necessary to send transactional messages, operate the service, detect abuse, or comply with legal
-          obligations.
+          necessary to send transactional messages, operate the service, detect abuse, or comply with
+          legal obligations.
+        </p>
+        <p>
+          See also our{" "}
+          <Link href="/sms-consent" className="font-semibold text-brand hover:underline">
+            SMS Messaging Consent
+          </Link>{" "}
+          page for opt-in locations and checkbox language.
         </p>
       </LegalSection>
 

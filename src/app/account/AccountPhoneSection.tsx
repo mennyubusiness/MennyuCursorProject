@@ -11,7 +11,7 @@ import {
   accountHubSectionTitleClass,
 } from "./account-hub-styles";
 import { buttonClassName } from "@/components/ui/button";
-import { SmsConsentNotice } from "@/components/legal/SmsConsentNotice";
+import { SmsConsentCheckbox } from "@/components/legal/SmsConsentCheckbox";
 import { cn } from "@/lib/cn";
 
 type AccountPhoneSectionProps = {
@@ -21,6 +21,7 @@ type AccountPhoneSectionProps = {
 export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps) {
   const router = useRouter();
   const [phone, setPhone] = useState("");
+  const [smsConsent, setSmsConsent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [otpSending, setOtpSending] = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
@@ -54,6 +55,10 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
       setOtpError("Enter your mobile number first.");
       return;
     }
+    if (!smsConsent) {
+      setOtpError("Agree to transactional SMS messages before we send a verification code.");
+      return;
+    }
     setOtpSending(true);
     try {
       const res = await fetch("/api/customer/phone/send-code", {
@@ -84,6 +89,10 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
     setLinkError(null);
     if (!phone.trim() || otpCode.length !== 6) {
       setOtpError("Enter your phone and the 6-digit code.");
+      return;
+    }
+    if (!smsConsent) {
+      setOtpError("Agree to transactional SMS messages to verify your phone.");
       return;
     }
     setOtpVerifying(true);
@@ -166,13 +175,18 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
                 className="oo-input mt-1 max-w-md"
                 placeholder="(555) 123-4567"
               />
-              <SmsConsentNotice className="mt-2 max-w-md" />
+              <SmsConsentCheckbox
+                id="account-sms-consent"
+                checked={smsConsent}
+                onChange={setSmsConsent}
+                className="mt-2 max-w-md"
+              />
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <button
                 type="button"
                 onClick={() => void handleSendCode()}
-                disabled={otpSending || !phone.trim()}
+                disabled={otpSending || !phone.trim() || !smsConsent}
                 className={cn(buttonClassName({ variant: "secondary", size: "sm" }))}
               >
                 {otpSending ? "Sending…" : "Send code"}
@@ -196,7 +210,7 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
               <button
                 type="button"
                 onClick={() => void handleVerifyAndLink()}
-                disabled={otpVerifying || otpCode.length !== 6}
+                disabled={otpVerifying || otpCode.length !== 6 || !smsConsent}
                 className={cn(buttonClassName({ variant: "primary", size: "sm" }))}
               >
                 {otpVerifying ? "Verifying…" : "Verify & link"}

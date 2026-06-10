@@ -81,6 +81,11 @@ describe("/account phone for order updates", () => {
     expect(accountViewModelSrc).toMatch(/linked_other/);
     expect(phoneSectionSrc).toMatch(/already linked to another account/);
   });
+
+  it("requires SMS consent checkbox before verification", () => {
+    expect(phoneSectionSrc).toMatch(/SmsConsentCheckbox/);
+    expect(phoneSectionSrc).toMatch(/smsConsent/);
+  });
 });
 
 describe("/account recent orders", () => {
@@ -146,6 +151,11 @@ describe("checkout phone verification copy", () => {
   it("describes phone as order updates not account login", () => {
     expect(checkoutPhoneSrc).toMatch(/Verify your phone number to receive order updates/);
     expect(checkoutPhoneSrc).toMatch(/We&apos;ll text you a code to confirm/);
+  });
+
+  it("requires transactional SMS consent checkbox before send-code", () => {
+    expect(checkoutPhoneSrc).toMatch(/SmsConsentCheckbox/);
+    expect(checkoutPhoneSrc).toMatch(/Agree to transactional SMS messages/);
   });
 });
 
