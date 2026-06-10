@@ -513,7 +513,7 @@ export function getCartValidationMessage(code: string): string {
     GROUP_ORDER_ITEM_NOT_OWNED: "You can only edit your own items in this group order.",
     GROUP_ORDER_CLOSED: "This group order is closed.",
     GROUP_ORDER_POD_MISMATCH: "That item isn’t part of this pod’s group order.",
-    group_checkout_host_only: "Only the host can check out a group order.",
+    group_checkout_host_only: "Only the host can check out for this group order.",
   };
   return map[code] ?? "Your cart needs attention. Please review or remove items.";
 }

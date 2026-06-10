@@ -744,7 +744,7 @@ export async function prepareGroupOrderCheckoutForHost(
       return {
         ok: false as const,
         code: "GROUP_ORDER_HOST_CHECKOUT",
-        message: "Only the host can check out a group order.",
+        message: "Only the host can check out for this group order.",
       };
     }
     if (GROUP_CHECKOUT_BLOCKED_STATUSES.includes(s.status)) {

@@ -1,14 +1,13 @@
 import { notFound } from "next/navigation";
-import { auth } from "@/auth";
 import { RecentPodViewTracker } from "@/components/retention/RecentViewTracker";
 import { PodPageHero } from "@/components/pod/PodPageHero";
 import { PodPageStickyNav, type PodPageNavItem } from "@/components/pod/PodPageStickyNav";
 import { PodVendorGrid, type PodVendorGridRow } from "@/components/pod/PodVendorGrid";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
-import { PageBand, PageSection, PageShell } from "@/components/layout/page-shell";
+import { PageSection, PageShell } from "@/components/layout/page-shell";
 import { ButtonLink } from "@/components/ui/button";
+import { PodPageGroupOrderSection } from "@/components/pod/PodPageGroupOrderSection";
 import { POD_QR_ENTRY_VALUE } from "@/lib/pod-ordering-url";
-import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { prisma } from "@/lib/db";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
 
@@ -108,12 +107,6 @@ export default async function PodPage({
     ? vendorRows.filter((r) => !r.isFeatured)
     : vendorRows;
 
-  const session = await auth();
-  const groupOrderCartUrl = `/cart?startGroupOrder=1&podId=${encodeURIComponent(pod.id)}`;
-  const groupOrderHref = session?.user
-    ? groupOrderCartUrl
-    : buildLoginHrefWithReturn(groupOrderCartUrl);
-
   const hasInfoSection = Boolean(pod.description?.trim() || pod.address?.trim());
   const navItems: PodPageNavItem[] = [];
   if (vendorRows.length > 0) {
@@ -160,23 +153,7 @@ export default async function PodPage({
 
       <ScrollPodVendorIntoView vendorId={highlightVendor} />
 
-      {pod.vendors.length > 0 && (
-        <PageBand variant="muted" className="border-t-0">
-          <section id="pod-group-order" className="scroll-mt-36">
-          <PageShell className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:py-5">
-            <div>
-              <p className="text-sm font-semibold text-oo-charcoal">Ordering with friends?</p>
-              <p className="mt-0.5 text-sm text-oo-stone-gray">
-                Start a group order — everyone adds to one shared cart.
-              </p>
-            </div>
-            <ButtonLink href={groupOrderHref} size="sm" className="shrink-0 self-start sm:self-center">
-              Start group order
-            </ButtonLink>
-          </PageShell>
-          </section>
-        </PageBand>
-      )}
+      {pod.vendors.length > 0 && <PodPageGroupOrderSection podId={pod.id} />}
 
       <PageSection className="!py-8 sm:!py-10">
         <PageShell className="space-y-10 sm:space-y-12">

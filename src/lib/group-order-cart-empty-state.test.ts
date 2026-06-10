@@ -78,6 +78,10 @@ describe("cart page wiring", () => {
     );
     expect(groupSrc).toMatch(/QuickCartHostGroupControls/);
     expect(hostControls).toMatch(/Copy code/);
+    expect(hostControls).toMatch(/Invite options/);
+    expect(hostControls).toMatch(/GroupOrderInviteQrModal/);
     expect(hostControls).not.toMatch(/group-order\/join\?session=/);
+    expect(hostControls).not.toMatch(/Add items/);
+    expect(hostControls).not.toMatch(/\/cart#group-order-invite/);
   });
 });

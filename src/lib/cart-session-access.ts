@@ -57,7 +57,7 @@ export async function assertCartSessionAccess(
         return {
           ok: false,
           status: 403,
-          error: "Only the host can check out a group order.",
+          error: "Only the host can check out for this group order.",
         };
       }
       if (groupSession.status !== "active" && groupSession.status !== "locked_checkout") {

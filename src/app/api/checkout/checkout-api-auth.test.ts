@@ -226,7 +226,7 @@ describe("POST /api/checkout cart session ownership", () => {
     mockAssertCartSessionAccess.mockResolvedValue({
       ok: false,
       status: 403,
-      error: "Only the host can check out a group order.",
+      error: "Only the host can check out for this group order.",
     });
 
     const res = await POST(checkoutRequest(SESSION_A));

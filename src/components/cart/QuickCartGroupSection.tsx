@@ -44,29 +44,17 @@ export function QuickCartGroupSection({
 
   if (role === "host" && group?.joinCode && cart) {
     return (
-      <QuickCartHostGroupControls
-        joinCode={group.joinCode}
-        podId={cart.podId}
-        podName={podName}
-        onNavigate={onNavigate}
-      />
+      <QuickCartHostGroupControls joinCode={group.joinCode} podName={podName} />
     );
   }
 
   if (role === "participant") {
     return (
       <section className="mb-4 rounded-xl border border-oo-light-stone bg-oo-cream/80 px-3 py-3 text-sm">
-        <p className="font-semibold text-oo-charcoal">You joined this group order</p>
+        <p className="font-semibold text-oo-charcoal">You&apos;re in a group order</p>
         <p className="mt-1 text-xs text-oo-stone-gray">
           Add your items before the host checks out.
         </p>
-        <Link
-          href="/cart"
-          onClick={onNavigate}
-          className="mt-3 inline-block text-xs font-semibold text-brand hover:underline"
-        >
-          View my items
-        </Link>
       </section>
     );
   }

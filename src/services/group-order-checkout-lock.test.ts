@@ -196,6 +196,8 @@ describe("checkout wiring", () => {
     const src = readFileSync(join(process.cwd(), "src/app/checkout/page.tsx"), "utf8");
     expect(src).toMatch(/prepareGroupOrderCheckoutForHost/);
     expect(src).toMatch(/groupCheckoutFingerprint=\{groupCheckoutFingerprint\}/);
+    expect(src).toMatch(/assertCartSessionAccess/);
+    expect(src).toMatch(/mode: "checkout"/);
   });
 
   it("checkout API accepts groupCheckoutFingerprint", () => {

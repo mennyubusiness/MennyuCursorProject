@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { assertCartSessionAccess } from "@/lib/cart-session-access";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 import { prisma } from "@/lib/db";
 import { prepareGroupOrderCheckoutForHost } from "@/services/group-order.service";
@@ -34,17 +35,25 @@ export default async function CheckoutPage({
     auth(),
   ]);
 
-  const groupSessionMeta = await prisma.groupOrderSession.findUnique({
-    where: { cartId },
-    select: { id: true, hostUserId: true, status: true },
+  const access = await assertCartSessionAccess(cartId, sessionId ?? null, {
+    authUserId: authSession?.user?.id ?? null,
+    mode: "checkout",
   });
+  if (!access.ok) {
+    const errorCode = access.error.includes("host") ? "group_checkout_host_only" : "cart_access_denied";
+    redirect(`/cart?error=${encodeURIComponent(errorCode)}`);
+  }
+
+  const groupSessionMeta = access.isGroupOrder
+    ? await prisma.groupOrderSession.findUnique({
+        where: { cartId },
+        select: { id: true, hostUserId: true, status: true },
+      })
+    : null;
 
   let groupCheckoutFingerprint: string | undefined;
 
   if (groupSessionMeta) {
-    if (authSession?.user?.id !== groupSessionMeta.hostUserId) {
-      redirect("/cart?error=group_checkout_host_only");
-    }
     const lockResult = await prepareGroupOrderCheckoutForHost(cartId, groupSessionMeta.hostUserId);
     if (!lockResult.ok) {
       redirect(`/cart?error=${encodeURIComponent(lockResult.code)}`);
@@ -58,7 +67,7 @@ export default async function CheckoutPage({
   });
   if (!cart || cart.items.length === 0) redirect("/cart");
 
-  if (!groupSessionMeta && cart.sessionId !== (sessionId ?? "")) {
+  if (!access.isGroupOrder && cart.sessionId !== (sessionId ?? "")) {
     redirect("/cart");
   }
 

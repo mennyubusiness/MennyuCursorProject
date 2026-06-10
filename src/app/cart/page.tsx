@@ -70,7 +70,9 @@ import { ParticipantGroupOrderSummary } from "./ParticipantGroupOrderSummary";
 import { resolveActorForGroupCart } from "@/services/group-order.service";
 import {
   buildGroupOrderViewerContext,
+  canViewerCheckoutOnCartPage,
   filterCartLinesForViewer,
+  isGroupParticipantCartView,
 } from "@/lib/group-order-viewer-context";
 import {
   buildGroupOrderCartReadModel,
@@ -549,7 +551,15 @@ export default async function CartPage({
   const viewerIsHost = groupActor?.role === "host";
   const viewerParticipantId = groupActor?.participantId ?? null;
 
-  const showParticipantTotalsOnly = Boolean(goState.active && groupActor?.role === "participant");
+  const viewerCanCheckout = canViewerCheckoutOnCartPage({
+    goStateActive: goState.active,
+    goStateView: goState.active ? goState.view : undefined,
+    viewerCtx,
+  });
+  const showParticipantTotalsOnly = isGroupParticipantCartView({
+    goStateActive: goState.active,
+    goStateView: goState.active ? goState.view : undefined,
+  });
   const pollGroupCart = shouldPollCollaborativeGroupCart({
     hasGroupSession: goState.active,
     sessionStatus: goState.active ? goState.status : "",
@@ -603,8 +613,8 @@ export default async function CartPage({
           {goState.active ? (
             showParticipantTotalsOnly ? (
               <>
-                You&apos;re adding your items to this group order. Only the host can see and checkout the
-                full group cart.
+                You&apos;re adding your items to this group order. The host will check out when everyone
+                is ready.
               </>
             ) : (
               <>
@@ -640,6 +650,7 @@ export default async function CartPage({
         podId={cart.podId}
         initialCart={initialCartSnapshot}
         initialValidation={initialValidation}
+        allowCheckout={viewerCanCheckout}
       >
       {hostGroupStartSyncCart ? <GroupOrderStartCartSync cart={hostGroupStartSyncCart} /> : null}
       <CartPageLiveSyncBanner />
@@ -875,7 +886,9 @@ export default async function CartPage({
               )}
             </div>
             <CartPageLiveCheckoutActions
+              viewerCanCheckout={viewerCanCheckout}
               showParticipantTotalsOnly={showParticipantTotalsOnly}
+              sessionLockedCheckout={sessionLocked}
               myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
               totalCentsFallback={totalCents}
               groupSubmitted={sessionSubmitted}

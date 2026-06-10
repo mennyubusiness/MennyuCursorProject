@@ -35,7 +35,9 @@ describe("cart live checkout gate", () => {
   });
 
   it("blocks continue while revalidation or cart sync is pending", () => {
-    expect(cartMutationSrc).toMatch(/checkoutEnabled = canCheckout && !isRevalidating && !isSyncingCart/);
+    expect(cartMutationSrc).toMatch(
+      /checkoutEnabled =[\s\S]*viewerCanCheckout && canCheckout && !isRevalidating && !isSyncingCart/
+    );
   });
 
   it("marks cart invalid when revalidation fails", () => {

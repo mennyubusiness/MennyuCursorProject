@@ -65,12 +65,14 @@ export function CartPageMutationProvider({
   podId,
   initialCart,
   initialValidation,
+  allowCheckout = true,
   children,
 }: {
   cartId: string;
   podId: string;
   initialCart: Cart;
   initialValidation: CartPageValidationSnapshot;
+  allowCheckout?: boolean;
   children: ReactNode;
 }) {
   const [cart, setCart] = useState(initialCart);
@@ -209,12 +211,12 @@ export function CartPageMutationProvider({
         cart.items.filter((i) => i.vendorId === vendorId).length,
       lineErrorMessage: (cartItemId: string) => errorByCartItemId.get(cartItemId),
       lineHasError: (cartItemId: string) => errorByCartItemId.has(cartItemId),
-      canCheckout: checkoutState.canCheckout,
+      canCheckout: checkoutState.canCheckout && allowCheckout,
       showValidationWarning: checkoutState.showWarning,
       isRevalidating,
       isSyncingCart,
     };
-  }, [cart, liveValidation, cartId, podId, errorByCartItemId, checkoutState, isRevalidating, isSyncingCart]);
+  }, [cart, liveValidation, cartId, podId, errorByCartItemId, checkoutState, isRevalidating, isSyncingCart, allowCheckout]);
 
   return (
     <CartPageMutationContext.Provider value={value}>{children}</CartPageMutationContext.Provider>
@@ -396,20 +398,25 @@ export function CartPageLiveCheckoutGate({ children }: { children: ReactNode }) 
 }
 
 export function CartPageLiveCheckoutActions({
+  viewerCanCheckout,
   showParticipantTotalsOnly,
+  sessionLockedCheckout = false,
   myParticipantSubtotalCents,
   totalCentsFallback,
   groupSubmitted = false,
   submittedOrderId = null,
 }: {
+  viewerCanCheckout: boolean;
   showParticipantTotalsOnly: boolean;
+  sessionLockedCheckout?: boolean;
   myParticipantSubtotalCents?: number;
   totalCentsFallback: number;
   groupSubmitted?: boolean;
   submittedOrderId?: string | null;
 }) {
   const { cartId, podId, canCheckout, isRevalidating, isSyncingCart } = useCartPageMutation();
-  const checkoutEnabled = canCheckout && !isRevalidating && !isSyncingCart && !groupSubmitted;
+  const checkoutEnabled =
+    viewerCanCheckout && canCheckout && !isRevalidating && !isSyncingCart && !groupSubmitted;
   const blockedLabel = isSyncingCart
     ? "Syncing your cart…"
     : !canCheckout && isRevalidating
@@ -418,7 +425,7 @@ export function CartPageLiveCheckoutActions({
 
   return (
     <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:items-end">
-      {checkoutEnabled && !showParticipantTotalsOnly && (
+      {checkoutEnabled && (
         <p className="text-center text-xs leading-snug text-stone-500 sm:text-right">
           Secure checkout with Stripe · Each vendor is notified after you pay
         </p>
@@ -430,10 +437,12 @@ export function CartPageLiveCheckoutActions({
         >
           Track order
         </Link>
-      ) : showParticipantTotalsOnly ? (
+      ) : showParticipantTotalsOnly || !viewerCanCheckout ? (
         <div className="w-full text-center sm:text-right">
           <p className="text-xs text-stone-500">
-            The host will review and place the order. You won&apos;t be charged here.
+            {sessionLockedCheckout
+              ? "The host is checking out. New changes are paused."
+              : "The host will check out when everyone is ready."}
           </p>
           <Link
             href={`/pod/${podId}`}

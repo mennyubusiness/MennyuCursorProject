@@ -3,8 +3,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   applyGroupOrderVisibilityToCart,
+  canViewerCheckoutOnCartPage,
   filterCartLinesForViewer,
   isGroupCartLineVisibleToViewer,
+  isGroupParticipantCartView,
   type GroupOrderViewerContext,
 } from "./group-order-viewer-context";
 import type { Cart } from "@/domain/types";
@@ -36,6 +38,19 @@ const participantCtx: GroupOrderViewerContext = {
 };
 
 describe("group-order-viewer-context", () => {
+  it("participant cannot checkout on cart page", () => {
+    expect(
+      canViewerCheckoutOnCartPage({
+        goStateActive: true,
+        goStateView: "participant",
+        viewerCtx: participantCtx,
+      })
+    ).toBe(false);
+    expect(isGroupParticipantCartView({ goStateActive: true, goStateView: "participant" })).toBe(
+      true
+    );
+  });
+
   it("host sees all lines", () => {
     const lines = [
       { id: "1", groupOrderParticipantId: "p_host" },

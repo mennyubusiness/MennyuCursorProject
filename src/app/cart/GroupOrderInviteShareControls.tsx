@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { buildGroupOrderShareText } from "@/lib/group-order-invite-url";
+import { GroupOrderInviteQrModal } from "@/components/group-order/GroupOrderInviteQrModal";
 
 type Props = {
   joinCode: string;
@@ -109,56 +110,14 @@ export function GroupOrderInviteShareControls({
       {shareError ? <p className="mt-2 text-xs text-amber-800">{shareError}</p> : null}
 
       {qrOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="group-order-qr-title"
-          onClick={() => setQrOpen(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 id="group-order-qr-title" className="text-lg font-semibold text-stone-900">
-              Scan to join group order
-            </h3>
-            <p className="mt-1 text-sm text-stone-600">{podName}</p>
-            {qrDataUrl ? (
-              <div className="mt-4 flex justify-center rounded-xl border border-stone-200 bg-white p-3">
-                {/* eslint-disable-next-line @next/next/no-img-element -- data URL from server */}
-                <img
-                  src={qrDataUrl}
-                  alt={`QR code to join group order at ${podName}`}
-                  width={200}
-                  height={200}
-                  className="h-auto w-[200px] max-w-full"
-                />
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-amber-800">Could not load QR code. Copy the link instead.</p>
-            )}
-            <p className="mt-4 text-center font-mono text-sm font-semibold text-stone-800">
-              Code: {joinCode}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void copyLink()}
-                className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-900 hover:bg-stone-100"
-              >
-                {linkCopied ? "Invite link copied" : "Copy link"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setQrOpen(false)}
-                className="rounded-lg bg-stone-900 px-3 py-2 text-sm font-semibold text-white hover:bg-stone-800"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <GroupOrderInviteQrModal
+          open={qrOpen}
+          onClose={() => setQrOpen(false)}
+          joinCode={joinCode}
+          inviteAbsoluteUrl={inviteAbsoluteUrl}
+          podName={podName}
+          qrDataUrl={qrDataUrl}
+        />
       ) : null}
     </div>
   );

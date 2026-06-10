@@ -25,6 +25,26 @@ export type GroupOrderViewerContext = {
   joinCode: string | null;
 };
 
+/** Host-only checkout for active group orders — never infer host from read paths. */
+export function canViewerCheckoutOnCartPage(args: {
+  goStateActive: boolean;
+  goStateView: "host" | "participant" | "unknown" | undefined;
+  viewerCtx: GroupOrderViewerContext | null;
+}): boolean {
+  if (!args.goStateActive) {
+    return args.viewerCtx?.canCheckout ?? true;
+  }
+  if (args.goStateView !== "host") return false;
+  return Boolean(args.viewerCtx?.canCheckout);
+}
+
+export function isGroupParticipantCartView(args: {
+  goStateActive: boolean;
+  goStateView: "host" | "participant" | "unknown" | undefined;
+}): boolean {
+  return args.goStateActive && args.goStateView === "participant";
+}
+
 const SOLO_VIEWER: GroupOrderViewerContext = {
   isGroupOrder: false,
   groupOrderSessionId: null,
