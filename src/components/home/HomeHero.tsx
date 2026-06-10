@@ -3,11 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+
 import { PodLogo } from "@/components/images/PodLogo";
-import { ButtonLink } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
+import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { HOME_MARKET_IMAGE } from "@/lib/home-assets";
+import {
+  HOME_HERO_HEADLINE,
+  HOME_HERO_SUPPORTING,
+  HOME_PRIMARY_CTA_LABEL,
+  HOME_SECONDARY_CTA_LABEL,
+  homePodOwnerMailtoHref,
+} from "@/lib/home-marketing";
 
 export type HomeHeroFeaturedPod = {
   id: string;
@@ -22,8 +30,8 @@ const ROTATE_MS = 7000;
 const PLACEHOLDER_FEATURES: HomeHeroFeaturedPod[] = [
   {
     id: "sample-1",
-    name: "Your local food hub",
-    description: "Browse pods, mix vendors, and check out once.",
+    name: "Your food pod",
+    description: "Multiple vendors, one cart, one checkout, one pickup flow.",
     imageUrl: null,
     vendorCount: 0,
   },
@@ -78,28 +86,30 @@ export function HomeHero({ featuredPods }: { featuredPods: HomeHeroFeaturedPod[]
 
       <PageShell className="relative z-10 grid min-h-[min(88vh,52rem)] gap-12 py-16 sm:py-20 lg:grid-cols-[1.15fr_minmax(0,22rem)] lg:items-end lg:gap-16 lg:py-24 xl:grid-cols-[1.2fr_minmax(0,26rem)]">
         <div className="flex flex-col justify-end animate-oo-fade-up motion-reduce:animate-none">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-oo-cream/50">
-            <span className="oo-live-dot" aria-hidden />
-            Live ordering network
+          <p className="text-[clamp(2rem,6vw,3.25rem)] font-black leading-none tracking-tight text-oo-warm-white">
+            Open Order
           </p>
-          <h1 className="oo-display mt-6 text-5xl leading-[0.95] text-oo-warm-white sm:text-6xl md:text-7xl lg:text-8xl">
-            Order everywhere.
-            <span className="mt-1 block text-oo-cream/55">Pay once.</span>
+          <p className="mt-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-oo-cream/50">
+            <span className="oo-live-dot" aria-hidden />
+            Connected ordering for food pods
+          </p>
+          <h1 className="mt-6 max-w-2xl text-3xl font-black leading-tight tracking-tight text-oo-warm-white sm:text-4xl md:text-[2.75rem] md:leading-[1.1]">
+            {HOME_HERO_HEADLINE}
           </h1>
-          <p className="mt-8 max-w-xl text-lg leading-relaxed text-oo-cream/70 sm:text-xl">
-            Multi-vendor food pods on one cart, one checkout, one pickup — built for speed at scale.
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-oo-cream/70 sm:text-xl">
+            {HOME_HERO_SUPPORTING}
           </p>
           <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <ButtonLink href="/explore" size="lg" className="w-full sm:w-auto">
-              Explore food pods
+            <ButtonLink href={homePodOwnerMailtoHref()} size="lg" className="w-full sm:w-auto">
+              {HOME_PRIMARY_CTA_LABEL}
             </ButtonLink>
             <ButtonLink
-              href="/register"
+              href="/explore"
               variant="secondary"
               size="lg"
               className="w-full border-oo-cream/40 text-oo-warm-white hover:border-oo-warm-white hover:bg-oo-warm-white hover:text-oo-charcoal sm:w-auto"
             >
-              Run a pod
+              {HOME_SECONDARY_CTA_LABEL}
             </ButtonLink>
           </div>
         </div>
@@ -112,7 +122,7 @@ export function HomeHero({ featuredPods }: { featuredPods: HomeHeroFeaturedPod[]
         >
           <div key={active.id} className="animate-mennyu-fade-in motion-reduce:animate-none">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-oo-cream/50">
-              Featured pod
+              Participating pod
             </p>
             <div className="mt-4 flex gap-4">
               <PodLogo
@@ -125,7 +135,7 @@ export function HomeHero({ featuredPods }: { featuredPods: HomeHeroFeaturedPod[]
                 <p className="truncate text-xl font-bold tracking-tight text-oo-warm-white">{active.name}</p>
                 {active.vendorCount > 0 && (
                   <p className="mt-1 text-sm font-medium text-oo-cream/65">
-                    {active.vendorCount} vendor{active.vendorCount !== 1 ? "s" : ""} · One pickup
+                    {active.vendorCount} vendor{active.vendorCount !== 1 ? "s" : ""} · One checkout
                   </p>
                 )}
               </div>

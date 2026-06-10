@@ -13,13 +13,14 @@ const panelInnerClass =
   "relative flex flex-col rounded-xl border border-oo-light-stone bg-oo-cream/60 p-5 sm:p-6";
 
 /**
- * Cream band under the hero: one warm-white module with group order (left) + shortcuts (right).
+ * Returning-customer utilities: group order join and recent activity.
+ * Placed below marketing content — QR/direct pod ordering remains the primary guest path.
  */
 export function HomeJoinGroupSection({ customerAccountId }: Props) {
   return (
     <section
       className="relative overflow-hidden border-y border-oo-light-stone bg-oo-cream"
-      aria-label="Group orders and your shortcuts"
+      aria-label="Returning guest shortcuts"
     >
       <div
         className="pointer-events-none absolute left-1/2 top-8 h-48 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-brand/10 blur-3xl"
@@ -66,12 +67,14 @@ export function HomeJoinGroupSection({ customerAccountId }: Props) {
               className="flex min-w-0 flex-col border-t border-oo-light-stone p-6 sm:p-7 lg:h-full lg:border-t-0 lg:p-8"
               aria-label="Recent activity"
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">Your shortcuts</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">
+                Already ordering?
+              </p>
               <div className={cn(panelInnerClass, "mt-5 min-h-[12.5rem] flex-1 lg:min-h-[14rem]")}>
                 <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-brand" aria-hidden />
                 <CustomerRetentionStrip
                   heading="Pick up where you left off"
-                  helperText="Jump back into a recent pod or vendor."
+                  helperText="Return to a recent pod or vendor."
                   showEmptyPlaceholder
                   embedded
                 />
@@ -82,11 +85,12 @@ export function HomeJoinGroupSection({ customerAccountId }: Props) {
                 embedded
               />
               <p className="mt-5 text-center text-sm text-oo-stone-gray lg:text-left">
+                No QR code?{" "}
                 <Link
                   href="/explore"
                   className="font-semibold text-brand underline-offset-4 transition hover:text-[#EA580C] hover:underline"
                 >
-                  Explore food pods →
+                  Browse participating pods →
                 </Link>
               </p>
             </aside>
