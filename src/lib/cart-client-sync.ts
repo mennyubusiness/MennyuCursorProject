@@ -1,4 +1,18 @@
 import type { Cart } from "@/domain/types";
+import {
+  enrichCartUpdatedDetail,
+} from "@/lib/cart-snapshot-freshness";
+
+export type { CartSnapshotMeta } from "@/lib/cart-snapshot-freshness";
+export {
+  buildCartSnapshotMeta,
+  enrichCartUpdatedDetail,
+  mergeAcceptedCartSnapshotMeta,
+  rememberAcceptedCartSnapshot,
+  resolveInitialVendorMenuCart,
+  shouldAcceptApiCartPayload,
+  shouldAcceptCartSnapshot,
+} from "@/lib/cart-snapshot-freshness";
 
 export const CART_UPDATED_EVENT = "mennyu:cart-updated";
 export const CART_CLEARED_EVENT = "mennyu:cart-cleared";
@@ -21,6 +35,14 @@ export type CartUpdatedDetail = {
   refresh?: boolean;
   /** Origin of the snapshot — listeners skip their own source to avoid rebroadcast loops. */
   source?: CartUpdateSource;
+  /** Monotonic client dispatch order — assigned in dispatchCartUpdated. */
+  clientSequence?: number;
+  /** Bumped on vendor-menu / quick-cart / cart-page mutation snapshots. */
+  mutationGeneration?: number;
+  /** Bumped on group-order-start / group-order-ended lifecycle snapshots. */
+  lifecycleGeneration?: number;
+  /** Mutation generation at group-order-ended dispatch — stale ends after later adds are ignored. */
+  endAtMutationGeneration?: number;
 };
 
 export type CartClearedDetail = {
@@ -222,14 +244,18 @@ export function consumePendingClientCartClear(orderId: string): PendingCartClear
 }
 
 /** Push cart snapshot to Quick Cart, vendor menu, and header badge without GET /api/cart. */
-export function dispatchCartUpdated(detail: CartUpdatedDetail): void {
-  if (typeof window === "undefined") return;
+export function dispatchCartUpdated(detail: CartUpdatedDetail): CartUpdatedDetail | null {
+  if (typeof window === "undefined") return null;
+  const enriched = enrichCartUpdatedDetail(detail);
   const normalized =
-    detail.cart != null ? { ...detail, cart: ensureCartSnapshotScalars(detail.cart) } : detail;
+    enriched.cart != null
+      ? { ...enriched, cart: ensureCartSnapshotScalars(enriched.cart) }
+      : enriched;
   window.dispatchEvent(new CustomEvent<CartUpdatedDetail>(CART_UPDATED_EVENT, { detail: normalized }));
   if (normalized.cart) {
     window.dispatchEvent(new CustomEvent("mennyu:cart-added"));
   }
+  return normalized;
 }
 
 /** Clear client cart state after checkout — listeners apply locally, never rebroadcast. */

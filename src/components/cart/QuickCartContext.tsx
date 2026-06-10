@@ -21,7 +21,13 @@ import {
   shouldQuickCartApplyCartSnapshot,
   shouldApplyCartFetchResult,
   cartClearAppliesToContext,
+  mergeAcceptedCartSnapshotMeta,
+  shouldAcceptApiCartPayload,
+  shouldAcceptCartSnapshot,
+  rememberAcceptedCartSnapshot,
+  resolveInitialVendorMenuCart,
   type CartClearedDetail,
+  type CartSnapshotMeta,
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
 import { getBrowsingPodIdFromClient } from "@/lib/quick-cart-pod";
@@ -96,6 +102,7 @@ export function QuickCartProvider({
   const cartRef = useRef<Cart | null>(null);
   const activeCartRecoveryRef = useRef<ActiveCartRecovery | null>(null);
   const snapshotGenerationRef = useRef(0);
+  const lastAcceptedMetaRef = useRef<CartSnapshotMeta | null>(null);
   const activeBrowsePodRef = useRef<string | null>(null);
 
   cartRef.current = cart;
@@ -111,6 +118,11 @@ export function QuickCartProvider({
   const enabled = routeQuickCartEnabled || hasActiveGroupOrder;
 
   const applyPayload = useCallback((payload: QuickCartApiResponse) => {
+    if (!shouldAcceptApiCartPayload(payload, lastAcceptedMetaRef.current)) {
+      setLoading(false);
+      return;
+    }
+    rememberAcceptedCartSnapshot(payload.cart);
     setCart(payload.cart);
     setPodContext(podContextFromPayload(payload));
     setActiveCartRecovery(payload.activeCartRecovery ?? null);
@@ -124,8 +136,15 @@ export function QuickCartProvider({
     setLoading(false);
   }, []);
 
-  const applyCartSnapshot = useCallback((next: Cart | null) => {
+  const applyCartSnapshot = useCallback((next: Cart | null, detail?: CartUpdatedDetail) => {
     snapshotGenerationRef.current += 1;
+    if (detail?.clientSequence != null) {
+      lastAcceptedMetaRef.current = mergeAcceptedCartSnapshotMeta(
+        lastAcceptedMetaRef.current,
+        detail
+      );
+    }
+    rememberAcceptedCartSnapshot(next);
     setCart(next);
     if (!next) {
       setPodContext(NEUTRAL_POD_CONTEXT);
@@ -245,9 +264,6 @@ export function QuickCartProvider({
     const onCartUpdated = (event: Event) => {
       const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
       if (detail?.cart !== undefined) {
-        if (detail.source === "group-order-ended") {
-          snapshotGenerationRef.current += 1;
-        }
         if (
           !shouldQuickCartApplyCartSnapshot(
             detail,
@@ -257,7 +273,13 @@ export function QuickCartProvider({
         ) {
           return;
         }
-        applyCartSnapshot(detail.cart);
+        if (!shouldAcceptCartSnapshot(detail, lastAcceptedMetaRef.current)) {
+          return;
+        }
+        if (detail.source === "group-order-ended") {
+          snapshotGenerationRef.current += 1;
+        }
+        applyCartSnapshot(detail.cart, detail);
         return;
       }
       if (detail?.refresh) {

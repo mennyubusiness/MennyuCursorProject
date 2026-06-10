@@ -27,7 +27,9 @@ export function EndGroupOrderHostButton({ cartId, className }: Props) {
         setMessage(result.error);
         return;
       }
-      dispatchGroupOrderEndCartSnapshot(result.cart);
+      dispatchGroupOrderEndCartSnapshot(result.cart, {
+        endedSessionId: result.endedSessionId,
+      });
       quickCart?.closeCart();
       setMessage("Group order ended.");
       router.refresh();

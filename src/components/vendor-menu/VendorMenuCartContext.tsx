@@ -19,7 +19,12 @@ import {
   ensureCartSnapshotScalars,
   shouldApplyCartSnapshot,
   cartClearAppliesToContext,
+  mergeAcceptedCartSnapshotMeta,
+  shouldAcceptCartSnapshot,
+  rememberAcceptedCartSnapshot,
+  resolveInitialVendorMenuCart,
   type CartClearedDetail,
+  type CartSnapshotMeta,
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
 import {
@@ -89,10 +94,11 @@ export function VendorMenuCartProvider({
   initialCart: Cart;
   vendorId: string;
 }) {
-  const [cart, setCart] = useState<Cart>(initialCart);
+  const [cart, setCart] = useState<Cart>(() => resolveInitialVendorMenuCart(initialCart));
   const [cartMutationError, setCartMutationError] = useState<CartMutationError | null>(null);
   const cartRef = useRef<Cart>(initialCart);
   const syncedInitialRef = useRef(false);
+  const lastAcceptedMetaRef = useRef<CartSnapshotMeta | null>(null);
 
   cartRef.current = cart;
 
@@ -104,22 +110,36 @@ export function VendorMenuCartProvider({
   useEffect(() => {
     if (syncedInitialRef.current) return;
     syncedInitialRef.current = true;
-    dispatchCartUpdated({ cart: initialCart, source: "vendor-menu" });
-  }, [initialCart]);
+    const detail = dispatchCartUpdated({ cart, source: "vendor-menu" });
+    if (detail && shouldAcceptCartSnapshot(detail, lastAcceptedMetaRef.current)) {
+      lastAcceptedMetaRef.current = mergeAcceptedCartSnapshotMeta(
+        lastAcceptedMetaRef.current,
+        detail
+      );
+      rememberAcceptedCartSnapshot(cart);
+    }
+  }, [cart]);
 
   useEffect(() => {
     const onCartUpdated = (event: Event) => {
       const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
       if (detail?.cart && detail.source === "group-order-start") {
         if (detail.cart.podId !== cartRef.current.podId) return;
+        if (!shouldAcceptCartSnapshot(detail, lastAcceptedMetaRef.current)) return;
         const normalized = ensureCartSnapshotScalars(detail.cart);
         cartRef.current = normalized;
         setCart(normalized);
         markCartSnapshotCommitted(normalized.id);
+        lastAcceptedMetaRef.current = mergeAcceptedCartSnapshotMeta(
+          lastAcceptedMetaRef.current,
+          detail
+        );
+        rememberAcceptedCartSnapshot(normalized);
         return;
       }
       if (detail?.cart !== undefined && detail.source === "group-order-ended") {
         if (detail.cart && detail.cart.podId !== cartRef.current.podId) return;
+        if (!shouldAcceptCartSnapshot(detail, lastAcceptedMetaRef.current)) return;
         const next =
           detail.cart ??
           emptyCartSnapshot({
@@ -131,10 +151,22 @@ export function VendorMenuCartProvider({
         cartRef.current = normalized;
         setCart(normalized);
         markCartSnapshotCommitted(normalized.id);
+        lastAcceptedMetaRef.current = mergeAcceptedCartSnapshotMeta(
+          lastAcceptedMetaRef.current,
+          detail
+        );
+        rememberAcceptedCartSnapshot(normalized);
         return;
       }
       if (!shouldApplyCartSnapshot(detail, "vendor-menu", snapshotContext)) return;
-      setCart(detail!.cart!);
+      if (!shouldAcceptCartSnapshot(detail, lastAcceptedMetaRef.current)) return;
+      const accepted = detail!.cart!;
+      setCart(accepted);
+      lastAcceptedMetaRef.current = mergeAcceptedCartSnapshotMeta(
+        lastAcceptedMetaRef.current,
+        detail!
+      );
+      rememberAcceptedCartSnapshot(accepted);
     };
     const onCartCleared = (event: Event) => {
       const detail = (event as CustomEvent<CartClearedDetail>).detail;
@@ -171,7 +203,14 @@ export function VendorMenuCartProvider({
       cartRef.current = normalized;
       setCart(normalized);
       markCartSnapshotCommitted(normalized.id);
-      dispatchCartUpdated({ cart: normalized, source: "vendor-menu" });
+      const detail = dispatchCartUpdated({ cart: normalized, source: "vendor-menu" });
+      if (detail) {
+        lastAcceptedMetaRef.current = mergeAcceptedCartSnapshotMeta(
+          lastAcceptedMetaRef.current,
+          detail
+        );
+        rememberAcceptedCartSnapshot(normalized);
+      }
     },
     []
   );
