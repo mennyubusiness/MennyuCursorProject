@@ -49,12 +49,50 @@ export function isUserPhoneVerifiedForCheckout(
 export type ResolveCheckoutPhoneVerificationResult =
   | {
       ok: true;
-      customerAccountId: string;
+      customerAccountId: string | null;
       phoneE164: string;
       /** Set mennyu_customer cookie on checkout response when bypassing OTP via account. */
       establishCustomerSession?: boolean;
     }
   | { ok: false; status: number; error: string; code: string };
+
+export type ResolveCheckoutPhoneForOrderResult = ResolveCheckoutPhoneVerificationResult;
+
+/**
+ * Resolve checkout phone for order placement.
+ * SMS verification is required only when the customer opts in to transactional SMS.
+ */
+export async function resolveCheckoutPhoneForOrder(
+  request: NextRequest,
+  authUserId: string | null,
+  checkoutPhoneRaw: string,
+  smsConsent: boolean
+): Promise<ResolveCheckoutPhoneForOrderResult> {
+  const trimmed = checkoutPhoneRaw.trim();
+  if (!trimmed) {
+    return { ok: true, phoneE164: "", customerAccountId: null };
+  }
+
+  const normalized = normalizePhoneToE164US(trimmed);
+  if (!normalized.ok) {
+    return {
+      ok: false,
+      status: 400,
+      error: normalized.error,
+      code: "INVALID_PHONE",
+    };
+  }
+
+  if (!smsConsent) {
+    return {
+      ok: true,
+      phoneE164: normalized.e164,
+      customerAccountId: null,
+    };
+  }
+
+  return resolveCheckoutPhoneVerification(request, authUserId, trimmed);
+}
 
 /**
  * Server-side checkout phone verification (do not trust client flags).

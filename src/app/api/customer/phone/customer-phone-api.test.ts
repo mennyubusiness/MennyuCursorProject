@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 const mockSendPhoneVerificationCode = vi.fn();
 const mockVerifyPhoneVerificationCode = vi.fn();
 const mockLinkCheckoutCustomerAccountToUser = vi.fn();
+const mockRecordSmsOptIn = vi.fn();
 const mockAuth = vi.fn();
 
 vi.mock("@/auth", () => ({
@@ -13,6 +14,10 @@ vi.mock("@/auth", () => ({
 vi.mock("@/services/customer-account-link.service", () => ({
   linkVerifiedPhoneToUserAfterOtp: (...args: unknown[]) =>
     mockLinkCheckoutCustomerAccountToUser(...args),
+}));
+
+vi.mock("@/lib/sms-opt-out.service", () => ({
+  recordSmsOptIn: (...args: unknown[]) => mockRecordSmsOptIn(...args),
 }));
 
 vi.mock("@/services/customer-phone-otp.service", () => ({
@@ -82,6 +87,45 @@ describe("POST /api/customer/phone/verify-code cookie", () => {
       customerAccountId: "acct_1",
       phoneE164: "+15551234567",
     });
+  });
+
+  it("records SMS opt-in when smsConsent is true", async () => {
+    mockVerifyPhoneVerificationCode.mockResolvedValue({
+      ok: true,
+      customerAccountId: "acct_1",
+      phoneE164: "+15551234567",
+      sessionToken: "opaque_session_token",
+    });
+
+    const req = new NextRequest("http://localhost/api/customer/phone/verify-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: "5551234567", code: "123456", smsConsent: true }),
+    });
+
+    const res = await verifyCodePost(req);
+
+    expect(res.status).toBe(200);
+    expect(mockRecordSmsOptIn).toHaveBeenCalledWith("+15551234567");
+  });
+
+  it("does not record SMS opt-in when smsConsent is omitted", async () => {
+    mockVerifyPhoneVerificationCode.mockResolvedValue({
+      ok: true,
+      customerAccountId: "acct_1",
+      phoneE164: "+15551234567",
+      sessionToken: "opaque_session_token",
+    });
+
+    const req = new NextRequest("http://localhost/api/customer/phone/verify-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: "5551234567", code: "123456" }),
+    });
+
+    await verifyCodePost(req);
+
+    expect(mockRecordSmsOptIn).not.toHaveBeenCalled();
   });
 });
 

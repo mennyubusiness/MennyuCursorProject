@@ -6,6 +6,7 @@ const mockSmsLogUpdate = vi.fn();
 const mockSmsLogUpdateMany = vi.fn();
 const mockSendTwilio = vi.fn();
 const mockIsPhoneSmsOptedOut = vi.fn();
+const mockHasTransactionalSmsConsent = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -24,6 +25,7 @@ vi.mock("@/lib/twilio", () => ({
 
 vi.mock("@/lib/sms-opt-out.service", () => ({
   isPhoneSmsOptedOut: (...args: unknown[]) => mockIsPhoneSmsOptedOut(...args),
+  hasTransactionalSmsConsent: (...args: unknown[]) => mockHasTransactionalSmsConsent(...args),
 }));
 
 vi.mock("@/lib/sms-config", () => ({
@@ -50,6 +52,7 @@ describe("sms.service", () => {
     mockSmsLogUpdateMany.mockResolvedValue({ count: 0 });
     mockSendTwilio.mockResolvedValue({ sid: "SM123", status: "queued" });
     mockIsPhoneSmsOptedOut.mockResolvedValue(false);
+    mockHasTransactionalSmsConsent.mockResolvedValue(true);
     vi.mocked(resolveSmsMode).mockReturnValue("twilio");
     vi.mocked(shouldSendViaTwilio).mockReturnValue(true);
   });
@@ -220,6 +223,25 @@ describe("sms.service", () => {
     });
     expect(r.status).toBe("suppressed");
     expect(mockSendTwilio).not.toHaveBeenCalled();
+  });
+
+  it("transactional SMS without consent skips without Twilio", async () => {
+    mockHasTransactionalSmsConsent.mockResolvedValue(false);
+    const r = await sendSms({
+      to: "+15551234567",
+      body: "hello",
+      type: "ORDER_RECEIVED",
+      idempotencyKey: "sms:ORDER_RECEIVED:ord_no_consent",
+    });
+    expect(r.status).toBe("skipped");
+    expect(r.failureMessage).toBe("no_sms_consent");
+    expect(mockSendTwilio).not.toHaveBeenCalled();
+  });
+
+  it("verification SMS bypasses transactional consent check", async () => {
+    mockHasTransactionalSmsConsent.mockResolvedValue(false);
+    await sendVerificationCodeSms({ to: "+15551234567", code: "123456" });
+    expect(mockSendTwilio).toHaveBeenCalled();
   });
 
   it("verification SMS uses Open Order template", async () => {

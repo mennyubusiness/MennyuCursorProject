@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { buildCustomerSessionCookieHeader } from "@/lib/customer-session";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
 import { linkVerifiedPhoneToUserAfterOtp } from "@/services/customer-account-link.service";
+import { recordSmsOptIn } from "@/lib/sms-opt-out.service";
 import { RATE_LIMITS, rateLimitKeys } from "@/lib/rate-limit";
 import { applyRateLimits, getClientIp } from "@/lib/rate-limit-http";
 import { verifyPhoneVerificationCode } from "@/services/customer-phone-otp.service";
@@ -11,6 +12,7 @@ import { verifyPhoneVerificationCode } from "@/services/customer-phone-otp.servi
 const bodySchema = z.object({
   phone: z.string().min(1),
   code: z.string().min(1),
+  smsConsent: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -47,6 +49,10 @@ export async function POST(request: NextRequest) {
       customerAccountId: result.customerAccountId,
       phoneE164: result.phoneE164,
     }).catch(() => undefined);
+  }
+
+  if (parsed.data.smsConsent) {
+    await recordSmsOptIn(result.phoneE164);
   }
 
   const response = NextResponse.json({

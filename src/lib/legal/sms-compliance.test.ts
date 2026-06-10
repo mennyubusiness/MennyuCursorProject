@@ -12,6 +12,9 @@ describe("sms-consent-copy", () => {
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("verification codes");
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("order issue notices");
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("Reply STOP");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain(
+      "Carriers are not liable for delayed or undelivered messages"
+    );
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).not.toMatch(/marketing/i);
   });
 });
@@ -21,6 +24,7 @@ describe("SMS compliance pages and forms", () => {
   const termsSrc = readFileSync(join(root, "app/terms/TermsOfServiceContent.tsx"), "utf8");
   const smsPageSrc = readFileSync(join(root, "app/sms-consent/SmsConsentPageContent.tsx"), "utf8");
   const footerSrc = readFileSync(join(root, "components/layout/site-footer.tsx"), "utf8");
+  const checkoutFormSrc = readFileSync(join(root, "app/checkout/CheckoutForm.tsx"), "utf8");
   const checkoutPhoneSrc = readFileSync(join(root, "app/checkout/CheckoutPhoneVerification.tsx"), "utf8");
   const accountPhoneSrc = readFileSync(join(root, "app/account/AccountPhoneSection.tsx"), "utf8");
   const groupJoinSrc = readFileSync(join(root, "app/group-order/join/GroupOrderJoinForm.tsx"), "utf8");
@@ -34,11 +38,13 @@ describe("SMS compliance pages and forms", () => {
   it("terms include transactional SMS program language", () => {
     expect(termsSrc).toMatch(/does not send marketing or promotional SMS messages/);
     expect(termsSrc).toMatch(/replying.*STOP/);
+    expect(termsSrc).toMatch(/Carriers are not liable for delayed or undelivered messages/);
   });
 
   it("public SMS consent page documents opt-in locations and checkbox copy", () => {
     expect(smsPageSrc).toMatch(/Where customers opt in/);
     expect(smsPageSrc).toMatch(/SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL/);
+    expect(smsPageSrc).toMatch(/Carriers are not liable for delayed or undelivered messages/);
     expect(smsPageSrc).toMatch(/\/privacy/);
     expect(smsPageSrc).toMatch(/\/terms/);
   });
@@ -50,8 +56,9 @@ describe("SMS compliance pages and forms", () => {
   });
 
   it("phone collection points use unchecked SMS consent checkbox", () => {
+    expect(checkoutFormSrc).toMatch(/useState\(initialSmsConsent\)/);
+    expect(checkoutFormSrc).toMatch(/initialSmsConsent = false/);
     expect(checkoutPhoneSrc).toMatch(/SmsConsentCheckbox/);
-    expect(checkoutPhoneSrc).toMatch(/useState\(false\)/);
     expect(accountPhoneSrc).toMatch(/SmsConsentCheckbox/);
     expect(accountPhoneSrc).toMatch(/smsConsent/);
     expect(groupJoinSrc).toMatch(/SmsConsentCheckbox/);

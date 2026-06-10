@@ -22,6 +22,7 @@ vi.mock("@/lib/db", () => ({
 import {
   getUserLinkedVerifiedPhoneAccount,
   isUserPhoneVerifiedForCheckout,
+  resolveCheckoutPhoneForOrder,
   resolveCheckoutPhoneVerification,
 } from "./customer-checkout-phone-verification";
 
@@ -47,6 +48,52 @@ describe("isUserPhoneVerifiedForCheckout", () => {
 
   it("returns false for invalid phone", () => {
     expect(isUserPhoneVerifiedForCheckout(account, "abc")).toBe(false);
+  });
+});
+
+describe("resolveCheckoutPhoneForOrder", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCustomerSessionFromRequest.mockResolvedValue(null);
+  });
+
+  function request() {
+    return new NextRequest("http://localhost/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  it("allows checkout with no phone when SMS is off", async () => {
+    const result = await resolveCheckoutPhoneForOrder(request(), null, "", false);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.phoneE164).toBe("");
+      expect(result.customerAccountId).toBeNull();
+    }
+  });
+
+  it("allows unverified phone when SMS consent is off", async () => {
+    const result = await resolveCheckoutPhoneForOrder(request(), null, "(503) 348-6843", false);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.phoneE164).toBe("+15033486843");
+      expect(result.customerAccountId).toBeNull();
+    }
+  });
+
+  it("requires OTP verification when SMS consent is on", async () => {
+    mockAssertCustomerSession.mockResolvedValue({
+      ok: false,
+      status: 401,
+      error: "Verify your phone before checkout.",
+    });
+
+    const result = await resolveCheckoutPhoneForOrder(request(), null, "+15551234567", true);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("CUSTOMER_SESSION_REQUIRED");
+    }
   });
 });
 

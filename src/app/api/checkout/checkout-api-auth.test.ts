@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mockAssertCartSessionAccess = vi.fn();
-const mockResolveCheckoutPhoneVerification = vi.fn();
+const mockResolveCheckoutPhoneForOrder = vi.fn();
+const mockRecordSmsOptIn = vi.fn();
 const mockCreateCustomerSessionCookieForAccount = vi.fn();
 const mockAuth = vi.fn();
 const mockCreateOrderFromCart = vi.fn();
@@ -17,10 +18,13 @@ vi.mock("@/lib/cart-session-access", () => ({
 }));
 
 vi.mock("@/lib/customer-checkout-phone-verification", () => ({
-  resolveCheckoutPhoneVerification: (...args: unknown[]) =>
-    mockResolveCheckoutPhoneVerification(...args),
+  resolveCheckoutPhoneForOrder: (...args: unknown[]) => mockResolveCheckoutPhoneForOrder(...args),
   createCustomerSessionCookieForAccount: (...args: unknown[]) =>
     mockCreateCustomerSessionCookieForAccount(...args),
+}));
+
+vi.mock("@/lib/sms-opt-out.service", () => ({
+  recordSmsOptIn: (...args: unknown[]) => mockRecordSmsOptIn(...args),
 }));
 
 vi.mock("@/lib/customer-order-access-token", () => ({
@@ -81,7 +85,7 @@ describe("POST /api/checkout customer session", () => {
   });
 
   it("rejects checkout without verified customer session", async () => {
-    mockResolveCheckoutPhoneVerification.mockResolvedValue({
+    mockResolveCheckoutPhoneForOrder.mockResolvedValue({
       ok: false,
       status: 401,
       error: "Verify your phone before checkout.",
@@ -97,7 +101,7 @@ describe("POST /api/checkout customer session", () => {
   });
 
   it("rejects checkout when submitted phone does not match verified account", async () => {
-    mockResolveCheckoutPhoneVerification.mockResolvedValue({
+    mockResolveCheckoutPhoneForOrder.mockResolvedValue({
       ok: false,
       status: 403,
       error: "Phone must match your verified number. Verify your phone again if you changed it.",
@@ -113,7 +117,7 @@ describe("POST /api/checkout customer session", () => {
   });
 
   it("checks out with verified customer session and sets customerAccountId", async () => {
-    mockResolveCheckoutPhoneVerification.mockResolvedValue({
+    mockResolveCheckoutPhoneForOrder.mockResolvedValue({
       ok: true,
       customerAccountId: "acct_1",
       phoneE164: "+15551234567",
@@ -141,7 +145,7 @@ describe("POST /api/checkout customer session", () => {
 
   it("checks out for signed-in user via linked account phone without customer session cookie", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user_1", email: "a@b.com" } });
-    mockResolveCheckoutPhoneVerification.mockResolvedValue({
+    mockResolveCheckoutPhoneForOrder.mockResolvedValue({
       ok: true,
       customerAccountId: "acct_linked",
       phoneE164: "+15551234567",
@@ -175,7 +179,7 @@ describe("POST /api/checkout cart session ownership", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue(null);
-    mockResolveCheckoutPhoneVerification.mockResolvedValue({
+    mockResolveCheckoutPhoneForOrder.mockResolvedValue({
       ok: true,
       customerAccountId: "acct_1",
       phoneE164: "+15551234567",

@@ -35,7 +35,7 @@ export default async function AccountPage() {
       <AccountRecentOrders orders={recentOrders} showPhoneLinkHint={showPhoneLinkHint} />
       <AccountSecurityCard email={session.user.email} />
       <AccountToolsGrid staff={ctx.staff} />
-      <AccountSignOutSection hasCheckoutPhoneSession={ctx.hasDeviceCheckoutSession} />
+      <AccountSignOutSection />
     </div>
   );
 }

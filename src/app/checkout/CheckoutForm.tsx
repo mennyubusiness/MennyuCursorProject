@@ -9,6 +9,7 @@ import {
   rememberCheckoutCartForClientClear,
 } from "@/lib/cart-checkout-client";
 import { CheckoutPhoneVerification } from "./CheckoutPhoneVerification";
+import { normalizePhoneToE164US } from "@/lib/phone-e164";
 
 const CheckoutPaymentStep = dynamic(
   () => import("./CheckoutPaymentStep").then((m) => m.CheckoutPaymentStep),
@@ -40,6 +41,8 @@ interface CheckoutFormProps {
   /** Linked verified phone (E.164) for signed-in customers — skips OTP when checkout phone matches. */
   accountVerifiedPhoneE164?: string | null;
   initialPhone?: string;
+  /** Restore SMS opt-in when this phone already has stored transactional consent. */
+  initialSmsConsent?: boolean;
   /** Server snapshot from group checkout lock; required when checking out a group order. */
   groupCheckoutFingerprint?: string;
 }
@@ -78,6 +81,7 @@ export function CheckoutForm({
   isSignedIn = false,
   accountVerifiedPhoneE164 = null,
   initialPhone = "",
+  initialSmsConsent = false,
   groupCheckoutFingerprint,
 }: CheckoutFormProps) {
   const router = useRouter();
@@ -91,6 +95,7 @@ export function CheckoutForm({
   } | null>(null);
   const [phone, setPhone] = useState(initialPhone);
   const [email, setEmail] = useState("");
+  const [smsConsent, setSmsConsent] = useState(initialSmsConsent);
   const [phoneVerified, setPhoneVerified] = useState(accountPhoneReady);
   const [verifiedPhoneE164, setVerifiedPhoneE164] = useState<string | null>(
     accountPhoneReady ? accountVerifiedPhoneE164 : null
@@ -181,8 +186,13 @@ export function CheckoutForm({
       }
     }
     if (customTipError) return;
-    if (!phoneVerified) {
-      setError("Verify your phone for order updates before continuing to payment.");
+    if (smsConsent && phone.trim() && !phoneVerified) {
+      setError("Verify your mobile number to receive SMS updates before continuing to payment.");
+      return;
+    }
+    const normalizedPhone = phone.trim() ? normalizePhoneToE164US(phone) : null;
+    if (phone.trim() && normalizedPhone && !normalizedPhone.ok) {
+      setError(normalizedPhone.error);
       return;
     }
     if (isCustomTipSelected && customTipInput.trim() !== "") {
@@ -201,7 +211,10 @@ export function CheckoutForm({
         credentials: "include",
         body: JSON.stringify({
           cartId,
-          customerPhone: verifiedPhoneE164 ?? phone,
+          customerPhone:
+            verifiedPhoneE164 ??
+            (normalizedPhone?.ok ? normalizedPhone.e164 : ""),
+          smsConsent,
           customerEmail: email || undefined,
           tipCents,
           idempotencyKey,
@@ -326,13 +339,16 @@ export function CheckoutForm({
           Contact
         </h2>
         <p className="mt-1 text-sm text-stone-500">
-          We&apos;ll use this to send order updates and help you find your order later.
+          Add a mobile number if you want SMS updates. You can also track your order from the order
+          status screen after checkout.
         </p>
         <CheckoutPhoneVerification
           phone={phone}
           onPhoneChange={setPhone}
           phoneVerified={phoneVerified}
           verifiedPhoneE164={verifiedPhoneE164}
+          smsConsent={smsConsent}
+          onSmsConsentChange={setSmsConsent}
           isSignedIn={isSignedIn}
           accountVerifiedPhoneE164={accountVerifiedPhoneE164}
           onVerified={(phoneE164) => {

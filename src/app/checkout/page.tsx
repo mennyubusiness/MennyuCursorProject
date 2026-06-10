@@ -12,6 +12,7 @@ import { CheckoutProgress } from "./CheckoutProgress";
 import { computeOrderPricing } from "@/domain/fees";
 import { getActivePricingRatesSnapshot } from "@/services/pricing-config.service";
 import { getUserLinkedVerifiedPhoneAccount } from "@/lib/customer-checkout-phone-verification";
+import { hasTransactionalSmsConsent } from "@/lib/sms-opt-out.service";
 import { formatUsPhoneDisplayFromE164 } from "@/lib/phone-e164";
 import { getCheckoutDefaultScheduledPickup, validateCartItemsForDisplay } from "@/services/order.service";
 import {
@@ -156,6 +157,9 @@ export default async function CheckoutPage({
   const initialPhone = accountVerifiedPhoneE164
     ? formatUsPhoneDisplayFromE164(accountVerifiedPhoneE164)
     : "";
+  const initialSmsConsent = accountVerifiedPhoneE164
+    ? await hasTransactionalSmsConsent(accountVerifiedPhoneE164)
+    : false;
 
   if (process.env.NODE_ENV === "development") {
     console.log("[checkout-load]", {
@@ -266,6 +270,7 @@ export default async function CheckoutPage({
         isSignedIn={Boolean(signedInUserId)}
         accountVerifiedPhoneE164={accountVerifiedPhoneE164}
         initialPhone={initialPhone}
+        initialSmsConsent={initialSmsConsent}
         groupCheckoutFingerprint={groupCheckoutFingerprint}
       />
     </div>

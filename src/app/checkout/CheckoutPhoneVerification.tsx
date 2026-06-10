@@ -10,6 +10,8 @@ type CheckoutPhoneVerificationProps = {
   onPhoneChange: (phone: string) => void;
   phoneVerified: boolean;
   verifiedPhoneE164: string | null;
+  smsConsent: boolean;
+  onSmsConsentChange: (value: boolean) => void;
   onVerified: (phoneE164: string) => void;
   onResetVerification: () => void;
   /** Signed-in user with a linked verified phone on file (E.164). */
@@ -22,13 +24,14 @@ export function CheckoutPhoneVerification({
   onPhoneChange,
   phoneVerified,
   verifiedPhoneE164,
+  smsConsent,
+  onSmsConsentChange,
   onVerified,
   onResetVerification,
   accountVerifiedPhoneE164 = null,
   isSignedIn = false,
 }: CheckoutPhoneVerificationProps) {
   const [otpCode, setOtpCode] = useState("");
-  const [smsConsent, setSmsConsent] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpMessage, setOtpMessage] = useState<string | null>(null);
@@ -42,7 +45,7 @@ export function CheckoutPhoneVerification({
       return;
     }
     if (!smsConsent) {
-      setOtpError("Agree to transactional SMS messages before we send a verification code.");
+      setOtpError("Check SMS updates to receive a verification code.");
       return;
     }
     setOtpSending(true);
@@ -74,10 +77,6 @@ export function CheckoutPhoneVerification({
     setOtpError(null);
     if (!phone.trim() || !otpCode.trim()) {
       setOtpError("Enter your phone and the 6-digit code.");
-      return;
-    }
-    if (!smsConsent) {
-      setOtpError("Agree to transactional SMS messages to verify your phone.");
       return;
     }
     setOtpVerifying(true);
@@ -131,18 +130,27 @@ export function CheckoutPhoneVerification({
     onPhoneChange(value);
   }
 
-  const showOtpPanel = !phoneVerified;
+  const showOtpPanel = smsConsent && !phoneVerified && Boolean(phone.trim());
+
+  function verifiedStatusCopy(): string {
+    if (phoneVerified && smsConsent) {
+      return "Phone verified. We\u2019ll text order updates to this number.";
+    }
+    if (phoneVerified && !smsConsent) {
+      return "Phone verified. SMS updates are off. You can track this order from the order status screen.";
+    }
+    return "";
+  }
 
   return (
     <div className="mt-4 space-y-4">
       <div>
         <label htmlFor="phone" className="block text-sm font-medium text-stone-800">
-          Mobile number <span className="text-red-600">*</span>
+          Mobile number (optional)
         </label>
         <input
           id="phone"
           type="tel"
-          required
           autoComplete="tel"
           value={phone}
           onChange={(e) => handlePhoneInputChange(e.target.value)}
@@ -151,9 +159,10 @@ export function CheckoutPhoneVerification({
         />
         <SmsConsentCheckbox
           id="checkout-sms-consent"
+          layout="checkout"
           checked={smsConsent}
-          onChange={setSmsConsent}
-          className="mt-2 max-w-md"
+          onChange={onSmsConsentChange}
+          className="mt-3 max-w-md"
         />
       </div>
 
@@ -163,27 +172,28 @@ export function CheckoutPhoneVerification({
             <span aria-hidden="true">✓</span>
             Phone verified
           </p>
-          <p className="mt-1 text-sm text-stone-600">
-            We&apos;ll text order updates to this number.
-          </p>
+          <p className="mt-1 text-sm text-stone-600">{verifiedStatusCopy()}</p>
         </div>
-      ) : showOtpPanel ? (
+      ) : null}
+
+      {!smsConsent && !phoneVerified ? (
+        <p className="text-sm text-stone-600" role="status">
+          SMS updates are off. After checkout, keep the order status page open or use your order
+          link to track pickup progress.
+        </p>
+      ) : null}
+
+      {showOtpPanel ? (
         <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-          <p className="text-sm font-medium text-stone-900">
-            {isSignedIn
-              ? "Verify this new phone number to receive order updates."
-              : "Verify your phone number to receive order updates."}
-          </p>
+          <p className="text-sm font-medium text-stone-900">Verify your mobile number for SMS updates</p>
           <p className="mt-1 text-sm text-stone-600">
-            {isSignedIn
-              ? "We&apos;ll text you a code to confirm this number."
-              : "We&apos;ll text you a code to confirm it&apos;s you."}
+            We&apos;ll text you a one-time code to confirm this number.
           </p>
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <button
               type="button"
               onClick={handleSendCode}
-              disabled={otpSending || !phone.trim() || !smsConsent}
+              disabled={otpSending || !phone.trim()}
               className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-50 disabled:opacity-50"
             >
               {otpSending ? "Sending…" : "Send code"}
@@ -207,22 +217,22 @@ export function CheckoutPhoneVerification({
             <button
               type="button"
               onClick={handleVerifyCode}
-              disabled={otpVerifying || otpCode.length !== 6 || !smsConsent}
+              disabled={otpVerifying || otpCode.length !== 6}
               className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
             >
               {otpVerifying ? "Verifying…" : "Verify"}
             </button>
           </div>
-          {otpMessage && (
+          {otpMessage ? (
             <p className="mt-2 text-sm text-stone-600" role="status">
               {otpMessage}
             </p>
-          )}
-          {otpError && (
+          ) : null}
+          {otpError ? (
             <p className="mt-2 text-sm text-red-600" role="alert">
               {otpError}
             </p>
-          )}
+          ) : null}
         </div>
       ) : null}
     </div>

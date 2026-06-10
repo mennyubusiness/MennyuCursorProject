@@ -20,6 +20,16 @@ export function normalizeSmsPhoneE164(raw: string): string | null {
   return null;
 }
 
+export async function hasTransactionalSmsConsent(phoneE164: string): Promise<boolean> {
+  const row = await prisma.smsOptOut.findUnique({
+    where: { phoneE164 },
+    select: { optedInAt: true, optedOutAt: true },
+  });
+  if (!row?.optedInAt) return false;
+  if (!row.optedOutAt) return true;
+  return row.optedInAt > row.optedOutAt;
+}
+
 export async function isPhoneSmsOptedOut(phoneE164: string): Promise<boolean> {
   const row = await prisma.smsOptOut.findUnique({
     where: { phoneE164 },

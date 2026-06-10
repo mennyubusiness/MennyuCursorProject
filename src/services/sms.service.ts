@@ -11,7 +11,7 @@ import {
   normalizeUsPhoneToE164,
   phoneLast4,
 } from "@/lib/phone";
-import { isPhoneSmsOptedOut } from "@/lib/sms-opt-out.service";
+import { hasTransactionalSmsConsent, isPhoneSmsOptedOut } from "@/lib/sms-opt-out.service";
 import {
   resolveSmsMode,
   shouldSendViaTwilio,
@@ -252,6 +252,18 @@ export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
       status: "suppressed",
       providerMessageId: null,
       failureMessage: "phone_opted_out",
+      errorCode: null,
+      destinationMasked,
+    };
+  }
+
+  if (eventType !== "PHONE_VERIFICATION" && !(await hasTransactionalSmsConsent(e164))) {
+    const reserved = await reserveTerminalSmsLog(ctx, "skipped", "no_sms_consent");
+    if (!reserved.ok) return reserved.result;
+    return {
+      status: "skipped",
+      providerMessageId: null,
+      failureMessage: "no_sms_consent",
       errorCode: null,
       destinationMasked,
     };

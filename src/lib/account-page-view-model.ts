@@ -24,11 +24,17 @@ export type AccountCheckoutPhone = {
 
   phoneDisplay: string;
 
+  phoneE164: string;
+
   linkStatus: PhoneLinkStatus | "none";
 
   linkStatusLabel: string;
 
   canLink: boolean;
+
+  isVerified: boolean;
+
+  smsUpdatesOn: boolean;
 
 };
 
@@ -174,11 +180,17 @@ function resolveCheckoutPhone(input: {
 
         phoneDisplay,
 
+        phoneE164: sessionAccount.phoneE164,
+
         linkStatus: "linked",
 
         linkStatusLabel: "Linked to this account",
 
         canLink: false,
+
+        isVerified: true,
+
+        smsUpdatesOn: false,
 
       };
 
@@ -192,11 +204,17 @@ function resolveCheckoutPhone(input: {
 
         phoneDisplay,
 
+        phoneE164: sessionAccount.phoneE164,
+
         linkStatus: "linked_other",
 
         linkStatusLabel: "Linked to another account",
 
         canLink: false,
+
+        isVerified: true,
+
+        smsUpdatesOn: false,
 
       };
 
@@ -210,11 +228,17 @@ function resolveCheckoutPhone(input: {
 
         phoneDisplay,
 
+        phoneE164: sessionAccount.phoneE164,
+
         linkStatus: "user_has_other",
 
         linkStatusLabel: "Not linked yet",
 
         canLink: false,
+
+        isVerified: true,
+
+        smsUpdatesOn: false,
 
       };
 
@@ -226,11 +250,17 @@ function resolveCheckoutPhone(input: {
 
       phoneDisplay,
 
+      phoneE164: sessionAccount.phoneE164,
+
       linkStatus: "linkable",
 
       linkStatusLabel: "Not linked yet",
 
       canLink: true,
+
+      isVerified: true,
+
+      smsUpdatesOn: false,
 
     };
 
@@ -244,11 +274,17 @@ function resolveCheckoutPhone(input: {
 
       phoneDisplay: formatMaskedCustomerPhone(input.userLinkedAccount.phoneE164),
 
+      phoneE164: input.userLinkedAccount.phoneE164,
+
       linkStatus: "linked",
 
       linkStatusLabel: "Linked to this account",
 
       canLink: false,
+
+      isVerified: true,
+
+      smsUpdatesOn: false,
 
     };
 

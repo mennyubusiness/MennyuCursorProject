@@ -9,7 +9,6 @@ const accountPageSrc = readFileSync(join(dir, "page.tsx"), "utf8");
 const accountLayoutSrc = readFileSync(join(dir, "layout.tsx"), "utf8");
 const profileCardSrc = readFileSync(join(dir, "AccountProfileCard.tsx"), "utf8");
 const phoneSectionSrc = readFileSync(join(dir, "AccountPhoneSection.tsx"), "utf8");
-const linkPhoneCardSrc = readFileSync(join(dir, "AccountLinkPhoneCard.tsx"), "utf8");
 const recentOrdersSrc = readFileSync(join(dir, "AccountRecentOrders.tsx"), "utf8");
 const securityCardSrc = readFileSync(join(dir, "AccountSecurityCard.tsx"), "utf8");
 const toolsGridSrc = readFileSync(join(dir, "AccountToolsGrid.tsx"), "utf8");
@@ -20,6 +19,7 @@ const accountViewModelSrc = readFileSync(join(dir, "../../lib/account-page-view-
 const accountPathsSrc = readFileSync(join(dir, "../../lib/auth/account-paths.ts"), "utf8");
 const headerNavSrc = readFileSync(join(dir, "../../components/SiteHeaderNav.tsx"), "utf8");
 const ordersPageSrc = readFileSync(join(dir, "../orders/page.tsx"), "utf8");
+const checkoutFormSrc = readFileSync(join(dir, "../checkout/CheckoutForm.tsx"), "utf8");
 const checkoutPhoneSrc = readFileSync(join(dir, "../checkout/CheckoutPhoneVerification.tsx"), "utf8");
 const loginFormSrc = readFileSync(join(dir, "../login/LoginForm.tsx"), "utf8");
 const loginActionsSrc = readFileSync(join(dir, "../login/actions.ts"), "utf8");
@@ -72,18 +72,18 @@ describe("/account profile", () => {
 });
 
 describe("/account phone for order updates", () => {
-  it("shows linked phone and link/add flows", () => {
-    expect(phoneSectionSrc).toMatch(/Phone for order updates/);
-    expect(phoneSectionSrc).toMatch(/Add phone for order updates/);
+  it("uses unified phone number settings card", () => {
+    expect(phoneSectionSrc).toMatch(/Phone number/);
+    expect(phoneSectionSrc).toMatch(/Add phone number/);
     expect(phoneSectionSrc).toMatch(/\/api\/customer\/phone\/send-code/);
-    expect(phoneSectionSrc).toMatch(/\/api\/customer\/account\/link/);
-    expect(linkPhoneCardSrc).toMatch(/Link phone to account/);
+    expect(phoneSectionSrc).toMatch(/\/api\/customer\/account\/phone\/remove/);
     expect(accountViewModelSrc).toMatch(/linked_other/);
-    expect(phoneSectionSrc).toMatch(/already linked to another account/);
+    expect(phoneSectionSrc).toMatch(/linked to another account/);
   });
 
-  it("requires SMS consent checkbox before verification", () => {
+  it("uses optional SMS consent in edit mode only", () => {
     expect(phoneSectionSrc).toMatch(/SmsConsentCheckbox/);
+    expect(phoneSectionSrc).toMatch(/layout="account"/);
     expect(phoneSectionSrc).toMatch(/smsConsent/);
   });
 });
@@ -117,10 +117,11 @@ describe("/account tools by role", () => {
 });
 
 describe("/account session actions", () => {
-  it("signs out via server action and can clear checkout phone separately", () => {
+  it("signs out via server action without a separate clear-phone control", () => {
     expect(sessionActionsSrc).toMatch(/CustomerSignOutForm/);
     expect(signOutSectionSrc).toMatch(/does not delete your account/);
-    expect(sessionActionsSrc).toMatch(/Clear checkout phone on this device/);
+    expect(sessionActionsSrc).not.toMatch(/Clear checkout phone/);
+    expect(phoneSectionSrc).toMatch(/Remove/);
   });
 });
 
@@ -148,14 +149,15 @@ describe("phone-only history removed", () => {
 });
 
 describe("checkout phone verification copy", () => {
-  it("describes phone as order updates not account login", () => {
-    expect(checkoutPhoneSrc).toMatch(/Verify your phone number to receive order updates/);
-    expect(checkoutPhoneSrc).toMatch(/We&apos;ll text you a code to confirm/);
+  it("describes optional SMS and order status tracking", () => {
+    expect(checkoutFormSrc).toMatch(/Add a mobile number if you want SMS updates/);
+    expect(checkoutPhoneSrc).toMatch(/Mobile number \(optional\)/);
   });
 
-  it("requires transactional SMS consent checkbox before send-code", () => {
+  it("requires SMS consent only for send-code verification flow", () => {
     expect(checkoutPhoneSrc).toMatch(/SmsConsentCheckbox/);
-    expect(checkoutPhoneSrc).toMatch(/Agree to transactional SMS messages/);
+    expect(checkoutPhoneSrc).toMatch(/Check SMS updates to receive a verification code/);
+    expect(checkoutPhoneSrc).toMatch(/showOtpPanel = smsConsent/);
   });
 });
 

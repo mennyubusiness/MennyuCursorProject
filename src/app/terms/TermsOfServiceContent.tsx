@@ -122,11 +122,11 @@ export function TermsOfServiceContent() {
         <p>
           By providing your phone number and opting in, you agree to receive transactional SMS messages
           from OpenOrder. These messages may include verification codes, order confirmations, order status
-          updates, pickup-ready alerts, cancellation notices, and order issue notices.
+          updates, pickup-ready alerts, cancellation notices, completed-order notices, and order issue notices.
         </p>
         <p>
           Message frequency varies based on account activity and order activity. Message and data rates
-          may apply.
+          may apply. Carriers are not liable for delayed or undelivered messages.
         </p>
         <p>
           You can opt out at any time by replying <strong className="text-oo-charcoal">STOP</strong> to

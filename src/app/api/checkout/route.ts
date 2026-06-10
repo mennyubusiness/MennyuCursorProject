@@ -6,8 +6,9 @@ import { buildCustomerSessionCookieHeader } from "@/lib/customer-session";
 import { createCustomerOrderAccessToken } from "@/lib/customer-order-access-token";
 import {
   createCustomerSessionCookieForAccount,
-  resolveCheckoutPhoneVerification,
+  resolveCheckoutPhoneForOrder,
 } from "@/lib/customer-checkout-phone-verification";
+import { recordSmsOptIn } from "@/lib/sms-opt-out.service";
 import { linkCheckoutCustomerAccountToUser } from "@/services/customer-account-link.service";
 import { buildOrderAccessCookieHeader, getSessionIdFromRequest } from "@/lib/session";
 import { RATE_LIMITS, rateLimitKeys } from "@/lib/rate-limit";
@@ -18,7 +19,8 @@ import { createPaymentIntent } from "@/services/payment.service";
 const bodySchema = z
   .object({
     cartId: z.string(),
-    customerPhone: z.string().min(1),
+    customerPhone: z.string().optional().default(""),
+    smsConsent: z.boolean().optional().default(false),
     customerEmail: z.string().email().optional(),
     tipCents: z.number().int().min(0),
     idempotencyKey: z.string().min(1),
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest) {
   const {
     cartId,
     customerPhone,
+    smsConsent,
     customerEmail,
     tipCents,
     idempotencyKey,
@@ -102,10 +105,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const phoneVerification = await resolveCheckoutPhoneVerification(
+  const phoneVerification = await resolveCheckoutPhoneForOrder(
     request,
     authSession?.user?.id ?? null,
-    customerPhone
+    customerPhone,
+    smsConsent
   );
   if (!phoneVerification.ok) {
     return NextResponse.json(
@@ -115,7 +119,11 @@ export async function POST(request: NextRequest) {
   }
   const submittedPhoneE164 = phoneVerification.phoneE164;
 
-  if (authSession?.user?.id) {
+  if (smsConsent && submittedPhoneE164) {
+    await recordSmsOptIn(submittedPhoneE164);
+  }
+
+  if (authSession?.user?.id && phoneVerification.customerAccountId) {
     await linkCheckoutCustomerAccountToUser({
       userId: authSession.user.id,
       customerAccountId: phoneVerification.customerAccountId,
@@ -177,7 +185,7 @@ export async function POST(request: NextRequest) {
     orderAccessToken,
   });
   response.headers.append("Set-Cookie", buildOrderAccessCookieHeader(orderAccessToken));
-  if (phoneVerification.establishCustomerSession) {
+  if (phoneVerification.establishCustomerSession && phoneVerification.customerAccountId) {
     const sessionToken = await createCustomerSessionCookieForAccount(
       phoneVerification.customerAccountId
     );

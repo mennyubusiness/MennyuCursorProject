@@ -12,6 +12,8 @@ import { prisma } from "@/lib/db";
 
 import { getCustomerSessionFromRequest } from "@/lib/customer-session";
 
+import { hasTransactionalSmsConsent } from "@/lib/sms-opt-out.service";
+
 
 
 export type {
@@ -170,9 +172,27 @@ export async function loadAccountPageContext(
 
 
 
+  let checkoutPhone = ctx.checkoutPhone;
+
+  if (checkoutPhone?.phoneE164) {
+
+    checkoutPhone = {
+
+      ...checkoutPhone,
+
+      smsUpdatesOn: await hasTransactionalSmsConsent(checkoutPhone.phoneE164),
+
+    };
+
+  }
+
+
+
   return {
 
     ...ctx,
+
+    checkoutPhone,
 
     hasDeviceCheckoutSession: Boolean(customerSession && sessionCustomerAccount?.phoneVerifiedAt),
 

@@ -5,11 +5,7 @@ import {
   accountHubSectionTitleClass,
 } from "./account-hub-styles";
 
-type AccountSignOutSectionProps = {
-  hasCheckoutPhoneSession: boolean;
-};
-
-export function AccountSignOutSection({ hasCheckoutPhoneSession }: AccountSignOutSectionProps) {
+export function AccountSignOutSection() {
   return (
     <section className={accountHubCardClass}>
       <h2 className={accountHubSectionTitleClass}>Sign out</h2>
@@ -17,7 +13,7 @@ export function AccountSignOutSection({ hasCheckoutPhoneSession }: AccountSignOu
         End your email sign-in session on this device. This does not delete your account.
       </p>
       <div className="mt-4">
-        <AccountSessionActions hasCheckoutPhoneSession={hasCheckoutPhoneSession} />
+        <AccountSessionActions />
       </div>
     </section>
   );

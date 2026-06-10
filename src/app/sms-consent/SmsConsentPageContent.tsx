@@ -33,7 +33,7 @@ export function SmsConsentPageContent() {
         <LegalList items={[...SMS_TRANSACTIONAL_MESSAGE_TYPES]} />
         <p>
           Message frequency varies based on your account activity and order activity. Message and data
-          rates may apply.
+          rates may apply. Carriers are not liable for delayed or undelivered messages.
         </p>
       </LegalSection>
 

@@ -1,10 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { AccountCheckoutPhone } from "@/lib/account-page-view-model";
-import { AccountLinkPhoneCard } from "./AccountLinkPhoneCard";
 import {
   accountHubCardClass,
   accountHubMutedClass,
@@ -13,13 +12,24 @@ import {
 import { buttonClassName } from "@/components/ui/button";
 import { SmsConsentCheckbox } from "@/components/legal/SmsConsentCheckbox";
 import { cn } from "@/lib/cn";
+import { normalizePhoneToE164US } from "@/lib/phone-e164";
 
 type AccountPhoneSectionProps = {
   checkoutPhone: AccountCheckoutPhone | null;
 };
 
+type CardMode = "readonly" | "edit" | "verify" | "remove_confirm";
+
+function smsStatusLabel(phone: AccountCheckoutPhone): string {
+  const parts: string[] = [];
+  if (phone.isVerified) parts.push("Verified");
+  parts.push(phone.smsUpdatesOn ? "SMS updates on" : "SMS updates off");
+  return parts.join(" · ");
+}
+
 export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps) {
   const router = useRouter();
+  const [mode, setMode] = useState<CardMode>("readonly");
   const [phone, setPhone] = useState("");
   const [smsConsent, setSmsConsent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
@@ -27,36 +37,57 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpMessage, setOtpMessage] = useState<string | null>(null);
   const [otpError, setOtpError] = useState<string | null>(null);
-  const [linkError, setLinkError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
 
-  const showAddPhone = checkoutPhone === null;
+  const linkedPhoneE164 = checkoutPhone?.phoneE164 ?? null;
+  const storedSmsConsent = checkoutPhone?.smsUpdatesOn ?? false;
+  const hasPhone = Boolean(checkoutPhone?.phoneDisplay);
 
-  async function linkVerifiedPhoneToAccount() {
-    const res = await fetch("/api/customer/account/link", {
-      method: "POST",
-      credentials: "include",
-    });
-    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-    if (!res.ok || !data.ok) {
-      setLinkError(
-        typeof data.error === "string" ? data.error : "Could not link phone to your account."
-      );
-      return false;
+  useEffect(() => {
+    if (mode !== "edit" && mode !== "verify") return;
+    if (!linkedPhoneE164) {
+      setSmsConsent(false);
+      return;
     }
-    router.refresh();
-    return true;
+    const normalized = normalizePhoneToE164US(phone);
+    if (normalized.ok && normalized.e164 === linkedPhoneE164) {
+      setSmsConsent(storedSmsConsent);
+    } else if (phone.trim()) {
+      setSmsConsent(false);
+    }
+  }, [phone, linkedPhoneE164, storedSmsConsent, mode]);
+
+  function resetFormState() {
+    setPhone("");
+    setSmsConsent(false);
+    setOtpCode("");
+    setOtpMessage(null);
+    setOtpError(null);
+    setActionError(null);
+  }
+
+  function openEdit() {
+    resetFormState();
+    setMode("edit");
+  }
+
+  function cancelEdit() {
+    resetFormState();
+    setMode("readonly");
   }
 
   async function handleSendCode() {
     setOtpError(null);
     setOtpMessage(null);
-    setLinkError(null);
+    setActionError(null);
     if (!phone.trim()) {
       setOtpError("Enter your mobile number first.");
       return;
     }
-    if (!smsConsent) {
-      setOtpError("Agree to transactional SMS messages before we send a verification code.");
+    const normalized = normalizePhoneToE164US(phone);
+    if (!normalized.ok) {
+      setOtpError(normalized.error);
       return;
     }
     setOtpSending(true);
@@ -77,6 +108,7 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
           ? data.message
           : "If this number can receive texts, we sent a verification code."
       );
+      setMode("verify");
     } catch {
       setOtpError("Could not send code. Try again.");
     } finally {
@@ -84,15 +116,11 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
     }
   }
 
-  async function handleVerifyAndLink() {
+  async function handleVerifyPhone() {
     setOtpError(null);
-    setLinkError(null);
+    setActionError(null);
     if (!phone.trim() || otpCode.length !== 6) {
       setOtpError("Enter your phone and the 6-digit code.");
-      return;
-    }
-    if (!smsConsent) {
-      setOtpError("Agree to transactional SMS messages to verify your phone.");
       return;
     }
     setOtpVerifying(true);
@@ -101,18 +129,16 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ phone, code: otpCode.trim() }),
+        body: JSON.stringify({ phone, code: otpCode.trim(), smsConsent }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setOtpError(typeof data.error === "string" ? data.error : "Verification failed.");
         return;
       }
-      const linked = await linkVerifiedPhoneToAccount();
-      if (linked) {
-        setOtpCode("");
-        setOtpMessage("Phone verified and linked to your account.");
-      }
+      resetFormState();
+      setMode("readonly");
+      router.refresh();
     } catch {
       setOtpError("Verification failed. Try again.");
     } finally {
@@ -120,118 +146,246 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
     }
   }
 
+  async function handleRemovePhone() {
+    setActionError(null);
+    setRemoving(true);
+    try {
+      const res = await fetch("/api/customer/account/phone/remove", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setActionError(
+          typeof data.error === "string" ? data.error : "Could not remove phone number. Try again."
+        );
+        return;
+      }
+      resetFormState();
+      setMode("readonly");
+      router.refresh();
+    } catch {
+      setActionError("Could not remove phone number. Try again.");
+    } finally {
+      setRemoving(false);
+    }
+  }
+
   return (
     <section className={accountHubCardClass}>
-      <h2 className={accountHubSectionTitleClass}>Phone for order updates</h2>
+      <h2 className={accountHubSectionTitleClass}>Phone number</h2>
       <p className={`mt-1 ${accountHubMutedClass}`}>
-        Used for checkout and SMS order updates — separate from your email sign-in.
+        Use your phone number for verification and optional order updates. You can also track orders
+        from the order status screen after checkout.
       </p>
 
-      {checkoutPhone?.linkStatus === "linked" && (
-        <div className="mt-4 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-4 py-3">
-          <p className="text-sm font-medium text-emerald-900">{checkoutPhone.phoneDisplay}</p>
-          <p className="mt-0.5 text-xs text-emerald-800">{checkoutPhone.linkStatusLabel}</p>
-        </div>
+      {checkoutPhone?.linkStatus === "linked_other" && mode === "readonly" && (
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          {checkoutPhone.phoneDisplay} is linked to another account. Use a different number or sign
+          in to that account.
+        </p>
       )}
 
-      {checkoutPhone?.linkStatus === "linked_other" && (
-        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <p className="font-medium">{checkoutPhone.phoneDisplay}</p>
-          <p className="mt-1">This phone is already linked to another account.</p>
-        </div>
+      {checkoutPhone?.linkStatus === "user_has_other" && mode === "readonly" && (
+        <p className="mt-3 rounded-lg border border-stone-200 bg-oo-cream px-4 py-3 text-sm text-oo-charcoal">
+          This device has a different phone than the one linked to your account (
+          {checkoutPhone.phoneDisplay}).
+        </p>
       )}
 
-      {checkoutPhone?.linkStatus === "user_has_other" && (
-        <div className="mt-4 rounded-lg border border-stone-200 bg-oo-cream px-4 py-3 text-sm text-oo-charcoal">
-          <p className="font-medium">{checkoutPhone.phoneDisplay}</p>
-          <p className="mt-1">Your account already has a different phone linked.</p>
-        </div>
-      )}
-
-      {checkoutPhone?.canLink && (
+      {mode === "readonly" && !hasPhone && (
         <div className="mt-4">
-          <AccountLinkPhoneCard phoneDisplay={checkoutPhone.phoneDisplay} />
+          <p className="text-sm font-medium text-oo-charcoal">No phone number added</p>
+          <p className="mt-1 text-sm text-oo-stone-gray">
+            Add a mobile number if you want SMS verification or optional order updates.
+          </p>
+          {!checkoutPhone?.smsUpdatesOn && (
+            <p className="mt-2 text-sm text-oo-stone-gray">
+              You can track orders from the order status screen after checkout.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={openEdit}
+            className={cn(buttonClassName({ variant: "primary", size: "sm" }), "mt-4")}
+          >
+            Add phone number
+          </button>
         </div>
       )}
 
-      {showAddPhone && (
-        <div className="mt-4 rounded-lg border border-oo-light-stone bg-oo-cream/80 p-4">
-          <p className="text-sm font-medium text-oo-charcoal">Add phone for order updates</p>
-          <p className="mt-1 text-sm text-oo-stone-gray">
-            Verify your mobile number to receive order texts and link phone checkout orders to this
-            account.
-          </p>
-          <div className="mt-4 space-y-3">
-            <div>
-              <label htmlFor="account-phone" className="oo-label">
-                Mobile number
-              </label>
-              <input
-                id="account-phone"
-                type="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="oo-input mt-1 max-w-md"
-                placeholder="(555) 123-4567"
-              />
-              <SmsConsentCheckbox
-                id="account-sms-consent"
-                checked={smsConsent}
-                onChange={setSmsConsent}
-                className="mt-2 max-w-md"
-              />
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <button
-                type="button"
-                onClick={() => void handleSendCode()}
-                disabled={otpSending || !phone.trim() || !smsConsent}
-                className={cn(buttonClassName({ variant: "secondary", size: "sm" }))}
-              >
-                {otpSending ? "Sending…" : "Send code"}
-              </button>
-              <div>
-                <label htmlFor="account-otp" className="block text-xs font-medium text-oo-stone-gray">
-                  6-digit code
-                </label>
-                <input
-                  id="account-otp"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  className="oo-input mt-1 w-32 tracking-widest"
-                  placeholder="000000"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => void handleVerifyAndLink()}
-                disabled={otpVerifying || otpCode.length !== 6 || !smsConsent}
-                className={cn(buttonClassName({ variant: "primary", size: "sm" }))}
-              >
-                {otpVerifying ? "Verifying…" : "Verify & link"}
-              </button>
-            </div>
-            {otpMessage && (
-              <p className="text-sm text-oo-stone-gray" role="status">
-                {otpMessage}
-              </p>
-            )}
-            {otpError && (
-              <p className="text-sm text-red-600" role="alert">
-                {otpError}
-              </p>
-            )}
-            {linkError && (
-              <p className="text-sm text-red-600" role="alert">
-                {linkError}
-              </p>
-            )}
+      {mode === "readonly" && hasPhone && checkoutPhone && (
+        <div className="mt-4">
+          <p className="text-base font-medium text-oo-charcoal">{checkoutPhone.phoneDisplay}</p>
+          <p className="mt-1 text-sm text-oo-stone-gray">{smsStatusLabel(checkoutPhone)}</p>
+          {!checkoutPhone.smsUpdatesOn && (
+            <p className="mt-2 text-sm text-oo-stone-gray">
+              You can track orders from the order status screen after checkout.
+            </p>
+          )}
+          {checkoutPhone.canLink && (
+            <p className="mt-2 text-sm text-oo-stone-gray">
+              Verify this number to link checkout orders to your account.
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={openEdit}
+              className={cn(buttonClassName({ variant: "secondary", size: "sm" }))}
+            >
+              Change
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                resetFormState();
+                setMode("remove_confirm");
+              }}
+              className={cn(buttonClassName({ variant: "secondary", size: "sm" }))}
+            >
+              Remove
+            </button>
           </div>
+        </div>
+      )}
+
+      {mode === "edit" && (
+        <div className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="account-phone" className="oo-label">
+              Mobile number
+            </label>
+            <input
+              id="account-phone"
+              type="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="oo-input mt-1 max-w-md"
+              placeholder="Enter mobile number"
+            />
+            <SmsConsentCheckbox
+              id="account-sms-consent"
+              layout="account"
+              checked={smsConsent}
+              onChange={setSmsConsent}
+              className="mt-3 max-w-md"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleSendCode()}
+              disabled={otpSending || !phone.trim()}
+              className={cn(buttonClassName({ variant: "primary", size: "sm" }))}
+            >
+              {otpSending ? "Sending…" : "Send verification code"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className={cn(buttonClassName({ variant: "secondary", size: "sm" }))}
+            >
+              Cancel
+            </button>
+          </div>
+          {otpError && (
+            <p className="text-sm text-red-600" role="alert">
+              {otpError}
+            </p>
+          )}
+        </div>
+      )}
+
+      {mode === "verify" && (
+        <div className="mt-4 space-y-4">
+          <p className="text-sm text-oo-charcoal">
+            Verifying <span className="font-medium">{phone.trim() || checkoutPhone?.phoneDisplay}</span>
+          </p>
+          <div>
+            <label htmlFor="account-otp" className="oo-label">
+              Verification code
+            </label>
+            <input
+              id="account-otp"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              className="oo-input mt-1 w-32 tracking-widest"
+              placeholder="000000"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleVerifyPhone()}
+              disabled={otpVerifying || otpCode.length !== 6}
+              className={cn(buttonClassName({ variant: "primary", size: "sm" }))}
+            >
+              {otpVerifying ? "Verifying…" : "Verify phone"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSendCode()}
+              disabled={otpSending}
+              className={cn(buttonClassName({ variant: "secondary", size: "sm" }))}
+            >
+              {otpSending ? "Sending…" : "Resend code"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className={cn(buttonClassName({ variant: "secondary", size: "sm" }))}
+            >
+              Cancel
+            </button>
+          </div>
+          {otpMessage && (
+            <p className="text-sm text-oo-stone-gray" role="status">
+              {otpMessage}
+            </p>
+          )}
+          {otpError && (
+            <p className="text-sm text-red-600" role="alert">
+              {otpError}
+            </p>
+          )}
+        </div>
+      )}
+
+      {mode === "remove_confirm" && (
+        <div className="mt-4 space-y-4">
+          <p className="text-sm text-oo-charcoal">
+            Remove this phone number from your account? You will not receive SMS order updates, but
+            you can still track orders from the order status screen.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleRemovePhone()}
+              disabled={removing}
+              className={cn(buttonClassName({ variant: "primary", size: "sm" }))}
+            >
+              {removing ? "Removing…" : "Remove phone number"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              disabled={removing}
+              className={cn(buttonClassName({ variant: "secondary", size: "sm" }))}
+            >
+              Cancel
+            </button>
+          </div>
+          {actionError && (
+            <p className="text-sm text-red-600" role="alert">
+              {actionError}
+            </p>
+          )}
         </div>
       )}
     </section>
