@@ -17,7 +17,15 @@ export type CartPodContext = {
 export function isActiveGroupOrderRole(
   role: CartGroupOrderDisplay["role"] | undefined
 ): boolean {
-  return role === "host" || role === "participant" || role === "unknown";
+  return role === "host" || role === "participant";
+}
+
+/** Viewer lacks access to an active group cart at this pod (server scope group_order + unknown role). */
+export function isInaccessibleGroupOrderView(
+  cart: Cart | null | undefined,
+  cartScope: CartPodScope
+): boolean {
+  return cartScope === "group_order" && cart?.groupOrder?.role === "unknown";
 }
 
 /** True when the cart row is committed to a pod (items or active group session). */
@@ -50,12 +58,21 @@ export function getCartPodContext(params: {
     });
 
   let cartScope: CartPodScope = "neutral";
-  if (params.cart && isActiveGroupOrderRole(groupRole)) {
+  const explicitScope = params.cart?.cartScope;
+  if (explicitScope === "group_order" && params.cart?.groupOrder?.role === "unknown") {
+    cartScope = "group_order";
+  } else if (params.cart && isActiveGroupOrderRole(groupRole)) {
     cartScope = "group_order";
   } else if (cartHasAssignment) {
     cartScope = "assigned_pod";
   } else if (params.browsingPodId) {
     cartScope = "browsing_pod";
+  } else if (
+    explicitScope === "assigned_pod" ||
+    explicitScope === "browsing_pod" ||
+    explicitScope === "neutral"
+  ) {
+    cartScope = explicitScope;
   }
 
   const cartPodId =

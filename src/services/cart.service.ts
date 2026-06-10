@@ -1133,7 +1133,13 @@ export async function getQuickCartPayload(
       participantIdFromCookie: opts.markers.participantId,
       joinTokenFromCookie: opts.markers.legacyJoinToken,
     });
-    const scope: CartPodScope = assignedRow.groupOrderSession ? "group_order" : "assigned_pod";
+    const scope: CartPodScope =
+      assignedRow.groupOrderSession &&
+      ACTIVE_GROUP_SESSION_STATUSES.includes(
+        assignedRow.groupOrderSession.status as (typeof ACTIVE_GROUP_SESSION_STATUSES)[number]
+      )
+        ? "group_order"
+        : "assigned_pod";
     const cart = await scopeCartForGroupViewer(assignedRow, assignedRow.id, actor, scope);
     const browsePodName = browsePodId
       ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ?? null

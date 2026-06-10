@@ -32,6 +32,7 @@ import {
 } from "@/lib/cart-client-sync";
 import { getBrowsingPodIdFromClient } from "@/lib/quick-cart-pod";
 import { buildCartPodContextForDisplay, quickCartHasActiveGroupOrder } from "@/lib/quick-cart-display";
+import { normalizeAuthoritativeCartSnapshot, normalizeQuickCartApiCart } from "@/lib/cart-group-metadata";
 import { isQuickCartEnabledForPath } from "@/lib/quick-cart-enabled";
 import type { CartPodContext } from "@/lib/cart-pod-context";
 import {
@@ -70,17 +71,6 @@ type QuickCartContextValue = {
 };
 
 const QuickCartContext = createContext<QuickCartContextValue | null>(null);
-
-function podContextFromPayload(payload: QuickCartApiResponse): CartPodContext {
-  return buildCartPodContextForDisplay({
-    cart: payload.cart,
-    browsingPodId: payload.browsingPodId,
-    browsingPodName: payload.browsingPodName,
-    assignedPodId: payload.assignedPodId,
-    assignedPodName: payload.assignedPodName,
-    requiresClearToSwitchPod: payload.requiresClearToSwitchPod,
-  });
-}
 
 export function QuickCartProvider({
   children,
@@ -122,9 +112,19 @@ export function QuickCartProvider({
       setLoading(false);
       return;
     }
-    rememberAcceptedCartSnapshot(payload.cart);
-    setCart(payload.cart);
-    setPodContext(podContextFromPayload(payload));
+    const normalizedCart = normalizeQuickCartApiCart(payload.cart, payload.scope);
+    rememberAcceptedCartSnapshot(normalizedCart);
+    setCart(normalizedCart);
+    setPodContext(
+      buildCartPodContextForDisplay({
+        cart: normalizedCart,
+        browsingPodId: payload.browsingPodId,
+        browsingPodName: payload.browsingPodName,
+        assignedPodId: payload.assignedPodId,
+        assignedPodName: payload.assignedPodName,
+        requiresClearToSwitchPod: payload.requiresClearToSwitchPod,
+      })
+    );
     setActiveCartRecovery(payload.activeCartRecovery ?? null);
     setShowActiveRecovery(
       shouldShowActiveRecovery(
@@ -144,20 +144,25 @@ export function QuickCartProvider({
         detail
       );
     }
-    rememberAcceptedCartSnapshot(next);
-    setCart(next);
-    if (!next) {
+    const normalized =
+      next != null ? normalizeAuthoritativeCartSnapshot(next, detail?.source) : null;
+    rememberAcceptedCartSnapshot(normalized);
+    setCart(normalized);
+    if (!normalized) {
       setPodContext(NEUTRAL_POD_CONTEXT);
       setActiveCartRecovery(null);
       setShowActiveRecovery(false);
     } else {
       setPodContext(
         buildCartPodContextForDisplay({
-          cart: next,
+          cart: normalized,
           browsingPodId: getBrowsingPodIdFromClient(),
           browsingPodName: null,
-          assignedPodId: next.cartScope === "assigned_pod" || next.cartScope === "group_order" ? next.podId : null,
-          assignedPodName: next.podName ?? null,
+          assignedPodId:
+            normalized.cartScope === "assigned_pod" || normalized.cartScope === "group_order"
+              ? normalized.podId
+              : null,
+          assignedPodName: normalized.podName ?? null,
           requiresClearToSwitchPod: false,
         })
       );

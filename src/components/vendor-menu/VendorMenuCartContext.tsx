@@ -31,6 +31,7 @@ import {
   enqueueCartMutation,
   markCartSnapshotCommitted,
 } from "@/lib/cart-mutation-queue";
+import { normalizeAuthoritativeCartSnapshot } from "@/lib/cart-group-metadata";
 import {
   optimisticPendingModifierLine,
   optimisticSimpleAdd,
@@ -147,7 +148,10 @@ export function VendorMenuCartProvider({
             podId: snapshotContext.podId,
             sessionId: cart.sessionId,
           });
-        const normalized = ensureCartSnapshotScalars(next);
+        const normalized = normalizeAuthoritativeCartSnapshot(
+          ensureCartSnapshotScalars(next),
+          "group-order-ended"
+        );
         cartRef.current = normalized;
         setCart(normalized);
         markCartSnapshotCommitted(normalized.id);
@@ -195,11 +199,14 @@ export function VendorMenuCartProvider({
 
   const publishCart = useCallback(
     (next: Cart) => {
-      const normalized = ensureCartSnapshotScalars(next, {
-        id: cartRef.current.id,
-        podId: cartRef.current.podId,
-        sessionId: cartRef.current.sessionId,
-      });
+      const normalized = normalizeAuthoritativeCartSnapshot(
+        ensureCartSnapshotScalars(next, {
+          id: cartRef.current.id,
+          podId: cartRef.current.podId,
+          sessionId: cartRef.current.sessionId,
+        }),
+        "vendor-menu"
+      );
       cartRef.current = normalized;
       setCart(normalized);
       markCartSnapshotCommitted(normalized.id);
@@ -246,9 +253,12 @@ export function VendorMenuCartProvider({
       const cartId = cartRef.current.id;
       void enqueueCartMutation(cartId, async () => {
         const snapshot = cartRef.current;
-        const optimisticCart = ensureCartSnapshotScalars(
-          optimisticPendingModifierLine(snapshot, optimistic),
-          { id: snapshot.id, podId: snapshot.podId, sessionId: snapshot.sessionId }
+        const optimisticCart = normalizeAuthoritativeCartSnapshot(
+          ensureCartSnapshotScalars(
+            optimisticPendingModifierLine(snapshot, optimistic),
+            { id: snapshot.id, podId: snapshot.podId, sessionId: snapshot.sessionId }
+          ),
+          "vendor-menu"
         );
         cartRef.current = optimisticCart;
         setCart(optimisticCart);
@@ -293,11 +303,14 @@ export function VendorMenuCartProvider({
         const snapshot = cartRef.current;
         const optimisticRaw = optimisticSimpleAdd(snapshot, optimisticParams);
         const optimisticCart = optimisticRaw
-          ? ensureCartSnapshotScalars(optimisticRaw, {
-              id: snapshot.id,
-              podId: snapshot.podId,
-              sessionId: snapshot.sessionId,
-            })
+          ? normalizeAuthoritativeCartSnapshot(
+              ensureCartSnapshotScalars(optimisticRaw, {
+                id: snapshot.id,
+                podId: snapshot.podId,
+                sessionId: snapshot.sessionId,
+              }),
+              "vendor-menu"
+            )
           : null;
         if (optimisticCart) {
           cartRef.current = optimisticCart;

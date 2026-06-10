@@ -4,6 +4,7 @@ import Link from "next/link";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import type { Cart } from "@/domain/types";
 import type { CartPodContext } from "@/lib/cart-pod-context";
+import { isInaccessibleGroupOrderView } from "@/lib/cart-pod-context";
 import { ButtonLink } from "@/components/ui/button";
 import { QuickCartHostGroupControls } from "@/components/cart/QuickCartHostGroupControls";
 import { StartGroupOrderButton } from "@/components/cart/StartGroupOrderButton";
@@ -59,7 +60,7 @@ export function QuickCartGroupSection({
     );
   }
 
-  if (role === "unknown" && podContext.cartScope === "group_order") {
+  if (isInaccessibleGroupOrderView(cart, podContext.cartScope)) {
     return (
       <section className="mb-4 rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/60 px-3 py-3 text-sm">
         <p className="font-semibold text-oo-charcoal">Group order</p>

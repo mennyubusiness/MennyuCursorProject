@@ -65,6 +65,14 @@ export async function buildGroupOrderViewerContext(
   const session = await findSessionByCartId(cartId);
   if (!session) return SOLO_VIEWER;
 
+  if (
+    session.status === "ended" ||
+    session.status === "expired" ||
+    session.status === "submitted"
+  ) {
+    return SOLO_VIEWER;
+  }
+
   const hostParticipant = session.participants.find((p) => p.role === "host" && !p.leftAt);
   const hostParticipantId = hostParticipant?.id ?? null;
 

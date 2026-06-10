@@ -2,6 +2,7 @@ import type { Cart } from "@/domain/types";
 import {
   enrichCartUpdatedDetail,
 } from "@/lib/cart-snapshot-freshness";
+import { normalizeAuthoritativeCartSnapshot } from "@/lib/cart-group-metadata";
 
 export type { CartSnapshotMeta } from "@/lib/cart-snapshot-freshness";
 export {
@@ -249,7 +250,13 @@ export function dispatchCartUpdated(detail: CartUpdatedDetail): CartUpdatedDetai
   const enriched = enrichCartUpdatedDetail(detail);
   const normalized =
     enriched.cart != null
-      ? { ...enriched, cart: ensureCartSnapshotScalars(enriched.cart) }
+      ? {
+          ...enriched,
+          cart: normalizeAuthoritativeCartSnapshot(
+            ensureCartSnapshotScalars(enriched.cart),
+            enriched.source
+          ),
+        }
       : enriched;
   window.dispatchEvent(new CustomEvent<CartUpdatedDetail>(CART_UPDATED_EVENT, { detail: normalized }));
   if (normalized.cart) {
