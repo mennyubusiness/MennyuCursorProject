@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BRAND, BRAND_ALT } from "@/lib/brand-assets";
+import { BRAND, BRAND_ALT, HORIZONTAL_LOGO_INTRINSIC } from "@/lib/brand-assets";
 import { cn } from "@/lib/cn";
 
 export type OpenOrderLogoVariant =
@@ -64,10 +64,11 @@ export function OpenOrderLogo({
         <Image
           src={BRAND.horizontalLogo}
           alt={BRAND_ALT.horizontalLogo}
-          width={320}
-          height={84}
-          className="h-auto w-full max-w-[220px] object-contain sm:max-w-[260px]"
+          width={HORIZONTAL_LOGO_INTRINSIC.width}
+          height={HORIZONTAL_LOGO_INTRINSIC.height}
+          className="h-auto w-full max-w-[220px] object-contain object-left sm:max-w-[260px]"
           priority={priority}
+          unoptimized
         />
       );
     }

@@ -12,6 +12,7 @@ import {
   HOME_SECONDARY_CTA_LABEL,
   homePodOwnerMailtoHref,
 } from "@/lib/home-marketing";
+import { BRAND } from "@/lib/brand-assets";
 
 const root = join(process.cwd(), "src");
 
@@ -32,6 +33,7 @@ describe("homepage marketing positioning", () => {
     expect(heroBrandSrc).toMatch(/BRAND\.mark/);
     expect(heroBrandSrc).toMatch(/Open Order/);
     expect(heroBrandSrc).toMatch(/homepage/);
+    expect(BRAND.horizontalLogo).toBe("/brand/open-order/open-order-horizontal.svg");
     expect(heroBrandSrc).toMatch(/1100/);
     expect(heroBrandSrc).not.toMatch(/mix-blend-screen/);
     expect(heroBrandSrc).toMatch(/sm:hidden/);

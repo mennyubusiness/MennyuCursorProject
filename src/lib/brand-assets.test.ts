@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -13,15 +13,17 @@ describe("brand assets catalog", () => {
     }
   });
 
-  it("uses the transparent horizontal logo for dark hero/footer surfaces", () => {
-    expect(BRAND.horizontalLogo).toBe(
-      "/brand/open-order/open-order-horizontal-transparent.png"
-    );
+  it("uses the cropped SVG horizontal logo for dark hero/footer surfaces", () => {
+    expect(BRAND.horizontalLogo).toBe("/brand/open-order/open-order-horizontal.svg");
+    const svg = join(publicRoot, BRAND.horizontalLogo);
+    const contents = readFileSync(svg, "utf8");
+    expect(contents).toMatch(/viewBox="352 609 2296 310"/);
   });
 
   it("uses only approved catalog filenames", () => {
     const approved = new Set([
       "open-order-mark-circle.png",
+      "open-order-horizontal.svg",
       "open-order-horizontal-transparent.png",
       "open-order-horizontal-dark.png",
       "open-order-horizontal-dark-silver.png",
