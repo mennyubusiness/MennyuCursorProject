@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 
-const src = process.argv[2] ?? "C:/Users/Sam/Downloads/Open Order Co. (7).svg";
+const src = process.argv[2] ?? "C:/Users/Sam/Downloads/Open Order Co. (8).svg";
 const dest =
   process.argv[3] ??
   path.join(process.cwd(), "public/brand/open-order/open-order-horizontal.svg");
