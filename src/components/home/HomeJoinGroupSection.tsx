@@ -13,64 +13,48 @@ const panelInnerClass =
   "relative flex flex-col rounded-xl border border-oo-light-stone bg-oo-cream/60 p-5 sm:p-6";
 
 /**
- * Returning-customer utilities: group order join and recent activity.
- * Placed below marketing content — QR/direct pod ordering remains the primary guest path.
+ * Signed-in customer utilities — separated from the public marketing homepage.
  */
 export function HomeJoinGroupSection({ customerAccountId }: Props) {
   return (
     <section
-      className="relative overflow-hidden border-y border-oo-light-stone bg-oo-cream"
-      aria-label="Returning guest shortcuts"
+      className="border-t border-oo-light-stone bg-oo-cream/50"
+      aria-labelledby="home-signed-in-heading"
     >
-      <div
-        className="pointer-events-none absolute left-1/2 top-8 h-48 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-brand/10 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -left-12 bottom-4 h-32 w-32 rounded-full border border-oo-light-stone/60 opacity-50"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-30"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, rgba(231, 224, 214, 0.5) 1px, transparent 0)",
-          backgroundSize: "24px 24px",
-        }}
-        aria-hidden
-      />
+      <PageShell className="py-10 sm:py-12">
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">Signed in</p>
+          <h2
+            id="home-signed-in-heading"
+            className="mt-2 text-2xl font-black tracking-tight text-oo-charcoal sm:text-3xl"
+          >
+            Your orders and group carts
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-oo-stone-gray sm:text-base">
+            Shortcuts for returning guests. New visitors should scan their pod&apos;s QR code to start
+            ordering.
+          </p>
+        </div>
 
-      <PageShell className="relative py-10 sm:py-12 lg:py-14">
-        <div className="overflow-hidden rounded-2xl border border-oo-light-stone bg-oo-warm-white shadow-[0_8px_32px_-14px_rgba(31,31,28,0.14)]">
+        <div className="mt-8 overflow-hidden rounded-2xl border border-oo-light-stone bg-oo-warm-white shadow-[0_8px_32px_-14px_rgba(31,31,28,0.12)]">
           <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch lg:divide-x lg:divide-oo-light-stone">
             <div className="flex min-w-0 flex-col p-6 sm:p-7 lg:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">Group order</p>
-              <h2
-                id="home-join-group-heading"
-                className="mt-2 text-xl font-bold tracking-tight text-oo-charcoal sm:text-2xl"
-              >
-                Ordering with friends?
-              </h2>
-              <p className="mt-2 max-w-md text-base leading-relaxed text-oo-stone-gray">
-                Enter a 6-digit group order code to add your items to a shared checkout.
+              <h3 className="text-lg font-bold text-oo-charcoal">Join a group order</h3>
+              <p className="mt-2 max-w-md text-sm leading-relaxed text-oo-stone-gray">
+                Enter a 6-digit code to add your items to a shared checkout.
               </p>
               <div className={cn(panelInnerClass, "mt-5")}>
                 <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-brand" aria-hidden />
-                <span className="mb-4 inline-flex w-fit items-center rounded-full border border-oo-light-stone bg-oo-warm-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-oo-stone-gray">
-                  Shared checkout
-                </span>
                 <JoinGroupOrderByCodeForm />
               </div>
             </div>
 
             <aside
-              className="flex min-w-0 flex-col border-t border-oo-light-stone p-6 sm:p-7 lg:h-full lg:border-t-0 lg:p-8"
+              className="flex min-w-0 flex-col border-t border-oo-light-stone p-6 sm:p-7 lg:border-t-0 lg:p-8"
               aria-label="Recent activity"
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">
-                Already ordering?
-              </p>
-              <div className={cn(panelInnerClass, "mt-5 min-h-[12.5rem] flex-1 lg:min-h-[14rem]")}>
+              <h3 className="text-lg font-bold text-oo-charcoal">Recent activity</h3>
+              <div className={cn(panelInnerClass, "mt-5 min-h-[12rem] flex-1")}>
                 <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-brand" aria-hidden />
                 <CustomerRetentionStrip
                   heading="Pick up where you left off"
@@ -84,14 +68,12 @@ export function HomeJoinGroupSection({ customerAccountId }: Props) {
                 variant="rail"
                 embedded
               />
-              <p className="mt-5 text-center text-sm text-oo-stone-gray lg:text-left">
-                No QR code?{" "}
-                <Link
-                  href="/explore"
-                  className="font-semibold text-brand underline-offset-4 transition hover:text-[#EA580C] hover:underline"
-                >
-                  Browse participating pods →
+              <p className="mt-5 text-sm text-oo-stone-gray">
+                Manage phone and order history in{" "}
+                <Link href="/account" className="font-semibold text-brand hover:underline">
+                  Account
                 </Link>
+                .
               </p>
             </aside>
           </div>

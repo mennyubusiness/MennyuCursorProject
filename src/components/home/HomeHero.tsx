@@ -1,10 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
 
-import { PodLogo } from "@/components/images/PodLogo";
+import { HomeHeroBrand } from "@/components/home/HomeHeroBrand";
+import { HomeProductPreview } from "@/components/home/HomeProductPreview";
+import { HomeQrCustomerFlow } from "@/components/home/HomeQrCustomerFlow";
 import { PageShell } from "@/components/layout/page-shell";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -17,43 +17,7 @@ import {
   homePodOwnerMailtoHref,
 } from "@/lib/home-marketing";
 
-export type HomeHeroFeaturedPod = {
-  id: string;
-  name: string;
-  description: string | null;
-  imageUrl: string | null;
-  vendorCount: number;
-};
-
-const ROTATE_MS = 7000;
-
-const PLACEHOLDER_FEATURES: HomeHeroFeaturedPod[] = [
-  {
-    id: "sample-1",
-    name: "Your food pod",
-    description: "Multiple vendors, one cart, one checkout, one pickup flow.",
-    imageUrl: null,
-    vendorCount: 0,
-  },
-];
-
-export function HomeHero({ featuredPods }: { featuredPods: HomeHeroFeaturedPod[] }) {
-  const slides = useMemo(
-    () => (featuredPods.length > 0 ? featuredPods : PLACEHOLDER_FEATURES),
-    [featuredPods]
-  );
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    if (slides.length <= 1) return;
-    const t = window.setInterval(() => {
-      setIndex((i) => (i + 1) % slides.length);
-    }, ROTATE_MS);
-    return () => window.clearInterval(t);
-  }, [slides.length]);
-
-  const active = slides[index]!;
-
+export function HomeHero() {
   return (
     <section className="relative isolate w-full overflow-hidden border-b border-oo-charcoal/30 bg-oo-charcoal text-oo-warm-white">
       <div
@@ -84,22 +48,23 @@ export function HomeHero({ featuredPods }: { featuredPods: HomeHeroFeaturedPod[]
         aria-hidden
       />
 
-      <PageShell className="relative z-10 grid min-h-[min(88vh,52rem)] gap-12 py-16 sm:py-20 lg:grid-cols-[1.15fr_minmax(0,22rem)] lg:items-end lg:gap-16 lg:py-24 xl:grid-cols-[1.2fr_minmax(0,26rem)]">
-        <div className="flex flex-col justify-end animate-oo-fade-up motion-reduce:animate-none">
-          <p className="text-[clamp(2rem,6vw,3.25rem)] font-black leading-none tracking-tight text-oo-warm-white">
-            Open Order
-          </p>
-          <p className="mt-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-oo-cream/50">
+      <PageShell className="relative z-10 grid gap-10 py-14 sm:py-16 lg:grid-cols-[1.1fr_minmax(0,22rem)] lg:items-center lg:gap-14 lg:py-20 xl:grid-cols-[1.15fr_minmax(0,26rem)]">
+        <div className="flex flex-col animate-oo-fade-up motion-reduce:animate-none">
+          <HomeHeroBrand />
+
+          <p className="mt-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-oo-cream/50">
             <span className="oo-live-dot" aria-hidden />
             Connected ordering for food pods
           </p>
-          <h1 className="mt-6 max-w-2xl text-3xl font-black leading-tight tracking-tight text-oo-warm-white sm:text-4xl md:text-[2.75rem] md:leading-[1.1]">
+
+          <h1 className="mt-5 max-w-2xl text-3xl font-black leading-tight tracking-tight text-oo-warm-white sm:text-4xl md:text-[2.75rem] md:leading-[1.1]">
             {HOME_HERO_HEADLINE}
           </h1>
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-oo-cream/70 sm:text-xl">
+          <p className="mt-5 max-w-xl text-base leading-relaxed text-oo-cream/70 sm:text-lg">
             {HOME_HERO_SUPPORTING}
           </p>
-          <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <ButtonLink href={homePodOwnerMailtoHref()} size="lg" className="w-full sm:w-auto">
               {HOME_PRIMARY_CTA_LABEL}
             </ButtonLink>
@@ -112,68 +77,17 @@ export function HomeHero({ featuredPods }: { featuredPods: HomeHeroFeaturedPod[]
               {HOME_SECONDARY_CTA_LABEL}
             </ButtonLink>
           </div>
+
+          <HomeQrCustomerFlow className="mt-8 max-w-2xl" tone="dark" />
         </div>
 
         <div
           className={cn(
-            "flex flex-col justify-between rounded-xl border border-oo-light-stone/15 bg-oo-charcoal/90 p-6 shadow-2xl backdrop-blur-sm",
-            "animate-oo-fade-up motion-reduce:animate-none [animation-delay:120ms]"
+            "animate-oo-fade-up motion-reduce:animate-none [animation-delay:120ms]",
+            "mx-auto w-full max-w-md lg:max-w-none"
           )}
         >
-          <div key={active.id} className="animate-mennyu-fade-in motion-reduce:animate-none">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-oo-cream/50">
-              Participating pod
-            </p>
-            <div className="mt-4 flex gap-4">
-              <PodLogo
-                imageUrl={active.imageUrl}
-                podName={active.name}
-                className="h-14 w-14 shrink-0 rounded-lg ring-1 ring-oo-light-stone/25"
-                sizes="56px"
-              />
-              <div className="min-w-0">
-                <p className="truncate text-xl font-bold tracking-tight text-oo-warm-white">{active.name}</p>
-                {active.vendorCount > 0 && (
-                  <p className="mt-1 text-sm font-medium text-oo-cream/65">
-                    {active.vendorCount} vendor{active.vendorCount !== 1 ? "s" : ""} · One checkout
-                  </p>
-                )}
-              </div>
-            </div>
-            {active.description && (
-              <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-oo-cream/55">
-                {active.description}
-              </p>
-            )}
-          </div>
-          {featuredPods.length > 0 && (
-            <div className="mt-8 flex items-center justify-between gap-3 border-t border-oo-light-stone/15 pt-5">
-              <Link
-                href={`/pod/${active.id}`}
-                className="text-sm font-semibold text-oo-warm-white underline-offset-4 transition hover:text-brand hover:underline"
-              >
-                View pod →
-              </Link>
-              {slides.length > 1 && (
-                <div className="flex gap-1.5" role="tablist" aria-label="Featured pods">
-                  {slides.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      role="tab"
-                      aria-selected={i === index}
-                      onClick={() => setIndex(i)}
-                      className={cn(
-                        "h-1.5 rounded-full transition-all duration-300",
-                        i === index ? "w-8 bg-brand" : "w-2 bg-oo-light-stone/30 hover:bg-oo-cream/50"
-                      )}
-                      aria-label={`Show featured pod ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <HomeProductPreview />
         </div>
       </PageShell>
     </section>
