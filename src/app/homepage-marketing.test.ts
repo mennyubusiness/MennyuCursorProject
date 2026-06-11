@@ -26,9 +26,10 @@ describe("homepage marketing positioning", () => {
   const exploreHeroSrc = readFileSync(join(root, "components/explore/ExploreHero.tsx"), "utf8");
   const podPageSrc = readFileSync(join(root, "app/pod/[podId]/page.tsx"), "utf8");
 
-  it("uses a large OO mark and company name in the hero", () => {
+  it("uses the header logo and company name in the hero", () => {
     expect(heroSrc).toMatch(/HomeHeroBrand/);
-    expect(heroBrandSrc).toMatch(/BRAND\.mark/);
+    expect(heroBrandSrc).toMatch(/BRAND\.headerLogo/);
+    expect(heroBrandSrc).not.toMatch(/BRAND\.mark/);
     expect(heroBrandSrc).toMatch(/Open Order/);
     expect(heroBrandSrc).toMatch(/h-\[5\.5rem\]/);
     expect(heroBrandSrc).toMatch(/lg:h-40/);

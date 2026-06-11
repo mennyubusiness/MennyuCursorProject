@@ -8,17 +8,17 @@ type HomeHeroBrandProps = {
   priority?: boolean;
 };
 
-/** Large OO mark + company name for the marketing homepage hero. */
+/** Large header logo + company name for the marketing homepage hero. */
 export function HomeHeroBrand({ className, priority = true }: HomeHeroBrandProps) {
   return (
     <div className={cn("flex flex-col items-start gap-3 sm:gap-4", className)}>
       <Image
-        src={BRAND.mark}
+        src={BRAND.headerLogo}
         alt=""
         width={160}
         height={160}
         priority={priority}
-        className="h-[5.5rem] w-[5.5rem] object-contain sm:h-32 sm:w-32 lg:h-40 lg:w-40"
+        className="h-[5.5rem] w-auto max-w-[11rem] object-contain sm:h-32 sm:max-w-[13rem] lg:h-40 lg:max-w-[16rem]"
         aria-hidden
       />
       <p className="text-xl font-black tracking-tight text-oo-warm-white sm:text-2xl">

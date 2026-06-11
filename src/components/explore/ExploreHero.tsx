@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { HomeHeroBrand } from "@/components/home/HomeHeroBrand";
 import { PageShell } from "@/components/layout/page-shell";
 
 type ExploreHeroProps = {
@@ -43,9 +44,7 @@ export function ExploreHero({ featuredPodNames }: ExploreHeroProps) {
       />
 
       <PageShell className="relative flex min-h-[min(44vh,24rem)] flex-col justify-end py-12 sm:min-h-[min(48vh,28rem)] sm:py-14 lg:py-16">
-        <p className="text-[clamp(1.75rem,5vw,2.5rem)] font-black leading-none tracking-tight text-oo-warm-white">
-          Open Order
-        </p>
+        <HomeHeroBrand className="scale-[0.85] origin-left sm:scale-100" />
         <p className="mt-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-oo-cream/50">
           <span className="oo-live-dot" aria-hidden />
           Secondary path · Find a pod
