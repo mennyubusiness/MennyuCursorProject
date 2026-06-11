@@ -42,8 +42,11 @@ describe("SiteHeaderNav signed-out pills", () => {
     expect(headerNavSrc).toMatch(/lg:hidden/);
   });
 
-  it("uses filled cream nav pill and secondary actions for readability", () => {
-    expect(headerNavSrc).toMatch(/creamPillBase|bg-oo-warm-white\/90/);
+  it("uses opaque cream nav pill and secondary actions for readability", () => {
+    expect(headerNavSrc).toMatch(/creamPillBase/);
+    expect(headerNavSrc).toMatch(/bg-oo-warm-white shadow-sm/);
+    expect(headerNavSrc).not.toMatch(/bg-oo-warm-white\/90/);
+    expect(headerNavSrc).not.toMatch(/bg-oo-warm-white\/95/);
     expect(headerNavSrc).toMatch(/navLinkActive/);
     expect(headerNavSrc).toMatch(/bg-oo-charcoal font-semibold text-oo-warm-white/);
     expect(headerNavSrc).toMatch(/headerSecondaryButton/);

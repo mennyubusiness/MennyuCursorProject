@@ -26,7 +26,7 @@ const headerFocusVisible =
   "outline-none focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
 const creamPillBase =
-  "border border-oo-light-stone/70 bg-oo-warm-white/90 shadow-sm backdrop-blur-sm";
+  "border border-oo-light-stone/70 bg-oo-warm-white shadow-sm";
 
 const navPill = cn(
   creamPillBase,
@@ -46,7 +46,7 @@ const navLinkActive =
 const headerSecondaryButton = cn(
   creamPillBase,
   headerFocusVisible,
-  "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium text-oo-charcoal transition-colors duration-200 hover:border-oo-light-stone hover:bg-oo-warm-white"
+  "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium text-oo-charcoal transition-colors duration-200 hover:border-oo-light-stone hover:bg-oo-cream"
 );
 
 const headerPrimaryCta = cn(
@@ -61,7 +61,7 @@ const mobileNavLinkBase = cn(
 );
 
 const mobileNavLinkIdle =
-  "border-oo-light-stone/50 bg-oo-warm-white/95 text-oo-charcoal hover:bg-oo-warm-white";
+  "border-oo-light-stone/70 bg-oo-warm-white text-oo-charcoal hover:bg-oo-cream";
 
 const mobileNavLinkActive =
   "border-oo-charcoal bg-oo-charcoal font-semibold text-oo-warm-white hover:bg-oo-charcoal hover:text-oo-warm-white";
