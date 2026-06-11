@@ -31,7 +31,8 @@ describe("homepage marketing positioning", () => {
     expect(heroBrandSrc).toMatch(/BRAND\.horizontalLogo/);
     expect(heroBrandSrc).toMatch(/BRAND\.mark/);
     expect(heroBrandSrc).toMatch(/Open Order/);
-    expect(heroBrandSrc).toMatch(/max-w-\[min\(760px,80%\)\]/);
+    expect(heroBrandSrc).toMatch(/max-w-\[min\(900px,85%\)\]/);
+    expect(heroBrandSrc).not.toMatch(/mix-blend-screen/);
     expect(heroBrandSrc).toMatch(/sm:hidden/);
   });
 

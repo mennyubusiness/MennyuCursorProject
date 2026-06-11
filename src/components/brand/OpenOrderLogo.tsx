@@ -20,9 +20,6 @@ type OpenOrderLogoProps = {
 
 const MARK_SIZE = { width: 56, height: 56 };
 
-const HORIZONTAL_DARK_BLEND =
-  "mix-blend-screen [filter:drop-shadow(0_1px_8px_rgba(0,0,0,0.3))]";
-
 export function OpenOrderLogo({
   variant = "header",
   href = "/",
@@ -69,10 +66,7 @@ export function OpenOrderLogo({
           alt={BRAND_ALT.horizontalLogo}
           width={320}
           height={84}
-          className={cn(
-            "h-auto w-full max-w-[220px] object-contain sm:max-w-[260px]",
-            HORIZONTAL_DARK_BLEND
-          )}
+          className="h-auto w-full max-w-[220px] object-contain sm:max-w-[260px]"
           priority={priority}
         />
       );

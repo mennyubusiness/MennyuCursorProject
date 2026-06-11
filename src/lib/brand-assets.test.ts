@@ -13,9 +13,16 @@ describe("brand assets catalog", () => {
     }
   });
 
+  it("uses the transparent horizontal logo for dark hero/footer surfaces", () => {
+    expect(BRAND.horizontalLogo).toBe(
+      "/brand/open-order/open-order-horizontal-transparent.png"
+    );
+  });
+
   it("uses only approved catalog filenames", () => {
     const approved = new Set([
       "open-order-mark-circle.png",
+      "open-order-horizontal-transparent.png",
       "open-order-horizontal-dark.png",
       "open-order-horizontal-dark-silver.png",
       "open-order-horizontal-light.png",

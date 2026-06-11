@@ -2,8 +2,10 @@
 export const BRAND = {
   /** Circular food-cart mark — navbar, favicon, compact UI */
   mark: "/brand/open-order/open-order-mark-circle.png",
-  /** Full horizontal logo for dark backgrounds — homepage hero, footer */
-  horizontalLogo: "/brand/open-order/open-order-horizontal-dark.png",
+  /** Transparent horizontal logo for dark hero/footer backgrounds */
+  horizontalLogo: "/brand/open-order/open-order-horizontal-transparent.png",
+  /** Opaque horizontal with baked-in black background — OG/social previews only */
+  horizontalLogoOpaque: "/brand/open-order/open-order-horizontal-dark.png",
   /** Silver stencil horizontal for dark backgrounds (alternate) */
   horizontalLogoSilver: "/brand/open-order/open-order-horizontal-dark-silver.png",
   /** Full horizontal logo for light backgrounds — auth panels, marketing on cream */
@@ -17,6 +19,7 @@ export const BRAND = {
 export const BRAND_ALT = {
   mark: "Open Order",
   horizontalLogo: "Open Order Co. — Order more. Serve more.",
+  horizontalLogoOpaque: "Open Order Co. — Order more. Serve more.",
   horizontalLogoSilver: "Open Order Co. — Order more. Serve more.",
   horizontalLogoLight: "Open Order Co. — Order more. Serve more.",
   markSquare: "Open Order",
