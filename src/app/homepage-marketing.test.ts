@@ -31,9 +31,11 @@ describe("homepage marketing positioning", () => {
     expect(heroBrandSrc).toMatch(/BRAND\.horizontalLogo/);
     expect(heroBrandSrc).toMatch(/BRAND\.mark/);
     expect(heroBrandSrc).toMatch(/Open Order/);
-    expect(heroBrandSrc).toMatch(/max-w-\[min\(900px,85%\)\]/);
+    expect(heroBrandSrc).toMatch(/homepage/);
+    expect(heroBrandSrc).toMatch(/1100/);
     expect(heroBrandSrc).not.toMatch(/mix-blend-screen/);
     expect(heroBrandSrc).toMatch(/sm:hidden/);
+    expect(heroSrc).toMatch(/HomeHeroBrand size=\"homepage\"/);
   });
 
   it("leads with pod-owner-first hero copy", () => {

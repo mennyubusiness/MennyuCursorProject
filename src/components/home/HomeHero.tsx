@@ -55,9 +55,9 @@ export function HomeHero() {
 
       <PageShell className="relative z-10 grid gap-10 py-14 sm:py-16 lg:grid-cols-[1.1fr_minmax(0,22rem)] lg:items-center lg:gap-14 lg:py-20 xl:grid-cols-[1.15fr_minmax(0,26rem)]">
         <div className="flex flex-col animate-oo-fade-up motion-reduce:animate-none">
-          <HomeHeroBrand className="mb-1 sm:mb-2" />
+          <HomeHeroBrand size="homepage" />
 
-          <h1 className="mt-6 max-w-2xl text-3xl font-black leading-tight tracking-tight text-oo-warm-white sm:mt-8 sm:text-4xl md:text-[2.75rem] md:leading-[1.1]">
+          <h1 className="mt-4 max-w-2xl text-3xl font-black leading-tight tracking-tight text-oo-warm-white sm:mt-5 sm:text-4xl md:text-[2.75rem] md:leading-[1.1]">
             {HOME_HERO_HEADLINE}
           </h1>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-oo-cream/70 sm:text-lg">
