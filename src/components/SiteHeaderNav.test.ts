@@ -41,6 +41,14 @@ describe("SiteHeaderNav signed-out pills", () => {
     expect(headerNavSrc).toMatch(/site-mobile-menu/);
     expect(headerNavSrc).toMatch(/lg:hidden/);
   });
+
+  it("uses glass pill nav and secondary glass actions for readability", () => {
+    expect(headerNavSrc).toMatch(/navPill|rounded-full border border-oo-warm-white\/15 bg-oo-charcoal\/55/);
+    expect(headerNavSrc).toMatch(/headerSecondaryButton/);
+    expect(headerNavSrc).toMatch(/headerPrimaryCta/);
+    expect(layoutSrc).toMatch(/bg-oo-charcoal\/40/);
+    expect(layoutSrc).toMatch(/backdrop-blur-lg/);
+  });
 });
 
 describe("SiteHeaderNav signed-in pills", () => {

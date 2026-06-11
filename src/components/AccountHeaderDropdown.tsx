@@ -57,7 +57,7 @@ export function AccountHeaderDropdown({
     <div ref={ref} className="relative">
       <button
         type="button"
-        className={cn(triggerClassName, open && "bg-[#FAF4EA]")}
+        className={cn(triggerClassName, open && "border-oo-warm-white/30 bg-oo-charcoal/70")}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Account menu"

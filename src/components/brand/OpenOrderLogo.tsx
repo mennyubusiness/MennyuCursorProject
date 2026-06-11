@@ -34,7 +34,7 @@ export function OpenOrderLogo({
           alt={BRAND_ALT.mark}
           width={MARK_SIZE.width}
           height={MARK_SIZE.height}
-          className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
+          className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
           priority={priority}
           unoptimized
         />
@@ -49,12 +49,12 @@ export function OpenOrderLogo({
             alt=""
             width={MARK_SIZE.width}
             height={MARK_SIZE.height}
-            className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
+            className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
             priority={priority}
             unoptimized
             aria-hidden
           />
-          <span className="hidden text-base font-semibold tracking-tight text-oo-warm-white sm:inline">
+          <span className="hidden text-base font-semibold tracking-tight text-oo-warm-white [text-shadow:0_1px_8px_rgba(31,31,28,0.5)] sm:inline">
             Open Order
           </span>
         </>

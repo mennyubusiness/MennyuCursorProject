@@ -22,14 +22,32 @@ type SiteHeaderNavProps = {
   cartHref: string;
 };
 
+const navPill =
+  "inline-flex items-center gap-0.5 rounded-full border border-oo-warm-white/15 bg-oo-charcoal/55 px-1 py-1 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)] backdrop-blur-md";
+
 const navLinkBase =
-  "rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white sm:text-[0.9375rem]";
+  "rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white sm:text-[0.9375rem]";
 
-const navLinkIdle = "text-oo-cream/75 hover:bg-oo-warm-white/10 hover:text-oo-warm-white";
+const navLinkIdle = "text-oo-cream/85 hover:bg-oo-warm-white/10 hover:text-oo-warm-white";
 
-const navLinkActive = "bg-oo-warm-white/10 text-oo-warm-white";
+const navLinkActive =
+  "bg-oo-warm-white/12 font-semibold text-oo-warm-white shadow-[inset_0_0_0_1px_rgba(255,253,248,0.1)] ring-1 ring-inset ring-brand/30";
 
-const actionLink = cn(navLinkBase, navLinkIdle);
+const headerSecondaryButton =
+  "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-oo-warm-white/20 bg-oo-charcoal/50 px-3.5 py-2 text-sm font-medium text-oo-warm-white shadow-[inset_0_1px_0_rgba(255,253,248,0.05)] backdrop-blur-sm transition-colors duration-200 hover:border-oo-warm-white/30 hover:bg-oo-charcoal/65 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white";
+
+const headerPrimaryCta = cn(
+  buttonClassName({ variant: "primary", size: "sm" }),
+  "h-10 min-h-10 whitespace-nowrap px-4 shadow-[0_0_16px_rgba(249,115,22,0.28)]"
+);
+
+const mobileNavLinkBase =
+  "block rounded-lg px-4 py-3 text-base font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white";
+
+const mobileNavLinkIdle = "text-oo-cream/90 hover:bg-oo-warm-white/8 hover:text-oo-warm-white";
+
+const mobileNavLinkActive =
+  "bg-oo-warm-white/10 font-semibold text-oo-warm-white ring-1 ring-inset ring-brand/25";
 
 function NavLink({
   href,
@@ -37,14 +55,34 @@ function NavLink({
   pathname,
   onNavigate,
   className,
+  mobile = false,
 }: {
   href: string;
   label: string;
   pathname: string;
   onNavigate?: () => void;
   className?: string;
+  mobile?: boolean;
 }) {
   const active = isSiteNavLinkActive(pathname, href);
+
+  if (mobile) {
+    return (
+      <Link
+        href={href}
+        onClick={onNavigate}
+        className={cn(
+          mobileNavLinkBase,
+          active ? mobileNavLinkActive : mobileNavLinkIdle,
+          className
+        )}
+        aria-current={active ? "page" : undefined}
+      >
+        {label}
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={href}
@@ -64,6 +102,7 @@ function CartControl({
   prominent,
   className,
   onNavigate,
+  mobile = false,
 }: {
   cartHref: string;
   activeOrderHref: string | null;
@@ -71,6 +110,7 @@ function CartControl({
   prominent: boolean;
   className?: string;
   onNavigate?: () => void;
+  mobile?: boolean;
 }) {
   const quickCart = useQuickCartOptional();
   const canOpenQuickCart = Boolean(quickCart?.enabled || quickCart?.hasActiveGroupOrder);
@@ -82,12 +122,13 @@ function CartControl({
   const sharedClass = cn(
     prominent
       ? cn(
-          buttonClassName({ variant: "primary", size: "sm" }),
+          buttonClassName({ variant: "primary", size: mobile ? "md" : "sm" }),
           "relative shadow-[0_0_12px_rgba(249,115,22,0.3)]",
+          !mobile && "h-10 min-h-10",
           cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
         )
-      : cn(actionLink, className),
-    !prominent && cartPulse && "text-oo-warm-white"
+      : cn(headerSecondaryButton, mobile && "w-full justify-start px-4", className),
+    !prominent && cartPulse && "border-brand/40 text-oo-warm-white"
   );
 
   if (canOpenQuickCart) {
@@ -182,30 +223,24 @@ export function SiteHeaderNav({
   return (
     <>
       <nav className="flex min-w-0 flex-1 items-center justify-end gap-3 lg:justify-between" aria-label="Site">
-        <div className="hidden items-center gap-0.5 lg:flex">
+        <div className={cn(navPill, "hidden lg:inline-flex")}>
           {SITE_NAV_LINKS.map((link) => (
             <NavLink key={link.href} href={link.href} label={link.label} pathname={pathname} />
           ))}
         </div>
 
         <div className="hidden items-center gap-2 lg:flex">
-          <a
-            href={businessCtaHref}
-            className={cn(
-              buttonClassName({ variant: "primary", size: "sm" }),
-              "whitespace-nowrap shadow-[0_0_12px_rgba(249,115,22,0.25)]"
-            )}
-          >
+          <a href={businessCtaHref} className={headerPrimaryCta}>
             {HOME_PRIMARY_CTA_LABEL}
           </a>
           {isSignedIn ? (
             <AccountHeaderDropdown
               accountMenu={accountMenu}
               hasServerSession={hasServerSession}
-              triggerClassName={actionLink}
+              triggerClassName={headerSecondaryButton}
             />
           ) : (
-            <HeaderSignInLink className={actionLink} title="Sign in" />
+            <HeaderSignInLink className={headerSecondaryButton} title="Sign in" />
           )}
           {showCart && (
             <CartControl
@@ -220,8 +255,9 @@ export function SiteHeaderNav({
         <button
           type="button"
           className={cn(
-            "inline-flex h-10 w-10 items-center justify-center rounded-lg border border-oo-cream/20 text-oo-warm-white transition hover:bg-oo-warm-white/10 lg:hidden",
-            mobileOpen && "bg-oo-warm-white/10"
+            headerSecondaryButton,
+            "h-10 w-10 min-w-10 p-0 lg:hidden",
+            mobileOpen && "border-oo-warm-white/30 bg-oo-charcoal/65"
           )}
           aria-expanded={mobileOpen}
           aria-controls="site-mobile-menu"
@@ -253,7 +289,7 @@ export function SiteHeaderNav({
       {mobileOpen && (
         <div
           id="site-mobile-menu"
-          className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-oo-light-stone/15 bg-oo-charcoal/98 backdrop-blur-md lg:hidden"
+          className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-oo-warm-white/15 bg-oo-charcoal/95 shadow-[0_16px_48px_rgba(31,31,28,0.35)] backdrop-blur-xl sm:top-[4.25rem] lg:hidden"
         >
           <div className="oo-shell flex flex-col gap-1 py-4">
             {SITE_NAV_LINKS.map((link) => (
@@ -263,39 +299,37 @@ export function SiteHeaderNav({
                 label={link.label}
                 pathname={pathname}
                 onNavigate={closeMobile}
-                className="px-3 py-2.5"
+                mobile
               />
             ))}
 
-            <div className="my-3 border-t border-oo-cream/10" />
+            <div className="my-3 border-t border-oo-warm-white/10" />
 
-            {isSignedIn ? (
-              <div className="px-1">
+            <div className="flex flex-col gap-2 px-1">
+              {isSignedIn ? (
                 <AccountHeaderDropdown
                   accountMenu={accountMenu}
                   hasServerSession={hasServerSession}
-                  triggerClassName={cn(actionLink, "w-full justify-start px-3 py-2.5")}
+                  triggerClassName={cn(headerSecondaryButton, "w-full justify-start px-4")}
                 />
-              </div>
-            ) : (
-              <HeaderSignInLink
-                className={cn(actionLink, "px-3 py-2.5")}
-                title="Sign in"
-              />
-            )}
+              ) : (
+                <HeaderSignInLink
+                  className={cn(headerSecondaryButton, "w-full justify-start px-4")}
+                  title="Sign in"
+                />
+              )}
 
-            {showCart && (
-              <div className="px-1">
+              {showCart && (
                 <CartControl
                   cartHref={cartHref}
                   activeOrderHref={activeOrderHref}
                   cartPulse={cartPulse}
                   prominent={prominentCart}
-                  className="w-full justify-start px-3 py-2.5"
+                  mobile
                   onNavigate={closeMobile}
                 />
-              </div>
-            )}
+              )}
+            </div>
 
             <a
               href={businessCtaHref}
