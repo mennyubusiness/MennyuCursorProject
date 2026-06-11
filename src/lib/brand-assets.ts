@@ -25,8 +25,8 @@ export const BRAND = {
 /** Cropped viewBox dimensions for `open-order-horizontal.svg` (2296×310). */
 export const HORIZONTAL_LOGO_INTRINSIC = { width: 2296, height: 310 } as const;
 
-/** Square viewBox for `open-order-mark.svg` (3000×3000). */
-export const MARK_INTRINSIC = { width: 3000, height: 3000 } as const;
+/** Square viewBox for `open-order-mark.svg` (1110×1110 cropped badge). */
+export const MARK_INTRINSIC = { width: 1110, height: 1110 } as const;
 
 export const BRAND_ALT = {
   mark: "Open Order",

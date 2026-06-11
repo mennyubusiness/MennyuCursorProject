@@ -26,6 +26,7 @@ describe("brand assets catalog", () => {
     const svg = readFileSync(join(publicRoot, BRAND.mark), "utf8");
     expect(svg).not.toMatch(/fill="#ffffff"/);
     expect(svg).not.toMatch(/width="5184" fill="#e7e0d6"/);
+    expect(svg).toMatch(/viewBox="195 195 1110 1110"/);
   });
 
   it("uses a transparent raster mark for favicon surfaces", async () => {

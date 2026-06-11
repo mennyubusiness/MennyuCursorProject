@@ -3,7 +3,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 const src =
-  process.argv[2] ?? "C:/Users/Sam/Downloads/Open Order Co. (9).svg";
+  process.argv[2] ?? "C:/Users/Sam/Downloads/Open Order Co. (1).svg";
 const brandDir = path.join(process.cwd(), "public/brand/open-order");
 const svgDest = path.join(brandDir, "open-order-mark.svg");
 const pngDest = path.join(brandDir, "open-order-mark.png");
@@ -12,7 +12,7 @@ const appleIconDest = path.join(process.cwd(), "src/app/apple-icon.png");
 
 let svgRaw = fs.readFileSync(src, "utf8");
 
-// Drop baked canvas backgrounds from the export.
+// Drop full-canvas export backgrounds only (keep the inner cream circle fill).
 svgRaw = svgRaw
   .replace(/<rect[^>]*fill="#ffffff"[^>]*\/>/gi, "")
   .replace(/<rect x="-1092" width="5184" fill="#e7e0d6"[^>]*\/>/g, "");
