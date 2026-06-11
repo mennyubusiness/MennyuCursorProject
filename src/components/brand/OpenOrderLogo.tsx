@@ -7,6 +7,7 @@ export type OpenOrderLogoVariant =
   | "header"
   | "mark"
   | "mark-with-label"
+  | "horizontal"
   | "wordmark"
   | "seal";
 
@@ -26,14 +27,46 @@ export function OpenOrderLogo({
   priority = false,
 }: OpenOrderLogoProps) {
   const inner = (() => {
-    if (variant === "header" || variant === "mark" || variant === "mark-with-label") {
+    if (variant === "header" || variant === "mark") {
       return (
         <Image
           src={BRAND.headerLogo}
           alt={BRAND_ALT.mark}
           width={HEADER_LOGO_SIZE.width}
           height={HEADER_LOGO_SIZE.height}
-          className="h-12 w-12 shrink-0 object-contain sm:h-14 sm:w-14"
+          className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
+          priority={priority}
+        />
+      );
+    }
+
+    if (variant === "mark-with-label") {
+      return (
+        <>
+          <Image
+            src={BRAND.headerLogo}
+            alt=""
+            width={HEADER_LOGO_SIZE.width}
+            height={HEADER_LOGO_SIZE.height}
+            className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
+            priority={priority}
+            aria-hidden
+          />
+          <span className="hidden text-base font-semibold tracking-tight text-oo-warm-white sm:inline">
+            Open Order
+          </span>
+        </>
+      );
+    }
+
+    if (variant === "horizontal") {
+      return (
+        <Image
+          src={BRAND.horizontalLogo}
+          alt={BRAND_ALT.horizontalLogo}
+          width={320}
+          height={84}
+          className="h-auto w-full max-w-[220px] object-contain sm:max-w-[260px]"
           priority={priority}
         />
       );
@@ -68,7 +101,7 @@ export function OpenOrderLogo({
     <Link
       href={href}
       className={cn(
-        "inline-flex shrink-0 items-center transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white",
+        "inline-flex shrink-0 items-center gap-2.5 transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white",
         className
       )}
       aria-label={BRAND_ALT.mark}

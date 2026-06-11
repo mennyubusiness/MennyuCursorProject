@@ -7,7 +7,7 @@ export function SiteFooter() {
     <footer className="border-t border-oo-light-stone/15 bg-oo-charcoal text-oo-stone-gray">
       <PageShell className="flex flex-col gap-8 py-12 sm:flex-row sm:items-end sm:justify-between sm:py-14">
         <div className="flex flex-col gap-4">
-          <OpenOrderLogo variant="header" />
+          <OpenOrderLogo variant="horizontal" />
           <p className="max-w-sm text-sm leading-relaxed text-oo-stone-gray">
             Multi-vendor food cart ordering — one cart, one payment, one pickup.
           </p>

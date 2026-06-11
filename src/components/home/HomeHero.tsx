@@ -28,12 +28,17 @@ export function HomeHero() {
           src={HOME_MARKET_IMAGE}
           alt=""
           fill
-          className="object-cover object-center opacity-[0.28] sm:opacity-[0.32]"
+          className="object-cover object-center opacity-[0.32] sm:opacity-[0.36]"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 58vw, 50vw"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-oo-charcoal from-5% via-oo-charcoal/85 via-40% to-oo-charcoal/55" />
-        <div className="absolute inset-0 bg-oo-charcoal/45" />
+        <div className="absolute inset-0 bg-gradient-to-r from-oo-charcoal from-0% via-oo-charcoal/92 via-38% to-oo-charcoal/48" />
+        <div className="absolute inset-0 bg-oo-charcoal/55" />
       </div>
+
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-oo-charcoal/90 via-oo-charcoal/75 to-transparent sm:via-oo-charcoal/55"
+        aria-hidden
+      />
 
       <div
         className="pointer-events-none absolute inset-0 opacity-40"
@@ -50,14 +55,9 @@ export function HomeHero() {
 
       <PageShell className="relative z-10 grid gap-10 py-14 sm:py-16 lg:grid-cols-[1.1fr_minmax(0,22rem)] lg:items-center lg:gap-14 lg:py-20 xl:grid-cols-[1.15fr_minmax(0,26rem)]">
         <div className="flex flex-col animate-oo-fade-up motion-reduce:animate-none">
-          <HomeHeroBrand />
+          <HomeHeroBrand className="mb-1 sm:mb-2" />
 
-          <p className="mt-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-oo-cream/50">
-            <span className="oo-live-dot" aria-hidden />
-            Connected ordering for food pods
-          </p>
-
-          <h1 className="mt-5 max-w-2xl text-3xl font-black leading-tight tracking-tight text-oo-warm-white sm:text-4xl md:text-[2.75rem] md:leading-[1.1]">
+          <h1 className="mt-6 max-w-2xl text-3xl font-black leading-tight tracking-tight text-oo-warm-white sm:mt-8 sm:text-4xl md:text-[2.75rem] md:leading-[1.1]">
             {HOME_HERO_HEADLINE}
           </h1>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-oo-cream/70 sm:text-lg">

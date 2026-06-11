@@ -26,13 +26,14 @@ describe("homepage marketing positioning", () => {
   const exploreHeroSrc = readFileSync(join(root, "components/explore/ExploreHero.tsx"), "utf8");
   const podPageSrc = readFileSync(join(root, "app/pod/[podId]/page.tsx"), "utf8");
 
-  it("uses the header logo and company name in the hero", () => {
+  it("uses the full horizontal logo in the hero with a mobile compact fallback", () => {
     expect(heroSrc).toMatch(/HomeHeroBrand/);
+    expect(heroBrandSrc).toMatch(/BRAND\.horizontalLogo/);
     expect(heroBrandSrc).toMatch(/BRAND\.headerLogo/);
     expect(heroBrandSrc).not.toMatch(/BRAND\.mark/);
     expect(heroBrandSrc).toMatch(/Open Order/);
-    expect(heroBrandSrc).toMatch(/h-\[5\.5rem\]/);
-    expect(heroBrandSrc).toMatch(/lg:h-40/);
+    expect(heroBrandSrc).toMatch(/max-w-\[min\(760px,80%\)\]/);
+    expect(heroBrandSrc).toMatch(/sm:hidden/);
   });
 
   it("leads with pod-owner-first hero copy", () => {
