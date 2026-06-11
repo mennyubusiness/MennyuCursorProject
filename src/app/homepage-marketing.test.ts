@@ -34,10 +34,12 @@ describe("homepage marketing positioning", () => {
     expect(heroBrandSrc).toMatch(/Open Order/);
     expect(heroBrandSrc).toMatch(/homepage/);
     expect(BRAND.horizontalLogo).toBe("/brand/open-order/open-order-horizontal.svg");
+    expect(BRAND.mark).toBe("/brand/open-order/open-order-mark.svg");
     expect(heroBrandSrc).toMatch(/1100/);
     expect(heroBrandSrc).not.toMatch(/mix-blend-screen/);
     expect(heroBrandSrc).toMatch(/sm:hidden/);
     expect(heroSrc).toMatch(/HomeHeroBrand size=\"homepage\"/);
+    expect(heroSrc).toMatch(/mt-7.*sm:mt-10/);
   });
 
   it("leads with pod-owner-first hero copy", () => {

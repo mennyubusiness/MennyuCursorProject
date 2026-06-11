@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BRAND, BRAND_ALT, HORIZONTAL_LOGO_INTRINSIC } from "@/lib/brand-assets";
+import { BRAND, BRAND_ALT, HORIZONTAL_LOGO_INTRINSIC, MARK_INTRINSIC } from "@/lib/brand-assets";
 import { cn } from "@/lib/cn";
 
 export type OpenOrderLogoVariant =
@@ -18,7 +18,7 @@ type OpenOrderLogoProps = {
   priority?: boolean;
 };
 
-const MARK_SIZE = { width: 56, height: 56 };
+const MARK_SIZE = MARK_INTRINSIC;
 
 export function OpenOrderLogo({
   variant = "header",
@@ -36,6 +36,7 @@ export function OpenOrderLogo({
           height={MARK_SIZE.height}
           className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
           priority={priority}
+          unoptimized
         />
       );
     }
@@ -50,6 +51,7 @@ export function OpenOrderLogo({
             height={MARK_SIZE.height}
             className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
             priority={priority}
+            unoptimized
             aria-hidden
           />
           <span className="hidden text-base font-semibold tracking-tight text-oo-warm-white sm:inline">

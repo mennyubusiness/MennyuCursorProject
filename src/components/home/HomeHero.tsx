@@ -57,7 +57,7 @@ export function HomeHero() {
         <div className="flex flex-col animate-oo-fade-up motion-reduce:animate-none">
           <HomeHeroBrand size="homepage" />
 
-          <h1 className="mt-6 max-w-2xl text-3xl font-black leading-tight tracking-tight text-oo-warm-white sm:mt-7 sm:text-4xl md:text-[2.75rem] md:leading-[1.1]">
+          <h1 className="mt-7 max-w-2xl text-3xl font-black leading-tight tracking-tight text-oo-warm-white sm:mt-10 sm:text-4xl md:text-[2.75rem] md:leading-[1.1]">
             {HOME_HERO_HEADLINE}
           </h1>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-oo-cream/70 sm:mt-6 sm:text-lg">

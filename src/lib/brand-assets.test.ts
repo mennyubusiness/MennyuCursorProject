@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
 import { BRAND } from "@/lib/brand-assets";
@@ -20,8 +21,28 @@ describe("brand assets catalog", () => {
     expect(contents).toMatch(/viewBox="352 609 2296 310"/);
   });
 
+  it("uses a transparent mark SVG without baked canvas backgrounds", () => {
+    expect(BRAND.mark).toBe("/brand/open-order/open-order-mark.svg");
+    const svg = readFileSync(join(publicRoot, BRAND.mark), "utf8");
+    expect(svg).not.toMatch(/fill="#ffffff"/);
+    expect(svg).not.toMatch(/width="5184" fill="#e7e0d6"/);
+  });
+
+  it("uses a transparent raster mark for favicon surfaces", async () => {
+    expect(BRAND.markRaster).toBe("/brand/open-order/open-order-mark.png");
+    const { data } = await sharp(join(publicRoot, BRAND.markRaster))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const cornerAlpha = [0, 0, 1023, 1023].map((offset) => data[offset * 4 + 3]);
+    expect(cornerAlpha.every((alpha) => alpha === 0)).toBe(true);
+  });
+
   it("uses only approved catalog filenames", () => {
     const approved = new Set([
+      "open-order-mark.svg",
+      "open-order-mark.png",
       "open-order-mark-circle.png",
       "open-order-horizontal.svg",
       "open-order-horizontal-transparent.png",

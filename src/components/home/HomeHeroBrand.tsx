@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import { BRAND, BRAND_ALT, HORIZONTAL_LOGO_INTRINSIC } from "@/lib/brand-assets";
+import { BRAND, BRAND_ALT, HORIZONTAL_LOGO_INTRINSIC, MARK_INTRINSIC } from "@/lib/brand-assets";
 import { cn } from "@/lib/cn";
 
 type HomeHeroBrandProps = {
@@ -35,9 +35,10 @@ export function HomeHeroBrand({
         <Image
           src={BRAND.mark}
           alt=""
-          width={80}
-          height={80}
+          width={MARK_INTRINSIC.width}
+          height={MARK_INTRINSIC.height}
           priority={priority}
+          unoptimized
           className="h-16 w-16 shrink-0 object-contain"
           aria-hidden
         />
