@@ -22,32 +22,49 @@ type SiteHeaderNavProps = {
   cartHref: string;
 };
 
-const navPill =
-  "inline-flex items-center gap-0.5 rounded-full border border-oo-warm-white/15 bg-oo-charcoal/55 px-1 py-1 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)] backdrop-blur-md";
+const headerFocusVisible =
+  "outline-none focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
-const navLinkBase =
-  "rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white sm:text-[0.9375rem]";
+const creamPillBase =
+  "border border-oo-light-stone/70 bg-oo-warm-white/90 shadow-sm backdrop-blur-sm";
 
-const navLinkIdle = "text-oo-cream/85 hover:bg-oo-warm-white/10 hover:text-oo-warm-white";
+const navPill = cn(
+  creamPillBase,
+  "inline-flex items-center gap-0.5 rounded-full px-1 py-1"
+);
+
+const navLinkBase = cn(
+  "rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 sm:text-[0.9375rem]",
+  headerFocusVisible
+);
+
+const navLinkIdle = "text-oo-charcoal hover:bg-oo-cream hover:text-oo-charcoal";
 
 const navLinkActive =
-  "bg-oo-warm-white/12 font-semibold text-oo-warm-white shadow-[inset_0_0_0_1px_rgba(255,253,248,0.1)] ring-1 ring-inset ring-brand/30";
+  "bg-oo-charcoal font-semibold text-oo-warm-white hover:bg-oo-charcoal hover:text-oo-warm-white";
 
-const headerSecondaryButton =
-  "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-oo-warm-white/20 bg-oo-charcoal/50 px-3.5 py-2 text-sm font-medium text-oo-warm-white shadow-[inset_0_1px_0_rgba(255,253,248,0.05)] backdrop-blur-sm transition-colors duration-200 hover:border-oo-warm-white/30 hover:bg-oo-charcoal/65 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white";
+const headerSecondaryButton = cn(
+  creamPillBase,
+  headerFocusVisible,
+  "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium text-oo-charcoal transition-colors duration-200 hover:border-oo-light-stone hover:bg-oo-warm-white"
+);
 
 const headerPrimaryCta = cn(
   buttonClassName({ variant: "primary", size: "sm" }),
+  headerFocusVisible,
   "h-10 min-h-10 whitespace-nowrap px-4 shadow-[0_0_16px_rgba(249,115,22,0.28)]"
 );
 
-const mobileNavLinkBase =
-  "block rounded-lg px-4 py-3 text-base font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-warm-white";
+const mobileNavLinkBase = cn(
+  "block rounded-lg border px-4 py-3 text-base font-medium transition-colors duration-200",
+  headerFocusVisible
+);
 
-const mobileNavLinkIdle = "text-oo-cream/90 hover:bg-oo-warm-white/8 hover:text-oo-warm-white";
+const mobileNavLinkIdle =
+  "border-oo-light-stone/50 bg-oo-warm-white/95 text-oo-charcoal hover:bg-oo-warm-white";
 
 const mobileNavLinkActive =
-  "bg-oo-warm-white/10 font-semibold text-oo-warm-white ring-1 ring-inset ring-brand/25";
+  "border-oo-charcoal bg-oo-charcoal font-semibold text-oo-warm-white hover:bg-oo-charcoal hover:text-oo-warm-white";
 
 function NavLink({
   href,
@@ -123,12 +140,13 @@ function CartControl({
     prominent
       ? cn(
           buttonClassName({ variant: "primary", size: mobile ? "md" : "sm" }),
+          headerFocusVisible,
           "relative shadow-[0_0_12px_rgba(249,115,22,0.3)]",
           !mobile && "h-10 min-h-10",
           cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
         )
       : cn(headerSecondaryButton, mobile && "w-full justify-start px-4", className),
-    !prominent && cartPulse && "border-brand/40 text-oo-warm-white"
+    !prominent && cartPulse && "border-brand/50 bg-oo-warm-white"
   );
 
   if (canOpenQuickCart) {
@@ -257,7 +275,7 @@ export function SiteHeaderNav({
           className={cn(
             headerSecondaryButton,
             "h-10 w-10 min-w-10 p-0 lg:hidden",
-            mobileOpen && "border-oo-warm-white/30 bg-oo-charcoal/65"
+            mobileOpen && "border-oo-light-stone bg-oo-cream"
           )}
           aria-expanded={mobileOpen}
           aria-controls="site-mobile-menu"
@@ -291,7 +309,7 @@ export function SiteHeaderNav({
           id="site-mobile-menu"
           className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-oo-warm-white/15 bg-oo-charcoal/95 shadow-[0_16px_48px_rgba(31,31,28,0.35)] backdrop-blur-xl sm:top-[4.25rem] lg:hidden"
         >
-          <div className="oo-shell flex flex-col gap-1 py-4">
+          <div className="oo-shell flex flex-col gap-2 py-4">
             {SITE_NAV_LINKS.map((link) => (
               <NavLink
                 key={link.href}
@@ -303,9 +321,9 @@ export function SiteHeaderNav({
               />
             ))}
 
-            <div className="my-3 border-t border-oo-warm-white/10" />
+            <div className="my-2 border-t border-oo-warm-white/10" />
 
-            <div className="flex flex-col gap-2 px-1">
+            <div className="flex flex-col gap-2">
               {isSignedIn ? (
                 <AccountHeaderDropdown
                   accountMenu={accountMenu}
@@ -333,7 +351,11 @@ export function SiteHeaderNav({
 
             <a
               href={businessCtaHref}
-              className={cn(buttonClassName({ variant: "primary", size: "md" }), "mx-1 mt-4")}
+              className={cn(
+                buttonClassName({ variant: "primary", size: "md" }),
+                headerFocusVisible,
+                "mt-3"
+              )}
               onClick={closeMobile}
             >
               {HOME_PRIMARY_CTA_LABEL}
