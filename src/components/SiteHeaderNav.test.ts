@@ -18,11 +18,15 @@ const accountSessionActionsSrc = readFileSync(
 const layoutSrc = readFileSync(join(dir, "../app/layout.tsx"), "utf8");
 
 describe("SiteHeaderNav signed-out pills", () => {
-  it("shows Explore, Cart, and Sign in when signed out", () => {
-    expect(headerNavSrc).toMatch(/Explore/);
+  it("shows marketing nav, business CTA, Cart, and Sign in when signed out", () => {
+    expect(headerNavSrc).toMatch(/SITE_NAV_LINKS/);
+    expect(headerNavSrc).toMatch(/isSiteNavLinkActive/);
+    expect(headerNavSrc).toMatch(/HOME_PRIMARY_CTA_LABEL/);
+    expect(headerNavSrc).toMatch(/homePodOwnerMailtoHref/);
     expect(headerNavSrc).toMatch(/Sign in/);
     expect(headerNavSrc).toMatch(/HeaderSignInLink/);
     expect(headerNavSrc).toMatch(/showCart/);
+    expect(headerNavSrc).toMatch(/prominentCart/);
   });
 
   it("does not show Orders or Account pills when signed out", () => {
@@ -32,10 +36,17 @@ describe("SiteHeaderNav signed-out pills", () => {
     expect(headerNavSrc).toMatch(/AccountHeaderDropdown/);
     expect(headerNavSrc).not.toMatch(/href="\/account"/);
   });
+
+  it("includes a mobile menu with business CTA", () => {
+    expect(headerNavSrc).toMatch(/site-mobile-menu/);
+    expect(headerNavSrc).toMatch(/lg:hidden/);
+  });
 });
 
 describe("SiteHeaderNav signed-in pills", () => {
-  it("shows Explore, Cart, and Account dropdown only", () => {
+  it("shows marketing nav, business CTA, Cart, and Account dropdown", () => {
+    expect(headerNavSrc).toMatch(/SITE_NAV_LINKS/);
+    expect(headerNavSrc).toMatch(/HOME_PRIMARY_CTA_LABEL/);
     expect(headerNavSrc).toMatch(/AccountHeaderDropdown/);
     expect(headerNavSrc).not.toMatch(/>\s*Orders\s*</);
     expect(headerNavSrc).not.toMatch(/href="\/orders"/);
