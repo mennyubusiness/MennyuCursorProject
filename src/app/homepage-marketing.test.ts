@@ -29,8 +29,7 @@ describe("homepage marketing positioning", () => {
   it("uses the full horizontal logo in the hero with a mobile compact fallback", () => {
     expect(heroSrc).toMatch(/HomeHeroBrand/);
     expect(heroBrandSrc).toMatch(/BRAND\.horizontalLogo/);
-    expect(heroBrandSrc).toMatch(/BRAND\.headerLogo/);
-    expect(heroBrandSrc).not.toMatch(/BRAND\.mark/);
+    expect(heroBrandSrc).toMatch(/BRAND\.mark/);
     expect(heroBrandSrc).toMatch(/Open Order/);
     expect(heroBrandSrc).toMatch(/max-w-\[min\(760px,80%\)\]/);
     expect(heroBrandSrc).toMatch(/sm:hidden/);

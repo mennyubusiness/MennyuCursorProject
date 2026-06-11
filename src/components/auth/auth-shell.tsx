@@ -25,7 +25,7 @@ function AuthBrandPanel() {
         aria-hidden
       >
         <Image
-          src={BRAND.authEmblem}
+          src={BRAND.seal}
           alt=""
           width={1024}
           height={1024}
@@ -39,14 +39,14 @@ function AuthBrandPanel() {
           <div className="absolute inset-x-0 top-0 h-0.5 bg-brand" aria-hidden />
 
           <div className="text-center lg:text-left">
-            <div className="flex items-center justify-center gap-3 lg:justify-start">
-              <span className="h-0.5 w-10 shrink-0 bg-brand" aria-hidden />
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden />
-            </div>
-            <p className="mt-5 text-base font-black uppercase tracking-[0.24em] text-oo-charcoal sm:text-lg sm:tracking-[0.28em]">
-              Open Order Co.
-            </p>
-            <p className="mt-2 text-sm font-semibold text-brand sm:text-base">Order everywhere. Pay once.</p>
+            <Image
+              src={BRAND.horizontalLogoLight}
+              alt="Open Order Co. — Order more. Serve more."
+              width={360}
+              height={96}
+              className="mx-auto h-auto w-full max-w-[min(100%,20rem)] object-contain lg:mx-0"
+              priority
+            />
           </div>
 
           <div className="mt-8 border-t border-oo-light-stone/80 pt-8 text-center lg:text-left">

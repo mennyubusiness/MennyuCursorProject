@@ -8,7 +8,7 @@ export type OpenOrderLogoVariant =
   | "mark"
   | "mark-with-label"
   | "horizontal"
-  | "wordmark"
+  | "horizontal-light"
   | "seal";
 
 type OpenOrderLogoProps = {
@@ -18,7 +18,10 @@ type OpenOrderLogoProps = {
   priority?: boolean;
 };
 
-const HEADER_LOGO_SIZE = { width: 56, height: 56 };
+const MARK_SIZE = { width: 56, height: 56 };
+
+const HORIZONTAL_DARK_BLEND =
+  "mix-blend-screen [filter:drop-shadow(0_1px_8px_rgba(0,0,0,0.3))]";
 
 export function OpenOrderLogo({
   variant = "header",
@@ -30,10 +33,10 @@ export function OpenOrderLogo({
     if (variant === "header" || variant === "mark") {
       return (
         <Image
-          src={BRAND.headerLogo}
+          src={BRAND.mark}
           alt={BRAND_ALT.mark}
-          width={HEADER_LOGO_SIZE.width}
-          height={HEADER_LOGO_SIZE.height}
+          width={MARK_SIZE.width}
+          height={MARK_SIZE.height}
           className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
           priority={priority}
         />
@@ -44,10 +47,10 @@ export function OpenOrderLogo({
       return (
         <>
           <Image
-            src={BRAND.headerLogo}
+            src={BRAND.mark}
             alt=""
-            width={HEADER_LOGO_SIZE.width}
-            height={HEADER_LOGO_SIZE.height}
+            width={MARK_SIZE.width}
+            height={MARK_SIZE.height}
             className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
             priority={priority}
             aria-hidden
@@ -66,20 +69,23 @@ export function OpenOrderLogo({
           alt={BRAND_ALT.horizontalLogo}
           width={320}
           height={84}
-          className="h-auto w-full max-w-[220px] object-contain sm:max-w-[260px]"
+          className={cn(
+            "h-auto w-full max-w-[220px] object-contain sm:max-w-[260px]",
+            HORIZONTAL_DARK_BLEND
+          )}
           priority={priority}
         />
       );
     }
 
-    if (variant === "wordmark") {
+    if (variant === "horizontal-light") {
       return (
         <Image
-          src={BRAND.wordmark}
-          alt={BRAND_ALT.wordmark}
-          width={280}
-          height={80}
-          className="h-auto w-auto max-h-12 max-w-[min(100%,280px)] object-contain"
+          src={BRAND.horizontalLogoLight}
+          alt={BRAND_ALT.horizontalLogoLight}
+          width={320}
+          height={84}
+          className="h-auto w-full max-w-[220px] object-contain sm:max-w-[280px]"
           priority={priority}
         />
       );

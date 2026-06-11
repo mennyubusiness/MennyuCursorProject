@@ -8,13 +8,16 @@ type HomeHeroBrandProps = {
   priority?: boolean;
 };
 
+const HORIZONTAL_DARK_BLEND =
+  "mix-blend-screen [filter:drop-shadow(0_2px_12px_rgba(0,0,0,0.35))]";
+
 /** Full horizontal logo on desktop; compact mark + name on small screens. */
 export function HomeHeroBrand({ className, priority = true }: HomeHeroBrandProps) {
   return (
     <div className={cn("w-full", className)}>
       <div className="flex items-center gap-3 sm:hidden">
         <Image
-          src={BRAND.headerLogo}
+          src={BRAND.mark}
           alt=""
           width={80}
           height={80}
@@ -34,7 +37,10 @@ export function HomeHeroBrand({ className, priority = true }: HomeHeroBrandProps
         width={760}
         height={200}
         priority={priority}
-        className="hidden h-auto w-full max-w-[min(760px,80%)] object-contain sm:block"
+        className={cn(
+          "hidden h-auto w-full max-w-[min(760px,80%)] object-contain sm:block",
+          HORIZONTAL_DARK_BLEND
+        )}
         sizes="(min-width: 640px) 760px"
       />
     </div>
