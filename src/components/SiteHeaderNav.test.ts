@@ -40,11 +40,17 @@ describe("SiteHeaderNav signed-out pills", () => {
   it("includes a polished mobile sheet with backdrop and grouped nav", () => {
     expect(headerNavSrc).toMatch(/site-mobile-menu/);
     expect(headerNavSrc).toMatch(/lg:hidden/);
+    expect(headerNavSrc).toMatch(/createPortal/);
+    expect(headerNavSrc).toMatch(/document\.body/);
+    expect(headerNavSrc).toMatch(/z-\[80\]/);
+    expect(headerNavSrc).toMatch(/z-\[90\]/);
+    expect(headerNavSrc).toMatch(/z-\[100\]/);
     expect(headerNavSrc).toMatch(/bg-oo-charcoal\/45 backdrop-blur-sm/);
     expect(headerNavSrc).toMatch(/bg-oo-warm-white p-4 shadow-xl/);
     expect(headerNavSrc).toMatch(/rounded-b-2xl border border-oo-light-stone/);
     expect(headerNavSrc).toMatch(/aria-modal="true"/);
     expect(headerNavSrc).toMatch(/Escape/);
+    expect(headerNavSrc).not.toMatch(/z-\[45\]/);
     expect(headerNavSrc).not.toMatch(/bg-oo-charcoal\/95 shadow-\[0_16px_48px/);
   });
 

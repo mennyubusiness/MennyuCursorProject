@@ -20,7 +20,7 @@ const savePodButtonClass =
 export function PodPageStickyNav({ items, podId, podName }: PodPageStickyNavProps) {
   return (
     <nav
-      className="sticky top-16 z-40 border-b border-oo-light-stone bg-oo-warm-white/95 shadow-sm backdrop-blur-md sm:top-[4.25rem]"
+      className="sticky top-16 z-30 border-b border-oo-light-stone bg-oo-warm-white/95 shadow-sm backdrop-blur-md sm:top-[4.25rem]"
       aria-label="Pod sections"
     >
       <div className="oo-shell flex items-center gap-3 py-2">

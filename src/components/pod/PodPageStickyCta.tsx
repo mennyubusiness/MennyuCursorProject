@@ -40,7 +40,7 @@ export function PodPageStickyCta({
   return (
     <div
       className={cn(
-        "fixed inset-x-0 bottom-0 z-40 border-t border-oo-light-stone bg-oo-warm-white/95 p-3 shadow-[0_-8px_24px_rgba(31,31,28,0.12)] backdrop-blur-md transition-transform duration-200 lg:hidden",
+        "fixed inset-x-0 bottom-0 z-30 border-t border-oo-light-stone bg-oo-warm-white/95 p-3 shadow-[0_-8px_24px_rgba(31,31,28,0.12)] backdrop-blur-md transition-transform duration-200 lg:hidden",
         visible ? "translate-y-0" : "translate-y-full pointer-events-none"
       )}
       role="region"

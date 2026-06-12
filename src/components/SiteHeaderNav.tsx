@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { AccountHeaderDropdown } from "@/components/AccountHeaderDropdown";
 import type { HeaderAccountMenu } from "@/lib/auth/header-account-menu";
@@ -68,7 +69,7 @@ const mobileMenuToggleIdle = cn(headerSecondaryButton, "h-10 w-10 min-w-10 p-0 l
 
 const mobileMenuToggleOpen = cn(
   headerFocusVisible,
-  "inline-flex h-10 w-10 min-w-10 items-center justify-center rounded-full border border-oo-light-stone bg-oo-warm-white text-oo-charcoal shadow-sm lg:hidden"
+  "relative z-[100] inline-flex h-10 w-10 min-w-10 items-center justify-center rounded-full border border-oo-light-stone bg-oo-warm-white text-oo-charcoal shadow-sm lg:hidden"
 );
 
 function NavLink({
@@ -214,8 +215,13 @@ export function SiteHeaderNav({
   const quickCart = useQuickCartOptional();
   const [cartPulse, setCartPulse] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuPortalReady, setMenuPortalReady] = useState(false);
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
+
+  useEffect(() => {
+    setMenuPortalReady(true);
+  }, []);
 
   useEffect(() => {
     let clearTimer: ReturnType<typeof setTimeout> | undefined;
@@ -261,6 +267,89 @@ export function SiteHeaderNav({
 
   const businessCtaHref = homePodOwnerMailtoHref();
   const mobileAccountRowClass = cn(mobileNavRowBase, mobileNavRowIdle, "w-full justify-start border-0 bg-transparent shadow-none");
+
+  const mobileMenuOverlay =
+    mobileOpen && menuPortalReady && typeof document !== "undefined"
+      ? createPortal(
+          <>
+            <button
+              type="button"
+              className={cn(
+                "fixed inset-0 z-[80] bg-oo-charcoal/45 backdrop-blur-sm motion-safe:transition-opacity lg:hidden",
+                MOBILE_MENU_TOP
+              )}
+              aria-label="Close menu"
+              onClick={closeMobile}
+            />
+            <div
+              id="site-mobile-menu"
+              className={cn(
+                "fixed inset-x-0 z-[90] overflow-y-auto pb-4 lg:hidden",
+                MOBILE_MENU_TOP,
+                MOBILE_MENU_MAX_H
+              )}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Mobile navigation"
+            >
+              <div className="oo-shell pt-2">
+                <div className="animate-oo-mobile-menu-in rounded-b-2xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-xl">
+                  <nav className="flex flex-col gap-1" aria-label="Primary">
+                    {SITE_NAV_LINKS.map((link) => (
+                      <NavLink
+                        key={link.href}
+                        href={link.href}
+                        label={link.label}
+                        pathname={pathname}
+                        onNavigate={closeMobile}
+                        mobile
+                      />
+                    ))}
+                  </nav>
+
+                  <div className="my-3 border-t border-oo-light-stone" aria-hidden />
+
+                  <div className="flex flex-col gap-1">
+                    {isSignedIn ? (
+                      <AccountHeaderDropdown
+                        accountMenu={accountMenu}
+                        hasServerSession={hasServerSession}
+                        triggerClassName={mobileAccountRowClass}
+                      />
+                    ) : (
+                      <HeaderSignInLink className={mobileAccountRowClass} title="Sign in" />
+                    )}
+
+                    {showCart && (
+                      <CartControl
+                        cartHref={cartHref}
+                        activeOrderHref={activeOrderHref}
+                        cartPulse={cartPulse}
+                        prominent={prominentCart}
+                        mobile
+                        onNavigate={closeMobile}
+                      />
+                    )}
+                  </div>
+
+                  <a
+                    href={businessCtaHref}
+                    className={cn(
+                      buttonClassName({ variant: "primary", size: "md" }),
+                      headerFocusVisible,
+                      "mt-4 w-full shadow-[0_0_16px_rgba(249,115,22,0.28)]"
+                    )}
+                    onClick={closeMobile}
+                  >
+                    {HOME_PRIMARY_CTA_LABEL}
+                  </a>
+                </div>
+              </div>
+            </div>
+          </>,
+          document.body
+        )
+      : null;
 
   return (
     <>
@@ -324,84 +413,7 @@ export function SiteHeaderNav({
         </button>
       </nav>
 
-      {mobileOpen && (
-        <>
-          <button
-            type="button"
-            className={cn(
-              "fixed inset-0 z-[45] bg-oo-charcoal/45 backdrop-blur-sm motion-safe:transition-opacity lg:hidden",
-              MOBILE_MENU_TOP
-            )}
-            aria-label="Close menu"
-            onClick={closeMobile}
-          />
-          <div
-            id="site-mobile-menu"
-            className={cn(
-              "fixed inset-x-0 z-[46] overflow-y-auto pb-4 lg:hidden",
-              MOBILE_MENU_TOP,
-              MOBILE_MENU_MAX_H
-            )}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Mobile navigation"
-          >
-            <div className="oo-shell pt-2">
-              <div className="animate-oo-mobile-menu-in rounded-b-2xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-xl">
-                <nav className="flex flex-col gap-1" aria-label="Primary">
-                  {SITE_NAV_LINKS.map((link) => (
-                    <NavLink
-                      key={link.href}
-                      href={link.href}
-                      label={link.label}
-                      pathname={pathname}
-                      onNavigate={closeMobile}
-                      mobile
-                    />
-                  ))}
-                </nav>
-
-                <div className="my-3 border-t border-oo-light-stone" aria-hidden />
-
-                <div className="flex flex-col gap-1">
-                  {isSignedIn ? (
-                    <AccountHeaderDropdown
-                      accountMenu={accountMenu}
-                      hasServerSession={hasServerSession}
-                      triggerClassName={mobileAccountRowClass}
-                    />
-                  ) : (
-                    <HeaderSignInLink className={mobileAccountRowClass} title="Sign in" />
-                  )}
-
-                  {showCart && (
-                    <CartControl
-                      cartHref={cartHref}
-                      activeOrderHref={activeOrderHref}
-                      cartPulse={cartPulse}
-                      prominent={prominentCart}
-                      mobile
-                      onNavigate={closeMobile}
-                    />
-                  )}
-                </div>
-
-                <a
-                  href={businessCtaHref}
-                  className={cn(
-                    buttonClassName({ variant: "primary", size: "md" }),
-                    headerFocusVisible,
-                    "mt-4 w-full shadow-[0_0_16px_rgba(249,115,22,0.28)]"
-                  )}
-                  onClick={closeMobile}
-                >
-                  {HOME_PRIMARY_CTA_LABEL}
-                </a>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {mobileMenuOverlay}
     </>
   );
 }
