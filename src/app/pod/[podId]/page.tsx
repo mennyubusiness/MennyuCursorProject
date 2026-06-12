@@ -171,7 +171,6 @@ export default async function PodPage({
       <RecentPodViewTracker podId={pod.id} podName={pod.name} />
 
       <PodPageHero
-        podId={pod.id}
         name={pod.name}
         tagline={pod.tagline}
         description={pod.description}
@@ -183,7 +182,7 @@ export default async function PodPage({
         groupOrderHref={groupOrderHref}
       />
 
-      {navItems.length > 0 && <PodPageStickyNav items={navItems} />}
+      <PodPageStickyNav items={navItems} podId={pod.id} podName={pod.name} />
 
       {isQrEntry && (
         <PageShell className="py-4">

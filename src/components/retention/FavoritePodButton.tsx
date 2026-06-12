@@ -13,9 +13,18 @@ type FavoritePodButtonProps = {
   className?: string;
   /** When true, show a text label next to the icon */
   labeled?: boolean;
+  saveLabel?: string;
+  savedLabel?: string;
 };
 
-export function FavoritePodButton({ podId, podName, className = "", labeled = false }: FavoritePodButtonProps) {
+export function FavoritePodButton({
+  podId,
+  podName,
+  className = "",
+  labeled = false,
+  saveLabel = "Save",
+  savedLabel = "Saved",
+}: FavoritePodButtonProps) {
   const [saved, setSaved] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -75,7 +84,9 @@ export function FavoritePodButton({ podId, podName, className = "", labeled = fa
       >
         {saved ? "♥" : "♡"}
       </span>
-      {labeled && <span className="max-w-[7rem] truncate text-xs">{saved ? "Saved" : "Save"}</span>}
+      {labeled && (
+        <span className="max-w-[7rem] truncate text-xs">{saved ? savedLabel : saveLabel}</span>
+      )}
     </button>
   );
 }
