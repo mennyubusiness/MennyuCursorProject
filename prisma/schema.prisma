@@ -37,10 +37,19 @@ model Pod {
   ownerContactName   String?
   ownerContactPhone  String?
   description        String?
+  /// Short hero line — separate from long-form description.
+  tagline            String?
   imageUrl           String?
   /// Customer-facing accent, e.g. #1d4ed8 — validated app-side; null = default Mennyu styling.
   accentColor        String?
   address            String?
+  /// Public contact (may differ from owner onboarding contact).
+  contactEmail       String?
+  websiteUrl         String?
+  instagramUrl       String?
+  pickupInstructions String?
+  /// JSON string array of amenity ids — see pod-amenities.ts.
+  amenities          Json?
   latitude           Float?
   longitude          Float?
   /// IANA timezone for scheduled pickup (e.g. America/Chicago). Falls back to DEFAULT_PICKUP_TIMEZONE env when null.

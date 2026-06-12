@@ -39,7 +39,7 @@ export function PodVendorGrid({
             id={`pod-vendor-${vendor.id}`}
             className={
               isHighlighted
-                ? "scroll-mt-36 rounded-xl p-0.5 ring-2 ring-zinc-900 ring-offset-2 ring-offset-zinc-50"
+                ? "scroll-mt-36 rounded-xl p-0.5 ring-2 ring-brand ring-offset-2 ring-offset-oo-cream"
                 : "scroll-mt-36 min-h-0"
             }
           >

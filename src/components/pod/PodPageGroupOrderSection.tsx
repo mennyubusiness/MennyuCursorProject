@@ -15,48 +15,54 @@ export async function PodPageGroupOrderSection({ podId }: { podId: string }) {
   const groupOrderHref = session?.user
     ? groupOrderCartUrl
     : buildLoginHrefWithReturn(groupOrderCartUrl);
+  const joinHref = `/group-order/join?podId=${encodeURIComponent(podId)}`;
 
   return (
     <PageBand variant="muted" className="border-t-0">
       <section id="pod-group-order" className="scroll-mt-36">
-        <PageShell className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:py-5">
+        <PageShell className="rounded-xl border border-oo-light-stone bg-oo-warm-white px-4 py-4 shadow-sm sm:px-5 sm:py-5">
           {ctaState.kind === "start" ? (
-            <>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-oo-charcoal">Ordering with friends?</p>
-                <p className="mt-0.5 text-sm text-oo-stone-gray">
-                  Start a group order — everyone adds to one shared cart.
+                <p className="text-sm font-bold text-oo-charcoal">Ordering with a group?</p>
+                <p className="mt-1 text-sm text-oo-stone-gray">
+                  Start a shared cart for your table, or join with a code from your host.
                 </p>
               </div>
-              {session?.user ? (
-                <PodPageStartGroupOrderButton podId={podId} fallbackHref={groupOrderCartUrl} />
-              ) : (
-                <ButtonLink href={groupOrderHref} size="sm" className="shrink-0 self-start sm:self-center">
-                  Start group order
+              <div className="flex flex-wrap gap-2">
+                {session?.user ? (
+                  <PodPageStartGroupOrderButton podId={podId} fallbackHref={groupOrderCartUrl} />
+                ) : (
+                  <ButtonLink href={groupOrderHref} size="sm" className="shrink-0">
+                    Start group order
+                  </ButtonLink>
+                )}
+                <ButtonLink href={joinHref} variant="outline" size="sm" className="shrink-0">
+                  Join with a code
                 </ButtonLink>
-              )}
-            </>
+              </div>
+            </div>
           ) : ctaState.kind === "host_active" ? (
-            <>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-oo-charcoal">Group order started</p>
-                <p className="mt-0.5 text-sm text-oo-stone-gray">
+                <p className="text-sm font-bold text-oo-charcoal">Group order started</p>
+                <p className="mt-1 text-sm text-oo-stone-gray">
                   Open Quick Cart to invite friends or add items.
                 </p>
               </div>
               <PodPageOpenQuickCartButton />
-            </>
+            </div>
           ) : ctaState.kind === "participant_active" ? (
             <div>
-              <p className="text-sm font-semibold text-oo-charcoal">You&apos;re in a group order</p>
-              <p className="mt-0.5 text-sm text-oo-stone-gray">
+              <p className="text-sm font-bold text-oo-charcoal">You&apos;re in a group order</p>
+              <p className="mt-1 text-sm text-oo-stone-gray">
                 Add your items before the host checks out.
               </p>
             </div>
           ) : (
             <div>
-              <p className="text-sm font-semibold text-oo-charcoal">Host is checking out</p>
-              <p className="mt-0.5 text-sm text-oo-stone-gray">
+              <p className="text-sm font-bold text-oo-charcoal">Host is checking out</p>
+              <p className="mt-1 text-sm text-oo-stone-gray">
                 New changes are paused until checkout finishes.
               </p>
             </div>

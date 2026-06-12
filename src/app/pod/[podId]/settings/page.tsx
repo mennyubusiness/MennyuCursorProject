@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
+import { parsePodAmenities } from "@/lib/pod-amenities";
 import { PodOrderingQrSection } from "@/components/pod/PodOrderingQrSection";
 import Link from "next/link";
 import { PodBrandProfileForm } from "./PodBrandProfileForm";
@@ -18,14 +19,23 @@ export default async function PodSettingsPage({
       id: true,
       name: true,
       slug: true,
+      tagline: true,
       description: true,
       imageUrl: true,
       accentColor: true,
+      address: true,
+      contactEmail: true,
+      ownerContactPhone: true,
+      websiteUrl: true,
+      instagramUrl: true,
+      pickupInstructions: true,
+      amenities: true,
     },
   });
   if (!pod) notFound();
 
   const publicOrigin = await getPublicSiteOrigin();
+  const amenities = parsePodAmenities(pod.amenities);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
@@ -41,9 +51,9 @@ export default async function PodSettingsPage({
       </div>
 
       <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">Brand / profile</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">Public profile</h2>
         <p className="mt-1 text-sm text-oo-stone-gray">
-          Name, description, logo, and accent on the public pod page.
+          Brand, contact, amenities, and pickup details on the customer pod page.
         </p>
         <p className="mt-2 text-xs text-oo-stone-gray">
           URL slug: <span className="font-mono text-oo-charcoal">{pod.slug}</span> (not editable here)
@@ -52,9 +62,17 @@ export default async function PodSettingsPage({
           <PodBrandProfileForm
             podId={pod.id}
             initialName={pod.name}
+            initialTagline={pod.tagline}
             initialDescription={pod.description}
             initialImageUrl={pod.imageUrl}
             initialAccentColor={pod.accentColor}
+            initialAddress={pod.address}
+            initialContactEmail={pod.contactEmail}
+            initialContactPhone={pod.ownerContactPhone}
+            initialWebsiteUrl={pod.websiteUrl}
+            initialInstagramUrl={pod.instagramUrl}
+            initialPickupInstructions={pod.pickupInstructions}
+            initialAmenities={amenities}
           />
         </div>
       </section>
