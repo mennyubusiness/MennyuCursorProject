@@ -34,7 +34,16 @@ import {
 import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import { resolveGroupOrderActorForCartRead } from "@/actions/group-order-context";
 import { buildPostEndCartClientSnapshot } from "@/lib/group-order-end-sync";
+import {
+  GROUP_ORDER_JOIN_COPY,
+  resolveGroupOrderJoinState,
+} from "@/lib/group-order-join-state";
+import { buildGroupOrderJoinPath } from "@/lib/group-order-invite-url";
 import type { Cart } from "@/domain/types";
+
+export type ValidateGroupOrderJoinCodeResult =
+  | { ok: true; joinPath: string }
+  | { ok: false; error: string };
 
 export type StartGroupOrderActionResult =
   | { success: true; sessionId: string; joinCode: string; cart: Cart }
@@ -240,4 +249,33 @@ export async function getGroupOrderStateAction(cartId: string) {
 
 export async function getCartForGroupOrderAction(cartId: string) {
   return getCartById(cartId);
+}
+
+/** Validates a join code before navigating — keeps invalid lookups out of the full-page join flow. */
+export async function validateGroupOrderJoinCodeAction(
+  rawCode: string
+): Promise<ValidateGroupOrderJoinCodeResult> {
+  const digits = rawCode.trim().replace(/\D/g, "");
+  if (!digits) {
+    return { ok: false, error: "Enter a group order code." };
+  }
+  if (digits.length !== 6) {
+    return { ok: false, error: "Code must be exactly 6 digits." };
+  }
+
+  const cookieStore = await cookies();
+  const markers = readGroupOrderParticipantMarkers(cookieStore);
+  const authSession = await auth();
+
+  const state = await resolveGroupOrderJoinState({
+    joinCode: digits,
+    markers,
+    hostUserId: authSession?.user?.id ?? null,
+  });
+
+  if (state.kind === "not_found") {
+    return { ok: false, error: GROUP_ORDER_JOIN_COPY.notFoundBody };
+  }
+
+  return { ok: true, joinPath: buildGroupOrderJoinPath(digits) };
 }

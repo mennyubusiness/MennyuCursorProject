@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { getPodPageGroupOrderCtaState } from "@/lib/pod-page-group-order-cta";
 import { ButtonLink, buttonClassName } from "@/components/ui/button";
+import { PodPageJoinWithCodeButton } from "@/components/pod/PodPageJoinWithCodeButton";
 import {
   PodPageOpenQuickCartButton,
   PodPageStartGroupOrderButton,
@@ -39,13 +40,8 @@ export async function PodPageHeroActions({ podId, hasVendors }: PodPageHeroActio
   const groupOrderHref = session?.user
     ? groupOrderCartUrl
     : buildLoginHrefWithReturn(groupOrderCartUrl);
-  const joinHref = `/group-order/join?podId=${encodeURIComponent(podId)}`;
 
-  const joinButton = (
-    <Link href={joinHref} className={heroSecondaryCta}>
-      Join with code
-    </Link>
-  );
+  const joinButton = <PodPageJoinWithCodeButton className={heroSecondaryCta} />;
 
   if (ctaState.kind === "host_active") {
     return (

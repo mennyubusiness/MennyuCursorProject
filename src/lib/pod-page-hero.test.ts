@@ -48,8 +48,8 @@ describe("Pod page hero CTAs", () => {
 
   it("shows group order and join CTAs in the hero", () => {
     expect(heroActionsSrc).toMatch(/Start group order/);
-    expect(heroActionsSrc).toMatch(/Join with code/);
-    expect(heroActionsSrc).toMatch(/group-order\/join/);
+    expect(heroActionsSrc).toMatch(/PodPageJoinWithCodeButton/);
+    expect(heroActionsSrc).not.toMatch(/group-order\/join\?podId=/);
   });
 
   it("does not render the bottom group order section on the pod page", () => {

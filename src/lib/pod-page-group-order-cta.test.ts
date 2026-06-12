@@ -135,7 +135,7 @@ describe("pod page group CTA wiring", () => {
     expect(podPageSrc).toMatch(/PodPageHero/);
     expect(podPageSrc).not.toMatch(/PodPageGroupOrderSection/);
     expect(heroActionsSrc).toMatch(/Start group order/);
-    expect(heroActionsSrc).toMatch(/Join with code/);
+    expect(heroActionsSrc).toMatch(/PodPageJoinWithCodeButton/);
   });
 
   it("shows open group cart for host active state in hero", () => {
