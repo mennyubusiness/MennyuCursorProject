@@ -37,9 +37,15 @@ describe("SiteHeaderNav signed-out pills", () => {
     expect(headerNavSrc).not.toMatch(/href="\/account"/);
   });
 
-  it("includes a mobile menu with business CTA", () => {
+  it("includes a polished mobile sheet with backdrop and grouped nav", () => {
     expect(headerNavSrc).toMatch(/site-mobile-menu/);
     expect(headerNavSrc).toMatch(/lg:hidden/);
+    expect(headerNavSrc).toMatch(/bg-oo-charcoal\/45 backdrop-blur-sm/);
+    expect(headerNavSrc).toMatch(/bg-oo-warm-white p-4 shadow-xl/);
+    expect(headerNavSrc).toMatch(/rounded-b-2xl border border-oo-light-stone/);
+    expect(headerNavSrc).toMatch(/aria-modal="true"/);
+    expect(headerNavSrc).toMatch(/Escape/);
+    expect(headerNavSrc).not.toMatch(/bg-oo-charcoal\/95 shadow-\[0_16px_48px/);
   });
 
   it("uses opaque cream nav pill and secondary actions for readability", () => {

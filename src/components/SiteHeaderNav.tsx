@@ -22,16 +22,15 @@ type SiteHeaderNavProps = {
   cartHref: string;
 };
 
+const MOBILE_MENU_TOP = "top-16 sm:top-[4.25rem]";
+const MOBILE_MENU_MAX_H = "max-h-[calc(100dvh-4rem)] sm:max-h-[calc(100dvh-4.25rem)]";
+
 const headerFocusVisible =
   "outline-none focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
-const creamPillBase =
-  "border border-oo-light-stone/70 bg-oo-warm-white shadow-sm";
+const creamPillBase = "border border-oo-light-stone/70 bg-oo-warm-white shadow-sm";
 
-const navPill = cn(
-  creamPillBase,
-  "inline-flex items-center gap-0.5 rounded-full px-1 py-1"
-);
+const navPill = cn(creamPillBase, "inline-flex items-center gap-0.5 rounded-full px-1 py-1");
 
 const navLinkBase = cn(
   "rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 sm:text-[0.9375rem]",
@@ -55,16 +54,22 @@ const headerPrimaryCta = cn(
   "h-10 min-h-10 whitespace-nowrap px-4 shadow-[0_0_16px_rgba(249,115,22,0.28)]"
 );
 
-const mobileNavLinkBase = cn(
-  "block rounded-lg border px-4 py-3 text-base font-medium transition-colors duration-200",
+const mobileNavRowBase = cn(
+  "flex min-h-11 items-center rounded-xl px-4 py-2.5 text-base font-medium transition-colors duration-200",
   headerFocusVisible
 );
 
-const mobileNavLinkIdle =
-  "border-oo-light-stone/70 bg-oo-warm-white text-oo-charcoal hover:bg-oo-cream";
+const mobileNavRowIdle = "text-oo-charcoal hover:bg-oo-cream";
 
-const mobileNavLinkActive =
-  "border-oo-charcoal bg-oo-charcoal font-semibold text-oo-warm-white hover:bg-oo-charcoal hover:text-oo-warm-white";
+const mobileNavRowActive =
+  "bg-oo-charcoal font-semibold text-oo-warm-white hover:bg-oo-charcoal hover:text-oo-warm-white";
+
+const mobileMenuToggleIdle = cn(headerSecondaryButton, "h-10 w-10 min-w-10 p-0 lg:hidden");
+
+const mobileMenuToggleOpen = cn(
+  headerFocusVisible,
+  "inline-flex h-10 w-10 min-w-10 items-center justify-center rounded-full border border-oo-light-stone bg-oo-warm-white text-oo-charcoal shadow-sm lg:hidden"
+);
 
 function NavLink({
   href,
@@ -89,8 +94,8 @@ function NavLink({
         href={href}
         onClick={onNavigate}
         className={cn(
-          mobileNavLinkBase,
-          active ? mobileNavLinkActive : mobileNavLinkIdle,
+          mobileNavRowBase,
+          active ? mobileNavRowActive : mobileNavRowIdle,
           className
         )}
         aria-current={active ? "page" : undefined}
@@ -136,18 +141,35 @@ function CartControl({
   const cartLabel =
     itemCount > 0 ? `Cart, ${itemCount} item${itemCount === 1 ? "" : "s"}` : "Cart";
 
-  const sharedClass = cn(
+  const desktopClass = cn(
     prominent
       ? cn(
-          buttonClassName({ variant: "primary", size: mobile ? "md" : "sm" }),
+          buttonClassName({ variant: "primary", size: "sm" }),
           headerFocusVisible,
-          "relative shadow-[0_0_12px_rgba(249,115,22,0.3)]",
-          !mobile && "h-10 min-h-10",
+          "relative h-10 min-h-10 shadow-[0_0_12px_rgba(249,115,22,0.3)]",
           cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
         )
-      : cn(headerSecondaryButton, mobile && "w-full justify-start px-4", className),
+      : cn(headerSecondaryButton, className),
     !prominent && cartPulse && "border-brand/50 bg-oo-warm-white"
   );
+
+  const mobileClass = cn(
+    mobileNavRowBase,
+    mobileNavRowIdle,
+    "w-full justify-between",
+    (prominent || itemCount > 0) && "font-semibold",
+    cartPulse && "border-brand/50 bg-oo-cream",
+    className
+  );
+
+  const sharedClass = mobile ? mobileClass : desktopClass;
+
+  const countBadge =
+    itemCount > 0 ? (
+      <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-oo-charcoal px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none text-oo-warm-white">
+        {itemCount > 99 ? "99+" : itemCount}
+      </span>
+    ) : null;
 
   if (canOpenQuickCart) {
     return (
@@ -161,12 +183,8 @@ function CartControl({
         title="Open your cart"
         aria-label={itemCount > 0 ? `Open cart, ${itemCount} items` : "Open cart"}
       >
-        Cart
-        {prominent && itemCount > 0 && (
-          <span className="ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none">
-            {itemCount > 99 ? "99+" : itemCount}
-          </span>
-        )}
+        <span>Cart</span>
+        {mobile ? countBadge : prominent && itemCount > 0 ? countBadge : null}
       </button>
     );
   }
@@ -179,12 +197,8 @@ function CartControl({
       title="Your cart"
       aria-label={cartLabel}
     >
-      Cart
-      {prominent && itemCount > 0 && (
-        <span className="ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none">
-          {itemCount > 99 ? "99+" : itemCount}
-        </span>
-      )}
+      <span>Cart</span>
+      {mobile ? countBadge : prominent && itemCount > 0 ? countBadge : null}
     </Link>
   );
 }
@@ -230,6 +244,15 @@ export function SiteHeaderNav({
     };
   }, [mobileOpen]);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeMobile();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen, closeMobile]);
+
   const isSignedIn = hasServerSession;
   const showCustomerOrdering = navMode === "guest" || navMode === "customer";
   const showCart = showCustomerOrdering || isSignedIn;
@@ -237,6 +260,7 @@ export function SiteHeaderNav({
   const prominentCart = cartItemCount > 0 || Boolean(quickCart?.hasActiveGroupOrder);
 
   const businessCtaHref = homePodOwnerMailtoHref();
+  const mobileAccountRowClass = cn(mobileNavRowBase, mobileNavRowIdle, "w-full justify-start border-0 bg-transparent shadow-none");
 
   return (
     <>
@@ -272,11 +296,7 @@ export function SiteHeaderNav({
 
         <button
           type="button"
-          className={cn(
-            headerSecondaryButton,
-            "h-10 w-10 min-w-10 p-0 lg:hidden",
-            mobileOpen && "border-oo-light-stone bg-oo-cream"
-          )}
+          className={mobileOpen ? mobileMenuToggleOpen : mobileMenuToggleIdle}
           aria-expanded={mobileOpen}
           aria-controls="site-mobile-menu"
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -305,63 +325,82 @@ export function SiteHeaderNav({
       </nav>
 
       {mobileOpen && (
-        <div
-          id="site-mobile-menu"
-          className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-oo-warm-white/15 bg-oo-charcoal/95 shadow-[0_16px_48px_rgba(31,31,28,0.35)] backdrop-blur-xl sm:top-[4.25rem] lg:hidden"
-        >
-          <div className="oo-shell flex flex-col gap-2 py-4">
-            {SITE_NAV_LINKS.map((link) => (
-              <NavLink
-                key={link.href}
-                href={link.href}
-                label={link.label}
-                pathname={pathname}
-                onNavigate={closeMobile}
-                mobile
-              />
-            ))}
+        <>
+          <button
+            type="button"
+            className={cn(
+              "fixed inset-0 z-[45] bg-oo-charcoal/45 backdrop-blur-sm motion-safe:transition-opacity lg:hidden",
+              MOBILE_MENU_TOP
+            )}
+            aria-label="Close menu"
+            onClick={closeMobile}
+          />
+          <div
+            id="site-mobile-menu"
+            className={cn(
+              "fixed inset-x-0 z-[46] overflow-y-auto pb-4 lg:hidden",
+              MOBILE_MENU_TOP,
+              MOBILE_MENU_MAX_H
+            )}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile navigation"
+          >
+            <div className="oo-shell pt-2">
+              <div className="animate-oo-mobile-menu-in rounded-b-2xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-xl">
+                <nav className="flex flex-col gap-1" aria-label="Primary">
+                  {SITE_NAV_LINKS.map((link) => (
+                    <NavLink
+                      key={link.href}
+                      href={link.href}
+                      label={link.label}
+                      pathname={pathname}
+                      onNavigate={closeMobile}
+                      mobile
+                    />
+                  ))}
+                </nav>
 
-            <div className="my-2 border-t border-oo-warm-white/10" />
+                <div className="my-3 border-t border-oo-light-stone" aria-hidden />
 
-            <div className="flex flex-col gap-2">
-              {isSignedIn ? (
-                <AccountHeaderDropdown
-                  accountMenu={accountMenu}
-                  hasServerSession={hasServerSession}
-                  triggerClassName={cn(headerSecondaryButton, "w-full justify-start px-4")}
-                />
-              ) : (
-                <HeaderSignInLink
-                  className={cn(headerSecondaryButton, "w-full justify-start px-4")}
-                  title="Sign in"
-                />
-              )}
+                <div className="flex flex-col gap-1">
+                  {isSignedIn ? (
+                    <AccountHeaderDropdown
+                      accountMenu={accountMenu}
+                      hasServerSession={hasServerSession}
+                      triggerClassName={mobileAccountRowClass}
+                    />
+                  ) : (
+                    <HeaderSignInLink className={mobileAccountRowClass} title="Sign in" />
+                  )}
 
-              {showCart && (
-                <CartControl
-                  cartHref={cartHref}
-                  activeOrderHref={activeOrderHref}
-                  cartPulse={cartPulse}
-                  prominent={prominentCart}
-                  mobile
-                  onNavigate={closeMobile}
-                />
-              )}
+                  {showCart && (
+                    <CartControl
+                      cartHref={cartHref}
+                      activeOrderHref={activeOrderHref}
+                      cartPulse={cartPulse}
+                      prominent={prominentCart}
+                      mobile
+                      onNavigate={closeMobile}
+                    />
+                  )}
+                </div>
+
+                <a
+                  href={businessCtaHref}
+                  className={cn(
+                    buttonClassName({ variant: "primary", size: "md" }),
+                    headerFocusVisible,
+                    "mt-4 w-full shadow-[0_0_16px_rgba(249,115,22,0.28)]"
+                  )}
+                  onClick={closeMobile}
+                >
+                  {HOME_PRIMARY_CTA_LABEL}
+                </a>
+              </div>
             </div>
-
-            <a
-              href={businessCtaHref}
-              className={cn(
-                buttonClassName({ variant: "primary", size: "md" }),
-                headerFocusVisible,
-                "mt-3"
-              )}
-              onClick={closeMobile}
-            >
-              {HOME_PRIMARY_CTA_LABEL}
-            </a>
           </div>
-        </div>
+        </>
       )}
     </>
   );
