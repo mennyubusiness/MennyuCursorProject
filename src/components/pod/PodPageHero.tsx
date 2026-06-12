@@ -23,13 +23,15 @@ type PodPageHeroProps = {
 
 const DEFAULT_TAGLINE = "Mix vendors in one cart — one payment, one trip.";
 
+const heroSaveButton =
+  "shrink-0 !h-9 !border-oo-light-stone/80 !bg-oo-warm-white/90 !px-3 !text-oo-charcoal shadow-sm hover:!border-oo-warm-white hover:!bg-oo-warm-white focus-visible:!outline-brand";
+
 const heroMetaBadge =
-  "rounded-full border border-oo-warm-white/30 bg-oo-warm-white/15 px-3 py-1 text-xs font-medium text-oo-warm-white shadow-sm backdrop-blur-sm";
+  "rounded-full border border-white/25 bg-white/90 px-3 py-1 text-xs font-semibold text-oo-charcoal shadow-sm";
 
 const heroSecondaryCta = cn(
-  buttonClassName({ variant: "ghost-light", size: "md" }),
-  "min-h-11 border border-oo-warm-white/40 bg-oo-warm-white/12 text-oo-warm-white backdrop-blur-sm",
-  "hover:border-oo-warm-white/55 hover:bg-oo-warm-white/20 hover:text-oo-warm-white"
+  buttonClassName({ variant: "outline", size: "md" }),
+  "min-h-11 border-white/80 bg-oo-warm-white/90 text-oo-charcoal shadow-sm hover:border-oo-warm-white hover:bg-oo-warm-white"
 );
 
 export function PodPageHero({
@@ -76,27 +78,24 @@ export function PodPageHero({
         )}
       </div>
 
-      {/* Layer 10: full-area dark tint (black/ opacity works reliably in Tailwind) */}
+      {/* Layer 10: lighter full-area tint — image stays recognizable */}
+      <div className="pointer-events-none absolute inset-0 z-10 bg-black/45" aria-hidden />
+
+      {/* Layer 10: darker left side behind text */}
       <div
-        className="pointer-events-none absolute inset-0 z-10 bg-black/60"
+        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-black/80 via-black/55 to-black/20"
         aria-hidden
       />
 
-      {/* Layer 10: left-side gradient for text readability; image still visible on the right */}
+      {/* Layer 10: mobile bottom gradient for stacked text */}
       <div
-        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-black/80 via-black/55 to-black/35"
-        aria-hidden
-      />
-
-      {/* Layer 10: mobile bottom gradient where text stacks */}
-      <div
-        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/70 via-black/35 to-transparent sm:from-black/40 sm:via-transparent sm:to-transparent"
+        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/65 via-black/30 to-transparent sm:from-black/35 sm:via-transparent sm:to-transparent"
         aria-hidden
       />
 
       {accentColor && hasImage && (
         <div
-          className="pointer-events-none absolute inset-0 z-10 opacity-[0.12] mix-blend-soft-light"
+          className="pointer-events-none absolute inset-0 z-10 opacity-[0.1] mix-blend-soft-light"
           style={{
             background: `linear-gradient(135deg, ${accentColor} 0%, transparent 50%)`,
           }}
@@ -104,30 +103,32 @@ export function PodPageHero({
         />
       )}
 
-      {/* Layer 20: hero content above all overlays */}
+      {/* Layer 20: hero content above overlays */}
       <PageShell className="relative z-20 py-8 sm:py-10 lg:py-12">
-        <div className="max-w-3xl">
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-oo-warm-white/90">
-              Food pod
-            </p>
+        <div className="max-w-3xl rounded-2xl bg-black/20 p-4 sm:p-6 lg:bg-black/15 lg:p-0 lg:rounded-none">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/70">
+            Food pod
+          </p>
+
+          <div className="mt-2 flex items-start justify-between gap-4">
+            <h1 className="min-w-0 text-3xl font-black tracking-tight text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.5)] sm:text-4xl lg:text-[2.75rem]">
+              {name}
+            </h1>
             <FavoritePodButton
               podId={podId}
               podName={name}
               labeled
-              className="shrink-0 !border-oo-warm-white/35 !bg-oo-warm-white/15 !text-oo-warm-white shadow-sm backdrop-blur-sm hover:!border-oo-warm-white/50 hover:!bg-oo-warm-white/25"
+              className={cn(heroSaveButton, "hidden sm:inline-flex")}
             />
           </div>
 
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-oo-warm-white [text-shadow:0_2px_16px_rgba(0,0,0,0.45)] sm:text-4xl lg:text-[2.75rem]">
-            {name}
-          </h1>
-
-          <p className="mt-3 max-w-2xl text-base leading-relaxed text-oo-cream/85 sm:text-lg">
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-white/90 sm:text-lg">
             {heroTagline}
           </p>
 
-          {location && <p className="mt-3 text-sm text-oo-cream/80">{location}</p>}
+          {location && (
+            <p className="mt-2 text-sm leading-relaxed text-white/75">{location}</p>
+          )}
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <span
@@ -150,26 +151,32 @@ export function PodPageHero({
             <span className={heroMetaBadge}>One cart · One pickup</span>
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <a
               href={vendorCtaHref}
               className={cn(
                 buttonClassName({ variant: "primary", size: "md" }),
-                "relative z-20 min-h-11 shadow-[0_0_20px_rgba(249,115,22,0.35)]"
+                "min-h-11 shadow-[0_0_20px_rgba(249,115,22,0.35)]"
               )}
             >
               {vendorCtaLabel}
             </a>
             {hasVendors && (
-              <Link href={groupOrderHref} className={cn(heroSecondaryCta, "relative z-20")}>
+              <Link href={groupOrderHref} className={heroSecondaryCta}>
                 Start group order
               </Link>
             )}
             {!hasVendors && (
-              <ButtonLink href="/explore" className={cn(heroSecondaryCta, "relative z-20")}>
+              <ButtonLink href="/explore" className={heroSecondaryCta}>
                 Find another pod
               </ButtonLink>
             )}
+            <FavoritePodButton
+              podId={podId}
+              podName={name}
+              labeled
+              className={cn(heroSaveButton, "sm:hidden")}
+            />
           </div>
         </div>
       </PageShell>
