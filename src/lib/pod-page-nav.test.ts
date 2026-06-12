@@ -7,7 +7,6 @@ describe("buildPodPageNavItems", () => {
       hasAboutSection: false,
       hasLocationSection: false,
       hasContactSection: false,
-      showGroupOrderNav: false,
     });
     expect(items.map((i) => i.label)).toEqual(["Vendors"]);
   });
@@ -17,15 +16,8 @@ describe("buildPodPageNavItems", () => {
       hasAboutSection: true,
       hasLocationSection: true,
       hasContactSection: true,
-      showGroupOrderNav: true,
     });
-    expect(items.map((i) => i.label)).toEqual([
-      "Vendors",
-      "Group Order",
-      "About",
-      "Location",
-      "Contact",
-    ]);
+    expect(items.map((i) => i.label)).toEqual(["Vendors", "About", "Location", "Contact"]);
   });
 
   it("omits empty sections from tabs", () => {
@@ -33,8 +25,7 @@ describe("buildPodPageNavItems", () => {
       hasAboutSection: false,
       hasLocationSection: false,
       hasContactSection: true,
-      showGroupOrderNav: true,
     });
-    expect(items.map((i) => i.label)).toEqual(["Vendors", "Group Order", "Contact"]);
+    expect(items.map((i) => i.label)).toEqual(["Vendors", "Contact"]);
   });
 });

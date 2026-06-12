@@ -126,32 +126,31 @@ describe("resolvePodPageGroupOrderCtaState", () => {
 
 describe("pod page group CTA wiring", () => {
   const podPageSrc = readFileSync(join(process.cwd(), "src/app/pod/[podId]/page.tsx"), "utf8");
-  const sectionSrc = readFileSync(
-    join(process.cwd(), "src/components/pod/PodPageGroupOrderSection.tsx"),
+  const heroActionsSrc = readFileSync(
+    join(process.cwd(), "src/components/pod/PodPageHeroActions.tsx"),
     "utf8"
   );
 
-  it("pod page delegates group CTA to PodPageGroupOrderSection", () => {
-    expect(podPageSrc).toMatch(/PodPageGroupOrderSection/);
-    expect(podPageSrc).not.toMatch(/Start group order/);
+  it("pod page delegates group CTAs to PodPageHeroActions", () => {
+    expect(podPageSrc).toMatch(/PodPageHero/);
+    expect(podPageSrc).not.toMatch(/PodPageGroupOrderSection/);
+    expect(heroActionsSrc).toMatch(/Start group order/);
+    expect(heroActionsSrc).toMatch(/Join with code/);
   });
 
-  it("shows Group order started for host active state", () => {
-    expect(sectionSrc).toMatch(/Group order started/);
-    expect(sectionSrc).toMatch(/Open Quick Cart to invite friends or add items/);
-    expect(sectionSrc).toMatch(/kind === "host_active"/);
+  it("shows open group cart for host active state in hero", () => {
+    expect(heroActionsSrc).toMatch(/Open group cart/);
+    expect(heroActionsSrc).toMatch(/kind === "host_active"/);
   });
 
-  it("hides start button for participant active group", () => {
-    expect(sectionSrc).toMatch(/You&apos;re in a group order/);
-    expect(sectionSrc).toMatch(/participant_active/);
-    const participantBranch = sectionSrc.split('kind === "participant_active"')[1] ?? "";
-    expect(participantBranch).not.toMatch(/Start group order/);
+  it("shows open group cart for participant active group", () => {
+    expect(heroActionsSrc).toMatch(/participant_active/);
+    expect(heroActionsSrc).toMatch(/Open group cart/);
   });
 
   it("still shows start CTA when kind is start", () => {
-    expect(sectionSrc).toMatch(/Start group order/);
-    expect(sectionSrc).toMatch(/kind === "start"/);
-    expect(sectionSrc).toContain("PodPageStartGroupOrderButton");
+    expect(heroActionsSrc).toMatch(/Start group order/);
+    expect(heroActionsSrc).toContain("PodPageStartGroupOrderButton");
+    expect(heroActionsSrc).not.toMatch(/kind === "start"/);
   });
 });

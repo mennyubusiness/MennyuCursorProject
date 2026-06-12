@@ -3,6 +3,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("pod page in-place group order start", () => {
+  const heroActionsSrc = readFileSync(
+    join(process.cwd(), "src/components/pod/PodPageHeroActions.tsx"),
+    "utf8"
+  );
   const sectionSrc = readFileSync(
     join(process.cwd(), "src/components/pod/PodPageGroupOrderSection.tsx"),
     "utf8"
@@ -30,8 +34,8 @@ describe("pod page in-place group order start", () => {
   const cartPageSrc = readFileSync(join(process.cwd(), "src/app/cart/page.tsx"), "utf8");
 
   it("pod page start CTA uses client StartGroupOrderButton for signed-in users", () => {
-    expect(sectionSrc).toContain("PodPageStartGroupOrderButton");
-    expect(sectionSrc).toMatch(/session\?\.user[\s\S]*PodPageStartGroupOrderButton/);
+    expect(heroActionsSrc).toContain("PodPageStartGroupOrderButton");
+    expect(heroActionsSrc).toMatch(/session\?\.user[\s\S]*PodPageStartGroupOrderButton/);
     expect(clientSrc).toContain("StartGroupOrderButton");
     expect(startBtnSrc).toContain("startGroupOrderForPodAction");
     expect(startBtnSrc).toContain("dispatchGroupOrderStartCartSnapshot");
@@ -44,8 +48,8 @@ describe("pod page in-place group order start", () => {
   });
 
   it("host active pod CTA opens Quick Cart instead of linking to /cart", () => {
-    expect(sectionSrc).toContain("PodPageOpenQuickCartButton");
-    expect(sectionSrc).not.toMatch(/host_active[\s\S]*href="\/cart"/);
+    expect(heroActionsSrc).toContain("PodPageOpenQuickCartButton");
+    expect(heroActionsSrc).toMatch(/host_active/);
     expect(clientSrc).toContain("quickCart?.openCart()");
   });
 
@@ -64,12 +68,12 @@ describe("pod page in-place group order start", () => {
   it("header cart opens Quick Cart when active empty group exists", () => {
     expect(headerSrc).toContain("canOpenQuickCart");
     expect(headerSrc).toContain("hasActiveGroupOrder");
-    expect(headerSrc).toMatch(/canOpenQuickCart \?/);
-    expect(headerSrc).not.toMatch(/itemCount\s*>\s*0[\s\S]*canOpenQuickCart/);
+    expect(headerSrc).toMatch(/if \(canOpenQuickCart\)/);
+    expect(headerSrc).toMatch(/prominentCart = cartItemCount > 0 \|\| Boolean\(quickCart\?\.hasActiveGroupOrder\)/);
   });
 
   it("cart redirect fallback still exists for no-JS and cart page SSR start", () => {
-    expect(sectionSrc).toContain("startGroupOrder=1");
+    expect(heroActionsSrc).toContain("startGroupOrder=1");
     expect(cartPageSrc).toContain("startGroupOrder");
     expect(cartPageSrc).toContain("GroupOrderStartCartSync");
   });

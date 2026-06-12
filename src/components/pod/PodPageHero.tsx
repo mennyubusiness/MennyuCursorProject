@@ -1,13 +1,13 @@
 import Image from "next/image";
-import Link from "next/link";
 import { PageShell } from "@/components/layout/page-shell";
-import { ButtonLink, buttonClassName } from "@/components/ui/button";
+import { PodPageHeroActions } from "@/components/pod/PodPageHeroActions";
 import { isHttpsImageUrl } from "@/lib/remote-image-url";
 import type { PodOrderingStatus } from "@/lib/pod-page-status";
 import { podOrderingStatusBadgeClass } from "@/lib/pod-page-status";
 import { cn } from "@/lib/cn";
 
 type PodPageHeroProps = {
+  podId: string;
   name: string;
   tagline: string | null;
   description: string | null;
@@ -16,7 +16,6 @@ type PodPageHeroProps = {
   accentColor: string | null;
   orderingStatus: PodOrderingStatus;
   hasVendors: boolean;
-  groupOrderHref: string;
 };
 
 const DEFAULT_TAGLINE = "Mix vendors in one cart — one payment, one trip.";
@@ -24,12 +23,8 @@ const DEFAULT_TAGLINE = "Mix vendors in one cart — one payment, one trip.";
 const heroMetaBadge =
   "rounded-full border border-white/25 bg-white/90 px-3 py-1 text-xs font-semibold text-oo-charcoal shadow-sm";
 
-const heroSecondaryCta = cn(
-  buttonClassName({ variant: "outline", size: "md" }),
-  "min-h-11 border-white/80 bg-oo-warm-white/90 text-oo-charcoal shadow-sm hover:border-oo-warm-white hover:bg-oo-warm-white"
-);
-
 export function PodPageHero({
+  podId,
   name,
   tagline,
   description,
@@ -38,7 +33,6 @@ export function PodPageHero({
   accentColor,
   orderingStatus,
   hasVendors,
-  groupOrderHref,
 }: PodPageHeroProps) {
   const hasImage = isHttpsImageUrl(imageUrl);
   const heroTagline =
@@ -46,13 +40,6 @@ export function PodPageHero({
     description?.trim()?.split(/\n/)[0]?.slice(0, 160) ||
     DEFAULT_TAGLINE;
   const location = address?.trim();
-
-  const vendorCtaLabel = hasVendors
-    ? orderingStatus.tone === "closed"
-      ? "Browse vendors"
-      : "Start order"
-    : "Explore pods";
-  const vendorCtaHref = hasVendors ? "#pod-vendors" : "/explore";
 
   return (
     <header id="pod-hero" className="relative isolate overflow-hidden border-b border-oo-light-stone">
@@ -137,26 +124,8 @@ export function PodPageHero({
             <span className={heroMetaBadge}>One cart · One pickup</span>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <a
-              href={vendorCtaHref}
-              className={cn(
-                buttonClassName({ variant: "primary", size: "md" }),
-                "min-h-11 shadow-[0_0_20px_rgba(249,115,22,0.35)]"
-              )}
-            >
-              {vendorCtaLabel}
-            </a>
-            {hasVendors && (
-              <Link href={groupOrderHref} className={heroSecondaryCta}>
-                Start group order
-              </Link>
-            )}
-            {!hasVendors && (
-              <ButtonLink href="/explore" className={heroSecondaryCta}>
-                Find another pod
-              </ButtonLink>
-            )}
+          <div className="mt-6">
+            <PodPageHeroActions podId={podId} hasVendors={hasVendors} />
           </div>
         </div>
       </PageShell>

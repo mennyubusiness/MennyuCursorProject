@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const heroSrc = readFileSync(join(dir, "../components/pod/PodPageHero.tsx"), "utf8");
+const heroActionsSrc = readFileSync(join(dir, "../components/pod/PodPageHeroActions.tsx"), "utf8");
 const navSrc = readFileSync(join(dir, "../components/pod/PodPageStickyNav.tsx"), "utf8");
 const pageSrc = readFileSync(join(dir, "../app/pod/[podId]/page.tsx"), "utf8");
 
@@ -36,5 +37,22 @@ describe("PodPageStickyNav save placement", () => {
     expect(navSrc).toMatch(/FavoritePodButton/);
     expect(navSrc).toMatch(/saveLabel="Save pod"/);
     expect(pageSrc).toMatch(/PodPageStickyNav items=\{navItems\} podId=\{pod\.id\} podName=\{pod\.name\}/);
+  });
+});
+
+describe("Pod page hero CTAs", () => {
+  it("does not render Start order in the hero", () => {
+    expect(heroSrc).not.toMatch(/Start order/);
+    expect(heroActionsSrc).not.toMatch(/Start order/);
+  });
+
+  it("shows group order and join CTAs in the hero", () => {
+    expect(heroActionsSrc).toMatch(/Start group order/);
+    expect(heroActionsSrc).toMatch(/Join with code/);
+    expect(heroActionsSrc).toMatch(/group-order\/join/);
+  });
+
+  it("does not render the bottom group order section on the pod page", () => {
+    expect(pageSrc).not.toMatch(/PodPageGroupOrderSection/);
   });
 });

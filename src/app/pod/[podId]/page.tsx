@@ -10,7 +10,6 @@ import { PodPageStickyCta } from "@/components/pod/PodPageStickyCta";
 import { PodPageVendorSection } from "@/components/pod/PodPageVendorSection";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
 import { PageShell } from "@/components/layout/page-shell";
-import { PodPageGroupOrderSection } from "@/components/pod/PodPageGroupOrderSection";
 import { POD_QR_ENTRY_VALUE } from "@/lib/pod-ordering-url";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { parsePodAmenities } from "@/lib/pod-amenities";
@@ -129,7 +128,6 @@ export default async function PodPage({
   const hasAboutSection = Boolean(
     pod.description?.trim() || pod.tagline?.trim() || amenities.length > 0
   );
-  const showGroupOrderSection = vendorRows.length > 0;
 
   const contactDetails = {
     contactEmail: pod.contactEmail,
@@ -147,7 +145,6 @@ export default async function PodPage({
     hasAboutSection,
     hasLocationSection,
     hasContactSection,
-    showGroupOrderNav: showGroupOrderSection,
   });
 
   return (
@@ -155,6 +152,7 @@ export default async function PodPage({
       <RecentPodViewTracker podId={pod.id} podName={pod.name} />
 
       <PodPageHero
+        podId={podId}
         name={pod.name}
         tagline={pod.tagline}
         description={pod.description}
@@ -163,7 +161,6 @@ export default async function PodPage({
         accentColor={pod.accentColor}
         orderingStatus={orderingStatus}
         hasVendors={vendorRows.length > 0}
-        groupOrderHref={groupOrderHref}
       />
 
       <PodPageStickyNav items={navItems} podId={pod.id} podName={pod.name} />
@@ -196,8 +193,6 @@ export default async function PodPage({
         }
       />
 
-      {showGroupOrderSection && <PodPageGroupOrderSection podId={pod.id} />}
-
       {hasAboutSection && (
         <PodPageIdentitySection
           podName={pod.name}
@@ -220,7 +215,7 @@ export default async function PodPage({
       <PodPageStickyCta
         podName={pod.name}
         showVendorsCta={vendorRows.length > 0}
-        showGroupOrderCta={showGroupOrderSection}
+        showGroupOrderCta={vendorRows.length > 0}
         groupOrderHref={groupOrderHref}
       />
     </div>
