@@ -10,7 +10,7 @@ export type AcceptPodMembershipResult =
 
 /**
  * Completes a pending pod membership request (vendor joins pod).
- * Shared by vendor-side and pod-side accept APIs.
+ * Shared by vendor-side accept API and admin-only pod-side accept API.
  */
 export async function acceptPodMembershipRequest(requestId: string): Promise<AcceptPodMembershipResult> {
   const req = await prisma.podMembershipRequest.findUnique({

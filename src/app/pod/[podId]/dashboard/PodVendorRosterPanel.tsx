@@ -27,20 +27,58 @@ export type PodRosterVendorRow = {
   description: string | null;
   imageUrl: string | null;
   isFeatured: boolean;
-  isActive: boolean;
+  /** Pod owner control: visible/orderable in this pod. */
+  podVendorActive: boolean;
+  /** Platform/admin global vendor state. */
+  vendorGloballyActive: boolean;
+  /** Vendor-controlled global pause across Open Order. */
   mennyuOrdersPaused: boolean;
 };
+
+function rosterStatusBadges(row: PodRosterVendorRow) {
+  const badges: Array<{ key: string; label: string; className: string }> = [];
+
+  if (!row.vendorGloballyActive) {
+    badges.push({
+      key: "platform",
+      label: "Inactive by Open Order",
+      className: "rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-800",
+    });
+  } else if (row.mennyuOrdersPaused) {
+    badges.push({
+      key: "vendor-pause",
+      label: "Paused by vendor",
+      className: "rounded bg-amber-50 px-1.5 py-0.5 text-amber-900",
+    });
+  } else if (!row.podVendorActive) {
+    badges.push({
+      key: "pod-pause",
+      label: "Paused in this pod",
+      className: "rounded bg-amber-50 px-1.5 py-0.5 text-amber-900",
+    });
+  } else {
+    badges.push({
+      key: "active",
+      label: "Active in pod",
+      className: "text-emerald-800",
+    });
+  }
+
+  return badges;
+}
 
 function SortableRosterRow({
   podId,
   row,
   onToggleFeatured,
+  onTogglePodVendorActive,
   onOpenRemove,
   disabled,
 }: {
   podId: string;
   row: PodRosterVendorRow;
   onToggleFeatured: (vendorId: string, next: boolean) => void;
+  onTogglePodVendorActive: (vendorId: string, next: boolean) => void;
   onOpenRemove: (vendorId: string, name: string) => void;
   disabled: boolean;
 }) {
@@ -52,6 +90,7 @@ function SortableRosterRow({
     transition,
     zIndex: isDragging ? 1 : undefined,
   };
+  const badges = rosterStatusBadges(row);
 
   return (
     <li
@@ -93,12 +132,12 @@ function SortableRosterRow({
         ) : (
           <p className="mt-0.5 text-sm text-oo-stone-gray">No description</p>
         )}
-        <div className="mt-1 text-xs text-oo-stone-gray">
-          {!row.isActive || row.mennyuOrdersPaused ? (
-            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-900">Paused</span>
-          ) : (
-            <span className="text-emerald-800">Active</span>
-          )}
+        <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
+          {badges.map((badge) => (
+            <span key={badge.key} className={badge.className}>
+              {badge.label}
+            </span>
+          ))}
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
@@ -112,6 +151,21 @@ function SortableRosterRow({
           />
           Featured
         </label>
+        <button
+          type="button"
+          disabled={disabled || !row.vendorGloballyActive}
+          onClick={() => onTogglePodVendorActive(row.vendorId, !row.podVendorActive)}
+          className="rounded border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+          title={
+            !row.vendorGloballyActive
+              ? "This vendor is inactive platform-wide. Contact Open Order support."
+              : row.podVendorActive
+                ? "Hide this vendor from your public pod page and stop new orders here."
+                : "Show this vendor on your public pod page and allow new orders here."
+          }
+        >
+          {row.podVendorActive ? "Pause in pod" : "Show in pod"}
+        </button>
         <details className="relative">
           <summary className="list-none cursor-pointer rounded border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm font-medium text-oo-charcoal hover:bg-oo-cream [&::-webkit-details-marker]:hidden">
             More
@@ -148,6 +202,7 @@ export function PodVendorRosterPanel({
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
   const [saving, setSaving] = useState(false);
+  const [togglingVendorId, setTogglingVendorId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [removeModal, setRemoveModal] = useState<{ vendorId: string; name: string } | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -203,6 +258,29 @@ export function PodVendorRosterPanel({
     });
   };
 
+  async function onTogglePodVendorActive(vendorId: string, isActive: boolean) {
+    setError(null);
+    setTogglingVendorId(vendorId);
+    const previous = rows;
+    setRows((prev) => prev.map((r) => (r.vendorId === vendorId ? { ...r, podVendorActive: isActive } : r)));
+    try {
+      const res = await fetch(`/api/pod/${podId}/vendors/${vendorId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRows(previous);
+        setError(data.error ?? "Could not update vendor visibility");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setTogglingVendorId(null);
+    }
+  }
+
   async function confirmRemove() {
     if (!removeModal) return;
     setRemoving(true);
@@ -222,6 +300,8 @@ export function PodVendorRosterPanel({
       setRemoving(false);
     }
   }
+
+  const busy = saving || removing || togglingVendorId !== null;
 
   if (rows.length === 0) {
     return (
@@ -244,8 +324,9 @@ export function PodVendorRosterPanel({
                 podId={podId}
                 row={row}
                 onToggleFeatured={onToggleFeatured}
+                onTogglePodVendorActive={(vendorId, next) => void onTogglePodVendorActive(vendorId, next)}
                 onOpenRemove={(id, name) => setRemoveModal({ vendorId: id, name })}
-                disabled={saving || removing}
+                disabled={busy}
               />
             ))}
           </ul>

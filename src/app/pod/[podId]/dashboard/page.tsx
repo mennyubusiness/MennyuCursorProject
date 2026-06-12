@@ -58,7 +58,8 @@ export default async function PodDashboardPage({
     description: pv.vendor.description,
     imageUrl: pv.vendor.imageUrl,
     isFeatured: pv.isFeatured,
-    isActive: pv.vendor.isActive,
+    podVendorActive: pv.isActive,
+    vendorGloballyActive: pv.vendor.isActive,
     mennyuOrdersPaused: pv.vendor.mennyuOrdersPaused ?? false,
   }));
 
@@ -108,7 +109,8 @@ export default async function PodDashboardPage({
       <section>
         <h2 className="mb-3 text-base font-semibold text-oo-charcoal">Vendor roster</h2>
         <p className="mb-3 text-sm text-oo-stone-gray">
-          Drag to reorder. Featured shows a badge only — it does not change sort order.
+          Drag to reorder. Pause a vendor to hide them from your public pod page without removing their
+          membership. Featured shows a badge only — it does not change sort order.
         </p>
         <PodVendorRosterPanel podId={pod.id} initialRows={rosterRows} />
       </section>

@@ -9,6 +9,11 @@ import type { Cart, CartGroup, CartItem, CartPodScope, QuickCartApiResponse } fr
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
 import { validateCartItemModifiers } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
+import {
+  getVendorOrderabilityInPod,
+  cartLineOrderabilityCode,
+  cartLineOrderabilityMessage,
+} from "@/lib/vendor-orderability-in-pod";
 import { selectCartForSessionAndPod } from "@/lib/cart-selection";
 import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
 import { getOperationalMenuItemIdsForVendor } from "@/services/menu-active-scope.service";
@@ -346,7 +351,7 @@ export async function addCartItem(
         ? "This vendor is no longer active."
         : vendorAvailability.status === "closed"
           ? "This vendor is currently closed."
-          : "This vendor is not accepting orders through Open Order right now. Try again later.";
+          : "This vendor is paused right now.";
     const code =
       vendorAvailability.status === "inactive"
         ? "VENDOR_INACTIVE"
@@ -368,12 +373,30 @@ export async function addCartItem(
       "GROUP_ORDER_POD_MISMATCH"
     );
   }
-  const vendorInPod = await prisma.podVendor.findUnique({
-    where: {
-      podId_vendorId: { podId: cart.podId, vendorId: menuItemInitial.vendorId },
-    },
+  const [vendorInPod, pod] = await Promise.all([
+    prisma.podVendor.findUnique({
+      where: {
+        podId_vendorId: { podId: cart.podId, vendorId: menuItemInitial.vendorId },
+      },
+      select: { isActive: true },
+    }),
+    prisma.pod.findUnique({
+      where: { id: cart.podId },
+      select: { isActive: true },
+    }),
+  ]);
+  const podOrderability = getVendorOrderabilityInPod({
+    podActive: pod?.isActive ?? false,
+    podVendorExists: Boolean(vendorInPod),
+    podVendorActive: vendorInPod?.isActive ?? false,
+    vendor: menuItemInitial.vendor,
   });
-  if (!vendorInPod) throw new Error("Menu item vendor is not in this pod");
+  if (!podOrderability.orderable) {
+    throw new CartValidationError(
+      podOrderability.message ?? cartLineOrderabilityMessage(podOrderability),
+      podOrderability.code ?? cartLineOrderabilityCode(podOrderability)
+    );
+  }
 
   /** Validate modifiers only after variant resolution: parent shell graphs do not include leaf-only option ids. */
   const { menuItem: menuItemResolved, selections: selectionsResolved, variantSelectionsPriceCents } =

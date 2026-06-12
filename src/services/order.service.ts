@@ -18,6 +18,11 @@ import {
 } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
 import {
+  getVendorOrderabilityInPod,
+  cartLineOrderabilityCode,
+  cartLineOrderabilityMessage,
+} from "@/lib/vendor-orderability-in-pod";
+import {
   getOperationalMenuItemIdsForVendor,
   getOperationalModifierOptionIdsForVendor,
 } from "@/services/menu-active-scope.service";
@@ -121,6 +126,18 @@ export async function validateCartForOrder(cart: {
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
   }>;
 }): Promise<CartValidationResult> {
+  const pod = await prisma.pod.findUnique({
+    where: { id: cart.podId },
+    select: { isActive: true },
+  });
+  if (!pod?.isActive) {
+    return {
+      valid: false,
+      code: "POD_INACTIVE",
+      message: "This pod is not currently accepting orders.",
+    };
+  }
+
   const vendorIds = [...new Set(cart.items.map((i) => i.vendorId))];
   const operationalByVendor = new Map<string, Set<string>>();
   for (const vid of vendorIds) {
@@ -158,9 +175,21 @@ export async function validateCartForOrder(cart: {
     }
     const vendorInPod = await prisma.podVendor.findUnique({
       where: { podId_vendorId: { podId: cart.podId, vendorId: item.vendorId } },
+      select: { isActive: true },
     });
-    if (!vendorInPod?.isActive) {
-      return { valid: false, code: "VENDOR_NOT_IN_POD", message: "A vendor in your cart is not in this pod." };
+    const podOrderability = getVendorOrderabilityInPod({
+      podActive: true,
+      podVendorExists: Boolean(vendorInPod),
+      podVendorActive: vendorInPod?.isActive ?? false,
+      vendor: item.vendor,
+    });
+    if (!podOrderability.orderable) {
+      const code = cartLineOrderabilityCode(podOrderability);
+      const message =
+        podOrderability.reason === "pod_vendor_missing" || podOrderability.reason === "pod_vendor_paused"
+          ? "A vendor in your cart is no longer accepting orders at this pod."
+          : cartLineOrderabilityMessage(podOrderability).replace(/^This vendor/, "A vendor in your cart");
+      return { valid: false, code, message };
     }
     const expectedUnitCents = await expectedCartItemUnitPriceCents(item);
     if (item.priceCents !== expectedUnitCents) {
@@ -328,6 +357,18 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
 }> {
   const errors: CartItemValidationError[] = [];
 
+  const pod = await prisma.pod.findUnique({
+    where: { id: cart.podId },
+    select: { isActive: true },
+  });
+  if (!pod?.isActive) {
+    errors.push({
+      code: "POD_INACTIVE",
+      message: "This pod is not currently accepting orders.",
+    });
+    return { valid: false, errors };
+  }
+
   const vendorIdsDisplay = [...new Set(cart.items.map((i) => i.vendorId))];
   const menuItemIds = [...new Set(cart.items.map((i) => i.menuItemId))];
 
@@ -405,9 +446,15 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
       continue;
     }
     if (podVendorActive.get(item.vendorId) !== true) {
+      const podOrderability = getVendorOrderabilityInPod({
+        podActive: true,
+        podVendorExists: podVendorActive.has(item.vendorId),
+        podVendorActive: podVendorActive.get(item.vendorId) === true,
+        vendor: item.vendor,
+      });
       errors.push({
-        code: "VENDOR_NOT_IN_POD",
-        message: "This vendor is no longer in this pod.",
+        code: cartLineOrderabilityCode(podOrderability),
+        message: cartLineOrderabilityMessage(podOrderability),
         cartItemId: item.id,
         menuItemId: item.menuItemId,
         menuItemName: item.menuItem.name,
@@ -489,7 +536,9 @@ export function getCartValidationMessage(code: string): string {
     VENDOR_INACTIVE: "A vendor in your cart is no longer active.",
     VENDOR_CLOSED: "A vendor in your cart is currently closed.",
     VENDOR_PAUSED_MENNYU: "A vendor in your cart is not accepting orders right now.",
-    VENDOR_NOT_IN_POD: "A vendor in your cart is no longer in this pod.",
+    VENDOR_PAUSED_IN_POD: "A vendor in your cart is no longer accepting orders at this pod.",
+    VENDOR_NOT_IN_POD: "A vendor in your cart is no longer accepting orders at this pod.",
+    POD_INACTIVE: "This pod is not currently accepting orders.",
     PRICE_CHANGED: "A price or selection changed; please review your cart.",
     MODIFIER_OPTION_UNAVAILABLE: "A modifier selection changed and needs review.",
     MODIFIER_GROUP_UNAVAILABLE: "A modifier selection changed and needs review.",

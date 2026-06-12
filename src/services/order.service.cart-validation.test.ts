@@ -7,6 +7,7 @@ vi.mock("@/lib/cart-session-access", () => ({
 
 const mockPodVendorFindUnique = vi.fn();
 const mockPodVendorFindMany = vi.fn();
+const mockPodFindUnique = vi.fn();
 const mockOperationalMenuIds = vi.fn();
 const mockOperationalModOpts = vi.fn();
 const mockShellBase = vi.fn();
@@ -16,6 +17,9 @@ const mockMenuItemFindMany = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
+    pod: {
+      findUnique: (...args: unknown[]) => mockPodFindUnique(...args),
+    },
     podVendor: {
       findUnique: (...args: unknown[]) => mockPodVendorFindUnique(...args),
       findMany: (...args: unknown[]) => mockPodVendorFindMany(...args),
@@ -65,6 +69,7 @@ function baseCart(items: CartForValidation["items"]): CartForValidation {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockPodFindUnique.mockResolvedValue({ isActive: true });
   mockPodVendorFindUnique.mockResolvedValue({ isActive: true });
   mockPodVendorFindMany.mockResolvedValue([{ vendorId: "v_1", isActive: true }]);
   mockOperationalMenuIds.mockResolvedValue(new Set(["mi_1", "mi_2"]));
@@ -170,6 +175,20 @@ describe("validateCartForOrder", () => {
     );
     expect(open.valid).toBe(true);
   });
+
+  it("rejects inactive pod", async () => {
+    mockPodFindUnique.mockResolvedValue({ isActive: false });
+    const result = await validateCartForOrder(baseCart([baseLine()]));
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe("POD_INACTIVE");
+  });
+
+  it("rejects vendor paused in pod", async () => {
+    mockPodVendorFindUnique.mockResolvedValue({ isActive: false });
+    const result = await validateCartForOrder(baseCart([baseLine()]));
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe("VENDOR_PAUSED_IN_POD");
+  });
 });
 
 describe("validateCartItemsForDisplay multi-vendor", () => {
@@ -219,5 +238,12 @@ describe("validateCartItemsForDisplay multi-vendor", () => {
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]?.cartItemId).toBe("line_2");
     expect(result.errors[0]?.code).toBe("VENDOR_PAUSED_MENNYU");
+  });
+
+  it("flags vendor paused in pod on display validation", async () => {
+    mockPodVendorFindMany.mockResolvedValue([{ vendorId: "v_1", isActive: false }]);
+    const result = await validateCartItemsForDisplay(baseCart([baseLine()]));
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]?.code).toBe("VENDOR_PAUSED_IN_POD");
   });
 });

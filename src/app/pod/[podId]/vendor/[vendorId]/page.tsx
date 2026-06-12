@@ -4,17 +4,10 @@ import { VendorMenuExperience } from "@/components/vendor-menu/VendorMenuExperie
 import { VendorMenuHero } from "@/components/vendor-menu/VendorMenuHero";
 import { getOrCreateCartForVendorMenuAction } from "@/actions/cart.actions";
 import { prisma } from "@/lib/db";
-import { getVendorAvailabilityStatus, type VendorAvailabilityStatus } from "@/lib/vendor-availability";
+import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
 import { loadCustomerVendorMenuSections } from "@/services/vendor-customer-menu.service";
 
 const DEBUG_VENDOR_MENU_PAGE = process.env.NODE_ENV === "development";
-
-function availabilityBannerCopy(status: VendorAvailabilityStatus): string | null {
-  if (status === "open") return null;
-  if (status === "closed") return "This vendor is currently closed.";
-  if (status === "mennyu_paused") return "This vendor is not accepting orders right now.";
-  return "This vendor is not currently available.";
-}
 
 export default async function VendorMenuPage({
   params,
@@ -29,10 +22,12 @@ export default async function VendorMenuPage({
     select: {
       id: true,
       name: true,
+      isActive: true,
       accentColor: true,
       vendors: {
         where: { vendorId },
-        include: {
+        select: {
+          isActive: true,
           vendor: {
             select: {
               id: true,
@@ -52,7 +47,7 @@ export default async function VendorMenuPage({
   });
   const pv = pod?.vendors[0];
   const vendor = pv?.vendor;
-  if (!pod || !vendor) notFound();
+  if (!pod || !pod.isActive || !vendor) notFound();
 
   const menuStarted = DEBUG_VENDOR_MENU_PAGE ? Date.now() : 0;
   const cartStarted = DEBUG_VENDOR_MENU_PAGE ? Date.now() : 0;
@@ -74,9 +69,22 @@ export default async function VendorMenuPage({
     });
   }
 
-  const availabilityStatus = getVendorAvailabilityStatus(vendor);
-  const unavailable = availabilityStatus !== "open";
-  const bannerLine = availabilityBannerCopy(availabilityStatus);
+  const orderability = getVendorOrderabilityInPod({
+    podActive: pod.isActive,
+    podVendorExists: Boolean(pv),
+    podVendorActive: pv?.isActive ?? false,
+    vendor,
+  });
+  const orderingDisabled = !orderability.orderable;
+  const bannerLine = orderingDisabled ? orderability.message ?? null : null;
+  const availabilityStatus = orderingDisabled
+    ? orderability.reason === "vendor_closed"
+      ? ("closed" as const)
+      : orderability.reason === "vendor_paused" || orderability.reason === "pod_vendor_paused"
+        ? ("mennyu_paused" as const)
+        : ("inactive" as const)
+    : ("open" as const);
+
   return (
     <div className="w-full min-h-0">
       <RecentVendorViewTracker vendorId={vendorId} podId={podId} vendorName={vendor.name} />
@@ -112,7 +120,7 @@ export default async function VendorMenuPage({
           sections={sections}
           variantChildCountByParentPlu={variantChildCountByParentPlu}
           cart={cart}
-          orderingDisabled={unavailable}
+          orderingDisabled={orderingDisabled}
           vendorUsesDeliverect={Boolean(vendor.deliverectChannelLinkId?.trim())}
         />
       )}

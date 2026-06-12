@@ -1,12 +1,12 @@
 /**
- * Pod owner accepts a pending membership request (adds vendor to pod).
- * Same outcome as vendor-side accept; use when pod curates roster directly.
+ * Admin-only: accept a pending membership request on behalf of a vendor.
+ * Pod owners must not accept invites for vendors — vendor consent is required.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { acceptPodMembershipRequest } from "@/lib/pod-membership-request-accept";
-import { assertPodApiAccess } from "@/lib/permissions";
+import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
 
 export async function POST(
   request: Request,
@@ -17,9 +17,14 @@ export async function POST(
     return NextResponse.json({ error: "Missing podId or requestId" }, { status: 400 });
   }
 
-  const gate = await assertPodApiAccess(request, podId);
-  if (!gate.ok) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: gate.status });
+  if (!(await isAdminApiRequestAuthorized(request))) {
+    return NextResponse.json(
+      {
+        error:
+          "Only the vendor can accept this invitation. Ask them to accept from their vendor settings or dashboard.",
+      },
+      { status: 403 }
+    );
   }
 
   const req = await prisma.podMembershipRequest.findUnique({

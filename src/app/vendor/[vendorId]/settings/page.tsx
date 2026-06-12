@@ -171,6 +171,9 @@ export default async function VendorSettingsPage({
           pendingDeliverectConnectionKey={vendor.pendingDeliverectConnectionKey}
           deliverectAutoMapLastOutcome={vendor.deliverectAutoMapLastOutcome}
           hasUnmatchedChannelRegistration={hasUnmatchedChannelRegistration}
+          stripeConnectedAccountId={vendor.stripeConnectedAccountId ?? null}
+          stripePayoutsEnabled={vendor.stripePayoutsEnabled ?? false}
+          pendingPodInviteCount={pendingRequests.length}
         />
         <VendorPosConnectionPanel
           vendorId={vendor.id}
