@@ -20,6 +20,8 @@ import { VendorOnboardingProgress } from "../dashboard/VendorOnboardingProgress"
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { VendorBrandProfileForm } from "./VendorBrandProfileForm";
 import { VendorStripePayoutCard } from "./VendorStripePayoutCard";
+import { deriveVendorPodReadiness } from "@/lib/vendor-pod-readiness";
+import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
 
 function countStripeRequirementsDue(value: unknown): number {
   if (value == null) return 0;
@@ -63,6 +65,10 @@ export default async function VendorSettingsPage({
         description: true,
         imageUrl: true,
         accentColor: true,
+        cuisineCategory: true,
+        contactEmail: true,
+        contactPhone: true,
+        isActive: true,
         mennyuOrdersPaused: true,
         autoPublishMenus: true,
         vendorDashboardToken: true,
@@ -92,13 +98,19 @@ export default async function VendorSettingsPage({
     }),
     prisma.podVendor.findFirst({
       where: { vendorId },
-      include: { pod: { select: { id: true, name: true } } },
+      select: {
+        isActive: true,
+        pod: { select: { id: true, name: true, isActive: true } },
+      },
     }),
   ]);
 
   if (!vendor) notFound();
 
-  const hasUnmatchedChannelRegistration = await hasUnmatchedChannelRegistrationForVendorById(vendorId);
+  const [hasUnmatchedChannelRegistration, menuSummaries] = await Promise.all([
+    hasUnmatchedChannelRegistrationForVendorById(vendorId),
+    loadVendorMenuReadinessSummaries([vendorId]),
+  ]);
 
   const deliverectMenuIntegrity =
     vendor.deliverectChannelLinkId?.trim() != null && vendor.deliverectChannelLinkId.trim() !== ""
@@ -122,6 +134,46 @@ export default async function VendorSettingsPage({
   }));
 
   const hasToken = Boolean(vendor.vendorDashboardToken?.trim());
+  const vendorReadiness = deriveVendorPodReadiness(
+    {
+      podId: currentPod?.pod.id ?? vendorId,
+      vendorId,
+      pod: { isActive: currentPod?.pod.isActive ?? true },
+      podVendor: currentPod ? { isActive: currentPod.isActive } : null,
+      vendor: {
+        isActive: vendor.isActive,
+        mennyuOrdersPaused: vendor.mennyuOrdersPaused ?? false,
+        name: vendor.name,
+        slug: vendor.slug,
+        description: vendor.description,
+        imageUrl: vendor.imageUrl,
+        cuisineCategory: vendor.cuisineCategory,
+        contactEmail: vendor.contactEmail,
+        contactPhone: vendor.contactPhone,
+      },
+      menuSummary: menuSummaries.get(vendorId) ?? {
+        hasPublishedMenuVersion: false,
+        hasOperationalItems: false,
+        hasAvailableOperationalItems: false,
+      },
+      posSummary: {
+        deliverectChannelLinkId: vendor.deliverectChannelLinkId,
+        posConnectionStatus: vendor.posConnectionStatus,
+        deliverectAutoMapLastOutcome: vendor.deliverectAutoMapLastOutcome,
+        pendingDeliverectConnectionKey: vendor.pendingDeliverectConnectionKey,
+        hasUnmatchedChannelRegistration,
+      },
+      stripeSummary: {
+        stripeConnectedAccountId: vendor.stripeConnectedAccountId,
+        stripeChargesEnabled: vendor.stripeChargesEnabled ?? false,
+        stripePayoutsEnabled: vendor.stripePayoutsEnabled ?? false,
+        stripeConnectConfigured: Boolean(env.STRIPE_SECRET_KEY),
+      },
+      pendingPodInviteCount: pendingRequests.length,
+      hasPodMembership: Boolean(currentPod),
+    },
+    { audience: "vendor" }
+  );
 
   return (
     <div className="space-y-10">
@@ -133,6 +185,8 @@ export default async function VendorSettingsPage({
       <Suspense fallback={null}>
         <VendorAccessQueryMessages />
       </Suspense>
+
+      <VendorOnboardingProgress checklist={vendorReadiness.checklist} />
 
       {/* Brand / profile */}
       <section className="space-y-4">
@@ -164,17 +218,6 @@ export default async function VendorSettingsPage({
             activation succeeds.
           </p>
         </div>
-        <VendorOnboardingProgress
-          vendorId={vendor.id}
-          posConnectionStatus={vendor.posConnectionStatus}
-          deliverectChannelLinkId={vendor.deliverectChannelLinkId}
-          pendingDeliverectConnectionKey={vendor.pendingDeliverectConnectionKey}
-          deliverectAutoMapLastOutcome={vendor.deliverectAutoMapLastOutcome}
-          hasUnmatchedChannelRegistration={hasUnmatchedChannelRegistration}
-          stripeConnectedAccountId={vendor.stripeConnectedAccountId ?? null}
-          stripePayoutsEnabled={vendor.stripePayoutsEnabled ?? false}
-          pendingPodInviteCount={pendingRequests.length}
-        />
         <VendorPosConnectionPanel
           vendorId={vendor.id}
           vendorName={vendor.name}

@@ -20,6 +20,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { updatePodVendorPresentation } from "@/actions/pod-settings.actions";
 import { VendorLogo } from "@/components/images/VendorLogo";
+import { PodRosterReadinessSummary, type PodRosterReadinessSnapshot } from "./PodRosterReadinessSummary";
 
 export type PodRosterVendorRow = {
   vendorId: string;
@@ -33,38 +34,29 @@ export type PodRosterVendorRow = {
   vendorGloballyActive: boolean;
   /** Vendor-controlled global pause across Open Order. */
   mennyuOrdersPaused: boolean;
+  readiness: PodRosterReadinessSnapshot;
 };
 
-function rosterStatusBadges(row: PodRosterVendorRow) {
-  const badges: Array<{ key: string; label: string; className: string }> = [];
-
-  if (!row.vendorGloballyActive) {
-    badges.push({
-      key: "platform",
-      label: "Inactive by Open Order",
-      className: "rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-800",
-    });
-  } else if (row.mennyuOrdersPaused) {
-    badges.push({
-      key: "vendor-pause",
-      label: "Paused by vendor",
-      className: "rounded bg-amber-50 px-1.5 py-0.5 text-amber-900",
-    });
-  } else if (!row.podVendorActive) {
-    badges.push({
-      key: "pod-pause",
-      label: "Paused in this pod",
-      className: "rounded bg-amber-50 px-1.5 py-0.5 text-amber-900",
-    });
-  } else {
-    badges.push({
-      key: "active",
-      label: "Active in pod",
-      className: "text-emerald-800",
-    });
+function rosterStatusBadge(readiness: PodRosterReadinessSnapshot) {
+  const status = readiness.status;
+  const label = readiness.label;
+  if (status === "active") {
+    return { label, className: "rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-900" };
   }
-
-  return badges;
+  if (
+    status === "paused_in_pod" ||
+    status === "paused_by_vendor" ||
+    status === "needs_profile" ||
+    status === "needs_payment" ||
+    status === "needs_pos" ||
+    status === "needs_menu"
+  ) {
+    return { label, className: "rounded bg-amber-50 px-1.5 py-0.5 text-amber-900" };
+  }
+  if (status === "inactive_by_open_order" || status === "pod_inactive") {
+    return { label, className: "rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-800" };
+  }
+  return { label, className: "rounded bg-sky-50 px-1.5 py-0.5 text-sky-900" };
 }
 
 function SortableRosterRow({
@@ -90,7 +82,7 @@ function SortableRosterRow({
     transition,
     zIndex: isDragging ? 1 : undefined,
   };
-  const badges = rosterStatusBadges(row);
+  const badges = rosterStatusBadge(row.readiness);
 
   return (
     <li
@@ -133,12 +125,9 @@ function SortableRosterRow({
           <p className="mt-0.5 text-sm text-oo-stone-gray">No description</p>
         )}
         <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
-          {badges.map((badge) => (
-            <span key={badge.key} className={badge.className}>
-              {badge.label}
-            </span>
-          ))}
+          <span className={badges.className}>{badges.label}</span>
         </div>
+        <PodRosterReadinessSummary readiness={row.readiness} />
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
         <label className="flex cursor-pointer items-center gap-2 text-sm text-oo-charcoal">
