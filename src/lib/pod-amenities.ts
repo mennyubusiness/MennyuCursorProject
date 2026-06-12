@@ -7,6 +7,7 @@ export const POD_AMENITY_OPTIONS = [
   { id: "parking", label: "Parking" },
   { id: "restrooms", label: "Restrooms" },
   { id: "events", label: "Events" },
+  { id: "games", label: "Games" },
 ] as const;
 
 export type PodAmenityId = (typeof POD_AMENITY_OPTIONS)[number]["id"];

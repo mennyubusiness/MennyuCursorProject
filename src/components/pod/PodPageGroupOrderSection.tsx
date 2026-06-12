@@ -18,55 +18,60 @@ export async function PodPageGroupOrderSection({ podId }: { podId: string }) {
   const joinHref = `/group-order/join?podId=${encodeURIComponent(podId)}`;
 
   return (
-    <PageBand variant="muted" className="border-t-0">
+    <PageBand variant="light" className="border-t-0">
       <section id="pod-group-order" className="scroll-mt-36">
-        <PageShell className="rounded-xl border border-oo-light-stone bg-oo-warm-white px-4 py-4 shadow-sm sm:px-5 sm:py-5">
-          {ctaState.kind === "start" ? (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-bold text-oo-charcoal">Ordering with a group?</p>
-                <p className="mt-1 text-sm text-oo-stone-gray">
-                  Start a shared cart for your table, or join with a code from your host.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {session?.user ? (
-                  <PodPageStartGroupOrderButton podId={podId} fallbackHref={groupOrderCartUrl} />
-                ) : (
-                  <ButtonLink href={groupOrderHref} size="sm" className="shrink-0">
-                    Start group order
+        <PageShell className="py-8 sm:py-10">
+          <div className="rounded-xl border border-oo-light-stone bg-oo-cream/50 p-5 shadow-sm sm:p-6">
+            {ctaState.kind === "start" ? (
+              <>
+                <header className="max-w-2xl">
+                  <h2 className="text-xl font-bold tracking-tight text-oo-charcoal sm:text-2xl">
+                    Ordering with friends?
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-oo-stone-gray sm:text-base">
+                    Start a group order so everyone can add from different vendors while one person
+                    checks out.
+                  </p>
+                </header>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  {session?.user ? (
+                    <PodPageStartGroupOrderButton podId={podId} fallbackHref={groupOrderCartUrl} />
+                  ) : (
+                    <ButtonLink href={groupOrderHref} size="sm">
+                      Start group order
+                    </ButtonLink>
+                  )}
+                  <ButtonLink href={joinHref} variant="outline" size="sm">
+                    Join with code
                   </ButtonLink>
-                )}
-                <ButtonLink href={joinHref} variant="outline" size="sm" className="shrink-0">
-                  Join with a code
-                </ButtonLink>
+                </div>
+              </>
+            ) : ctaState.kind === "host_active" ? (
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-oo-charcoal">Group order started</h2>
+                  <p className="mt-1 text-sm text-oo-stone-gray">
+                    Open Quick Cart to invite friends or add items.
+                  </p>
+                </div>
+                <PodPageOpenQuickCartButton />
               </div>
-            </div>
-          ) : ctaState.kind === "host_active" ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            ) : ctaState.kind === "participant_active" ? (
               <div>
-                <p className="text-sm font-bold text-oo-charcoal">Group order started</p>
+                <h2 className="text-lg font-bold text-oo-charcoal">You&apos;re in a group order</h2>
                 <p className="mt-1 text-sm text-oo-stone-gray">
-                  Open Quick Cart to invite friends or add items.
+                  Add your items before the host checks out.
                 </p>
               </div>
-              <PodPageOpenQuickCartButton />
-            </div>
-          ) : ctaState.kind === "participant_active" ? (
-            <div>
-              <p className="text-sm font-bold text-oo-charcoal">You&apos;re in a group order</p>
-              <p className="mt-1 text-sm text-oo-stone-gray">
-                Add your items before the host checks out.
-              </p>
-            </div>
-          ) : (
-            <div>
-              <p className="text-sm font-bold text-oo-charcoal">Host is checking out</p>
-              <p className="mt-1 text-sm text-oo-stone-gray">
-                New changes are paused until checkout finishes.
-              </p>
-            </div>
-          )}
+            ) : (
+              <div>
+                <h2 className="text-lg font-bold text-oo-charcoal">Host is checking out</h2>
+                <p className="mt-1 text-sm text-oo-stone-gray">
+                  New changes are paused until checkout finishes.
+                </p>
+              </div>
+            )}
+          </div>
         </PageShell>
       </section>
     </PageBand>

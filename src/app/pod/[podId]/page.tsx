@@ -4,17 +4,19 @@ import { RecentPodViewTracker } from "@/components/retention/RecentViewTracker";
 import { PodPageHero } from "@/components/pod/PodPageHero";
 import { PodPageIdentitySection } from "@/components/pod/PodPageIdentitySection";
 import { PodPageContactSection } from "@/components/pod/PodPageContactSection";
-import { PodPageStickyNav, type PodPageNavItem } from "@/components/pod/PodPageStickyNav";
+import { PodPageLocationSection } from "@/components/pod/PodPageLocationSection";
+import { PodPageStickyNav } from "@/components/pod/PodPageStickyNav";
 import { PodPageStickyCta } from "@/components/pod/PodPageStickyCta";
-import { PodVendorGrid, type PodVendorGridRow } from "@/components/pod/PodVendorGrid";
+import { PodPageVendorSection } from "@/components/pod/PodPageVendorSection";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
-import { PageSection, PageShell } from "@/components/layout/page-shell";
-import { ButtonLink } from "@/components/ui/button";
+import { PageShell } from "@/components/layout/page-shell";
 import { PodPageGroupOrderSection } from "@/components/pod/PodPageGroupOrderSection";
 import { POD_QR_ENTRY_VALUE } from "@/lib/pod-ordering-url";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { parsePodAmenities } from "@/lib/pod-amenities";
+import { buildPodPageNavItems } from "@/lib/pod-page-nav";
 import { getPodOrderingStatus } from "@/lib/pod-page-status";
+import type { PodVendorGridRow } from "@/components/pod/PodVendorGrid";
 import { prisma } from "@/lib/db";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
 
@@ -114,57 +116,39 @@ export default async function PodPage({
   if (!pod || !pod.isActive) notFound();
 
   const vendorRows = pod.vendors.map(toGridRow);
-  const featuredRows = vendorRows.filter((r) => r.isFeatured);
-  const hasFeaturedSection =
-    featuredRows.length > 0 && featuredRows.length < vendorRows.length;
-  const mainVendorRows = hasFeaturedSection
-    ? vendorRows.filter((r) => !r.isFeatured)
-    : vendorRows;
-
   const amenities = parsePodAmenities(pod.amenities);
   const orderingStatus = getPodOrderingStatus(vendorRows.map((r) => r.availability));
 
-  const contact = {
-    address: pod.address,
+  const hasLocationSection = Boolean(pod.address?.trim());
+  const hasContactSection = Boolean(
+    pod.contactEmail?.trim() ||
+      pod.ownerContactPhone?.trim() ||
+      pod.websiteUrl?.trim() ||
+      pod.instagramUrl?.trim()
+  );
+  const hasAboutSection = Boolean(
+    pod.description?.trim() || pod.tagline?.trim() || amenities.length > 0
+  );
+  const showGroupOrderSection = vendorRows.length > 0;
+
+  const contactDetails = {
     contactEmail: pod.contactEmail,
     contactPhone: pod.ownerContactPhone,
     websiteUrl: pod.websiteUrl,
     instagramUrl: pod.instagramUrl,
-    pickupInstructions: pod.pickupInstructions,
   };
-
-  const hasAboutSection = Boolean(pod.description?.trim() || amenities.length > 0);
-  const hasContactSection = Boolean(
-    contact.address?.trim() ||
-      contact.contactEmail?.trim() ||
-      contact.contactPhone?.trim() ||
-      contact.websiteUrl?.trim() ||
-      contact.instagramUrl?.trim() ||
-      contact.pickupInstructions?.trim()
-  );
 
   const groupOrderCartUrl = `/cart?startGroupOrder=1&podId=${encodeURIComponent(podId)}`;
   const groupOrderHref = session?.user
     ? groupOrderCartUrl
     : buildLoginHrefWithReturn(groupOrderCartUrl);
 
-  const navItems: PodPageNavItem[] = [];
-  if (hasAboutSection) {
-    navItems.push({ id: "pod-about", label: "About" });
-  }
-  if (vendorRows.length > 0) {
-    navItems.push({
-      id: hasFeaturedSection ? "pod-featured" : "pod-vendors",
-      label: hasFeaturedSection ? "Featured" : "Vendors",
-    });
-    if (hasFeaturedSection && mainVendorRows.length > 0) {
-      navItems.push({ id: "pod-vendors", label: "All vendors" });
-    }
-    navItems.push({ id: "pod-group-order", label: "Group order" });
-  }
-  if (hasContactSection) {
-    navItems.push({ id: "pod-contact", label: "Contact" });
-  }
+  const navItems = buildPodPageNavItems({
+    hasAboutSection,
+    hasLocationSection,
+    hasContactSection,
+    showGroupOrderNav: showGroupOrderSection,
+  });
 
   return (
     <div className="w-full min-h-0 pb-20 lg:pb-0">
@@ -200,109 +184,43 @@ export default async function PodPage({
 
       <ScrollPodVendorIntoView vendorId={highlightVendor} />
 
+      <PodPageVendorSection
+        podId={podId}
+        podName={pod.name}
+        rows={vendorRows}
+        highlightVendorId={highlightVendor}
+        orderingStatus={orderingStatus}
+        showContactLink={hasLocationSection || hasContactSection}
+        contactAnchorId={
+          hasLocationSection ? "pod-location" : hasContactSection ? "pod-contact" : null
+        }
+      />
+
+      {showGroupOrderSection && <PodPageGroupOrderSection podId={pod.id} />}
+
       {hasAboutSection && (
         <PodPageIdentitySection
+          podName={pod.name}
+          tagline={pod.tagline}
           description={pod.description}
           amenities={amenities}
-          address={pod.address}
         />
       )}
 
-      {vendorRows.length > 0 && <PodPageGroupOrderSection podId={pod.id} />}
+      {hasLocationSection && (
+        <PodPageLocationSection
+          podName={pod.name}
+          address={pod.address!}
+          pickupInstructions={pod.pickupInstructions}
+        />
+      )}
 
-      <PageSection className="!py-8 sm:!py-10">
-        <PageShell className="space-y-10 sm:space-y-12">
-          {vendorRows.length === 0 ? (
-            <section id="pod-vendors" className="scroll-mt-36">
-              <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white px-6 py-10 text-center shadow-sm">
-                <p className="text-lg font-bold text-oo-charcoal">No vendors accepting orders yet</p>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-oo-stone-gray">
-                  {pod.name} is set up on Open Order, but no kitchens are listed right now. Check
-                  back soon or explore other pods nearby.
-                </p>
-                {orderingStatus.tone === "closed" && (
-                  <p className="mx-auto mt-3 max-w-md text-sm text-oo-stone-gray">
-                    When vendors return, you&apos;ll order from one shared cart and pick up in one
-                    trip.
-                  </p>
-                )}
-                <div className="mt-6 flex flex-wrap justify-center gap-3">
-                  <ButtonLink href="/explore" variant="primary" size="sm">
-                    Explore pods
-                  </ButtonLink>
-                  {hasContactSection && (
-                    <a
-                      href="#pod-contact"
-                      className="inline-flex min-h-9 items-center rounded-lg border border-oo-light-stone bg-oo-cream px-3.5 py-2 text-sm font-semibold text-oo-charcoal hover:bg-oo-warm-white"
-                    >
-                      Contact &amp; location
-                    </a>
-                  )}
-                </div>
-              </div>
-            </section>
-          ) : (
-            <>
-              {hasFeaturedSection && (
-                <section
-                  id="pod-featured"
-                  aria-labelledby="pod-featured-heading"
-                  className="scroll-mt-36"
-                >
-                  <header className="mb-4">
-                    <h2
-                      id="pod-featured-heading"
-                      className="text-lg font-bold tracking-tight text-oo-charcoal sm:text-xl"
-                    >
-                      Featured vendors
-                    </h2>
-                    <p className="mt-1 text-sm text-oo-stone-gray">
-                      Popular picks at {pod.name} — same shared cart for every kitchen.
-                    </p>
-                  </header>
-                  <PodVendorGrid
-                    podId={podId}
-                    rows={featuredRows}
-                    highlightVendorId={highlightVendor}
-                  />
-                </section>
-              )}
-
-              <section
-                id="pod-vendors"
-                aria-labelledby="pod-vendors-heading"
-                className="scroll-mt-36"
-              >
-                <header className="mb-4">
-                  <h2
-                    id="pod-vendors-heading"
-                    className="text-lg font-bold tracking-tight text-oo-charcoal sm:text-xl"
-                  >
-                    {hasFeaturedSection ? "All vendors" : "Vendors"}
-                  </h2>
-                  <p className="mt-1 max-w-2xl text-sm text-oo-stone-gray">
-                    {orderingStatus.tone === "closed"
-                      ? "Kitchens may be closed — menus are still browsable when available."
-                      : "Open any kitchen for its menu. Pickup timing may vary across vendors."}
-                  </p>
-                </header>
-                <PodVendorGrid
-                  podId={podId}
-                  rows={mainVendorRows}
-                  highlightVendorId={highlightVendor}
-                />
-              </section>
-            </>
-          )}
-
-          {hasContactSection && <PodPageContactSection contact={contact} />}
-        </PageShell>
-      </PageSection>
+      {hasContactSection && <PodPageContactSection contact={contactDetails} />}
 
       <PodPageStickyCta
         podName={pod.name}
         showVendorsCta={vendorRows.length > 0}
-        showGroupOrderCta={vendorRows.length > 0}
+        showGroupOrderCta={showGroupOrderSection}
         groupOrderHref={groupOrderHref}
       />
     </div>

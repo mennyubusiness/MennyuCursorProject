@@ -80,7 +80,7 @@ export function PodVendorCard({ podId, variant, vendor, isFeatured, availability
   const href = `/pod/${podId}/vendor/${vendor.id}`;
   const grid = variant === "grid";
   const cuisine = vendor.cuisineCategory?.trim();
-  const ctaLabel = availability.unavailable ? "View menu" : "Order from vendor";
+  const ctaLabel = availability.unavailable ? "View menu" : "Order now";
 
   return (
     <Link
