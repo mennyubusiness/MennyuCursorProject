@@ -11,6 +11,10 @@ export type HeaderAccountMenu = {
   podDashboardLabel: string | null;
 };
 
+export function getHeaderAccountDisplayLabel(accountMenu: HeaderAccountMenu): string {
+  return accountMenu.name?.trim() || accountMenu.email.split("@")[0] || "Account";
+}
+
 export function buildHeaderAccountRoleHint(input: {
   isPlatformAdmin: boolean;
   vendorCount: number;

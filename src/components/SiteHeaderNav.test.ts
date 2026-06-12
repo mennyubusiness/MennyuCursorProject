@@ -7,6 +7,7 @@ const dir = dirname(fileURLToPath(import.meta.url));
 
 const headerNavSrc = readFileSync(join(dir, "SiteHeaderNav.tsx"), "utf8");
 const dropdownSrc = readFileSync(join(dir, "AccountHeaderDropdown.tsx"), "utf8");
+const menuActionsSrc = readFileSync(join(dir, "account/AccountHeaderMenuActions.tsx"), "utf8");
 const signOutFormSrc = readFileSync(join(dir, "auth/CustomerSignOutForm.tsx"), "utf8");
 const authProviderSrc = readFileSync(join(dir, "AuthSessionProvider.tsx"), "utf8");
 const headerNavContextSrc = readFileSync(join(dir, "../lib/auth/header-nav-context.ts"), "utf8");
@@ -102,12 +103,14 @@ describe("AuthSessionProvider stale session sync", () => {
 });
 
 describe("AccountHeaderDropdown menu items", () => {
-  it("includes identity summary and core links", () => {
-    expect(dropdownSrc).toMatch(/View account/);
-    expect(dropdownSrc).toMatch(/ACCOUNT_HUB_PATH/);
-    expect(dropdownSrc).toMatch(/Order history/);
-    expect(dropdownSrc).toMatch(/ORDER_HISTORY_PATH/);
-    expect(dropdownSrc).toMatch(/CustomerSignOutForm/);
+  it("includes identity summary and core links via shared actions", () => {
+    expect(dropdownSrc).toMatch(/AccountHeaderMenuActions/);
+    expect(dropdownSrc).toMatch(/getHeaderAccountDisplayLabel/);
+    expect(menuActionsSrc).toMatch(/View account/);
+    expect(menuActionsSrc).toMatch(/ACCOUNT_HUB_PATH/);
+    expect(menuActionsSrc).toMatch(/Order history/);
+    expect(menuActionsSrc).toMatch(/ORDER_HISTORY_PATH/);
+    expect(menuActionsSrc).toMatch(/CustomerSignOutForm/);
   });
 
   it("uses accessible dropdown trigger", () => {
@@ -117,12 +120,14 @@ describe("AccountHeaderDropdown menu items", () => {
   });
 
   it("closes after navigation", () => {
-    expect(dropdownSrc).toMatch(/onClick=\{close\}/);
+    expect(dropdownSrc).toMatch(/onNavigate=\{close\}/);
+    expect(menuActionsSrc).toMatch(/onClick=\{onNavigate\}/);
   });
 
   it("does not close sign-out form before submit starts", () => {
     expect(dropdownSrc).toMatch(/onSignOutStart=\{close\}/);
-    expect(dropdownSrc).not.toMatch(/onClick=\{close\}[\s\S]*Sign out/);
+    expect(menuActionsSrc).toMatch(/onSignOutStart=\{onSignOutStart\}/);
+    expect(menuActionsSrc).not.toMatch(/onClick=\{onNavigate\}[\s\S]*Sign out/);
   });
 
   it("requires server session and account menu", () => {
@@ -131,10 +136,10 @@ describe("AccountHeaderDropdown menu items", () => {
   });
 
   it("includes optional single-role dashboard links", () => {
-    expect(dropdownSrc).toMatch(/Platform admin/);
-    expect(dropdownSrc).toMatch(/adminDashboardHref/);
-    expect(dropdownSrc).toMatch(/vendorDashboardHref/);
-    expect(dropdownSrc).toMatch(/podDashboardHref/);
+    expect(menuActionsSrc).toMatch(/Platform admin/);
+    expect(menuActionsSrc).toMatch(/adminDashboardHref/);
+    expect(menuActionsSrc).toMatch(/vendorDashboardHref/);
+    expect(menuActionsSrc).toMatch(/podDashboardHref/);
   });
 });
 

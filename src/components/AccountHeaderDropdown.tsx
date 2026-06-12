@@ -1,14 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CustomerSignOutForm } from "@/components/auth/CustomerSignOutForm";
-import {
-  ACCOUNT_HUB_PATH,
-  ORDER_HISTORY_PATH,
-} from "@/lib/auth/account-paths";
+import { AccountHeaderMenuActions } from "@/components/account/AccountHeaderMenuActions";
 import type { HeaderAccountMenu } from "@/lib/auth/header-account-menu";
+import { getHeaderAccountDisplayLabel } from "@/lib/auth/header-account-menu";
 import { cn } from "@/lib/cn";
 
 type AccountHeaderDropdownProps = {
@@ -51,7 +47,7 @@ export function AccountHeaderDropdown({
 
   if (!hasServerSession || !accountMenu) return null;
 
-  const displayLabel = accountMenu.name?.trim() || accountMenu.email.split("@")[0] || "Account";
+  const displayLabel = getHeaderAccountDisplayLabel(accountMenu);
 
   return (
     <div ref={ref} className="relative">
@@ -79,57 +75,14 @@ export function AccountHeaderDropdown({
               </p>
             )}
           </div>
-          <Link
-            href={ACCOUNT_HUB_PATH}
-            role="menuitem"
-            className={menuItemClass}
-            onClick={close}
-          >
-            View account
-          </Link>
-          <Link
-            href={ORDER_HISTORY_PATH}
-            role="menuitem"
-            className={menuItemClass}
-            onClick={close}
-          >
-            Order history
-          </Link>
-          {accountMenu.adminDashboardHref && (
-            <Link
-              href={accountMenu.adminDashboardHref}
-              role="menuitem"
-              className={menuItemClass}
-              onClick={close}
-            >
-              Platform admin
-            </Link>
-          )}
-          {accountMenu.vendorDashboardHref && accountMenu.vendorDashboardLabel && (
-            <Link
-              href={accountMenu.vendorDashboardHref}
-              role="menuitem"
-              className={menuItemClass}
-              onClick={close}
-            >
-              {accountMenu.vendorDashboardLabel}
-            </Link>
-          )}
-          {accountMenu.podDashboardHref && accountMenu.podDashboardLabel && (
-            <Link
-              href={accountMenu.podDashboardHref}
-              role="menuitem"
-              className={menuItemClass}
-              onClick={close}
-            >
-              {accountMenu.podDashboardLabel}
-            </Link>
-          )}
-          <div className="my-1 border-t border-[#E7E0D6]" />
-          <CustomerSignOutForm
+          <AccountHeaderMenuActions
+            accountMenu={accountMenu}
+            itemClassName={menuItemClass}
+            signOutClassName={cn(menuItemClass, "text-red-800 hover:bg-red-50")}
+            dividerClassName="my-1 border-t border-[#E7E0D6]"
+            itemRole="menuitem"
+            onNavigate={close}
             onSignOutStart={close}
-            className={cn(menuItemClass, "text-red-800 hover:bg-red-50")}
-            role="menuitem"
           />
         </div>
       )}

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { AccountHeaderDropdown } from "@/components/AccountHeaderDropdown";
+import { MobileAccountNavSection } from "@/components/account/MobileAccountNavSection";
 import type { HeaderAccountMenu } from "@/lib/auth/header-account-menu";
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
 import { HeaderSignInLink } from "@/components/HeaderSignInLink";
@@ -309,18 +310,19 @@ export function SiteHeaderNav({
 
                   <div className="my-3 border-t border-oo-light-stone" aria-hidden />
 
-                  <div className="flex flex-col gap-1">
-                    {isSignedIn ? (
-                      <AccountHeaderDropdown
-                        accountMenu={accountMenu}
-                        hasServerSession={hasServerSession}
-                        triggerClassName={mobileAccountRowClass}
-                      />
-                    ) : (
-                      <HeaderSignInLink className={mobileAccountRowClass} title="Sign in" />
-                    )}
+                  {isSignedIn ? (
+                    <MobileAccountNavSection
+                      accountMenu={accountMenu}
+                      hasServerSession={hasServerSession}
+                      onNavigate={closeMobile}
+                    />
+                  ) : (
+                    <HeaderSignInLink className={mobileAccountRowClass} title="Sign in" />
+                  )}
 
-                    {showCart && (
+                  {showCart && (
+                    <>
+                      <div className="my-3 border-t border-oo-light-stone" aria-hidden />
                       <CartControl
                         cartHref={cartHref}
                         activeOrderHref={activeOrderHref}
@@ -329,8 +331,8 @@ export function SiteHeaderNav({
                         mobile
                         onNavigate={closeMobile}
                       />
-                    )}
-                  </div>
+                    </>
+                  )}
 
                   <a
                     href={businessCtaHref}
