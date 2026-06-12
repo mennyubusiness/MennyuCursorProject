@@ -3,15 +3,11 @@
 import Link from "next/link";
 
 import { CustomerSignOutForm } from "@/components/auth/CustomerSignOutForm";
-import {
-  ACCOUNT_HUB_PATH,
-  ORDER_HISTORY_PATH,
-} from "@/lib/auth/account-paths";
-import type { HeaderAccountMenu } from "@/lib/auth/header-account-menu";
+import type { RoleAccountAction } from "@/lib/auth/role-nav-items";
 import { cn } from "@/lib/cn";
 
 type AccountHeaderMenuActionsProps = {
-  accountMenu: HeaderAccountMenu;
+  actions: RoleAccountAction[];
   itemClassName: string;
   signOutClassName: string;
   dividerClassName?: string;
@@ -21,7 +17,7 @@ type AccountHeaderMenuActionsProps = {
 };
 
 export function AccountHeaderMenuActions({
-  accountMenu,
+  actions,
   itemClassName,
   signOutClassName,
   dividerClassName = "my-1 border-t border-oo-light-stone",
@@ -29,60 +25,30 @@ export function AccountHeaderMenuActions({
   onNavigate,
   onSignOutStart,
 }: AccountHeaderMenuActionsProps) {
+  const linkActions = actions.filter((action): action is Extract<RoleAccountAction, { type: "link" }> => action.type === "link");
+  const signOutAction = actions.find((action) => action.type === "sign-out");
+
   return (
     <>
-      <Link
-        href={ACCOUNT_HUB_PATH}
-        role={itemRole}
-        className={itemClassName}
-        onClick={onNavigate}
-      >
-        View account
-      </Link>
-      <Link
-        href={ORDER_HISTORY_PATH}
-        role={itemRole}
-        className={itemClassName}
-        onClick={onNavigate}
-      >
-        Order history
-      </Link>
-      {accountMenu.adminDashboardHref && (
+      {linkActions.map((action) => (
         <Link
-          href={accountMenu.adminDashboardHref}
+          key={`${action.href}-${action.label}`}
+          href={action.href}
           role={itemRole}
-          className={itemClassName}
+          className={cn(itemClassName, action.danger && "text-red-800 hover:bg-red-50")}
           onClick={onNavigate}
         >
-          Platform admin
+          {action.label}
         </Link>
-      )}
-      {accountMenu.vendorDashboardHref && accountMenu.vendorDashboardLabel && (
-        <Link
-          href={accountMenu.vendorDashboardHref}
-          role={itemRole}
-          className={itemClassName}
-          onClick={onNavigate}
-        >
-          {accountMenu.vendorDashboardLabel}
-        </Link>
-      )}
-      {accountMenu.podDashboardHref && accountMenu.podDashboardLabel && (
-        <Link
-          href={accountMenu.podDashboardHref}
-          role={itemRole}
-          className={itemClassName}
-          onClick={onNavigate}
-        >
-          {accountMenu.podDashboardLabel}
-        </Link>
-      )}
+      ))}
       <div className={dividerClassName} aria-hidden />
       <CustomerSignOutForm
         onSignOutStart={onSignOutStart}
-        className={cn(signOutClassName)}
+        className={cn(signOutClassName, signOutAction?.danger && "text-red-800 hover:bg-red-50")}
         role={itemRole}
-      />
+      >
+        {signOutAction?.label ?? "Sign out"}
+      </CustomerSignOutForm>
     </>
   );
 }

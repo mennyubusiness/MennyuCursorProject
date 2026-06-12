@@ -54,6 +54,8 @@ describe("/account hub layout", () => {
     expect(accountPageSrc).toMatch(/AccountSecurityCard/);
     expect(accountPageSrc).toMatch(/AccountToolsGrid/);
     expect(accountPageSrc).toMatch(/AccountSignOutSection/);
+    expect(accountPageSrc).toMatch(/resolveAccountPrimaryNavMode/);
+    expect(accountPageSrc).toMatch(/primaryMode === "customer"/);
   });
 
   it("loads recent orders preview", () => {

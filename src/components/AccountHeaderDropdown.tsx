@@ -5,11 +5,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountHeaderMenuActions } from "@/components/account/AccountHeaderMenuActions";
 import type { HeaderAccountMenu } from "@/lib/auth/header-account-menu";
 import { getHeaderAccountDisplayLabel } from "@/lib/auth/header-account-menu";
+import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
+import { buildRoleAccountActions } from "@/lib/auth/role-nav-items";
 import { cn } from "@/lib/cn";
 
 type AccountHeaderDropdownProps = {
   accountMenu: HeaderAccountMenu | null;
   hasServerSession: boolean;
+  navMode: HeaderNavMode;
+  dashboardHref: string | null;
   triggerClassName: string;
 };
 
@@ -22,6 +26,8 @@ const menuItemClass =
 export function AccountHeaderDropdown({
   accountMenu,
   hasServerSession,
+  navMode,
+  dashboardHref,
   triggerClassName,
 }: AccountHeaderDropdownProps) {
   const [open, setOpen] = useState(false);
@@ -48,6 +54,7 @@ export function AccountHeaderDropdown({
   if (!hasServerSession || !accountMenu) return null;
 
   const displayLabel = getHeaderAccountDisplayLabel(accountMenu);
+  const actions = buildRoleAccountActions({ mode: navMode, accountMenu, dashboardHref });
 
   return (
     <div ref={ref} className="relative">
@@ -76,7 +83,7 @@ export function AccountHeaderDropdown({
             )}
           </div>
           <AccountHeaderMenuActions
-            accountMenu={accountMenu}
+            actions={actions}
             itemClassName={menuItemClass}
             signOutClassName={cn(menuItemClass, "text-red-800 hover:bg-red-50")}
             dividerClassName="my-1 border-t border-[#E7E0D6]"

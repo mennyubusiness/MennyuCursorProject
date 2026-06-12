@@ -13,13 +13,15 @@ import { HeaderSignInLink } from "@/components/HeaderSignInLink";
 import { buttonClassName } from "@/components/ui/button";
 import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
 import { HOME_PRIMARY_CTA_LABEL, homePodOwnerMailtoHref } from "@/lib/home-marketing";
-import { isSiteNavLinkActive, SITE_NAV_LINKS } from "@/lib/site-nav";
+import { isSiteNavLinkActive } from "@/lib/site-nav";
+import { buildRoleNavConfig, shouldShowHeaderCart } from "@/lib/auth/role-nav-items";
 import { cn } from "@/lib/cn";
 
 type SiteHeaderNavProps = {
   hasServerSession: boolean;
   navMode: HeaderNavMode;
   accountMenu: HeaderAccountMenu | null;
+  dashboardHref: string | null;
   activeOrderHref: string | null;
   cartHref: string;
 };
@@ -209,6 +211,7 @@ export function SiteHeaderNav({
   hasServerSession,
   navMode,
   accountMenu,
+  dashboardHref,
   activeOrderHref,
   cartHref,
 }: SiteHeaderNavProps) {
@@ -261,10 +264,13 @@ export function SiteHeaderNav({
   }, [mobileOpen, closeMobile]);
 
   const isSignedIn = hasServerSession;
-  const showCustomerOrdering = navMode === "guest" || navMode === "customer";
-  const showCart = showCustomerOrdering || isSignedIn;
+  const roleNav = buildRoleNavConfig({ mode: navMode, accountMenu, dashboardHref });
   const cartItemCount = quickCart?.itemCount ?? 0;
+  const hasActiveCart =
+    cartItemCount > 0 || Boolean(quickCart?.hasActiveGroupOrder);
+  const showCart = shouldShowHeaderCart({ navMode, hasActiveCart });
   const prominentCart = cartItemCount > 0 || Boolean(quickCart?.hasActiveGroupOrder);
+  const showBusinessCta = roleNav.showBusinessCta;
 
   const businessCtaHref = homePodOwnerMailtoHref();
   const mobileAccountRowClass = cn(mobileNavRowBase, mobileNavRowIdle, "w-full justify-start border-0 bg-transparent shadow-none");
@@ -296,7 +302,7 @@ export function SiteHeaderNav({
               <div className="oo-shell pt-2">
                 <div className="animate-oo-mobile-menu-in rounded-b-2xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-xl">
                   <nav className="flex flex-col gap-1" aria-label="Primary">
-                    {SITE_NAV_LINKS.map((link) => (
+                    {roleNav.headerLinks.map((link) => (
                       <NavLink
                         key={link.href}
                         href={link.href}
@@ -308,12 +314,16 @@ export function SiteHeaderNav({
                     ))}
                   </nav>
 
-                  <div className="my-3 border-t border-oo-light-stone" aria-hidden />
+                  {roleNav.headerLinks.length > 0 && (
+                    <div className="my-3 border-t border-oo-light-stone" aria-hidden />
+                  )}
 
                   {isSignedIn ? (
                     <MobileAccountNavSection
                       accountMenu={accountMenu}
                       hasServerSession={hasServerSession}
+                      navMode={navMode}
+                      dashboardHref={dashboardHref}
                       onNavigate={closeMobile}
                     />
                   ) : (
@@ -334,17 +344,19 @@ export function SiteHeaderNav({
                     </>
                   )}
 
-                  <a
-                    href={businessCtaHref}
-                    className={cn(
-                      buttonClassName({ variant: "primary", size: "md" }),
-                      headerFocusVisible,
-                      "mt-4 w-full shadow-[0_0_16px_rgba(249,115,22,0.28)]"
-                    )}
-                    onClick={closeMobile}
-                  >
-                    {HOME_PRIMARY_CTA_LABEL}
-                  </a>
+                  {showBusinessCta && (
+                    <a
+                      href={businessCtaHref}
+                      className={cn(
+                        buttonClassName({ variant: "primary", size: "md" }),
+                        headerFocusVisible,
+                        "mt-4 w-full shadow-[0_0_16px_rgba(249,115,22,0.28)]"
+                      )}
+                      onClick={closeMobile}
+                    >
+                      {HOME_PRIMARY_CTA_LABEL}
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
@@ -356,20 +368,28 @@ export function SiteHeaderNav({
   return (
     <>
       <nav className="flex min-w-0 flex-1 items-center justify-end gap-3 lg:justify-between" aria-label="Site">
-        <div className={cn(navPill, "hidden lg:inline-flex")}>
-          {SITE_NAV_LINKS.map((link) => (
-            <NavLink key={link.href} href={link.href} label={link.label} pathname={pathname} />
-          ))}
-        </div>
+        {roleNav.headerLinks.length > 0 ? (
+          <div className={cn(navPill, "hidden lg:inline-flex")}>
+            {roleNav.headerLinks.map((link) => (
+              <NavLink key={link.href} href={link.href} label={link.label} pathname={pathname} />
+            ))}
+          </div>
+        ) : (
+          <div className="hidden flex-1 lg:block" aria-hidden />
+        )}
 
         <div className="hidden items-center gap-2 lg:flex">
-          <a href={businessCtaHref} className={headerPrimaryCta}>
-            {HOME_PRIMARY_CTA_LABEL}
-          </a>
+          {showBusinessCta && (
+            <a href={businessCtaHref} className={headerPrimaryCta}>
+              {HOME_PRIMARY_CTA_LABEL}
+            </a>
+          )}
           {isSignedIn ? (
             <AccountHeaderDropdown
               accountMenu={accountMenu}
               hasServerSession={hasServerSession}
+              navMode={navMode}
+              dashboardHref={dashboardHref}
               triggerClassName={headerSecondaryButton}
             />
           ) : (

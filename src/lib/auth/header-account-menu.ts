@@ -9,6 +9,15 @@ export type HeaderAccountMenu = {
   vendorDashboardLabel: string | null;
   podDashboardHref: string | null;
   podDashboardLabel: string | null;
+  primaryVendorId: string | null;
+  primaryPodId: string | null;
+  vendorSelectHref: string | null;
+  podSelectHref: string | null;
+  vendorOrdersHref: string | null;
+  vendorKitchenHref: string | null;
+  vendorSettingsHref: string | null;
+  podSettingsHref: string | null;
+  podVendorsHref: string | null;
 };
 
 export function getHeaderAccountDisplayLabel(accountMenu: HeaderAccountMenu): string {

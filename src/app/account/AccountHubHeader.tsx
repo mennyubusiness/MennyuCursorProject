@@ -1,8 +1,10 @@
 import type { LoadedAccountPageContext } from "@/lib/account-page-context";
+import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
 import { accountHubCardClass, accountHubMutedClass } from "./account-hub-styles";
 
 type AccountHubHeaderProps = {
   ctx: LoadedAccountPageContext;
+  primaryMode: HeaderNavMode;
 };
 
 function displayName(ctx: LoadedAccountPageContext): string {
@@ -22,7 +24,20 @@ function roleSummary(ctx: LoadedAccountPageContext): string | null {
   return parts.join(" · ");
 }
 
-export function AccountHubHeader({ ctx }: AccountHubHeaderProps) {
+function hubSubtitle(primaryMode: HeaderNavMode): string {
+  switch (primaryMode) {
+    case "vendor":
+      return "Vendor account settings, kitchen access, and operational shortcuts.";
+    case "pod":
+      return "Pod profile, vendor roster, and operational shortcuts.";
+    case "admin":
+      return "Platform admin account and operational shortcuts.";
+    default:
+      return "Manage your profile, order updates phone, and recent orders.";
+  }
+}
+
+export function AccountHubHeader({ ctx, primaryMode }: AccountHubHeaderProps) {
   const name = displayName(ctx);
   const initial = name.charAt(0).toUpperCase();
   const roles = roleSummary(ctx);
@@ -44,9 +59,7 @@ export function AccountHubHeader({ ctx }: AccountHubHeaderProps) {
           {roles && (
             <p className="mt-2 text-xs font-medium uppercase tracking-wide text-brand">{roles}</p>
           )}
-          <p className={`mt-3 ${accountHubMutedClass}`}>
-            Manage your profile, order updates phone, and shortcuts to your tools.
-          </p>
+          <p className={`mt-3 ${accountHubMutedClass}`}>{hubSubtitle(primaryMode)}</p>
         </div>
       </div>
     </header>

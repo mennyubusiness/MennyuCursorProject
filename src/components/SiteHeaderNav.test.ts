@@ -8,6 +8,7 @@ const dir = dirname(fileURLToPath(import.meta.url));
 const headerNavSrc = readFileSync(join(dir, "SiteHeaderNav.tsx"), "utf8");
 const dropdownSrc = readFileSync(join(dir, "AccountHeaderDropdown.tsx"), "utf8");
 const menuActionsSrc = readFileSync(join(dir, "account/AccountHeaderMenuActions.tsx"), "utf8");
+const roleNavSrc = readFileSync(join(dir, "../lib/auth/role-nav-items.ts"), "utf8");
 const signOutFormSrc = readFileSync(join(dir, "auth/CustomerSignOutForm.tsx"), "utf8");
 const authProviderSrc = readFileSync(join(dir, "AuthSessionProvider.tsx"), "utf8");
 const headerNavContextSrc = readFileSync(join(dir, "../lib/auth/header-nav-context.ts"), "utf8");
@@ -19,15 +20,15 @@ const accountSessionActionsSrc = readFileSync(
 const layoutSrc = readFileSync(join(dir, "../app/layout.tsx"), "utf8");
 
 describe("SiteHeaderNav signed-out pills", () => {
-  it("shows marketing nav, business CTA, Cart, and Sign in when signed out", () => {
-    expect(headerNavSrc).toMatch(/SITE_NAV_LINKS/);
-    expect(headerNavSrc).toMatch(/isSiteNavLinkActive/);
+  it("shows explore, business CTA, conditional cart, and Sign in when signed out", () => {
+    expect(headerNavSrc).toMatch(/buildRoleNavConfig/);
+    expect(headerNavSrc).toMatch(/shouldShowHeaderCart/);
     expect(headerNavSrc).toMatch(/HOME_PRIMARY_CTA_LABEL/);
     expect(headerNavSrc).toMatch(/homePodOwnerMailtoHref/);
     expect(headerNavSrc).toMatch(/Sign in/);
     expect(headerNavSrc).toMatch(/HeaderSignInLink/);
     expect(headerNavSrc).toMatch(/showCart/);
-    expect(headerNavSrc).toMatch(/prominentCart/);
+    expect(headerNavSrc).toMatch(/showBusinessCta/);
   });
 
   it("does not show Orders or Account pills when signed out", () => {
@@ -71,17 +72,17 @@ describe("SiteHeaderNav signed-out pills", () => {
 });
 
 describe("SiteHeaderNav signed-in pills", () => {
-  it("shows marketing nav, business CTA, Cart, and Account dropdown", () => {
-    expect(headerNavSrc).toMatch(/SITE_NAV_LINKS/);
-    expect(headerNavSrc).toMatch(/HOME_PRIMARY_CTA_LABEL/);
+  it("uses role-based nav config instead of full marketing nav for all users", () => {
+    expect(headerNavSrc).toMatch(/buildRoleNavConfig/);
+    expect(headerNavSrc).not.toMatch(/SITE_NAV_LINKS/);
     expect(headerNavSrc).toMatch(/AccountHeaderDropdown/);
-    expect(headerNavSrc).not.toMatch(/>\s*Orders\s*</);
-    expect(headerNavSrc).not.toMatch(/href="\/orders"/);
+    expect(headerNavSrc).toMatch(/showBusinessCta/);
   });
 
-  it("passes server account menu from layout", () => {
+  it("passes server account menu and dashboard href from layout", () => {
     expect(layoutSrc).toMatch(/accountMenu=\{headerNav\.accountMenu\}/);
-    expect(headerNavSrc).toMatch(/accountMenu/);
+    expect(layoutSrc).toMatch(/dashboardHref=\{headerNav\.dashboardHref\}/);
+    expect(headerNavSrc).toMatch(/dashboardHref/);
   });
 
   it("uses server session as auth source of truth for header", () => {
@@ -103,13 +104,10 @@ describe("AuthSessionProvider stale session sync", () => {
 });
 
 describe("AccountHeaderDropdown menu items", () => {
-  it("includes identity summary and core links via shared actions", () => {
+  it("builds role-aware actions via shared helper", () => {
+    expect(dropdownSrc).toMatch(/buildRoleAccountActions/);
     expect(dropdownSrc).toMatch(/AccountHeaderMenuActions/);
-    expect(dropdownSrc).toMatch(/getHeaderAccountDisplayLabel/);
-    expect(menuActionsSrc).toMatch(/View account/);
-    expect(menuActionsSrc).toMatch(/ACCOUNT_HUB_PATH/);
-    expect(menuActionsSrc).toMatch(/Order history/);
-    expect(menuActionsSrc).toMatch(/ORDER_HISTORY_PATH/);
+    expect(menuActionsSrc).toMatch(/RoleAccountAction/);
     expect(menuActionsSrc).toMatch(/CustomerSignOutForm/);
   });
 
@@ -127,19 +125,21 @@ describe("AccountHeaderDropdown menu items", () => {
   it("does not close sign-out form before submit starts", () => {
     expect(dropdownSrc).toMatch(/onSignOutStart=\{close\}/);
     expect(menuActionsSrc).toMatch(/onSignOutStart=\{onSignOutStart\}/);
-    expect(menuActionsSrc).not.toMatch(/onClick=\{onNavigate\}[\s\S]*Sign out/);
   });
 
   it("requires server session and account menu", () => {
     expect(dropdownSrc).toMatch(/!hasServerSession \|\| !accountMenu/);
     expect(dropdownSrc).not.toMatch(/useSession/);
   });
+});
 
-  it("includes optional single-role dashboard links", () => {
-    expect(menuActionsSrc).toMatch(/Platform admin/);
-    expect(menuActionsSrc).toMatch(/adminDashboardHref/);
-    expect(menuActionsSrc).toMatch(/vendorDashboardHref/);
-    expect(menuActionsSrc).toMatch(/podDashboardHref/);
+describe("role-based nav helper", () => {
+  it("centralizes guest, customer, vendor, and pod header behavior", () => {
+    expect(roleNavSrc).toMatch(/buildRoleNavConfig/);
+    expect(roleNavSrc).toMatch(/buildRoleAccountActions/);
+    expect(roleNavSrc).toMatch(/showBusinessCta/);
+    expect(roleNavSrc).toMatch(/Kitchen mode/);
+    expect(roleNavSrc).toMatch(/Manage vendors/);
   });
 });
 
@@ -147,8 +147,8 @@ describe("header account menu server context", () => {
   it("builds account menu for signed-in users", () => {
     expect(headerNavContextSrc).toMatch(/accountMenu/);
     expect(headerNavContextSrc).toMatch(/buildHeaderAccountRoleHint/);
-    expect(headerNavContextSrc).toMatch(/vendorCount === 1/);
-    expect(headerNavContextSrc).toMatch(/podCount === 1/);
+    expect(headerNavContextSrc).toMatch(/vendorKitchenHref/);
+    expect(headerNavContextSrc).toMatch(/podSettingsHref/);
   });
 
   it("does not expose account menu when signed out", () => {

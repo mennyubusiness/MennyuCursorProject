@@ -33,7 +33,8 @@ describe("SiteHeaderNav mobile account", () => {
       headerNavSrc.match(/createPortal\([\s\S]*document\.body/)?.[0] ?? "";
 
     expect(headerNavSrc).toMatch(/MobileAccountNavSection/);
-    expect(headerNavSrc).toMatch(/onNavigate=\{closeMobile\}/);
+    expect(headerNavSrc).toMatch(/navMode=\{navMode\}/);
+    expect(headerNavSrc).toMatch(/dashboardHref=\{dashboardHref\}/);
     expect(mobilePortalBlock).toMatch(/MobileAccountNavSection/);
     expect(mobilePortalBlock).not.toMatch(/AccountHeaderDropdown/);
   });
@@ -45,15 +46,14 @@ describe("SiteHeaderNav mobile account", () => {
 });
 
 describe("AccountHeaderMenuActions shared links", () => {
-  it("includes core account routes and sign out", () => {
-    expect(menuActionsSrc).toMatch(/ACCOUNT_HUB_PATH/);
-    expect(menuActionsSrc).toMatch(/ORDER_HISTORY_PATH/);
+  it("renders dynamic role-based action lists", () => {
+    expect(menuActionsSrc).toMatch(/actions\.filter/);
     expect(menuActionsSrc).toMatch(/CustomerSignOutForm/);
-    expect(menuActionsSrc).toMatch(/Platform admin/);
   });
 
-  it("is reused by desktop dropdown", () => {
+  it("is reused by desktop dropdown with role-aware actions", () => {
     expect(dropdownSrc).toMatch(/AccountHeaderMenuActions/);
+    expect(dropdownSrc).toMatch(/buildRoleAccountActions/);
     expect(dropdownSrc).toMatch(/absolute right-0 top-full/);
   });
 });

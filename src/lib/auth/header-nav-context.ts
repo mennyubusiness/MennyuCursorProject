@@ -41,6 +41,8 @@ async function contextForUserId(userId: string): Promise<HeaderNavContext> {
 
   const vendorCount = user.vendorMemberships.length;
   const podCount = user.podMemberships.length;
+  const primaryVendorId = vendorCount > 0 ? user.vendorMemberships[0].vendorId : null;
+  const primaryPodId = podCount > 0 ? user.podMemberships[0].podId : null;
 
   const accountMenu = {
     email: user.email,
@@ -57,6 +59,15 @@ async function contextForUserId(userId: string): Promise<HeaderNavContext> {
     podDashboardHref:
       podCount === 1 ? `/pod/${user.podMemberships[0].podId}/dashboard` : null,
     podDashboardLabel: podCount === 1 ? user.podMemberships[0].pod.name : null,
+    primaryVendorId,
+    primaryPodId,
+    vendorSelectHref: vendorCount > 1 ? "/vendor/select" : null,
+    podSelectHref: podCount > 1 ? "/pod/dashboard" : null,
+    vendorOrdersHref: primaryVendorId ? `/vendor/${primaryVendorId}/orders` : null,
+    vendorKitchenHref: primaryVendorId ? `/vendor/${primaryVendorId}/kitchen` : null,
+    vendorSettingsHref: primaryVendorId ? `/vendor/${primaryVendorId}/settings` : null,
+    podSettingsHref: primaryPodId ? `/pod/${primaryPodId}/settings` : null,
+    podVendorsHref: primaryPodId ? `/pod/${primaryPodId}/dashboard` : null,
   };
 
   if (user.isPlatformAdmin) {

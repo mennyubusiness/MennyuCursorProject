@@ -3,6 +3,8 @@
 import { AccountHeaderMenuActions } from "@/components/account/AccountHeaderMenuActions";
 import type { HeaderAccountMenu } from "@/lib/auth/header-account-menu";
 import { getHeaderAccountDisplayLabel } from "@/lib/auth/header-account-menu";
+import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
+import { buildRoleAccountActions } from "@/lib/auth/role-nav-items";
 import { cn } from "@/lib/cn";
 
 const headerFocusVisible =
@@ -20,17 +22,22 @@ const mobileActionRow = cn(mobileNavRowBase, mobileNavRowIdle, "w-full justify-s
 type MobileAccountNavSectionProps = {
   accountMenu: HeaderAccountMenu | null;
   hasServerSession: boolean;
+  navMode: HeaderNavMode;
+  dashboardHref: string | null;
   onNavigate?: () => void;
 };
 
 export function MobileAccountNavSection({
   accountMenu,
   hasServerSession,
+  navMode,
+  dashboardHref,
   onNavigate,
 }: MobileAccountNavSectionProps) {
   if (!hasServerSession || !accountMenu) return null;
 
   const displayLabel = getHeaderAccountDisplayLabel(accountMenu);
+  const actions = buildRoleAccountActions({ mode: navMode, accountMenu, dashboardHref });
 
   return (
     <section className="flex flex-col gap-1" aria-label="Account">
@@ -45,7 +52,7 @@ export function MobileAccountNavSection({
       </div>
 
       <AccountHeaderMenuActions
-        accountMenu={accountMenu}
+        actions={actions}
         itemClassName={mobileActionRow}
         signOutClassName={cn(mobileActionRow, "text-red-800 hover:bg-red-50")}
         onNavigate={onNavigate}
