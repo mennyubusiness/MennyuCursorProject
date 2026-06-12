@@ -7,10 +7,16 @@ const dir = dirname(fileURLToPath(import.meta.url));
 const heroSrc = readFileSync(join(dir, "../components/pod/PodPageHero.tsx"), "utf8");
 
 describe("PodPageHero banner contrast", () => {
-  it("uses layered dark overlays for readable text on any banner", () => {
-    expect(heroSrc).toMatch(/bg-oo-charcoal\/60/);
-    expect(heroSrc).toMatch(/bg-gradient-to-r from-oo-charcoal\/85 via-oo-charcoal\/55 to-oo-charcoal\/25/);
-    expect(heroSrc).toMatch(/bg-gradient-to-t from-oo-charcoal\/75/);
+  it("layers image at z-0, overlay at z-10, content at z-20", () => {
+    expect(heroSrc).toMatch(/absolute inset-0 z-0/);
+    expect(heroSrc).toMatch(/absolute inset-0 z-10 bg-black\/60/);
+    expect(heroSrc).toMatch(/relative z-20/);
+    expect(heroSrc).toMatch(/pointer-events-none absolute inset-0 z-10/);
+  });
+
+  it("uses black opacity overlays that render reliably in Tailwind", () => {
+    expect(heroSrc).toMatch(/bg-gradient-to-r from-black\/80 via-black\/55 to-black\/35/);
+    expect(heroSrc).not.toMatch(/bg-oo-charcoal\/60/);
   });
 
   it("uses warm-white hero text and translucent secondary badges", () => {

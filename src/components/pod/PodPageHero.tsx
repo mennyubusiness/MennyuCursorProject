@@ -59,34 +59,53 @@ export function PodPageHero({
   const vendorCtaHref = hasVendors ? "#pod-vendors" : "/explore";
 
   return (
-    <header id="pod-hero" className="relative overflow-hidden border-b border-oo-light-stone">
-      <div className="absolute inset-0" aria-hidden>
+    <header id="pod-hero" className="relative isolate overflow-hidden border-b border-oo-light-stone">
+      {/* Layer 0: banner image or fallback fill */}
+      <div className="absolute inset-0 z-0" aria-hidden>
         {hasImage ? (
-          <Image src={imageUrl!} alt="" fill className="object-cover" sizes="100vw" priority />
+          <Image
+            src={imageUrl!}
+            alt=""
+            fill
+            className="z-0 object-cover"
+            sizes="100vw"
+            priority
+          />
         ) : (
           <div className="h-full w-full bg-gradient-to-br from-oo-charcoal via-[#2a2926] to-[#1a1917]" />
         )}
-
-        {/* Universal dark overlay — keeps text readable on bright/busy banners */}
-        <div className="absolute inset-0 bg-oo-charcoal/60" />
-
-        {/* Stronger left-side gradient behind text; lighter on the right so the image shows through */}
-        <div className="absolute inset-0 bg-gradient-to-r from-oo-charcoal/85 via-oo-charcoal/55 to-oo-charcoal/25" />
-
-        {/* Mobile: extra depth where stacked text sits over the image */}
-        <div className="absolute inset-0 bg-gradient-to-t from-oo-charcoal/75 via-oo-charcoal/35 to-transparent sm:from-oo-charcoal/40 sm:via-transparent sm:to-transparent" />
-
-        {accentColor && hasImage && (
-          <div
-            className="absolute inset-0 opacity-[0.12] mix-blend-soft-light"
-            style={{
-              background: `linear-gradient(135deg, ${accentColor} 0%, transparent 50%)`,
-            }}
-          />
-        )}
       </div>
 
-      <PageShell className="relative z-10 py-8 sm:py-10 lg:py-12">
+      {/* Layer 10: full-area dark tint (black/ opacity works reliably in Tailwind) */}
+      <div
+        className="pointer-events-none absolute inset-0 z-10 bg-black/60"
+        aria-hidden
+      />
+
+      {/* Layer 10: left-side gradient for text readability; image still visible on the right */}
+      <div
+        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-black/80 via-black/55 to-black/35"
+        aria-hidden
+      />
+
+      {/* Layer 10: mobile bottom gradient where text stacks */}
+      <div
+        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/70 via-black/35 to-transparent sm:from-black/40 sm:via-transparent sm:to-transparent"
+        aria-hidden
+      />
+
+      {accentColor && hasImage && (
+        <div
+          className="pointer-events-none absolute inset-0 z-10 opacity-[0.12] mix-blend-soft-light"
+          style={{
+            background: `linear-gradient(135deg, ${accentColor} 0%, transparent 50%)`,
+          }}
+          aria-hidden
+        />
+      )}
+
+      {/* Layer 20: hero content above all overlays */}
+      <PageShell className="relative z-20 py-8 sm:py-10 lg:py-12">
         <div className="max-w-3xl">
           <div className="flex items-start justify-between gap-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-oo-warm-white/90">
@@ -100,7 +119,7 @@ export function PodPageHero({
             />
           </div>
 
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-oo-warm-white [text-shadow:0_2px_16px_rgba(31,31,28,0.55)] sm:text-4xl lg:text-[2.75rem]">
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-oo-warm-white [text-shadow:0_2px_16px_rgba(0,0,0,0.45)] sm:text-4xl lg:text-[2.75rem]">
             {name}
           </h1>
 
@@ -136,18 +155,18 @@ export function PodPageHero({
               href={vendorCtaHref}
               className={cn(
                 buttonClassName({ variant: "primary", size: "md" }),
-                "min-h-11 shadow-[0_0_20px_rgba(249,115,22,0.35)]"
+                "relative z-20 min-h-11 shadow-[0_0_20px_rgba(249,115,22,0.35)]"
               )}
             >
               {vendorCtaLabel}
             </a>
             {hasVendors && (
-              <Link href={groupOrderHref} className={heroSecondaryCta}>
+              <Link href={groupOrderHref} className={cn(heroSecondaryCta, "relative z-20")}>
                 Start group order
               </Link>
             )}
             {!hasVendors && (
-              <ButtonLink href="/explore" className={heroSecondaryCta}>
+              <ButtonLink href="/explore" className={cn(heroSecondaryCta, "relative z-20")}>
                 Find another pod
               </ButtonLink>
             )}
