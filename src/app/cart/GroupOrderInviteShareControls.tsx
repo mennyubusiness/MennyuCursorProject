@@ -3,24 +3,34 @@
 import { useCallback, useState } from "react";
 import { buildGroupOrderShareText } from "@/lib/group-order-invite-url";
 import { GroupOrderInviteQrModal } from "@/components/group-order/GroupOrderInviteQrModal";
+import { buttonClassName } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 
 type Props = {
   joinCode: string;
   inviteAbsoluteUrl: string;
   podName: string;
   qrDataUrl: string;
+  variant?: "default" | "compact";
 };
+
+const shareButtonClass = cn(
+  buttonClassName({ variant: "outline", size: "sm" }),
+  "min-h-10"
+);
 
 export function GroupOrderInviteShareControls({
   joinCode,
   inviteAbsoluteUrl,
   podName,
   qrDataUrl,
+  variant = "default",
 }: Props) {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const compact = variant === "compact";
 
   const copyCode = useCallback(async () => {
     try {
@@ -60,54 +70,62 @@ export function GroupOrderInviteShareControls({
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   return (
-    <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50/80 p-4">
-      <p className="text-sm font-semibold text-stone-900">Invite people</p>
-      <p className="mt-1 text-xs text-stone-600">
-        Friends can scan the QR code or enter this 6-digit code.
+    <div
+      className={cn(
+        compact
+          ? ""
+          : "mt-4 rounded-xl border border-stone-200 bg-stone-50/80 p-4"
+      )}
+    >
+      <p
+        className={cn(
+          "font-semibold text-oo-charcoal",
+          compact ? "text-sm" : "text-sm text-stone-900"
+        )}
+      >
+        {compact ? "Invite friends" : "Invite people"}
+      </p>
+      <p className={cn("mt-1 text-xs", compact ? "text-oo-stone-gray" : "text-stone-600")}>
+        {compact
+          ? "Share this 6-digit code or link so friends can join."
+          : "Friends can scan the QR code or enter this 6-digit code."}
       </p>
       <p
-        className="mt-3 font-mono text-3xl font-bold tracking-[0.2em] text-stone-900"
+        className={cn(
+          "font-mono font-bold tracking-[0.2em] text-oo-charcoal",
+          compact ? "mt-3 text-2xl" : "mt-3 text-3xl text-stone-900"
+        )}
         aria-label={`Group order code ${joinCode}`}
       >
         {joinCode}
       </p>
-      <p className="mt-2 text-xs text-stone-600">
-        Share this code or QR link with friends so they can join your group order. You&apos;ll pay for
-        the group at checkout.
-      </p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => void copyCode()}
-          className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-900 hover:bg-stone-100"
-        >
+      {!compact && (
+        <p className="mt-2 text-xs text-stone-600">
+          Share this code or QR link with friends so they can join your group order. You&apos;ll pay for
+          the group at checkout.
+        </p>
+      )}
+      <div className={cn("flex flex-wrap gap-2", compact ? "mt-4" : "mt-4")}>
+        <button type="button" onClick={() => void copyCode()} className={shareButtonClass}>
           {codeCopied ? "Code copied" : "Copy code"}
         </button>
-        <button
-          type="button"
-          onClick={() => void copyLink()}
-          className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-900 hover:bg-stone-100"
-        >
-          {linkCopied ? "Invite link copied" : "Copy link"}
+        <button type="button" onClick={() => void copyLink()} className={shareButtonClass}>
+          {linkCopied ? "Link copied" : "Copy link"}
         </button>
-        <button
-          type="button"
-          onClick={() => setQrOpen(true)}
-          className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-900 hover:bg-stone-100"
-        >
+        <button type="button" onClick={() => setQrOpen(true)} className={shareButtonClass}>
           QR code
         </button>
         {canNativeShare ? (
-          <button
-            type="button"
-            onClick={() => void shareInvite()}
-            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-900 hover:bg-stone-100"
-          >
+          <button type="button" onClick={() => void shareInvite()} className={shareButtonClass}>
             Share
           </button>
         ) : null}
       </div>
-      {shareError ? <p className="mt-2 text-xs text-amber-800">{shareError}</p> : null}
+      {shareError ? (
+        <p className={cn("mt-2 text-xs text-amber-800", compact && "text-status-error")} role="alert">
+          {shareError}
+        </p>
+      ) : null}
 
       {qrOpen ? (
         <GroupOrderInviteQrModal

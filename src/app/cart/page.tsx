@@ -51,13 +51,13 @@ import {
 } from "@/lib/group-order-cart-page";
 import { resolveSubmittedGroupOrderForParticipantCart } from "@/lib/group-participant-submitted-cart";
 import { resolveGroupCartEmptyState, shouldShowJoinGroupOrderForm } from "@/lib/group-order-cart-empty-state";
-import { GroupOrderCartPanel, GROUP_INVITE_SECTION_ID } from "./GroupOrderCartPanel";
+import { GroupOrderCartPanel } from "./GroupOrderCartPanel";
+import { GroupOrderHostEmptyCartCard } from "./GroupOrderHostEmptyCartCard";
 import { GroupOrderStartCartSync } from "@/components/cart/GroupOrderStartCartSync";
 import { GroupOrderEndCartSync } from "@/components/cart/GroupOrderEndCartSync";
 import { buildHostGroupCartClientSnapshot } from "@/lib/group-order-start-sync";
 import { buildPostEndCartClientSnapshot } from "@/lib/group-order-end-sync";
 import {
-  GroupOrderHostEmptyCartState,
   GroupOrderParticipantEmptyCartState,
 } from "./GroupOrderEmptyCartStates";
 import { GroupOrderCartPoll } from "./GroupOrderCartPoll";
@@ -329,19 +329,11 @@ export default async function CartPage({
         ) : null}
         {hostGroupStartSyncCart ? <GroupOrderStartCartSync cart={hostGroupStartSyncCart} /> : null}
         <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
-        <GroupOrderCartPanel
+        <GroupOrderHostEmptyCartCard
           cartId={cart.id}
           podId={cart.podId}
           podName={cart.pod.name}
           goState={goState}
-          canStartGroup={Boolean(authSession?.user?.id)}
-          readModel={null}
-          locked={goState.active ? goState.status === "locked_checkout" : false}
-        />
-        <GroupOrderHostEmptyCartState
-          podId={cart.podId}
-          podName={cart.pod.name}
-          onInviteClickId={GROUP_INVITE_SECTION_ID}
         />
       </div>
     );

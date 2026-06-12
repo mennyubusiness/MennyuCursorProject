@@ -57,9 +57,8 @@ describe("cart page wiring", () => {
     const { join } = require("node:path");
     const cartPage = readFileSync(join(process.cwd(), "src/app/cart/page.tsx"), "utf8");
     expect(cartPage).toMatch(/host_group_empty/);
-    expect(cartPage).toMatch(/GroupOrderHostEmptyCartState/);
+    expect(cartPage).toMatch(/GroupOrderHostEmptyCartCard/);
     expect(cartPage).toMatch(/shouldShowJoinGroupOrderForm/);
-    expect(cartPage).toMatch(/GROUP_INVITE_SECTION_ID/);
     const panel = readFileSync(join(process.cwd(), "src/app/cart/GroupOrderCartPanel.tsx"), "utf8");
     expect(panel).toMatch(/GroupOrderInviteShareControls/);
     expect(panel).toMatch(/buildGroupOrderJoinAbsoluteUrl/);

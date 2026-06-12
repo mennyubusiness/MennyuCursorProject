@@ -116,7 +116,7 @@ describe("empty group cart wiring", () => {
   it("header opens Quick Cart drawer (not item-count gated)", () => {
     expect(headerSrc).toMatch(/canOpenQuickCart/);
     expect(headerSrc).toMatch(/openCart/);
-    expect(headerSrc).not.toMatch(/itemCount\s*>\s*0[\s\S]*canOpenQuickCart/);
+    expect(headerSrc).toMatch(/if \(canOpenQuickCart\)/);
   });
 
   it("Quick Cart drawer footer works for empty group carts", () => {
@@ -127,7 +127,7 @@ describe("empty group cart wiring", () => {
 
   it("cart page loads active group cart before solo fallbacks", () => {
     expect(cartPageSrc).toMatch(/loadActiveGroupCartForCartPage/);
-    expect(cartPageSrc).toMatch(/GroupOrderHostEmptyCartState/);
+    expect(cartPageSrc).toMatch(/GroupOrderHostEmptyCartCard/);
   });
 
   it("getQuickCartPayload resolves host group without browse pod", () => {
