@@ -61,20 +61,19 @@ describe("shouldShowHeaderCart", () => {
 });
 
 describe("buildRoleNavConfig", () => {
-  it("shows explore and business CTA for guests only", () => {
+  it("shows business CTA for guests only", () => {
     const guest = buildRoleNavConfig({ mode: "guest", accountMenu: null, dashboardHref: null });
-    expect(guest.headerLinks).toEqual([{ href: "/explore", label: "Explore" }]);
     expect(guest.showBusinessCta).toBe(true);
     expect(guest.showCartForSession).toBe(false);
+    expect(guest.accountActions).toEqual([]);
   });
 
-  it("shows explore and cart for customers without business CTA", () => {
+  it("shows cart for customers without business CTA", () => {
     const customer = buildRoleNavConfig({
       mode: "customer",
       accountMenu: { ...baseAccountMenu, roleHint: null },
       dashboardHref: null,
     });
-    expect(customer.headerLinks).toEqual([{ href: "/explore", label: "Explore" }]);
     expect(customer.showBusinessCta).toBe(false);
     expect(customer.showCartForSession).toBe(true);
     expect(customer.accountActions.some((a) => a.type === "link" && a.label === "Orders")).toBe(
@@ -82,18 +81,16 @@ describe("buildRoleNavConfig", () => {
     );
   });
 
-  it("shows vendor dashboard and kitchen links for vendor users", () => {
+  it("does not expose separate header link arrays", () => {
     const vendor = buildRoleNavConfig({
       mode: "vendor",
       accountMenu: baseAccountMenu,
       dashboardHref: "/vendor/v1",
     });
-    expect(vendor.headerLinks).toEqual([
-      { href: "/vendor/v1", label: "Vendor dashboard" },
-      { href: "/vendor/v1/kitchen", label: "Kitchen mode" },
-    ]);
-    expect(vendor.showBusinessCta).toBe(false);
-    expect(vendor.showCartForSession).toBe(false);
+    expect(vendor).not.toHaveProperty("headerLinks");
+    expect(vendor.accountActions.some((a) => a.type === "link" && a.label === "Kitchen mode")).toBe(
+      true
+    );
   });
 });
 

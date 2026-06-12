@@ -13,7 +13,6 @@ import { HeaderSignInLink } from "@/components/HeaderSignInLink";
 import { buttonClassName } from "@/components/ui/button";
 import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
 import { HOME_PRIMARY_CTA_LABEL, homePodOwnerMailtoHref } from "@/lib/home-marketing";
-import { isSiteNavLinkActive } from "@/lib/site-nav";
 import { buildRoleNavConfig, shouldShowHeaderCart } from "@/lib/auth/role-nav-items";
 import { cn } from "@/lib/cn";
 
@@ -34,18 +33,6 @@ const headerFocusVisible =
 
 const creamPillBase = "border border-oo-light-stone/70 bg-oo-warm-white shadow-sm";
 
-const navPill = cn(creamPillBase, "inline-flex items-center gap-0.5 rounded-full px-1 py-1");
-
-const navLinkBase = cn(
-  "rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 sm:text-[0.9375rem]",
-  headerFocusVisible
-);
-
-const navLinkIdle = "text-oo-charcoal hover:bg-oo-cream hover:text-oo-charcoal";
-
-const navLinkActive =
-  "bg-oo-charcoal font-semibold text-oo-warm-white hover:bg-oo-charcoal hover:text-oo-warm-white";
-
 const headerSecondaryButton = cn(
   creamPillBase,
   headerFocusVisible,
@@ -65,61 +52,12 @@ const mobileNavRowBase = cn(
 
 const mobileNavRowIdle = "text-oo-charcoal hover:bg-oo-cream";
 
-const mobileNavRowActive =
-  "bg-oo-charcoal font-semibold text-oo-warm-white hover:bg-oo-charcoal hover:text-oo-warm-white";
-
 const mobileMenuToggleIdle = cn(headerSecondaryButton, "h-10 w-10 min-w-10 p-0 lg:hidden");
 
 const mobileMenuToggleOpen = cn(
   headerFocusVisible,
   "relative z-[100] inline-flex h-10 w-10 min-w-10 items-center justify-center rounded-full border border-oo-light-stone bg-oo-warm-white text-oo-charcoal shadow-sm lg:hidden"
 );
-
-function NavLink({
-  href,
-  label,
-  pathname,
-  onNavigate,
-  className,
-  mobile = false,
-}: {
-  href: string;
-  label: string;
-  pathname: string;
-  onNavigate?: () => void;
-  className?: string;
-  mobile?: boolean;
-}) {
-  const active = isSiteNavLinkActive(pathname, href);
-
-  if (mobile) {
-    return (
-      <Link
-        href={href}
-        onClick={onNavigate}
-        className={cn(
-          mobileNavRowBase,
-          active ? mobileNavRowActive : mobileNavRowIdle,
-          className
-        )}
-        aria-current={active ? "page" : undefined}
-      >
-        {label}
-      </Link>
-    );
-  }
-
-  return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      className={cn(navLinkBase, active ? navLinkActive : navLinkIdle, className)}
-      aria-current={active ? "page" : undefined}
-    >
-      {label}
-    </Link>
-  );
-}
 
 function CartControl({
   cartHref,
@@ -266,14 +204,17 @@ export function SiteHeaderNav({
   const isSignedIn = hasServerSession;
   const roleNav = buildRoleNavConfig({ mode: navMode, accountMenu, dashboardHref });
   const cartItemCount = quickCart?.itemCount ?? 0;
-  const hasActiveCart =
-    cartItemCount > 0 || Boolean(quickCart?.hasActiveGroupOrder);
+  const hasActiveCart = cartItemCount > 0 || Boolean(quickCart?.hasActiveGroupOrder);
   const showCart = shouldShowHeaderCart({ navMode, hasActiveCart });
   const prominentCart = cartItemCount > 0 || Boolean(quickCart?.hasActiveGroupOrder);
   const showBusinessCta = roleNav.showBusinessCta;
 
   const businessCtaHref = homePodOwnerMailtoHref();
-  const mobileAccountRowClass = cn(mobileNavRowBase, mobileNavRowIdle, "w-full justify-start border-0 bg-transparent shadow-none");
+  const mobileAccountRowClass = cn(
+    mobileNavRowBase,
+    mobileNavRowIdle,
+    "w-full justify-start border-0 bg-transparent shadow-none"
+  );
 
   const mobileMenuOverlay =
     mobileOpen && menuPortalReady && typeof document !== "undefined"
@@ -301,23 +242,6 @@ export function SiteHeaderNav({
             >
               <div className="oo-shell pt-2">
                 <div className="animate-oo-mobile-menu-in rounded-b-2xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-xl">
-                  <nav className="flex flex-col gap-1" aria-label="Primary">
-                    {roleNav.headerLinks.map((link) => (
-                      <NavLink
-                        key={link.href}
-                        href={link.href}
-                        label={link.label}
-                        pathname={pathname}
-                        onNavigate={closeMobile}
-                        mobile
-                      />
-                    ))}
-                  </nav>
-
-                  {roleNav.headerLinks.length > 0 && (
-                    <div className="my-3 border-t border-oo-light-stone" aria-hidden />
-                  )}
-
                   {isSignedIn ? (
                     <MobileAccountNavSection
                       accountMenu={accountMenu}
@@ -367,17 +291,10 @@ export function SiteHeaderNav({
 
   return (
     <>
-      <nav className="flex min-w-0 flex-1 items-center justify-end gap-3 lg:justify-between" aria-label="Site">
-        {roleNav.headerLinks.length > 0 ? (
-          <div className={cn(navPill, "hidden lg:inline-flex")}>
-            {roleNav.headerLinks.map((link) => (
-              <NavLink key={link.href} href={link.href} label={link.label} pathname={pathname} />
-            ))}
-          </div>
-        ) : (
-          <div className="hidden flex-1 lg:block" aria-hidden />
-        )}
-
+      <nav
+        className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3"
+        aria-label="Site"
+      >
         <div className="hidden items-center gap-2 lg:flex">
           {showBusinessCta && (
             <a href={businessCtaHref} className={headerPrimaryCta}>

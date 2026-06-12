@@ -5,16 +5,11 @@ import {
 import type { HeaderAccountMenu } from "@/lib/auth/header-account-menu";
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
 
-export const EXPLORE_NAV_LINK = { href: "/explore", label: "Explore" } as const;
-
-export type RoleNavLink = { href: string; label: string };
-
 export type RoleAccountAction =
   | { type: "link"; href: string; label: string; danger?: boolean }
   | { type: "sign-out"; label: string; danger?: boolean };
 
 export type RoleNavConfig = {
-  headerLinks: RoleNavLink[];
   showBusinessCta: boolean;
   /** Server-side cart eligibility; guest users also need an active cart client-side. */
   showCartForSession: boolean;
@@ -162,7 +157,6 @@ export function buildRoleNavConfig(input: {
 
   if (mode === "guest") {
     return {
-      headerLinks: [EXPLORE_NAV_LINK],
       showBusinessCta: true,
       showCartForSession: false,
       accountActions: [],
@@ -171,7 +165,6 @@ export function buildRoleNavConfig(input: {
 
   if (!accountMenu) {
     return {
-      headerLinks: [EXPLORE_NAV_LINK],
       showBusinessCta: false,
       showCartForSession: mode === "customer",
       accountActions: [],
@@ -184,59 +177,9 @@ export function buildRoleNavConfig(input: {
     dashboardHref,
   });
 
-  switch (mode) {
-    case "customer":
-      return {
-        headerLinks: [EXPLORE_NAV_LINK],
-        showBusinessCta: false,
-        showCartForSession: true,
-        accountActions,
-      };
-    case "vendor": {
-      const headerLinks: RoleNavLink[] = [];
-      if (dashboardHref) {
-        headerLinks.push({ href: dashboardHref, label: "Vendor dashboard" });
-      }
-      if (accountMenu.vendorKitchenHref) {
-        headerLinks.push({ href: accountMenu.vendorKitchenHref, label: "Kitchen mode" });
-      }
-      return {
-        headerLinks,
-        showBusinessCta: false,
-        showCartForSession: false,
-        accountActions,
-      };
-    }
-    case "pod": {
-      const headerLinks: RoleNavLink[] = [];
-      if (dashboardHref) {
-        headerLinks.push({ href: dashboardHref, label: "Pod dashboard" });
-      }
-      if (accountMenu.podVendorsHref) {
-        headerLinks.push({ href: accountMenu.podVendorsHref, label: "Manage vendors" });
-      }
-      return {
-        headerLinks,
-        showBusinessCta: false,
-        showCartForSession: false,
-        accountActions,
-      };
-    }
-    case "admin":
-      return {
-        headerLinks: accountMenu.adminDashboardHref
-          ? [{ href: accountMenu.adminDashboardHref, label: "Platform admin" }]
-          : [],
-        showBusinessCta: false,
-        showCartForSession: false,
-        accountActions,
-      };
-    default:
-      return {
-        headerLinks: [EXPLORE_NAV_LINK],
-        showBusinessCta: false,
-        showCartForSession: false,
-        accountActions,
-      };
-  }
+  return {
+    showBusinessCta: false,
+    showCartForSession: mode === "customer",
+    accountActions,
+  };
 }

@@ -20,7 +20,7 @@ const accountSessionActionsSrc = readFileSync(
 const layoutSrc = readFileSync(join(dir, "../app/layout.tsx"), "utf8");
 
 describe("SiteHeaderNav signed-out pills", () => {
-  it("shows explore, business CTA, conditional cart, and Sign in when signed out", () => {
+  it("shows business CTA, conditional cart, and Sign in when signed out", () => {
     expect(headerNavSrc).toMatch(/buildRoleNavConfig/);
     expect(headerNavSrc).toMatch(/shouldShowHeaderCart/);
     expect(headerNavSrc).toMatch(/HOME_PRIMARY_CTA_LABEL/);
@@ -56,13 +56,13 @@ describe("SiteHeaderNav signed-out pills", () => {
     expect(headerNavSrc).not.toMatch(/bg-oo-charcoal\/95 shadow-\[0_16px_48px/);
   });
 
-  it("uses opaque cream nav pill and secondary actions for readability", () => {
+  it("uses opaque cream secondary actions for readability", () => {
     expect(headerNavSrc).toMatch(/creamPillBase/);
     expect(headerNavSrc).toMatch(/bg-oo-warm-white shadow-sm/);
-    expect(headerNavSrc).not.toMatch(/bg-oo-warm-white\/90/);
-    expect(headerNavSrc).not.toMatch(/bg-oo-warm-white\/95/);
-    expect(headerNavSrc).toMatch(/navLinkActive/);
-    expect(headerNavSrc).toMatch(/bg-oo-charcoal font-semibold text-oo-warm-white/);
+    expect(headerNavSrc).not.toMatch(/navPill/);
+    expect(headerNavSrc).not.toMatch(/navLinkBase/);
+    expect(headerNavSrc).not.toMatch(/SITE_NAV_LINKS/);
+    expect(headerNavSrc).not.toMatch(/isSiteNavLinkActive/);
     expect(headerNavSrc).toMatch(/headerSecondaryButton/);
     expect(headerNavSrc).toMatch(/focus-visible:outline-brand/);
     expect(headerNavSrc).not.toMatch(/ring-brand/);
@@ -72,9 +72,11 @@ describe("SiteHeaderNav signed-out pills", () => {
 });
 
 describe("SiteHeaderNav signed-in pills", () => {
-  it("uses role-based nav config instead of full marketing nav for all users", () => {
+  it("uses role-based account dropdown without left-side header pills", () => {
     expect(headerNavSrc).toMatch(/buildRoleNavConfig/);
-    expect(headerNavSrc).not.toMatch(/SITE_NAV_LINKS/);
+    expect(headerNavSrc).not.toMatch(/navPill/);
+    expect(headerNavSrc).not.toMatch(/headerLinks/);
+    expect(headerNavSrc).toMatch(/justify-end/);
     expect(headerNavSrc).toMatch(/AccountHeaderDropdown/);
     expect(headerNavSrc).toMatch(/showBusinessCta/);
   });
@@ -134,12 +136,13 @@ describe("AccountHeaderDropdown menu items", () => {
 });
 
 describe("role-based nav helper", () => {
-  it("centralizes guest, customer, vendor, and pod header behavior", () => {
+  it("centralizes guest, customer, vendor, and pod account actions", () => {
     expect(roleNavSrc).toMatch(/buildRoleNavConfig/);
     expect(roleNavSrc).toMatch(/buildRoleAccountActions/);
     expect(roleNavSrc).toMatch(/showBusinessCta/);
     expect(roleNavSrc).toMatch(/Kitchen mode/);
     expect(roleNavSrc).toMatch(/Manage vendors/);
+    expect(roleNavSrc).not.toMatch(/headerLinks/);
   });
 });
 
