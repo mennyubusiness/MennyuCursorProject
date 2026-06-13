@@ -2,7 +2,7 @@
  * Deliverect channel registration webhook: parse payload, resolve vendor by exact keys (email → correlation → account id), assign channel link id.
  */
 import { createHash } from "crypto";
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { PosConnectionStatus } from "@prisma/client";
 import type { DeliverectWebhookPayload } from "@/integrations/deliverect/payloads";
 import { flattenDeliverectWebhookPayload } from "@/integrations/deliverect/webhook-handler";
@@ -10,6 +10,8 @@ import {
   extractChannelLinkIdSecret,
   nonEmptyStringField,
 } from "@/integrations/deliverect/webhook-inbound-shared";
+
+type DbClient = PrismaClient | Prisma.TransactionClient;
 
 export type ChannelRegistrationExtract = {
   channelLinkId: string | null;
@@ -317,7 +319,7 @@ const AUTO_MAP_OUTCOMES = {
 } as const;
 
 export async function applyChannelRegistrationToVendor(
-  db: PrismaClient,
+  db: DbClient,
   vendorId: string,
   extract: ChannelRegistrationExtract
 ): Promise<ApplyChannelRegistrationResult> {

@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { PosConnectionStatus } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { isAdminDashboardLayoutAuthorized } from "@/lib/admin-auth";
+import { disconnectVendorFromDeliverect } from "@/services/admin-deliverect-connection.service";
 
 const LOG_PREFIX = "[admin:disconnect-vendor-pos]";
 
@@ -50,9 +50,6 @@ export async function adminDisconnectVendorFromPos(vendorId: string): Promise<Di
   }
 
   const session = await auth();
-  const adminUserId = session?.user?.id ?? null;
-  const adminEmail = session?.user?.email ?? null;
-
   const before = {
     deliverectChannelLinkId: vendor.deliverectChannelLinkId,
     deliverectLocationId: vendor.deliverectLocationId,
@@ -67,29 +64,12 @@ export async function adminDisconnectVendorFromPos(vendorId: string): Promise<Di
     autoPublishMenus: vendor.autoPublishMenus,
   };
 
-  await prisma.vendor.update({
-    where: { id },
-    data: {
-      deliverectChannelLinkId: null,
-      deliverectLocationId: null,
-      deliverectAccountId: null,
-      deliverectAccountEmail: null,
-      pendingDeliverectConnectionKey: null,
-      deliverectAutoMapLastAt: null,
-      deliverectAutoMapLastOutcome: null,
-      deliverectAutoMapLastDetail: null,
-      posProvider: null,
-      posConnectionStatus: PosConnectionStatus.not_connected,
-      autoPublishMenus: false,
-    },
-  });
+  await disconnectVendorFromDeliverect(prisma, id);
 
   const cleared: Record<string, string | null> = {};
   for (const [k, v] of Object.entries(before)) {
     if (k === "posConnectionStatus") {
-      if (v !== PosConnectionStatus.not_connected) {
-        cleared[k] = String(v);
-      }
+      if (v !== "not_connected") cleared[k] = String(v);
     } else if (k === "autoPublishMenus") {
       if (v === true) cleared[k] = "true";
     } else if (v != null && String(v).trim() !== "") {
@@ -103,14 +83,15 @@ export async function adminDisconnectVendorFromPos(vendorId: string): Promise<Di
       at: new Date().toISOString(),
       vendorId: vendor.id,
       vendorName: vendor.name,
-      adminUserId,
-      adminEmail,
+      adminUserId: session?.user?.id ?? null,
+      adminEmail: session?.user?.email ?? null,
       clearedFields: Object.keys(cleared),
       previousSnapshot: before,
     })
   );
 
   revalidatePath(adminMappingPath(id));
+  revalidatePath("/admin/deliverect-connections");
   revalidatePath(`/vendor/${id}/orders`);
   revalidatePath(`/vendor/${id}/settings`);
   revalidatePath(`/vendor/${id}/connect-pos`);
