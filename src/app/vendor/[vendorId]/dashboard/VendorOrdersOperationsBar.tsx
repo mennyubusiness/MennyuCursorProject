@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { vendorSettingsSectionHref } from "@/lib/vendor-settings-sections";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -72,7 +73,7 @@ export function VendorOrdersOperationsBar({
           <p className="text-xs text-oo-stone-gray">
             Pause or resume from here, or use{" "}
             <Link
-              href={`/vendor/${vendorId}/settings#vendor-settings-ordering`}
+              href={vendorSettingsSectionHref(vendorId, "ordering")}
               className="underline hover:text-oo-charcoal"
             >
               Settings

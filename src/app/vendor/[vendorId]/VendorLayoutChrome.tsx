@@ -16,20 +16,24 @@ export function VendorLayoutChrome({
 }) {
   const pathname = usePathname();
   const isKitchen = pathname?.includes(`/vendor/${vendorId}/kitchen`);
+  const isSettings = pathname?.includes(`/vendor/${vendorId}/settings`);
 
   if (isKitchen) {
     return <div className="min-h-dvh bg-oo-cream">{children}</div>;
   }
 
+  const headerWidth = isSettings ? "mx-auto max-w-7xl px-4 pb-2 pt-4" : "mx-auto max-w-2xl px-4 pb-2 pt-4";
+  const mainWidth = isSettings ? "mx-auto w-full max-w-7xl px-4 py-6" : "mx-auto max-w-2xl p-4";
+
   return (
     <div className="oo-dash">
       <header className="oo-dash-titlebar">
-        <div className="mx-auto max-w-2xl px-4 pb-2 pt-4">
+        <div className={headerWidth}>
           <h1 className="oo-dash-titlebar-heading">{vendorName}</h1>
         </div>
         <VendorAreaNav vendorId={vendorId} />
       </header>
-      <main className="mx-auto max-w-2xl p-4">{children}</main>
+      <main className={mainWidth}>{children}</main>
     </div>
   );
 }

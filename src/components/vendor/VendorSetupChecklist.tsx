@@ -7,10 +7,16 @@ function ownerLabel(owner: ReadinessChecklistItem["owner"]): string {
   return "Vendor";
 }
 
-export function VendorSetupChecklist({ items }: { items: ReadinessChecklistItem[] }) {
+export function VendorSetupChecklist({
+  items,
+  title = "Getting started",
+}: {
+  items: ReadinessChecklistItem[];
+  title?: string;
+}) {
   return (
     <section className="rounded-xl border border-oo-light-stone bg-oo-cream/80 p-4 text-sm text-oo-charcoal">
-      <h3 className="font-semibold text-oo-charcoal">Getting started</h3>
+      <h3 className="font-semibold text-oo-charcoal">{title}</h3>
       <ol className="mt-3 space-y-3">
         {items.map((item, index) => (
           <li key={item.key} className="flex gap-3">

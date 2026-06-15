@@ -189,8 +189,9 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
     hasUnmatchedChannelRegistrationForVendor: posSummary.hasUnmatchedChannelRegistration,
   });
 
+  const settingsBase = `/vendor/${vendorId}/settings`;
   const profileHref =
-    audience === "vendor" ? `/vendor/${vendorId}/settings` : podOwnerVendorHref(podId, vendorId);
+    audience === "vendor" ? `${settingsBase}?section=profile` : podOwnerVendorHref(podId, vendorId);
   const profileAction =
     audience === "vendor" ? "Edit profile" : "View vendor page";
 
@@ -213,7 +214,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
         stripeSummary.stripeConnectConfigured === false
           ? "Stripe Connect is not configured on this server."
           : "Stripe Connect account with charges and payouts enabled.",
-      actionHref: audience === "vendor" ? `/vendor/${vendorId}/settings#vendor-settings-payouts` : undefined,
+      actionHref: audience === "vendor" ? `${settingsBase}?section=payouts` : undefined,
       actionLabel: audience === "vendor" ? "Set up payouts" : undefined,
     },
     {
@@ -225,7 +226,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
         posState === "connected"
           ? "Kitchen routing is connected through Deliverect."
           : "Connect Deliverect so orders can route to the kitchen POS.",
-      actionHref: audience === "vendor" ? `/vendor/${vendorId}/connect-pos` : undefined,
+      actionHref: audience === "vendor" ? `${settingsBase}?section=pos-menu` : undefined,
       actionLabel: audience === "vendor" ? "Connect POS" : undefined,
     },
     {
@@ -257,7 +258,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
           : input.hasPodMembership
             ? "You are linked to a pod."
             : "Join a pod when a pod owner invites you.",
-      actionHref: `/vendor/${vendorId}/settings`,
+      actionHref: `${settingsBase}?section=pod-membership`,
       actionLabel: "View invitations",
     });
     items.push({

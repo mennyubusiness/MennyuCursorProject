@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { vendorSettingsSectionHref } from "@/lib/vendor-settings-sections";
+
 type Props = {
   vendorId: string;
   show: boolean;
@@ -12,7 +14,7 @@ export function VendorOrdersSetupBanner({ vendorId, show }: Props) {
   return (
     <div className="rounded-lg border border-oo-light-stone bg-oo-cream px-3 py-2.5 text-sm text-oo-charcoal">
       <Link
-        href={`/vendor/${vendorId}/settings#vendor-settings-pos`}
+        href={vendorSettingsSectionHref(vendorId, "overview")}
         className="font-semibold text-oo-charcoal underline decoration-stone-300 underline-offset-2 hover:decoration-stone-600"
       >
         Setup incomplete

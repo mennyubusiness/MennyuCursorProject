@@ -160,7 +160,7 @@ describe("deriveVendorPodReadiness vendor checklist", () => {
 
     const stripe = result.checklist.find((item) => item.key === "stripe");
     expect(stripe?.complete).toBe(false);
-    expect(stripe?.actionHref).toContain("vendor-settings-payouts");
+    expect(stripe?.actionHref).toContain("section=payouts");
 
     const invite = result.checklist.find((item) => item.key === "pod_invite");
     expect(invite?.complete).toBe(false);

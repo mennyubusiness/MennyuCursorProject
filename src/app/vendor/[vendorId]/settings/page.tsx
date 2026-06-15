@@ -1,31 +1,39 @@
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
 import { auth } from "@/auth";
 import { canManageVendor } from "@/lib/permissions";
 import { env } from "@/lib/env";
 import { retrieveAndSyncVendorConnectedAccount } from "@/services/stripe-connect.service";
-import { DeliverectMenuHealthPanel } from "@/components/deliverect/DeliverectMenuHealthPanel";
 import { prisma } from "@/lib/db";
 import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
-import { VendorPauseToggle } from "../dashboard/VendorPauseToggle";
-import { VendorPodRequests } from "../dashboard/VendorPodRequests";
-import { VendorRecentPodRequests } from "../dashboard/VendorRecentPodRequests";
-import { VendorAutoPublishToggle } from "./VendorAutoPublishToggle";
-import { VendorDashboardAccessCard } from "./VendorDashboardAccessCard";
-import { VendorAccessQueryMessages } from "./VendorAccessMessages";
-import { MennyuLocationIdField } from "@/components/vendor/MennyuLocationIdField";
-import { VendorPosConnectionPanel } from "@/components/vendor/VendorPosConnectionPanel";
-import { VendorOnboardingProgress } from "../dashboard/VendorOnboardingProgress";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
-import { VendorBrandProfileForm } from "./VendorBrandProfileForm";
-import { VendorStripePayoutCard } from "./VendorStripePayoutCard";
 import { deriveVendorPodReadiness } from "@/lib/vendor-pod-readiness";
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
+import {
+  buildVendorSettingsSectionBadges,
+  resolveVendorSettingsSection,
+} from "@/lib/vendor-settings-sections";
+import { VendorAccessQueryMessages } from "./VendorAccessMessages";
+import { VendorSettingsSectionPanels } from "./VendorSettingsSectionPanels";
+import { VendorSettingsShell } from "./VendorSettingsShell";
 
 function countStripeRequirementsDue(value: unknown): number {
   if (value == null) return 0;
   return Array.isArray(value) ? value.length : 0;
+}
+
+function settingsRedirectPath(
+  vendorId: string,
+  section: "overview" | "payouts" = "payouts",
+  extra?: Record<string, string>
+): string {
+  const params = new URLSearchParams();
+  if (section !== "overview") params.set("section", section);
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) params.set(k, v);
+  }
+  const qs = params.toString();
+  return qs ? `/vendor/${vendorId}/settings?${qs}` : `/vendor/${vendorId}/settings`;
 }
 
 export default async function VendorSettingsPage({
@@ -33,11 +41,12 @@ export default async function VendorSettingsPage({
   searchParams,
 }: {
   params: Promise<{ vendorId: string }>;
-  searchParams: Promise<{ stripe_connect?: string; payout_notice?: string }>;
+  searchParams: Promise<{ stripe_connect?: string; payout_notice?: string; section?: string; access?: string }>;
 }) {
   const { vendorId } = await params;
   const sp = await searchParams;
   const session = await auth();
+  const activeSection = resolveVendorSettingsSection(sp.section);
 
   const connect = sp.stripe_connect;
   if (connect === "return" || connect === "refresh") {
@@ -50,9 +59,9 @@ export default async function VendorSettingsPage({
       }
     }
     if (connect === "refresh") {
-      redirect(`/vendor/${vendorId}/settings?payout_notice=link_expired`);
+      redirect(settingsRedirectPath(vendorId, "payouts", { payout_notice: "link_expired" }));
     }
-    redirect(`/vendor/${vendorId}/settings`);
+    redirect(settingsRedirectPath(vendorId, "payouts"));
   }
 
   const [vendor, pendingRequests, recentRequests, currentPod] = await Promise.all([
@@ -175,52 +184,38 @@ export default async function VendorSettingsPage({
     { audience: "vendor" }
   );
 
-  return (
-    <div className="space-y-10">
-      <header>
-        <h2 className="text-xl font-semibold text-oo-charcoal">Settings</h2>
-        <p className="mt-1 text-sm text-oo-stone-gray">Brand, menu, ordering, and pod membership.</p>
-      </header>
+  const badges = buildVendorSettingsSectionBadges({
+    setupSummary: vendorReadiness.setupSummary,
+    ordersPaused: vendor.mennyuOrdersPaused ?? false,
+    pendingPodInviteCount: pendingRequests.length,
+    hasPodMembership: Boolean(currentPod),
+  });
 
+  return (
+    <div className="space-y-6">
       <Suspense fallback={null}>
         <VendorAccessQueryMessages />
       </Suspense>
 
-      <VendorOnboardingProgress checklist={vendorReadiness.checklist} />
-
-      {/* Brand / profile */}
-      <section className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-oo-charcoal">Brand &amp; profile</h3>
-          <p className="mt-1 text-sm text-oo-stone-gray">Name, logo, and colors on the pod and customer menu.</p>
-          <p className="mt-1 text-xs text-oo-stone-gray">
-            URL slug: <span className="font-mono text-oo-stone-gray">{vendor.slug}</span> (fixed)
-          </p>
-        </div>
-        <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
-          <VendorBrandProfileForm
-            vendorId={vendor.id}
-            initialName={vendor.name}
-            initialDescription={vendor.description}
-            initialImageUrl={vendor.imageUrl}
-            initialAccentColor={vendor.accentColor}
-          />
-        </div>
-      </section>
-
-      {/* POS & routing — identifiers (not secrets) */}
-      <section id="vendor-settings-pos" className="scroll-mt-4 space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-oo-charcoal">POS &amp; routing</h3>
-          <p className="mt-1 text-sm text-oo-stone-gray">
-            Kitchen connection status, identifiers, and Deliverect setup. Your Open Order location ID is what you paste into
-            Deliverect as <strong>channelLocationId</strong>; the channel link ID is applied automatically when
-            activation succeeds.
-          </p>
-        </div>
-        <VendorPosConnectionPanel
+      <VendorSettingsShell
+        vendorId={vendor.id}
+        vendorName={vendor.name}
+        activeSection={activeSection}
+        badges={badges}
+        setupSummary={vendorReadiness.setupSummary}
+      >
+        <VendorSettingsSectionPanels
           vendorId={vendor.id}
           vendorName={vendor.name}
+          vendorSlug={vendor.slug}
+          vendorDescription={vendor.description}
+          vendorImageUrl={vendor.imageUrl}
+          vendorAccentColor={vendor.accentColor}
+          section={activeSection}
+          checklist={vendorReadiness.checklist}
+          badges={badges}
+          ordersPaused={vendor.mennyuOrdersPaused ?? false}
+          autoPublishMenus={vendor.autoPublishMenus ?? false}
           deliverectChannelLinkId={vendor.deliverectChannelLinkId}
           deliverectLocationId={vendor.deliverectLocationId}
           posConnectionStatus={vendor.posConnectionStatus}
@@ -228,63 +223,7 @@ export default async function VendorSettingsPage({
           deliverectAutoMapLastOutcome={vendor.deliverectAutoMapLastOutcome}
           deliverectAutoMapLastAt={vendor.deliverectAutoMapLastAt}
           hasUnmatchedChannelRegistration={hasUnmatchedChannelRegistration}
-        />
-        <MennyuLocationIdField mennyuLocationId={vendor.id} />
-      </section>
-
-      {/* Ordering & availability */}
-      <section id="vendor-settings-ordering" className="scroll-mt-4 space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-oo-charcoal">Ordering &amp; availability</h3>
-          <p className="mt-1 text-sm text-oo-stone-gray">Stop or resume new orders through Open Order.</p>
-        </div>
-        <VendorPauseToggle vendorId={vendor.id} initialPaused={vendor.mennyuOrdersPaused ?? false} embedded />
-        <p className="text-xs text-oo-stone-gray">
-          You can also pause from{" "}
-          <Link href={`/vendor/${vendorId}/orders`} className="text-oo-stone-gray underline hover:text-oo-charcoal">
-            Orders
-          </Link>
-          .
-        </p>
-      </section>
-
-      {/* Menu publishing */}
-      <section className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-oo-charcoal">Menu publishing</h3>
-          <p className="mt-1 text-sm text-oo-stone-gray">How Deliverect menu updates go live.</p>
-        </div>
-        <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
-          <VendorAutoPublishToggle vendorId={vendor.id} initialAutoPublishMenus={vendor.autoPublishMenus ?? false} />
-        </div>
-      </section>
-
-      {deliverectMenuIntegrity && (
-        <section className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold text-oo-charcoal">Kitchen POS (Deliverect)</h3>
-            <p className="mt-1 text-sm text-oo-stone-gray">
-              Mapping health for orders sent to the kitchen. Contact Open Order support if you see critical issues.
-            </p>
-          </div>
-          <DeliverectMenuHealthPanel report={deliverectMenuIntegrity} title="Menu mapping health" />
-        </section>
-      )}
-
-      {/* Pod membership */}
-      <section className="space-y-4">
-        <VendorPodRequests
-          vendorId={vendor.id}
-          requests={pendingRequestsForComponent}
-          currentPod={currentPod ? { id: currentPod.pod.id, name: currentPod.pod.name } : null}
-        />
-        <VendorRecentPodRequests recentRequests={recentRequestsForComponent} />
-      </section>
-
-      <section id="vendor-settings-payouts" className="scroll-mt-4 space-y-3">
-        <h3 className="text-lg font-semibold text-oo-charcoal">Payouts</h3>
-        <VendorStripePayoutCard
-          vendorId={vendor.id}
+          deliverectMenuIntegrity={deliverectMenuIntegrity}
           stripeConnectConfigured={Boolean(env.STRIPE_SECRET_KEY)}
           stripeConnectedAccountId={vendor.stripeConnectedAccountId ?? null}
           stripeChargesEnabled={vendor.stripeChargesEnabled ?? false}
@@ -292,18 +231,14 @@ export default async function VendorSettingsPage({
           stripeOnboardingCompletedAt={vendor.stripeOnboardingCompletedAt?.toISOString() ?? null}
           requirementsPendingCount={countStripeRequirementsDue(vendor.stripeRequirementsCurrentlyDue)}
           payoutNotice={sp.payout_notice === "link_expired" ? "link_expired" : null}
-        />
-      </section>
-
-      <section className="space-y-3">
-        <h3 className="text-lg font-semibold text-oo-charcoal">Account</h3>
-        <VendorDashboardAccessCard
-          vendorId={vendor.id}
+          pendingPodRequests={pendingRequestsForComponent}
+          recentPodRequests={recentRequestsForComponent}
+          currentPod={currentPod ? { id: currentPod.pod.id, name: currentPod.pod.name } : null}
           hasDashboardSecret={hasToken}
           userEmail={session?.user?.email ?? null}
           isPlatformAdmin={Boolean(session?.user?.isPlatformAdmin)}
         />
-      </section>
+      </VendorSettingsShell>
     </div>
   );
 }
