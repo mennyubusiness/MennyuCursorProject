@@ -15,6 +15,7 @@ import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
 import { HOME_PRIMARY_CTA_LABEL, homePodOwnerMailtoHref } from "@/lib/home-marketing";
 import { buildRoleNavConfig, shouldShowHeaderCart } from "@/lib/auth/role-nav-items";
 import { isCustomerOrderingPath } from "@/lib/mobile-customer-ui";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { cn } from "@/lib/cn";
 
 type SiteHeaderNavProps = {
@@ -229,14 +230,7 @@ export function SiteHeaderNav({
     closeMobile();
   }, [pathname, closeMobile]);
 
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [mobileOpen]);
+  useBodyScrollLock(mobileOpen);
 
   useEffect(() => {
     if (!mobileOpen) return;

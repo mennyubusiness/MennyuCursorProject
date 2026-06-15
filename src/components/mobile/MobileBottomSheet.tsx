@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { Z_BOTTOM_SHEET } from "@/lib/layout-z-index";
 import { mobileSafeAreaBottomPadding } from "@/lib/mobile-sticky-cart-bar-classes";
 
@@ -36,6 +37,8 @@ export function MobileBottomSheet({
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
 
+  useBodyScrollLock(open);
+
   useEffect(() => {
     if (!open) return;
     const timer = window.setTimeout(() => {
@@ -59,15 +62,6 @@ export function MobileBottomSheet({
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
 

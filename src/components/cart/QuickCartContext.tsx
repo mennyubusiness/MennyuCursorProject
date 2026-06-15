@@ -34,6 +34,7 @@ import { getBrowsingPodIdFromClient } from "@/lib/quick-cart-pod";
 import { buildCartPodContextForDisplay, quickCartHasActiveGroupOrder } from "@/lib/quick-cart-display";
 import { normalizeAuthoritativeCartSnapshot, normalizeQuickCartApiCart } from "@/lib/cart-group-metadata";
 import { isQuickCartEnabledForPath } from "@/lib/quick-cart-enabled";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import type { CartPodContext } from "@/lib/cart-pod-context";
 import {
   shouldShowActiveRecovery,
@@ -369,13 +370,12 @@ export function QuickCartProvider({
       if (e.key === "Escape") closeCart();
     };
     window.addEventListener("keydown", onKeyDown);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prevOverflow;
     };
   }, [isOpen, closeCart]);
+
+  useBodyScrollLock(isOpen);
 
   const value = useMemo(
     () => ({
