@@ -87,6 +87,22 @@
     --tw-ring-color: var(--oo-brand-muted);
   }
 
+  .oo-input-touch {
+    @apply min-h-12 py-3 text-base;
+  }
+
+  .oo-touch-row {
+    @apply flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition duration-200 hover:bg-oo-cream;
+  }
+
+  .oo-mobile-body {
+    @apply text-[15px] leading-relaxed sm:text-base;
+  }
+
+  .oo-safe-area-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
   .oo-form-error {
     @apply text-sm font-medium text-status-error;
   }

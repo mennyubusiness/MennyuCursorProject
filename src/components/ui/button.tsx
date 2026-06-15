@@ -3,7 +3,7 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "ghost-light" | "outline";
-export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonSize = "sm" | "md" | "lg" | "touch";
 
 const base =
   "inline-flex items-center justify-center gap-2 rounded-lg font-semibold tracking-tight transition-all duration-200 ease-smooth focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none active:scale-[0.98] motion-reduce:active:scale-100";
@@ -25,6 +25,7 @@ const sizes: Record<ButtonSize, string> = {
   sm: "min-h-9 px-3.5 py-2 text-sm",
   md: "min-h-11 px-5 py-2.5 text-sm sm:text-base",
   lg: "min-h-12 px-7 py-3 text-base sm:min-h-[3.25rem] sm:text-lg",
+  touch: "min-h-[3.25rem] px-6 py-3 text-base",
 };
 
 export function buttonClassName({

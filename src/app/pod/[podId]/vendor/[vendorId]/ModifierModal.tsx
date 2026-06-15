@@ -10,6 +10,10 @@ import {
 import { useVendorMenuCartOptional } from "@/components/vendor-menu/VendorMenuCartContext";
 import type { Cart, CartItemSelection } from "@/domain/types";
 import { restoreCartFocus } from "@/lib/cart-focus";
+import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
+import { MobileBottomSheet } from "@/components/mobile/MobileBottomSheet";
+import { buttonClassName } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { getVariantMergedModifierConfigAction } from "@/actions/variant-modifier-config.actions";
 import { modifierMaxSelectionsIsUnbounded } from "@/domain/modifier-selection-unbounded";
 import { totalSelectedInGroup, totalSelectedInNested } from "@/lib/modifier-deliverect-variant-steps";
@@ -364,36 +368,38 @@ export function ModifierModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-oo-charcoal/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modifier-modal-title"
-      onClick={onClose}
+    <MobileBottomSheet
+      open
+      onClose={onClose}
+      title={displayConfig.menuItemName}
+      description={`Base price $${(displayConfig.priceCents / 100).toFixed(2)}`}
+      initialFocusSelector="#modifier-notes, button, input"
+      footer={
+        <MobileBottomActionBar
+          fixed={false}
+          mobileOnly={false}
+          summaryTitle={`Total $${(totalCents / 100).toFixed(2)}`}
+          primaryLabel={
+            isEditMode && loading ? "Saving…" : isEditMode ? "Save changes" : "Add to cart"
+          }
+          onPrimaryClick={submit}
+          primaryDisabled={(isEditMode && loading) || !requiredSatisfied}
+          secondaryAction={
+            <button
+              type="button"
+              onClick={onClose}
+              className={cn(
+                buttonClassName({ variant: "outline", size: "md" }),
+                "hidden min-h-11 sm:inline-flex"
+              )}
+            >
+              Cancel
+            </button>
+          }
+        />
+      }
     >
-      <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-oo-warm-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-oo-light-stone bg-oo-warm-white px-4 py-3">
-          <h2 id="modifier-modal-title" className="text-lg font-semibold text-stone-900">
-            {displayConfig.menuItemName}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-700"
-            aria-label="Close"
-          >
-            <span className="text-xl leading-none">×</span>
-          </button>
-        </div>
-
-        <div className="space-y-4 p-4">
-          <p className="text-sm text-stone-600">
-            Base price: ${(displayConfig.priceCents / 100).toFixed(2)}
-          </p>
-
+      <div className="space-y-5">
           {displayConfig.groups
             .filter((link) => {
               const c = classifyMenuItemModifierLink(link, variantChildMenuItemCount);
@@ -407,15 +413,15 @@ export function ModifierModal({
               const unavailableRequired =
                 !link.modifierGroup.isAvailable && classification.required;
               return (
-                <fieldset key={link.modifierGroup.id} className="rounded-lg border border-stone-200 p-3">
-                  <legend className="text-sm font-medium text-stone-900">
+                <fieldset key={link.modifierGroup.id} className="rounded-xl border border-oo-light-stone p-3 sm:p-4">
+                  <legend className="text-sm font-semibold text-oo-charcoal">
                     {link.modifierGroup.name}
                     {classification.uiShowsAsRequired && (
                       <span className="ml-1 text-red-600" aria-hidden>
                         *
                       </span>
                     )}
-                    <span className="ml-2 font-normal text-stone-500">
+                    <span className="ml-2 font-normal text-oo-stone-gray">
                       {`(${formatModifierGroupNoteFromClassification(classification)})`}
                     </span>
                   </legend>
@@ -430,7 +436,7 @@ export function ModifierModal({
                       Please select at least {classification.minSelections} option(s).
                     </p>
                   )}
-                  <div className="mt-2 space-y-2">
+                  <div className="mt-3 space-y-2">
                     {link.modifierGroup.options.map((opt) => (
                       <OptionRow
                         key={opt.id}
@@ -450,7 +456,7 @@ export function ModifierModal({
             })}
 
           <div>
-            <label htmlFor="modifier-notes" className="block text-sm font-medium text-stone-700">
+            <label htmlFor="modifier-notes" className="oo-label">
               Special instructions
             </label>
             <textarea
@@ -459,41 +465,17 @@ export function ModifierModal({
               onChange={(e) => setSpecialInstructions(e.target.value)}
               placeholder="e.g. no onions"
               rows={2}
-              className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+              className="oo-input oo-input-touch mt-1"
             />
           </div>
 
           {error && (
-            <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800" role="alert">
               {error.message}
             </div>
           )}
-
-          <div className="flex items-center justify-between border-t border-stone-200 pt-4">
-            <span className="font-medium text-stone-900">
-              Total: ${(totalCents / 100).toFixed(2)}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={submit}
-                disabled={(isEditMode && loading) || !requiredSatisfied}
-                className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
-              >
-                {isEditMode && loading ? "Saving…" : isEditMode ? "Save changes" : "Add to cart"}
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
-    </div>
+    </MobileBottomSheet>
   );
 }
 
@@ -521,40 +503,42 @@ function OptionRow({
   const disabled = !option.isAvailable;
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onDecrease()}
-            disabled={quantity === 0 || disabled}
-            className="h-8 w-8 rounded border border-stone-300 bg-white text-stone-600 disabled:opacity-50"
-            aria-label={`Less ${option.name}`}
-          >
-            −
-          </button>
-          <span className="min-w-[2ch] text-sm">{quantity}</span>
-          <button
-            type="button"
-            onClick={() => onIncrease()}
-            disabled={!canAdd || disabled}
-            className="h-8 w-8 rounded border border-stone-300 bg-white text-stone-600 disabled:opacity-50"
-            aria-label={`More ${option.name}`}
-          >
-            +
-          </button>
+    <div className="flex flex-col gap-2">
+      <div className="oo-touch-row justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onDecrease()}
+              disabled={quantity === 0 || disabled}
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-oo-light-stone bg-oo-warm-white text-lg font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+              aria-label={`Less ${option.name}`}
+            >
+              −
+            </button>
+            <span className="min-w-[2ch] text-center text-base font-semibold tabular-nums">{quantity}</span>
+            <button
+              type="button"
+              onClick={() => onIncrease()}
+              disabled={!canAdd || disabled}
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-oo-light-stone bg-oo-warm-white text-lg font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+              aria-label={`More ${option.name}`}
+            >
+              +
+            </button>
+          </div>
+          <span className={cn("min-w-0 text-base", disabled ? "text-oo-stone-gray" : "text-oo-charcoal")}>
+            {option.name}
+            {!option.isAvailable && (
+              <span className="ml-2 rounded-md bg-oo-light-stone px-1.5 py-0.5 text-xs font-semibold text-oo-charcoal">
+                Unavailable
+              </span>
+            )}
+            {option.priceCents > 0 && (
+              <span className="ml-1 text-sm text-oo-stone-gray">+${(option.priceCents / 100).toFixed(2)}</span>
+            )}
+          </span>
         </div>
-        <span className={disabled ? "text-stone-400" : "text-stone-900"}>
-          {option.name}
-          {!option.isAvailable && (
-            <span className="ml-2 rounded bg-stone-200 px-1.5 py-0.5 text-xs font-medium text-stone-700">
-              Unavailable
-            </span>
-          )}
-          {option.priceCents > 0 && (
-            <span className="ml-1 text-stone-500">+${(option.priceCents / 100).toFixed(2)}</span>
-          )}
-        </span>
       </div>
       {quantity >= 1 && (option.nestedModifierGroups?.length ?? 0) > 0 && (
         <div className="ml-6 mt-2 space-y-2 border-l-2 border-stone-200 pl-3">

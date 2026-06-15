@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/cn";
+import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
 import { buttonClassName } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 
 type PodPageStickyCtaProps = {
   podName: string;
@@ -40,34 +41,30 @@ export function PodPageStickyCta({
   return (
     <div
       className={cn(
-        "fixed inset-x-0 bottom-0 z-30 border-t border-oo-light-stone bg-oo-warm-white/95 p-3 shadow-[0_-8px_24px_rgba(31,31,28,0.12)] backdrop-blur-md transition-transform duration-200 lg:hidden",
-        visible ? "translate-y-0" : "translate-y-full pointer-events-none"
+        "transition-transform duration-200 lg:hidden",
+        visible ? "translate-y-0" : "pointer-events-none translate-y-full"
       )}
       role="region"
       aria-label={`Quick actions for ${podName}`}
     >
-      <div className="oo-shell flex gap-2">
-        {showVendorsCta && (
-          <a
-            href="#pod-vendors"
-            className={cn(buttonClassName({ variant: "primary", size: "sm" }), "min-h-10 flex-1")}
-          >
-            View vendors
-          </a>
-        )}
-        {showGroupOrderCta && (
-          <Link
-            href={groupOrderHref}
-            className={cn(
-              buttonClassName({ variant: showVendorsCta ? "outline" : "primary", size: "sm" }),
-              "min-h-10 shrink-0",
-              showVendorsCta ? "px-3" : "flex-1"
-            )}
-          >
-            {showVendorsCta ? "Group order" : "Start group order"}
-          </Link>
-        )}
-      </div>
+      <MobileBottomActionBar
+        mobileOnly
+        primaryLabel={showVendorsCta ? "View vendors" : "Start group order"}
+        primaryHref={showVendorsCta ? "#pod-vendors" : groupOrderHref}
+        secondaryAction={
+          showVendorsCta && showGroupOrderCta ? (
+            <Link
+              href={groupOrderHref}
+              className={cn(
+                buttonClassName({ variant: "outline", size: "md" }),
+                "min-h-11 shrink-0 px-3 text-sm sm:px-4"
+              )}
+            >
+              Group
+            </Link>
+          ) : undefined
+        }
+      />
     </div>
   );
 }

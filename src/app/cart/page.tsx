@@ -5,7 +5,8 @@ import { auth } from "@/auth";
 import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
-import { mobileStickyCartBarSurfaceClass } from "@/lib/mobile-sticky-cart-bar-classes";
+import { cn } from "@/lib/cn";
+import { mobileBottomActionBarFixedClass, mobileBottomActionBarContentPadClass } from "@/lib/mobile-sticky-cart-bar-classes";
 import {
   discardStaleCheckoutCartsForSession,
   getOrCreateCart,
@@ -323,7 +324,7 @@ export default async function CartPage({
 
   if (emptyStateKind === "host_group_empty") {
     return (
-      <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+      <div className={cn("mx-auto max-w-2xl", mobileBottomActionBarContentPadClass, "sm:pb-10")}>
         {groupEndSyncCart !== null || groupEnded ? (
           <GroupOrderEndCartSync cart={groupEndSyncCart} endedSessionId={cart?.id} />
         ) : null}
@@ -341,7 +342,7 @@ export default async function CartPage({
 
   if (emptyStateKind === "participant_group_empty") {
     return (
-      <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+      <div className={cn("mx-auto max-w-2xl", mobileBottomActionBarContentPadClass, "sm:pb-10")}>
         <GroupOrderSubmittedRedirect
           enabled={
             goState.active &&
@@ -580,7 +581,7 @@ export default async function CartPage({
     (goState.status === "active" || goState.status === "locked_checkout");
 
   return (
-    <div className="mx-auto max-w-2xl pb-28 sm:pb-10">
+    <div className={cn("mx-auto max-w-2xl", mobileBottomActionBarContentPadClass, "sm:pb-10")}>
       <GroupOrderSubmittedRedirect
         enabled={participantSubmissionPoll}
         cartId={cart.id}
@@ -862,7 +863,7 @@ export default async function CartPage({
       {/* Sticky checkout strip on small screens; flows inline from md+ */}
       <CartPageLiveCheckoutGate>
       <div
-        className={`${mobileStickyCartBarSurfaceClass} fixed inset-x-0 bottom-0 z-30 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:mt-10 sm:border-0 sm:bg-transparent sm:p-0 sm:pb-0 sm:shadow-none`}
+        className={`${mobileBottomActionBarFixedClass} sm:static sm:z-auto sm:mt-10 sm:border-0 sm:bg-transparent sm:p-0 sm:pb-0 sm:shadow-none`}
       >
         <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <Link

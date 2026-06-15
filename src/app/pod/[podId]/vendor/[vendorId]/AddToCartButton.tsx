@@ -61,7 +61,7 @@ function CartLineQtyControls({
       : "flex items-center gap-1 rounded-lg border border-oo-light-stone bg-oo-warm-white px-1 py-0.5 shadow-sm";
 
   const btnClass = overlay
-    ? "flex h-6 min-w-[1.5rem] items-center justify-center rounded text-sm font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-40"
+    ? "flex h-9 min-w-[2rem] items-center justify-center rounded-full text-base font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-40 sm:h-8 sm:min-w-[1.5rem] sm:text-sm"
     : compact
       ? "flex h-7 min-w-[1.75rem] items-center justify-center rounded text-base font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-40"
       : "flex h-9 min-w-[2.25rem] items-center justify-center rounded-md text-lg font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-40";
@@ -237,7 +237,7 @@ export function AddToCartButton({
           disabled={buttonDisabled}
           className={
             isCardOverlay
-              ? "inline-flex min-h-9 shrink-0 items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-md transition hover:bg-brand hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50"
+              ? "inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-white px-5 py-2.5 text-base font-semibold text-zinc-900 shadow-md transition hover:bg-brand hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50"
               : isCard
                 ? "inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-oo-charcoal px-3 py-2 text-xs font-semibold text-oo-warm-white transition hover:bg-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
                 : "rounded-xl border-2 border-oo-charcoal bg-oo-warm-white px-4 py-2.5 text-sm font-semibold text-oo-charcoal shadow-sm transition duration-200 hover:bg-oo-cream hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oo-charcoal active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"

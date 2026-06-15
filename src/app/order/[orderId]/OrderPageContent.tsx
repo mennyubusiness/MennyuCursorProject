@@ -224,7 +224,7 @@ export function OrderPageContent({
 
       <header className="mb-6">
         {from === "cart" && !isParticipantView && (
-          <p className="mb-4 rounded-lg border border-stone-200 bg-stone-100 px-4 py-2 text-sm text-stone-700">
+          <p className="mb-4 rounded-xl border border-oo-light-stone bg-oo-warm-white px-4 py-3 text-sm text-oo-charcoal">
             You already have an active order. Here&apos;s your order status.
           </p>
         )}
@@ -241,11 +241,11 @@ export function OrderPageContent({
             </p>
           </div>
         )}
-        <h1 className="text-2xl font-semibold text-stone-900 sm:text-3xl">
+        <h1 className="text-2xl font-bold text-oo-charcoal sm:text-3xl">
           {isParticipantView ? "Group order tracking" : "Your order"}
         </h1>
-        <p className="mt-1 text-stone-600">Order #{order.id.slice(-8).toUpperCase()}</p>
-        <p className="mt-3 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-800">
+        <p className="mt-1 text-sm text-oo-stone-gray sm:text-base">Order #{order.id.slice(-8).toUpperCase()}</p>
+        <p className="mt-3 rounded-xl border border-oo-light-stone bg-oo-warm-white px-4 py-3 text-sm font-medium text-oo-charcoal">
           {pickupLine}
         </p>
       </header>
@@ -253,14 +253,14 @@ export function OrderPageContent({
       <div className="flex flex-col gap-8 lg:grid lg:grid-cols-3 lg:items-start">
         <div className="order-1 min-w-0 lg:col-span-2">
           <section
-            className="rounded-xl border-2 border-stone-300 bg-stone-50 p-5 sm:p-6"
+            className="rounded-2xl border-2 border-brand/25 bg-gradient-to-b from-oo-warm-white to-oo-cream p-5 sm:p-6"
             aria-label="Pickup code"
           >
-            <p className="text-sm font-medium uppercase tracking-wide text-stone-500">Pickup code</p>
-            <p className="mt-2 text-4xl font-bold tabular-nums tracking-[0.25em] text-stone-900 sm:text-5xl">
+            <p className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">Pickup code</p>
+            <p className="mt-2 text-4xl font-black tabular-nums tracking-[0.2em] text-oo-charcoal sm:text-5xl sm:tracking-[0.25em]">
               {pickupCode}
             </p>
-            <p className="mt-3 text-sm text-stone-600">
+            <p className="mt-3 text-sm leading-relaxed text-oo-stone-gray">
               {isParticipantView
                 ? "Show this code at pickup for the group order."
                 : "Show this code at pickup. Give it to the vendor when you collect your order."}
@@ -268,17 +268,17 @@ export function OrderPageContent({
           </section>
 
           <section
-            className="mt-6 rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-5 shadow-sm sm:p-6"
+            className="mt-6 rounded-2xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm sm:p-6"
             aria-label="Order progress"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-oo-stone-gray">
               {statusCard.shortLabel}
             </p>
-            <h2 className="mt-1 text-xl font-semibold text-stone-900 sm:text-2xl">
+            <h2 className="mt-1 text-2xl font-bold text-oo-charcoal sm:text-3xl">
               {statusCard.headline}
             </h2>
-            <p className="mt-2 text-sm leading-relaxed text-stone-600">{statusCard.nextAction}</p>
-            <div className="mt-5 border-t border-stone-100 pt-5">
+            <p className="mt-2 text-[15px] leading-relaxed text-oo-stone-gray sm:text-base">{statusCard.nextAction}</p>
+            <div className="mt-5 min-h-[4.5rem] border-t border-oo-light-stone pt-5">
               <CustomerOrderProgressTimeline steps={parentProgressSteps} />
             </div>
             {isOrderCancelled && refundMessage && (

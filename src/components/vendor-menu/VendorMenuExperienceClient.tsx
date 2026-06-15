@@ -131,7 +131,7 @@ export function VendorMenuExperienceClient({
               extraAnchors={extraAnchors}
             />
 
-            <div className="min-w-0 flex-1 space-y-8 pb-24 lg:pb-8">
+            <div className="min-w-0 flex-1 space-y-8 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-8">
               {spotlightSections.length > 0 && (
                 <section
                   id="pod-menu-spotlight"

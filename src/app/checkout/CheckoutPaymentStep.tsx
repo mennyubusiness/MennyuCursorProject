@@ -4,6 +4,8 @@ import { useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { CheckoutProgress } from "./CheckoutProgress";
+import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
+import { MobileCustomerPageShell } from "@/components/mobile/MobileCustomerPageShell";
 
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
 
@@ -82,6 +84,7 @@ function PaymentStepForm({
   }
 
   return (
+    <MobileCustomerPageShell withBottomActionBar className="pb-2 sm:pb-0">
     <div className="mt-8 space-y-6">
       <CheckoutProgress activeStep={3} />
       <div className="rounded-xl border border-stone-200 bg-stone-50 p-5">
@@ -118,8 +121,8 @@ function PaymentStepForm({
           </div>
         </dl>
       </div>
-      <form onSubmit={handlePay} className="space-y-4">
-        <div className="rounded-xl border border-stone-200 bg-white p-4">
+      <form id="checkout-payment-form" onSubmit={handlePay} className="space-y-4">
+        <div className="rounded-xl border border-stone-200 bg-white p-4 sm:p-5">
           <PaymentElement options={{ layout: "tabs" }} />
         </div>
         {error && (
@@ -130,17 +133,28 @@ function PaymentStepForm({
         <button
           type="submit"
           disabled={!stripe || !elements || loading}
-          className="w-full rounded-xl bg-stone-900 py-4 text-base font-semibold text-white hover:bg-stone-800 disabled:opacity-50 sm:py-3"
+          className="hidden w-full rounded-xl bg-stone-900 py-4 text-base font-semibold text-white hover:bg-stone-800 disabled:opacity-50 sm:block sm:py-3"
         >
           {loading ? "Processing…" : "Pay and place order"}
         </button>
         {process.env.NODE_ENV === "development" && (
-          <p className="text-center text-xs text-stone-400">
+          <p className="hidden text-center text-xs text-stone-400 sm:block">
             Test mode: use card 4242 4242 4242 4242, any future expiry, any CVC.
           </p>
         )}
       </form>
     </div>
+    <MobileBottomActionBar
+      primaryLabel={loading ? "Processing…" : "Pay and place order"}
+      primaryType="submit"
+      form="checkout-payment-form"
+      primaryDisabled={!stripe || !elements || loading}
+      primaryLoading={loading}
+      priceLabel={`$${(totalWithTip / 100).toFixed(2)}`}
+      summarySubtitle="Total due now"
+      aria-label="Pay and place order"
+    />
+    </MobileCustomerPageShell>
   );
 }
 

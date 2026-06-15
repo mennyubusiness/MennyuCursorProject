@@ -50,12 +50,12 @@ export function VendorMenuItemCard({
         />
 
         {!item.isAvailable && (
-          <span className="absolute left-2 top-2 z-10 rounded-md bg-oo-charcoal/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-oo-warm-white">
+          <span className="absolute left-2 top-2 z-10 rounded-md bg-oo-charcoal/80 px-2 py-1 text-xs font-bold uppercase tracking-wide text-oo-warm-white">
             Unavailable
           </span>
         )}
 
-        <div className="absolute inset-x-0 bottom-0 z-10 flex justify-end p-2 sm:p-2.5">
+        <div className="absolute inset-x-0 bottom-0 z-10 flex justify-end p-2.5 sm:p-3">
           <AddToCartButton
             cartId={cartId}
             menuItemId={item.id}
@@ -78,12 +78,12 @@ export function VendorMenuItemCard({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col p-2.5 sm:p-3">
-        <h3 className="line-clamp-1 text-sm font-semibold text-oo-charcoal">{item.name}</h3>
+      <div className="flex flex-1 flex-col p-3 sm:p-3.5">
+        <h3 className="line-clamp-2 text-base font-semibold leading-snug text-oo-charcoal">{item.name}</h3>
         {item.description && (
-          <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-zinc-600">{item.description}</p>
+          <p className="mt-1 line-clamp-2 text-sm leading-snug text-oo-stone-gray">{item.description}</p>
         )}
-        <p className="mt-1.5 text-sm font-bold tabular-nums text-oo-charcoal">
+        <p className="mt-2 text-base font-bold tabular-nums text-oo-charcoal">
           ${(item.priceCents / 100).toFixed(2)}
         </p>
       </div>

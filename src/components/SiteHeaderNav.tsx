@@ -14,6 +14,7 @@ import { buttonClassName } from "@/components/ui/button";
 import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
 import { HOME_PRIMARY_CTA_LABEL, homePodOwnerMailtoHref } from "@/lib/home-marketing";
 import { buildRoleNavConfig, shouldShowHeaderCart } from "@/lib/auth/role-nav-items";
+import { isCustomerOrderingPath } from "@/lib/mobile-customer-ui";
 import { cn } from "@/lib/cn";
 
 type SiteHeaderNavProps = {
@@ -52,11 +53,11 @@ const mobileNavRowBase = cn(
 
 const mobileNavRowIdle = "text-oo-charcoal hover:bg-oo-cream";
 
-const mobileMenuToggleIdle = cn(headerSecondaryButton, "h-10 w-10 min-w-10 p-0 lg:hidden");
+const mobileMenuToggleIdle = cn(headerSecondaryButton, "h-11 w-11 min-w-11 p-0 lg:hidden");
 
 const mobileMenuToggleOpen = cn(
   headerFocusVisible,
-  "relative z-[100] inline-flex h-10 w-10 min-w-10 items-center justify-center rounded-full border border-oo-light-stone bg-oo-warm-white text-oo-charcoal shadow-sm lg:hidden"
+  "relative z-[100] inline-flex h-11 w-11 min-w-11 items-center justify-center rounded-full border border-oo-light-stone bg-oo-warm-white text-oo-charcoal shadow-sm lg:hidden"
 );
 
 function CartControl({
@@ -67,6 +68,7 @@ function CartControl({
   className,
   onNavigate,
   mobile = false,
+  headerCompact = false,
 }: {
   cartHref: string;
   activeOrderHref: string | null;
@@ -75,6 +77,7 @@ function CartControl({
   className?: string;
   onNavigate?: () => void;
   mobile?: boolean;
+  headerCompact?: boolean;
 }) {
   const quickCart = useQuickCartOptional();
   const canOpenQuickCart = Boolean(quickCart?.enabled || quickCart?.hasActiveGroupOrder);
@@ -104,11 +107,30 @@ function CartControl({
     className
   );
 
-  const sharedClass = mobile ? mobileClass : desktopClass;
+  const headerCompactClass = cn(
+    headerSecondaryButton,
+    "relative h-11 min-h-11 w-11 min-w-11 p-0 lg:hidden",
+    prominent &&
+      cn(
+        buttonClassName({ variant: "primary", size: "sm" }),
+        headerFocusVisible,
+        "shadow-[0_0_12px_rgba(249,115,22,0.3)]",
+        cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
+      ),
+    !prominent && cartPulse && "border-brand/50 bg-oo-warm-white",
+    className
+  );
+
+  const sharedClass = headerCompact ? headerCompactClass : mobile ? mobileClass : desktopClass;
 
   const countBadge =
     itemCount > 0 ? (
-      <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-oo-charcoal px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none text-oo-warm-white">
+      <span
+        className={cn(
+          "inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-oo-charcoal px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none text-oo-warm-white",
+          headerCompact && "absolute -right-1 -top-1 min-w-[1.125rem] px-1"
+        )}
+      >
         {itemCount > 99 ? "99+" : itemCount}
       </span>
     ) : null;
@@ -125,8 +147,20 @@ function CartControl({
         title="Open your cart"
         aria-label={itemCount > 0 ? `Open cart, ${itemCount} items` : "Open cart"}
       >
-        <span>Cart</span>
-        {mobile ? countBadge : prominent && itemCount > 0 ? countBadge : null}
+        {headerCompact ? (
+          <>
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h15l-1.5 9h-12L6 6z" />
+              <path strokeLinecap="round" d="M9 20a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" />
+            </svg>
+            {countBadge}
+          </>
+        ) : (
+          <>
+            <span>Cart</span>
+            {mobile ? countBadge : prominent && itemCount > 0 ? countBadge : null}
+          </>
+        )}
       </button>
     );
   }
@@ -139,8 +173,20 @@ function CartControl({
       title="Your cart"
       aria-label={cartLabel}
     >
-      <span>Cart</span>
-      {mobile ? countBadge : prominent && itemCount > 0 ? countBadge : null}
+      {headerCompact ? (
+        <>
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h15l-1.5 9h-12L6 6z" />
+            <path strokeLinecap="round" d="M9 20a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" />
+          </svg>
+          {countBadge}
+        </>
+      ) : (
+        <>
+          <span>Cart</span>
+          {mobile ? countBadge : prominent && itemCount > 0 ? countBadge : null}
+        </>
+      )}
     </Link>
   );
 }
@@ -208,6 +254,8 @@ export function SiteHeaderNav({
   const showCart = shouldShowHeaderCart({ navMode, hasActiveCart });
   const prominentCart = cartItemCount > 0 || Boolean(quickCart?.hasActiveGroupOrder);
   const showBusinessCta = roleNav.showBusinessCta;
+  const hideOrderingClutter = isCustomerOrderingPath(pathname);
+  const showMobileBusinessCta = showBusinessCta && !hideOrderingClutter;
 
   const businessCtaHref = homePodOwnerMailtoHref();
   const mobileAccountRowClass = cn(
@@ -268,7 +316,7 @@ export function SiteHeaderNav({
                     </>
                   )}
 
-                  {showBusinessCta && (
+                  {showMobileBusinessCta && (
                     <a
                       href={businessCtaHref}
                       className={cn(
@@ -318,6 +366,18 @@ export function SiteHeaderNav({
               activeOrderHref={activeOrderHref}
               cartPulse={cartPulse}
               prominent={prominentCart}
+            />
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 lg:hidden">
+          {showCart && (
+            <CartControl
+              cartHref={cartHref}
+              activeOrderHref={activeOrderHref}
+              cartPulse={cartPulse}
+              prominent={prominentCart}
+              headerCompact
             />
           )}
         </div>

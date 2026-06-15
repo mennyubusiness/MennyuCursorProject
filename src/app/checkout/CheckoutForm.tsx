@@ -9,6 +9,8 @@ import {
   rememberCheckoutCartForClientClear,
 } from "@/lib/cart-checkout-client";
 import { CheckoutPhoneVerification } from "./CheckoutPhoneVerification";
+import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
+import { MobileCustomerPageShell } from "@/components/mobile/MobileCustomerPageShell";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
 
 const CheckoutPaymentStep = dynamic(
@@ -333,7 +335,8 @@ export function CheckoutForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-8 space-y-8">
+    <MobileCustomerPageShell withBottomActionBar className="pb-2 sm:pb-0">
+    <form id="checkout-details-form" onSubmit={handleSubmit} className="mt-8 space-y-8">
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
           Contact
@@ -564,10 +567,21 @@ export function CheckoutForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl bg-stone-900 py-4 text-base font-semibold text-white transition hover:bg-stone-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.99] disabled:opacity-50"
+        className="hidden w-full rounded-xl bg-stone-900 py-4 text-base font-semibold text-white transition hover:bg-stone-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.99] disabled:opacity-50 sm:block"
       >
         {loading ? "Preparing payment…" : "Continue to payment"}
       </button>
     </form>
+    <MobileBottomActionBar
+      primaryLabel={loading ? "Preparing payment…" : "Continue to payment"}
+      primaryType="submit"
+      form="checkout-details-form"
+      primaryDisabled={loading}
+      primaryLoading={loading}
+      priceLabel={`$${(totalWithTip / 100).toFixed(2)}`}
+      summarySubtitle="Estimated total with tip"
+      aria-label="Continue to payment"
+    />
+    </MobileCustomerPageShell>
   );
 }

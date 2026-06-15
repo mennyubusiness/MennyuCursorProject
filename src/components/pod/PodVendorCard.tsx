@@ -124,14 +124,14 @@ export function PodVendorCard({ podId, variant, vendor, isFeatured, availability
           <p className="mt-1 text-xs font-medium text-oo-stone-gray">{cuisine}</p>
         )}
 
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           {!availability.unavailable ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-900 ring-1 ring-emerald-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-900 ring-1 ring-emerald-200">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
               Open
             </span>
           ) : (
-            <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-950 ring-1 ring-amber-200">
+            <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-amber-950 ring-1 ring-amber-200">
               {availability.statusLabel}
             </span>
           )}
@@ -147,9 +147,9 @@ export function PodVendorCard({ podId, variant, vendor, isFeatured, availability
         )}
         <span
           className={cn(
-            "mt-3 inline-flex w-fit items-center rounded-lg font-semibold transition duration-200",
-            "bg-oo-charcoal px-3 py-1.5 text-xs text-oo-warm-white group-hover:bg-brand group-focus-visible:bg-brand",
-            grid ? "text-sm" : "px-2 py-0.5 text-[11px]"
+            "mt-3 inline-flex w-fit min-h-11 items-center rounded-lg font-semibold transition duration-200",
+            "bg-oo-charcoal px-4 py-2.5 text-sm text-oo-warm-white group-hover:bg-brand group-focus-visible:bg-brand",
+            grid ? "text-base" : "px-3 py-2 text-xs"
           )}
         >
           {ctaLabel} →
