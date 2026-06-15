@@ -11,7 +11,10 @@ import {
   isTopLevelDeliverectVariantGroupModifierGroup,
   maxSubItemsChainVariantStepsForProductShape,
 } from "@/lib/deliverect-subitem-nesting";
-import { getOperationalMenuItemIdsForVendor } from "@/services/menu-active-scope.service";
+import {
+  getOperationalMenuItemIdsForVendor,
+  getOperationalModifierOptionIdsForVendor,
+} from "@/services/menu-active-scope.service";
 
 export type DeliverectMenuIntegritySeverity = "critical" | "warning" | "info";
 
@@ -27,7 +30,8 @@ export type DeliverectMenuIntegrityFindingType =
   | "stale_canonical_variant_mapping"
   | "missing_external_product_id"
   | "missing_external_modifier_id"
-  | "no_published_menu_baseline";
+  | "no_published_menu_baseline"
+  | "deliverect_plu_reused_across_product_and_modifier";
 
 export interface DeliverectMenuIntegrityFinding {
   severity: DeliverectMenuIntegritySeverity;
@@ -82,6 +86,105 @@ export function findDuplicatePluGroups(
     if (ids.length > 1) out.set(k, ids);
   }
   return out;
+}
+
+/** Deliverect variant parent placeholder rows use a sentinel PLU suffix — not sellable product lines. */
+export function isDeliverectVariantParentPlaceholderPlu(plu: string | null | undefined): boolean {
+  const trimmed = plu?.trim();
+  if (!trimmed) return false;
+  return trimmed.includes("###PRNT");
+}
+
+export type ProductPluIntegrityRow = {
+  id: string;
+  name: string;
+  deliverectPlu: string | null;
+};
+
+/**
+ * Duplicate product PLUs among operational sellable rows only.
+ * Retired/historical MenuItem rows and variant parent placeholders are excluded.
+ */
+export function findDuplicateOperationalProductPlus(
+  items: ProductPluIntegrityRow[],
+  operationalIds: Set<string>
+): Map<string, string[]> {
+  const entries = items
+    .filter((it) => operationalIds.has(it.id))
+    .filter((it) => !isDeliverectVariantParentPlaceholderPlu(it.deliverectPlu))
+    .map((it) => ({ key: it.deliverectPlu, id: it.id }));
+  return findDuplicatePluGroups(entries);
+}
+
+export type ModifierPluIntegrityRow = {
+  optionId: string;
+  groupId: string;
+  groupName: string;
+  plu: string | null;
+  isOperational: boolean;
+};
+
+/**
+ * Duplicate modifier PLUs scoped to the same modifier group and operational options only.
+ * Reuse of the same PLU across different groups (e.g. TOMAT on multiple items) is valid.
+ */
+export function findDuplicateModifierPlusInSameGroup(
+  rows: ModifierPluIntegrityRow[]
+): Array<{ groupId: string; groupName: string; plu: string; optionIds: string[] }> {
+  const byGroupPlu = new Map<string, { groupId: string; groupName: string; plu: string; optionIds: string[] }>();
+
+  for (const row of rows) {
+    if (!row.isOperational) continue;
+    const plu = row.plu?.trim();
+    if (!plu) continue;
+    const key = `${row.groupId}\0${plu}`;
+    const existing = byGroupPlu.get(key);
+    if (existing) {
+      existing.optionIds.push(row.optionId);
+    } else {
+      byGroupPlu.set(key, {
+        groupId: row.groupId,
+        groupName: row.groupName,
+        plu,
+        optionIds: [row.optionId],
+      });
+    }
+  }
+
+  return [...byGroupPlu.values()].filter((entry) => entry.optionIds.length > 1);
+}
+
+/** PLUs shared between operational products and operational modifiers — usually intentional in Deliverect. */
+export function findProductModifierPluOverlap(
+  productPlus: Set<string>,
+  modifierPlus: Set<string>
+): string[] {
+  const overlap: string[] = [];
+  for (const plu of productPlus) {
+    if (modifierPlus.has(plu)) overlap.push(plu);
+  }
+  return overlap.sort();
+}
+
+export function collectOperationalProductPlus(items: ProductPluIntegrityRow[], operationalIds: Set<string>): Set<string> {
+  const plus = new Set<string>();
+  for (const it of items) {
+    if (!operationalIds.has(it.id)) continue;
+    if (isDeliverectVariantParentPlaceholderPlu(it.deliverectPlu)) continue;
+    const plu = it.deliverectPlu?.trim();
+    if (plu) plus.add(plu);
+  }
+  return plus;
+}
+
+export function collectOperationalModifierPlus(rows: ModifierPluIntegrityRow[]): Set<string> {
+  const plus = new Set<string>();
+  for (const row of rows) {
+    if (!row.isOperational) continue;
+    const plu = row.plu?.trim();
+    if (plu) plus.add(plu);
+  }
+  return plus;
 }
 
 /**
@@ -166,6 +269,7 @@ export async function evaluateDeliverectMenuIntegrityForVendor(
   }
 
   const operationalIds = await getOperationalMenuItemIdsForVendor(vendorId);
+  const operationalModifierOptionIds = await getOperationalModifierOptionIdsForVendor(vendorId);
 
   const items = await prisma.menuItem.findMany({
     where: { vendorId },
@@ -200,35 +304,63 @@ export async function evaluateDeliverectMenuIntegrityForVendor(
     },
   });
 
-  const productPluEntries = items.map((it) => ({ key: it.deliverectPlu, id: it.id }));
-  for (const [plu, ids] of findDuplicatePluGroups(productPluEntries)) {
+  const productPluRows: ProductPluIntegrityRow[] = items.map((it) => ({
+    id: it.id,
+    name: it.name,
+    deliverectPlu: it.deliverectPlu,
+  }));
+
+  for (const [plu, ids] of findDuplicateOperationalProductPlus(productPluRows, operationalIds)) {
     const named = items.filter((i) => ids.includes(i.id)).map((i) => i.name);
     findings.push(
       finding({
         severity: "warning",
         type: "duplicate_product_plu",
-        message: `Duplicate deliverectPlu "${plu}" on ${ids.length} menu rows (${named.slice(0, 3).join(", ")}${named.length > 3 ? "…" : ""}).`,
-        suggestedFix: "Ensure only one operational row per PLU; retire duplicates in the menu publisher.",
+        message: `Duplicate deliverectPlu "${plu}" on ${ids.length} operational menu rows (${named.slice(0, 3).join(", ")}${named.length > 3 ? "…" : ""}).`,
+        suggestedFix:
+          "Two active sellable products share the same POS PLU — kitchen routing may be ambiguous. Republish or retire the extra row.",
         plu,
       })
     );
   }
 
-  const modifierPluEntries: Array<{ key: string | null | undefined; id: string }> = [];
+  const modifierPluRows: ModifierPluIntegrityRow[] = [];
   for (const it of items) {
     for (const link of it.modifierGroups) {
       for (const opt of link.modifierGroup.options) {
-        modifierPluEntries.push({ key: opt.deliverectModifierPlu, id: opt.id });
+        modifierPluRows.push({
+          optionId: opt.id,
+          groupId: link.modifierGroup.id,
+          groupName: link.modifierGroup.name,
+          plu: opt.deliverectModifierPlu,
+          isOperational: operationalModifierOptionIds.has(opt.id),
+        });
       }
     }
   }
-  for (const [plu, ids] of findDuplicatePluGroups(modifierPluEntries)) {
+
+  for (const dup of findDuplicateModifierPlusInSameGroup(modifierPluRows)) {
     findings.push(
       finding({
         severity: "warning",
         type: "duplicate_modifier_plu",
-        message: `Duplicate deliverectModifierPlu "${plu}" on ${ids.length} modifier option rows.`,
-        suggestedFix: "Deduplicate modifier options or use distinct PLUs per POS requirement.",
+        message: `Duplicate deliverectModifierPlu "${dup.plu}" on ${dup.optionIds.length} options in modifier group “${dup.groupName}”.`,
+        suggestedFix:
+          "Two active options in the same modifier group share a PLU — outbound modifier routing may be ambiguous within that group.",
+        plu: dup.plu,
+        modifierGroupName: dup.groupName,
+      })
+    );
+  }
+
+  const productPlus = collectOperationalProductPlus(productPluRows, operationalIds);
+  const modifierPlus = collectOperationalModifierPlus(modifierPluRows);
+  for (const plu of findProductModifierPluOverlap(productPlus, modifierPlus)) {
+    findings.push(
+      finding({
+        severity: "info",
+        type: "deliverect_plu_reused_across_product_and_modifier",
+        message: `PLU "${plu}" is used on both an operational product and modifier option(s). Deliverect often reuses PLUs this way; routing is usually unambiguous.`,
         plu,
       })
     );
