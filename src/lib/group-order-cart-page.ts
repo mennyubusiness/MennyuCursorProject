@@ -10,6 +10,9 @@ import {
   resolveGroupParticipantForSession,
 } from "@/lib/group-participant-order-access";
 import { expireGroupOrderSessionIfStale } from "@/lib/group-order-session-lifecycle";
+import {
+  isTerminalGroupOrderSessionStatus,
+} from "@/lib/group-order-session-status";
 import { resolveActiveGroupParticipantBinding } from "@/lib/group-order-participant-resolve";
 import { prisma } from "@/lib/db";
 import { CART_DISPLAY_SESSION_CART_INCLUDE } from "@/services/cart.service";
@@ -199,6 +202,10 @@ export async function getGroupOrderStateForCartPage(
       participantId: actor.participantId,
       submittedOrderId,
     };
+  }
+
+  if (isTerminalGroupOrderSessionStatus(s.status)) {
+    return { active: false };
   }
 
   return {

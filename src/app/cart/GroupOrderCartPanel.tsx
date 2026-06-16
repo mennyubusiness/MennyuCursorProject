@@ -115,6 +115,7 @@ export async function GroupOrderCartPanel({
   }
 
   if (isEnded) {
+    if (isUnknown) return null;
     return (
       <ClosedGroupOrderPanel
         title="This group order was ended."
@@ -128,6 +129,7 @@ export async function GroupOrderCartPanel({
   }
 
   if (isExpired) {
+    if (isUnknown) return null;
     return (
       <ClosedGroupOrderPanel
         title="This group order expired."
@@ -141,6 +143,7 @@ export async function GroupOrderCartPanel({
   }
 
   if (isSubmitted) {
+    if (isUnknown) return null;
     return (
       <section className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm text-emerald-950 shadow-sm">
         <p className="font-semibold text-emerald-950">

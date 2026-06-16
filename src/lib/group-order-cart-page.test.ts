@@ -10,6 +10,7 @@ const mockAuth = vi.fn();
 const mockFindSessionByCartId = vi.fn();
 const mockStartGroupOrderSession = vi.fn();
 const mockUnlock = vi.fn();
+const mockResolveGroupParticipantForSession = vi.fn();
 
 vi.mock("@/auth", () => ({
   auth: () => mockAuth(),
@@ -37,13 +38,21 @@ vi.mock("@/lib/group-order-session-lifecycle", () => ({
   expireGroupOrderSessionIfStale: vi.fn().mockResolvedValue("unchanged"),
 }));
 
+vi.mock("@/lib/group-participant-order-access", () => ({
+  findOrderIdForGroupOrderSession: vi.fn().mockResolvedValue(null),
+  resolveGroupParticipantForSession: (...args: unknown[]) =>
+    mockResolveGroupParticipantForSession(...args),
+}));
+
 describe("group-order-cart-page (server render helpers)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuth.mockResolvedValue({ user: { id: "user_1", name: "Sam" } });
+    mockAuth.mockResolvedValue(null);
+    mockResolveGroupParticipantForSession.mockResolvedValue(null);
   });
 
   it("getGroupOrderStateForCartPage does not revalidate", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user_1", name: "Sam" } });
     mockFindSessionByCartId.mockResolvedValue({
       id: "gos_1",
       joinCode: "123456",
@@ -58,6 +67,60 @@ describe("group-order-cart-page (server render helpers)", () => {
     if (state.active && state.view === "host") {
       expect(state.joinCode).toBe("123456");
       expect(state.isHost).toBe(true);
+    }
+  });
+
+  it("returns inactive state for guest solo cart with ended group session on same cart row", async () => {
+    mockFindSessionByCartId.mockResolvedValue({
+      id: "gos_ended",
+      joinCode: "123456",
+      status: "ended",
+      podId: "pod_1",
+      hostUserId: "other_host",
+      participants: [{ id: "p1", displayName: "Host", role: "host", leftAt: null }],
+    });
+    const { getGroupOrderStateForCartPage } = await import("./group-order-cart-page");
+    const state = await getGroupOrderStateForCartPage("cart_1");
+    expect(state).toEqual({ active: false });
+  });
+
+  it("returns inactive state for host viewing ended group session", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user_1", name: "Sam" } });
+    mockFindSessionByCartId.mockResolvedValue({
+      id: "gos_ended",
+      joinCode: "123456",
+      status: "ended",
+      podId: "pod_1",
+      hostUserId: "user_1",
+      participants: [{ id: "p1", displayName: "Sam", role: "host", leftAt: null }],
+    });
+    const { getGroupOrderStateForCartPage } = await import("./group-order-cart-page");
+    const state = await getGroupOrderStateForCartPage("cart_1");
+    expect(state).toEqual({ active: false });
+  });
+
+  it("keeps participant ended group state active for real participants", async () => {
+    mockFindSessionByCartId.mockResolvedValue({
+      id: "gos_ended",
+      joinCode: "123456",
+      status: "ended",
+      podId: "pod_1",
+      hostUserId: "other_host",
+      participants: [{ id: "p_guest", displayName: "Alex", role: "participant", leftAt: null }],
+    });
+    mockResolveGroupParticipantForSession.mockResolvedValue({
+      id: "p_guest",
+      role: "participant",
+      displayName: "Alex",
+    });
+    const { getGroupOrderStateForCartPage } = await import("./group-order-cart-page");
+    const state = await getGroupOrderStateForCartPage("cart_1", {
+      participantMarkers: { participantId: "p_guest", legacyJoinToken: null },
+    });
+    expect(state.active).toBe(true);
+    if (state.active) {
+      expect(state.view).toBe("participant");
+      expect(state.status).toBe("ended");
     }
   });
 
