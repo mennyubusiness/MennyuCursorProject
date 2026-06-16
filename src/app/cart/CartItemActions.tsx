@@ -128,23 +128,25 @@ export function CartItemActions({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => updateQuantity(Math.max(0, quantity - 1))}
           disabled={loading || quantity <= 1}
-          className="h-8 w-8 rounded border border-stone-300 text-stone-600 hover:bg-stone-100 disabled:opacity-50"
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-oo-light-stone text-lg font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50 sm:h-8 sm:w-8 sm:text-base"
+          aria-label="Decrease quantity"
         >
           −
         </button>
-        <span className="w-6 text-center text-sm">
+        <span className="min-w-[2ch] text-center text-base font-semibold tabular-nums sm:text-sm">
           <CartPageLiveQuantity cartItemId={cartItemId} fallback={quantity} />
         </span>
         <button
           type="button"
           onClick={() => updateQuantity(quantity + 1)}
           disabled={loading}
-          className="h-8 w-8 rounded border border-stone-300 text-stone-600 hover:bg-stone-100 disabled:opacity-50"
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-oo-light-stone text-lg font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50 sm:h-8 sm:w-8 sm:text-base"
+          aria-label="Increase quantity"
         >
           +
         </button>
@@ -161,7 +163,7 @@ export function CartItemActions({
               }
             }}
             disabled={loading}
-            className="ml-2 text-sm text-stone-900 hover:underline"
+            className="ml-1 inline-flex min-h-11 items-center px-3 text-sm font-semibold text-oo-charcoal hover:underline sm:min-h-0 sm:px-2"
           >
             Edit
           </button>
@@ -170,7 +172,7 @@ export function CartItemActions({
           type="button"
           onClick={remove}
           disabled={loading}
-          className="ml-2 text-sm text-red-600 hover:underline"
+          className="inline-flex min-h-11 items-center px-3 text-sm font-semibold text-red-700 hover:underline sm:min-h-0 sm:px-2"
         >
           Remove
         </button>

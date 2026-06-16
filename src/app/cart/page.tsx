@@ -6,7 +6,7 @@ import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/s
 import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { cn } from "@/lib/cn";
-import { mobileBottomActionBarFixedClass, mobileBottomActionBarContentPadClass } from "@/lib/mobile-sticky-cart-bar-classes";
+import { mobileBottomActionBarContentPadClass } from "@/lib/mobile-sticky-cart-bar-classes";
 import {
   discardStaleCheckoutCartsForSession,
   getOrCreateCart,
@@ -375,31 +375,31 @@ export default async function CartPage({
 
   if (emptyStateKind === "solo_empty") {
     return (
-      <div className="mx-auto max-w-lg px-2 py-12">
-        <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+      <div className="mx-auto max-w-lg px-2 py-10 sm:py-12">
+        <div className="oo-empty-state px-6 py-12 sm:px-10">
           <div
-            className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-xs font-medium text-stone-400"
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-oo-light-stone bg-oo-cream text-sm font-bold text-oo-stone-gray"
             aria-hidden
           >
             Cart
           </div>
-          <h1 className="mt-5 text-2xl font-semibold text-stone-900">Your cart is empty</h1>
-          <p className="mt-3 text-stone-600">
-            Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen prepares
-            its part of your order.
+          <h1 className="mt-6 text-2xl font-bold text-oo-charcoal">Your cart is empty</h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-oo-stone-gray">
+            Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen
+            prepares its part of your order.
           </p>
           <div className="mt-8 text-left">
             <JoinGroupOrderByCodeForm />
           </div>
           <Link
             href="/explore"
-            className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:bg-stone-800 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98]"
+            className="mt-8 inline-flex min-h-[3.25rem] w-full items-center justify-center rounded-xl bg-brand px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-brand-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto"
           >
             Browse pods
           </Link>
-          <p className="mt-6 text-sm text-stone-500">
+          <p className="mt-6 text-sm text-oo-stone-gray">
             Already ordered?{" "}
-            <Link href="/orders" className="font-medium text-stone-900 hover:underline">
+            <Link href="/orders" className="font-semibold text-oo-charcoal hover:underline">
               View orders and order again
             </Link>
           </p>
@@ -748,9 +748,9 @@ export default async function CartPage({
                     <MenuItemImage imageUrl={lineImageUrl} itemName={lineTitle} />
                     <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-stone-900">
+                        <p className="text-base font-semibold text-oo-charcoal sm:text-base">
                           {lineTitle}
-                          <span className="ml-2 font-normal text-stone-500">
+                          <span className="ml-2 font-normal text-oo-stone-gray">
                             × <CartPageLiveQuantity cartItemId={item.id} fallback={item.quantity} />
                           </span>
                         </p>
@@ -860,41 +860,24 @@ export default async function CartPage({
         </div>
       )}
 
-      {/* Sticky checkout strip on small screens; flows inline from md+ */}
+      {/* Sticky checkout on mobile; inline actions on sm+ */}
       <CartPageLiveCheckoutGate>
-      <div
-        className={`${mobileBottomActionBarFixedClass} sm:static sm:z-auto sm:mt-10 sm:border-0 sm:bg-transparent sm:p-0 sm:pb-0 sm:shadow-none`}
-      >
-        <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="mt-10 hidden sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-6">
           <Link
             href={`/pod/${cart.podId}`}
-            className="order-2 hidden rounded-xl border-2 border-stone-300 bg-white px-5 py-3 text-center text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400 active:scale-[0.99] sm:order-1 sm:inline-flex sm:justify-center"
+            className="inline-flex justify-center rounded-xl border-2 border-stone-300 bg-white px-5 py-3 text-center text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400 active:scale-[0.99]"
           >
             Back to pod
           </Link>
-          <div className="order-1 flex w-full flex-col gap-3 sm:order-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-6">
-            <div className="flex items-baseline justify-between gap-4 sm:hidden">
-              {showParticipantTotalsOnly && myParticipantRow ? (
-                <>
-                  <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                    Your food
-                  </span>
-                  <span className="text-lg font-bold tabular-nums text-stone-900">
-                    ${(myParticipantRow.subtotalCents / 100).toFixed(2)}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                    Food subtotal
-                  </span>
-                  <span className="text-lg font-bold tabular-nums text-stone-900">
-                    <CartPageLiveFoodSubtotal fallbackCents={totalCents} />
-                  </span>
-                </>
-              )}
+          <div className="ml-auto flex items-center gap-6">
+            <div className="text-right">
+              <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Food subtotal</p>
+              <p className="text-xl font-bold tabular-nums text-stone-900">
+                <CartPageLiveFoodSubtotal fallbackCents={totalCents} />
+              </p>
             </div>
             <CartPageLiveCheckoutActions
+              surface="desktop"
               viewerCanCheckout={viewerCanCheckout}
               showParticipantTotalsOnly={showParticipantTotalsOnly}
               sessionLockedCheckout={sessionLocked}
@@ -905,13 +888,18 @@ export default async function CartPage({
             />
           </div>
         </div>
-        <Link
-          href={`/pod/${cart.podId}`}
-          className="mt-2 block text-center text-sm font-medium text-stone-600 underline-offset-4 transition hover:text-stone-900 hover:underline sm:hidden"
-        >
-          ← Back to pod
-        </Link>
-      </div>
+        <div className="sm:hidden">
+          <CartPageLiveCheckoutActions
+            surface="mobile"
+            viewerCanCheckout={viewerCanCheckout}
+            showParticipantTotalsOnly={showParticipantTotalsOnly}
+            sessionLockedCheckout={sessionLocked}
+            myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
+            totalCentsFallback={totalCents}
+            groupSubmitted={sessionSubmitted}
+            submittedOrderId={submittedOrderId}
+          />
+        </div>
       </CartPageLiveCheckoutGate>
       </CartPageMutationProvider>
     </div>

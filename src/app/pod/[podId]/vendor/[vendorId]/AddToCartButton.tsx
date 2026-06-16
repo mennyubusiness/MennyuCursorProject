@@ -1,13 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { addToCartAction, updateCartItemAction } from "@/actions/cart.actions";
+import { updateCartItemAction } from "@/actions/cart.actions";
 import type { ModifierConfigForUI } from "./modifier-config";
-import { useVendorMenuModifier } from "@/components/vendor-menu/VendorMenuModifierContext";
 import { useVendorMenuCart } from "@/components/vendor-menu/VendorMenuCartContext";
 import type { Cart, CartItem } from "@/domain/types";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
 import { enqueueCartMutation } from "@/lib/cart-mutation-queue";
+import {
+  useMenuItemAddAction,
+  type MenuItemAddAction,
+  type MenuItemAddActionParams,
+} from "@/components/vendor-menu/useMenuItemAddAction";
+
+function stopOverlayBubble(event: React.MouseEvent) {
+  event.stopPropagation();
+}
 
 function CartLineQtyControls({
   cartId,
@@ -61,23 +69,26 @@ function CartLineQtyControls({
       : "flex items-center gap-1 rounded-lg border border-oo-light-stone bg-oo-warm-white px-1 py-0.5 shadow-sm";
 
   const btnClass = overlay
-    ? "flex h-9 min-w-[2rem] items-center justify-center rounded-full text-base font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-40 sm:h-8 sm:min-w-[1.5rem] sm:text-sm"
+    ? "flex h-11 min-w-[2.75rem] items-center justify-center rounded-full text-base font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-40 sm:h-9 sm:min-w-[2rem] sm:text-sm"
     : compact
-      ? "flex h-7 min-w-[1.75rem] items-center justify-center rounded text-base font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-40"
-      : "flex h-9 min-w-[2.25rem] items-center justify-center rounded-md text-lg font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-40";
+      ? "flex h-11 min-w-[2.75rem] items-center justify-center rounded text-base font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-40 sm:h-7 sm:min-w-[1.75rem]"
+      : "flex h-11 min-w-[2.75rem] items-center justify-center rounded-md text-lg font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-40 sm:h-9 sm:min-w-[2.25rem]";
 
   const qtyClass = overlay
-    ? "min-w-[1.1rem] text-center text-[11px] font-semibold tabular-nums text-oo-charcoal"
+    ? "min-w-[1.25rem] text-center text-xs font-semibold tabular-nums text-oo-charcoal sm:min-w-[1.1rem] sm:text-[11px]"
     : compact
       ? "min-w-[1.25rem] text-center text-xs font-semibold tabular-nums text-oo-charcoal"
       : "min-w-[1.5rem] text-center text-sm font-semibold tabular-nums text-oo-charcoal";
 
   return (
-    <div className={shell}>
+    <div className={shell} onClick={overlay ? stopOverlayBubble : undefined}>
       <button
         type="button"
         disabled={orderingDisabled || loading}
-        onClick={() => void setQty(line.quantity - 1)}
+        onClick={(event) => {
+          if (overlay) stopOverlayBubble(event);
+          void setQty(line.quantity - 1);
+        }}
         className={btnClass}
         aria-label="Decrease quantity"
       >
@@ -87,7 +98,10 @@ function CartLineQtyControls({
       <button
         type="button"
         disabled={orderingDisabled || loading}
-        onClick={() => void setQty(line.quantity + 1)}
+        onClick={(event) => {
+          if (overlay) stopOverlayBubble(event);
+          void setQty(line.quantity + 1);
+        }}
         className={btnClass}
         aria-label="Increase quantity"
       >
@@ -97,114 +111,42 @@ function CartLineQtyControls({
   );
 }
 
-export function AddToCartButton({
-  cartId,
+function AddToCartButtonView({
   menuItemId,
-  /** Parent shell Deliverect PLU — cart lines may store a leaf row whose `deliverectVariantParentPlu` matches. */
-  shellDeliverectPlu,
   modifierConfig,
   podId,
-  vendorId,
-  vendorName,
-  menuItemName,
-  unitPriceCents,
-  /** True when vendor is closed/paused or this menu item is snoozed / unavailable. */
   orderingDisabled = false,
-  vendorUsesDeliverect = false,
-  menuItemDeliverectVariantParentPlu,
   displayMode = "default",
+  addAction,
 }: {
-  cartId: string;
   menuItemId: string;
-  shellDeliverectPlu?: string | null;
   modifierConfig?: ModifierConfigForUI;
   podId: string;
-  vendorId: string;
-  vendorName: string;
-  menuItemName: string;
-  unitPriceCents: number;
   orderingDisabled?: boolean;
-  vendorUsesDeliverect?: boolean;
-  menuItemDeliverectVariantParentPlu?: string | null;
   displayMode?: "default" | "card" | "card-overlay";
+  addAction: MenuItemAddAction;
 }) {
   const isCardOverlay = displayMode === "card-overlay";
   const isCard = displayMode === "card" || isCardOverlay;
-  const { openModifier } = useVendorMenuModifier();
-  const { cartId: liveCartId, vendorCartItems, runSimpleAddToCart } = useVendorMenuCart();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const hasModifiers = Boolean(modifierConfig && modifierConfig.groups.length > 0);
-  const buttonDisabled = loading || !liveCartId || orderingDisabled;
-
-  const linesForThisItem = useMemo(() => {
-    const shellPlu = shellDeliverectPlu?.trim();
-    return vendorCartItems.filter((i) => {
-      if (i.menuItemId === menuItemId) return true;
-      if (shellPlu && i.menuItem?.deliverectVariantParentPlu === shellPlu) return true;
-      return false;
-    });
-  }, [vendorCartItems, menuItemId, shellDeliverectPlu]);
-
-  async function addDirect() {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await runSimpleAddToCart({
-        menuItemId,
-        vendorId,
-        vendorName,
-        menuItemName,
-        unitPriceCents,
-        shellDeliverectPlu,
-        add: () => addToCartAction(liveCartId, menuItemId, 1, undefined, undefined, podId),
-      });
-      if (!result.success) {
-        setError(result.error);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not add to cart");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleClickAdd() {
-    if (orderingDisabled) return;
-    if (hasModifiers && modifierConfig) {
-      openModifier({
-        modifierConfig,
-        cartId: liveCartId,
-        podId,
-        vendorId,
-        vendorUsesDeliverect,
-        menuItemDeliverectVariantParentPlu,
-        returnFocusMenuItemId: menuItemId,
-      });
-      setError(null);
-    } else {
-      addDirect();
-    }
-  }
-
-  function openCustomizeAnother() {
-    if (!modifierConfig) return;
-      openModifier({
-        modifierConfig,
-        cartId: liveCartId,
-        podId,
-      vendorId,
-      vendorUsesDeliverect,
-      menuItemDeliverectVariantParentPlu,
-      returnFocusMenuItemId: menuItemId,
-    });
-    setError(null);
-  }
+  const {
+    loading,
+    error,
+    hasModifiers,
+    linesForThisItem,
+    triggerAddFlow,
+    openCustomizeAnother,
+    buttonDisabled,
+    liveCartId,
+  } = addAction;
 
   const showInitialAdd = linesForThisItem.length === 0;
-
   const overlayActionRow = "flex max-w-full flex-wrap items-center justify-end gap-1.5";
+
+  const handleAddClick = (event: React.MouseEvent) => {
+    if (isCardOverlay) stopOverlayBubble(event);
+    triggerAddFlow();
+  };
 
   return (
     <div
@@ -215,6 +157,7 @@ export function AddToCartButton({
             ? "flex w-full flex-col items-stretch gap-1.5"
             : "flex w-full max-w-[min(100%,20rem)] flex-col items-stretch gap-2 sm:items-end"
       }
+      onClick={isCardOverlay ? stopOverlayBubble : undefined}
     >
       {error && (
         <p
@@ -233,7 +176,7 @@ export function AddToCartButton({
         <button
           type="button"
           data-cart-focus-menu-item={menuItemId}
-          onClick={handleClickAdd}
+          onClick={handleAddClick}
           disabled={buttonDisabled}
           className={
             isCardOverlay
@@ -259,9 +202,12 @@ export function AddToCartButton({
             <button
               type="button"
               data-cart-focus-menu-item={menuItemId}
-              onClick={openCustomizeAnother}
+              onClick={(event) => {
+                stopOverlayBubble(event);
+                openCustomizeAnother();
+              }}
               disabled={orderingDisabled}
-              className="shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold text-white/95 underline decoration-white/50 underline-offset-2 transition hover:text-white hover:decoration-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-11 shrink-0 rounded-full px-3 py-2 text-xs font-semibold text-white/95 underline decoration-white/50 underline-offset-2 transition hover:text-white hover:decoration-white disabled:cursor-not-allowed disabled:opacity-50 sm:px-2 sm:py-1 sm:text-[11px]"
               aria-label="Customize another"
             >
               Customize
@@ -339,7 +285,49 @@ export function AddToCartButton({
           )}
         </div>
       )}
-
     </div>
+  );
+}
+
+export function AddToCartButton({
+  cartId: _cartId,
+  addAction: addActionProp,
+  ...params
+}: MenuItemAddActionParams & {
+  cartId: string;
+  displayMode?: "default" | "card" | "card-overlay";
+  addAction?: MenuItemAddAction;
+}) {
+  if (addActionProp) {
+    return (
+      <AddToCartButtonView
+        menuItemId={params.menuItemId}
+        modifierConfig={params.modifierConfig}
+        podId={params.podId}
+        orderingDisabled={params.orderingDisabled}
+        displayMode={params.displayMode}
+        addAction={addActionProp}
+      />
+    );
+  }
+
+  return <AddToCartButtonWithHook {...params} />;
+}
+
+function AddToCartButtonWithHook(
+  params: MenuItemAddActionParams & {
+    displayMode?: "default" | "card" | "card-overlay";
+  }
+) {
+  const addAction = useMenuItemAddAction(params);
+  return (
+    <AddToCartButtonView
+      menuItemId={params.menuItemId}
+      modifierConfig={params.modifierConfig}
+      podId={params.podId}
+      orderingDisabled={params.orderingDisabled}
+      displayMode={params.displayMode}
+      addAction={addAction}
+    />
   );
 }

@@ -3,7 +3,10 @@
 import { useState } from "react";
 
 import { SmsConsentCheckbox } from "@/components/legal/SmsConsentCheckbox";
+import { buttonClassName } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
+import { MOBILE_MIN_TAP_TARGET_CLASS } from "@/lib/mobile-customer-ui";
 
 type CheckoutPhoneVerificationProps = {
   phone: string;
@@ -143,18 +146,21 @@ export function CheckoutPhoneVerification({
   }
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="space-y-4">
       <div>
-        <label htmlFor="phone" className="block text-sm font-medium text-stone-800">
-          Mobile number (optional)
+        <label htmlFor="phone" className="block text-sm font-semibold text-oo-charcoal">
+          Mobile number <span className="font-normal text-oo-stone-gray">(optional)</span>
         </label>
+        <p className="mt-1 text-sm text-oo-stone-gray">
+          We&apos;ll use this only for order updates if you choose SMS.
+        </p>
         <input
           id="phone"
           type="tel"
           autoComplete="tel"
           value={phone}
           onChange={(e) => handlePhoneInputChange(e.target.value)}
-          className="mt-1.5 w-full max-w-md rounded-lg border border-stone-300 px-3 py-2.5 text-stone-900"
+          className="oo-input oo-input-touch mt-2 max-w-md"
           placeholder="(555) 123-4567"
         />
         <SmsConsentCheckbox
@@ -162,44 +168,46 @@ export function CheckoutPhoneVerification({
           layout="checkout"
           checked={smsConsent}
           onChange={onSmsConsentChange}
-          className="mt-3 max-w-md"
+          className="mt-4 max-w-md"
         />
       </div>
 
       {phoneVerified ? (
-        <div role="status">
-          <p className="flex items-center gap-2 text-sm font-medium text-emerald-700">
+        <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-3">
+          <p className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
             <span aria-hidden="true">✓</span>
             Phone verified
           </p>
-          <p className="mt-1 text-sm text-stone-600">{verifiedStatusCopy()}</p>
+          <p className="mt-1 text-sm text-emerald-900/90">{verifiedStatusCopy()}</p>
         </div>
       ) : null}
 
       {!smsConsent && !phoneVerified ? (
-        <p className="text-sm text-stone-600" role="status">
-          SMS updates are off. After checkout, keep the order status page open or use your order
-          link to track pickup progress.
+        <p className="rounded-lg border border-oo-light-stone bg-oo-cream/60 px-3 py-3 text-sm text-oo-stone-gray" role="status">
+          You can still track your order on the order status page.
         </p>
       ) : null}
 
       {showOtpPanel ? (
-        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-          <p className="text-sm font-medium text-stone-900">Verify your mobile number for SMS updates</p>
-          <p className="mt-1 text-sm text-stone-600">
-            We&apos;ll text you a one-time code to confirm this number.
+        <div className="rounded-xl border border-oo-light-stone bg-oo-cream/70 p-4">
+          <p className="text-sm font-semibold text-oo-charcoal">Verify your number for SMS updates</p>
+          <p className="mt-1 text-sm text-oo-stone-gray">
+            We&apos;ll text a one-time code to confirm this number.
           </p>
-          <div className="mt-3 flex flex-wrap items-end gap-3">
+          <div className="mt-4 space-y-3">
             <button
               type="button"
               onClick={handleSendCode}
               disabled={otpSending || !phone.trim()}
-              className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-50 disabled:opacity-50"
+              className={cn(
+                buttonClassName({ variant: "secondary", size: "touch" }),
+                "w-full sm:w-auto"
+              )}
             >
               {otpSending ? "Sending…" : "Send code"}
             </button>
-            <div className="min-w-[8rem] flex-1">
-              <label htmlFor="otp-code" className="block text-xs font-medium text-stone-600">
+            <div>
+              <label htmlFor="otp-code" className="block text-sm font-semibold text-oo-charcoal">
                 6-digit code
               </label>
               <input
@@ -210,7 +218,7 @@ export function CheckoutPhoneVerification({
                 maxLength={6}
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="mt-1 w-full max-w-[10rem] rounded-lg border border-stone-300 px-3 py-2 text-stone-900 tracking-widest"
+                className="oo-input oo-input-touch mt-2 max-w-[12rem] tracking-widest"
                 placeholder="000000"
               />
             </div>
@@ -218,18 +226,22 @@ export function CheckoutPhoneVerification({
               type="button"
               onClick={handleVerifyCode}
               disabled={otpVerifying || otpCode.length !== 6}
-              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+              className={cn(
+                buttonClassName({ variant: "primary", size: "touch" }),
+                MOBILE_MIN_TAP_TARGET_CLASS,
+                "w-full sm:w-auto"
+              )}
             >
-              {otpVerifying ? "Verifying…" : "Verify"}
+              {otpVerifying ? "Verifying…" : "Verify number"}
             </button>
           </div>
           {otpMessage ? (
-            <p className="mt-2 text-sm text-stone-600" role="status">
+            <p className="mt-3 text-sm text-oo-stone-gray" role="status">
               {otpMessage}
             </p>
           ) : null}
           {otpError ? (
-            <p className="mt-2 text-sm text-red-600" role="alert">
+            <p className="mt-3 text-sm font-medium text-red-700" role="alert">
               {otpError}
             </p>
           ) : null}

@@ -4,12 +4,21 @@ import { useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { CheckoutProgress } from "./CheckoutProgress";
+import { CheckoutSectionCard } from "@/components/checkout/CheckoutSectionCard";
+import { buttonClassName } from "@/components/ui/button";
 import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
 import { MobileCustomerPageShell } from "@/components/mobile/MobileCustomerPageShell";
+import { cn } from "@/lib/cn";
+import {
+  CHECKOUT_SECTION_HEADINGS,
+  resolveCheckoutPaymentCtaState,
+} from "@/lib/checkout-place-order-cta-state";
 
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
 
 const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
+
+const PAYMENT_ELEMENT_MIN_HEIGHT_CLASS = "min-h-[13rem]";
 
 function PaymentStepForm({
   orderId,
@@ -42,6 +51,12 @@ function PaymentStepForm({
   const elements = useElements();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const paymentCta = resolveCheckoutPaymentCtaState({
+    loading,
+    stripeReady: Boolean(stripe && elements),
+    totalWithTipCents: totalWithTip,
+  });
 
   async function handlePay(e: React.FormEvent) {
     e.preventDefault();
@@ -84,76 +99,100 @@ function PaymentStepForm({
   }
 
   return (
-    <MobileCustomerPageShell withBottomActionBar className="pb-2 sm:pb-0">
-    <div className="mt-8 space-y-6">
-      <CheckoutProgress activeStep={3} />
-      <div className="rounded-xl border border-stone-200 bg-stone-50 p-5">
-        <h2 className="text-lg font-semibold text-stone-900">Pay securely</h2>
-        <p className="mt-2 text-sm text-stone-600">
-          Your card is processed by Stripe. Vendors receive this order only after payment succeeds.
-        </p>
-        <dl className="mt-4 space-y-2 border-t border-stone-200 pt-4 text-sm">
-          <div className="flex justify-between gap-4 text-stone-800">
-            <dt className="text-stone-600">Pickup</dt>
-            <dd className="max-w-[65%] text-right text-sm font-medium">{pickupSummaryLine}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">Subtotal</dt>
-            <dd className="tabular-nums">${(subtotalCents / 100).toFixed(2)}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">Service fee</dt>
-            <dd className="tabular-nums">${(serviceFeeCents / 100).toFixed(2)}</dd>
-          </div>
-          {taxCents > 0 && (
-            <div className="flex justify-between gap-4">
-              <dt className="text-stone-600">Sales tax</dt>
-              <dd className="tabular-nums">${(taxCents / 100).toFixed(2)}</dd>
-            </div>
-          )}
-          <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">Tip</dt>
-            <dd className="tabular-nums">${(tipCents / 100).toFixed(2)}</dd>
-          </div>
-          <div className="flex justify-between gap-4 border-t border-stone-200 pt-2 text-base font-bold text-stone-900">
-            <dt>Total due</dt>
-            <dd className="tabular-nums">${(totalWithTip / 100).toFixed(2)}</dd>
-          </div>
-        </dl>
-      </div>
-      <form id="checkout-payment-form" onSubmit={handlePay} className="space-y-4">
-        <div className="rounded-xl border border-stone-200 bg-white p-4 sm:p-5">
-          <PaymentElement options={{ layout: "tabs" }} />
+    <MobileCustomerPageShell withBottomActionBar className="bg-oo-cream px-1 pb-2 sm:bg-transparent sm:px-0 sm:pb-0">
+      <div className="mx-auto max-w-2xl">
+        <CheckoutProgress activeStep={3} />
+        <header className="border-b border-oo-light-stone pb-4">
+          <h1 className="text-2xl font-bold text-oo-charcoal">Payment</h1>
+          <p className="mt-2 text-[15px] leading-relaxed text-oo-stone-gray sm:text-base">
+            Review your total and pay securely to place your order.
+          </p>
+        </header>
+
+        <div className="mt-6 space-y-5 sm:space-y-6">
+          <CheckoutSectionCard
+            id="checkout-payment-review"
+            title={CHECKOUT_SECTION_HEADINGS.review}
+            helper="Confirm pickup time and total before placing your order."
+          >
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between gap-4 text-oo-charcoal">
+                <dt className="text-oo-stone-gray">Pickup</dt>
+                <dd className="max-w-[65%] text-right font-medium">{pickupSummaryLine}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-oo-stone-gray">Subtotal</dt>
+                <dd className="tabular-nums text-oo-charcoal">${(subtotalCents / 100).toFixed(2)}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-oo-stone-gray">Service fee</dt>
+                <dd className="tabular-nums text-oo-charcoal">
+                  ${(serviceFeeCents / 100).toFixed(2)}
+                </dd>
+              </div>
+              {taxCents > 0 ? (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-oo-stone-gray">Sales tax</dt>
+                  <dd className="tabular-nums text-oo-charcoal">${(taxCents / 100).toFixed(2)}</dd>
+                </div>
+              ) : null}
+              <div className="flex justify-between gap-4">
+                <dt className="text-oo-stone-gray">Tip</dt>
+                <dd className="tabular-nums text-oo-charcoal">${(tipCents / 100).toFixed(2)}</dd>
+              </div>
+              <div className="flex justify-between gap-4 border-t border-oo-light-stone pt-2 text-lg font-bold text-oo-charcoal">
+                <dt>Total due</dt>
+                <dd className="tabular-nums">${(totalWithTip / 100).toFixed(2)}</dd>
+              </div>
+            </dl>
+          </CheckoutSectionCard>
+
+          <form id="checkout-payment-form" onSubmit={handlePay} className="space-y-4">
+            <CheckoutSectionCard
+              id="checkout-payment"
+              title={CHECKOUT_SECTION_HEADINGS.payment}
+              helper="Secure payment powered by Stripe."
+              status={error ? "error" : "default"}
+            >
+              <div className={cn(PAYMENT_ELEMENT_MIN_HEIGHT_CLASS, "rounded-lg bg-oo-warm-white")}>
+                <PaymentElement options={{ layout: "tabs" }} />
+              </div>
+              {error ? (
+                <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-800" role="alert">
+                  {error}
+                </p>
+              ) : null}
+            </CheckoutSectionCard>
+
+            <button
+              type="submit"
+              disabled={!paymentCta.primaryEnabled}
+              className={cn(
+                buttonClassName({ variant: "primary", size: "touch" }),
+                "hidden w-full sm:inline-flex"
+              )}
+            >
+              {paymentCta.primaryLabel}
+            </button>
+            {process.env.NODE_ENV === "development" ? (
+              <p className="hidden text-center text-xs text-oo-stone-gray sm:block">
+                Test mode: use card 4242 4242 4242 4242, any future expiry, any CVC.
+              </p>
+            ) : null}
+          </form>
         </div>
-        {error && (
-          <p className="text-sm text-red-600" role="alert">
-            {error}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={!stripe || !elements || loading}
-          className="hidden w-full rounded-xl bg-stone-900 py-4 text-base font-semibold text-white hover:bg-stone-800 disabled:opacity-50 sm:block sm:py-3"
-        >
-          {loading ? "Processing…" : "Pay and place order"}
-        </button>
-        {process.env.NODE_ENV === "development" && (
-          <p className="hidden text-center text-xs text-stone-400 sm:block">
-            Test mode: use card 4242 4242 4242 4242, any future expiry, any CVC.
-          </p>
-        )}
-      </form>
-    </div>
-    <MobileBottomActionBar
-      primaryLabel={loading ? "Processing…" : "Pay and place order"}
-      primaryType="submit"
-      form="checkout-payment-form"
-      primaryDisabled={!stripe || !elements || loading}
-      primaryLoading={loading}
-      priceLabel={`$${(totalWithTip / 100).toFixed(2)}`}
-      summarySubtitle="Total due now"
-      aria-label="Pay and place order"
-    />
+      </div>
+
+      <MobileBottomActionBar
+        summaryTitle={paymentCta.summaryTitle}
+        summarySubtitle={paymentCta.summarySubtitle ?? undefined}
+        primaryLabel={paymentCta.primaryLabel}
+        primaryType="submit"
+        form="checkout-payment-form"
+        primaryDisabled={!paymentCta.primaryEnabled}
+        primaryLoading={loading}
+        aria-label={paymentCta.blockedReason ?? paymentCta.primaryLabel}
+      />
     </MobileCustomerPageShell>
   );
 }
@@ -177,7 +216,7 @@ export interface CheckoutPaymentStepProps {
 export function CheckoutPaymentStep(props: CheckoutPaymentStepProps) {
   if (!stripePromise) {
     return (
-      <p className="mt-8 text-sm text-red-600" role="alert">
+      <p className="mt-8 text-sm text-red-700" role="alert">
         Stripe is not configured. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.
       </p>
     );

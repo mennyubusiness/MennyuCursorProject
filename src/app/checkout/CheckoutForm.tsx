@@ -8,9 +8,15 @@ import {
   clearCartOnServerAndNotifyClient,
   rememberCheckoutCartForClientClear,
 } from "@/lib/cart-checkout-client";
+import { cn } from "@/lib/cn";
 import { CheckoutPhoneVerification } from "./CheckoutPhoneVerification";
+import { CheckoutSectionCard } from "@/components/checkout/CheckoutSectionCard";
+import { buttonClassName } from "@/components/ui/button";
 import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
-import { MobileCustomerPageShell } from "@/components/mobile/MobileCustomerPageShell";
+import {
+  CHECKOUT_SECTION_HEADINGS,
+  resolveCheckoutFormCtaState,
+} from "@/lib/checkout-place-order-cta-state";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
 
 const CheckoutPaymentStep = dynamic(
@@ -30,6 +36,7 @@ const CheckoutPaymentStep = dynamic(
 interface CheckoutFormProps {
   cartId: string;
   podId: string;
+  itemCount: number;
   totalCents: number;
   subtotalCents: number;
   serviceFeeCents: number;
@@ -73,6 +80,7 @@ function tipCentsForPercent(subtotalCents: number, percent: number): number {
 export function CheckoutForm({
   cartId,
   podId,
+  itemCount,
   totalCents,
   subtotalCents,
   serviceFeeCents,
@@ -118,6 +126,19 @@ export function CheckoutForm({
 
   const idempotencyKeyRef = useRef(crypto.randomUUID());
   const totalWithTip = totalCents + tipCents;
+
+  const formCta = resolveCheckoutFormCtaState({
+    loading,
+    customTipError,
+    smsConsent,
+    phone,
+    phoneVerified,
+    pickupMode,
+    scheduledDate,
+    scheduledTime,
+    totalWithTipCents: totalWithTip,
+    itemCount,
+  });
 
   const pickupSummaryLine =
     pickupMode === "asap"
@@ -335,16 +356,31 @@ export function CheckoutForm({
   }
 
   return (
-    <MobileCustomerPageShell withBottomActionBar className="pb-2 sm:pb-0">
-    <form id="checkout-details-form" onSubmit={handleSubmit} className="mt-8 space-y-8">
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
-          Contact
-        </h2>
-        <p className="mt-1 text-sm text-stone-500">
-          Add a mobile number if you want SMS updates. You can also track your order from the order
-          status screen after checkout.
-        </p>
+    <>
+    <form id="checkout-details-form" onSubmit={handleSubmit} className="mt-6 space-y-5 sm:space-y-6">
+      {error ? (
+        <div
+          className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+          role="alert"
+        >
+          <p className="font-semibold">Something needs attention</p>
+          <p className="mt-1">{error}</p>
+          {groupCartChanged ? (
+            <Link
+              href="/cart?groupUnlock=1"
+              className="mt-3 inline-flex min-h-11 items-center font-semibold text-red-900 underline hover:no-underline"
+            >
+              Review group cart
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+
+      <CheckoutSectionCard
+        id="checkout-contact"
+        title={CHECKOUT_SECTION_HEADINGS.contact}
+        helper="Optional contact info for receipts and SMS updates."
+      >
         <CheckoutPhoneVerification
           phone={phone}
           onPhoneChange={setPhone}
@@ -363,9 +399,9 @@ export function CheckoutForm({
             setVerifiedPhoneE164(null);
           }}
         />
-        <div className="mt-4">
-          <label htmlFor="email" className="block text-sm font-medium text-stone-800">
-            Email <span className="font-normal text-stone-500">(optional)</span>
+        <div className="mt-5 border-t border-oo-light-stone pt-5">
+          <label htmlFor="email" className="block text-sm font-semibold text-oo-charcoal">
+            Email <span className="font-normal text-oo-stone-gray">(optional)</span>
           </label>
           <input
             id="email"
@@ -373,18 +409,21 @@ export function CheckoutForm({
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1.5 w-full max-w-md rounded-lg border border-stone-300 px-3 py-2.5"
+            className="oo-input oo-input-touch mt-2 max-w-md"
             placeholder="you@example.com"
           />
         </div>
-      </section>
+      </CheckoutSectionCard>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Pickup</h2>
-        <p className="mt-1 text-sm text-stone-500">Pickup orders only. Times use {pickupTimezoneLabel}.</p>
-        <fieldset className="mt-4 space-y-3">
+      <CheckoutSectionCard
+        id="checkout-pickup"
+        title={CHECKOUT_SECTION_HEADINGS.pickup}
+        helper={`Pickup orders only. Times use ${pickupTimezoneLabel}.`}
+        status={pickupFieldError ? "error" : "default"}
+      >
+        <fieldset className="space-y-3">
           <legend className="sr-only">When to pick up</legend>
-          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-200 p-3 has-[:checked]:border-stone-900 has-[:checked]:bg-stone-50">
+          <label className="oo-touch-row has-[:checked]:border-brand has-[:checked]:bg-brand-muted/40 flex items-start rounded-xl border border-oo-light-stone bg-oo-warm-white p-3 has-[:checked]:border-2">
             <input
               type="radio"
               name="pickupMode"
@@ -393,32 +432,32 @@ export function CheckoutForm({
                 setPickupMode("asap");
                 setPickupFieldError(null);
               }}
-              className="mt-1"
+              className="mt-1 h-4 w-4 shrink-0"
             />
-            <span>
-              <span className="font-medium text-stone-900">ASAP</span>
-              <span className="mt-0.5 block text-sm text-stone-600">
-                As soon as the kitchen can prepare your order (default).
+            <span className="min-w-0">
+              <span className="font-semibold text-oo-charcoal">ASAP</span>
+              <span className="mt-0.5 block text-sm text-oo-stone-gray">
+                As soon as the kitchen can prepare your order.
               </span>
             </span>
           </label>
-          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-200 p-3 has-[:checked]:border-stone-900 has-[:checked]:bg-stone-50">
+          <label className="oo-touch-row has-[:checked]:border-brand has-[:checked]:bg-brand-muted/40 flex items-start rounded-xl border border-oo-light-stone bg-oo-warm-white p-3 has-[:checked]:border-2">
             <input
               type="radio"
               name="pickupMode"
               checked={pickupMode === "scheduled"}
               onChange={() => setPickupMode("scheduled")}
-              className="mt-1"
+              className="mt-1 h-4 w-4 shrink-0"
             />
             <span className="min-w-0 flex-1">
-              <span className="font-medium text-stone-900">Schedule for later</span>
-              <span className="mt-0.5 block text-sm text-stone-600">
-                Choose when you plan to pick up (at least ~30 minutes from now).
+              <span className="font-semibold text-oo-charcoal">Schedule for later</span>
+              <span className="mt-0.5 block text-sm text-oo-stone-gray">
+                Choose when you plan to pick up (about 30+ minutes from now).
               </span>
               {pickupMode === "scheduled" && (
                 <div className="mt-3 flex flex-wrap gap-3">
                   <div>
-                    <label htmlFor="pickup-date" className="block text-xs font-medium text-stone-600">
+                    <label htmlFor="pickup-date" className="block text-sm font-semibold text-oo-charcoal">
                       Date
                     </label>
                     <input
@@ -426,11 +465,11 @@ export function CheckoutForm({
                       type="date"
                       value={scheduledDate}
                       onChange={(e) => setScheduledDate(e.target.value)}
-                      className="mt-1 rounded-lg border border-stone-300 px-3 py-2 text-stone-900"
+                      className="oo-input oo-input-touch mt-1"
                     />
                   </div>
                   <div>
-                    <label htmlFor="pickup-time" className="block text-xs font-medium text-stone-600">
+                    <label htmlFor="pickup-time" className="block text-sm font-semibold text-oo-charcoal">
                       Time
                     </label>
                     <input
@@ -438,7 +477,7 @@ export function CheckoutForm({
                       type="time"
                       value={scheduledTime}
                       onChange={(e) => setScheduledTime(e.target.value)}
-                      className="mt-1 rounded-lg border border-stone-300 px-3 py-2 text-stone-900"
+                      className="oo-input oo-input-touch mt-1"
                     />
                   </div>
                 </div>
@@ -446,19 +485,20 @@ export function CheckoutForm({
             </span>
           </label>
         </fieldset>
-        {pickupFieldError && (
-          <p className="mt-2 text-sm text-red-600" role="alert">
+        {pickupFieldError ? (
+          <p className="mt-3 text-sm font-medium text-red-700" role="alert">
             {pickupFieldError}
           </p>
-        )}
-      </section>
+        ) : null}
+      </CheckoutSectionCard>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Tip</h2>
-        <p className="mt-1 text-sm text-stone-500">
-          Based on food subtotal (${(subtotalCents / 100).toFixed(2)}). Shared across vendors.
-        </p>
-        <div className="mt-4 flex flex-wrap items-stretch gap-2">
+      <CheckoutSectionCard
+        id="checkout-tip"
+        title={CHECKOUT_SECTION_HEADINGS.tip}
+        helper={`Based on food subtotal ($${(subtotalCents / 100).toFixed(2)}). Shared across vendors.`}
+        status={customTipError ? "error" : "default"}
+      >
+        <div className="flex flex-wrap items-stretch gap-2">
           {TIP_PRESET_PERCENTAGES.map((pct) => {
             const amt = tipCentsForPercent(subtotalCents, pct);
             const selected = tipPresetPercent === pct;
@@ -467,27 +507,27 @@ export function CheckoutForm({
                 key={pct}
                 type="button"
                 onClick={() => selectPercentPreset(pct)}
-                className={`min-h-[44px] flex-1 rounded-lg border px-3 py-2 text-sm font-medium sm:flex-none sm:px-4 ${
+                className={`min-h-11 flex-1 rounded-xl border px-3 py-2 text-sm font-semibold sm:flex-none sm:px-4 ${
                   selected
-                    ? "border-stone-900 bg-stone-50 text-stone-900"
-                    : "border-stone-300 text-stone-700 hover:bg-stone-50"
+                    ? "border-brand bg-brand-muted/50 text-oo-charcoal"
+                    : "border-oo-light-stone text-oo-charcoal hover:bg-oo-cream"
                 }`}
               >
                 <span className="block">{pct}%</span>
-                <span className="block text-xs font-normal text-stone-600">
+                <span className="block text-xs font-normal text-oo-stone-gray">
                   (${(amt / 100).toFixed(2)})
                 </span>
               </button>
             );
           })}
           <div
-            className={`flex min-h-[44px] min-w-[7rem] flex-1 items-center rounded-lg border px-3 sm:flex-none ${
+            className={`flex min-h-11 min-w-[7rem] flex-1 items-center rounded-xl border px-3 sm:flex-none ${
               isCustomTipSelected
-                ? "border-stone-900 bg-stone-50"
-                : "border-stone-300 bg-white"
+                ? "border-brand bg-brand-muted/50"
+                : "border-oo-light-stone bg-oo-warm-white"
             }`}
           >
-            <span className="pr-2 text-sm text-stone-500">$</span>
+            <span className="pr-2 text-sm text-oo-stone-gray">$</span>
             <input
               type="text"
               inputMode="decimal"
@@ -506,82 +546,64 @@ export function CheckoutForm({
             />
           </div>
         </div>
-        {customTipError && (
-          <p className="mt-2 text-sm text-red-600" role="alert">
+        {customTipError ? (
+          <p className="mt-3 text-sm font-medium text-red-700" role="alert">
             {customTipError}
           </p>
-        )}
-      </section>
+        ) : null}
+      </CheckoutSectionCard>
 
-      <section className="rounded-xl border-2 border-stone-200 bg-stone-50 p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
-          Total before payment
-        </h2>
-        <dl className="mt-3 space-y-2 text-sm">
-          <div className="flex justify-between gap-4 text-stone-800">
-            <dt className="text-stone-600">Pickup</dt>
-            <dd className="max-w-[65%] text-right text-sm font-medium">{pickupSummaryLine}</dd>
+      <CheckoutSectionCard
+        id="checkout-review"
+        title={CHECKOUT_SECTION_HEADINGS.review}
+        helper="Confirm pickup, tip, and total before payment."
+      >
+        <dl className="space-y-2 text-sm">
+          <div className="flex justify-between gap-4 text-oo-charcoal">
+            <dt className="text-oo-stone-gray">Pickup</dt>
+            <dd className="max-w-[65%] text-right font-medium">{pickupSummaryLine}</dd>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-stone-600">Food, service fee{taxCents > 0 ? " & tax" : ""}</dt>
-            <dd className="tabular-nums">${(totalCents / 100).toFixed(2)}</dd>
+          <div className="flex justify-between gap-4">
+            <dt className="text-oo-stone-gray">Food, service fee{taxCents > 0 ? " & tax" : ""}</dt>
+            <dd className="tabular-nums text-oo-charcoal">${(totalCents / 100).toFixed(2)}</dd>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-stone-600">Tip</dt>
-            <dd className="tabular-nums">${(tipCents / 100).toFixed(2)}</dd>
+          <div className="flex justify-between gap-4">
+            <dt className="text-oo-stone-gray">Tip</dt>
+            <dd className="tabular-nums text-oo-charcoal">${(tipCents / 100).toFixed(2)}</dd>
           </div>
-          <div className="flex justify-between border-t border-stone-200 pt-2 text-lg font-bold text-stone-900">
-            <dt>Estimated charge</dt>
+          <div className="flex justify-between gap-4 border-t border-oo-light-stone pt-2 text-lg font-bold text-oo-charcoal">
+            <dt>Estimated total</dt>
             <dd className="tabular-nums">${(totalWithTip / 100).toFixed(2)}</dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-stone-500">
+        <p className="mt-3 text-sm text-oo-stone-gray">
           {stripeConfigured
-            ? "Next step: secure card payment with Stripe."
+            ? "Next: secure card payment with Stripe. Vendors are notified only after payment succeeds."
             : "Without Stripe keys, checkout uses the dev payment path."}
         </p>
-      </section>
-
-      {error && (
-        <div
-          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
-          role="alert"
-        >
-          <p>{error}</p>
-          {groupCartChanged ? (
-            <Link
-              href="/cart?groupUnlock=1"
-              className="mt-2 inline-flex font-semibold text-red-900 underline hover:no-underline"
-            >
-              Review group cart
-            </Link>
-          ) : null}
-        </div>
-      )}
-
-      <p className="mx-auto max-w-lg text-center text-sm leading-relaxed text-stone-600">
-        After you pay, each vendor receives their part of the order. Pickup timing can vary slightly by
-        kitchen.
-      </p>
+      </CheckoutSectionCard>
 
       <button
         type="submit"
-        disabled={loading}
-        className="hidden w-full rounded-xl bg-stone-900 py-4 text-base font-semibold text-white transition hover:bg-stone-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.99] disabled:opacity-50 sm:block"
+        disabled={loading || !formCta.primaryEnabled}
+        className={cn(
+          buttonClassName({ variant: "primary", size: "touch" }),
+          "hidden w-full sm:inline-flex"
+        )}
       >
-        {loading ? "Preparing payment…" : "Continue to payment"}
+        {formCta.primaryLabel}
       </button>
     </form>
     <MobileBottomActionBar
-      primaryLabel={loading ? "Preparing payment…" : "Continue to payment"}
+      summaryTitle={formCta.summaryTitle}
+      summarySubtitle={formCta.summarySubtitle ?? undefined}
+      primaryLabel={formCta.primaryLabel}
       primaryType="submit"
       form="checkout-details-form"
-      primaryDisabled={loading}
+      primaryDisabled={!formCta.primaryEnabled}
       primaryLoading={loading}
-      priceLabel={`$${(totalWithTip / 100).toFixed(2)}`}
-      summarySubtitle="Estimated total with tip"
-      aria-label="Continue to payment"
+      aria-label={formCta.blockedReason ?? formCta.primaryLabel}
     />
-    </MobileCustomerPageShell>
+    </>
   );
 }

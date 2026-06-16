@@ -8,6 +8,11 @@ const checkoutPageSrc = readFileSync(join(dir, "page.tsx"), "utf8");
 const cartMutationSrc = readFileSync(join(dir, "../cart/CartPageMutationSync.tsx"), "utf8");
 const checkoutFormSrc = readFileSync(join(dir, "CheckoutForm.tsx"), "utf8");
 const checkoutPaymentSrc = readFileSync(join(dir, "CheckoutPaymentStep.tsx"), "utf8");
+const cartCheckoutCtaSrc = readFileSync(join(dir, "../../lib/cart-checkout-cta-state.ts"), "utf8");
+const checkoutPlaceOrderCtaSrc = readFileSync(
+  join(dir, "../../lib/checkout-place-order-cta-state.ts"),
+  "utf8"
+);
 const orderServiceSrc = readFileSync(
   join(dir, "../../services/order.service.ts"),
   "utf8"
@@ -35,9 +40,9 @@ describe("cart live checkout gate", () => {
   });
 
   it("blocks continue while revalidation or cart sync is pending", () => {
-    expect(cartMutationSrc).toMatch(
-      /checkoutEnabled =[\s\S]*viewerCanCheckout && canCheckout && !isRevalidating && !isSyncingCart/
-    );
+    expect(cartCheckoutCtaSrc).toMatch(/!input\.isRevalidating/);
+    expect(cartCheckoutCtaSrc).toMatch(/!input\.isSyncingCart/);
+    expect(cartCheckoutCtaSrc).toMatch(/input\.viewerCanCheckout/);
   });
 
   it("marks cart invalid when revalidation fails", () => {
@@ -56,6 +61,16 @@ describe("checkout payment lifecycle guards", () => {
 
   it("does not clear cart client-side before payment confirms", () => {
     expect(checkoutPaymentSrc).not.toMatch(/clearCartOnServerAndNotifyClient/);
+  });
+
+  it("uses blocked payment CTA state for Stripe readiness", () => {
+    expect(checkoutPaymentSrc).toMatch(/resolveCheckoutPaymentCtaState/);
+    expect(checkoutPlaceOrderCtaSrc).toMatch(/Complete payment details/);
+  });
+
+  it("uses blocked payment CTA state for sticky place-order bar", () => {
+    expect(checkoutPaymentSrc).toMatch(/summaryTitle=\{paymentCta\.summaryTitle\}/);
+    expect(checkoutPlaceOrderCtaSrc).toMatch(/primaryLabel: "Place order"/);
   });
 
   it("post-payment replay no-ops when order is already paid", () => {

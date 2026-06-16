@@ -18,14 +18,14 @@ const smsCheckboxSrc = readFileSync(
 
 describe("checkout contact SMS UX", () => {
   it("does not show a required asterisk on mobile number", () => {
-    expect(checkoutPhoneSrc).toMatch(/Mobile number \(optional\)/);
+    expect(checkoutPhoneSrc).toMatch(/Mobile number[\s\S]*\(optional\)/);
     expect(checkoutPhoneSrc).not.toMatch(/text-red-600">\*/);
     expect(checkoutPhoneSrc).not.toMatch(/\srequired/);
   });
 
   it("uses optional SMS helper copy in the contact section", () => {
-    expect(checkoutFormSrc).toMatch(/Add a mobile number if you want SMS updates/);
-    expect(checkoutFormSrc).toMatch(/track your order from the order[\s\S]*status screen after checkout/);
+    expect(checkoutPhoneSrc).toMatch(/We&apos;ll use this only for order updates if you choose SMS/);
+    expect(checkoutFormSrc).toMatch(/CheckoutSectionCard/);
     expect(checkoutFormSrc).not.toMatch(
       /We&apos;ll use this to send order updates and help you find your order later\./
     );
@@ -44,10 +44,14 @@ describe("checkout contact SMS UX", () => {
   });
 
   it("shows SMS-off copy when consent is not granted", () => {
-    expect(checkoutPhoneSrc).toMatch(/SMS updates are off\. After checkout, keep the order status page open/);
+    expect(checkoutPhoneSrc).toMatch(/You can still track your order on the order status page/);
     expect(checkoutPhoneSrc).toMatch(
       /Phone verified\. SMS updates are off\. You can track this order from the order status screen\./
     );
+  });
+
+  it("shows OTP panel only when SMS consent is checked and phone is present", () => {
+    expect(checkoutPhoneSrc).toMatch(/showOtpPanel = smsConsent && !phoneVerified && Boolean\(phone\.trim\(\)\)/);
   });
 
   it("shows SMS-on copy when phone is verified and consent is granted", () => {
