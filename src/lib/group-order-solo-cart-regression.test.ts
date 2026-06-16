@@ -50,4 +50,12 @@ describe("solo cart stale group metadata regression", () => {
     expect(viewerCtxSrc).toMatch(/session\.status === "ended"/);
     expect(viewerCtxSrc).toMatch(/return SOLO_VIEWER/);
   });
+
+  it("inactive group state always allows solo checkout on cart page", () => {
+    const viewerCtxSrc = readFileSync(
+      join(process.cwd(), "src/lib/group-order-viewer-context.ts"),
+      "utf8"
+    );
+    expect(viewerCtxSrc).toMatch(/if \(!args\.goStateActive\) \{\s*\n\s*return true;/);
+  });
 });

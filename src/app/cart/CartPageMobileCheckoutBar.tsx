@@ -75,7 +75,7 @@ export function CartPageMobileCheckoutBar({
     );
   }
 
-  if (showParticipantTotalsOnly || !viewerCanCheckout) {
+  if (showParticipantTotalsOnly) {
     return (
       <MobileBottomActionBar
         summaryTitle={cta.summaryTitle}
@@ -133,9 +133,11 @@ export function CartPageDesktopCheckoutActions({
     viewerCanCheckout && canCheckout && !isRevalidating && !isSyncingCart && !groupSubmitted;
   const blockedLabel = isSyncingCart
     ? "Syncing your cart…"
-    : !canCheckout && isRevalidating
-      ? "Checking cart…"
-      : "Fix items above to continue";
+    : !viewerCanCheckout && !showParticipantTotalsOnly
+      ? "Only the host can check out for this group order"
+      : !canCheckout && isRevalidating
+        ? "Checking cart…"
+        : "Fix items above to continue";
 
   return (
     <div className="hidden w-full flex-col gap-1.5 sm:flex sm:w-auto sm:items-end">
@@ -151,7 +153,7 @@ export function CartPageDesktopCheckoutActions({
         >
           Track order
         </Link>
-      ) : showParticipantTotalsOnly || !viewerCanCheckout ? (
+      ) : showParticipantTotalsOnly ? (
         <div className="w-full text-center sm:text-right">
           <p className="text-xs text-stone-500">
             {sessionLockedCheckout

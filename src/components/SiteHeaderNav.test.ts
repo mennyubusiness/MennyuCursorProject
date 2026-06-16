@@ -19,6 +19,32 @@ const accountSessionActionsSrc = readFileSync(
 );
 const layoutSrc = readFileSync(join(dir, "../app/layout.tsx"), "utf8");
 
+describe("SiteHeaderNav mobile header cart contrast", () => {
+  it("keeps compact mobile cart on warm white with charcoal icon in all states", () => {
+    expect(headerNavSrc).toMatch(/const headerCompactClass = cn\(\s*headerSecondaryButton/);
+    expect(headerNavSrc).toMatch(/text-oo-charcoal lg:hidden/);
+    expect(headerNavSrc).toMatch(/shrink-0 text-oo-charcoal/);
+    expect(headerNavSrc).not.toMatch(
+      /headerCompactClass = cn\([\s\S]{0,280}buttonClassName\(\{ variant: "primary"/
+    );
+  });
+
+  it("uses orange count badge and cart aria-label with item count", () => {
+    expect(headerNavSrc).toMatch(/countBadgeClass = cn\(/);
+    expect(headerNavSrc).toMatch(/bg-brand/);
+    expect(headerNavSrc).toMatch(
+      /itemCount > 0 \? `Cart, \$\{itemCount\} item\$\{itemCount === 1 \? "" : "s"\}` : "Cart"/
+    );
+    expect(headerNavSrc).toMatch(/aria-label=\{cartLabel\}/);
+  });
+
+  it("still hides cart for vendor and pod nav modes", () => {
+    expect(roleNavSrc).toMatch(/shouldShowHeaderCart/);
+    expect(roleNavSrc).toMatch(/navMode === "vendor"/);
+    expect(roleNavSrc).toMatch(/navMode === "pod"/);
+  });
+});
+
 describe("SiteHeaderNav signed-out pills", () => {
   it("shows business CTA, conditional cart, and Sign in when signed out", () => {
     expect(headerNavSrc).toMatch(/buildRoleNavConfig/);

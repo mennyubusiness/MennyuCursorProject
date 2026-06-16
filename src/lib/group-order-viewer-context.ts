@@ -31,8 +31,9 @@ export function canViewerCheckoutOnCartPage(args: {
   goStateView: "host" | "participant" | "unknown" | undefined;
   viewerCtx: GroupOrderViewerContext | null;
 }): boolean {
+  // Inactive group state (solo cart, terminal session, or no session) — always eligible for checkout UI.
   if (!args.goStateActive) {
-    return args.viewerCtx?.canCheckout ?? true;
+    return true;
   }
   if (args.goStateView !== "host") return false;
   return Boolean(args.viewerCtx?.canCheckout);

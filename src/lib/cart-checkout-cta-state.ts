@@ -34,9 +34,11 @@ export function resolveCartCheckoutCtaState(input: CartCheckoutCtaInput): CartCh
 
   const blockedLabel = input.isSyncingCart
     ? "Syncing your cart…"
-    : !input.canCheckout && input.isRevalidating
-      ? "Checking cart…"
-      : "Fix items above to continue";
+    : !input.viewerCanCheckout && !input.showParticipantTotalsOnly
+      ? "Only the host can check out for this group order"
+      : !input.canCheckout && input.isRevalidating
+        ? "Checking cart…"
+        : "Fix items above to continue";
 
   const subtotalCents =
     input.showParticipantTotalsOnly && input.participantSubtotalCents != null
@@ -56,7 +58,7 @@ export function resolveCartCheckoutCtaState(input: CartCheckoutCtaInput): CartCh
       ? "Tax and service fee at checkout"
       : blockedLabel,
     showTrackOrder: input.groupSubmitted,
-    showParticipantMessage: input.showParticipantTotalsOnly || !input.viewerCanCheckout,
+    showParticipantMessage: input.showParticipantTotalsOnly,
     participantMessage: input.sessionLockedCheckout
       ? "The host is checking out. New changes are paused."
       : "The host will check out when everyone is ready.",

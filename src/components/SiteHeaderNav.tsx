@@ -87,6 +87,11 @@ function CartControl({
   const cartLabel =
     itemCount > 0 ? `Cart, ${itemCount} item${itemCount === 1 ? "" : "s"}` : "Cart";
 
+  const countBadgeClass = cn(
+    "inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none text-white",
+    headerCompact && "absolute -right-1 -top-1 min-w-[1.125rem] px-1 ring-2 ring-oo-warm-white"
+  );
+
   const desktopClass = cn(
     prominent
       ? cn(
@@ -110,15 +115,9 @@ function CartControl({
 
   const headerCompactClass = cn(
     headerSecondaryButton,
-    "relative h-11 min-h-11 w-11 min-w-11 p-0 lg:hidden",
-    prominent &&
-      cn(
-        buttonClassName({ variant: "primary", size: "sm" }),
-        headerFocusVisible,
-        "shadow-[0_0_12px_rgba(249,115,22,0.3)]",
-        cartPulse && "animate-mennyu-cart-nudge motion-reduce:animate-none"
-      ),
-    !prominent && cartPulse && "border-brand/50 bg-oo-warm-white",
+    "relative h-11 min-h-11 w-11 min-w-11 p-0 text-oo-charcoal lg:hidden",
+    itemCount > 0 && "border-brand/45",
+    cartPulse && "border-brand/50 bg-oo-cream",
     className
   );
 
@@ -126,12 +125,7 @@ function CartControl({
 
   const countBadge =
     itemCount > 0 ? (
-      <span
-        className={cn(
-          "inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-oo-charcoal px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none text-oo-warm-white",
-          headerCompact && "absolute -right-1 -top-1 min-w-[1.125rem] px-1"
-        )}
-      >
+      <span className={countBadgeClass} aria-hidden>
         {itemCount > 99 ? "99+" : itemCount}
       </span>
     ) : null;
@@ -146,11 +140,18 @@ function CartControl({
         }}
         className={sharedClass}
         title="Open your cart"
-        aria-label={itemCount > 0 ? `Open cart, ${itemCount} items` : "Open cart"}
+        aria-label={cartLabel}
       >
         {headerCompact ? (
           <>
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+            <svg
+              className="h-5 w-5 shrink-0 text-oo-charcoal"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h15l-1.5 9h-12L6 6z" />
               <path strokeLinecap="round" d="M9 20a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" />
             </svg>
@@ -176,7 +177,14 @@ function CartControl({
     >
       {headerCompact ? (
         <>
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+          <svg
+            className="h-5 w-5 shrink-0 text-oo-charcoal"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h15l-1.5 9h-12L6 6z" />
             <path strokeLinecap="round" d="M9 20a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" />
           </svg>

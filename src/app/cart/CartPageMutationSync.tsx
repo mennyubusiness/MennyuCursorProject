@@ -18,7 +18,10 @@ import type { Cart } from "@/domain/types";
 import {
   CART_UPDATED_EVENT,
   cartSnapshotAppliesToContext,
+  mergeAcceptedCartSnapshotMeta,
+  shouldAcceptCartSnapshot,
   shouldApplyCartSnapshot,
+  type CartSnapshotMeta,
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
 import {
@@ -84,6 +87,7 @@ export function CartPageMutationProvider({
     () => hasPendingCartMutations(cartId)
   );
   const revalidateSeqRef = useRef(0);
+  const lastAcceptedSnapshotMetaRef = useRef<CartSnapshotMeta | null>(null);
   const skipRevalidateForFingerprintRef = useRef(
     cartMutationFingerprint(initialCart.items)
   );
@@ -92,13 +96,19 @@ export function CartPageMutationProvider({
     setCart(initialCart);
     setServerValidation(initialValidation);
     skipRevalidateForFingerprintRef.current = cartMutationFingerprint(initialCart.items);
+    lastAcceptedSnapshotMetaRef.current = null;
   }, [initialCart, initialValidation]);
 
   useEffect(() => {
     const onUpdate = (event: Event) => {
       const detail = (event as CustomEvent<CartUpdatedDetail>).detail;
       if (!shouldApplyCartSnapshot(detail, "cart-page", { cartId, podId })) return;
+      if (!shouldAcceptCartSnapshot(detail, lastAcceptedSnapshotMetaRef.current)) return;
       if (!detail?.cart) return;
+      lastAcceptedSnapshotMetaRef.current = mergeAcceptedCartSnapshotMeta(
+        lastAcceptedSnapshotMetaRef.current,
+        detail
+      );
       setCart(detail.cart);
       skipRevalidateForFingerprintRef.current = cartMutationFingerprint(detail.cart.items);
     };
