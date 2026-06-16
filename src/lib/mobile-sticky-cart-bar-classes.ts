@@ -7,10 +7,10 @@ export const mobileSafeAreaBottomPadding = "pb-[max(0.75rem,env(safe-area-inset-
 export const mobileStickyCartBarSurfaceClass =
   "border-t border-oo-light-stone bg-oo-warm-white shadow-[0_-4px_20px_rgba(31,31,28,0.12)]";
 
-/** Fixed mobile cart CTA bar (vendor menu, etc.). Hidden from `lg` up via caller. */
+/** Fixed mobile cart CTA bar (vendor menu, etc.). Hidden from `lg` up via caller. Keep z-40 in sync with Z_MOBILE_BOTTOM_ACTION_BAR. */
 export const mobileStickyCartBarFixedClass = [
   mobileStickyCartBarSurfaceClass,
-  "fixed inset-x-0 bottom-0 z-30 px-4 pt-3",
+  "fixed inset-x-0 bottom-0 z-40 px-4 pt-3",
   mobileSafeAreaBottomPadding,
 ].join(" ");
 

@@ -19,7 +19,7 @@ describe("resolveCartCheckoutCtaState", () => {
     });
 
     expect(state.checkoutEnabled).toBe(true);
-    expect(state.primaryLabel).toBe("Checkout");
+    expect(state.primaryLabel).toBe("Proceed to checkout");
   });
 
   it("keeps checkout visible but disabled when validation fails", () => {
@@ -85,7 +85,14 @@ describe("solo cart checkout CTA regression", () => {
     );
     expect(mobileBarSrc).toMatch(/if \(showParticipantTotalsOnly\) \{/);
     expect(mobileBarSrc).not.toMatch(/showParticipantTotalsOnly \|\| !viewerCanCheckout/);
-    expect(mobileBarSrc).toMatch(/primaryLabel="Checkout"/);
+    expect(mobileBarSrc).toMatch(/Proceed to checkout/);
+    expect(mobileBarSrc).toMatch(/createPortal/);
+  });
+
+  it("cart page aligns mobile sticky bar with lg breakpoint", () => {
+    const cartPageSrc = readFileSync(join(process.cwd(), "src/app/cart/page.tsx"), "utf8");
+    expect(cartPageSrc).toMatch(/hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-6/);
+    expect(cartPageSrc).not.toMatch(/sm:hidden[\s\S]*CartPageLiveCheckoutActions/);
   });
 
   it("CartPageMutationSync rejects stale lifecycle snapshots", () => {
@@ -94,5 +101,13 @@ describe("solo cart checkout CTA regression", () => {
       "utf8"
     );
     expect(syncSrc).toMatch(/shouldAcceptCartSnapshot/);
+  });
+
+  it("mobile sticky checkout bar uses elevated z-index", () => {
+    const barClassesSrc = readFileSync(
+      join(process.cwd(), "src/lib/mobile-sticky-cart-bar-classes.ts"),
+      "utf8"
+    );
+    expect(barClassesSrc).toMatch(/z-40/);
   });
 });

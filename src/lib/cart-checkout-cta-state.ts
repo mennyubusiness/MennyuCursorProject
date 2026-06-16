@@ -52,7 +52,7 @@ export function resolveCartCheckoutCtaState(input: CartCheckoutCtaInput): CartCh
   return {
     checkoutEnabled,
     blockedLabel,
-    primaryLabel: checkoutEnabled ? "Checkout" : blockedLabel,
+    primaryLabel: checkoutEnabled ? "Proceed to checkout" : blockedLabel,
     summaryTitle,
     summarySubtitle: checkoutEnabled
       ? "Tax and service fee at checkout"

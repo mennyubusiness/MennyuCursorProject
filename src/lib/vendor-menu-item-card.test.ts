@@ -43,7 +43,7 @@ describe("resolveCartCheckoutCtaState", () => {
     });
 
     expect(state.checkoutEnabled).toBe(true);
-    expect(state.primaryLabel).toBe("Checkout");
+    expect(state.primaryLabel).toBe("Proceed to checkout");
     expect(state.summaryTitle).toBe("2 items · $18.99");
   });
 

@@ -34,7 +34,7 @@ describe("Cart page mobile checkout bar", () => {
   it("uses MobileBottomActionBar for mobile checkout", () => {
     expect(mobileBarSrc).toMatch(/MobileBottomActionBar/);
     expect(mobileBarSrc).toMatch(/resolveCartCheckoutCtaState/);
-    expect(mobileBarSrc).toMatch(/primaryLabel="Checkout"/);
+    expect(mobileBarSrc).toMatch(/Proceed to checkout/);
   });
 
   it("applies bottom padding and mobile checkout surface on cart page", () => {

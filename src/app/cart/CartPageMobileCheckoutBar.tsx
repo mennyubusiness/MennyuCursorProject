@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
 import { AwaitCartNavigationLink } from "@/components/cart/AwaitCartNavigationLink";
 import { flushCartMutations } from "@/lib/cart-mutation-queue";
@@ -27,7 +29,9 @@ type CartPageMobileCheckoutBarProps = CartPageCheckoutMutationProps & {
   submittedOrderId?: string | null;
 };
 
-export function CartPageMobileCheckoutBar({
+const MOBILE_CHECKOUT_PRIMARY_LABEL = "Proceed to checkout";
+
+function CartPageMobileCheckoutBarContent({
   cartId,
   podId,
   cart,
@@ -92,13 +96,13 @@ export function CartPageMobileCheckoutBar({
       <MobileBottomActionBar
         summaryTitle={cta.summaryTitle}
         summarySubtitle={cta.summarySubtitle ?? undefined}
-        primaryLabel="Checkout"
+        primaryLabel={MOBILE_CHECKOUT_PRIMARY_LABEL}
         onPrimaryClick={() => {
           void flushCartMutations(cartId).then(() => {
             router.push(`/checkout?cartId=${cartId}`);
           });
         }}
-        aria-label={`Checkout, ${itemCount} items`}
+        aria-label={`${MOBILE_CHECKOUT_PRIMARY_LABEL}, ${itemCount} items`}
       />
     );
   }
@@ -107,11 +111,28 @@ export function CartPageMobileCheckoutBar({
     <MobileBottomActionBar
       summaryTitle={cta.summaryTitle}
       summarySubtitle={cta.summarySubtitle ?? undefined}
-      primaryLabel="Checkout"
+      primaryLabel={MOBILE_CHECKOUT_PRIMARY_LABEL}
       primaryDisabled
       aria-label={cta.blockedLabel}
     />
   );
+}
+
+/** Fixed bottom checkout bar — portaled to body so it is not clipped by page layout. */
+export function CartPageMobileCheckoutBar(props: CartPageMobileCheckoutBarProps) {
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  const bar = <CartPageMobileCheckoutBarContent {...props} />;
+
+  if (!portalReady || typeof document === "undefined") {
+    return bar;
+  }
+
+  return createPortal(bar, document.body);
 }
 
 type CartPageDesktopCheckoutActionsProps = CartPageMobileCheckoutBarProps;
@@ -140,21 +161,21 @@ export function CartPageDesktopCheckoutActions({
         : "Fix items above to continue";
 
   return (
-    <div className="hidden w-full flex-col gap-1.5 sm:flex sm:w-auto sm:items-end">
+    <div className="hidden w-full flex-col gap-1.5 lg:flex lg:w-auto lg:items-end">
       {checkoutEnabled && (
-        <p className="text-center text-xs leading-snug text-stone-500 sm:text-right">
+        <p className="text-center text-xs leading-snug text-stone-500 lg:text-right">
           Secure checkout with Stripe · Each vendor is notified after you pay
         </p>
       )}
       {groupSubmitted && submittedOrderId ? (
         <Link
           href={`/order/${submittedOrderId}`}
-          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-emerald-900 px-8 py-3.5 text-center text-base font-bold text-white shadow-md transition hover:bg-emerald-800 sm:min-w-[14rem] sm:w-auto"
+          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-emerald-900 px-8 py-3.5 text-center text-base font-bold text-white shadow-md transition hover:bg-emerald-800 lg:min-w-[14rem] lg:w-auto"
         >
           Track order
         </Link>
       ) : showParticipantTotalsOnly ? (
-        <div className="w-full text-center sm:text-right">
+        <div className="w-full text-center lg:text-right">
           <p className="text-xs text-stone-500">
             {sessionLockedCheckout
               ? "The host is checking out. New changes are paused."
@@ -162,7 +183,7 @@ export function CartPageDesktopCheckoutActions({
           </p>
           <Link
             href={`/pod/${podId}`}
-            className="mt-2 inline-flex min-h-[48px] w-full items-center justify-center rounded-xl border-2 border-stone-300 bg-white px-8 py-3.5 text-center text-base font-semibold text-stone-900 transition hover:bg-stone-50 sm:min-w-[14rem] sm:w-auto"
+            className="mt-2 inline-flex min-h-[48px] w-full items-center justify-center rounded-xl border-2 border-stone-300 bg-white px-8 py-3.5 text-center text-base font-semibold text-stone-900 transition hover:bg-stone-50 lg:min-w-[14rem] lg:w-auto"
           >
             Back to pod
           </Link>
@@ -171,13 +192,13 @@ export function CartPageDesktopCheckoutActions({
         <AwaitCartNavigationLink
           cartId={cartId}
           href={`/checkout?cartId=${cartId}`}
-          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-900 px-8 py-3.5 text-center text-base font-bold text-white shadow-md transition duration-200 hover:bg-stone-800 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98] sm:min-w-[14rem] sm:w-auto"
+          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-900 px-8 py-3.5 text-center text-base font-bold text-white shadow-md transition duration-200 hover:bg-stone-800 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98] lg:min-w-[14rem] lg:w-auto"
         >
           Continue to checkout
         </AwaitCartNavigationLink>
       ) : (
         <span
-          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-500 sm:w-auto"
+          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-500 lg:w-auto"
           aria-disabled
         >
           {blockedLabel}

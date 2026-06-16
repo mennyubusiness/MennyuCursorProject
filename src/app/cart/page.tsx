@@ -860,9 +860,9 @@ export default async function CartPage({
         </div>
       )}
 
-      {/* Sticky checkout on mobile; inline actions on sm+ */}
+      {/* Sticky checkout on mobile/tablet; inline actions on lg+ */}
       <CartPageLiveCheckoutGate>
-        <div className="mt-10 hidden sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-6">
+        <div className="mt-10 hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-6">
           <Link
             href={`/pod/${cart.podId}`}
             className="inline-flex justify-center rounded-xl border-2 border-stone-300 bg-white px-5 py-3 text-center text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400 active:scale-[0.99]"
@@ -888,18 +888,16 @@ export default async function CartPage({
             />
           </div>
         </div>
-        <div className="sm:hidden">
-          <CartPageLiveCheckoutActions
-            surface="mobile"
-            viewerCanCheckout={viewerCanCheckout}
-            showParticipantTotalsOnly={showParticipantTotalsOnly}
-            sessionLockedCheckout={sessionLocked}
-            myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
-            totalCentsFallback={totalCents}
-            groupSubmitted={sessionSubmitted}
-            submittedOrderId={submittedOrderId}
-          />
-        </div>
+        <CartPageLiveCheckoutActions
+          surface="mobile"
+          viewerCanCheckout={viewerCanCheckout}
+          showParticipantTotalsOnly={showParticipantTotalsOnly}
+          sessionLockedCheckout={sessionLocked}
+          myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
+          totalCentsFallback={totalCents}
+          groupSubmitted={sessionSubmitted}
+          submittedOrderId={submittedOrderId}
+        />
       </CartPageLiveCheckoutGate>
       </CartPageMutationProvider>
     </div>
