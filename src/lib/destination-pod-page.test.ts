@@ -20,6 +20,11 @@ const vendorSectionSrc = readFileSync(
   join(dir, "../components/pod/destination/DestinationPodVendorSection.tsx"),
   "utf8"
 );
+const vendorCardSrc = readFileSync(
+  join(dir, "../components/pod/destination/DestinationPodVendorCard.tsx"),
+  "utf8"
+);
+const standardVendorCardSrc = readFileSync(join(dir, "../components/pod/PodVendorCard.tsx"), "utf8");
 
 describe("DestinationPodHero", () => {
   it("centers pod name over a muted banner masthead", () => {
@@ -73,5 +78,27 @@ describe("DestinationPodVendorSection", () => {
   it("uses the simplified vendor heading", () => {
     expect(vendorSectionSrc).toMatch(/Check out our vendors/);
     expect(vendorSectionSrc).not.toMatch(/Order from vendors at/);
+  });
+});
+
+describe("DestinationPodVendorCard", () => {
+  it("is a showcase card without order CTA buttons or open badges", () => {
+    expect(vendorCardSrc).toMatch(/href=\{href\}/);
+    expect(vendorCardSrc).toMatch(/View menu/);
+    expect(vendorCardSrc).not.toMatch(/Order now/);
+    expect(vendorCardSrc).not.toMatch(/Open for orders/);
+    expect(vendorCardSrc).not.toMatch(/bg-emerald-50/);
+    expect(vendorCardSrc).not.toMatch(/min-h-11 items-center justify-center/);
+  });
+
+  it("shows a muted unavailable label only when ordering is blocked", () => {
+    expect(vendorCardSrc).toMatch(/unavailable &&/);
+    expect(vendorCardSrc).toMatch(/availability\.statusLabel/);
+    expect(vendorCardSrc).toMatch(/text-xs font-medium text-oo-stone-gray/);
+  });
+
+  it("does not change the standard pod vendor card", () => {
+    expect(standardVendorCardSrc).toMatch(/Order now/);
+    expect(standardVendorCardSrc).toMatch(/Open/);
   });
 });
