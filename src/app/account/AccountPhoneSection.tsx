@@ -90,6 +90,10 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
       setOtpError(normalized.error);
       return;
     }
+    if (!smsConsent) {
+      setOtpError("Check SMS updates to receive a verification code.");
+      return;
+    }
     setOtpSending(true);
     try {
       const res = await fetch("/api/customer/phone/send-code", {
@@ -272,12 +276,18 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
               onChange={setSmsConsent}
               className="mt-3 max-w-md"
             />
+            {!smsConsent ? (
+              <p className="mt-2 text-sm text-oo-stone-gray" role="status">
+                SMS order updates are optional. Check the box above to verify your number and enable
+                transactional texts. You can track orders on the order status page without SMS.
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => void handleSendCode()}
-              disabled={otpSending || !phone.trim()}
+              disabled={otpSending || !phone.trim() || !smsConsent}
               className={cn(buttonClassName({ variant: "primary", size: "sm" }))}
             >
               {otpSending ? "Sending…" : "Send verification code"}

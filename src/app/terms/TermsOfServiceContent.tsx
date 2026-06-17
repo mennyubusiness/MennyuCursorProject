@@ -121,8 +121,9 @@ export function TermsOfServiceContent() {
       <LegalSection id="text-messages" title="8. Text Message Notifications">
         <p>
           By providing your phone number and opting in, you agree to receive transactional SMS messages
-          from OpenOrder. These messages may include verification codes, order confirmations, order status
-          updates, pickup-ready alerts, cancellation notices, completed-order notices, and order issue notices.
+          from Open Order. These messages may include verification codes, order received confirmations,
+          order preparing updates, ready-for-pickup alerts, cancellation notices, and order issue
+          notifications.
         </p>
         <p>
           Message frequency varies based on account activity and order activity. Message and data rates
@@ -130,9 +131,9 @@ export function TermsOfServiceContent() {
         </p>
         <p>
           You can opt out at any time by replying <strong className="text-oo-charcoal">STOP</strong> to
-          any OpenOrder SMS message. After you opt out, you may no longer receive SMS updates related to
+          any Open Order SMS message. After you opt out, you may no longer receive SMS updates related to
           your orders unless you opt in again. You can reply{" "}
-          <strong className="text-oo-charcoal">HELP</strong> for help or contact OpenOrder at{" "}
+          <strong className="text-oo-charcoal">HELP</strong> for help or contact Open Order at{" "}
           <a
             href={`mailto:${OPEN_ORDER_SUPPORT_EMAIL}`}
             className="font-semibold text-brand hover:underline"
@@ -142,7 +143,7 @@ export function TermsOfServiceContent() {
           .
         </p>
         <p className="rounded-lg border border-brand/20 bg-oo-cream/80 px-4 py-3 font-medium text-oo-charcoal">
-          OpenOrder does not send marketing or promotional SMS messages under this transactional messaging
+          Open Order does not send marketing or promotional SMS messages under this transactional messaging
           program.
         </p>
         <p>

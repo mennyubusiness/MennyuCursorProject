@@ -19,10 +19,11 @@ describe("sms-templates", () => {
     expect(buildPhoneVerificationSmsBody("123456")).toContain("Reply STOP to opt out");
   });
 
-  it("order received template is transactional", () => {
+  it("order received template is transactional and includes HELP", () => {
     expect(buildOrderReceivedSmsBody("ABCD1234")).toContain(
       "Open Order: Your pickup order #ABCD1234 has been received"
     );
+    expect(buildOrderReceivedSmsBody("ABCD1234")).toContain("Reply HELP for help or STOP to opt out");
   });
 
   it("order ready template includes pickup code", () => {

@@ -66,9 +66,10 @@ describe("account phone settings card", () => {
     expect(phoneSectionSrc).toMatch(/layout="account"/);
   });
 
-  it("does not require SMS consent to send verification code", () => {
-    expect(phoneSectionSrc).not.toMatch(/if \(!smsConsent\)/);
-    expect(phoneSectionSrc).toMatch(/disabled={otpSending \|\| !phone\.trim\(\)}/);
+  it("requires SMS consent before sending verification code", () => {
+    expect(phoneSectionSrc).toMatch(/if \(!smsConsent\)/);
+    expect(phoneSectionSrc).toMatch(/Check SMS updates to receive a verification code/);
+    expect(phoneSectionSrc).toMatch(/disabled={otpSending \|\| !phone\.trim\(\) \|\| !smsConsent}/);
   });
 
   it("shows order status tracking when SMS updates are off", () => {

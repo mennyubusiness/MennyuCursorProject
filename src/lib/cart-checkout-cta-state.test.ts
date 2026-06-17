@@ -80,7 +80,7 @@ describe("solo cart checkout CTA regression", () => {
 
   it("CartPageMobileCheckoutBar keeps checkout CTA for non-participant views", () => {
     const mobileBarSrc = readFileSync(
-      join(process.cwd(), "src/app/cart/CartPageMobileCheckoutBar.tsx"),
+      join(process.cwd(), "src/app/cart/cart-page-checkout-actions.tsx"),
       "utf8"
     );
     expect(mobileBarSrc).toMatch(/if \(showParticipantTotalsOnly\) \{/);
@@ -89,10 +89,10 @@ describe("solo cart checkout CTA regression", () => {
     expect(mobileBarSrc).toMatch(/createPortal/);
   });
 
-  it("cart page aligns mobile sticky bar with lg breakpoint", () => {
+  it("cart page aligns mobile sticky bar below lg", () => {
     const cartPageSrc = readFileSync(join(process.cwd(), "src/app/cart/page.tsx"), "utf8");
-    expect(cartPageSrc).toMatch(/hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-6/);
-    expect(cartPageSrc).not.toMatch(/sm:hidden[\s\S]*CartPageLiveCheckoutActions/);
+    expect(cartPageSrc).toMatch(/hidden sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-6/);
+    expect(cartPageSrc).toMatch(/surface="summary"/);
   });
 
   it("CartPageMutationSync rejects stale lifecycle snapshots", () => {

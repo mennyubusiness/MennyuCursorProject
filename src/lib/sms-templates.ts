@@ -23,7 +23,7 @@ export function buildPhoneVerificationSmsBody(code: string): string {
 }
 
 export function buildOrderReceivedSmsBody(orderNumber: string): string {
-  return `Open Order: Your pickup order #${orderNumber} has been received. We'll text you when it is ready. Reply STOP to opt out.`;
+  return `Open Order: Your pickup order #${orderNumber} has been received. We'll text you when it is ready. Reply HELP for help or STOP to opt out.`;
 }
 
 export function buildOrderPreparingSmsBody(orderNumber: string): string {

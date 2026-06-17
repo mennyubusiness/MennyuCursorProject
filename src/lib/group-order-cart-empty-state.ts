@@ -18,6 +18,9 @@ export function resolveGroupCartEmptyState(args: {
 
 export function shouldShowJoinGroupOrderForm(args: {
   goStateActive: boolean;
+  cartItemCount?: number;
 }): boolean {
-  return !args.goStateActive;
+  if (args.goStateActive) return false;
+  if ((args.cartItemCount ?? 0) > 0) return false;
+  return true;
 }

@@ -1,16 +1,15 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { joinGroupOrderFormAction } from "@/actions/group-order.actions";
-import { SmsConsentCheckbox } from "@/components/legal/SmsConsentCheckbox";
 
-function JoinSubmitButton({ disabled = false }: { disabled?: boolean }) {
+function JoinSubmitButton() {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      disabled={pending || disabled}
+      disabled={pending}
       aria-busy={pending}
       className="w-full rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
     >
@@ -30,21 +29,12 @@ export function GroupOrderJoinForm({ groupOrderSessionId }: Props) {
       : `join_${Date.now()}_${Math.random().toString(36).slice(2)}`
   );
   const submitGuardRef = useRef(false);
-  const [smsConsent, setSmsConsent] = useState(false);
-  const [consentError, setConsentError] = useState<string | null>(null);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     if (submitGuardRef.current) {
       e.preventDefault();
       return;
     }
-    if (!smsConsent) {
-      e.preventDefault();
-      setConsentError("Agree to transactional SMS messages before joining the group order.");
-      submitGuardRef.current = false;
-      return;
-    }
-    setConsentError(null);
     submitGuardRef.current = true;
   }
 
@@ -76,27 +66,14 @@ export function GroupOrderJoinForm({ groupOrderSessionId }: Props) {
           required
           autoComplete="tel"
           className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
-          placeholder="For order-ready texts (not shown to others)"
+          placeholder="For group coordination (not shown to others)"
         />
         <p className="mt-1 text-xs text-stone-500">
-          Used to notify you when your items are ready. Not shared with the host or vendors.
+          Used only for group order coordination within Open Order. This is not an SMS marketing or
+          order-update opt-in. Not shared with the host or vendors.
         </p>
-        <SmsConsentCheckbox
-          id="group-join-sms-consent"
-          checked={smsConsent}
-          onChange={(checked) => {
-            setSmsConsent(checked);
-            if (checked) setConsentError(null);
-          }}
-          className="mt-3"
-        />
       </div>
-      {consentError ? (
-        <p className="text-sm text-red-600" role="alert">
-          {consentError}
-        </p>
-      ) : null}
-      <JoinSubmitButton disabled={!smsConsent} />
+      <JoinSubmitButton />
     </form>
   );
 }

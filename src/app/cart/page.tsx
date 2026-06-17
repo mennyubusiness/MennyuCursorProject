@@ -280,7 +280,10 @@ export default async function CartPage({
   }
 
   const goState = await getGroupOrderStateForCartPage(cart.id, { participantMarkers });
-  const showJoinCodeForm = shouldShowJoinGroupOrderForm({ goStateActive: goState.active });
+  const showJoinCodeForm = shouldShowJoinGroupOrderForm({
+    goStateActive: goState.active,
+    cartItemCount: displayItems.length,
+  });
 
   if (
     goState.active &&
@@ -590,7 +593,6 @@ export default async function CartPage({
       />
       <GroupOrderCartPoll enabled={pollGroupCart} cartId={pollGroupCart ? cart.id : null} />
       <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
-      <JoinGroupOrderByCodeForm visible={showJoinCodeForm} className="mb-4" />
       <GroupOrderCartPanel
         cartId={cart.id}
         podId={cart.podId}
@@ -857,12 +859,37 @@ export default async function CartPage({
               )}
             </div>
           </dl>
+          <CartPageLiveCheckoutGate
+            serverItemCount={displayItems.reduce((n, item) => n + item.quantity, 0)}
+          >
+            <CartPageLiveCheckoutActions
+              surface="summary"
+              viewerCanCheckout={viewerCanCheckout}
+              showParticipantTotalsOnly={showParticipantTotalsOnly}
+              sessionLockedCheckout={sessionLocked}
+              myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
+              totalCentsFallback={totalCents}
+              groupSubmitted={sessionSubmitted}
+              submittedOrderId={submittedOrderId}
+            />
+          </CartPageLiveCheckoutGate>
         </div>
       )}
 
-      {/* Sticky checkout on mobile/tablet; inline actions on lg+ */}
-      <CartPageLiveCheckoutGate>
-        <div className="mt-10 hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-6">
+      {showJoinCodeForm ? (
+        <details className="mt-10 rounded-2xl border border-stone-200/90 bg-stone-50/80 px-4 py-3 sm:px-5">
+          <summary className="cursor-pointer text-sm font-semibold text-stone-800">
+            Join a group order with a code
+          </summary>
+          <JoinGroupOrderByCodeForm visible className="mt-4" />
+        </details>
+      ) : null}
+
+      {/* Sticky checkout on mobile/tablet; inline actions on sm+ */}
+      <CartPageLiveCheckoutGate
+        serverItemCount={displayItems.reduce((n, item) => n + item.quantity, 0)}
+      >
+        <div className="mt-10 hidden sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-6">
           <Link
             href={`/pod/${cart.podId}`}
             className="inline-flex justify-center rounded-xl border-2 border-stone-300 bg-white px-5 py-3 text-center text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400 active:scale-[0.99]"

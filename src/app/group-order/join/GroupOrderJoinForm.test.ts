@@ -22,4 +22,9 @@ describe("GroupOrderJoinForm", () => {
     expect(src).toMatch(/submitGuardRef/);
     expect(src).toMatch(/e\.preventDefault\(\)/);
   });
+
+  it("does not collect SMS consent", () => {
+    expect(src).not.toMatch(/SmsConsentCheckbox/);
+    expect(src).not.toMatch(/smsConsent/);
+  });
 });

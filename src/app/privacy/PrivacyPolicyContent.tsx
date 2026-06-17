@@ -6,6 +6,7 @@ import {
   LEGAL_MAILING_ADDRESS_NOTICE,
   OPEN_ORDER_SUPPORT_EMAIL,
 } from "@/lib/legal/constants";
+import { SMS_TRANSACTIONAL_MESSAGE_TYPES } from "@/lib/legal/sms-consent-copy";
 
 export function PrivacyPolicyContent() {
   return (
@@ -80,16 +81,7 @@ export function PrivacyPolicyContent() {
           If you provide your phone number and agree to receive text messages, we may collect and use your
           phone number to send transactional SMS notifications, including:
         </p>
-        <LegalList
-          items={[
-            "Phone verification codes",
-            "Order confirmations",
-            "Order status updates",
-            "Pickup-ready alerts",
-            "Cancellation notices",
-            "Order issue notifications",
-          ]}
-        />
+        <LegalList items={[...SMS_TRANSACTIONAL_MESSAGE_TYPES]} />
         <p className="font-medium text-oo-charcoal">
           We do not use transactional SMS consent for marketing messages unless you separately opt in to
           marketing communications.
@@ -118,18 +110,19 @@ export function PrivacyPolicyContent() {
 
       <LegalSection id="text-message-privacy" title="3. Text Message Privacy">
         <p>
-          OpenOrder may collect your mobile phone number when you create an account, verify your phone
+          Open Order may collect your mobile phone number when you create an account, verify your phone
           number, place an order, or request transactional order updates.
         </p>
         <p>
-          OpenOrder uses mobile phone numbers and SMS consent only to provide transactional messages
-          related to OpenOrder services, including verification codes, order confirmations, order status
-          updates, pickup-ready alerts, cancellation notices, and order issue notices.
+          Open Order uses mobile phone numbers and SMS consent only to provide transactional messages
+          related to Open Order services, including verification codes, order received confirmations,
+          order preparing updates, ready-for-pickup alerts, cancellation notices, and order issue
+          notifications.
         </p>
         <p>
           Message frequency varies. Message and data rates may apply. You may opt out of SMS messages at
           any time by replying <strong className="text-oo-charcoal">STOP</strong>. You may reply{" "}
-          <strong className="text-oo-charcoal">HELP</strong> for help or contact OpenOrder at{" "}
+          <strong className="text-oo-charcoal">HELP</strong> for help or contact Open Order at{" "}
           <a
             href={`mailto:${OPEN_ORDER_SUPPORT_EMAIL}`}
             className="font-semibold text-brand hover:underline"
@@ -139,9 +132,9 @@ export function PrivacyPolicyContent() {
           .
         </p>
         <p className="rounded-lg border border-brand/20 bg-oo-cream/80 px-4 py-3 font-medium text-oo-charcoal">
-          OpenOrder does not sell, rent, share, or transfer mobile phone numbers, SMS opt-in data, or SMS
+          Open Order does not sell, rent, share, or transfer mobile phone numbers, SMS opt-in data, or SMS
           consent information to third parties or affiliates for marketing or promotional purposes. SMS
-          opt-in data and consent are used only to provide transactional messaging related to OpenOrder
+          opt-in data and consent are used only to provide transactional messaging related to Open Order
           services.
         </p>
         <p>

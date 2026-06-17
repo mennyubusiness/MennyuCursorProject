@@ -3,6 +3,8 @@
 import {
   CartPageDesktopCheckoutActions,
   CartPageMobileCheckoutBar,
+  CartPageSummaryCheckoutActions,
+  cartPageLiveItemCount,
 } from "./CartPageMobileCheckoutBar";
 import {
   createContext,
@@ -17,8 +19,10 @@ import { revalidateCartPageAction } from "@/actions/cart-validation.actions";
 import type { Cart } from "@/domain/types";
 import {
   CART_UPDATED_EVENT,
+  buildCartSnapshotMeta,
   cartSnapshotAppliesToContext,
   mergeAcceptedCartSnapshotMeta,
+  shouldAcceptApiCartPayload,
   shouldAcceptCartSnapshot,
   shouldApplyCartSnapshot,
   type CartSnapshotMeta,
@@ -87,7 +91,12 @@ export function CartPageMutationProvider({
     () => hasPendingCartMutations(cartId)
   );
   const revalidateSeqRef = useRef(0);
-  const lastAcceptedSnapshotMetaRef = useRef<CartSnapshotMeta | null>(null);
+  const lastAcceptedSnapshotMetaRef = useRef<CartSnapshotMeta | null>(
+    buildCartSnapshotMeta({
+      cart: initialCart,
+      clientSequence: 0,
+    })
+  );
   const skipRevalidateForFingerprintRef = useRef(
     cartMutationFingerprint(initialCart.items)
   );
@@ -96,7 +105,10 @@ export function CartPageMutationProvider({
     setCart(initialCart);
     setServerValidation(initialValidation);
     skipRevalidateForFingerprintRef.current = cartMutationFingerprint(initialCart.items);
-    lastAcceptedSnapshotMetaRef.current = null;
+    lastAcceptedSnapshotMetaRef.current = buildCartSnapshotMeta({
+      cart: initialCart,
+      clientSequence: lastAcceptedSnapshotMetaRef.current?.clientSequence ?? 0,
+    });
   }, [initialCart, initialValidation]);
 
   useEffect(() => {
@@ -134,8 +146,18 @@ export function CartPageMutationProvider({
         if (!res.ok || cancelled) return;
         const fresh = (await res.json()) as Cart;
         if (!cartSnapshotAppliesToContext(fresh, { cartId, podId })) return;
+        if (!shouldAcceptApiCartPayload({ cart: fresh }, lastAcceptedSnapshotMetaRef.current)) {
+          return;
+        }
         setCart(fresh);
         skipRevalidateForFingerprintRef.current = cartMutationFingerprint(fresh.items);
+        lastAcceptedSnapshotMetaRef.current = mergeAcceptedCartSnapshotMeta(
+          lastAcceptedSnapshotMetaRef.current,
+          {
+            cart: fresh,
+            clientSequence: (lastAcceptedSnapshotMetaRef.current?.clientSequence ?? 0) + 1,
+          }
+        );
       } catch {
         /* keep SSR cart */
       } finally {
@@ -403,9 +425,16 @@ export function CartPageLiveFoodSubtotal({ fallbackCents }: { fallbackCents: num
   return <>${((computed || cart.subtotalCents || fallbackCents) / 100).toFixed(2)}</>;
 }
 
-export function CartPageLiveCheckoutGate({ children }: { children: ReactNode }) {
+export function CartPageLiveCheckoutGate({
+  children,
+  serverItemCount = 0,
+}: {
+  children: ReactNode;
+  serverItemCount?: number;
+}) {
   const { cart } = useCartPageMutation();
-  if (cart.items.length === 0) return null;
+  const liveItemCount = cartPageLiveItemCount(cart);
+  if (liveItemCount === 0 && serverItemCount === 0) return null;
   return children;
 }
 
@@ -426,7 +455,7 @@ export function CartPageLiveCheckoutActions({
   totalCentsFallback: number;
   groupSubmitted?: boolean;
   submittedOrderId?: string | null;
-  surface?: "all" | "desktop" | "mobile";
+  surface?: "all" | "desktop" | "mobile" | "summary";
 }) {
   const {
     cartId,
@@ -458,6 +487,9 @@ export function CartPageLiveCheckoutActions({
   }
   if (surface === "mobile") {
     return <CartPageMobileCheckoutBar {...sharedProps} />;
+  }
+  if (surface === "summary") {
+    return <CartPageSummaryCheckoutActions {...sharedProps} />;
   }
 
   return (

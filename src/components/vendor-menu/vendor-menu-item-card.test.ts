@@ -28,13 +28,13 @@ describe("VendorMenuItemCard tappable surface", () => {
 });
 
 describe("Cart page mobile checkout bar", () => {
-  const mobileBarSrc = readFileSync(join(root, "app/cart/CartPageMobileCheckoutBar.tsx"), "utf8");
+  const actionsSrc = readFileSync(join(root, "app/cart/cart-page-checkout-actions.tsx"), "utf8");
   const pageSrc = readFileSync(join(root, "app/cart/page.tsx"), "utf8");
 
   it("uses MobileBottomActionBar for mobile checkout", () => {
-    expect(mobileBarSrc).toMatch(/MobileBottomActionBar/);
-    expect(mobileBarSrc).toMatch(/resolveCartCheckoutCtaState/);
-    expect(mobileBarSrc).toMatch(/Proceed to checkout/);
+    expect(actionsSrc).toMatch(/MobileBottomActionBar/);
+    expect(actionsSrc).toMatch(/resolveCartCheckoutCtaState/);
+    expect(actionsSrc).toMatch(/Proceed to checkout/);
   });
 
   it("applies bottom padding and mobile checkout surface on cart page", () => {
