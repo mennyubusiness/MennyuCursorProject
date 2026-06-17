@@ -11,6 +11,7 @@ type PodPageStickyCtaProps = {
   showVendorsCta: boolean;
   showGroupOrderCta: boolean;
   groupOrderHref: string;
+  primaryLabel?: string;
 };
 
 export function PodPageStickyCta({
@@ -18,6 +19,7 @@ export function PodPageStickyCta({
   showVendorsCta,
   showGroupOrderCta,
   groupOrderHref,
+  primaryLabel = "View vendors",
 }: PodPageStickyCtaProps) {
   const [visible, setVisible] = useState(false);
 
@@ -49,7 +51,7 @@ export function PodPageStickyCta({
     >
       <MobileBottomActionBar
         mobileOnly
-        primaryLabel={showVendorsCta ? "View vendors" : "Start group order"}
+        primaryLabel={showVendorsCta ? primaryLabel : "Start group order"}
         primaryHref={showVendorsCta ? "#pod-vendors" : groupOrderHref}
         secondaryAction={
           showVendorsCta && showGroupOrderCta ? (

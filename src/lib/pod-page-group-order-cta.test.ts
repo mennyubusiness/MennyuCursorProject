@@ -126,13 +126,17 @@ describe("resolvePodPageGroupOrderCtaState", () => {
 
 describe("pod page group CTA wiring", () => {
   const podPageSrc = readFileSync(join(process.cwd(), "src/app/pod/[podId]/page.tsx"), "utf8");
+  const standardPageSrc = readFileSync(
+    join(process.cwd(), "src/components/pod/StandardPodPageView.tsx"),
+    "utf8"
+  );
   const heroActionsSrc = readFileSync(
     join(process.cwd(), "src/components/pod/PodPageHeroActions.tsx"),
     "utf8"
   );
 
-  it("pod page delegates group CTAs to PodPageHeroActions", () => {
-    expect(podPageSrc).toMatch(/PodPageHero/);
+  it("pod page delegates group CTAs to PodPageHeroActions on standard layout", () => {
+    expect(standardPageSrc).toMatch(/PodPageHero/);
     expect(podPageSrc).not.toMatch(/PodPageGroupOrderSection/);
     expect(heroActionsSrc).toMatch(/Start group order/);
     expect(heroActionsSrc).toMatch(/PodPageJoinWithCodeButton/);

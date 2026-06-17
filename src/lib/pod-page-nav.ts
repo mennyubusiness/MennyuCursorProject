@@ -21,3 +21,23 @@ export function buildPodPageNavItems(ctx: PodPageNavContext): PodPageNavItem[] {
 
   return items;
 }
+
+export function buildDestinationPodNavItems(ctx: {
+  hasAboutSection: boolean;
+  hasVisitSection: boolean;
+  hasGroupOrderSection: boolean;
+}): PodPageNavItem[] {
+  const items: PodPageNavItem[] = [{ id: "pod-vendors", label: "Order" }];
+
+  if (ctx.hasGroupOrderSection) {
+    items.push({ id: "pod-group-order", label: "Group" });
+  }
+  if (ctx.hasAboutSection) {
+    items.push({ id: "pod-about", label: "About" });
+  }
+  if (ctx.hasVisitSection) {
+    items.push({ id: "pod-visit", label: "Visit" });
+  }
+
+  return items;
+}
