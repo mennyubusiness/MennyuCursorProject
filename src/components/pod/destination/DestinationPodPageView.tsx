@@ -1,5 +1,4 @@
 import { RecentPodViewTracker } from "@/components/retention/RecentViewTracker";
-import { DestinationPodAboutSection } from "@/components/pod/destination/DestinationPodAboutSection";
 import { DestinationPodGroupOrderSection } from "@/components/pod/destination/DestinationPodGroupOrderSection";
 import { DestinationPodHero } from "@/components/pod/destination/DestinationPodHero";
 import { DestinationPodVendorSection } from "@/components/pod/destination/DestinationPodVendorSection";
@@ -22,7 +21,6 @@ export function DestinationPodPageView({
   vendorRows,
   amenities,
   orderingStatus,
-  hasAboutSection,
   hasVisitSection,
   contactDetails,
   groupOrderHref,
@@ -37,13 +35,8 @@ export function DestinationPodPageView({
     amenities,
   });
 
-  const destinationAbout =
-    hasAboutSection ||
-    Boolean(pod.ownerContactName?.trim()) ||
-    amenities.length > 0;
-
   const navItems = buildDestinationPodNavItems({
-    hasAboutSection: destinationAbout,
+    hasAboutSection: false,
     hasVisitSection,
     hasGroupOrderSection: hasVendors,
   });
@@ -53,15 +46,10 @@ export function DestinationPodPageView({
       <RecentPodViewTracker podId={pod.id} podName={pod.name} />
 
       <DestinationPodHero
-        podId={podId}
         name={pod.name}
         tagline={pod.tagline}
-        description={pod.description}
-        address={pod.address}
         imageUrl={pod.imageUrl}
         accentColor={pod.accentColor}
-        orderingStatus={orderingStatus}
-        hasVendors={hasVendors}
         marqueeItems={marqueeItems}
       />
 
@@ -94,17 +82,6 @@ export function DestinationPodPageView({
       />
 
       {hasVendors && <DestinationPodGroupOrderSection podId={podId} />}
-
-      {destinationAbout && (
-        <DestinationPodAboutSection
-          podName={pod.name}
-          tagline={pod.tagline}
-          description={pod.description}
-          ownerContactName={pod.ownerContactName}
-          address={pod.address}
-          amenities={amenities}
-        />
-      )}
 
       {hasVisitSection && (
         <DestinationPodVisitSection

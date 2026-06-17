@@ -9,10 +9,6 @@ const heroActionsSrc = readFileSync(join(dir, "../components/pod/PodPageHeroActi
 const navSrc = readFileSync(join(dir, "../components/pod/PodPageStickyNav.tsx"), "utf8");
 const pageSrc = readFileSync(join(dir, "../app/pod/[podId]/page.tsx"), "utf8");
 const standardPageSrc = readFileSync(join(dir, "../components/pod/StandardPodPageView.tsx"), "utf8");
-const destinationHeroSrc = readFileSync(
-  join(dir, "../components/pod/destination/DestinationPodHeroActions.tsx"),
-  "utf8"
-);
 
 describe("PodPageHero banner contrast", () => {
   it("layers image at z-0, overlay at z-10, content at z-20", () => {
@@ -51,11 +47,6 @@ describe("Pod page hero CTAs", () => {
   it("does not render Start order in the default hero", () => {
     expect(heroSrc).not.toMatch(/Start order/);
     expect(heroActionsSrc).not.toMatch(/Start order/);
-  });
-
-  it("renders Start order in the destination hero actions", () => {
-    expect(destinationHeroSrc).toMatch(/Start order/);
-    expect(destinationHeroSrc).toMatch(/Start group order/);
   });
 
   it("shows group order and join CTAs in the hero", () => {

@@ -63,12 +63,17 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(12px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "destination-pod-marquee": {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" },
+        },
       },
       animation: {
         "mennyu-fade-in": "mennyu-fade-in 0.45s ease-out forwards",
         "mennyu-cart-nudge": "mennyu-cart-nudge 0.55s ease-out",
         "mennyu-hero-gradient": "mennyu-hero-gradient 14s ease-in-out infinite",
         "oo-fade-up": "oo-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        "destination-pod-marquee": "destination-pod-marquee 32s linear infinite",
       },
     },
   },

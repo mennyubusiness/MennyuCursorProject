@@ -32,10 +32,10 @@ export function DestinationPodVendorSection({
               id="pod-vendors-heading"
               className="text-2xl font-bold tracking-tight text-oo-charcoal sm:text-3xl"
             >
-              Order from vendors at {podName}
+              Check out our vendors
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-oo-stone-gray sm:text-base">
-              Choose from participating vendors, add everything to one cart, and check out once.
+              Add from multiple vendors to one cart and check out once.
             </p>
           </header>
 
