@@ -54,32 +54,20 @@ export function VendorMenuHero({
   availabilityStatus,
   bannerLine,
 }: VendorMenuHeroProps) {
-  const accent = vendorAccentColor ?? podAccentColor;
+  const trimmedPodName = podName?.trim();
+  const backLabel = trimmedPodName ? `Back to ${trimmedPodName}` : "Back to pod";
+  const podHref = `/pod/${podId}`;
 
   return (
     <header className="border-b border-oo-light-stone bg-oo-warm-white">
       <PageShell className="py-4 sm:py-5">
-        <nav
-          className="mb-4 text-xs text-oo-stone-gray"
-          aria-label="Breadcrumb"
-          style={accent ? { borderBottomColor: accent } : undefined}
+        <Link
+          href={podHref}
+          className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-oo-stone-gray transition-colors hover:text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
-          <ol className="flex flex-wrap items-center gap-1.5">
-            <li>
-              <Link
-                href={`/pod/${podId}`}
-                className="font-semibold text-oo-charcoal transition hover:text-brand"
-                style={podAccentColor ? { color: podAccentColor } : undefined}
-              >
-                {podName}
-              </Link>
-            </li>
-            <li aria-hidden className="text-oo-light-stone">
-              /
-            </li>
-            <li className="font-medium text-oo-charcoal">{vendorName}</li>
-          </ol>
-        </nav>
+          <span aria-hidden>←</span>
+          {backLabel}
+        </Link>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
           <VendorLogo
@@ -97,25 +85,23 @@ export function VendorMenuHero({
                 <p className="mt-1 text-sm text-oo-stone-gray">
                   at{" "}
                   <Link
-                    href={`/pod/${podId}`}
+                    href={podHref}
                     className="font-semibold text-oo-charcoal underline decoration-oo-light-stone underline-offset-2 hover:text-brand"
                   >
-                    {podName}
+                    {trimmedPodName || "pod"}
                   </Link>
                 </p>
               </div>
               <FavoriteVendorButton vendorId={vendorId} podId={podId} vendorName={vendorName} />
             </div>
 
-            <ul className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-oo-stone-gray">
+            <ul className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <li>
                 <VendorStatusBadge status={availabilityStatus} />
               </li>
-              {cuisineCategory?.trim() && (
+              {cuisineCategory?.trim() ? (
                 <li className="text-oo-stone-gray">{cuisineCategory.trim()}</li>
-              )}
-              <li className="text-oo-stone-gray">Pickup at pod</li>
-              <li className="text-oo-stone-gray">Shared multi-vendor cart</li>
+              ) : null}
             </ul>
 
             {vendorDescription?.trim() && (

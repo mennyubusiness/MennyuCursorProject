@@ -89,10 +89,11 @@ describe("solo cart checkout CTA regression", () => {
     expect(mobileBarSrc).toMatch(/createPortal/);
   });
 
-  it("cart page aligns mobile sticky bar below lg", () => {
+  it("cart page uses mobile sticky checkout and summary checkout without duplicating desktop footer actions", () => {
     const cartPageSrc = readFileSync(join(process.cwd(), "src/app/cart/page.tsx"), "utf8");
-    expect(cartPageSrc).toMatch(/hidden sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-6/);
+    expect(cartPageSrc).toMatch(/surface="mobile"/);
     expect(cartPageSrc).toMatch(/surface="summary"/);
+    expect(cartPageSrc).not.toMatch(/surface="desktop"/);
   });
 
   it("CartPageMutationSync rejects stale lifecycle snapshots", () => {

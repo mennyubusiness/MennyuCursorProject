@@ -109,14 +109,14 @@ export function CartPageSummaryCheckoutActions(props: CartPageCheckoutActionProp
   }
 
   return (
-    <div className="mt-6 border-t border-stone-100 pt-6">
+    <div className="mt-6 border-t border-oo-light-stone pt-6">
       {checkoutEnabled ? (
         <AwaitCartNavigationLink
           cartId={cartId}
           href={`/checkout?cartId=${cartId}`}
           className={cn(
             buttonClassName({ variant: "primary", size: "touch" }),
-            "inline-flex w-full items-center justify-center"
+            "hidden w-full items-center justify-center lg:inline-flex"
           )}
         >
           {CART_CHECKOUT_PRIMARY_LABEL}
@@ -128,15 +128,15 @@ export function CartPageSummaryCheckoutActions(props: CartPageCheckoutActionProp
           aria-disabled
           className={cn(
             buttonClassName({ variant: "primary", size: "touch" }),
-            "inline-flex w-full cursor-not-allowed items-center justify-center opacity-60"
+            "hidden w-full cursor-not-allowed items-center justify-center opacity-60 lg:inline-flex"
           )}
         >
           {blockedLabel}
         </button>
       )}
-      <p className="mt-2 text-center text-xs text-stone-500">
-        Secure checkout with Stripe · Each vendor is notified after you pay
-      </p>
+      {!checkoutEnabled && blockedLabel ? (
+        <p className="mt-2 hidden text-sm text-oo-stone-gray lg:block">{blockedLabel}</p>
+      ) : null}
     </div>
   );
 }
@@ -251,13 +251,16 @@ export function CartPageDesktopCheckoutActions(props: CartPageCheckoutActionProp
         <AwaitCartNavigationLink
           cartId={cartId}
           href={`/checkout?cartId=${cartId}`}
-          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-900 px-8 py-3.5 text-center text-base font-bold text-white shadow-md transition duration-200 hover:bg-stone-800 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98] sm:min-w-[14rem] sm:w-auto"
+          className={cn(
+            buttonClassName({ variant: "primary", size: "touch" }),
+            "hidden min-h-[3rem] w-full items-center justify-center lg:inline-flex lg:min-w-[14rem] lg:w-auto"
+          )}
         >
-          Continue to checkout
+          {CART_CHECKOUT_PRIMARY_LABEL}
         </AwaitCartNavigationLink>
       ) : (
         <span
-          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-stone-200 px-8 py-3.5 text-center text-base font-semibold text-stone-500 sm:w-auto"
+          className="hidden min-h-[3rem] w-full items-center justify-center rounded-xl bg-oo-cream px-8 py-3.5 text-center text-base font-semibold text-oo-stone-gray lg:inline-flex lg:w-auto"
           aria-disabled
         >
           {blockedLabel}

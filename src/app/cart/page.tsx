@@ -37,12 +37,10 @@ import {
   CartPageLiveQuantity,
   CartPageLiveSyncBanner,
   CartPageLiveValidationBanner,
-  CartPageLiveVendorLineCountLabel,
   CartPageLiveVendorSection,
   CartPageLiveVendorSubtotal,
   CartPageMutationProvider,
 } from "./CartPageMutationSync";
-import { CheckoutProgress } from "../checkout/CheckoutProgress";
 import { readGroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
 import {
   getGroupOrderStateForCartPage,
@@ -51,7 +49,7 @@ import {
   unlockGroupCheckoutForCartPage,
 } from "@/lib/group-order-cart-page";
 import { resolveSubmittedGroupOrderForParticipantCart } from "@/lib/group-participant-submitted-cart";
-import { resolveGroupCartEmptyState, shouldShowJoinGroupOrderForm } from "@/lib/group-order-cart-empty-state";
+import { resolveGroupCartEmptyState } from "@/lib/group-order-cart-empty-state";
 import { GroupOrderCartPanel } from "./GroupOrderCartPanel";
 import { GroupOrderHostEmptyCartCard } from "./GroupOrderHostEmptyCartCard";
 import { GroupOrderStartCartSync } from "@/components/cart/GroupOrderStartCartSync";
@@ -79,7 +77,7 @@ import {
   findParticipantRow,
 } from "@/lib/group-order-cart-read-model";
 import { shouldPollCollaborativeGroupCart } from "@/lib/collaborative-cart-freshness";
-import { JoinGroupOrderByCodeForm } from "./JoinGroupOrderByCodeForm";
+import { CartPageJoinGroupAction } from "./CartPageJoinGroupAction";
 
 function modifierGroupCountFromDisplayMenuItem(menuItem: { _count?: { modifierGroups: number } }): number {
   return menuItem._count?.modifierGroups ?? 0;
@@ -254,20 +252,19 @@ export default async function CartPage({
           >
             Cart
           </div>
-          <h1 className="mt-5 text-2xl font-semibold text-stone-900">Your cart is empty</h1>
-          <p className="mt-3 text-stone-600">
-            Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen prepares
-            its part of your order.
+          <h1 className="mt-5 text-2xl font-bold text-oo-charcoal">Your cart is empty</h1>
+          <p className="mt-3 text-sm leading-relaxed text-oo-stone-gray">
+            Pick a pod, then add from any open vendor.
           </p>
-          <div className="mt-8 text-left">
-            <JoinGroupOrderByCodeForm />
-          </div>
           <Link
             href="/explore"
-            className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:bg-stone-800 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:scale-[0.98]"
+            className="mt-8 inline-flex min-h-[3.25rem] w-full items-center justify-center rounded-xl bg-brand px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-brand-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto"
           >
             Browse pods
           </Link>
+          <div className="mt-6">
+            <CartPageJoinGroupAction />
+          </div>
           <p className="mt-6 text-sm text-stone-500">
             Already ordered?{" "}
             <Link href="/orders" className="font-medium text-stone-900 hover:underline">
@@ -280,11 +277,6 @@ export default async function CartPage({
   }
 
   const goState = await getGroupOrderStateForCartPage(cart.id, { participantMarkers });
-  const showJoinCodeForm = shouldShowJoinGroupOrderForm({
-    goStateActive: goState.active,
-    cartItemCount: displayItems.length,
-  });
-
   if (
     goState.active &&
     goState.view === "participant" &&
@@ -332,7 +324,6 @@ export default async function CartPage({
           <GroupOrderEndCartSync cart={groupEndSyncCart} endedSessionId={cart?.id} />
         ) : null}
         {hostGroupStartSyncCart ? <GroupOrderStartCartSync cart={hostGroupStartSyncCart} /> : null}
-        <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
         <GroupOrderHostEmptyCartCard
           cartId={cart.id}
           podId={cart.podId}
@@ -355,7 +346,6 @@ export default async function CartPage({
           initialSessionStatus={goState.active ? goState.status : "active"}
           initialSubmittedOrderId={null}
         />
-        <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
         <GroupOrderCartPanel
           cartId={cart.id}
           podId={cart.podId}
@@ -388,18 +378,17 @@ export default async function CartPage({
           </div>
           <h1 className="mt-6 text-2xl font-bold text-oo-charcoal">Your cart is empty</h1>
           <p className="mt-3 text-[15px] leading-relaxed text-oo-stone-gray">
-            Pick a pod, then add from any open vendor. One cart, one checkout — each kitchen
-            prepares its part of your order.
+            Review your items before checkout — add from any open vendor at this pod.
           </p>
-          <div className="mt-8 text-left">
-            <JoinGroupOrderByCodeForm />
-          </div>
           <Link
-            href="/explore"
+            href={`/pod/${cart.podId}`}
             className="mt-8 inline-flex min-h-[3.25rem] w-full items-center justify-center rounded-xl bg-brand px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-brand-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto"
           >
-            Browse pods
+            Browse vendors
           </Link>
+          <div className="mt-6">
+            <CartPageJoinGroupAction />
+          </div>
           <p className="mt-6 text-sm text-oo-stone-gray">
             Already ordered?{" "}
             <Link href="/orders" className="font-semibold text-oo-charcoal hover:underline">
@@ -430,7 +419,6 @@ export default async function CartPage({
     }
   }
   const totalCents = Array.from(byVendor.values()).reduce((a, v) => a + v.subtotalCents, 0);
-  const vendorCount = byVendor.size;
 
   const initialCartSnapshot: Cart = {
     id: cart.id,
@@ -584,7 +572,7 @@ export default async function CartPage({
     (goState.status === "active" || goState.status === "locked_checkout");
 
   return (
-    <div className={cn("mx-auto max-w-2xl", mobileBottomActionBarContentPadClass, "sm:pb-10")}>
+    <div className={cn("oo-shell py-4 sm:py-6", mobileBottomActionBarContentPadClass, "lg:pb-10")}>
       <GroupOrderSubmittedRedirect
         enabled={participantSubmissionPoll}
         cartId={cart.id}
@@ -592,7 +580,6 @@ export default async function CartPage({
         initialSubmittedOrderId={submittedOrderId}
       />
       <GroupOrderCartPoll enabled={pollGroupCart} cartId={pollGroupCart ? cart.id : null} />
-      <CheckoutProgress activeStep={1} className="pt-3 sm:pt-4" />
       <GroupOrderCartPanel
         cartId={cart.id}
         podId={cart.podId}
@@ -607,31 +594,20 @@ export default async function CartPage({
         viewerIsHost={Boolean(viewerIsHost)}
         showReviewHint={showGroupReviewHint && Boolean(viewerIsHost)}
       />
-      <header className="border-b border-stone-200/90 pb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-stone-900">
+      <header className="mb-6 border-b border-oo-light-stone pb-5">
+        <h1 className="text-2xl font-bold tracking-tight text-oo-charcoal sm:text-3xl">
           {goState.active ? "Group order" : "Your cart"}
         </h1>
-        <p className="mt-3 text-base text-stone-600">
-          <span className="font-semibold text-stone-800">{cart.pod.name}</span>
-          {vendorCount > 1 && (
-            <span className="text-stone-500"> · {vendorCount} vendors</span>
-          )}
-        </p>
-        <p className="mt-2 text-sm text-stone-500">
+        <p className="mt-2 text-base font-semibold text-oo-charcoal">{cart.pod.name}</p>
+        <p className="mt-1 text-sm text-oo-stone-gray">
           {goState.active ? (
             showParticipantTotalsOnly ? (
-              <>
-                You&apos;re adding your items to this group order. The host will check out when everyone
-                is ready.
-              </>
+              <>You&apos;re adding your items. The host will check out when everyone is ready.</>
             ) : (
-              <>
-                Shared cart for this pod. Participants add their own lines; you&apos;ll see everyone&apos;s items
-                labeled below.
-              </>
+              <>Shared cart for this pod — each participant&apos;s lines are labeled below.</>
             )
           ) : (
-            <>Vendors get your order after payment — you&apos;ll see live status updates here.</>
+            <>Review your items before checkout.</>
           )}
         </p>
       </header>
@@ -668,31 +644,28 @@ export default async function CartPage({
       <CartPageLiveValidationBanner />
       <CartPageLiveEmptyNotice hideWhenGroupActive={goState.active} />
 
-      <div className="mt-10 space-y-10">
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_min(100%,20rem)] lg:items-start lg:gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-6">
         {Array.from(byVendor.entries()).map(([vendorId, group]) => (
           <CartPageLiveVendorSection key={vendorId} vendorId={vendorId}>
           <section
-            className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_1px_0_rgba(0,0,0,0.04),0_8px_24px_-8px_rgba(0,0,0,0.08)]"
+            className="overflow-hidden rounded-2xl border border-oo-light-stone bg-oo-warm-white shadow-sm"
             aria-labelledby={`vendor-${vendorId}-heading`}
           >
-            <div className="border-b border-stone-200/80 bg-gradient-to-r from-stone-50 to-stone-50/40 px-4 py-4 sm:px-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">Vendor</p>
-              <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 id={`vendor-${vendorId}-heading`} className="text-lg font-semibold text-stone-900">
+            <div className="border-b border-oo-light-stone bg-oo-cream/40 px-4 py-3.5 sm:px-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 id={`vendor-${vendorId}-heading`} className="text-base font-bold text-oo-charcoal sm:text-lg">
                   {group.name}
                 </h2>
                 <Link
                   href={`/pod/${cart.podId}/vendor/${vendorId}`}
-                  className="text-sm font-semibold text-stone-900 underline-offset-4 transition hover:underline"
+                  className="text-sm font-semibold text-oo-stone-gray transition hover:text-brand"
                 >
-                  Add more from this vendor
+                  Add more
                 </Link>
               </div>
-              <p className="mt-1 text-xs text-stone-500">
-                <CartPageLiveVendorLineCountLabel vendorId={vendorId} fallback={group.items.length} />
-              </p>
             </div>
-            <ul className="divide-y divide-stone-100/90">
+            <ul className="divide-y divide-oo-light-stone/80">
               {group.items.map((item) => {
                 const lineInteraction =
                   !goState.active
@@ -748,42 +721,39 @@ export default async function CartPage({
                   <CartPageLiveLineGate key={item.id} cartItemId={item.id}>
                   <CartPageLiveLineShell cartItemId={item.id}>
                     <MenuItemImage imageUrl={lineImageUrl} itemName={lineTitle} />
-                    <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                       <div className="min-w-0 flex-1">
-                        <p className="text-base font-semibold text-oo-charcoal sm:text-base">
+                        <p className="text-base font-semibold text-oo-charcoal">
                           {lineTitle}
-                          <span className="ml-2 font-normal text-oo-stone-gray">
-                            × <CartPageLiveQuantity cartItemId={item.id} fallback={item.quantity} />
-                          </span>
                         </p>
                         {modLines.length > 0 && (
-                          <ul className="mt-2 space-y-0.5 text-sm text-stone-600">
+                          <ul className="mt-1.5 space-y-0.5 text-sm text-oo-stone-gray">
                             {modLines.map((m) => (
-                              <li key={m.key} className="flex gap-2">
-                                <span className="text-stone-400" aria-hidden>
-                                  ·
-                                </span>
-                                <span>{m.label}</span>
-                              </li>
+                              <li key={m.key}>{m.label}</li>
                             ))}
                           </ul>
                         )}
                         {item.specialInstructions && (
-                          <p className="mt-2 text-sm text-stone-600">
-                            <span className="font-medium text-stone-700">Note:</span>{" "}
+                          <p className="mt-2 text-sm text-oo-stone-gray">
+                            <span className="font-medium text-oo-charcoal">Note:</span>{" "}
                             {item.specialInstructions}
                           </p>
                         )}
                         <CartPageLiveLineError cartItemId={item.id} />
                       </div>
-                      <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end">
-                      <span className="text-lg font-semibold tabular-nums text-stone-900">
-                        <CartPageLiveLineTotal
-                          cartItemId={item.id}
-                          fallbackCents={item.priceCents * item.quantity}
-                        />
-                      </span>
-                      <CartItemActions
+                      <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+                        <span className="text-base font-semibold tabular-nums text-oo-charcoal">
+                          <CartPageLiveLineTotal
+                            cartItemId={item.id}
+                            fallbackCents={item.priceCents * item.quantity}
+                          />
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-oo-stone-gray">
+                          <span>
+                            Qty <CartPageLiveQuantity cartItemId={item.id} fallback={item.quantity} />
+                          </span>
+                        </div>
+                        <CartItemActions
                         cartId={cart.id}
                         podId={cart.podId}
                         cartItemId={item.id}
@@ -813,108 +783,73 @@ export default async function CartPage({
                 );
               })}
             </ul>
-            <div className="border-t border-stone-100 bg-stone-50/80 px-4 py-3 text-right text-sm text-stone-600 sm:px-5">
-              <span className="text-stone-500">Subtotal for {group.name}</span>{" "}
-              <span className="font-semibold text-stone-900 tabular-nums">
+            <div className="border-t border-oo-light-stone bg-oo-cream/30 px-4 py-3 text-right text-sm text-oo-stone-gray sm:px-5">
+              <span>Subtotal</span>{" "}
+              <span className="font-semibold text-oo-charcoal tabular-nums">
                 <CartPageLiveVendorSubtotal vendorId={vendorId} fallbackCents={group.subtotalCents} />
               </span>
             </div>
           </section>
           </CartPageLiveVendorSection>
         ))}
+        </div>
+
+        <aside className="mt-8 lg:sticky lg:top-24 lg:mt-0">
+          {showParticipantTotalsOnly && groupReadModel && viewerParticipantId ? (
+            <ParticipantGroupOrderSummary model={groupReadModel} viewerParticipantId={viewerParticipantId} />
+          ) : showParticipantTotalsOnly ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950">
+              We couldn&apos;t load your personal totals. Refresh the page or re-open the join link.
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-sm font-bold text-oo-charcoal">Order summary</h2>
+              <dl className="mt-4 space-y-3">
+                <div className="flex items-baseline justify-between gap-4 border-b border-oo-light-stone pb-3">
+                  <dt className="text-sm text-oo-stone-gray">Food subtotal</dt>
+                  <dd className="text-xl font-bold tabular-nums text-oo-charcoal">
+                    <CartPageLiveFoodSubtotal fallbackCents={totalCents} />
+                  </dd>
+                </div>
+                <p className="text-xs leading-relaxed text-oo-stone-gray">
+                  {goState.active ? (
+                    <>
+                      Tax, service fee, and tip are calculated at checkout. As host, one payment covers every
+                      vendor in this group order.
+                    </>
+                  ) : (
+                    <>Tax, service fee, and optional tip are calculated at checkout.</>
+                  )}
+                </p>
+              </dl>
+              <CartPageLiveCheckoutGate
+                serverItemCount={displayItems.reduce((n, item) => n + item.quantity, 0)}
+              >
+                <CartPageLiveCheckoutActions
+                  surface="summary"
+                  viewerCanCheckout={viewerCanCheckout}
+                  showParticipantTotalsOnly={showParticipantTotalsOnly}
+                  sessionLockedCheckout={sessionLocked}
+                  myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
+                  totalCentsFallback={totalCents}
+                  groupSubmitted={sessionSubmitted}
+                  submittedOrderId={submittedOrderId}
+                />
+              </CartPageLiveCheckoutGate>
+              <Link
+                href={`/pod/${cart.podId}`}
+                className="mt-4 hidden text-sm font-semibold text-oo-stone-gray transition hover:text-brand lg:inline-flex"
+              >
+                ← Back to pod
+              </Link>
+            </div>
+          )}
+        </aside>
       </div>
 
-      {showParticipantTotalsOnly && groupReadModel && viewerParticipantId ? (
-        <ParticipantGroupOrderSummary model={groupReadModel} viewerParticipantId={viewerParticipantId} />
-      ) : showParticipantTotalsOnly ? (
-        <div className="mt-12 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950">
-          We couldn&apos;t load your personal totals. Refresh the page or re-open the join link.
-        </div>
-      ) : (
-        <div className="mt-12 rounded-2xl border-2 border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-6 shadow-sm sm:p-8">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Order summary</h2>
-          <dl className="mt-5 space-y-3">
-            <div className="flex items-baseline justify-between gap-4 border-b border-stone-100 pb-3">
-              <dt className="text-base text-stone-700">Food subtotal</dt>
-              <dd className="text-xl font-bold tabular-nums text-stone-900">
-                <CartPageLiveFoodSubtotal fallbackCents={totalCents} />
-              </dd>
-            </div>
-            <div className="flex flex-wrap gap-x-2 text-xs leading-relaxed text-stone-500">
-              <span>
-                <span className="font-medium text-stone-600">Tax</span> (if applicable) and{" "}
-                <span className="font-medium text-stone-600">service fee</span> are calculated at checkout.
-              </span>
-            </div>
-            <div className="pt-1 text-xs text-stone-500">
-              {goState.active ? (
-                <>
-                  One payment covers every vendor in this group order. You&apos;ll set the tip at checkout as host —
-                  each person&apos;s share of the tip follows their share of food (see breakdown above).
-                </>
-              ) : (
-                <>
-                  One payment covers every vendor in this cart. Tips are optional and added at checkout.
-                </>
-              )}
-            </div>
-          </dl>
-          <CartPageLiveCheckoutGate
-            serverItemCount={displayItems.reduce((n, item) => n + item.quantity, 0)}
-          >
-            <CartPageLiveCheckoutActions
-              surface="summary"
-              viewerCanCheckout={viewerCanCheckout}
-              showParticipantTotalsOnly={showParticipantTotalsOnly}
-              sessionLockedCheckout={sessionLocked}
-              myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
-              totalCentsFallback={totalCents}
-              groupSubmitted={sessionSubmitted}
-              submittedOrderId={submittedOrderId}
-            />
-          </CartPageLiveCheckoutGate>
-        </div>
-      )}
-
-      {showJoinCodeForm ? (
-        <details className="mt-10 rounded-2xl border border-stone-200/90 bg-stone-50/80 px-4 py-3 sm:px-5">
-          <summary className="cursor-pointer text-sm font-semibold text-stone-800">
-            Join a group order with a code
-          </summary>
-          <JoinGroupOrderByCodeForm visible className="mt-4" />
-        </details>
-      ) : null}
-
-      {/* Sticky checkout on mobile/tablet; inline actions on sm+ */}
       <CartPageLiveCheckoutGate
         serverItemCount={displayItems.reduce((n, item) => n + item.quantity, 0)}
       >
-        <div className="mt-10 hidden sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-6">
-          <Link
-            href={`/pod/${cart.podId}`}
-            className="inline-flex justify-center rounded-xl border-2 border-stone-300 bg-white px-5 py-3 text-center text-sm font-medium text-stone-700 transition hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400 active:scale-[0.99]"
-          >
-            Back to pod
-          </Link>
-          <div className="ml-auto flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Food subtotal</p>
-              <p className="text-xl font-bold tabular-nums text-stone-900">
-                <CartPageLiveFoodSubtotal fallbackCents={totalCents} />
-              </p>
-            </div>
-            <CartPageLiveCheckoutActions
-              surface="desktop"
-              viewerCanCheckout={viewerCanCheckout}
-              showParticipantTotalsOnly={showParticipantTotalsOnly}
-              sessionLockedCheckout={sessionLocked}
-              myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
-              totalCentsFallback={totalCents}
-              groupSubmitted={sessionSubmitted}
-              submittedOrderId={submittedOrderId}
-            />
-          </div>
-        </div>
         <CartPageLiveCheckoutActions
           surface="mobile"
           viewerCanCheckout={viewerCanCheckout}
