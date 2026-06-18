@@ -572,6 +572,13 @@ export default async function CartPage({
     (goState.status === "active" || goState.status === "locked_checkout");
 
   return (
+    <CartPageMutationProvider
+      cartId={cart.id}
+      podId={cart.podId}
+      initialCart={initialCartSnapshot}
+      initialValidation={initialValidation}
+      allowCheckout={viewerCanCheckout}
+    >
     <div className={cn("oo-shell py-4 sm:py-6", mobileBottomActionBarContentPadClass, "lg:pb-10")}>
       <GroupOrderSubmittedRedirect
         enabled={participantSubmissionPoll}
@@ -629,13 +636,6 @@ export default async function CartPage({
         </p>
       )}
 
-      <CartPageMutationProvider
-        cartId={cart.id}
-        podId={cart.podId}
-        initialCart={initialCartSnapshot}
-        initialValidation={initialValidation}
-        allowCheckout={viewerCanCheckout}
-      >
       {groupEndSyncCart !== null || groupEnded ? (
         <GroupOrderEndCartSync cart={groupEndSyncCart} endedSessionId={cart.id} />
       ) : null}
@@ -846,6 +846,7 @@ export default async function CartPage({
           )}
         </aside>
       </div>
+    </div>
 
       <CartPageLiveCheckoutGate
         serverItemCount={displayItems.reduce((n, item) => n + item.quantity, 0)}
@@ -861,7 +862,6 @@ export default async function CartPage({
           submittedOrderId={submittedOrderId}
         />
       </CartPageLiveCheckoutGate>
-      </CartPageMutationProvider>
-    </div>
+    </CartPageMutationProvider>
   );
 }

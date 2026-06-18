@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
 import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
 import { AwaitCartNavigationLink } from "@/components/cart/AwaitCartNavigationLink";
 import { buttonClassName } from "@/components/ui/button";
@@ -68,7 +66,7 @@ function useCartCheckoutActionState(props: CartPageCheckoutActionProps) {
   return { itemCount, subtotalCents, cta, checkoutEnabled, blockedLabel };
 }
 
-/** Primary checkout CTA in the order summary — visible on all viewports when cart has items. */
+/** Primary checkout CTA in the order summary — desktop only; mobile uses the sticky bar. */
 export function CartPageSummaryCheckoutActions(props: CartPageCheckoutActionProps) {
   const { cartId, podId, groupSubmitted, submittedOrderId, showParticipantTotalsOnly } = props;
   const { checkoutEnabled, blockedLabel } = useCartCheckoutActionState(props);
@@ -197,21 +195,9 @@ function CartPageMobileCheckoutBarContent(props: CartPageCheckoutActionProps) {
   );
 }
 
-/** Fixed bottom checkout bar — portaled to body so it is not clipped by page layout. */
+/** Fixed bottom checkout bar — mobile/tablet only (`lg:hidden` on the shared bar shell). */
 export function CartPageMobileCheckoutBar(props: CartPageCheckoutActionProps) {
-  const [portalReady, setPortalReady] = useState(false);
-
-  useEffect(() => {
-    setPortalReady(true);
-  }, []);
-
-  const bar = <CartPageMobileCheckoutBarContent {...props} />;
-
-  if (!portalReady || typeof document === "undefined") {
-    return bar;
-  }
-
-  return createPortal(bar, document.body);
+  return <CartPageMobileCheckoutBarContent {...props} />;
 }
 
 export function CartPageDesktopCheckoutActions(props: CartPageCheckoutActionProps) {

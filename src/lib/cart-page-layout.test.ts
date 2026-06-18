@@ -43,7 +43,16 @@ describe("cart page layout", () => {
     expect(cartPageSrc).not.toMatch(/surface="desktop"/);
     expect(actionsSrc).toMatch(/hidden w-full items-center justify-center lg:inline-flex/);
     expect(actionsSrc).toMatch(/CartPageMobileCheckoutBar/);
-    expect(actionsSrc).toMatch(/createPortal/);
+    expect(actionsSrc).not.toMatch(/createPortal/);
+  });
+
+  it("mounts mobile checkout bar outside the shell wrapper as a provider sibling", () => {
+    expect(cartPageSrc).toMatch(
+      /<\/div>\s*\n\s*<CartPageLiveCheckoutGate[\s\S]*surface="mobile"/
+    );
+    expect(cartPageSrc).toMatch(
+      /<CartPageMutationProvider[\s\S]*<div className=\{cn\("oo-shell[\s\S]*<\/div>\s*\n\s*<CartPageLiveCheckoutGate/
+    );
   });
 
   it("does not duplicate the old bottom desktop checkout row", () => {
@@ -66,5 +75,31 @@ describe("solo cart checkout CTA regression", () => {
     });
     expect(state.checkoutEnabled).toBe(true);
     expect(state.primaryLabel).toBe("Proceed to checkout");
+  });
+
+  it("blocked checkout keeps disabled label instead of hiding the CTA", () => {
+    const state = resolveCartCheckoutCtaState({
+      viewerCanCheckout: true,
+      canCheckout: false,
+      isRevalidating: false,
+      isSyncingCart: false,
+      groupSubmitted: false,
+      showParticipantTotalsOnly: false,
+      sessionLockedCheckout: false,
+      itemCount: 1,
+      subtotalCents: 1200,
+    });
+    expect(state.checkoutEnabled).toBe(false);
+    expect(state.summarySubtitle).toBe("Fix items above to continue");
+  });
+
+  it("mobile checkout bar uses fixed bottom shell hidden from lg up", () => {
+    expect(actionsSrc).toMatch(/MobileBottomActionBar/);
+    const mobileBarSrc = readFileSync(
+      join(process.cwd(), "src/components/mobile/MobileBottomActionBar.tsx"),
+      "utf8"
+    );
+    expect(mobileBarSrc).toMatch(/mobileBottomActionBarFixedClass/);
+    expect(mobileBarSrc).toMatch(/mobileOnly && "lg:hidden"/);
   });
 });

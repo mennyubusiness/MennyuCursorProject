@@ -434,8 +434,9 @@ export function CartPageLiveCheckoutGate({
 }) {
   const { cart } = useCartPageMutation();
   const liveItemCount = cartPageLiveItemCount(cart);
-  if (liveItemCount === 0 && serverItemCount === 0) return null;
-  return children;
+  const hasItems = liveItemCount > 0 || serverItemCount > 0;
+  if (!hasItems) return null;
+  return <>{children}</>;
 }
 
 export function CartPageLiveCheckoutActions({

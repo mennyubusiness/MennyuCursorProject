@@ -86,7 +86,7 @@ describe("solo cart checkout CTA regression", () => {
     expect(mobileBarSrc).toMatch(/if \(showParticipantTotalsOnly\) \{/);
     expect(mobileBarSrc).not.toMatch(/showParticipantTotalsOnly \|\| !viewerCanCheckout/);
     expect(mobileBarSrc).toMatch(/Proceed to checkout/);
-    expect(mobileBarSrc).toMatch(/createPortal/);
+    expect(mobileBarSrc).not.toMatch(/createPortal/);
   });
 
   it("cart page uses mobile sticky checkout and summary checkout without duplicating desktop footer actions", () => {
