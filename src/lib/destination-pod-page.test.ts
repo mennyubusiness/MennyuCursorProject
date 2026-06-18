@@ -124,23 +124,31 @@ describe("DestinationPodPageView layout", () => {
     expect(pageViewSrc).toMatch(/vendorNames: vendorRows\.map/);
   });
 
-  it("does not pass amenities into About section", () => {
-    expect(pageViewSrc).not.toMatch(/amenities=\{amenities\}/);
-    expect(pageViewSrc).not.toMatch(/customAmenities=\{customAmenities\}/);
+  it("passes amenities to About section once without a separate grid", () => {
+    expect(pageViewSrc).toMatch(/amenities=\{amenities\}/);
+    expect(pageViewSrc).toMatch(/customAmenities=\{customAmenities\}/);
     expect(pageViewSrc).not.toMatch(/DestinationPodAmenityGrid/);
+    expect(pageViewSrc).not.toMatch(/Known for/);
   });
 });
 
 describe("DestinationPodAboutSection", () => {
-  it("uses About heading with contact/location and no amenities display", () => {
+  it("uses About heading with one simple amenities block and contact info", () => {
     expect(aboutSectionSrc).toMatch(/About \{podName\}/);
     expect(aboutSectionSrc).not.toMatch(/Visit \{podName\}/);
+    expect(aboutSectionSrc).toMatch(/Amenities/);
+    expect(aboutSectionSrc).toMatch(/buildDestinationPodAmenityLabels/);
     expect(aboutSectionSrc).toMatch(/Pickup instructions/);
     expect(aboutSectionSrc).toMatch(/Get directions/);
     expect(aboutSectionSrc).toMatch(/id="pod-about"/);
     expect(aboutSectionSrc).not.toMatch(/Known for/);
     expect(aboutSectionSrc).not.toMatch(/DestinationPodAmenityGrid/);
-    expect(aboutSectionSrc).not.toMatch(/customAmenities/);
+  });
+
+  it("renders amenities only when labels exist and does not duplicate sections", () => {
+    expect(aboutSectionSrc).toMatch(/amenityLabels\.length > 0 &&/);
+    expect(aboutSectionSrc.match(/<h3[^>]*>\s*\n?\s*Amenities\s*\n?\s*<\/h3>/g)?.length).toBe(1);
+    expect(aboutSectionSrc).toMatch(/customAmenities/);
   });
 });
 

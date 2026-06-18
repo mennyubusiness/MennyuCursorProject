@@ -20,10 +20,10 @@ const GENERIC_VENUE_PHRASES = [
   "EAT LOCAL",
 ] as const;
 
-/** Minimum unique vendor labels before repeating for a full desktop strip. */
-export const DESTINATION_MARQUEE_MIN_LOOP_ITEMS = 8;
-
 const MAX_MARQUEE_UNIQUE_VENDORS = 16;
+
+/** Minimum labels in one marquee row before duplicating for the -50% loop. */
+export const DESTINATION_MARQUEE_MIN_ROW_ITEMS = 24;
 
 export type DestinationMarqueeKind = "vendors" | "fallback";
 
@@ -58,6 +58,33 @@ function buildCleanedVendorLabels(vendorNames: string[]): string[] {
   return items;
 }
 
+/** How many times to repeat the full vendor list in one marquee row. */
+export function getMarqueeRepeatCycles(uniqueVendorCount: number): number {
+  if (uniqueVendorCount <= 1) return 12;
+  if (uniqueVendorCount <= 3) return 10;
+  if (uniqueVendorCount <= 6) return 6;
+  return 4;
+}
+
+/** Repeat the base vendor list enough times to avoid blank gaps on wide viewports. */
+export function expandMarqueeLoopItems(uniqueLabels: string[]): string[] {
+  if (uniqueLabels.length === 0) return [];
+
+  const capped = uniqueLabels.slice(0, MAX_MARQUEE_UNIQUE_VENDORS);
+  const cycles = getMarqueeRepeatCycles(capped.length);
+  const expanded: string[] = [];
+
+  for (let cycle = 0; cycle < cycles; cycle++) {
+    expanded.push(...capped);
+  }
+
+  while (expanded.length < DESTINATION_MARQUEE_MIN_ROW_ITEMS) {
+    expanded.push(...capped);
+  }
+
+  return expanded;
+}
+
 function buildFallbackLabels(podName: string): string[] {
   const seen = new Set<string>();
   const items: string[] = [];
@@ -66,21 +93,6 @@ function buildFallbackLabels(podName: string): string[] {
   collectLabels([...GENERIC_VENUE_PHRASES], seen, items);
 
   return expandMarqueeLoopItems(items);
-}
-
-/** Repeat labels cyclically so the marquee strip fills wide viewports. */
-export function expandMarqueeLoopItems(uniqueLabels: string[]): string[] {
-  if (uniqueLabels.length === 0) return [];
-
-  const capped = uniqueLabels.slice(0, MAX_MARQUEE_UNIQUE_VENDORS);
-  const targetLength = Math.max(DESTINATION_MARQUEE_MIN_LOOP_ITEMS, capped.length);
-  const expanded: string[] = [];
-
-  for (let i = 0; i < targetLength; i++) {
-    expanded.push(capped[i % capped.length]!);
-  }
-
-  return expanded;
 }
 
 /**

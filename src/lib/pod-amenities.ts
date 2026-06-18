@@ -81,3 +81,28 @@ export function formatCustomAmenitiesForDisplay(labels: string[]): { id: string;
     label,
   }));
 }
+
+/** Custom amenities first, then built-in — deduped case-insensitively for Destination About. */
+export function buildDestinationPodAmenityLabels(
+  customAmenities: string[],
+  amenities: PodAmenityId[]
+): string[] {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+
+  for (const { label } of formatCustomAmenitiesForDisplay(customAmenities)) {
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    labels.push(label);
+  }
+
+  for (const { label } of formatPodAmenitiesForDisplay(amenities)) {
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    labels.push(label);
+  }
+
+  return labels;
+}

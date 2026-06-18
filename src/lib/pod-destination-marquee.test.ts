@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildDestinationMarqueeContent,
   cleanMarqueeLabel,
-  DESTINATION_MARQUEE_MIN_LOOP_ITEMS,
+  DESTINATION_MARQUEE_MIN_ROW_ITEMS,
   expandMarqueeLoopItems,
+  getMarqueeRepeatCycles,
   OPEN_ORDER_MARQUEE_BANNED,
 } from "./pod-destination-marquee";
 
@@ -23,11 +24,27 @@ describe("cleanMarqueeLabel", () => {
   });
 });
 
+describe("getMarqueeRepeatCycles", () => {
+  it("uses more cycles for fewer unique vendors", () => {
+    expect(getMarqueeRepeatCycles(1)).toBe(12);
+    expect(getMarqueeRepeatCycles(3)).toBe(10);
+    expect(getMarqueeRepeatCycles(6)).toBe(6);
+    expect(getMarqueeRepeatCycles(8)).toBe(4);
+  });
+});
+
 describe("expandMarqueeLoopItems", () => {
-  it("repeats vendor labels to fill wide desktop strips", () => {
+  it("repeats a single vendor many times", () => {
+    const expanded = expandMarqueeLoopItems(["TACO FIESTA"]);
+
+    expect(expanded.length).toBeGreaterThanOrEqual(DESTINATION_MARQUEE_MIN_ROW_ITEMS);
+    expect(expanded.every((item) => item === "TACO FIESTA")).toBe(true);
+  });
+
+  it("repeats three vendors in cycles", () => {
     const expanded = expandMarqueeLoopItems(["TACO FIESTA", "EASTSIDE NOODLES", "GREEN BOWL"]);
 
-    expect(expanded.length).toBeGreaterThanOrEqual(DESTINATION_MARQUEE_MIN_LOOP_ITEMS);
+    expect(expanded.length).toBeGreaterThanOrEqual(DESTINATION_MARQUEE_MIN_ROW_ITEMS);
     expect(expanded.slice(0, 3)).toEqual(["TACO FIESTA", "EASTSIDE NOODLES", "GREEN BOWL"]);
     expect(expanded[3]).toBe("TACO FIESTA");
   });
@@ -41,7 +58,7 @@ describe("buildDestinationMarqueeContent", () => {
     });
 
     expect(result.kind).toBe("vendors");
-    expect(result.items.length).toBeGreaterThanOrEqual(DESTINATION_MARQUEE_MIN_LOOP_ITEMS);
+    expect(result.items.length).toBeGreaterThanOrEqual(DESTINATION_MARQUEE_MIN_ROW_ITEMS);
     expect(result.items.slice(0, 3)).toEqual(["HAPPY BURGER", "RIVER COFFEE", "TACO STAND"]);
   });
 
@@ -52,7 +69,7 @@ describe("buildDestinationMarqueeContent", () => {
     });
 
     expect(result.kind).toBe("vendors");
-    expect(result.items.every((item) => item.includes("HAPPY BURGER"))).toBe(true);
+    expect(result.items.every((item) => item === "HAPPY BURGER")).toBe(true);
     expect(result.items).not.toContain("OUTDOOR SEATING");
     expect(result.items).not.toContain("LIVE MUSIC");
   });
@@ -77,8 +94,6 @@ describe("buildDestinationMarqueeContent", () => {
     });
 
     expect(result.kind).toBe("vendors");
-    expect(result.items.filter((item) => item === "HAPPY BURGER").length).toBeGreaterThan(0);
-    expect(result.items.filter((item) => item === "RIVER COFFEE").length).toBeGreaterThan(0);
     expect(result.items.every((item) => item === "HAPPY BURGER" || item === "RIVER COFFEE")).toBe(true);
   });
 

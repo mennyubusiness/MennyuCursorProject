@@ -7,6 +7,7 @@ import {
   normalizePodCustomAmenitiesInput,
   parsePodAmenities,
   parsePodCustomAmenities,
+  buildDestinationPodAmenityLabels,
 } from "./pod-amenities";
 
 describe("parsePodAmenities", () => {
@@ -65,5 +66,16 @@ describe("normalizePodCustomAmenitiesInput", () => {
 
   it("removes empty values and duplicates", () => {
     expect(normalizePodCustomAmenitiesInput("Vegan, vegan, ")).toEqual(["Vegan"]);
+  });
+});
+
+describe("buildDestinationPodAmenityLabels", () => {
+  it("lists custom amenities before built-in amenities and dedupes", () => {
+    const labels = buildDestinationPodAmenityLabels(
+      ["Live music", "live music", "Fire pits"],
+      ["bar", "outdoor_seating"]
+    );
+
+    expect(labels).toEqual(["Live music", "Fire pits", "Bar", "Outdoor seating"]);
   });
 });
