@@ -1,18 +1,3 @@
-import type { PodAmenityId } from "@/lib/pod-amenities";
-import { formatPodAmenitiesForDisplay } from "@/lib/pod-amenities";
-
-const AMENITY_MARQUEE_LABELS: Partial<Record<PodAmenityId, string>> = {
-  outdoor_seating: "OUTDOOR SEATING",
-  covered_seating: "COVERED SEATING",
-  bar: "BAR",
-  family_friendly: "FAMILY FRIENDLY",
-  pet_friendly: "PET FRIENDLY",
-  parking: "PARKING",
-  restrooms: "RESTROOMS",
-  events: "EVENTS",
-  games: "GAMES",
-};
-
 /** Platform capability copy — never used in the destination marquee. */
 export const OPEN_ORDER_MARQUEE_BANNED = new Set([
   "ONE CHECKOUT",
@@ -27,19 +12,22 @@ export const OPEN_ORDER_MARQUEE_BANNED = new Set([
 ]);
 
 const GENERIC_VENUE_PHRASES = [
-  "LOCAL FLAVOR",
-  "EAT OUTSIDE",
-  "GRAB A TABLE",
   "FOOD CARTS",
+  "LOCAL FLAVOR",
+  "GRAB A TABLE",
+  "EAT OUTSIDE",
   "LOCAL FOOD CARTS",
   "EAT LOCAL",
-  "GOOD TIMES",
-  "FRESH AIR",
-  "COMMUNITY GATHERING",
 ] as const;
 
-const MIN_MARQUEE_ITEMS = 6;
 const MAX_MARQUEE_ITEMS = 16;
+
+export type DestinationMarqueeKind = "vendors" | "fallback";
+
+export type DestinationMarqueeContent = {
+  kind: DestinationMarqueeKind;
+  items: string[];
+};
 
 export function cleanMarqueeLabel(raw: string): string | null {
   const stripped = raw.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -47,47 +35,61 @@ export function cleanMarqueeLabel(raw: string): string | null {
   return stripped.toUpperCase().slice(0, 40);
 }
 
-/**
- * Pod identity strip — custom amenities, built-in amenities, vendors, then venue atmosphere.
- */
-export function buildDestinationMarqueeItems(input: {
-  podName: string;
-  customAmenities: string[];
-  amenities: PodAmenityId[];
-  vendorNames: string[];
-}): string[] {
-  const items: string[] = [];
-  const seen = new Set<string>();
-
-  function push(label: string | null | undefined) {
-    const cleaned = label ? cleanMarqueeLabel(label) : null;
-    if (!cleaned || seen.has(cleaned) || OPEN_ORDER_MARQUEE_BANNED.has(cleaned)) return;
+function collectLabels(
+  sources: Array<string | null | undefined>,
+  seen: Set<string>,
+  items: string[]
+) {
+  for (const source of sources) {
+    const cleaned = source ? cleanMarqueeLabel(source) : null;
+    if (!cleaned || seen.has(cleaned) || OPEN_ORDER_MARQUEE_BANNED.has(cleaned)) continue;
     seen.add(cleaned);
     items.push(cleaned);
   }
+}
 
-  for (const custom of input.customAmenities) {
-    push(custom);
-    if (items.length >= MAX_MARQUEE_ITEMS) return items;
+function buildCleanedVendorLabels(vendorNames: string[]): string[] {
+  const seen = new Set<string>();
+  const items: string[] = [];
+  collectLabels(vendorNames, seen, items);
+  return items;
+}
+
+function buildFallbackLabels(podName: string): string[] {
+  const seen = new Set<string>();
+  const items: string[] = [];
+
+  collectLabels([podName], seen, items);
+  collectLabels([...GENERIC_VENUE_PHRASES], seen, items);
+
+  return items;
+}
+
+/**
+ * Destination marquee — vendor names only, or venue fallback when no vendors.
+ */
+export function buildDestinationMarqueeContent(input: {
+  podName: string;
+  vendorNames: string[];
+}): DestinationMarqueeContent {
+  const vendorLabels = buildCleanedVendorLabels(input.vendorNames);
+
+  if (vendorLabels.length > 0) {
+    return {
+      kind: "vendors",
+      items: vendorLabels.slice(0, MAX_MARQUEE_ITEMS),
+    };
   }
 
-  for (const id of input.amenities) {
-    const label = AMENITY_MARQUEE_LABELS[id] ?? formatPodAmenitiesForDisplay([id])[0]?.label;
-    push(label);
-    if (items.length >= MAX_MARQUEE_ITEMS) return items;
-  }
+  return {
+    kind: "fallback",
+    items: buildFallbackLabels(input.podName),
+  };
+}
 
-  for (const name of input.vendorNames) {
-    push(name);
-    if (items.length >= MAX_MARQUEE_ITEMS) return items;
-  }
-
-  push(input.podName);
-
-  for (const phrase of GENERIC_VENUE_PHRASES) {
-    push(phrase);
-    if (items.length >= MIN_MARQUEE_ITEMS) break;
-  }
-
-  return items.slice(0, MAX_MARQUEE_ITEMS);
+/** @deprecated Use `buildDestinationMarqueeContent` for kind metadata. */
+export function buildDestinationMarqueeItems(
+  input: Parameters<typeof buildDestinationMarqueeContent>[0]
+): string[] {
+  return buildDestinationMarqueeContent(input).items;
 }

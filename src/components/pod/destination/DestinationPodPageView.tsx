@@ -7,7 +7,7 @@ import { PodPageStickyNav } from "@/components/pod/PodPageStickyNav";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
 import { PageShell } from "@/components/layout/page-shell";
 import type { PodCustomerPageData } from "@/lib/pod-customer-page-data";
-import { buildDestinationMarqueeItems } from "@/lib/pod-destination-marquee";
+import { buildDestinationMarqueeContent } from "@/lib/pod-destination-marquee";
 import { buildDestinationPodNavItems } from "@/lib/pod-page-nav";
 
 type DestinationPodPageViewProps = PodCustomerPageData & {
@@ -30,12 +30,10 @@ export function DestinationPodPageView({
   const podId = pod.id;
   const hasVendors = vendorRows.length > 0;
   const hasDestinationAboutSection = hasAboutSection || hasVisitSection;
-  const marqueeItems = buildDestinationMarqueeItems({
+  const marqueeItems = buildDestinationMarqueeContent({
     podName: pod.name,
-    customAmenities,
-    amenities,
     vendorNames: vendorRows.map((row) => row.vendor.name),
-  });
+  }).items;
 
   const navItems = buildDestinationPodNavItems({
     hasAboutSection: hasDestinationAboutSection,

@@ -1,77 +1,91 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildDestinationMarqueeItems,
+  buildDestinationMarqueeContent,
   cleanMarqueeLabel,
   OPEN_ORDER_MARQUEE_BANNED,
 } from "./pod-destination-marquee";
 
+const baseInput = {
+  podName: "Downtown Food Pod",
+  vendorNames: [] as string[],
+};
+
 describe("cleanMarqueeLabel", () => {
   it("uppercases and trims labels", () => {
-    expect(cleanMarqueeLabel("  live music  ")).toBe("LIVE MUSIC");
+    expect(cleanMarqueeLabel("  happy burger  ")).toBe("HAPPY BURGER");
   });
 
   it("strips unsafe markup", () => {
-    expect(cleanMarqueeLabel("<b>Bar</b>")).toBe("BAR");
+    expect(cleanMarqueeLabel("<b>Taco Stand</b>")).toBe("TACO STAND");
   });
 });
 
-describe("buildDestinationMarqueeItems", () => {
-  it("prioritizes custom amenities, then built-in amenities, then vendors", () => {
-    const items = buildDestinationMarqueeItems({
-      podName: "Downtown Food Pod",
-      customAmenities: ["Live music", "Fire pits"],
-      amenities: ["outdoor_seating", "bar"],
-      vendorNames: ["Happy Burger", "River Coffee"],
+describe("buildDestinationMarqueeContent", () => {
+  it("returns vendor names when vendors exist", () => {
+    const result = buildDestinationMarqueeContent({
+      ...baseInput,
+      vendorNames: ["Happy Burger", "River Coffee", "Taco Stand"],
     });
 
-    expect(items.indexOf("LIVE MUSIC")).toBeLessThan(items.indexOf("OUTDOOR SEATING"));
-    expect(items.indexOf("OUTDOOR SEATING")).toBeLessThan(items.indexOf("HAPPY BURGER"));
-    expect(items).toContain("LIVE MUSIC");
-    expect(items).toContain("FIRE PITS");
-    expect(items).toContain("OUTDOOR SEATING");
-    expect(items).toContain("HAPPY BURGER");
+    expect(result.kind).toBe("vendors");
+    expect(result.items).toEqual(["HAPPY BURGER", "RIVER COFFEE", "TACO STAND"]);
   });
 
-  it("does not include Open Order capability copy", () => {
-    const items = buildDestinationMarqueeItems({
-      podName: "Test Pod",
-      customAmenities: [],
-      amenities: [],
-      vendorNames: [],
+  it("does not use amenities or custom amenities even when many exist", () => {
+    const result = buildDestinationMarqueeContent({
+      podName: "Downtown Food Pod",
+      vendorNames: ["Happy Burger"],
     });
+
+    expect(result.kind).toBe("vendors");
+    expect(result.items).toEqual(["HAPPY BURGER"]);
+    expect(result.items).not.toContain("OUTDOOR SEATING");
+    expect(result.items).not.toContain("LIVE MUSIC");
+  });
+
+  it("does not include Open Order capability copy in vendor or fallback modes", () => {
+    const vendorResult = buildDestinationMarqueeContent({
+      ...baseInput,
+      vendorNames: ["One Checkout Kitchen"],
+    });
+    const fallbackResult = buildDestinationMarqueeContent(baseInput);
 
     for (const banned of OPEN_ORDER_MARQUEE_BANNED) {
-      expect(items).not.toContain(banned);
+      expect(vendorResult.items).not.toContain(banned);
+      expect(fallbackResult.items).not.toContain(banned);
     }
-    expect(items).not.toContain("ONE CHECKOUT");
-    expect(items).not.toContain("GROUP ORDERING");
-    expect(items).not.toContain("PICKUP UPDATES");
   });
 
-  it("deduplicates labels case-insensitively", () => {
-    const items = buildDestinationMarqueeItems({
-      podName: "Pod",
-      customAmenities: ["Live Music", "live music"],
-      amenities: ["bar"],
-      vendorNames: ["Bar"],
+  it("deduplicates vendor names case-insensitively", () => {
+    const result = buildDestinationMarqueeContent({
+      ...baseInput,
+      vendorNames: ["Happy Burger", "happy burger", "River Coffee"],
     });
 
-    expect(items.filter((item) => item === "LIVE MUSIC")).toHaveLength(1);
-    expect(items.filter((item) => item === "BAR")).toHaveLength(1);
+    expect(result.kind).toBe("vendors");
+    expect(result.items).toEqual(["HAPPY BURGER", "RIVER COFFEE"]);
   });
 
-  it("uses vendor names and generic venue phrases when amenities are sparse", () => {
-    const items = buildDestinationMarqueeItems({
-      podName: "Riverside Pod",
-      customAmenities: [],
-      amenities: [],
-      vendorNames: ["Taco Cart"],
-    });
+  it("returns fallback only when no vendor names exist", () => {
+    const result = buildDestinationMarqueeContent(baseInput);
 
-    expect(items).toContain("TACO CART");
-    expect(items).toContain("RIVERSIDE POD");
-    expect(items.length).toBeGreaterThanOrEqual(6);
-    expect(items.some((item) => item.includes("LOCAL") || item.includes("FOOD"))).toBe(true);
+    expect(result.kind).toBe("fallback");
+    expect(result.items).toContain("DOWNTOWN FOOD POD");
+    expect(result.items).toContain("FOOD CARTS");
+    expect(result.items).toContain("LOCAL FLAVOR");
+  });
+
+  it("never returns an amenities kind", () => {
+    const vendorResult = buildDestinationMarqueeContent({
+      ...baseInput,
+      vendorNames: ["Vendor A"],
+    });
+    const fallbackResult = buildDestinationMarqueeContent(baseInput);
+
+    expect(vendorResult.kind).not.toBe("amenities");
+    expect(fallbackResult.kind).not.toBe("amenities");
+    expect(["vendors", "fallback"]).toContain(vendorResult.kind);
+    expect(["vendors", "fallback"]).toContain(fallbackResult.kind);
   });
 });

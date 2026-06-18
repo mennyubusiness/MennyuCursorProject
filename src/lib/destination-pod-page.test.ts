@@ -72,12 +72,14 @@ describe("DestinationPodMarquee", () => {
     expect(marqueeSrc).toMatch(/text-brand/);
   });
 
-  it("loops seamlessly with duplicated content and -50% animation track", () => {
+  it("loops seamlessly with two identical rows and -50% animation track", () => {
     expect(marqueeSrc).toMatch(/overflow-hidden/);
     expect(marqueeSrc).toMatch(/whitespace-nowrap/);
     expect(marqueeSrc).toMatch(/min-w-max/);
+    expect(marqueeSrc).toMatch(/shrink-0/);
     expect(marqueeSrc).toMatch(/animate-destination-pod-marquee/);
-    expect(marqueeSrc).toMatch(/\[\.\.\.items, \.\.\.items\]/);
+    expect(marqueeSrc).toMatch(/MarqueeRow items=\{items\}/);
+    expect(marqueeSrc).toMatch(/MarqueeRow items=\{items\} ariaHidden/);
     expect(marqueeSrc).not.toMatch(/flex-wrap/);
     expect(marqueeSrc).toMatch(/motion-reduce:hidden/);
     expect(marqueeSrc).toMatch(/motion-reduce:block/);
@@ -109,6 +111,11 @@ describe("DestinationPodPageView layout", () => {
   it("omits mobile bottom sticky CTA on Destination variant", () => {
     expect(pageViewSrc).not.toMatch(/PodPageStickyCta/);
     expect(pageViewSrc).not.toMatch(/pb-20/);
+  });
+
+  it("builds marquee from vendor names only", () => {
+    expect(pageViewSrc).toMatch(/vendorNames: vendorRows\.map/);
+    expect(pageViewSrc).not.toMatch(/customAmenities,\s*\n\s*amenities,/);
   });
 });
 
