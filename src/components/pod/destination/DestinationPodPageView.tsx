@@ -1,8 +1,8 @@
 import { RecentPodViewTracker } from "@/components/retention/RecentViewTracker";
-import { DestinationPodGroupOrderSection } from "@/components/pod/destination/DestinationPodGroupOrderSection";
+import { DestinationPodAboutSection } from "@/components/pod/destination/DestinationPodAboutSection";
+import { DestinationPodGroupOrderNavActions } from "@/components/pod/destination/DestinationPodGroupOrderNavActions";
 import { DestinationPodHero } from "@/components/pod/destination/DestinationPodHero";
 import { DestinationPodVendorSection } from "@/components/pod/destination/DestinationPodVendorSection";
-import { DestinationPodVisitSection } from "@/components/pod/destination/DestinationPodVisitSection";
 import { PodPageStickyNav } from "@/components/pod/PodPageStickyNav";
 import { PodPageStickyCta } from "@/components/pod/PodPageStickyCta";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
@@ -21,6 +21,7 @@ export function DestinationPodPageView({
   vendorRows,
   amenities,
   orderingStatus,
+  hasAboutSection,
   hasVisitSection,
   contactDetails,
   groupOrderHref,
@@ -29,6 +30,7 @@ export function DestinationPodPageView({
 }: DestinationPodPageViewProps) {
   const podId = pod.id;
   const hasVendors = vendorRows.length > 0;
+  const hasDestinationAboutSection = hasAboutSection || hasVisitSection;
   const marqueeItems = buildDestinationMarqueeItems({
     orderingStatus,
     vendorCount: vendorRows.length,
@@ -36,9 +38,7 @@ export function DestinationPodPageView({
   });
 
   const navItems = buildDestinationPodNavItems({
-    hasAboutSection: false,
-    hasVisitSection,
-    hasGroupOrderSection: hasVendors,
+    hasAboutSection: hasDestinationAboutSection,
   });
 
   return (
@@ -53,7 +53,14 @@ export function DestinationPodPageView({
         marqueeItems={marqueeItems}
       />
 
-      <PodPageStickyNav items={navItems} podId={pod.id} podName={pod.name} />
+      <PodPageStickyNav
+        items={navItems}
+        podId={pod.id}
+        podName={pod.name}
+        trailingActions={
+          hasVendors ? <DestinationPodGroupOrderNavActions podId={podId} /> : undefined
+        }
+      />
 
       {isQrEntry && (
         <PageShell className="py-4">
@@ -77,17 +84,18 @@ export function DestinationPodPageView({
         rows={vendorRows}
         highlightVendorId={highlightVendor}
         orderingStatus={orderingStatus}
-        showContactLink={hasVisitSection}
-        contactAnchorId={hasVisitSection ? "pod-visit" : null}
+        showContactLink={hasDestinationAboutSection}
+        contactAnchorId={hasDestinationAboutSection ? "pod-about" : null}
       />
 
-      {hasVendors && <DestinationPodGroupOrderSection podId={podId} />}
-
-      {hasVisitSection && (
-        <DestinationPodVisitSection
+      {hasDestinationAboutSection && (
+        <DestinationPodAboutSection
           podName={pod.name}
+          description={pod.description}
+          ownerContactName={pod.ownerContactName}
           address={pod.address}
           pickupInstructions={pod.pickupInstructions}
+          amenities={amenities}
           contact={contactDetails}
         />
       )}

@@ -3,6 +3,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { buildDestinationPodNavItems } from "./pod-page-nav";
+
 const dir = dirname(fileURLToPath(import.meta.url));
 const heroSrc = readFileSync(
   join(dir, "../components/pod/destination/DestinationPodHero.tsx"),
@@ -16,6 +18,14 @@ const pageViewSrc = readFileSync(
   join(dir, "../components/pod/destination/DestinationPodPageView.tsx"),
   "utf8"
 );
+const aboutSectionSrc = readFileSync(
+  join(dir, "../components/pod/destination/DestinationPodAboutSection.tsx"),
+  "utf8"
+);
+const groupOrderNavSrc = readFileSync(
+  join(dir, "../components/pod/destination/DestinationPodGroupOrderNavActions.tsx"),
+  "utf8"
+);
 const vendorSectionSrc = readFileSync(
   join(dir, "../components/pod/destination/DestinationPodVendorSection.tsx"),
   "utf8"
@@ -24,7 +34,12 @@ const vendorCardSrc = readFileSync(
   join(dir, "../components/pod/destination/DestinationPodVendorCard.tsx"),
   "utf8"
 );
+const standardPageSrc = readFileSync(
+  join(dir, "../components/pod/StandardPodPageView.tsx"),
+  "utf8"
+);
 const standardVendorCardSrc = readFileSync(join(dir, "../components/pod/PodVendorCard.tsx"), "utf8");
+const navSrc = readFileSync(join(dir, "../lib/pod-page-nav.ts"), "utf8");
 
 describe("DestinationPodHero", () => {
   it("centers pod name over a muted banner masthead", () => {
@@ -67,10 +82,50 @@ describe("DestinationPodMarquee", () => {
   });
 });
 
-describe("DestinationPodPageView", () => {
-  it("omits the About section for now", () => {
-    expect(pageViewSrc).not.toMatch(/DestinationPodAboutSection/);
-    expect(pageViewSrc).toMatch(/hasAboutSection: false/);
+describe("DestinationPodPageView layout", () => {
+  it("renders consolidated About section and omits standalone group-order block", () => {
+    expect(pageViewSrc).toMatch(/DestinationPodAboutSection/);
+    expect(pageViewSrc).not.toMatch(/DestinationPodGroupOrderSection/);
+    expect(pageViewSrc).not.toMatch(/DestinationPodVisitSection/);
+    expect(pageViewSrc).not.toMatch(/Ordering with friends/);
+  });
+
+  it("places compact group-order actions in the sticky nav action row", () => {
+    expect(pageViewSrc).toMatch(/DestinationPodGroupOrderNavActions/);
+    expect(pageViewSrc).toMatch(/trailingActions=/);
+    expect(groupOrderNavSrc).toMatch(/Start group order/);
+    expect(groupOrderNavSrc).toMatch(/PodPageJoinWithCodeButton/);
+  });
+
+  it("does not change the standard pod page layout", () => {
+    expect(standardPageSrc).not.toMatch(/DestinationPodGroupOrderNavActions/);
+    expect(standardPageSrc).not.toMatch(/DestinationPodAboutSection/);
+    expect(standardPageSrc).toMatch(/PodPageIdentitySection/);
+  });
+});
+
+describe("DestinationPodAboutSection", () => {
+  it("uses About heading and consolidates pod information", () => {
+    expect(aboutSectionSrc).toMatch(/About \{podName\}/);
+    expect(aboutSectionSrc).not.toMatch(/Visit \{podName\}/);
+    expect(aboutSectionSrc).toMatch(/Pickup instructions/);
+    expect(aboutSectionSrc).toMatch(/Get directions/);
+    expect(aboutSectionSrc).toMatch(/Known for/);
+    expect(aboutSectionSrc).toMatch(/id="pod-about"/);
+  });
+});
+
+describe("buildDestinationPodNavItems", () => {
+  it("links Vendors and About only", () => {
+    expect(buildDestinationPodNavItems({ hasAboutSection: false })).toEqual([
+      { id: "pod-vendors", label: "Vendors" },
+    ]);
+    expect(buildDestinationPodNavItems({ hasAboutSection: true })).toEqual([
+      { id: "pod-vendors", label: "Vendors" },
+      { id: "pod-about", label: "About" },
+    ]);
+    expect(navSrc).not.toMatch(/pod-group-order/);
+    expect(navSrc).not.toMatch(/pod-visit/);
   });
 });
 
