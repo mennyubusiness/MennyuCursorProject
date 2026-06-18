@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useFormStatus } from "react-dom";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { signOutAccountAction } from "@/app/account/actions";
 
@@ -32,15 +33,24 @@ function CustomerSignOutSubmit({
   );
 }
 
-/** Shared email-account sign-out — server action clears Auth.js session and redirects to login. */
-export function CustomerSignOutForm({
-  onSignOutStart,
-  children,
-  className,
-  role,
-}: CustomerSignOutFormProps) {
+function buildCurrentReturnPath(
+  pathname: string | null,
+  searchParams: Pick<URLSearchParams, "toString"> | null
+): string {
+  if (!pathname) return "/";
+  const search = searchParams?.toString();
+  return search ? `${pathname}?${search}` : pathname;
+}
+
+function CustomerSignOutFormInner(props: CustomerSignOutFormProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const returnPath = buildCurrentReturnPath(pathname, searchParams);
+  const { onSignOutStart, children, className, role } = props;
+
   return (
     <form action={signOutAccountAction}>
+      <input type="hidden" name="returnPath" value={returnPath} />
       <CustomerSignOutSubmit
         onSignOutStart={onSignOutStart}
         className={className}
@@ -49,5 +59,34 @@ export function CustomerSignOutForm({
         {children}
       </CustomerSignOutSubmit>
     </form>
+  );
+}
+
+function CustomerSignOutFormFallback({
+  onSignOutStart,
+  children,
+  className,
+  role,
+}: CustomerSignOutFormProps) {
+  return (
+    <form action={signOutAccountAction}>
+      <input type="hidden" name="returnPath" value="/" />
+      <CustomerSignOutSubmit
+        onSignOutStart={onSignOutStart}
+        className={className}
+        role={role}
+      >
+        {children}
+      </CustomerSignOutSubmit>
+    </form>
+  );
+}
+
+/** Shared email-account sign-out — server action clears Auth.js session and redirects contextually. */
+export function CustomerSignOutForm(props: CustomerSignOutFormProps) {
+  return (
+    <Suspense fallback={<CustomerSignOutFormFallback {...props} />}>
+      <CustomerSignOutFormInner {...props} />
+    </Suspense>
   );
 }

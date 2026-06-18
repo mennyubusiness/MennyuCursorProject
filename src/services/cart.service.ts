@@ -49,12 +49,18 @@ import {
 import { attachQuickCartDisplay, shouldShowFullCartInQuickCartDrawer } from "@/lib/quick-cart-display";
 import { isCartRowAssigned } from "@/lib/cart-pod-context";
 import { assertSessionAllowsAddToCart } from "@/lib/cart-pod-guard";
+import {
+  ensureCartOwnedByUser,
+  findActiveAccountSoloCartId,
+} from "@/lib/account-cart-ownership";
 
 export { assertSessionAllowsAddToCart } from "@/lib/cart-pod-guard";
 
 export { CartValidationError } from "@/services/cart-validation-error";
 
 export type { ResolvedGroupCartActor } from "@/services/group-order.service";
+
+export type CartServiceAuthOpts = { authUserId?: string | null };
 
 /** TEMP: set false to silence add-to-cart trace logs */
 const DEBUG_ADD_TO_CART_TRACE = true;
@@ -129,10 +135,41 @@ export async function findOrCreateCartForPodSession<I extends Prisma.CartInclude
   }
 }
 
-export async function getOrCreateCart(podId: string, sessionId: string): Promise<Cart> {
+export async function getOrCreateCart(
+  podId: string,
+  sessionId: string,
+  opts: CartServiceAuthOpts = {}
+): Promise<Cart> {
+  const authUserId = opts.authUserId?.trim() || null;
+
+  if (authUserId) {
+    const accountCartId = await findActiveAccountSoloCartId(authUserId, podId);
+    if (accountCartId) {
+      const accountRow = await prisma.cart.findUnique({
+        where: { id: accountCartId },
+        include: CART_SESSION_FULL_INCLUDE,
+      });
+      if (accountRow) {
+        await unlinkCompletedCheckoutOrdersFromCart(accountRow.id);
+        return scopeCartForGroupViewer(accountRow, accountRow.id, null);
+      }
+    }
+  }
+
   const cart = await findOrCreateCartForPodSession(podId, sessionId, CART_SESSION_FULL_INCLUDE);
 
   await unlinkCompletedCheckoutOrdersFromCart(cart.id);
+
+  if (authUserId) {
+    await ensureCartOwnedByUser(cart.id, authUserId);
+    const refreshed = await prisma.cart.findUnique({
+      where: { id: cart.id },
+      include: CART_SESSION_FULL_INCLUDE,
+    });
+    if (refreshed) {
+      return scopeCartForGroupViewer(refreshed, refreshed.id, null);
+    }
+  }
 
   return scopeCartForGroupViewer(cart, cart.id, null);
 }
@@ -193,8 +230,25 @@ export const CART_MUTATION_CART_INCLUDE = {
 
 export async function getOrCreateCartForVendorMenuPage(
   podId: string,
-  sessionId: string
+  sessionId: string,
+  opts: CartServiceAuthOpts = {}
 ): Promise<Cart> {
+  const authUserId = opts.authUserId?.trim() || null;
+
+  if (authUserId) {
+    const accountCartId = await findActiveAccountSoloCartId(authUserId, podId);
+    if (accountCartId) {
+      const accountRow = await prisma.cart.findUnique({
+        where: { id: accountCartId },
+        include: CART_MUTATION_CART_INCLUDE,
+      });
+      if (accountRow) {
+        await unlinkCompletedCheckoutOrdersFromCart(accountRow.id);
+        return toCartWithGroups(accountRow);
+      }
+    }
+  }
+
   const cart = await findOrCreateCartForPodSession(
     podId,
     sessionId,
@@ -202,6 +256,17 @@ export async function getOrCreateCartForVendorMenuPage(
   );
 
   await unlinkCompletedCheckoutOrdersFromCart(cart.id);
+
+  if (authUserId) {
+    await ensureCartOwnedByUser(cart.id, authUserId);
+    const refreshed = await prisma.cart.findUnique({
+      where: { id: cart.id },
+      include: CART_MUTATION_CART_INCLUDE,
+    });
+    if (refreshed) {
+      return toCartWithGroups(refreshed);
+    }
+  }
 
   return toCartWithGroups(cart);
 }
@@ -977,7 +1042,8 @@ export async function loadActiveDisplayCartForSession(
   sessionId: string,
   preferredPodId: string | null,
   /** Active group participant markers — loads shared group cart before solo fallback. */
-  participantMarkers?: GroupOrderParticipantMarkers | null
+  participantMarkers?: GroupOrderParticipantMarkers | null,
+  authUserId?: string | null
 ) {
   if (participantMarkers && (participantMarkers.participantId || participantMarkers.legacyJoinToken)) {
     const gid = await resolveGroupCartIdFromParticipantMarkers(participantMarkers);
@@ -992,8 +1058,25 @@ export async function loadActiveDisplayCartForSession(
       }
     }
   }
+
+  const uid = authUserId?.trim() || null;
+  if (uid) {
+    const accountCartId = await findActiveAccountSoloCartId(uid, preferredPodId);
+    if (accountCartId) {
+      const row = await prisma.cart.findUnique({
+        where: { id: accountCartId },
+        include: CART_DISPLAY_SESSION_CART_INCLUDE,
+      });
+      if (row) {
+        await unlinkCompletedCheckoutOrdersFromCart(row.id);
+        return row;
+      }
+    }
+    return undefined;
+  }
+
   const rows = await prisma.cart.findMany({
-    where: { sessionId },
+    where: { sessionId, userId: null },
     include: CART_DISPLAY_SESSION_CART_INCLUDE,
     orderBy: { updatedAt: "desc" },
   });
@@ -1143,8 +1226,35 @@ export async function getQuickCartPayload(
     }
   }
 
+  const signedInUserId = opts.hostUserId?.trim() || null;
+  if (signedInUserId) {
+    const accountCartId = await findActiveAccountSoloCartId(signedInUserId, browsePodId);
+    if (accountCartId) {
+      const row = await prisma.cart.findUnique({
+        where: { id: accountCartId },
+        include: CART_SESSION_FULL_INCLUDE,
+      });
+      if (row) {
+        const scoped = await scopeCartForGroupViewer(row, accountCartId, null, "assigned_pod");
+        const browsePodName = browsePodId
+          ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ??
+            null
+          : null;
+        return packageQuickCartForActiveAssignment({
+          assignedPodId: scoped.podId,
+          assignedPodName: scoped.podName ?? row.pod.name,
+          cart: scoped,
+          scope: "assigned_pod",
+          browsePodId,
+          browsePodName,
+        });
+      }
+    }
+    return neutral;
+  }
+
   const sessionRows = await prisma.cart.findMany({
-    where: { sessionId },
+    where: { sessionId, userId: null },
     include: CART_SESSION_FULL_INCLUDE,
     orderBy: { updatedAt: "desc" },
   });

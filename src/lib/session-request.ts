@@ -12,6 +12,7 @@ import "server-only";
 import { cookies, headers } from "next/headers";
 import {
   COOKIE_NAME,
+  CURRENT_POD_COOKIE,
   MENNYU_SESSION_MAX_AGE,
   createMennyuSessionId,
   getSessionIdFromHeaders,
@@ -43,6 +44,29 @@ export async function getOrCreateMennyuSessionIdForCart(): Promise<string> {
     sameSite: "lax",
     path: "/",
     maxAge: MENNYU_SESSION_MAX_AGE,
+    secure: process.env.NODE_ENV === "production",
+  });
+  return sessionId;
+}
+
+/**
+ * Mint a fresh mennyu session on sign-out so the browser no longer matches account cart rows.
+ * Clears the current-pod cookie when it was tied to account browsing.
+ */
+export async function rotateMennyuSessionForSignOut(): Promise<string> {
+  const sessionId = createMennyuSessionId();
+  const store = await cookies();
+  store.set(COOKIE_NAME, sessionId, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: MENNYU_SESSION_MAX_AGE,
+    secure: process.env.NODE_ENV === "production",
+  });
+  store.set(CURRENT_POD_COOKIE, "", {
+    path: "/",
+    maxAge: 0,
+    sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
   return sessionId;

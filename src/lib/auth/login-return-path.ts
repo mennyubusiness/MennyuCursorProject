@@ -7,14 +7,15 @@ export const SIGN_IN_PATH = "/login";
 
 export const LOGIN_RETURN_QUERY_PARAM = "next";
 
-/** Default when no safe `next` is provided (customer hub, not order history). */
-export const DEFAULT_CUSTOMER_POST_LOGIN_PATH = "/account";
+/** Default when no safe `next` is provided (customer discovery, not account hub). */
+export const DEFAULT_CUSTOMER_POST_LOGIN_PATH = "/explore";
 
-const AUTH_ONLY_PREFIXES = [
+export const AUTH_ONLY_PREFIXES = [
   "/login",
   "/register",
   "/forgot-password",
   "/reset-password",
+  "/auth",
 ] as const;
 
 /**

@@ -142,7 +142,9 @@ export default async function CartPage({
       const dest = `/cart?startGroupOrder=1&podId=${encodeURIComponent(targetPodForGroup)}`;
       redirect(buildLoginHrefWithReturn(dest));
     }
-    await getOrCreateCart(targetPodForGroup, sessionId);
+    await getOrCreateCart(targetPodForGroup, sessionId, {
+      authUserId: authSession?.user?.id ?? null,
+    });
   }
 
   const preferredPodId = startGroupOrder && targetPodForGroup ? targetPodForGroup : currentPodId;
@@ -155,7 +157,12 @@ export default async function CartPage({
     })) ?? undefined;
   if (!cart) {
     cart =
-      (await loadActiveDisplayCartForSession(sessionId, preferredPodId, participantMarkers)) ??
+      (await loadActiveDisplayCartForSession(
+        sessionId,
+        preferredPodId,
+        participantMarkers,
+        authSession?.user?.id ?? null
+      )) ??
       undefined;
   }
   if (params.groupUnlock === "1" && cart?.id && authSession?.user?.id) {

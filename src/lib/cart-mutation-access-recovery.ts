@@ -432,7 +432,9 @@ export async function tryRecoverCartForPodMutation(params: {
           const sessionId = params.requestSessionId?.trim()
             ? params.requestSessionId.trim()
             : await getOrCreateMennyuSessionIdForCart();
-          const soloCart = await getOrCreateCartForVendorMenuPage(podId, sessionId);
+          const soloCart = await getOrCreateCartForVendorMenuPage(podId, sessionId, {
+            authUserId: params.authUserId,
+          });
           const access = await checkCartMutationAccess(soloCart.id);
           if (access.ok) {
             return {
@@ -480,7 +482,9 @@ export async function tryRecoverCartForPodMutation(params: {
     ? params.requestSessionId.trim()
     : await getOrCreateMennyuSessionIdForCart();
 
-  const soloCart = await getOrCreateCartForVendorMenuPage(podId, sessionId);
+  const soloCart = await getOrCreateCartForVendorMenuPage(podId, sessionId, {
+    authUserId: params.authUserId,
+  });
   const access = await checkCartMutationAccess(soloCart.id);
   if (!access.ok) {
     return { kind: "blocked", error: ACCESS_DENIED, code: "CART_ACCESS_DENIED" };

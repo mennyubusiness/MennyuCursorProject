@@ -69,8 +69,15 @@ export default async function CheckoutPage({
   });
   if (!cart || cart.items.length === 0) redirect("/cart");
 
-  if (!access.isGroupOrder && cart.sessionId !== (sessionId ?? "")) {
-    redirect("/cart");
+  if (!access.isGroupOrder) {
+    const ownerId = cart.userId?.trim();
+    if (ownerId) {
+      if (authSession?.user?.id !== ownerId) {
+        redirect("/cart?error=" + encodeURIComponent("cart_access_denied"));
+      }
+    } else if (cart.sessionId !== (sessionId ?? "")) {
+      redirect("/cart");
+    }
   }
 
   const validationCart = await prisma.cart.findUnique({

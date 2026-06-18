@@ -96,6 +96,8 @@ export function QuickCartProvider({
   const lastAcceptedMetaRef = useRef<CartSnapshotMeta | null>(null);
   const activeBrowsePodRef = useRef<string | null>(null);
 
+  const prevHasServerSessionRef = useRef(hasServerSession);
+
   cartRef.current = cart;
   activeCartRecoveryRef.current = activeCartRecovery;
 
@@ -250,6 +252,18 @@ export function QuickCartProvider({
   const closeCart = useCallback(() => {
     setIsOpen(false);
   }, []);
+
+  useEffect(() => {
+    if (prevHasServerSessionRef.current === hasServerSession) return;
+    prevHasServerSessionRef.current = hasServerSession;
+    snapshotGenerationRef.current += 1;
+    lastAcceptedMetaRef.current = null;
+    setCart(null);
+    setPodContext(NEUTRAL_POD_CONTEXT);
+    setActiveCartRecovery(null);
+    setShowActiveRecovery(false);
+    void refreshCart();
+  }, [hasServerSession, refreshCart]);
 
   useEffect(() => {
     if (!routeQuickCartEnabled && !quickCartHasActiveGroupOrder(cartRef.current)) return;

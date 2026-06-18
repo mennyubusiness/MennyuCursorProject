@@ -1,12 +1,13 @@
 /**
  * Post-login routing: optional safe `next` path, else role-based default.
  * Platform admins → /admin (unless `next` is an allowed admin path).
- * Customers without `next` → /account (not order history).
+ * Customers without `next` → /explore (not account hub).
  */
 import "server-only";
 
 import { extractVendorIdFromVendorPath } from "@/lib/auth/login-intent";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
+import { isPublicCustomerSafePath } from "@/lib/auth/customer-safe-paths";
 import {
   DEFAULT_CUSTOMER_POST_LOGIN_PATH,
   isAdminReturnPath,
@@ -23,6 +24,8 @@ async function canRedirectToPath(userId: string, path: string): Promise<boolean>
 
   const clean = safe.split("?")[0]?.trim() ?? "";
   if (!clean.startsWith("/")) return false;
+
+  if (isPublicCustomerSafePath(clean)) return true;
 
   if (clean === "/admin" || clean.startsWith("/admin/")) {
     return isAdminUser(userId);
@@ -47,25 +50,18 @@ async function canRedirectToPath(userId: string, path: string): Promise<boolean>
     return canViewVendor(userId, vendorId);
   }
 
-  const podMatch = clean.match(/^\/pod\/([^/]+)/);
-  if (podMatch) {
-    const podId = podMatch[1];
+  const podSubMatch = clean.match(/^\/pod\/([^/]+)\/(.+)/);
+  if (podSubMatch) {
+    const podId = podSubMatch[1];
+    const sub = podSubMatch[2] ?? "";
+    if (sub.startsWith("vendor/")) return false;
     if (podId === "dashboard") return false;
     return canViewPod(userId, podId);
   }
 
-  if (
-    clean === "/account" ||
-    clean.startsWith("/account/") ||
-    clean === "/orders" ||
-    clean === "/explore" ||
-    clean === "/cart" ||
-    clean === "/" ||
-    clean === "/register"
-  ) {
+  if (clean === "/account" || clean.startsWith("/account/") || clean === "/orders") {
     return true;
   }
-  if (clean.startsWith("/order/")) return true;
 
   return false;
 }

@@ -25,6 +25,50 @@ export type AssertCartSessionAccessOptions = {
 
 const ACCESS_DENIED = "Cart not found or access denied";
 
+type SoloCartAccessRow = {
+  id: string;
+  sessionId: string;
+  podId: string;
+  userId: string | null;
+};
+
+function assertSoloCartAccess(
+  cart: SoloCartAccessRow,
+  currentSessionId: string | null,
+  authUserId: string | null | undefined
+): CartSessionAccessResult {
+  const ownerId = cart.userId?.trim();
+  if (ownerId) {
+    const uid = authUserId?.trim();
+    if (!uid || uid !== ownerId) {
+      return { ok: false, status: 403, error: ACCESS_DENIED };
+    }
+    return {
+      ok: true,
+      cartId: cart.id,
+      sessionId: cart.sessionId,
+      podId: cart.podId,
+      isGroupOrder: false,
+    };
+  }
+
+  if (authUserId?.trim()) {
+    return { ok: false, status: 403, error: ACCESS_DENIED };
+  }
+
+  if (!currentSessionId?.trim() || cart.sessionId !== currentSessionId.trim()) {
+    return { ok: false, status: 403, error: ACCESS_DENIED };
+  }
+
+  return {
+    ok: true,
+    cartId: cart.id,
+    sessionId: cart.sessionId,
+    podId: cart.podId,
+    isGroupOrder: false,
+  };
+}
+
 /**
  * Verifies the caller may access a cart by id.
  * Solo carts: mennyu session must match cart.sessionId.
@@ -39,7 +83,7 @@ export async function assertCartSessionAccess(
 
   const cart = await prisma.cart.findUnique({
     where: { id: cartId },
-    select: { id: true, sessionId: true, podId: true },
+    select: { id: true, sessionId: true, podId: true, userId: true },
   });
   if (!cart) {
     return { ok: false, status: 403, error: ACCESS_DENIED };
@@ -52,16 +96,7 @@ export async function assertCartSessionAccess(
 
   if (groupSession) {
     if (groupSession.status === "ended" || groupSession.status === "expired") {
-      if (!currentSessionId?.trim() || cart.sessionId !== currentSessionId.trim()) {
-        return { ok: false, status: 403, error: ACCESS_DENIED };
-      }
-      return {
-        ok: true,
-        cartId: cart.id,
-        sessionId: cart.sessionId,
-        podId: cart.podId,
-        isGroupOrder: false,
-      };
+      return assertSoloCartAccess(cart, currentSessionId, options.authUserId);
     }
 
     if (mode === "checkout") {
@@ -99,20 +134,11 @@ export async function assertCartSessionAccess(
     return { ok: false, status: 403, error: ACCESS_DENIED };
   }
 
-  if (!currentSessionId?.trim()) {
+  if (!currentSessionId?.trim() && !options.authUserId?.trim()) {
     return { ok: false, status: 401, error: "Session required" };
   }
-  if (cart.sessionId !== currentSessionId.trim()) {
-    return { ok: false, status: 403, error: ACCESS_DENIED };
-  }
 
-  return {
-    ok: true,
-    cartId: cart.id,
-    sessionId: cart.sessionId,
-    podId: cart.podId,
-    isGroupOrder: false,
-  };
+  return assertSoloCartAccess(cart, currentSessionId, options.authUserId);
 }
 
 /** Resolve group-order host/participant actor from route handler cookies + auth session. */

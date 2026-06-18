@@ -3,15 +3,21 @@
 import { revalidatePath } from "next/cache";
 
 import { auth, signOut } from "@/auth";
+import { getPostLogoutRedirect } from "@/lib/auth/customer-safe-paths";
+import { rotateMennyuSessionForSignOut } from "@/lib/session-request";
 import { prisma } from "@/lib/db";
-import { SIGN_IN_PATH } from "@/lib/auth/account-paths";
 
 export type UpdateAccountNameResult = { ok: true } | { ok: false; error: string };
 
-/** Clears NextAuth User session, revalidates auth-dependent layout, redirects to sign-in. */
-export async function signOutAccountAction(): Promise<void> {
+/** Clears NextAuth User session, revalidates auth-dependent layout, redirects contextually. */
+export async function signOutAccountAction(formData: FormData): Promise<void> {
+  const rawPath = formData.get("returnPath");
+  const returnPath = typeof rawPath === "string" ? rawPath : null;
+  const redirectTo = getPostLogoutRedirect(returnPath);
+
+  await rotateMennyuSessionForSignOut();
   revalidatePath("/", "layout");
-  await signOut({ redirectTo: SIGN_IN_PATH });
+  await signOut({ redirectTo });
 }
 
 export async function updateAccountNameAction(name: string): Promise<UpdateAccountNameResult> {

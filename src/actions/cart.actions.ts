@@ -43,12 +43,14 @@ async function assertCartAccessForAction(
   mode: "read" | "mutate"
 ): Promise<{ ok: true; actor: ResolvedGroupCartActor | null } | CartActionAccessDenied> {
   const sessionId = await getMennyuSessionIdForRequest();
+  const authSession = await auth();
   const actor =
     mode === "read"
       ? await resolveGroupOrderActorForCartRead(cartId)
       : await resolveGroupOrderActorForCartMutation(cartId);
   const access = await assertCartSessionAccess(cartId, sessionId, {
     groupOrderActor: actor,
+    authUserId: authSession?.user?.id ?? null,
     mode,
   });
   if (!access.ok) {
@@ -129,7 +131,9 @@ export async function getOrCreateCartForVendorMenuAction(podId: string) {
     }
   }
   const sessionId = await getOrCreateMennyuSessionIdForCart();
-  return getOrCreateCartForVendorMenuPage(podId, sessionId);
+  return getOrCreateCartForVendorMenuPage(podId, sessionId, {
+    authUserId: authSession?.user?.id ?? null,
+  });
 }
 
 export async function getOrCreateCartAction(podId: string) {
@@ -148,7 +152,7 @@ export async function getOrCreateCartAction(podId: string) {
     }
   }
   const sessionId = await getOrCreateMennyuSessionIdForCart();
-  return getOrCreateCart(podId, sessionId);
+  return getOrCreateCart(podId, sessionId, { authUserId: authSession?.user?.id ?? null });
 }
 
 export async function getCartAction(cartId: string) {

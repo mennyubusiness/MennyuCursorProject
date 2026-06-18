@@ -13,6 +13,11 @@ describe("checkout SSR and API cart access alignment", () => {
     expect(checkoutPageSrc).toMatch(/cart\.sessionId\s*!==\s*\(sessionId/);
   });
 
+  it("checkout page allows account-owned carts for signed-in owner", () => {
+    expect(checkoutPageSrc).toMatch(/cart\.userId/);
+    expect(checkoutPageSrc).toMatch(/authSession\?\.user\?\.id !== ownerId/);
+  });
+
   it("checkout page restricts group checkout to host user", () => {
     expect(checkoutPageSrc).toMatch(/groupSessionMeta\.hostUserId/);
   });

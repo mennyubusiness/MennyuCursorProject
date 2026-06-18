@@ -10,6 +10,7 @@ import {
   readLoginReturnParam,
   sanitizeLoginReturnPath,
 } from "@/lib/auth/login-return-path";
+import { dispatchCartUpdated } from "@/lib/cart-client-sync";
 import { resolvePostLoginDestinationAction } from "./actions";
 
 function LoginFormInner() {
@@ -53,6 +54,7 @@ function LoginFormInner() {
       }
 
       router.replace(dest.path);
+      dispatchCartUpdated({ refresh: true });
       router.refresh();
     } finally {
       setLoading(false);

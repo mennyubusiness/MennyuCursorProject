@@ -188,10 +188,12 @@ describe("header account menu server context", () => {
 describe("shared customer sign-out path", () => {
   it("uses one server action for account page and header dropdown", () => {
     expect(signOutFormSrc).toMatch(/signOutAccountAction/);
+    expect(signOutFormSrc).toMatch(/name="returnPath"/);
     expect(accountSessionActionsSrc).toMatch(/CustomerSignOutForm/);
     expect(accountActionsSrc).toMatch(/signOutAccountAction/);
     expect(accountActionsSrc).toMatch(/revalidatePath\("\/", "layout"\)/);
-    expect(accountActionsSrc).toMatch(/signOut\(\{ redirectTo: SIGN_IN_PATH \}\)/);
+    expect(accountActionsSrc).toMatch(/getPostLogoutRedirect/);
+    expect(accountActionsSrc).toMatch(/rotateMennyuSessionForSignOut/);
     expect(dropdownSrc).not.toMatch(/\/api\/customer\/session\/clear/);
   });
 

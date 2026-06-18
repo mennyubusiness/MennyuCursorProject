@@ -142,6 +142,7 @@ describe("cart server actions session ownership", () => {
       expect(mockAddCartItem).not.toHaveBeenCalled();
       expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(CART_ID, SESSION_A, {
         groupOrderActor: null,
+        authUserId: null,
         mode: "mutate",
       });
     });
@@ -312,6 +313,7 @@ describe("cart server actions session ownership", () => {
       expect(result.success).toBe(true);
       expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(CART_ID, SESSION_A, {
         groupOrderActor: participantActor,
+        authUserId: null,
         mode: "mutate",
       });
       expect(mockAddCartItem).toHaveBeenCalledWith(

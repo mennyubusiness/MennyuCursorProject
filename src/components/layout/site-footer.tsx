@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { OpenOrderLogo } from "@/components/brand/OpenOrderLogo";
+import { HeaderSignInLink } from "@/components/HeaderSignInLink";
 import { PageShell } from "@/components/layout/page-shell";
 
 export function SiteFooter() {
@@ -22,9 +23,7 @@ export function SiteFooter() {
           <Link href="/register" className="transition hover:text-oo-warm-white">
             List your pod
           </Link>
-          <Link href="/login" className="transition hover:text-oo-warm-white">
-            Sign in
-          </Link>
+          <HeaderSignInLink className="transition hover:text-oo-warm-white" title="Sign in" />
           <Link href="/privacy" className="transition hover:text-oo-warm-white">
             Privacy
           </Link>

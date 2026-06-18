@@ -25,6 +25,7 @@ describe("sanitizeLoginReturnPath", () => {
     expect(sanitizeLoginReturnPath("/login")).toBeNull();
     expect(sanitizeLoginReturnPath("/login?next=/cart")).toBeNull();
     expect(sanitizeLoginReturnPath("/register")).toBeNull();
+    expect(sanitizeLoginReturnPath("/auth/signout")).toBeNull();
   });
 });
 
@@ -71,7 +72,7 @@ describe("isAdminReturnPath", () => {
 });
 
 describe("defaults", () => {
-  it("uses account hub as customer default", () => {
-    expect(DEFAULT_CUSTOMER_POST_LOGIN_PATH).toBe("/account");
+  it("uses explore as customer default", () => {
+    expect(DEFAULT_CUSTOMER_POST_LOGIN_PATH).toBe("/explore");
   });
 });

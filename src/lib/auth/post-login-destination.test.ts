@@ -53,14 +53,14 @@ describe("resolvePostLoginDestination", () => {
     expect(dest).toEqual({ kind: "redirect", path: "/pod/pod_1" });
   });
 
-  it("defaults plain customer to /account when next is missing", async () => {
+  it("defaults plain customer to /explore when next is missing", async () => {
     const dest = await resolvePostLoginDestination("user_1", null);
-    expect(dest).toEqual({ kind: "redirect", path: "/account" });
+    expect(dest).toEqual({ kind: "redirect", path: "/explore" });
   });
 
-  it("defaults plain customer to /account when next is unsafe", async () => {
+  it("defaults plain customer to /explore when next is unsafe", async () => {
     const dest = await resolvePostLoginDestination("user_1", "https://evil.com");
-    expect(dest).toEqual({ kind: "redirect", path: "/account" });
+    expect(dest).toEqual({ kind: "redirect", path: "/explore" });
   });
 
   it("platform admin without next goes to /admin", async () => {
@@ -103,6 +103,18 @@ describe("resolvePostLoginDestination", () => {
     mockIsAdminUser.mockResolvedValue(false);
 
     const dest = await resolvePostLoginDestination("user_1", "/admin");
-    expect(dest).toEqual({ kind: "redirect", path: "/account" });
+    expect(dest).toEqual({ kind: "redirect", path: "/explore" });
+  });
+
+  it("returns pod vendor page without pod membership check", async () => {
+    mockCanViewPod.mockResolvedValue(false);
+
+    const dest = await resolvePostLoginDestination("user_1", "/pod/pod_1/vendor/v1");
+    expect(dest).toEqual({ kind: "redirect", path: "/pod/pod_1/vendor/v1" });
+  });
+
+  it("returns checkout when next=/checkout", async () => {
+    const dest = await resolvePostLoginDestination("user_1", "/checkout?cartId=c1");
+    expect(dest).toEqual({ kind: "redirect", path: "/checkout?cartId=c1" });
   });
 });

@@ -115,7 +115,9 @@ export async function startGroupOrderForPodAction(podId: string): Promise<StartG
     return { success: false, error: "Sign in to start a group order." };
   }
   const sessionId = await getOrCreateMennyuSessionIdForCart();
-  const cartRow = await getOrCreateCart(trimmedPod, sessionId);
+  const cartRow = await getOrCreateCart(trimmedPod, sessionId, {
+    authUserId: session.user.id,
+  });
   return startGroupOrderFromCartAction(cartRow.id, trimmedPod);
 }
 
