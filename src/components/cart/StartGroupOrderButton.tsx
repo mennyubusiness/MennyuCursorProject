@@ -8,6 +8,7 @@ type Props = {
   podId: string;
   className?: string;
   label?: string;
+  id?: string;
   onStarted?: () => void;
   onError?: (message: string) => void;
 };
@@ -16,6 +17,7 @@ export function StartGroupOrderButton({
   podId,
   className,
   label = "Start group order",
+  id,
   onStarted,
   onError,
 }: Props) {
@@ -41,6 +43,7 @@ export function StartGroupOrderButton({
 
   return (
     <button
+      id={id}
       type="button"
       disabled={pending}
       onClick={() => void onClick()}

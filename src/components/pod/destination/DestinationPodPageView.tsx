@@ -1,6 +1,6 @@
 import { RecentPodViewTracker } from "@/components/retention/RecentViewTracker";
 import { DestinationPodAboutSection } from "@/components/pod/destination/DestinationPodAboutSection";
-import { DestinationPodGroupOrderNavActions } from "@/components/pod/destination/DestinationPodGroupOrderNavActions";
+import { DestinationPodGroupOrderPromptGate } from "@/components/pod/destination/DestinationPodGroupOrderPromptGate";
 import { DestinationPodHero } from "@/components/pod/destination/DestinationPodHero";
 import { DestinationPodVendorSection } from "@/components/pod/destination/DestinationPodVendorSection";
 import { PodPageStickyNav } from "@/components/pod/PodPageStickyNav";
@@ -54,13 +54,13 @@ export function DestinationPodPageView({
         marqueeItems={marqueeItems}
       />
 
-      <PodPageStickyNav
-        items={navItems}
-        podId={pod.id}
-        podName={pod.name}
-        trailingActions={
-          hasVendors ? <DestinationPodGroupOrderNavActions podId={podId} /> : undefined
-        }
+      <PodPageStickyNav items={navItems} podId={pod.id} podName={pod.name} />
+
+      <DestinationPodGroupOrderPromptGate
+        podId={podId}
+        hasVendors={hasVendors}
+        isQrEntry={isQrEntry}
+        orderingStatus={orderingStatus}
       />
 
       {isQrEntry && (

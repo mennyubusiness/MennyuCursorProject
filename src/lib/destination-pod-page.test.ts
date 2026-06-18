@@ -22,8 +22,12 @@ const aboutSectionSrc = readFileSync(
   join(dir, "../components/pod/destination/DestinationPodAboutSection.tsx"),
   "utf8"
 );
-const groupOrderNavSrc = readFileSync(
-  join(dir, "../components/pod/destination/DestinationPodGroupOrderNavActions.tsx"),
+const groupPromptSrc = readFileSync(
+  join(dir, "../components/pod/destination/DestinationPodGroupOrderPrompt.tsx"),
+  "utf8"
+);
+const groupPromptGateSrc = readFileSync(
+  join(dir, "../components/pod/destination/DestinationPodGroupOrderPromptGate.tsx"),
   "utf8"
 );
 const vendorSectionSrc = readFileSync(
@@ -98,21 +102,29 @@ describe("DestinationPodPageView layout", () => {
     expect(pageViewSrc).toMatch(/DestinationPodAboutSection/);
     expect(pageViewSrc).not.toMatch(/DestinationPodGroupOrderSection/);
     expect(pageViewSrc).not.toMatch(/DestinationPodVisitSection/);
-    expect(pageViewSrc).not.toMatch(/Ordering with friends/);
+    expect(pageViewSrc).not.toMatch(/DestinationPodGroupOrderNavActions/);
   });
 
-  it("places compact group-order actions in the sticky nav action row", () => {
-    expect(pageViewSrc).toMatch(/DestinationPodGroupOrderNavActions/);
-    expect(pageViewSrc).toMatch(/trailingActions=/);
-    expect(groupOrderNavSrc).toMatch(/Start group order/);
-    expect(groupOrderNavSrc).toMatch(/PodPageJoinWithCodeButton/);
+  it("does not render main-page group-order buttons in the sticky nav", () => {
+    expect(pageViewSrc).not.toMatch(/trailingActions=/);
+    expect(pageViewSrc).not.toMatch(/PodPageJoinWithCodeButton/);
+    expect(pageViewSrc).not.toMatch(/PodPageStartGroupOrderButton/);
+    expect(pageViewSrc).not.toMatch(/Start group order/);
+    expect(pageViewSrc).not.toMatch(/Join with code/);
+  });
+
+  it("mounts the first-visit group-order prompt gate instead of inline actions", () => {
+    expect(pageViewSrc).toMatch(/DestinationPodGroupOrderPromptGate/);
+    expect(groupPromptGateSrc).toMatch(/shouldOfferDestinationGroupOrderPrompt/);
+    expect(groupPromptGateSrc).toMatch(/getPodPageGroupOrderCtaState/);
   });
 
   it("does not change the standard pod page layout", () => {
-    expect(standardPageSrc).not.toMatch(/DestinationPodGroupOrderNavActions/);
+    expect(standardPageSrc).not.toMatch(/DestinationPodGroupOrderPromptGate/);
     expect(standardPageSrc).not.toMatch(/DestinationPodAboutSection/);
     expect(standardPageSrc).toMatch(/PodPageIdentitySection/);
     expect(standardPageSrc).toMatch(/PodPageStickyCta/);
+    expect(standardPageSrc).toMatch(/PodPageHero/);
   });
 
   it("omits mobile bottom sticky CTA on Destination variant", () => {
@@ -129,6 +141,34 @@ describe("DestinationPodPageView layout", () => {
     expect(pageViewSrc).toMatch(/customAmenities=\{customAmenities\}/);
     expect(pageViewSrc).not.toMatch(/DestinationPodAmenityGrid/);
     expect(pageViewSrc).not.toMatch(/Known for/);
+  });
+});
+
+describe("DestinationPodGroupOrderPrompt", () => {
+  it("shows the first-visit modal copy and actions after client hydration", () => {
+    expect(groupPromptSrc).toMatch(/Ordering with friends\?/);
+    expect(groupPromptSrc).toMatch(
+      /Start a group order so everyone can add from different vendors, or join an existing order with a code\./
+    );
+    expect(groupPromptSrc).toMatch(/Start group order/);
+    expect(groupPromptSrc).toMatch(/Join with code/);
+    expect(groupPromptSrc).toMatch(/Continue browsing/);
+    expect(groupPromptSrc).toMatch(/shouldOpenDestinationGroupOrderPrompt/);
+    expect(groupPromptSrc).toMatch(/setHydrated\(true\)/);
+  });
+
+  it("reuses existing start and join flows and remembers dismissal per pod", () => {
+    expect(groupPromptSrc).toMatch(/StartGroupOrderButton/);
+    expect(groupPromptSrc).toMatch(/JoinGroupOrderByCodeModal/);
+    expect(groupPromptSrc).toMatch(/markDestinationGroupPromptDismissed\(podId\)/);
+    expect(groupPromptSrc).toMatch(/isDestinationGroupPromptDismissed\(podId\)/);
+    expect(groupPromptSrc).toMatch(/Z_DESTINATION_GROUP_PROMPT/);
+  });
+
+  it("dismisses the prompt when continuing, closing, or starting a group order", () => {
+    expect(groupPromptSrc).toMatch(/onClose=\{dismissPrompt\}/);
+    expect(groupPromptSrc).toMatch(/onClick=\{dismissPrompt\}/);
+    expect(groupPromptSrc).toMatch(/onStarted=\{handleStarted\}/);
   });
 });
 

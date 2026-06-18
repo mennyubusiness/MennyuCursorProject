@@ -16,6 +16,8 @@ export type MobileBottomSheetProps = {
   description?: string;
   /** Extra classes on the overlay (e.g. z-index overrides). */
   overlayClassName?: string;
+  /** Portal overlay z-index; defaults to {@link Z_BOTTOM_SHEET}. */
+  zIndex?: number;
   /** Focus this selector on open. */
   initialFocusSelector?: string;
   /** Sheet panel width on desktop (centered modal). */
@@ -30,6 +32,7 @@ export function MobileBottomSheet({
   footer,
   description,
   overlayClassName,
+  zIndex,
   initialFocusSelector,
   panelClassName,
 }: MobileBottomSheetProps) {
@@ -71,7 +74,7 @@ export function MobileBottomSheet({
         "fixed inset-0 flex items-end justify-center bg-oo-charcoal/45 backdrop-blur-sm sm:items-center sm:p-4",
         overlayClassName
       )}
-      style={{ zIndex: Z_BOTTOM_SHEET }}
+      style={{ zIndex: zIndex ?? Z_BOTTOM_SHEET }}
       role="presentation"
       onClick={onClose}
     >

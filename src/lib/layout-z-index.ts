@@ -9,3 +9,5 @@ export const Z_MOBILE_MENU_TOGGLE = 100;
 export const Z_QUICK_CART_DRAWER = 110;
 /** Modifier sheets, join-code sheets — above header/mobile menu, below quick cart when both open. */
 export const Z_BOTTOM_SHEET = 105;
+/** Destination pod first-visit group-order prompt — above quick cart and mobile menu. */
+export const Z_DESTINATION_GROUP_PROMPT = 115;

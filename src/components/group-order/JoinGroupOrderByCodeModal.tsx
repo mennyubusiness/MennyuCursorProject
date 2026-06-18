@@ -12,12 +12,14 @@ type JoinGroupOrderByCodeModalProps = {
   open: boolean;
   onClose: () => void;
   overlayClassName?: string;
+  zIndex?: number;
 };
 
 export function JoinGroupOrderByCodeModal({
   open,
   onClose,
   overlayClassName,
+  zIndex,
 }: JoinGroupOrderByCodeModalProps) {
   const router = useRouter();
   const helperId = useId();
@@ -79,6 +81,7 @@ export function JoinGroupOrderByCodeModal({
       title="Join a group order"
       description="Enter the group order code shared by your host."
       overlayClassName={overlayClassName}
+      zIndex={zIndex}
       initialFocusSelector="#join-group-order-code"
       footer={
         <div className="border-t border-oo-light-stone px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
