@@ -209,5 +209,30 @@ describe("/api/cart session ownership", () => {
       expect(res.status).toBe(403);
       expect(mockRemoveCartItem).not.toHaveBeenCalled();
     });
+
+    it("passes authUserId into mutation access checks", async () => {
+      mockAuth.mockResolvedValue({ user: { id: "user_customer" } });
+      mockAssertCartSessionAccess.mockResolvedValue({
+        ok: true,
+        cartId: CART_ID,
+        sessionId: SESSION_A,
+        podId: "pod_1",
+        isGroupOrder: false,
+      });
+      mockRemoveCartItem.mockResolvedValue({ id: CART_ID, items: [] });
+
+      await DELETE(
+        requestWithSession(
+          `http://localhost/api/cart?cartId=${CART_ID}&cartItemId=line_1`,
+          SESSION_A
+        )
+      );
+
+      expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(CART_ID, SESSION_A, {
+        groupOrderActor: null,
+        authUserId: "user_customer",
+        mode: "mutate",
+      });
+    });
   });
 });

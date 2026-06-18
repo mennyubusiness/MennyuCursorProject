@@ -70,11 +70,13 @@ import {
 
 const STALE_CART = "cart_stale";
 const CURRENT_CART = "cart_current";
+const ACCOUNT_CART = "cart_account";
 const GROUP_CART = "cart_group";
 const ACTIVE_HOST_CART = "cart_active_host";
 const POD_A = "pod_a";
 const MENU_ITEM = "item_1";
 const SESSION = "sess_current";
+const ACCOUNT_USER = "user_1";
 
 describe("cart-mutation-access-recovery", () => {
   beforeEach(() => {
@@ -89,13 +91,16 @@ describe("cart-mutation-access-recovery", () => {
     mockPodVendorFindFirst.mockResolvedValue({ podId: POD_A });
     mockCartFindUnique.mockImplementation(async ({ where }: { where: { id: string } }) => {
       if (where.id === STALE_CART) {
-        return { id: STALE_CART, sessionId: "sess_old", podId: POD_A };
+        return { id: STALE_CART, sessionId: "sess_old", podId: POD_A, userId: null };
+      }
+      if (where.id === ACCOUNT_CART) {
+        return { id: ACCOUNT_CART, sessionId: "sess_old", podId: POD_A, userId: ACCOUNT_USER };
       }
       if (where.id === CURRENT_CART) {
-        return { id: CURRENT_CART, sessionId: SESSION, podId: POD_A };
+        return { id: CURRENT_CART, sessionId: SESSION, podId: POD_A, userId: null };
       }
       if (where.id === ACTIVE_HOST_CART) {
-        return { id: ACTIVE_HOST_CART, sessionId: SESSION, podId: POD_A };
+        return { id: ACTIVE_HOST_CART, sessionId: SESSION, podId: POD_A, userId: null };
       }
       return null;
     });
@@ -127,8 +132,17 @@ describe("cart-mutation-access-recovery", () => {
       async (
         cartId: string,
         sessionId: string | null,
-        options?: { groupOrderActor?: unknown }
+        options?: { groupOrderActor?: unknown; authUserId?: string | null }
       ) => {
+        if (cartId === ACCOUNT_CART && options?.authUserId === ACCOUNT_USER) {
+          return {
+            ok: true,
+            cartId: ACCOUNT_CART,
+            sessionId: "sess_old",
+            podId: POD_A,
+            isGroupOrder: false,
+          };
+        }
         if (cartId === STALE_CART) {
           return { ok: false, status: 403, error: "Cart not found or access denied" };
         }
@@ -176,6 +190,38 @@ describe("cart-mutation-access-recovery", () => {
       });
       expect(diagnostic.denyReason).toBe("cart_not_found");
     });
+
+    it("does not treat account-owned cart as session mismatch for owner", async () => {
+      const diagnostic = await diagnoseCartMutationAccess({
+        cartId: ACCOUNT_CART,
+        requestSessionId: SESSION,
+        authUserId: ACCOUNT_USER,
+        groupOrderActor: null,
+      });
+      expect(diagnostic.cartExists).toBe(true);
+      expect(diagnostic.denyReason).toBe("unknown");
+      expect(diagnostic.cartSessionMatchesRequest).toBe(false);
+    });
+
+    it("reports session_required for signed-out access to account cart", async () => {
+      const diagnostic = await diagnoseCartMutationAccess({
+        cartId: ACCOUNT_CART,
+        requestSessionId: SESSION,
+        authUserId: null,
+        groupOrderActor: null,
+      });
+      expect(diagnostic.denyReason).toBe("session_required");
+    });
+
+    it("reports session_mismatch for another user account cart", async () => {
+      const diagnostic = await diagnoseCartMutationAccess({
+        cartId: ACCOUNT_CART,
+        requestSessionId: SESSION,
+        authUserId: "user_other",
+        groupOrderActor: null,
+      });
+      expect(diagnostic.denyReason).toBe("session_mismatch");
+    });
   });
 
   describe("tryRecoverCartForMutation", () => {
@@ -195,7 +241,9 @@ describe("cart-mutation-access-recovery", () => {
         recovered: true,
         actor: null,
       });
-      expect(mockGetOrCreateCartForVendorMenuPage).toHaveBeenCalledWith(POD_A, SESSION);
+      expect(mockGetOrCreateCartForVendorMenuPage).toHaveBeenCalledWith(POD_A, SESSION, {
+        authUserId: "user_1",
+      });
     });
 
     it("does not recover to solo cart when active group cart resolves", async () => {
@@ -458,6 +506,68 @@ describe("cart-mutation-access-recovery", () => {
   });
 
   describe("resolveCartItemMutationAccess", () => {
+    it("returns ready for account-owned cart when session differs but user matches", async () => {
+      mockCartItemFindFirst.mockResolvedValueOnce({ id: "line_account" });
+
+      const result = await resolveCartItemMutationAccess({
+        requestedCartId: ACCOUNT_CART,
+        cartItemId: "line_account",
+        podIdHint: POD_A,
+        requestSessionId: SESSION,
+        authUserId: ACCOUNT_USER,
+        markers: { participantId: null, legacyJoinToken: null },
+        action: "removeFromCart",
+      });
+
+      expect(result).toEqual({
+        status: "ready",
+        cartId: ACCOUNT_CART,
+        cartItemId: "line_account",
+        actor: null,
+        recovered: false,
+      });
+      expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(
+        ACCOUNT_CART,
+        SESSION,
+        expect.objectContaining({ authUserId: ACCOUNT_USER, mode: "mutate" })
+      );
+      expect(mockGetOrCreateCartForVendorMenuPage).not.toHaveBeenCalled();
+    });
+
+    it("blocks signed-out guest from mutating account-owned cart", async () => {
+      const result = await resolveCartItemMutationAccess({
+        requestedCartId: ACCOUNT_CART,
+        cartItemId: "line_account",
+        podIdHint: POD_A,
+        requestSessionId: SESSION,
+        authUserId: null,
+        markers: { participantId: null, legacyJoinToken: null },
+        action: "removeFromCart",
+      });
+
+      expect(result.status).toBe("blocked");
+      if (result.status === "blocked") {
+        expect(result.code).toBe("CART_ACCESS_DENIED");
+      }
+    });
+
+    it("blocks another signed-in user from mutating account-owned cart", async () => {
+      const result = await resolveCartItemMutationAccess({
+        requestedCartId: ACCOUNT_CART,
+        cartItemId: "line_account",
+        podIdHint: POD_A,
+        requestSessionId: SESSION,
+        authUserId: "user_other",
+        markers: { participantId: null, legacyJoinToken: null },
+        action: "updateCartItem",
+      });
+
+      expect(result.status).toBe("blocked");
+      if (result.status === "blocked") {
+        expect(result.code).toBe("CART_ACCESS_DENIED");
+      }
+    });
+
     it("returns ready when line exists on accessible cart", async () => {
       mockCartItemFindFirst.mockResolvedValueOnce({ id: "line_1" });
 

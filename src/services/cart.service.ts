@@ -26,6 +26,7 @@ import {
   shellBasePriceCentsForMenuItem,
 } from "@/services/cart-deliverect-variant-resolution";
 import { CartValidationError } from "@/services/cart-validation-error";
+import { assertCartSessionAccess } from "@/lib/cart-session-access";
 import type { GroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
 import {
   enforceGroupOrderCartMutation,
@@ -882,15 +883,18 @@ export async function removeCartItem(
 }
 
 /**
- * Clear all items from the cart. Only succeeds if the cart belongs to the given session
- * (avoids clearing another session's cart). Use after successful order placement.
+ * Clear all items from the cart. Caller must own the cart via session or account user id.
  */
-export async function clearCartForSession(cartId: string, sessionId: string): Promise<Cart | null> {
-  const cart = await prisma.cart.findUnique({
-    where: { id: cartId },
-    select: { id: true, sessionId: true },
+export async function clearCartForSession(
+  cartId: string,
+  sessionId: string | null,
+  opts?: { authUserId?: string | null }
+): Promise<Cart | null> {
+  const access = await assertCartSessionAccess(cartId, sessionId, {
+    authUserId: opts?.authUserId ?? null,
+    mode: "mutate",
   });
-  if (!cart || cart.sessionId !== sessionId) return null;
+  if (!access.ok) return null;
   await prisma.cartItem.deleteMany({ where: { cartId } });
   return getCartById(cartId);
 }
@@ -1147,20 +1151,23 @@ async function packageQuickCartForActiveAssignment(params: {
  */
 export async function clearActiveSoloCartForSessionSwitch(
   cartId: string,
-  sessionId: string
+  sessionId: string | null,
+  opts?: { authUserId?: string | null }
 ): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  const access = await assertCartSessionAccess(cartId, sessionId, {
+    authUserId: opts?.authUserId ?? null,
+    mode: "mutate",
+  });
+  if (!access.ok) {
+    return { ok: false, code: "NOT_FOUND", message: "Cart not found or access denied." };
+  }
   const cart = await prisma.cart.findUnique({
     where: { id: cartId },
     select: {
-      id: true,
-      sessionId: true,
       groupOrderSession: { select: { status: true } },
     },
   });
-  if (!cart || cart.sessionId !== sessionId) {
-    return { ok: false, code: "NOT_FOUND", message: "Cart not found or access denied." };
-  }
-  if (isActiveGroupSessionStatus(cart.groupOrderSession?.status)) {
+  if (isActiveGroupSessionStatus(cart?.groupOrderSession?.status)) {
     return {
       ok: false,
       code: "GROUP_ORDER_ACTIVE",

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { clearActiveSoloCartForSessionSwitch, clearCartForSession } from "@/services/cart.service";
 import { getSessionIdFromRequest } from "@/lib/session";
 
@@ -12,11 +13,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "cartId required" }, { status: 400 });
     }
     const sessionId = getSessionIdFromRequest(request);
-    if (!sessionId) {
+    const authSession = await auth();
+    const authUserId = authSession?.user?.id ?? null;
+    if (!sessionId && !authUserId) {
       return NextResponse.json({ error: "Session required" }, { status: 401 });
     }
     if (switchPod) {
-      const result = await clearActiveSoloCartForSessionSwitch(cartId, sessionId);
+      const result = await clearActiveSoloCartForSessionSwitch(cartId, sessionId, { authUserId });
       if (!result.ok) {
         return NextResponse.json(
           { error: result.message, code: result.code },
@@ -25,7 +28,7 @@ export async function POST(request: NextRequest) {
       }
       return NextResponse.json({ cleared: true, cartId });
     }
-    const cart = await clearCartForSession(cartId, sessionId);
+    const cart = await clearCartForSession(cartId, sessionId, { authUserId });
     if (!cart) {
       return NextResponse.json({ error: "Cart not found or access denied" }, { status: 404 });
     }

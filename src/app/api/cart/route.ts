@@ -20,6 +20,11 @@ import {
 } from "@/lib/group-order-cookies";
 import { getOrSetSessionId, buildSessionCookieHeader, getSessionIdFromRequest } from "@/lib/session";
 
+async function resolveAuthUserId(): Promise<string | null> {
+  const authSession = await auth();
+  return authSession?.user?.id ?? null;
+}
+
 async function denyCartAccess(
   access: Extract<Awaited<ReturnType<typeof assertCartSessionAccess>>, { ok: false }>
 ) {
@@ -32,9 +37,11 @@ export async function GET(request: NextRequest) {
   const cartId = searchParams.get("cartId");
   if (cartId) {
     const sessionId = getSessionIdFromRequest(request);
+    const authUserId = await resolveAuthUserId();
     const groupOrderActor = await resolveGroupOrderActorFromRequest(request, cartId, "read");
     const access = await assertCartSessionAccess(cartId, sessionId, {
       groupOrderActor,
+      authUserId,
       mode: "read",
     });
     if (!access.ok) return denyCartAccess(access);
@@ -66,9 +73,11 @@ export async function POST(request: NextRequest) {
   }
 
   const sessionId = getSessionIdFromRequest(request);
+  const authUserId = await resolveAuthUserId();
   const groupOrderActor = await resolveGroupOrderActorFromRequest(request, cartId);
   const access = await assertCartSessionAccess(cartId, sessionId, {
     groupOrderActor,
+    authUserId,
     mode: "mutate",
   });
   if (!access.ok) return denyCartAccess(access);
@@ -116,9 +125,11 @@ export async function PATCH(request: NextRequest) {
   }
 
   const sessionId = getSessionIdFromRequest(request);
+  const authUserId = await resolveAuthUserId();
   const groupOrderActor = await resolveGroupOrderActorFromRequest(request, cartId);
   const access = await assertCartSessionAccess(cartId, sessionId, {
     groupOrderActor,
+    authUserId,
     mode: "mutate",
   });
   if (!access.ok) return denyCartAccess(access);
@@ -162,9 +173,11 @@ export async function DELETE(request: NextRequest) {
   }
 
   const sessionId = getSessionIdFromRequest(request);
+  const authUserId = await resolveAuthUserId();
   const groupOrderActor = await resolveGroupOrderActorFromRequest(request, cartId);
   const access = await assertCartSessionAccess(cartId, sessionId, {
     groupOrderActor,
+    authUserId,
     mode: "mutate",
   });
   if (!access.ok) return denyCartAccess(access);

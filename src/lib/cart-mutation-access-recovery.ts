@@ -48,11 +48,12 @@ export type CartMutationRecoveryResult =
 export async function diagnoseCartMutationAccess(params: {
   cartId: string;
   requestSessionId: string | null;
+  authUserId?: string | null;
   groupOrderActor: ResolvedGroupCartActor | null;
 }): Promise<CartMutationAccessDiagnostic> {
   const cart = await prisma.cart.findUnique({
     where: { id: params.cartId },
-    select: { id: true, sessionId: true, podId: true },
+    select: { id: true, sessionId: true, podId: true, userId: true },
   });
   if (!cart) {
     return {
@@ -94,6 +95,37 @@ export async function diagnoseCartMutationAccess(params: {
       cartSessionMatchesRequest: false,
       groupSessionStatus: groupSession.status,
       denyReason: "group_no_actor",
+    };
+  }
+
+  const ownerId = cart.userId?.trim();
+  if (ownerId) {
+    const uid = params.authUserId?.trim();
+    const sessionMatches = cart.sessionId === params.requestSessionId?.trim();
+    if (uid && uid === ownerId) {
+      return {
+        cartExists: true,
+        cartPodId: cart.podId,
+        cartSessionMatchesRequest: sessionMatches,
+        groupSessionStatus: null,
+        denyReason: "unknown",
+      };
+    }
+    if (!uid) {
+      return {
+        cartExists: true,
+        cartPodId: cart.podId,
+        cartSessionMatchesRequest: sessionMatches,
+        groupSessionStatus: null,
+        denyReason: "session_required",
+      };
+    }
+    return {
+      cartExists: true,
+      cartPodId: cart.podId,
+      cartSessionMatchesRequest: sessionMatches,
+      groupSessionStatus: null,
+      denyReason: "session_mismatch",
     };
   }
 
@@ -271,12 +303,14 @@ async function loadCartPodHint(cartId: string): Promise<string | null> {
 }
 
 async function checkCartMutationAccess(
-  cartId: string
+  cartId: string,
+  authUserId: string | null
 ): Promise<{ ok: true; actor: ResolvedGroupCartActor | null } | { ok: false; actor: ResolvedGroupCartActor | null }> {
   const actor = await resolveGroupOrderActorForCartMutation(cartId);
   const sessionId = await getMennyuSessionIdForRequest();
   const access = await assertCartSessionAccess(cartId, sessionId, {
     groupOrderActor: actor,
+    authUserId,
     mode: "mutate",
   });
   if (!access.ok) return { ok: false, actor };
@@ -374,7 +408,7 @@ export async function tryRecoverCartForPodMutation(params: {
   });
 
   if (activeGroupCartId) {
-    const access = await checkCartMutationAccess(activeGroupCartId);
+    const access = await checkCartMutationAccess(activeGroupCartId, params.authUserId);
     if (access.ok) {
       return {
         kind: "use_cart",
@@ -386,6 +420,7 @@ export async function tryRecoverCartForPodMutation(params: {
     const diagnostic = await diagnoseCartMutationAccess({
       cartId: activeGroupCartId,
       requestSessionId: params.requestSessionId,
+      authUserId: params.authUserId,
       groupOrderActor: access.actor,
     });
     return blockedForActiveGroupAccess(diagnostic);
@@ -414,7 +449,7 @@ export async function tryRecoverCartForPodMutation(params: {
           select: { cartId: true },
         });
         if (hostActive && hostActive.cartId !== params.requestedCartId) {
-          const access = await checkCartMutationAccess(hostActive.cartId);
+          const access = await checkCartMutationAccess(hostActive.cartId, params.authUserId);
           if (access.ok) {
             return {
               kind: "use_cart",
@@ -435,7 +470,7 @@ export async function tryRecoverCartForPodMutation(params: {
           const soloCart = await getOrCreateCartForVendorMenuPage(podId, sessionId, {
             authUserId: params.authUserId,
           });
-          const access = await checkCartMutationAccess(soloCart.id);
+          const access = await checkCartMutationAccess(soloCart.id, params.authUserId);
           if (access.ok) {
             return {
               kind: "use_cart",
@@ -485,7 +520,7 @@ export async function tryRecoverCartForPodMutation(params: {
   const soloCart = await getOrCreateCartForVendorMenuPage(podId, sessionId, {
     authUserId: params.authUserId,
   });
-  const access = await checkCartMutationAccess(soloCart.id);
+  const access = await checkCartMutationAccess(soloCart.id, params.authUserId);
   if (!access.ok) {
     return { kind: "blocked", error: ACCESS_DENIED, code: "CART_ACCESS_DENIED" };
   }
@@ -510,7 +545,7 @@ export async function resolveCartItemMutationAccess(params: {
   markers: GroupOrderParticipantMarkers;
   action: "updateCartItem" | "removeFromCart";
 }): Promise<CartItemMutationResolveResult> {
-  const access = await checkCartMutationAccess(params.requestedCartId);
+  const access = await checkCartMutationAccess(params.requestedCartId, params.authUserId);
 
   if (access.ok) {
     const lineOnCart = await prisma.cartItem.findFirst({
@@ -539,10 +574,23 @@ export async function resolveCartItemMutationAccess(params: {
     };
   }
 
+  const requestedCartOwner = await prisma.cart.findUnique({
+    where: { id: params.requestedCartId },
+    select: { userId: true },
+  });
+  const requestedOwnerId = requestedCartOwner?.userId?.trim();
+  if (requestedOwnerId) {
+    const uid = params.authUserId?.trim();
+    if (!uid || uid !== requestedOwnerId) {
+      return { status: "blocked", error: ACCESS_DENIED, code: "CART_ACCESS_DENIED" };
+    }
+  }
+
   const staleFingerprint = await loadCartLineFingerprint(params.requestedCartId, params.cartItemId);
   const diagnostic = await diagnoseCartMutationAccess({
     cartId: params.requestedCartId,
     requestSessionId: params.requestSessionId,
+    authUserId: params.authUserId,
     groupOrderActor: access.actor,
   });
 

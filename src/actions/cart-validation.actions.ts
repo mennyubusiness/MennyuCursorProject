@@ -1,5 +1,6 @@
 "use server";
 
+import { auth } from "@/auth";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
 import { buildCartForValidationFromDisplayCart } from "@/lib/cart-for-validation";
 import type { CartPageValidationSnapshot } from "@/lib/cart-page-validation";
@@ -13,9 +14,11 @@ export async function revalidateCartPageAction(
   cartId: string
 ): Promise<CartPageValidationSnapshot> {
   const sessionId = await getMennyuSessionIdForRequest();
+  const authSession = await auth();
   const actor = await resolveGroupOrderActorForCartMutation(cartId);
   const access = await assertCartSessionAccess(cartId, sessionId, {
     groupOrderActor: actor,
+    authUserId: authSession?.user?.id ?? null,
     mode: "read",
   });
   if (!access.ok) {

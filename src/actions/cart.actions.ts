@@ -192,6 +192,7 @@ export async function addToCartAction(
     const diagnostic = await diagnoseCartMutationAccess({
       cartId: effectiveCartId,
       requestSessionId,
+      authUserId: authSession?.user?.id ?? null,
       groupOrderActor: actor,
     });
     logCartMutationAccessDenied({
