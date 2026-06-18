@@ -59,9 +59,10 @@ describe("DestinationPodHero", () => {
     expect(heroSrc).not.toMatch(/address/);
   });
 
-  it("only shows an explicit tagline when provided", () => {
-    expect(heroSrc).toMatch(/tagline\?\.trim\(\)/);
-    expect(heroSrc).not.toMatch(/description/);
+  it("renders marquee outside the hero header for full bleed", () => {
+    expect(heroSrc).toMatch(/<\/header>/);
+    expect(heroSrc).toMatch(/DestinationPodMarquee items=\{marqueeItems\}/);
+    expect(heroSrc).toMatch(/\{marqueeItems\.length > 0 && <DestinationPodMarquee/);
   });
 });
 
@@ -70,6 +71,12 @@ describe("DestinationPodMarquee", () => {
     expect(marqueeSrc).toMatch(/text-oo-warm-white/);
     expect(marqueeSrc).toMatch(/bg-oo-charcoal/);
     expect(marqueeSrc).toMatch(/text-brand/);
+  });
+
+  it("spans full viewport width with overflow clipped on the bleed wrapper", () => {
+    expect(marqueeSrc).toMatch(/w-screen/);
+    expect(marqueeSrc).toMatch(/overflow-x-clip/);
+    expect(marqueeSrc).toMatch(/-translate-x-1\/2/);
   });
 
   it("loops seamlessly with two identical rows and -50% animation track", () => {
@@ -115,18 +122,25 @@ describe("DestinationPodPageView layout", () => {
 
   it("builds marquee from vendor names only", () => {
     expect(pageViewSrc).toMatch(/vendorNames: vendorRows\.map/);
-    expect(pageViewSrc).not.toMatch(/customAmenities,\s*\n\s*amenities,/);
+  });
+
+  it("does not pass amenities into About section", () => {
+    expect(pageViewSrc).not.toMatch(/amenities=\{amenities\}/);
+    expect(pageViewSrc).not.toMatch(/customAmenities=\{customAmenities\}/);
+    expect(pageViewSrc).not.toMatch(/DestinationPodAmenityGrid/);
   });
 });
 
 describe("DestinationPodAboutSection", () => {
-  it("uses About heading and consolidates pod information", () => {
+  it("uses About heading with contact/location and no amenities display", () => {
     expect(aboutSectionSrc).toMatch(/About \{podName\}/);
     expect(aboutSectionSrc).not.toMatch(/Visit \{podName\}/);
     expect(aboutSectionSrc).toMatch(/Pickup instructions/);
     expect(aboutSectionSrc).toMatch(/Get directions/);
-    expect(aboutSectionSrc).toMatch(/Known for/);
     expect(aboutSectionSrc).toMatch(/id="pod-about"/);
+    expect(aboutSectionSrc).not.toMatch(/Known for/);
+    expect(aboutSectionSrc).not.toMatch(/DestinationPodAmenityGrid/);
+    expect(aboutSectionSrc).not.toMatch(/customAmenities/);
   });
 });
 

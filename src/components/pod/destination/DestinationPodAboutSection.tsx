@@ -1,6 +1,4 @@
 import type { PodContactInfo } from "@/components/pod/PodPageContactSection";
-import type { PodAmenityId } from "@/lib/pod-amenities";
-import { formatCustomAmenitiesForDisplay, formatPodAmenitiesForDisplay } from "@/lib/pod-amenities";
 import {
   buildDirectionsUrl,
   buildMailtoHref,
@@ -10,7 +8,6 @@ import {
 import { cn } from "@/lib/cn";
 import { PageSection, PageShell } from "@/components/layout/page-shell";
 import { ButtonLink } from "@/components/ui/button";
-import { DestinationPodAmenityGrid } from "@/components/pod/destination/DestinationPodAmenityGrid";
 
 type DestinationPodAboutSectionProps = {
   podName: string;
@@ -18,8 +15,6 @@ type DestinationPodAboutSectionProps = {
   ownerContactName: string | null;
   address: string | null;
   pickupInstructions: string | null;
-  amenities: PodAmenityId[];
-  customAmenities: string[];
   contact: PodContactInfo;
 };
 
@@ -38,8 +33,6 @@ export function DestinationPodAboutSection({
   ownerContactName,
   address,
   pickupInstructions,
-  amenities,
-  customAmenities,
   contact,
 }: DestinationPodAboutSectionProps) {
   const about = description?.trim();
@@ -50,12 +43,9 @@ export function DestinationPodAboutSection({
   const phone = contact.contactPhone?.trim();
   const website = contact.websiteUrl?.trim();
   const instagram = contact.instagramUrl?.trim();
-  const amenityItems = formatPodAmenitiesForDisplay(amenities);
-  const customAmenityItems = formatCustomAmenitiesForDisplay(customAmenities);
-  const highlightItems = [...customAmenityItems, ...amenityItems];
 
   const hasContactBlock = Boolean(location || pickup || email || phone || website || instagram);
-  const hasBody = Boolean(about || operator || highlightItems.length > 0 || hasContactBlock);
+  const hasBody = Boolean(about || operator || hasContactBlock);
   if (!hasBody) return null;
 
   const directionsUrl = location ? buildDirectionsUrl(location) : null;
@@ -86,31 +76,11 @@ export function DestinationPodAboutSection({
             </p>
           )}
 
-          {highlightItems.length > 0 && (
-            <div className={about || operator ? "mt-6" : "mt-0"}>
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-oo-stone-gray">
-                Known for
-              </p>
-              <ul className="mt-3 flex flex-wrap gap-2" aria-label="Pod highlights">
-                {highlightItems.map(({ id, label }) => (
-                  <li key={id}>
-                    <span className="inline-flex rounded-full border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal shadow-sm">
-                      {label}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {amenityItems.length > 0 && (
-                <DestinationPodAmenityGrid amenities={amenities} className="mt-6" />
-              )}
-            </div>
-          )}
-
           {hasContactBlock && (
             <div
               className={cn(
                 "rounded-2xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm sm:p-7",
-                about || operator || highlightItems.length > 0 ? "mt-8" : "mt-0"
+                about || operator ? "mt-8" : "mt-0"
               )}
             >
               <dl className="grid gap-5 sm:grid-cols-2">

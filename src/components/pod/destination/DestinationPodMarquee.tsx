@@ -23,27 +23,33 @@ function MarqueeRow({ items, ariaHidden = false }: { items: string[]; ariaHidden
   );
 }
 
+/** Break out of constrained page width to span the full viewport. */
+const fullBleedClass =
+  "relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 overflow-x-clip";
+
 export function DestinationPodMarquee({ items }: DestinationPodMarqueeProps) {
   if (items.length === 0) return null;
 
   return (
-    <div
-      className="relative z-20 border-t border-white/10 bg-oo-charcoal py-3"
-      aria-label="Pod vendors"
-    >
-      <p className="sr-only">{items.join(", ")}</p>
+    <div className={fullBleedClass}>
+      <div
+        className="relative z-20 w-full border-t border-white/10 bg-oo-charcoal py-3"
+        aria-label="Pod vendors"
+      >
+        <p className="sr-only">{items.join(", ")}</p>
 
-      {/* Animated seamless loop: two identical rows, track animates -50% */}
-      <div className="overflow-hidden motion-reduce:hidden">
-        <div className="flex w-max shrink-0 will-change-transform animate-destination-pod-marquee">
-          <MarqueeRow items={items} />
-          <MarqueeRow items={items} ariaHidden />
+        {/* Animated seamless loop: two identical rows, track animates -50% */}
+        <div className="w-full overflow-hidden motion-reduce:hidden">
+          <div className="flex w-max shrink-0 will-change-transform animate-destination-pod-marquee">
+            <MarqueeRow items={items} />
+            <MarqueeRow items={items} ariaHidden />
+          </div>
         </div>
-      </div>
 
-      {/* Reduced motion: static horizontal scroll, single row */}
-      <div className="hidden overflow-x-auto motion-reduce:block">
-        <MarqueeRow items={items} />
+        {/* Reduced motion: static horizontal scroll, single row */}
+        <div className="hidden w-full overflow-x-auto motion-reduce:block">
+          <MarqueeRow items={items} />
+        </div>
       </div>
     </div>
   );

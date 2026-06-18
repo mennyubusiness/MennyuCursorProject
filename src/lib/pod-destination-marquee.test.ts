@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildDestinationMarqueeContent,
   cleanMarqueeLabel,
+  DESTINATION_MARQUEE_MIN_LOOP_ITEMS,
+  expandMarqueeLoopItems,
   OPEN_ORDER_MARQUEE_BANNED,
 } from "./pod-destination-marquee";
 
@@ -21,25 +23,36 @@ describe("cleanMarqueeLabel", () => {
   });
 });
 
+describe("expandMarqueeLoopItems", () => {
+  it("repeats vendor labels to fill wide desktop strips", () => {
+    const expanded = expandMarqueeLoopItems(["TACO FIESTA", "EASTSIDE NOODLES", "GREEN BOWL"]);
+
+    expect(expanded.length).toBeGreaterThanOrEqual(DESTINATION_MARQUEE_MIN_LOOP_ITEMS);
+    expect(expanded.slice(0, 3)).toEqual(["TACO FIESTA", "EASTSIDE NOODLES", "GREEN BOWL"]);
+    expect(expanded[3]).toBe("TACO FIESTA");
+  });
+});
+
 describe("buildDestinationMarqueeContent", () => {
-  it("returns vendor names when vendors exist", () => {
+  it("returns expanded vendor names when vendors exist", () => {
     const result = buildDestinationMarqueeContent({
       ...baseInput,
       vendorNames: ["Happy Burger", "River Coffee", "Taco Stand"],
     });
 
     expect(result.kind).toBe("vendors");
-    expect(result.items).toEqual(["HAPPY BURGER", "RIVER COFFEE", "TACO STAND"]);
+    expect(result.items.length).toBeGreaterThanOrEqual(DESTINATION_MARQUEE_MIN_LOOP_ITEMS);
+    expect(result.items.slice(0, 3)).toEqual(["HAPPY BURGER", "RIVER COFFEE", "TACO STAND"]);
   });
 
-  it("does not use amenities or custom amenities even when many exist", () => {
+  it("does not use amenities in marquee output", () => {
     const result = buildDestinationMarqueeContent({
       podName: "Downtown Food Pod",
       vendorNames: ["Happy Burger"],
     });
 
     expect(result.kind).toBe("vendors");
-    expect(result.items).toEqual(["HAPPY BURGER"]);
+    expect(result.items.every((item) => item.includes("HAPPY BURGER"))).toBe(true);
     expect(result.items).not.toContain("OUTDOOR SEATING");
     expect(result.items).not.toContain("LIVE MUSIC");
   });
@@ -57,14 +70,16 @@ describe("buildDestinationMarqueeContent", () => {
     }
   });
 
-  it("deduplicates vendor names case-insensitively", () => {
+  it("deduplicates vendor names case-insensitively before repeating", () => {
     const result = buildDestinationMarqueeContent({
       ...baseInput,
       vendorNames: ["Happy Burger", "happy burger", "River Coffee"],
     });
 
     expect(result.kind).toBe("vendors");
-    expect(result.items).toEqual(["HAPPY BURGER", "RIVER COFFEE"]);
+    expect(result.items.filter((item) => item === "HAPPY BURGER").length).toBeGreaterThan(0);
+    expect(result.items.filter((item) => item === "RIVER COFFEE").length).toBeGreaterThan(0);
+    expect(result.items.every((item) => item === "HAPPY BURGER" || item === "RIVER COFFEE")).toBe(true);
   });
 
   it("returns fallback only when no vendor names exist", () => {

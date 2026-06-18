@@ -18,10 +18,7 @@ type DestinationPodPageViewProps = PodCustomerPageData & {
 export function DestinationPodPageView({
   pod,
   vendorRows,
-  amenities,
-  customAmenities,
   orderingStatus,
-  hasAboutSection,
   hasVisitSection,
   contactDetails,
   isQrEntry,
@@ -29,7 +26,9 @@ export function DestinationPodPageView({
 }: DestinationPodPageViewProps) {
   const podId = pod.id;
   const hasVendors = vendorRows.length > 0;
-  const hasDestinationAboutSection = hasAboutSection || hasVisitSection;
+  const hasDestinationAboutSection =
+    hasVisitSection ||
+    Boolean(pod.description?.trim() || pod.ownerContactName?.trim());
   const marqueeItems = buildDestinationMarqueeContent({
     podName: pod.name,
     vendorNames: vendorRows.map((row) => row.vendor.name),
@@ -93,8 +92,6 @@ export function DestinationPodPageView({
           ownerContactName={pod.ownerContactName}
           address={pod.address}
           pickupInstructions={pod.pickupInstructions}
-          amenities={amenities}
-          customAmenities={customAmenities}
           contact={contactDetails}
         />
       )}
