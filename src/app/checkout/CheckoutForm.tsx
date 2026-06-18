@@ -12,7 +12,6 @@ import { cn } from "@/lib/cn";
 import { CheckoutPhoneVerification } from "./CheckoutPhoneVerification";
 import { CheckoutSectionCard } from "@/components/checkout/CheckoutSectionCard";
 import { buttonClassName } from "@/components/ui/button";
-import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
 import {
   CHECKOUT_SECTION_HEADINGS,
   resolveCheckoutFormCtaState,
@@ -581,29 +580,23 @@ export function CheckoutForm({
             ? "Next: secure card payment with Stripe. Vendors are notified only after payment succeeds."
             : "Without Stripe keys, checkout uses the dev payment path."}
         </p>
+        <div className="mt-6 border-t border-oo-light-stone pt-6">
+          <button
+            type="submit"
+            disabled={loading || !formCta.primaryEnabled}
+            className={cn(
+              buttonClassName({ variant: "primary", size: "touch" }),
+              "inline-flex w-full items-center justify-center"
+            )}
+          >
+            {formCta.primaryLabel}
+          </button>
+          {!formCta.primaryEnabled && formCta.blockedReason ? (
+            <p className="mt-2 text-sm text-oo-stone-gray">{formCta.blockedReason}</p>
+          ) : null}
+        </div>
       </CheckoutSectionCard>
-
-      <button
-        type="submit"
-        disabled={loading || !formCta.primaryEnabled}
-        className={cn(
-          buttonClassName({ variant: "primary", size: "touch" }),
-          "hidden w-full sm:inline-flex"
-        )}
-      >
-        {formCta.primaryLabel}
-      </button>
     </form>
-    <MobileBottomActionBar
-      summaryTitle={formCta.summaryTitle}
-      summarySubtitle={formCta.summarySubtitle ?? undefined}
-      primaryLabel={formCta.primaryLabel}
-      primaryType="submit"
-      form="checkout-details-form"
-      primaryDisabled={!formCta.primaryEnabled}
-      primaryLoading={loading}
-      aria-label={formCta.blockedReason ?? formCta.primaryLabel}
-    />
     </>
   );
 }

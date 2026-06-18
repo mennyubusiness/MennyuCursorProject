@@ -7,7 +7,7 @@ import {
 } from "@/lib/checkout-place-order-cta-state";
 
 describe("formatCheckoutTotalSummary", () => {
-  it("formats total label for sticky bar", () => {
+  it("formats total label for checkout summary", () => {
     expect(formatCheckoutTotalSummary(4218)).toBe("Total · $42.18");
   });
 });
@@ -31,6 +31,12 @@ describe("resolveCheckoutFormCtaState", () => {
     expect(state.primaryEnabled).toBe(true);
     expect(state.primaryLabel).toBe("Continue to payment");
     expect(state.summaryTitle).toBe("Total · $42.18");
+  });
+
+  it("allows continue when SMS is unchecked and contact fields are empty", () => {
+    const state = resolveCheckoutFormCtaState(base);
+    expect(state.primaryEnabled).toBe(true);
+    expect(state.primaryLabel).toBe("Continue to payment");
   });
 
   it("blocks when SMS consent requires verification", () => {

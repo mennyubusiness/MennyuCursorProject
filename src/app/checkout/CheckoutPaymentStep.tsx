@@ -6,8 +6,6 @@ import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-
 import { CheckoutProgress } from "./CheckoutProgress";
 import { CheckoutSectionCard } from "@/components/checkout/CheckoutSectionCard";
 import { buttonClassName } from "@/components/ui/button";
-import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
-import { MobileCustomerPageShell } from "@/components/mobile/MobileCustomerPageShell";
 import { cn } from "@/lib/cn";
 import {
   CHECKOUT_SECTION_HEADINGS,
@@ -99,101 +97,92 @@ function PaymentStepForm({
   }
 
   return (
-    <MobileCustomerPageShell withBottomActionBar className="bg-oo-cream px-1 pb-2 sm:bg-transparent sm:px-0 sm:pb-0">
-      <div className="mx-auto max-w-2xl">
-        <CheckoutProgress activeStep={3} />
-        <header className="border-b border-oo-light-stone pb-4">
-          <h1 className="text-2xl font-bold text-oo-charcoal">Payment</h1>
-          <p className="mt-2 text-[15px] leading-relaxed text-oo-stone-gray sm:text-base">
-            Review your total and pay securely to place your order.
-          </p>
-        </header>
+    <div className="mx-auto max-w-2xl bg-oo-cream px-1 sm:bg-transparent sm:px-0">
+      <CheckoutProgress activeStep={3} />
+      <header className="border-b border-oo-light-stone pb-4">
+        <h1 className="text-2xl font-bold text-oo-charcoal">Payment</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-oo-stone-gray sm:text-base">
+          Review your total and pay securely to place your order.
+        </p>
+      </header>
 
-        <div className="mt-6 space-y-5 sm:space-y-6">
+      <div className="mt-6 space-y-5 sm:space-y-6">
+        <CheckoutSectionCard
+          id="checkout-payment-review"
+          title={CHECKOUT_SECTION_HEADINGS.review}
+          helper="Confirm pickup time and total before placing your order."
+        >
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-4 text-oo-charcoal">
+              <dt className="text-oo-stone-gray">Pickup</dt>
+              <dd className="max-w-[65%] text-right font-medium">{pickupSummaryLine}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-oo-stone-gray">Subtotal</dt>
+              <dd className="tabular-nums text-oo-charcoal">${(subtotalCents / 100).toFixed(2)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-oo-stone-gray">Service fee</dt>
+              <dd className="tabular-nums text-oo-charcoal">
+                ${(serviceFeeCents / 100).toFixed(2)}
+              </dd>
+            </div>
+            {taxCents > 0 ? (
+              <div className="flex justify-between gap-4">
+                <dt className="text-oo-stone-gray">Sales tax</dt>
+                <dd className="tabular-nums text-oo-charcoal">${(taxCents / 100).toFixed(2)}</dd>
+              </div>
+            ) : null}
+            <div className="flex justify-between gap-4">
+              <dt className="text-oo-stone-gray">Tip</dt>
+              <dd className="tabular-nums text-oo-charcoal">${(tipCents / 100).toFixed(2)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 border-t border-oo-light-stone pt-2 text-lg font-bold text-oo-charcoal">
+              <dt>Total due</dt>
+              <dd className="tabular-nums">${(totalWithTip / 100).toFixed(2)}</dd>
+            </div>
+          </dl>
+        </CheckoutSectionCard>
+
+        <form id="checkout-payment-form" onSubmit={handlePay} className="space-y-4">
           <CheckoutSectionCard
-            id="checkout-payment-review"
-            title={CHECKOUT_SECTION_HEADINGS.review}
-            helper="Confirm pickup time and total before placing your order."
+            id="checkout-payment"
+            title={CHECKOUT_SECTION_HEADINGS.payment}
+            helper="Secure payment powered by Stripe."
+            status={error ? "error" : "default"}
           >
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between gap-4 text-oo-charcoal">
-                <dt className="text-oo-stone-gray">Pickup</dt>
-                <dd className="max-w-[65%] text-right font-medium">{pickupSummaryLine}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-oo-stone-gray">Subtotal</dt>
-                <dd className="tabular-nums text-oo-charcoal">${(subtotalCents / 100).toFixed(2)}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-oo-stone-gray">Service fee</dt>
-                <dd className="tabular-nums text-oo-charcoal">
-                  ${(serviceFeeCents / 100).toFixed(2)}
-                </dd>
-              </div>
-              {taxCents > 0 ? (
-                <div className="flex justify-between gap-4">
-                  <dt className="text-oo-stone-gray">Sales tax</dt>
-                  <dd className="tabular-nums text-oo-charcoal">${(taxCents / 100).toFixed(2)}</dd>
-                </div>
-              ) : null}
-              <div className="flex justify-between gap-4">
-                <dt className="text-oo-stone-gray">Tip</dt>
-                <dd className="tabular-nums text-oo-charcoal">${(tipCents / 100).toFixed(2)}</dd>
-              </div>
-              <div className="flex justify-between gap-4 border-t border-oo-light-stone pt-2 text-lg font-bold text-oo-charcoal">
-                <dt>Total due</dt>
-                <dd className="tabular-nums">${(totalWithTip / 100).toFixed(2)}</dd>
-              </div>
-            </dl>
-          </CheckoutSectionCard>
-
-          <form id="checkout-payment-form" onSubmit={handlePay} className="space-y-4">
-            <CheckoutSectionCard
-              id="checkout-payment"
-              title={CHECKOUT_SECTION_HEADINGS.payment}
-              helper="Secure payment powered by Stripe."
-              status={error ? "error" : "default"}
-            >
-              <div className={cn(PAYMENT_ELEMENT_MIN_HEIGHT_CLASS, "rounded-lg bg-oo-warm-white")}>
-                <PaymentElement options={{ layout: "tabs" }} />
-              </div>
-              {error ? (
-                <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-800" role="alert">
-                  {error}
-                </p>
-              ) : null}
-            </CheckoutSectionCard>
-
-            <button
-              type="submit"
-              disabled={!paymentCta.primaryEnabled}
-              className={cn(
-                buttonClassName({ variant: "primary", size: "touch" }),
-                "hidden w-full sm:inline-flex"
-              )}
-            >
-              {paymentCta.primaryLabel}
-            </button>
-            {process.env.NODE_ENV === "development" ? (
-              <p className="hidden text-center text-xs text-oo-stone-gray sm:block">
-                Test mode: use card 4242 4242 4242 4242, any future expiry, any CVC.
+            <div className={cn(PAYMENT_ELEMENT_MIN_HEIGHT_CLASS, "rounded-lg bg-oo-warm-white")}>
+              <PaymentElement options={{ layout: "tabs" }} />
+            </div>
+            {error ? (
+              <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-800" role="alert">
+                {error}
               </p>
             ) : null}
-          </form>
-        </div>
+            <div className="mt-6 border-t border-oo-light-stone pt-6">
+              <button
+                type="submit"
+                disabled={!paymentCta.primaryEnabled}
+                className={cn(
+                  buttonClassName({ variant: "primary", size: "touch" }),
+                  "inline-flex w-full items-center justify-center"
+                )}
+              >
+                {paymentCta.primaryLabel}
+              </button>
+              {!paymentCta.primaryEnabled && paymentCta.blockedReason ? (
+                <p className="mt-2 text-sm text-oo-stone-gray">{paymentCta.blockedReason}</p>
+              ) : null}
+            </div>
+          </CheckoutSectionCard>
+          {process.env.NODE_ENV === "development" ? (
+            <p className="text-center text-xs text-oo-stone-gray">
+              Test mode: use card 4242 4242 4242 4242, any future expiry, any CVC.
+            </p>
+          ) : null}
+        </form>
       </div>
-
-      <MobileBottomActionBar
-        summaryTitle={paymentCta.summaryTitle}
-        summarySubtitle={paymentCta.summarySubtitle ?? undefined}
-        primaryLabel={paymentCta.primaryLabel}
-        primaryType="submit"
-        form="checkout-payment-form"
-        primaryDisabled={!paymentCta.primaryEnabled}
-        primaryLoading={loading}
-        aria-label={paymentCta.blockedReason ?? paymentCta.primaryLabel}
-      />
-    </MobileCustomerPageShell>
+    </div>
   );
 }
 

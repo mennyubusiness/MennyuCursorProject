@@ -10,8 +10,6 @@ import { buildCartForValidationFromDisplayCart } from "@/lib/cart-for-validation
 import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutOrderSummary } from "./CheckoutOrderSummary";
 import { CheckoutProgress } from "./CheckoutProgress";
-import { cn } from "@/lib/cn";
-import { mobileBottomActionBarContentPadClass } from "@/lib/mobile-sticky-cart-bar-classes";
 import { computeOrderPricing } from "@/domain/fees";
 import { getActivePricingRatesSnapshot } from "@/services/pricing-config.service";
 import { getUserLinkedVerifiedPhoneAccount } from "@/lib/customer-checkout-phone-verification";
@@ -180,13 +178,7 @@ export default async function CheckoutPage({
   }
 
   return (
-    <div
-      className={cn(
-        "mx-auto max-w-2xl bg-oo-cream px-1 sm:bg-transparent sm:px-0",
-        mobileBottomActionBarContentPadClass,
-        "sm:pb-10"
-      )}
-    >
+    <div className="mx-auto max-w-2xl bg-oo-cream px-1 sm:bg-transparent sm:px-0 sm:pb-10">
       <CheckoutProgress activeStep={2} className="pt-3 sm:pt-4" />
       <div className="mb-2">
         <Link

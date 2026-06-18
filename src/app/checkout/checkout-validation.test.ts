@@ -68,9 +68,11 @@ describe("checkout payment lifecycle guards", () => {
     expect(checkoutPlaceOrderCtaSrc).toMatch(/Complete payment details/);
   });
 
-  it("uses blocked payment CTA state for sticky place-order bar", () => {
-    expect(checkoutPaymentSrc).toMatch(/summaryTitle=\{paymentCta\.summaryTitle\}/);
+  it("uses blocked payment CTA state for in-page place-order action", () => {
+    expect(checkoutPaymentSrc).toMatch(/resolveCheckoutPaymentCtaState/);
+    expect(checkoutPaymentSrc).toMatch(/paymentCta\.blockedReason/);
     expect(checkoutPlaceOrderCtaSrc).toMatch(/primaryLabel: "Place order"/);
+    expect(checkoutPaymentSrc).not.toMatch(/MobileBottomActionBar/);
   });
 
   it("post-payment replay no-ops when order is already paid", () => {
