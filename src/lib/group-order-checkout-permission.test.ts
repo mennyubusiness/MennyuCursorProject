@@ -94,8 +94,8 @@ describe("group checkout permission wiring", () => {
     join(process.cwd(), "src/app/cart/CartPageMutationSync.tsx"),
     "utf8"
   );
-  const cartMobileSrc = readFileSync(
-    join(process.cwd(), "src/app/cart/CartPageMobileCheckoutBar.tsx"),
+  const cartActionsSrc = readFileSync(
+    join(process.cwd(), "src/app/cart/cart-page-checkout-actions.tsx"),
     "utf8"
   );
   const checkoutPageSrc = readFileSync(join(process.cwd(), "src/app/checkout/page.tsx"), "utf8");
@@ -113,10 +113,10 @@ describe("group checkout permission wiring", () => {
 
   it("cart live checkout actions hide payment CTA only for participant totals view", () => {
     expect(cartMutationSrc).toMatch(/viewerCanCheckout/);
-    expect(cartMobileSrc).toMatch(/showParticipantTotalsOnly/);
-    expect(cartMobileSrc).toMatch(/The host will check out when everyone is ready/);
-    expect(cartMobileSrc).toMatch(/The host is checking out\. New changes are paused\./);
-    expect(cartMobileSrc).not.toMatch(/showParticipantTotalsOnly \|\| !viewerCanCheckout/);
+    expect(cartActionsSrc).toMatch(/showParticipantTotalsOnly/);
+    expect(cartActionsSrc).toMatch(/The host will check out when everyone is ready/);
+    expect(cartActionsSrc).toMatch(/The host is checking out\. New changes are paused\./);
+    expect(cartActionsSrc).not.toMatch(/showParticipantTotalsOnly \|\| !viewerCanCheckout/);
     expect(cartMutationSrc).not.toMatch(/Continue to checkout[\s\S]*showParticipantTotalsOnly/);
   });
 

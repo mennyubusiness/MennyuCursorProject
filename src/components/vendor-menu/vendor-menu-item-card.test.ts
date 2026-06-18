@@ -27,19 +27,19 @@ describe("VendorMenuItemCard tappable surface", () => {
   });
 });
 
-describe("Cart page mobile checkout bar", () => {
+describe("Cart page in-page checkout", () => {
   const actionsSrc = readFileSync(join(root, "app/cart/cart-page-checkout-actions.tsx"), "utf8");
   const pageSrc = readFileSync(join(root, "app/cart/page.tsx"), "utf8");
 
-  it("uses MobileBottomActionBar for mobile checkout", () => {
-    expect(actionsSrc).toMatch(/MobileBottomActionBar/);
-    expect(actionsSrc).toMatch(/resolveCartCheckoutCtaState/);
+  it("uses shared summary checkout actions for all viewports", () => {
+    expect(actionsSrc).toMatch(/CartPageSummaryCheckoutActions/);
     expect(actionsSrc).toMatch(/Proceed to checkout/);
+    expect(actionsSrc).not.toMatch(/MobileBottomActionBar/);
   });
 
-  it("applies bottom padding and mobile checkout surface on cart page", () => {
-    expect(pageSrc).toMatch(/mobileBottomActionBarContentPadClass/);
-    expect(pageSrc).toMatch(/surface="mobile"/);
+  it("does not reserve sticky-bar padding or mount a mobile checkout surface", () => {
+    expect(pageSrc).not.toMatch(/mobileBottomActionBarContentPadClass/);
+    expect(pageSrc).not.toMatch(/surface="mobile"/);
   });
 
   it("renders polished empty cart primary action", () => {

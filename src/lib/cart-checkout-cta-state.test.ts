@@ -78,22 +78,22 @@ describe("solo cart checkout CTA regression", () => {
     ).toBe(true);
   });
 
-  it("CartPageMobileCheckoutBar keeps checkout CTA for non-participant views", () => {
-    const mobileBarSrc = readFileSync(
+  it("CartPageSummaryCheckoutActions keeps checkout CTA for non-participant views", () => {
+    const summaryActionsSrc = readFileSync(
       join(process.cwd(), "src/app/cart/cart-page-checkout-actions.tsx"),
       "utf8"
     );
-    expect(mobileBarSrc).toMatch(/if \(showParticipantTotalsOnly\) \{/);
-    expect(mobileBarSrc).not.toMatch(/showParticipantTotalsOnly \|\| !viewerCanCheckout/);
-    expect(mobileBarSrc).toMatch(/Proceed to checkout/);
-    expect(mobileBarSrc).not.toMatch(/createPortal/);
+    expect(summaryActionsSrc).toMatch(/if \(showParticipantTotalsOnly\) \{/);
+    expect(summaryActionsSrc).not.toMatch(/showParticipantTotalsOnly \|\| !viewerCanCheckout/);
+    expect(summaryActionsSrc).toMatch(/Proceed to checkout/);
+    expect(summaryActionsSrc).not.toMatch(/MobileBottomActionBar/);
   });
 
-  it("cart page uses mobile sticky checkout and summary checkout without duplicating desktop footer actions", () => {
+  it("cart page uses a single in-page checkout action without sticky mobile bar", () => {
     const cartPageSrc = readFileSync(join(process.cwd(), "src/app/cart/page.tsx"), "utf8");
-    expect(cartPageSrc).toMatch(/surface="mobile"/);
-    expect(cartPageSrc).toMatch(/surface="summary"/);
-    expect(cartPageSrc).not.toMatch(/surface="desktop"/);
+    expect(cartPageSrc).toMatch(/CartPageLiveCheckoutActions/);
+    expect(cartPageSrc).not.toMatch(/surface="mobile"/);
+    expect(cartPageSrc).not.toMatch(/mobileBottomActionBarContentPadClass/);
   });
 
   it("CartPageMutationSync rejects stale lifecycle snapshots", () => {
@@ -102,13 +102,6 @@ describe("solo cart checkout CTA regression", () => {
       "utf8"
     );
     expect(syncSrc).toMatch(/shouldAcceptCartSnapshot/);
-  });
-
-  it("mobile sticky checkout bar uses elevated z-index", () => {
-    const barClassesSrc = readFileSync(
-      join(process.cwd(), "src/lib/mobile-sticky-cart-bar-classes.ts"),
-      "utf8"
-    );
-    expect(barClassesSrc).toMatch(/z-40/);
+    expect(syncSrc).not.toMatch(/CartPageMobileCheckoutBar/);
   });
 });

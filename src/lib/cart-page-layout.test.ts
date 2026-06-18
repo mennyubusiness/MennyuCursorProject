@@ -10,6 +10,10 @@ const actionsSrc = readFileSync(
   join(process.cwd(), "src/app/cart/cart-page-checkout-actions.tsx"),
   "utf8"
 );
+const mutationSrc = readFileSync(
+  join(process.cwd(), "src/app/cart/CartPageMutationSync.tsx"),
+  "utf8"
+);
 const joinActionSrc = readFileSync(
   join(process.cwd(), "src/app/cart/CartPageJoinGroupAction.tsx"),
   "utf8"
@@ -37,22 +41,19 @@ describe("cart page layout", () => {
     expect(joinActionSrc).toMatch(/Join a group order/);
   });
 
-  it("separates desktop summary checkout from mobile sticky checkout", () => {
-    expect(cartPageSrc).toMatch(/surface="summary"/);
-    expect(cartPageSrc).toMatch(/surface="mobile"/);
+  it("uses one in-page checkout CTA inside the order summary for all viewports", () => {
+    expect(cartPageSrc).toMatch(/CartPageLiveCheckoutActions/);
+    expect(cartPageSrc).not.toMatch(/surface="mobile"/);
+    expect(cartPageSrc).not.toMatch(/surface="summary"/);
     expect(cartPageSrc).not.toMatch(/surface="desktop"/);
-    expect(actionsSrc).toMatch(/hidden w-full items-center justify-center lg:inline-flex/);
-    expect(actionsSrc).toMatch(/CartPageMobileCheckoutBar/);
-    expect(actionsSrc).not.toMatch(/createPortal/);
-  });
-
-  it("mounts mobile checkout bar outside the shell wrapper as a provider sibling", () => {
-    expect(cartPageSrc).toMatch(
-      /<\/div>\s*\n\s*<CartPageLiveCheckoutGate[\s\S]*surface="mobile"/
-    );
-    expect(cartPageSrc).toMatch(
-      /<CartPageMutationProvider[\s\S]*<div className=\{cn\("oo-shell[\s\S]*<\/div>\s*\n\s*<CartPageLiveCheckoutGate/
-    );
+    expect(cartPageSrc).not.toMatch(/mobileBottomActionBarContentPadClass/);
+    expect(actionsSrc).toMatch(/CartPageSummaryCheckoutActions/);
+    expect(actionsSrc).toMatch(/inline-flex w-full items-center justify-center/);
+    expect(actionsSrc).not.toMatch(/hidden w-full items-center justify-center lg:inline-flex/);
+    expect(actionsSrc).not.toMatch(/MobileBottomActionBar/);
+    expect(actionsSrc).not.toMatch(/CartPageMobileCheckoutBar/);
+    expect(mutationSrc).toMatch(/CartPageSummaryCheckoutActions/);
+    expect(mutationSrc).not.toMatch(/CartPageMobileCheckoutBar/);
   });
 
   it("does not duplicate the old bottom desktop checkout row", () => {
@@ -93,13 +94,8 @@ describe("solo cart checkout CTA regression", () => {
     expect(state.summarySubtitle).toBe("Fix items above to continue");
   });
 
-  it("mobile checkout bar uses fixed bottom shell hidden from lg up", () => {
-    expect(actionsSrc).toMatch(/MobileBottomActionBar/);
-    const mobileBarSrc = readFileSync(
-      join(process.cwd(), "src/components/mobile/MobileBottomActionBar.tsx"),
-      "utf8"
-    );
-    expect(mobileBarSrc).toMatch(/mobileBottomActionBarFixedClass/);
-    expect(mobileBarSrc).toMatch(/mobileOnly && "lg:hidden"/);
+  it("summary checkout shows blocked reason on all viewports", () => {
+    expect(actionsSrc).toMatch(/mt-2 text-sm text-oo-stone-gray/);
+    expect(actionsSrc).not.toMatch(/hidden text-sm text-oo-stone-gray lg:block/);
   });
 });

@@ -5,8 +5,6 @@ import { auth } from "@/auth";
 import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
-import { cn } from "@/lib/cn";
-import { mobileBottomActionBarContentPadClass } from "@/lib/mobile-sticky-cart-bar-classes";
 import {
   discardStaleCheckoutCartsForSession,
   getOrCreateCart,
@@ -319,7 +317,7 @@ export default async function CartPage({
 
   if (emptyStateKind === "host_group_empty") {
     return (
-      <div className={cn("mx-auto max-w-2xl", mobileBottomActionBarContentPadClass, "sm:pb-10")}>
+      <div className="mx-auto max-w-2xl sm:pb-10">
         {groupEndSyncCart !== null || groupEnded ? (
           <GroupOrderEndCartSync cart={groupEndSyncCart} endedSessionId={cart?.id} />
         ) : null}
@@ -336,7 +334,7 @@ export default async function CartPage({
 
   if (emptyStateKind === "participant_group_empty") {
     return (
-      <div className={cn("mx-auto max-w-2xl", mobileBottomActionBarContentPadClass, "sm:pb-10")}>
+      <div className="mx-auto max-w-2xl sm:pb-10">
         <GroupOrderSubmittedRedirect
           enabled={
             goState.active &&
@@ -572,14 +570,7 @@ export default async function CartPage({
     (goState.status === "active" || goState.status === "locked_checkout");
 
   return (
-    <CartPageMutationProvider
-      cartId={cart.id}
-      podId={cart.podId}
-      initialCart={initialCartSnapshot}
-      initialValidation={initialValidation}
-      allowCheckout={viewerCanCheckout}
-    >
-    <div className={cn("oo-shell py-4 sm:py-6", mobileBottomActionBarContentPadClass, "lg:pb-10")}>
+    <div className="oo-shell py-4 sm:py-6 lg:pb-10">
       <GroupOrderSubmittedRedirect
         enabled={participantSubmissionPoll}
         cartId={cart.id}
@@ -636,6 +627,13 @@ export default async function CartPage({
         </p>
       )}
 
+      <CartPageMutationProvider
+        cartId={cart.id}
+        podId={cart.podId}
+        initialCart={initialCartSnapshot}
+        initialValidation={initialValidation}
+        allowCheckout={viewerCanCheckout}
+      >
       {groupEndSyncCart !== null || groupEnded ? (
         <GroupOrderEndCartSync cart={groupEndSyncCart} endedSessionId={cart.id} />
       ) : null}
@@ -826,7 +824,6 @@ export default async function CartPage({
                 serverItemCount={displayItems.reduce((n, item) => n + item.quantity, 0)}
               >
                 <CartPageLiveCheckoutActions
-                  surface="summary"
                   viewerCanCheckout={viewerCanCheckout}
                   showParticipantTotalsOnly={showParticipantTotalsOnly}
                   sessionLockedCheckout={sessionLocked}
@@ -846,22 +843,7 @@ export default async function CartPage({
           )}
         </aside>
       </div>
+      </CartPageMutationProvider>
     </div>
-
-      <CartPageLiveCheckoutGate
-        serverItemCount={displayItems.reduce((n, item) => n + item.quantity, 0)}
-      >
-        <CartPageLiveCheckoutActions
-          surface="mobile"
-          viewerCanCheckout={viewerCanCheckout}
-          showParticipantTotalsOnly={showParticipantTotalsOnly}
-          sessionLockedCheckout={sessionLocked}
-          myParticipantSubtotalCents={myParticipantRow?.subtotalCents}
-          totalCentsFallback={totalCents}
-          groupSubmitted={sessionSubmitted}
-          submittedOrderId={submittedOrderId}
-        />
-      </CartPageLiveCheckoutGate>
-    </CartPageMutationProvider>
   );
 }

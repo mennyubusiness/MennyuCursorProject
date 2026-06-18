@@ -1,11 +1,9 @@
 "use client";
 
 import {
-  CartPageDesktopCheckoutActions,
-  CartPageMobileCheckoutBar,
   CartPageSummaryCheckoutActions,
   cartPageLiveItemCount,
-} from "./CartPageMobileCheckoutBar";
+} from "./cart-page-checkout-actions";
 import {
   createContext,
   useContext,
@@ -447,7 +445,6 @@ export function CartPageLiveCheckoutActions({
   totalCentsFallback,
   groupSubmitted = false,
   submittedOrderId = null,
-  surface = "all",
 }: {
   viewerCanCheckout: boolean;
   showParticipantTotalsOnly: boolean;
@@ -456,7 +453,6 @@ export function CartPageLiveCheckoutActions({
   totalCentsFallback: number;
   groupSubmitted?: boolean;
   submittedOrderId?: string | null;
-  surface?: "all" | "desktop" | "mobile" | "summary";
 }) {
   const {
     cartId,
@@ -467,36 +463,21 @@ export function CartPageLiveCheckoutActions({
     isSyncingCart,
   } = useCartPageMutation();
 
-  const sharedProps = {
-    cartId,
-    podId,
-    cart,
-    canCheckout,
-    isRevalidating,
-    isSyncingCart,
-    viewerCanCheckout,
-    showParticipantTotalsOnly,
-    sessionLockedCheckout,
-    myParticipantSubtotalCents,
-    totalCentsFallback,
-    groupSubmitted,
-    submittedOrderId,
-  };
-
-  if (surface === "desktop") {
-    return <CartPageDesktopCheckoutActions {...sharedProps} />;
-  }
-  if (surface === "mobile") {
-    return <CartPageMobileCheckoutBar {...sharedProps} />;
-  }
-  if (surface === "summary") {
-    return <CartPageSummaryCheckoutActions {...sharedProps} />;
-  }
-
   return (
-    <>
-      <CartPageDesktopCheckoutActions {...sharedProps} />
-      <CartPageMobileCheckoutBar {...sharedProps} />
-    </>
+    <CartPageSummaryCheckoutActions
+      cartId={cartId}
+      podId={podId}
+      cart={cart}
+      canCheckout={canCheckout}
+      isRevalidating={isRevalidating}
+      isSyncingCart={isSyncingCart}
+      viewerCanCheckout={viewerCanCheckout}
+      showParticipantTotalsOnly={showParticipantTotalsOnly}
+      sessionLockedCheckout={sessionLockedCheckout}
+      myParticipantSubtotalCents={myParticipantSubtotalCents}
+      totalCentsFallback={totalCentsFallback}
+      groupSubmitted={groupSubmitted}
+      submittedOrderId={submittedOrderId}
+    />
   );
 }
