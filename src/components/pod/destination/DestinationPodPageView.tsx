@@ -2,8 +2,8 @@ import { RecentPodViewTracker } from "@/components/retention/RecentViewTracker";
 import { DestinationPodAboutSection } from "@/components/pod/destination/DestinationPodAboutSection";
 import { DestinationPodGroupOrderPromptGate } from "@/components/pod/destination/DestinationPodGroupOrderPromptGate";
 import { DestinationPodHero } from "@/components/pod/destination/DestinationPodHero";
+import { DestinationPodStickyNav } from "@/components/pod/destination/DestinationPodStickyNav";
 import { DestinationPodVendorSection } from "@/components/pod/destination/DestinationPodVendorSection";
-import { PodPageStickyNav } from "@/components/pod/PodPageStickyNav";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
 import { PageShell } from "@/components/layout/page-shell";
 import type { PodCustomerPageData } from "@/lib/pod-customer-page-data";
@@ -54,7 +54,7 @@ export function DestinationPodPageView({
         marqueeItems={marqueeItems}
       />
 
-      <PodPageStickyNav items={navItems} podId={pod.id} podName={pod.name} />
+      <DestinationPodStickyNav items={navItems} podId={pod.id} podName={pod.name} />
 
       <DestinationPodGroupOrderPromptGate
         podId={podId}

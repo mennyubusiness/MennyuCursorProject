@@ -30,6 +30,10 @@ const groupPromptGateSrc = readFileSync(
   join(dir, "../components/pod/destination/DestinationPodGroupOrderPromptGate.tsx"),
   "utf8"
 );
+const stickyNavSrc = readFileSync(
+  join(dir, "../components/pod/destination/DestinationPodStickyNav.tsx"),
+  "utf8"
+);
 const vendorSectionSrc = readFileSync(
   join(dir, "../components/pod/destination/DestinationPodVendorSection.tsx"),
   "utf8"
@@ -122,6 +126,8 @@ describe("DestinationPodPageView layout", () => {
   it("does not change the standard pod page layout", () => {
     expect(standardPageSrc).not.toMatch(/DestinationPodGroupOrderPromptGate/);
     expect(standardPageSrc).not.toMatch(/DestinationPodAboutSection/);
+    expect(standardPageSrc).not.toMatch(/DestinationPodStickyNav/);
+    expect(standardPageSrc).toMatch(/PodPageStickyNav/);
     expect(standardPageSrc).toMatch(/PodPageIdentitySection/);
     expect(standardPageSrc).toMatch(/PodPageStickyCta/);
     expect(standardPageSrc).toMatch(/PodPageHero/);
@@ -141,6 +147,27 @@ describe("DestinationPodPageView layout", () => {
     expect(pageViewSrc).toMatch(/customAmenities=\{customAmenities\}/);
     expect(pageViewSrc).not.toMatch(/DestinationPodAmenityGrid/);
     expect(pageViewSrc).not.toMatch(/Known for/);
+  });
+});
+
+describe("DestinationPodStickyNav", () => {
+  it("uses a compact single-row layout with aligned nav links and Save pod", () => {
+    expect(pageViewSrc).toMatch(/DestinationPodStickyNav/);
+    expect(pageViewSrc).not.toMatch(/PodPageStickyNav/);
+    expect(stickyNavSrc).toMatch(/flex items-center justify-between/);
+    expect(stickyNavSrc).toMatch(/items-center gap-2 overflow-x-auto sm:gap-4/);
+    expect(stickyNavSrc).toMatch(/self-center/);
+    expect(stickyNavSrc).toMatch(/py-3/);
+    expect(stickyNavSrc).not.toMatch(/flex-col/);
+    expect(stickyNavSrc).not.toMatch(/flex-wrap/);
+  });
+
+  it("styles Save pod as a compact secondary action aligned to nav height", () => {
+    expect(stickyNavSrc).toMatch(/saveLabel="Save pod"/);
+    expect(stickyNavSrc).toMatch(/!h-10/);
+    expect(stickyNavSrc).toMatch(/inline-flex h-10 shrink-0 items-center/);
+    expect(stickyNavSrc).toMatch(/!text-xs/);
+    expect(stickyNavSrc).toMatch(/!bg-oo-warm-white/);
   });
 });
 

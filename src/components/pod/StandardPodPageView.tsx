@@ -10,6 +10,7 @@ import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoVie
 import { PageShell } from "@/components/layout/page-shell";
 import type { PodCustomerPageData } from "@/lib/pod-customer-page-data";
 
+/** Legacy/classic pod page template. Destination is the current default. */
 type StandardPodPageViewProps = PodCustomerPageData & {
   isQrEntry: boolean;
   highlightVendor: string | null;

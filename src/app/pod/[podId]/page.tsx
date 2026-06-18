@@ -4,7 +4,7 @@ import { DestinationPodPageView } from "@/components/pod/destination/Destination
 import { StandardPodPageView } from "@/components/pod/StandardPodPageView";
 import { POD_QR_ENTRY_VALUE } from "@/lib/pod-ordering-url";
 import { loadPodCustomerPageData } from "@/lib/pod-customer-page-data";
-import { isDestinationPodPage } from "@/lib/pod-page-variant";
+import { resolvePodPageTemplate } from "@/lib/pod-page-variant";
 
 export default async function PodPage({
   params,
@@ -33,13 +33,14 @@ export default async function PodPage({
     highlightVendor,
   };
 
-  if (
-    isDestinationPodPage({
-      podId: data.pod.id,
-      podSlug: data.pod.slug,
-      variantParam,
-    })
-  ) {
+  const template = resolvePodPageTemplate({
+    podId: data.pod.id,
+    podSlug: data.pod.slug,
+    variantParam,
+    // Future: podTemplate: data.pod.pageTemplate,
+  });
+
+  if (template === "destination") {
     return <DestinationPodPageView {...viewProps} />;
   }
 

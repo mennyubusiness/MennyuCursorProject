@@ -38,8 +38,10 @@ describe("PodPageStickyNav save placement", () => {
     expect(navSrc).toMatch(/FavoritePodButton/);
     expect(navSrc).toMatch(/saveLabel="Save pod"/);
     expect(standardPageSrc).toMatch(/PodPageStickyNav items=\{navItems\} podId=\{pod\.id\} podName=\{pod\.name\}/);
+    expect(pageSrc).toMatch(/resolvePodPageTemplate/);
     expect(pageSrc).toMatch(/StandardPodPageView/);
     expect(pageSrc).toMatch(/DestinationPodPageView/);
+    expect(pageSrc).toMatch(/template === "destination"/);
   });
 });
 
