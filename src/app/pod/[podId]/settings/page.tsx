@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
-import { parsePodAmenities } from "@/lib/pod-amenities";
+import { parsePodAmenities, parsePodCustomAmenities } from "@/lib/pod-amenities";
 import { PodOrderingQrSection } from "@/components/pod/PodOrderingQrSection";
 import Link from "next/link";
 import { PodBrandProfileForm } from "./PodBrandProfileForm";
@@ -30,12 +30,14 @@ export default async function PodSettingsPage({
       instagramUrl: true,
       pickupInstructions: true,
       amenities: true,
+      customAmenities: true,
     },
   });
   if (!pod) notFound();
 
   const publicOrigin = await getPublicSiteOrigin();
   const amenities = parsePodAmenities(pod.amenities);
+  const customAmenities = parsePodCustomAmenities(pod.customAmenities);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
@@ -73,6 +75,7 @@ export default async function PodSettingsPage({
             initialInstagramUrl={pod.instagramUrl}
             initialPickupInstructions={pod.pickupInstructions}
             initialAmenities={amenities}
+            initialCustomAmenities={customAmenities}
           />
         </div>
       </section>

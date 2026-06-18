@@ -25,6 +25,7 @@ export function PodBrandProfileForm({
   initialInstagramUrl,
   initialPickupInstructions,
   initialAmenities,
+  initialCustomAmenities,
 }: {
   podId: string;
   initialName: string;
@@ -39,6 +40,7 @@ export function PodBrandProfileForm({
   initialInstagramUrl: string | null;
   initialPickupInstructions: string | null;
   initialAmenities: PodAmenityId[];
+  initialCustomAmenities: string[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -55,6 +57,7 @@ export function PodBrandProfileForm({
   const [instagramUrl, setInstagramUrl] = useState(initialInstagramUrl ?? "");
   const [pickupInstructions, setPickupInstructions] = useState(initialPickupInstructions ?? "");
   const [amenities, setAmenities] = useState<PodAmenityId[]>(initialAmenities);
+  const [customAmenities, setCustomAmenities] = useState(initialCustomAmenities.join(", "));
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
 
   function syncColorPickerToHex(hex: string) {
@@ -84,6 +87,7 @@ export function PodBrandProfileForm({
         instagramUrl,
         pickupInstructions,
         amenities,
+        customAmenities,
       });
       if (!res.ok) {
         setMessage({ text: res.error ?? "Could not save", error: true });
@@ -296,6 +300,23 @@ export function PodBrandProfileForm({
               {label}
             </label>
           ))}
+        </div>
+        <div>
+          <label htmlFor="pod-custom-amenities" className="block text-sm font-medium text-oo-charcoal">
+            Custom amenities
+          </label>
+          <p className="mt-1 text-xs text-oo-stone-gray">
+            Add custom pod features such as Live music, Fire pits, Trivia nights, Vegan options.
+            Separate with commas.
+          </p>
+          <textarea
+            id="pod-custom-amenities"
+            value={customAmenities}
+            onChange={(e) => setCustomAmenities(e.target.value)}
+            rows={2}
+            placeholder="Live music, Fire pits, Trivia nights"
+            className={inputClass}
+          />
         </div>
       </div>
 

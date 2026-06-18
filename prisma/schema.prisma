@@ -50,6 +50,8 @@ model Pod {
   pickupInstructions String?
   /// JSON string array of amenity ids — see pod-amenities.ts.
   amenities          Json?
+  /// JSON string array of owner-defined amenity labels (plain text).
+  customAmenities    Json?
   latitude           Float?
   longitude          Float?
   /// IANA timezone for scheduled pickup (e.g. America/Chicago). Falls back to DEFAULT_PICKUP_TIMEZONE env when null.

@@ -4,7 +4,6 @@ import { DestinationPodGroupOrderNavActions } from "@/components/pod/destination
 import { DestinationPodHero } from "@/components/pod/destination/DestinationPodHero";
 import { DestinationPodVendorSection } from "@/components/pod/destination/DestinationPodVendorSection";
 import { PodPageStickyNav } from "@/components/pod/PodPageStickyNav";
-import { PodPageStickyCta } from "@/components/pod/PodPageStickyCta";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
 import { PageShell } from "@/components/layout/page-shell";
 import type { PodCustomerPageData } from "@/lib/pod-customer-page-data";
@@ -20,11 +19,11 @@ export function DestinationPodPageView({
   pod,
   vendorRows,
   amenities,
+  customAmenities,
   orderingStatus,
   hasAboutSection,
   hasVisitSection,
   contactDetails,
-  groupOrderHref,
   isQrEntry,
   highlightVendor,
 }: DestinationPodPageViewProps) {
@@ -32,9 +31,10 @@ export function DestinationPodPageView({
   const hasVendors = vendorRows.length > 0;
   const hasDestinationAboutSection = hasAboutSection || hasVisitSection;
   const marqueeItems = buildDestinationMarqueeItems({
-    orderingStatus,
-    vendorCount: vendorRows.length,
+    podName: pod.name,
+    customAmenities,
     amenities,
+    vendorNames: vendorRows.map((row) => row.vendor.name),
   });
 
   const navItems = buildDestinationPodNavItems({
@@ -42,7 +42,7 @@ export function DestinationPodPageView({
   });
 
   return (
-    <div className="w-full min-h-0 pb-20 lg:pb-0">
+    <div className="w-full min-h-0">
       <RecentPodViewTracker podId={pod.id} podName={pod.name} />
 
       <DestinationPodHero
@@ -96,17 +96,10 @@ export function DestinationPodPageView({
           address={pod.address}
           pickupInstructions={pod.pickupInstructions}
           amenities={amenities}
+          customAmenities={customAmenities}
           contact={contactDetails}
         />
       )}
-
-      <PodPageStickyCta
-        podName={pod.name}
-        showVendorsCta={hasVendors}
-        showGroupOrderCta={hasVendors}
-        groupOrderHref={groupOrderHref}
-        primaryLabel="Start order"
-      />
     </div>
   );
 }

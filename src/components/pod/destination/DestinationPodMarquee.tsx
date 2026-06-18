@@ -2,12 +2,9 @@ type DestinationPodMarqueeProps = {
   items: string[];
 };
 
-function MarqueeRow({ items, ariaHidden = false }: { items: string[]; ariaHidden?: boolean }) {
+function MarqueeItems({ items }: { items: string[] }) {
   return (
-    <ul
-      className="flex min-w-max shrink-0 items-center gap-8 whitespace-nowrap px-6"
-      aria-hidden={ariaHidden || undefined}
-    >
+    <>
       {items.map((item, index) => (
         <li
           key={`${item}-${index}`}
@@ -19,23 +16,36 @@ function MarqueeRow({ items, ariaHidden = false }: { items: string[]; ariaHidden
           {item}
         </li>
       ))}
-    </ul>
+    </>
   );
 }
 
 export function DestinationPodMarquee({ items }: DestinationPodMarqueeProps) {
   if (items.length === 0) return null;
 
+  const loopItems = [...items, ...items];
+
   return (
     <div
       className="relative z-20 border-t border-white/10 bg-oo-charcoal py-3"
       aria-label="Pod highlights"
     >
-      <div className="overflow-hidden motion-reduce:overflow-x-auto">
-        <div className="flex w-max animate-destination-pod-marquee motion-reduce:w-full motion-reduce:animate-none motion-reduce:overflow-x-auto">
-          <MarqueeRow items={items} />
-          <MarqueeRow items={items} ariaHidden />
+      <p className="sr-only">{items.join(", ")}</p>
+
+      {/* Animated seamless loop (desktop + mobile) */}
+      <div className="overflow-hidden motion-reduce:hidden">
+        <div className="flex w-max will-change-transform animate-destination-pod-marquee">
+          <ul className="flex min-w-max shrink-0 items-center gap-8 whitespace-nowrap">
+            <MarqueeItems items={loopItems} />
+          </ul>
         </div>
+      </div>
+
+      {/* Reduced motion: static horizontal scroll, single row */}
+      <div className="hidden overflow-x-auto motion-reduce:block">
+        <ul className="flex min-w-max items-center gap-8 whitespace-nowrap px-4">
+          <MarqueeItems items={items} />
+        </ul>
       </div>
     </div>
   );

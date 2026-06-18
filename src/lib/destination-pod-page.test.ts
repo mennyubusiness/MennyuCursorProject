@@ -72,13 +72,15 @@ describe("DestinationPodMarquee", () => {
     expect(marqueeSrc).toMatch(/text-brand/);
   });
 
-  it("animates horizontally without wrapping", () => {
+  it("loops seamlessly with duplicated content and -50% animation track", () => {
     expect(marqueeSrc).toMatch(/overflow-hidden/);
     expect(marqueeSrc).toMatch(/whitespace-nowrap/);
     expect(marqueeSrc).toMatch(/min-w-max/);
     expect(marqueeSrc).toMatch(/animate-destination-pod-marquee/);
+    expect(marqueeSrc).toMatch(/\[\.\.\.items, \.\.\.items\]/);
     expect(marqueeSrc).not.toMatch(/flex-wrap/);
-    expect(marqueeSrc).toMatch(/motion-reduce:animate-none/);
+    expect(marqueeSrc).toMatch(/motion-reduce:hidden/);
+    expect(marqueeSrc).toMatch(/motion-reduce:block/);
   });
 });
 
@@ -101,6 +103,12 @@ describe("DestinationPodPageView layout", () => {
     expect(standardPageSrc).not.toMatch(/DestinationPodGroupOrderNavActions/);
     expect(standardPageSrc).not.toMatch(/DestinationPodAboutSection/);
     expect(standardPageSrc).toMatch(/PodPageIdentitySection/);
+    expect(standardPageSrc).toMatch(/PodPageStickyCta/);
+  });
+
+  it("omits mobile bottom sticky CTA on Destination variant", () => {
+    expect(pageViewSrc).not.toMatch(/PodPageStickyCta/);
+    expect(pageViewSrc).not.toMatch(/pb-20/);
   });
 });
 

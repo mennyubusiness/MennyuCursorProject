@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { canAccessPodDashboardLayout } from "@/lib/permissions";
 import { deleteSupabasePublicObjectIfInBucket } from "@/lib/supabase/storage-cleanup";
-import { normalizePodAmenitiesInput } from "@/lib/pod-amenities";
+import { normalizePodAmenitiesInput, normalizePodCustomAmenitiesInput } from "@/lib/pod-amenities";
 import {
   normalizeVendorDescription,
   normalizeVendorDisplayName,
@@ -80,6 +80,7 @@ export type PodBrandProfileInput = {
   instagramUrl: string;
   pickupInstructions: string;
   amenities: string[];
+  customAmenities: string;
 };
 
 export async function updatePodBrandProfile(
@@ -142,6 +143,7 @@ export async function updatePodBrandProfile(
   const pickupInstructions = pickupRaw ? pickupRaw : null;
 
   const amenities = normalizePodAmenitiesInput(input.amenities ?? []);
+  const customAmenities = normalizePodCustomAmenitiesInput(input.customAmenities ?? "");
 
   const logoUrl = normalizeVendorLogoUrl(input.imageUrl);
   if (input.imageUrl?.trim() && !logoUrl) {
@@ -175,6 +177,7 @@ export async function updatePodBrandProfile(
       instagramUrl,
       pickupInstructions,
       amenities: amenities.length > 0 ? amenities : Prisma.DbNull,
+      customAmenities: customAmenities.length > 0 ? customAmenities : Prisma.DbNull,
     },
   });
 

@@ -73,7 +73,7 @@ const config: Config = {
         "mennyu-cart-nudge": "mennyu-cart-nudge 0.55s ease-out",
         "mennyu-hero-gradient": "mennyu-hero-gradient 14s ease-in-out infinite",
         "oo-fade-up": "oo-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards",
-        "destination-pod-marquee": "destination-pod-marquee 32s linear infinite",
+        "destination-pod-marquee": "destination-pod-marquee 36s linear infinite",
       },
     },
   },

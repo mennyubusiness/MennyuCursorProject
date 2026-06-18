@@ -5,7 +5,7 @@ import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import type { PodContactInfo } from "@/components/pod/PodPageContactSection";
 import type { PodVendorGridRow } from "@/components/pod/PodVendorGrid";
 import { prisma } from "@/lib/db";
-import { parsePodAmenities, type PodAmenityId } from "@/lib/pod-amenities";
+import { parsePodAmenities, parsePodCustomAmenities, type PodAmenityId } from "@/lib/pod-amenities";
 import { buildPodPageNavItems } from "@/lib/pod-page-nav";
 import { getPodOrderingStatus } from "@/lib/pod-page-status";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
@@ -80,6 +80,7 @@ export type PodCustomerPageData = {
   pod: PodCustomerPagePod;
   vendorRows: PodVendorGridRow[];
   amenities: PodAmenityId[];
+  customAmenities: string[];
   orderingStatus: ReturnType<typeof getPodOrderingStatus>;
   hasLocationSection: boolean;
   hasContactSection: boolean;
@@ -121,6 +122,7 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
 
   const vendorRows = pod.vendors.map(toGridRow);
   const amenities = parsePodAmenities(pod.amenities);
+  const customAmenities = parsePodCustomAmenities(pod.customAmenities);
   const orderingStatus = getPodOrderingStatus(vendorRows.map((r) => r.availability));
 
   const hasLocationSection = Boolean(pod.address?.trim());
@@ -134,7 +136,8 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
     pod.description?.trim() ||
       pod.tagline?.trim() ||
       pod.ownerContactName?.trim() ||
-      amenities.length > 0
+      amenities.length > 0 ||
+      customAmenities.length > 0
   );
   const hasVisitSection = hasLocationSection || hasContactSection || Boolean(pod.pickupInstructions?.trim());
 
@@ -175,6 +178,7 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
     },
     vendorRows,
     amenities,
+    customAmenities,
     orderingStatus,
     hasLocationSection,
     hasContactSection,
