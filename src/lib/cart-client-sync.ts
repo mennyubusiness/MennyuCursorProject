@@ -269,11 +269,8 @@ export function dispatchCartUpdated(detail: CartUpdatedDetail): CartUpdatedDetai
 export function dispatchCartCleared(detail: CartClearedDetail): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent<CartClearedDetail>(CART_CLEARED_EVENT, { detail }));
-  const empty =
-    detail.cart ??
-    emptyCartSnapshot({ id: detail.cartId, podId: detail.podId });
   dispatchCartUpdated({
-    cart: empty,
+    cart: null,
     source: detail.source === "order-page" ? "order-page" : "checkout",
   });
 }

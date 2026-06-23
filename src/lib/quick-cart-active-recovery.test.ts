@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildActiveCartRecovery,
+  isActiveCartRecoveryDisplayable,
   recoveryItemCountLabel,
   shouldShowActiveRecovery,
   shouldShowActiveRecoverySection,
@@ -87,6 +88,37 @@ describe("buildActiveCartRecovery", () => {
   });
 });
 
+describe("isActiveCartRecoveryDisplayable", () => {
+  it("hides solo recovery after clear when item count is zero", () => {
+    const cleared = buildActiveCartRecovery({
+      cart: { ...soloCart, items: [], subtotalCents: 0 },
+      browsePodId: null,
+      browsePodName: null,
+    });
+    expect(cleared.itemCount).toBe(0);
+    expect(isActiveCartRecoveryDisplayable(cleared)).toBe(false);
+  });
+
+  it("keeps group host recovery visible with zero items", () => {
+    const groupRecovery = buildActiveCartRecovery({
+      cart: {
+        ...soloCart,
+        items: [],
+        subtotalCents: 0,
+        groupOrder: {
+          role: "host",
+          canCheckout: true,
+          joinCode: "280963",
+          groupOrderSessionId: "gos_1",
+        },
+      },
+      browsePodId: null,
+      browsePodName: null,
+    });
+    expect(isActiveCartRecoveryDisplayable(groupRecovery)).toBe(true);
+  });
+});
+
 describe("shouldShowActiveRecoverySection", () => {
   const base: QuickCartApiResponse = {
     scope: "neutral",
@@ -105,6 +137,19 @@ describe("shouldShowActiveRecoverySection", () => {
 
   it("shows on neutral with solo active recovery", () => {
     expect(shouldShowActiveRecoverySection(base)).toBe(true);
+  });
+
+  it("hides zero-item solo recovery on neutral scope", () => {
+    expect(
+      shouldShowActiveRecoverySection({
+        ...base,
+        activeCartRecovery: buildActiveCartRecovery({
+          cart: { ...soloCart, items: [], subtotalCents: 0 },
+          browsePodId: null,
+          browsePodName: null,
+        }),
+      })
+    ).toBe(false);
   });
 
   it("hides group host recovery on neutral when drawer shows group cart", () => {

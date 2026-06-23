@@ -117,6 +117,14 @@ describe("findActiveAccountSoloCartId", () => {
 
     await expect(findActiveAccountSoloCartId(USER_ID, "pod_1")).resolves.toBe(ACCOUNT_CART);
   });
+
+  it("returns null when account solo cart has no items", async () => {
+    mockCartFindMany.mockResolvedValue([
+      cartRow(ACCOUNT_CART, { userId: USER_ID, itemCount: 0 }),
+    ]);
+
+    await expect(findActiveAccountSoloCartId(USER_ID, "pod_1")).resolves.toBeNull();
+  });
 });
 
 describe("attachGuestCartToUser", () => {

@@ -60,7 +60,7 @@ function selectAssignedAccountSoloCart<T extends CartRowPick>(
     })
   );
   if (assigned.length === 0) {
-    return selectCartForSessionAndPod(solo, preferredPodId) ?? null;
+    return null;
   }
   return (
     selectCartForSessionAndPod(assigned, preferredPodId) ??

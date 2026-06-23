@@ -8,6 +8,7 @@ import {
   quickCartPodLinkLabel,
   quickCartSubtitle,
   buildCartPodContextForDisplay,
+  resolveQuickCartSnapshotAfterUpdate,
 } from "./quick-cart-display";
 import type { Cart } from "@/domain/types";
 import type { GroupOrderViewerContext } from "./group-order-viewer-context";
@@ -135,6 +136,25 @@ describe("quick-cart-display", () => {
       requiresClearToSwitchPod: false,
     });
     expect(quickCartPodLinkLabel(ctx)).toBe("Explore pods");
+  });
+
+  it("resolveQuickCartSnapshotAfterUpdate drops empty solo carts", () => {
+    expect(resolveQuickCartSnapshotAfterUpdate(baseCart)).toBeNull();
+    expect(
+      resolveQuickCartSnapshotAfterUpdate({
+        ...baseCart,
+        items: [{ id: "l1", menuItemId: "m1", vendorId: "v1", quantity: 1, priceCents: 500, specialInstructions: null }],
+      })
+    ).not.toBeNull();
+  });
+
+  it("resolveQuickCartSnapshotAfterUpdate keeps empty group host carts", () => {
+    expect(
+      resolveQuickCartSnapshotAfterUpdate({
+        ...baseCart,
+        groupOrder: { role: "host", canCheckout: true, joinCode: "123456" },
+      })
+    ).not.toBeNull();
   });
 });
 

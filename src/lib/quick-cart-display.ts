@@ -19,6 +19,18 @@ export function quickCartHasActiveGroupOrder(cart: Cart | null | undefined): boo
   return hasActiveGroupOrderDisplay(cart);
 }
 
+export function cartSnapshotLineCount(cart: Cart | null | undefined): number {
+  return cart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0;
+}
+
+/** Solo empty carts should not keep Quick Cart / header badge state after clear or last-line removal. */
+export function resolveQuickCartSnapshotAfterUpdate(cart: Cart | null): Cart | null {
+  if (!cart) return null;
+  if (cartSnapshotLineCount(cart) > 0) return cart;
+  if (quickCartHasActiveGroupOrder(cart)) return cart;
+  return null;
+}
+
 /** Attach pod + group-order UI fields to a scoped cart (API / mutations). */
 export function attachQuickCartDisplay(
   cart: Cart,

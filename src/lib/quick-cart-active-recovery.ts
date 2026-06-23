@@ -48,13 +48,24 @@ export function buildActiveCartRecovery(params: {
   };
 }
 
+/** Solo recovery with zero items is stale after clear — do not render an empty card. */
+export function isActiveCartRecoveryDisplayable(
+  recovery: ActiveCartRecovery | null | undefined
+): boolean {
+  if (!recovery) return false;
+  if (recovery.kind === "solo_cart") {
+    return (recovery.itemCount ?? 0) > 0;
+  }
+  return true;
+}
+
 /** Show the compact recovery card (not the full in-drawer cart). */
 export function shouldShowActiveRecovery(
   recovery: ActiveCartRecovery | null | undefined,
   scope: CartPodScope,
   requiresClearToSwitchPod: boolean
 ): boolean {
-  if (!recovery) return false;
+  if (!isActiveCartRecoveryDisplayable(recovery)) return false;
   if (recovery.isConflictingWithBrowsePod) return true;
   if (recovery.kind === "group_host" || recovery.kind === "group_participant") {
     return false;

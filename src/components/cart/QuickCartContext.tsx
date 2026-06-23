@@ -17,7 +17,6 @@ import {
   CART_UPDATED_EVENT,
   dispatchCartCleared,
   dispatchCartUpdated,
-  emptyCartSnapshot,
   shouldQuickCartApplyCartSnapshot,
   shouldApplyCartFetchResult,
   cartClearAppliesToContext,
@@ -31,12 +30,13 @@ import {
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
 import { getBrowsingPodIdFromClient } from "@/lib/quick-cart-pod";
-import { buildCartPodContextForDisplay, quickCartHasActiveGroupOrder } from "@/lib/quick-cart-display";
+import { buildCartPodContextForDisplay, quickCartHasActiveGroupOrder, resolveQuickCartSnapshotAfterUpdate } from "@/lib/quick-cart-display";
 import { normalizeAuthoritativeCartSnapshot, normalizeQuickCartApiCart } from "@/lib/cart-group-metadata";
 import { isQuickCartEnabledForPath } from "@/lib/quick-cart-enabled";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import type { CartPodContext } from "@/lib/cart-pod-context";
 import {
+  isActiveCartRecoveryDisplayable,
   shouldShowActiveRecovery,
 } from "@/lib/quick-cart-active-recovery";
 
@@ -115,12 +115,19 @@ export function QuickCartProvider({
       setLoading(false);
       return;
     }
-    const normalizedCart = normalizeQuickCartApiCart(payload.cart, payload.scope);
-    rememberAcceptedCartSnapshot(normalizedCart);
-    setCart(normalizedCart);
+    const normalizedCart =
+      payload.cart != null
+        ? normalizeQuickCartApiCart(payload.cart, payload.scope)
+        : null;
+    const displayCart = resolveQuickCartSnapshotAfterUpdate(normalizedCart);
+    const recovery = isActiveCartRecoveryDisplayable(payload.activeCartRecovery)
+      ? payload.activeCartRecovery
+      : null;
+    rememberAcceptedCartSnapshot(displayCart);
+    setCart(displayCart);
     setPodContext(
       buildCartPodContextForDisplay({
-        cart: normalizedCart,
+        cart: displayCart,
         browsingPodId: payload.browsingPodId,
         browsingPodName: payload.browsingPodName,
         assignedPodId: payload.assignedPodId,
@@ -128,14 +135,17 @@ export function QuickCartProvider({
         requiresClearToSwitchPod: payload.requiresClearToSwitchPod,
       })
     );
-    setActiveCartRecovery(payload.activeCartRecovery ?? null);
+    setActiveCartRecovery(recovery);
     setShowActiveRecovery(
       shouldShowActiveRecovery(
-        payload.activeCartRecovery,
+        recovery,
         payload.scope,
         payload.requiresClearToSwitchPod
       )
     );
+    if (!displayCart && !recovery && !quickCartHasActiveGroupOrder(displayCart)) {
+      setIsOpen(false);
+    }
     setLoading(false);
   }, []);
 
@@ -149,23 +159,25 @@ export function QuickCartProvider({
     }
     const normalized =
       next != null ? normalizeAuthoritativeCartSnapshot(next, detail?.source) : null;
-    rememberAcceptedCartSnapshot(normalized);
-    setCart(normalized);
-    if (!normalized) {
+    const displayCart = resolveQuickCartSnapshotAfterUpdate(normalized);
+    rememberAcceptedCartSnapshot(displayCart);
+    setCart(displayCart);
+    if (!displayCart) {
       setPodContext(NEUTRAL_POD_CONTEXT);
       setActiveCartRecovery(null);
       setShowActiveRecovery(false);
+      setIsOpen(false);
     } else {
       setPodContext(
         buildCartPodContextForDisplay({
-          cart: normalized,
+          cart: displayCart,
           browsingPodId: getBrowsingPodIdFromClient(),
           browsingPodName: null,
           assignedPodId:
-            normalized.cartScope === "assigned_pod" || normalized.cartScope === "group_order"
-              ? normalized.podId
+            displayCart.cartScope === "assigned_pod" || displayCart.cartScope === "group_order"
+              ? displayCart.podId
               : null,
-          assignedPodName: normalized.podName ?? null,
+          assignedPodName: displayCart.podName ?? null,
           requiresClearToSwitchPod: false,
         })
       );
@@ -309,20 +321,12 @@ export function QuickCartProvider({
     const onCartCleared = (event: Event) => {
       const detail = (event as CustomEvent<CartClearedDetail>).detail;
       const local = cartRef.current;
-      const currentPodId = getBrowsingPodIdFromClient() ?? local?.podId ?? "";
       const ctx = {
         cartId: local?.id ?? detail?.cartId ?? "",
-        podId: currentPodId || detail?.podId || "",
+        podId: detail?.podId ?? local?.podId ?? getBrowsingPodIdFromClient() ?? "",
       };
-      if (!detail || !ctx.podId || !cartClearAppliesToContext(detail, ctx)) return;
-      const empty =
-        detail.cart ??
-        emptyCartSnapshot({
-          id: detail.cartId,
-          podId: detail.podId,
-          sessionId: local?.sessionId,
-        });
-      applyCartSnapshot(empty);
+      if (!detail?.podId || !cartClearAppliesToContext(detail, ctx)) return;
+      applyCartSnapshot(null);
     };
     window.addEventListener(CART_UPDATED_EVENT, onCartUpdated);
     window.addEventListener(CART_CLEARED_EVENT, onCartCleared);
@@ -352,6 +356,7 @@ export function QuickCartProvider({
       podId: recovery.podId,
       source: "quick-cart",
     });
+    setIsOpen(false);
     await refreshCart();
   }, [refreshCart]);
 
@@ -375,6 +380,7 @@ export function QuickCartProvider({
       podId: recovery.podId,
       source: "quick-cart",
     });
+    setIsOpen(false);
     await refreshCart();
   }, [refreshCart]);
 
@@ -448,6 +454,7 @@ export function useQuickCartOptional(): QuickCartContextValue | null {
 
 /** After server cart mutations from drawer controls. */
 export function notifyQuickCartUpdated(cart: Cart | null) {
-  dispatchCartUpdated({ cart, source: "quick-cart" });
-  return cart;
+  const resolved = resolveQuickCartSnapshotAfterUpdate(cart);
+  dispatchCartUpdated({ cart: resolved, source: "quick-cart" });
+  return resolved;
 }

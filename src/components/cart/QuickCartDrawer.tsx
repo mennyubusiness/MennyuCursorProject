@@ -12,6 +12,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { shouldSuppressNeutralGroupPromo } from "@/lib/quick-cart-active-recovery";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
 import { quickCartEmptyTitle, quickCartFooterCtaLabel, quickCartHasActiveGroupOrder } from "@/lib/quick-cart-display";
+import { isActiveCartRecoveryDisplayable } from "@/lib/quick-cart-active-recovery";
 
 export function QuickCartDrawer() {
   const {
@@ -43,6 +44,14 @@ export function QuickCartDrawer() {
   const itemCount = cart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0;
   const hasItems = Boolean(cart && cart.items.length > 0);
   const hasActiveGroupOrder = quickCartHasActiveGroupOrder(cart);
+  const hasDisplayableRecovery = Boolean(
+    showActiveRecovery &&
+      activeCartRecovery &&
+      isActiveCartRecoveryDisplayable(activeCartRecovery)
+  );
+  if (!hasItems && !hasActiveGroupOrder && !hasDisplayableRecovery && !loading) {
+    return null;
+  }
   const showHostGroupEmpty =
     Boolean(cart && groupOrder?.role === "host" && groupOrder.joinCode && !hasItems);
   const showParticipantGroupEmpty = Boolean(cart && isParticipant && !hasItems);
