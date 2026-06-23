@@ -5,6 +5,10 @@ vi.mock("react", () => ({
   cache: (fn: unknown) => fn,
 }));
 
+vi.mock("@/auth", () => ({
+  auth: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock("@/lib/db", () => ({
   prisma: {
     order: {

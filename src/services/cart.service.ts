@@ -63,8 +63,7 @@ export type { ResolvedGroupCartActor } from "@/services/group-order.service";
 
 export type CartServiceAuthOpts = { authUserId?: string | null };
 
-/** TEMP: set false to silence add-to-cart trace logs */
-const DEBUG_ADD_TO_CART_TRACE = true;
+import { isAddToCartTraceEnabled } from "@/lib/debug-add-to-cart-trace";
 
 /** TEMP: set false to silence stale-checkout unlink trace logs */
 const DEBUG_DISCARD_STALE_CHECKOUT = process.env.NODE_ENV === "development";
@@ -380,17 +379,17 @@ export async function addCartItem(
   /** When the cart is in a group-order session, pass the resolved host/participant actor. */
   groupOrderActor?: ResolvedGroupCartActor | null
 ): Promise<Cart> {
-  if (DEBUG_ADD_TO_CART_TRACE) {
+  if (isAddToCartTraceEnabled()) {
     console.log("[addCartItem] enter", { cartId, menuItemId, quantity });
   }
   const menuItemInitial = await loadMenuItemForVariantResolution(menuItemId);
   if (!menuItemInitial) {
-    if (DEBUG_ADD_TO_CART_TRACE) {
+    if (isAddToCartTraceEnabled()) {
       console.error("[addCartItem] MenuItem not found", { menuItemId });
     }
     throw new Error("MenuItem not found");
   }
-  if (DEBUG_ADD_TO_CART_TRACE) {
+  if (isAddToCartTraceEnabled()) {
     console.log("[addCartItem] menuItem loaded", {
       menuItemId: menuItemInitial.id,
       vendorId: menuItemInitial.vendorId,
@@ -583,7 +582,7 @@ export async function addCartItem(
     await enforceGroupOrderCartMutation(cartId, groupOrderActor ?? null, { kind: "add" });
   }
 
-  if (DEBUG_ADD_TO_CART_TRACE) {
+  if (isAddToCartTraceEnabled()) {
     console.log("[addCartItem] pre-write", {
       cartId,
       incomingKey,
@@ -603,7 +602,7 @@ export async function addCartItem(
     const row = findMatchingCartLine(candidates, incomingKey);
 
     if (row) {
-      if (DEBUG_ADD_TO_CART_TRACE) {
+      if (isAddToCartTraceEnabled()) {
         console.log("[addCartItem] tx path=update", { cartItemId: row.id });
       }
       await tx.cartItem.update({
@@ -635,7 +634,7 @@ export async function addCartItem(
           groupOrderParticipantId: groupOrderActor?.participantId ?? null,
         },
       });
-      if (DEBUG_ADD_TO_CART_TRACE) {
+      if (isAddToCartTraceEnabled()) {
         console.log("[addCartItem] tx path=create", { cartItemId: created.id });
       }
       if (selectionsForLeaf.length > 0) {
@@ -649,7 +648,7 @@ export async function addCartItem(
     }
   });
 
-  if (DEBUG_ADD_TO_CART_TRACE) {
+  if (isAddToCartTraceEnabled()) {
     console.log("[addCartItem] write complete, loading cart via getCartByIdForMutation");
   }
 

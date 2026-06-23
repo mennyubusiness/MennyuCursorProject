@@ -6,6 +6,10 @@ vi.mock("react", () => ({
   cache: (fn: unknown) => fn,
 }));
 
+vi.mock("@/auth", () => ({
+  auth: vi.fn().mockResolvedValue(null),
+}));
+
 const mockCartFindUnique = vi.fn();
 const mockCartCreate = vi.fn();
 const mockOrderUpdateMany = vi.fn();

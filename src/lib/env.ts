@@ -105,6 +105,12 @@ const envSchema = z.object({
   ALLOW_DELIVERECT_STAGING_WEBHOOKS: z.enum(["true", "false"]).optional(),
   /** Verbose Deliverect HTTP / normalize logging (server). Keeps warnings for failures. */
   DEBUG_DELIVERECT: z.enum(["true", "false"]).optional(),
+  /** Verbose add-to-cart trace logs (server). Off in production; dev/test only when "true". */
+  DEBUG_ADD_TO_CART_TRACE: z.enum(["true", "false"]).optional(),
+  /**
+   * When "true", enables legacy POST/PATCH/DELETE on /api/cart. Default off — use cart.actions.
+   */
+  ENABLE_CART_API_MUTATIONS: z.enum(["true", "false"]).optional(),
   /** IANA timezone when Pod.pickupTimezone is unset (scheduled pickup checkout & display). */
   DEFAULT_PICKUP_TIMEZONE: z.string().optional(),
   /** Supabase project URL (public). Used for Storage public URLs and optional admin client. */

@@ -13,8 +13,7 @@ import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { CartValidationError } from "@/services/cart-validation-error";
 
-/** Match cart.service / cart.actions — set true while debugging add-to-cart modifier issues. */
-const DEBUG_ADD_TO_CART_TRACE = false;
+import { isAddToCartTraceEnabled } from "@/lib/debug-add-to-cart-trace";
 
 export type CartItemSelectionInput = { modifierOptionId: string; quantity: number };
 
@@ -97,7 +96,7 @@ function logVariantResolutionFailure(
   selections: CartItemSelectionInput[] | null | undefined,
   reason: string
 ) {
-  if (!DEBUG_ADD_TO_CART_TRACE) return;
+  if (!isAddToCartTraceEnabled()) return;
   const selectionByOptionId = new Map(
     (selections ?? [])
       .filter((s) => s.quantity >= 1)

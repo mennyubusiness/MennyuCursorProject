@@ -1,7 +1,9 @@
 /**
  * Temporary diagnostics for modifier / Deliverect variant add-to-cart failures.
- * Enable with DEBUG_ADD_TO_CART_TRACE in cart.service / cart.actions / ModifierModal.
+ * Enable with DEBUG_ADD_TO_CART_TRACE=true in non-production (see debug-add-to-cart-trace.ts).
  */
+
+import { isAddToCartTraceEnabled } from "@/lib/debug-add-to-cart-trace";
 
 import type { OpenOrderModifierGroupKind } from "@/domain/modifier-group-kind";
 import {
@@ -129,5 +131,6 @@ export function logModifierValidationDebug(
     extra?: Record<string, unknown>;
   }
 ): void {
+  if (!isAddToCartTraceEnabled()) return;
   console.warn(`[modifier-validation-debug] ${context}`, payload);
 }

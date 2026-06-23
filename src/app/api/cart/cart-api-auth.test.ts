@@ -9,6 +9,15 @@ const mockGetCartById = vi.fn();
 const mockAddCartItem = vi.fn();
 const mockUpdateCartItem = vi.fn();
 const mockRemoveCartItem = vi.fn();
+const mockIsCartApiMutationsEnabled = vi.fn();
+
+vi.mock("@/lib/cart-api-mutations-gate", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/cart-api-mutations-gate")>();
+  return {
+    ...actual,
+    isCartApiMutationsEnabled: () => mockIsCartApiMutationsEnabled(),
+  };
+});
 
 vi.mock("@/lib/cart-session-access", () => ({
   assertCartSessionAccess: (...args: unknown[]) => mockAssertCartSessionAccess(...args),
@@ -38,6 +47,10 @@ vi.mock("@/services/cart.service", () => ({
 }));
 
 import { GET, POST, PATCH, DELETE } from "./route";
+import {
+  CART_API_MUTATIONS_DISABLED_CODE,
+  CART_API_MUTATIONS_DISABLED_MESSAGE,
+} from "@/lib/cart-api-mutations-gate";
 
 const CART_ID = "cart_1";
 const SESSION_A = "sess_a";
@@ -51,6 +64,7 @@ function requestWithSession(url: string, sessionId?: string) {
 describe("/api/cart session ownership", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsCartApiMutationsEnabled.mockReturnValue(false);
     mockResolveGroupOrderActorFromRequest.mockResolvedValue(null);
     mockAuth.mockResolvedValue(null);
     mockGetQuickCartPayload.mockResolvedValue({
@@ -130,7 +144,57 @@ describe("/api/cart session ownership", () => {
     });
   });
 
-  describe("POST mutations", () => {
+  describe("POST/PATCH/DELETE disabled by default", () => {
+    it("POST returns 410 without touching cart service", async () => {
+      const res = await POST(
+        new NextRequest("http://localhost/api/cart", {
+          method: "POST",
+          headers: { cookie: `mennyu_session=${SESSION_A}` },
+          body: JSON.stringify({ cartId: CART_ID, menuItemId: "item_1", quantity: 1 }),
+        })
+      );
+
+      expect(res.status).toBe(410);
+      expect(await res.json()).toEqual({
+        error: CART_API_MUTATIONS_DISABLED_MESSAGE,
+        code: CART_API_MUTATIONS_DISABLED_CODE,
+      });
+      expect(mockAssertCartSessionAccess).not.toHaveBeenCalled();
+      expect(mockAddCartItem).not.toHaveBeenCalled();
+    });
+
+    it("PATCH returns 410 without touching cart service", async () => {
+      const res = await PATCH(
+        new NextRequest("http://localhost/api/cart", {
+          method: "PATCH",
+          body: JSON.stringify({ cartId: CART_ID, cartItemId: "line_1", quantity: 2 }),
+        })
+      );
+
+      expect(res.status).toBe(410);
+      expect((await res.json()).code).toBe(CART_API_MUTATIONS_DISABLED_CODE);
+      expect(mockUpdateCartItem).not.toHaveBeenCalled();
+    });
+
+    it("DELETE returns 410 without touching cart service", async () => {
+      const res = await DELETE(
+        requestWithSession(
+          `http://localhost/api/cart?cartId=${CART_ID}&cartItemId=line_1`,
+          SESSION_A
+        )
+      );
+
+      expect(res.status).toBe(410);
+      expect((await res.json()).code).toBe(CART_API_MUTATIONS_DISABLED_CODE);
+      expect(mockRemoveCartItem).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("POST mutations when ENABLE_CART_API_MUTATIONS", () => {
+    beforeEach(() => {
+      mockIsCartApiMutationsEnabled.mockReturnValue(true);
+    });
+
     it("rejects unauthorized add before mutating", async () => {
       mockAssertCartSessionAccess.mockResolvedValue({
         ok: false,
@@ -173,7 +237,11 @@ describe("/api/cart session ownership", () => {
     });
   });
 
-  describe("PATCH and DELETE", () => {
+  describe("PATCH and DELETE when ENABLE_CART_API_MUTATIONS", () => {
+    beforeEach(() => {
+      mockIsCartApiMutationsEnabled.mockReturnValue(true);
+    });
+
     it("rejects unauthorized update", async () => {
       mockAssertCartSessionAccess.mockResolvedValue({
         ok: false,

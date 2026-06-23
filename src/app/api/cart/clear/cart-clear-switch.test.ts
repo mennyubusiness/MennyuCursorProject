@@ -1,10 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-import { POST } from "./route";
 
 const mockGetSessionId = vi.fn();
 const mockClearForSession = vi.fn();
 const mockClearActiveSoloSwitch = vi.fn();
+const mockAuth = vi.fn();
+
+vi.mock("@/auth", () => ({
+  auth: () => mockAuth(),
+}));
 
 vi.mock("@/lib/session", () => ({
   getSessionIdFromRequest: (...args: unknown[]) => mockGetSessionId(...args),
@@ -15,10 +19,13 @@ vi.mock("@/services/cart.service", () => ({
   clearActiveSoloCartForSessionSwitch: (...args: unknown[]) => mockClearActiveSoloSwitch(...args),
 }));
 
+import { POST } from "./route";
+
 describe("POST /api/cart/clear switchPod", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetSessionId.mockReturnValue("sess_1");
+    mockAuth.mockResolvedValue(null);
   });
 
   it("clears solo cart for pod switch", async () => {
@@ -29,7 +36,9 @@ describe("POST /api/cart/clear switchPod", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(200);
-    expect(mockClearActiveSoloSwitch).toHaveBeenCalledWith("cart_1", "sess_1");
+    expect(mockClearActiveSoloSwitch).toHaveBeenCalledWith("cart_1", "sess_1", {
+      authUserId: null,
+    });
     expect(mockClearForSession).not.toHaveBeenCalled();
   });
 

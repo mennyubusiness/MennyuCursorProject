@@ -26,6 +26,10 @@ Multi-vendor food ordering platform for food cart pods. One cart, one payment, o
    npm run dev
    ```
 
+## Pre-beta deploy
+
+Before staging or production beta with real pods/vendors, follow **[docs/PRE_BETA_DEPLOYMENT_CHECKLIST.md](docs/PRE_BETA_DEPLOYMENT_CHECKLIST.md)** (migrations, env flags, Stripe/Twilio/Deliverect, smoke tests).
+
 ## Key flows
 
 - **Cart**: Session + pod scoped; add items from multiple vendors in one pod.

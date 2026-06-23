@@ -29,8 +29,7 @@ import {
   tryRecoverCartForMutation,
 } from "@/lib/cart-mutation-access-recovery";
 
-/** TEMP: set false to silence add-to-cart trace logs */
-const DEBUG_ADD_TO_CART_TRACE = true;
+import { isAddToCartTraceEnabled } from "@/lib/debug-add-to-cart-trace";
 
 type CartActionAccessDenied = {
   ok: false;
@@ -169,7 +168,7 @@ export async function addToCartAction(
   selections?: CartItemSelectionInput[] | null,
   podId?: string | null
 ): Promise<AddToCartResult> {
-  if (DEBUG_ADD_TO_CART_TRACE) {
+  if (isAddToCartTraceEnabled()) {
     console.log("[addToCartAction] enter", {
       cartId,
       menuItemId,
@@ -233,7 +232,7 @@ export async function addToCartAction(
       selections,
       access.actor
     );
-    if (DEBUG_ADD_TO_CART_TRACE) {
+    if (isAddToCartTraceEnabled()) {
       console.log("[addToCartAction] addCartItem ok", {
         cartId: cart.id,
         podId: cart.podId,
@@ -245,7 +244,7 @@ export async function addToCartAction(
     return { success: true, cart, ...(recoveredCart ? { recoveredCart: true } : {}) };
   } catch (e) {
     if (e instanceof CartValidationError) {
-      if (DEBUG_ADD_TO_CART_TRACE) {
+      if (isAddToCartTraceEnabled()) {
         console.warn("[addToCartAction] CartValidationError", {
           code: e.code,
           message: e.message,
@@ -259,7 +258,7 @@ export async function addToCartAction(
         ...e.details,
       };
     }
-    if (DEBUG_ADD_TO_CART_TRACE) {
+    if (isAddToCartTraceEnabled()) {
       console.error("[addToCartAction] non-validation error (rethrowing)", e);
     }
     throw e;

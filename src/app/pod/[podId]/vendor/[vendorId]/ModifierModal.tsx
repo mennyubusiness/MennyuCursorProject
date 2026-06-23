@@ -23,7 +23,7 @@ import {
   classifyNestedModifierGroup,
 } from "@/lib/modifier-group-rules";
 
-const DEBUG_ADD_TO_CART_TRACE = false;
+import { isAddToCartTraceEnabled } from "@/lib/debug-add-to-cart-trace";
 
 type SelectionState = Record<string, number>;
 
@@ -284,7 +284,7 @@ export function ModifierModal({
 
   async function submit() {
     if (!requiredSatisfied) {
-      if (DEBUG_ADD_TO_CART_TRACE) {
+      if (isAddToCartTraceEnabled()) {
         console.log("[ModifierModal] submit skipped (requiredSatisfied=false)");
       }
       return;
@@ -331,7 +331,7 @@ export function ModifierModal({
     setError(null);
     const cartSnapshot = vendorMenuCart?.cart ?? null;
     if (isEditMode && cartItemId) {
-      if (DEBUG_ADD_TO_CART_TRACE) {
+      if (isAddToCartTraceEnabled()) {
         console.log("[ModifierModal] submit → updateCartItemAction", {
           cartId,
           cartItemId,
@@ -348,7 +348,7 @@ export function ModifierModal({
         podId
       );
       setLoading(false);
-      if (DEBUG_ADD_TO_CART_TRACE) {
+      if (isAddToCartTraceEnabled()) {
         console.log("[ModifierModal] updateCartItemAction returned", { success: result?.success, error: result && !result.success ? result.error : undefined });
       }
       if (result?.success) {

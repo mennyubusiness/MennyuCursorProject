@@ -19,6 +19,10 @@ import {
   GROUP_ORDER_JOIN_TOKEN_COOKIE,
 } from "@/lib/group-order-cookies";
 import { getOrSetSessionId, buildSessionCookieHeader, getSessionIdFromRequest } from "@/lib/session";
+import {
+  isCartApiMutationsEnabled,
+  rejectDisabledCartApiMutation,
+} from "@/lib/cart-api-mutations-gate";
 
 async function resolveAuthUserId(): Promise<string | null> {
   const authSession = await auth();
@@ -65,7 +69,16 @@ export async function GET(request: NextRequest) {
   return res;
 }
 
+/**
+ * Legacy REST cart line mutations (add / update / remove).
+ * First-party UI mutates carts via `cart.actions` Server Actions, which include stale
+ * cart/session recovery. These handlers remain behind ENABLE_CART_API_MUTATIONS for
+ * exceptional integrations only.
+ */
 export async function POST(request: NextRequest) {
+  if (!isCartApiMutationsEnabled()) {
+    return rejectDisabledCartApiMutation("POST");
+  }
   const body = await request.json();
   const { cartId, menuItemId, quantity = 1, specialInstructions, selections } = body;
   if (!cartId || !menuItemId) {
@@ -117,7 +130,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/** @see POST — legacy; prefer cart.actions. Gated by ENABLE_CART_API_MUTATIONS. */
 export async function PATCH(request: NextRequest) {
+  if (!isCartApiMutationsEnabled()) {
+    return rejectDisabledCartApiMutation("PATCH");
+  }
   const body = await request.json();
   const { cartId, cartItemId, quantity, specialInstructions, selections } = body;
   if (!cartId || !cartItemId) {
@@ -164,7 +181,11 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+/** @see POST — legacy; prefer cart.actions. Gated by ENABLE_CART_API_MUTATIONS. */
 export async function DELETE(request: NextRequest) {
+  if (!isCartApiMutationsEnabled()) {
+    return rejectDisabledCartApiMutation("DELETE");
+  }
   const { searchParams } = new URL(request.url);
   const cartId = searchParams.get("cartId");
   const cartItemId = searchParams.get("cartItemId");
