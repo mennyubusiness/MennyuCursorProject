@@ -4,8 +4,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
-  SMS_ACCOUNT_OPT_IN_LABEL,
-  SMS_TRANSACTIONAL_COMPLIANCE_DISCLOSURE,
+  SMS_PHONE_NUMBER_LABEL,
+  SMS_PHONE_OPTIONAL_TAG,
+  SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL,
 } from "@/lib/legal/sms-consent-copy";
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,12 @@ describe("account phone settings card", () => {
     expect(phoneSectionSrc).toMatch(/Use your phone number for verification and optional order updates/);
     expect(phoneSectionSrc).toMatch(/track orders from the order status screen after checkout/);
     expect(phoneSectionSrc).not.toMatch(/Phone for order updates/);
+  });
+
+  it("shows Phone Number Optional label in edit mode", () => {
+    expect(phoneSectionSrc).toMatch(/SmsPhoneNumberLabel/);
+    expect(SMS_PHONE_NUMBER_LABEL).toBe("Phone Number");
+    expect(SMS_PHONE_OPTIONAL_TAG).toBe("Optional");
   });
 
   it("shows current phone, verified status, and SMS on/off in read-only state", () => {
@@ -63,7 +70,6 @@ describe("account phone settings card", () => {
     expect(phoneSectionSrc).toMatch(/storedSmsConsent/);
     expect(phoneSectionSrc).toMatch(/linkedPhoneE164/);
     expect(phoneSectionSrc).toMatch(/normalized\.e164 === linkedPhoneE164/);
-    expect(phoneSectionSrc).toMatch(/layout="account"/);
   });
 
   it("requires SMS consent before sending verification code", () => {
@@ -84,24 +90,26 @@ describe("account phone settings card", () => {
     expect(accountViewModelSrc).toMatch(/smsUpdatesOn/);
   });
 
-  it("records SMS opt-in only when consent is granted on verify", () => {
+  it("records transactional SMS opt-in only when consent is granted on verify", () => {
     expect(verifyCodeSrc).toMatch(/smsConsent/);
     expect(verifyCodeSrc).toMatch(/recordSmsOptIn/);
+    expect(verifyCodeSrc).not.toMatch(/marketing/i);
     expect(phoneSectionSrc).toMatch(/smsConsent,/);
   });
 
-  it("includes compliance disclosure with carrier liability and policy links in edit mode", () => {
-    expect(smsCheckboxSrc).toMatch(/layout === "account"/);
-    expect(smsCheckboxSrc).toMatch(/SMS_ACCOUNT_OPT_IN_LABEL/);
-    expect(SMS_ACCOUNT_OPT_IN_LABEL).toBe("Send me transactional SMS updates.");
-    expect(smsCheckboxSrc).toMatch(/Carriers are not liable for[\s\S]*delayed or undelivered messages/);
-    expect(smsCheckboxSrc).toMatch(/Message frequency varies/);
-    expect(smsCheckboxSrc).toMatch(/Message and data rates may apply/);
-    expect(smsCheckboxSrc).toMatch(/Reply STOP to opt out or HELP for help/);
+  it("uses Twilio-aligned disclosure with disabled marketing row and legal links", () => {
+    expect(smsCheckboxSrc).toMatch(/SMS_MARKETING_NOT_OFFERED_LABEL/);
+    expect(smsCheckboxSrc).toMatch(/SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL/);
+    expect(smsCheckboxSrc).toMatch(/disabled/);
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("order updates");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("account notifications");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("verification codes");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("Open Order");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toMatch(/Message frequency may vary/i);
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toMatch(/Message and data rates may apply/i);
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toMatch(/Reply HELP for help/i);
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toMatch(/STOP to opt-out/i);
     expect(smsCheckboxSrc).toMatch(/href="\/privacy"/);
     expect(smsCheckboxSrc).toMatch(/href="\/terms"/);
-    expect(SMS_TRANSACTIONAL_COMPLIANCE_DISCLOSURE).toContain(
-      "Carriers are not liable for delayed or undelivered messages"
-    );
   });
 });

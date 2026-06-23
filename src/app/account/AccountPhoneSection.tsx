@@ -10,7 +10,7 @@ import {
   accountHubSectionTitleClass,
 } from "./account-hub-styles";
 import { buttonClassName } from "@/components/ui/button";
-import { SmsConsentCheckbox } from "@/components/legal/SmsConsentCheckbox";
+import { SmsConsentCheckbox, SmsPhoneNumberLabel } from "@/components/legal/SmsConsentCheckbox";
 import { cn } from "@/lib/cn";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
 
@@ -257,8 +257,8 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
       {mode === "edit" && (
         <div className="mt-4 space-y-4">
           <div>
-            <label htmlFor="account-phone" className="oo-label">
-              Mobile number
+            <label htmlFor="account-phone" className="oo-label block">
+              <SmsPhoneNumberLabel />
             </label>
             <input
               id="account-phone"
@@ -271,7 +271,6 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
             />
             <SmsConsentCheckbox
               id="account-sms-consent"
-              layout="account"
               checked={smsConsent}
               onChange={setSmsConsent}
               className="mt-3 max-w-md"

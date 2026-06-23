@@ -4,23 +4,30 @@ import { describe, expect, it } from "vitest";
 
 import {
   SMS_ACTIVE_OPT_IN_PATHS,
+  SMS_MARKETING_NOT_OFFERED_LABEL,
   SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL,
+  TWILIO_CONSENT_FORM_SCREENSHOT_URL,
 } from "./sms-consent-copy";
 
 const root = join(process.cwd(), "src");
 
 describe("sms-consent-copy", () => {
-  it("uses Open Order brand and required transactional message types", () => {
+  it("uses Open Order brand and required transactional disclosure language", () => {
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("Open Order");
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).not.toContain("OpenOrder");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("order updates");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("account notifications");
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("verification codes");
-    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("order issue notifications");
-    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("Reply STOP");
-    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain(
-      "Carriers are not liable for delayed or undelivered messages"
-    );
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("Message frequency may vary");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("Message and data rates may apply");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toMatch(/Reply HELP for help/i);
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toMatch(/STOP to opt-out/i);
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).not.toMatch(/marketing/i);
-    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).not.toMatch(/completed-order/i);
+  });
+
+  it("documents marketing SMS as not offered", () => {
+    expect(SMS_MARKETING_NOT_OFFERED_LABEL).toMatch(/not currently offered/i);
+    expect(SMS_MARKETING_NOT_OFFERED_LABEL).toMatch(/does not send marketing or promotional/i);
   });
 
   it("lists only active opt-in paths without group order join", () => {
@@ -44,6 +51,7 @@ describe("SMS compliance pages and forms", () => {
   const accountPhoneSrc = readFileSync(join(root, "app/account/AccountPhoneSection.tsx"), "utf8");
   const groupJoinSrc = readFileSync(join(root, "app/group-order/join/GroupOrderJoinForm.tsx"), "utf8");
   const checkboxSrc = readFileSync(join(root, "components/legal/SmsConsentCheckbox.tsx"), "utf8");
+  const verifyCodeSrc = readFileSync(join(root, "app/api/customer/phone/verify-code/route.ts"), "utf8");
   const templatesSrc = readFileSync(join(root, "lib/sms-templates.ts"), "utf8");
 
   it("privacy policy includes SMS non-sharing language and Open Order brand", () => {
@@ -65,6 +73,8 @@ describe("SMS compliance pages and forms", () => {
     expect(smsPageSrc).toMatch(/Supported SMS opt-in paths/);
     expect(smsPageSrc).toMatch(/SMS_ACTIVE_OPT_IN_PATHS/);
     expect(smsPageSrc).toMatch(/not.*an SMS opt-in path/);
+    expect(smsPageSrc).toMatch(/marketing or promotional SMS/);
+    expect(smsPageSrc).toMatch(/transactional checkbox below is the only active web/);
     expect(SMS_ACTIVE_OPT_IN_PATHS.join(" ")).not.toMatch(/group order join/i);
     expect(smsPageSrc).toMatch(/SmsConsentCheckoutReviewerMockup/);
     expect(smsPageSrc).toMatch(/SmsConsentAccountReviewerMockup/);
@@ -78,8 +88,18 @@ describe("SMS compliance pages and forms", () => {
     expect(smsPageSrc).toMatch(/\/terms/);
     expect(smsPageSrc).toMatch(/consent is stored when the order is placed/);
     expect(smsMockSrc).toMatch(/data-sms-reviewer-mockup/);
+    expect(smsMockSrc).toMatch(/SMS_MARKETING_NOT_OFFERED_LABEL/);
+    expect(smsMockSrc).toMatch(/SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL/);
+    expect(smsMockSrc).toMatch(/SMS_PHONE_NUMBER_LABEL/);
+    expect(smsMockSrc).toMatch(/SMS_PHONE_OPTIONAL_TAG/);
     expect(smsMockSrc).toMatch(/href="\/privacy"/);
     expect(smsMockSrc).toMatch(/href="\/terms"/);
+    expect(smsPageSrc).toMatch(/Twilio reviewer consent form screenshot/);
+    expect(smsPageSrc).toMatch(/TWILIO_CONSENT_FORM_SCREENSHOT_URL/);
+    expect(smsPageSrc).toMatch(/TWILIO_CONSENT_FORM_SCREENSHOT_PATH/);
+    expect(TWILIO_CONSENT_FORM_SCREENSHOT_URL).toBe(
+      "https://openorderco.com/twilio/consent-form.png"
+    );
   });
 
   it("footer links to privacy, terms, and SMS consent", () => {
@@ -88,14 +108,29 @@ describe("SMS compliance pages and forms", () => {
     expect(footerSrc).toMatch(/href="\/sms-consent"/);
   });
 
-  it("checkout and account use unchecked SMS consent checkbox", () => {
+  it("checkout and account use Twilio-aligned SMS consent with disabled marketing row", () => {
     expect(checkoutFormSrc).toMatch(/useState\(initialSmsConsent\)/);
     expect(checkoutPageSrc).toMatch(/hasTransactionalSmsConsent/);
     expect(checkoutPhoneSrc).toMatch(/SmsConsentCheckbox/);
+    expect(checkoutPhoneSrc).toMatch(/SmsPhoneNumberLabel/);
     expect(accountPhoneSrc).toMatch(/SmsConsentCheckbox/);
+    expect(accountPhoneSrc).toMatch(/SmsPhoneNumberLabel/);
     expect(accountPhoneSrc).toMatch(/smsConsent/);
-    expect(checkboxSrc).toMatch(/type="checkbox"/);
+    expect(checkboxSrc).toMatch(/SMS_MARKETING_NOT_OFFERED_LABEL/);
+    expect(checkboxSrc).toMatch(/SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL/);
+    expect(checkboxSrc).toMatch(/disabled/);
+    expect(checkboxSrc).toMatch(/name="smsMarketingConsent"/);
+    expect(checkboxSrc).toMatch(/name="smsConsent"/);
+    expect(checkboxSrc).toMatch(/href="\/privacy"/);
+    expect(checkboxSrc).toMatch(/href="\/terms"/);
     expect(checkboxSrc).not.toMatch(/defaultChecked/);
+  });
+
+  it("does not store marketing consent", () => {
+    expect(verifyCodeSrc).toMatch(/smsConsent/);
+    expect(verifyCodeSrc).not.toMatch(/marketing/i);
+    expect(checkboxSrc).toMatch(/readOnly/);
+    expect(checkboxSrc).toMatch(/checked={false}/);
   });
 
   it("group join does not collect SMS consent", () => {
@@ -109,7 +144,12 @@ describe("SMS compliance pages and forms", () => {
     expect(accountPhoneSrc).toMatch(/disabled={otpSending \|\| !phone\.trim\(\) \|\| !smsConsent}/);
   });
 
-  it("ORDER_RECEIVED template includes HELP language", () => {
-    expect(templatesSrc).toMatch(/Reply HELP for help or STOP to opt out/);
+  it("exposes public Twilio consent screenshot asset", () => {
+    expect(
+      readFileSync(join(process.cwd(), "public/twilio/consent-form.png"))
+    ).toBeDefined();
+    expect(TWILIO_CONSENT_FORM_SCREENSHOT_URL).toBe(
+      "https://openorderco.com/twilio/consent-form.png"
+    );
   });
 });

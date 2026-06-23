@@ -3,10 +3,9 @@
 import Link from "next/link";
 
 import {
-  SMS_ACCOUNT_OPT_IN_LABEL,
-  SMS_CHECKOUT_OPT_IN_LABEL,
-  SMS_MESSAGE_TYPES_INLINE,
-  SMS_TRANSACTIONAL_COMPLIANCE_DISCLOSURE,
+  SMS_MARKETING_NOT_OFFERED_LABEL,
+  SMS_PHONE_NUMBER_LABEL,
+  SMS_PHONE_OPTIONAL_TAG,
   SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL,
 } from "@/lib/legal/sms-consent-copy";
 
@@ -16,65 +15,45 @@ type SmsConsentCheckboxProps = {
   onChange: (checked: boolean) => void;
   className?: string;
   disabled?: boolean;
-  /** Checkout/account use a short opt-in label with compliance disclosure below. */
+  /** @deprecated Checkout and account share the same Twilio disclosure layout. */
   layout?: "checkout" | "account" | "full";
 };
 
-function ComplianceDisclosure({ className = "" }: { className?: string }) {
+const checkboxClassName =
+  "mt-0.5 h-4 w-4 shrink-0 rounded border-stone-300 text-brand focus:ring-brand";
+
+const disclosureBoxClassName =
+  "rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-3";
+
+/** Shared phone field label: "Phone Number" with inline Optional tag. */
+export function SmsPhoneNumberLabel({ className = "" }: { className?: string }) {
   return (
-    <p className={`text-xs leading-relaxed text-oo-stone-gray ${className}`.trim()}>
-      Messages may include {SMS_MESSAGE_TYPES_INLINE}.
-      Message frequency varies. Message and data rates may apply. Carriers are not liable for
-      delayed or undelivered messages. Reply STOP to opt out or HELP for help. View our{" "}
+    <span className={`text-sm font-semibold text-oo-charcoal ${className}`.trim()}>
+      {SMS_PHONE_NUMBER_LABEL}{" "}
+      <span className="ml-1 inline-flex rounded-md bg-oo-cream px-1.5 py-0.5 text-xs font-medium text-oo-stone-gray">
+        {SMS_PHONE_OPTIONAL_TAG}
+      </span>
+    </span>
+  );
+}
+
+function SmsLegalLinks({ className = "" }: { className?: string }) {
+  return (
+    <p className={`text-xs text-oo-stone-gray ${className}`.trim()}>
       <Link href="/privacy" className="font-semibold text-brand hover:underline">
         Privacy Policy
-      </Link>{" "}
-      and{" "}
+      </Link>
+      <span aria-hidden="true"> · </span>
       <Link href="/terms" className="font-semibold text-brand hover:underline">
         Terms of Service
       </Link>
-      .
     </p>
   );
 }
 
-function ShortOptInCheckbox({
-  id,
-  checked,
-  onChange,
-  disabled,
-  label,
-  className,
-}: {
-  id: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  disabled?: boolean;
-  label: string;
-  className?: string;
-}) {
-  return (
-    <div className={className}>
-      <label htmlFor={id} className="flex cursor-pointer gap-2.5 text-sm text-oo-charcoal">
-        <input
-          id={id}
-          name="smsConsent"
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          disabled={disabled}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-stone-300 text-brand focus:ring-brand"
-        />
-        <span>{label}</span>
-      </label>
-      <ComplianceDisclosure className="mt-2 pl-6" />
-      <span className="sr-only">{SMS_TRANSACTIONAL_COMPLIANCE_DISCLOSURE}</span>
-    </div>
-  );
-}
-
 /**
- * Unchecked-by-default transactional SMS opt-in (TCPA / A2P).
+ * Twilio-aligned SMS consent block: disabled marketing row, active transactional row, legal links.
+ * Transactional checkbox is unchecked by default unless parent restores stored consent.
  */
 export function SmsConsentCheckbox({
   id,
@@ -82,52 +61,43 @@ export function SmsConsentCheckbox({
   onChange,
   className = "",
   disabled = false,
-  layout = "full",
 }: SmsConsentCheckboxProps) {
-  if (layout === "checkout") {
-    return (
-      <ShortOptInCheckbox
-        id={id}
-        checked={checked}
-        onChange={onChange}
-        disabled={disabled}
-        label={SMS_CHECKOUT_OPT_IN_LABEL}
-        className={className}
-      />
-    );
-  }
-
-  if (layout === "account") {
-    return (
-      <ShortOptInCheckbox
-        id={id}
-        checked={checked}
-        onChange={onChange}
-        disabled={disabled}
-        label={SMS_ACCOUNT_OPT_IN_LABEL}
-        className={className}
-      />
-    );
-  }
+  const marketingId = `${id}-marketing`;
 
   return (
-    <div className={className}>
-      <label
-        htmlFor={id}
-        className="flex cursor-pointer gap-2.5 text-xs leading-relaxed text-oo-stone-gray"
-      >
-        <input
-          id={id}
-          name="smsConsent"
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          disabled={disabled}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-stone-300 text-brand focus:ring-brand"
-        />
-        <span>{SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL}</span>
-      </label>
-      <span className="sr-only">{SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL}</span>
+    <div className={`space-y-3 ${className}`.trim()}>
+      <div className={disclosureBoxClassName}>
+        <label htmlFor={marketingId} className="flex gap-2.5 text-sm text-oo-stone-gray">
+          <input
+            id={marketingId}
+            name="smsMarketingConsent"
+            type="checkbox"
+            checked={false}
+            disabled
+            readOnly
+            aria-disabled="true"
+            className={`${checkboxClassName} cursor-not-allowed opacity-60`}
+          />
+          <span>{SMS_MARKETING_NOT_OFFERED_LABEL}</span>
+        </label>
+      </div>
+
+      <div className={`${disclosureBoxClassName} bg-white`}>
+        <label htmlFor={id} className="flex cursor-pointer gap-2.5 text-sm leading-relaxed text-oo-charcoal">
+          <input
+            id={id}
+            name="smsConsent"
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => onChange(e.target.checked)}
+            disabled={disabled}
+            className={checkboxClassName}
+          />
+          <span>{SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL}</span>
+        </label>
+      </div>
+
+      <SmsLegalLinks />
     </div>
   );
 }

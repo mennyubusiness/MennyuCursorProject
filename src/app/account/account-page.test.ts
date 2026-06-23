@@ -85,7 +85,7 @@ describe("/account phone for order updates", () => {
 
   it("uses optional SMS consent in edit mode only", () => {
     expect(phoneSectionSrc).toMatch(/SmsConsentCheckbox/);
-    expect(phoneSectionSrc).toMatch(/layout="account"/);
+    expect(phoneSectionSrc).toMatch(/SmsPhoneNumberLabel/);
     expect(phoneSectionSrc).toMatch(/smsConsent/);
   });
 });
@@ -152,8 +152,9 @@ describe("phone-only history removed", () => {
 
 describe("checkout phone verification copy", () => {
   it("describes optional SMS and order status tracking", () => {
-    expect(checkoutFormSrc).toMatch(/Add a mobile number if you want SMS updates/);
-    expect(checkoutPhoneSrc).toMatch(/Mobile number \(optional\)/);
+    expect(checkoutFormSrc).toMatch(/Optional contact info for receipts and SMS updates/);
+    expect(checkoutPhoneSrc).toMatch(/SmsPhoneNumberLabel/);
+    expect(checkoutPhoneSrc).toMatch(/You can still track your order on the order status page/);
   });
 
   it("requires SMS consent only for send-code verification flow", () => {

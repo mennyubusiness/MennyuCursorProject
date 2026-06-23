@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { SmsConsentCheckbox } from "@/components/legal/SmsConsentCheckbox";
+import { SmsConsentCheckbox, SmsPhoneNumberLabel } from "@/components/legal/SmsConsentCheckbox";
 import { buttonClassName } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
@@ -148,8 +148,8 @@ export function CheckoutPhoneVerification({
   return (
     <div className="space-y-4">
       <div>
-        <label htmlFor="phone" className="block text-sm font-semibold text-oo-charcoal">
-          Mobile number <span className="font-normal text-oo-stone-gray">(optional)</span>
+        <label htmlFor="phone" className="block">
+          <SmsPhoneNumberLabel />
         </label>
         <p className="mt-1 text-sm text-oo-stone-gray">
           We&apos;ll use this only for order updates if you choose SMS.
@@ -165,7 +165,6 @@ export function CheckoutPhoneVerification({
         />
         <SmsConsentCheckbox
           id="checkout-sms-consent"
-          layout="checkout"
           checked={smsConsent}
           onChange={onSmsConsentChange}
           className="mt-4 max-w-md"

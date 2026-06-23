@@ -4,8 +4,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
-  SMS_CHECKOUT_OPT_IN_LABEL,
-  SMS_TRANSACTIONAL_COMPLIANCE_DISCLOSURE,
+  SMS_PHONE_NUMBER_LABEL,
+  SMS_PHONE_OPTIONAL_TAG,
+  SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL,
 } from "@/lib/legal/sms-consent-copy";
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -17,8 +18,10 @@ const smsCheckboxSrc = readFileSync(
 );
 
 describe("checkout contact SMS UX", () => {
-  it("does not show a required asterisk on mobile number", () => {
-    expect(checkoutPhoneSrc).toMatch(/Mobile number[\s\S]*\(optional\)/);
+  it("shows Phone Number label with Optional tag", () => {
+    expect(checkoutPhoneSrc).toMatch(/SmsPhoneNumberLabel/);
+    expect(SMS_PHONE_NUMBER_LABEL).toBe("Phone Number");
+    expect(SMS_PHONE_OPTIONAL_TAG).toBe("Optional");
     expect(checkoutPhoneSrc).not.toMatch(/text-red-600">\*/);
     expect(checkoutPhoneSrc).not.toMatch(/\srequired/);
   });
@@ -60,19 +63,20 @@ describe("checkout contact SMS UX", () => {
     );
   });
 
-  it("uses checkout opt-in label with compliance disclosure and policy links", () => {
-    expect(smsCheckboxSrc).toMatch(/layout === "checkout"/);
-    expect(smsCheckboxSrc).toMatch(/SMS_CHECKOUT_OPT_IN_LABEL/);
+  it("uses Twilio-aligned disclosure boxes with transactional opt-in and legal links", () => {
+    expect(smsCheckboxSrc).toMatch(/SMS_MARKETING_NOT_OFFERED_LABEL/);
+    expect(smsCheckboxSrc).toMatch(/SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL/);
+    expect(smsCheckboxSrc).toMatch(/disabled/);
     expect(smsCheckboxSrc).toMatch(/href="\/privacy"/);
     expect(smsCheckboxSrc).toMatch(/href="\/terms"/);
-    expect(smsCheckboxSrc).toMatch(/Carriers are not liable for[\s\S]*delayed or undelivered messages/);
-    expect(smsCheckboxSrc).toMatch(/Reply STOP to opt out or HELP for help/);
     expect(smsCheckboxSrc).toMatch(/type="checkbox"/);
     expect(smsCheckboxSrc).not.toMatch(/defaultChecked/);
-    expect(SMS_CHECKOUT_OPT_IN_LABEL).toBe(
-      "Send me transactional SMS updates for this order."
-    );
-    expect(SMS_TRANSACTIONAL_COMPLIANCE_DISCLOSURE).toContain("Privacy Policy");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("order updates");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("account notifications");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("verification codes");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("Open Order");
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toMatch(/Reply HELP for help/i);
+    expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toMatch(/STOP to opt-out/i);
   });
 
   it("routes successful checkout to the order status page", () => {

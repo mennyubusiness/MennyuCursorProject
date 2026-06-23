@@ -2,9 +2,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import {
-  SMS_ACCOUNT_OPT_IN_LABEL,
-  SMS_CHECKOUT_OPT_IN_LABEL,
-  SMS_MESSAGE_TYPES_INLINE,
+  SMS_MARKETING_NOT_OFFERED_LABEL,
+  SMS_PHONE_NUMBER_LABEL,
+  SMS_PHONE_OPTIONAL_TAG,
+  SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL,
 } from "@/lib/legal/sms-consent-copy";
 
 function MockPanel({
@@ -27,45 +28,80 @@ function MockPanel({
   );
 }
 
-function MockCheckbox({
+const disclosureBoxClassName =
+  "rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-3";
+
+function MockPhoneNumberLabel() {
+  return (
+    <p className="text-sm font-semibold text-oo-charcoal">
+      {SMS_PHONE_NUMBER_LABEL}{" "}
+      <span className="ml-1 inline-flex rounded-md bg-oo-cream px-1.5 py-0.5 text-xs font-medium text-oo-stone-gray">
+        {SMS_PHONE_OPTIONAL_TAG}
+      </span>
+    </p>
+  );
+}
+
+function MockCheckboxBox({
   id,
   label,
   checked = false,
+  disabled = false,
+  variant = "muted",
 }: {
   id: string;
   label: string;
   checked?: boolean;
+  disabled?: boolean;
+  variant?: "muted" | "active";
 }) {
   return (
-    <label htmlFor={id} className="flex cursor-default gap-2.5 text-sm text-oo-charcoal">
-      <input
-        id={id}
-        type="checkbox"
-        readOnly
-        checked={checked}
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-stone-300 text-brand"
-        aria-hidden
-      />
-      <span>{label}</span>
-    </label>
+    <div className={`${disclosureBoxClassName} ${variant === "active" ? "bg-white" : ""}`.trim()}>
+      <label htmlFor={id} className="flex cursor-default gap-2.5 text-sm leading-relaxed text-oo-charcoal">
+        <input
+          id={id}
+          type="checkbox"
+          readOnly
+          checked={checked}
+          disabled={disabled}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-stone-300 text-brand"
+          aria-hidden
+        />
+        <span className={disabled ? "text-oo-stone-gray" : undefined}>{label}</span>
+      </label>
+    </div>
   );
 }
 
-function MockComplianceDisclosure() {
+function MockLegalLinks() {
   return (
-    <p className="mt-2 pl-6 text-xs leading-relaxed text-oo-stone-gray">
-      Messages may include {SMS_MESSAGE_TYPES_INLINE}. Message frequency varies. Message and data rates
-      may apply. Carriers are not liable for delayed or undelivered messages. Reply STOP to opt out or
-      HELP for help. View our{" "}
+    <p className="text-xs text-oo-stone-gray">
       <Link href="/privacy" className="font-semibold text-brand hover:underline">
         Privacy Policy
-      </Link>{" "}
-      and{" "}
+      </Link>
+      <span aria-hidden="true"> · </span>
       <Link href="/terms" className="font-semibold text-brand hover:underline">
         Terms of Service
       </Link>
-      .
     </p>
+  );
+}
+
+function MockSmsConsentStack({ transactionalId }: { transactionalId: string }) {
+  return (
+    <div className="space-y-3">
+      <MockCheckboxBox
+        id={`${transactionalId}-marketing`}
+        label={SMS_MARKETING_NOT_OFFERED_LABEL}
+        disabled
+      />
+      <MockCheckboxBox
+        id={transactionalId}
+        label={SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL}
+        variant="active"
+      />
+      <MockLegalLinks />
+    </div>
   );
 }
 
@@ -74,9 +110,7 @@ export function SmsConsentCheckoutReviewerMockup() {
     <MockPanel title="Checkout contact section">
       <div className="space-y-4">
         <div>
-          <p className="text-sm font-semibold text-oo-charcoal">
-            Mobile number <span className="font-normal text-oo-stone-gray">(optional)</span>
-          </p>
+          <MockPhoneNumberLabel />
           <p className="mt-1 text-sm text-oo-stone-gray">
             We&apos;ll use this only for order updates if you choose SMS.
           </p>
@@ -88,16 +122,16 @@ export function SmsConsentCheckoutReviewerMockup() {
           </div>
         </div>
         <div className="max-w-md">
-          <MockCheckbox id="mock-checkout-sms" label={SMS_CHECKOUT_OPT_IN_LABEL} />
-          <MockComplianceDisclosure />
+          <MockSmsConsentStack transactionalId="mock-checkout-sms" />
         </div>
         <p className="rounded-lg border border-oo-light-stone bg-oo-cream/60 px-3 py-3 text-sm text-oo-stone-gray">
           You can still track your order on the order status page.
         </p>
         <p className="text-xs text-oo-stone-gray">
-          SMS checkbox is <strong className="text-oo-charcoal">optional</strong> and{" "}
-          <strong className="text-oo-charcoal">unchecked by default</strong> unless the signed-in
-          customer already has stored transactional consent.
+          Open Order does not send marketing or promotional SMS. The transactional checkbox is the
+          active opt-in path. SMS is optional and not required to place an order. The transactional
+          checkbox is <strong className="text-oo-charcoal">unchecked by default</strong> unless the
+          signed-in customer already has stored transactional consent.
         </p>
       </div>
     </MockPanel>
@@ -113,7 +147,7 @@ export function SmsConsentAccountReviewerMockup() {
           from the order status screen after checkout.
         </p>
         <div>
-          <p className="text-sm font-semibold text-oo-charcoal">Mobile number</p>
+          <MockPhoneNumberLabel />
           <div
             className="mt-2 max-w-md rounded-lg border border-dashed border-oo-light-stone bg-oo-cream/40 px-3 py-2 text-sm text-oo-stone-gray"
             aria-hidden
@@ -122,16 +156,16 @@ export function SmsConsentAccountReviewerMockup() {
           </div>
         </div>
         <div className="max-w-md">
-          <MockCheckbox id="mock-account-sms" label={SMS_ACCOUNT_OPT_IN_LABEL} />
-          <MockComplianceDisclosure />
+          <MockSmsConsentStack transactionalId="mock-account-sms" />
         </div>
         <p className="text-sm text-oo-stone-gray">
-          Customer must check SMS updates before &ldquo;Send verification code&rdquo; is enabled.
-          Transactional SMS opt-in is recorded when verification completes with the checkbox still
-          checked.
+          Customer must check transactional SMS consent before &ldquo;Send verification code&rdquo; is
+          enabled. Transactional SMS opt-in is recorded when verification completes with the checkbox
+          still checked.
         </p>
         <p className="text-xs text-oo-stone-gray">
-          SMS checkbox is <strong className="text-oo-charcoal">optional</strong> and{" "}
+          Marketing SMS is disabled and not offered. Group order join is not an SMS opt-in path. The
+          transactional checkbox is <strong className="text-oo-charcoal">optional</strong> and{" "}
           <strong className="text-oo-charcoal">unchecked by default</strong> unless editing the same
           verified number that already has stored consent.
         </p>
