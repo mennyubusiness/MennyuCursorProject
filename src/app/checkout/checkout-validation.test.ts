@@ -51,8 +51,10 @@ describe("cart live checkout gate", () => {
 });
 
 describe("checkout payment lifecycle guards", () => {
-  it("reuses existing pending_payment order for same cart", () => {
+  it("revalidates cart before reusing pending_payment order for same cart", () => {
     expect(orderServiceSrc).toMatch(/sourceCartId: input\.cartId, status: "pending_payment"/);
+    expect(orderServiceSrc).toMatch(/evaluatePendingOrderReuse/);
+    expect(orderServiceSrc).toMatch(/validateCartForOrder/);
   });
 
   it("inline Stripe success navigates with payment=success for reconcile", () => {

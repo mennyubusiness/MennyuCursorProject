@@ -9,6 +9,7 @@ const mockFindStalled = vi.fn();
 const mockPodFindUnique = vi.fn();
 const mockPodUpdate = vi.fn();
 const mockDeliverectSyncDebug = vi.fn();
+const mockPayoutFindMany = vi.fn();
 
 vi.mock("@/lib/admin-auth", () => ({
   isAdminApiRequestAuthorized: (...args: unknown[]) => mockIsAdminApiAuthorized(...args),
@@ -32,11 +33,15 @@ vi.mock("@/lib/db", () => ({
       findUnique: (...args: unknown[]) => mockPodFindUnique(...args),
       update: (...args: unknown[]) => mockPodUpdate(...args),
     },
+    vendorPayoutTransfer: {
+      findMany: (...args: unknown[]) => mockPayoutFindMany(...args),
+    },
   },
 }));
 
 import { NextRequest } from "next/server";
 import { PATCH as patchPodActive } from "./pods/[podId]/active/route";
+import { GET as getPayoutTransfers } from "./payout-transfers/route";
 import { GET as getStalledPos } from "./vendor-orders/stalled-pos/route";
 import { POST as postVendorOrderTransition } from "./vendor-orders/[vendorOrderId]/transition/route";
 import { GET as getDeliverectSync } from "./vendor-orders/[vendorOrderId]/deliverect-sync/route";
@@ -58,6 +63,7 @@ describe("admin API auth", () => {
     mockPodFindUnique.mockResolvedValue({ id: "pod_1" });
     mockPodUpdate.mockResolvedValue({ id: "pod_1", isActive: false });
     mockDeliverectSyncDebug.mockResolvedValue({ vendorOrderId: "vo_1" });
+    mockPayoutFindMany.mockResolvedValue([]);
   });
 
   describe("POST /api/admin/vendor-orders/[vendorOrderId]/transition", () => {
@@ -166,6 +172,29 @@ describe("admin API auth", () => {
 
       expect(res.status).toBe(403);
       expect(mockDeliverectSyncDebug).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("GET /api/admin/payout-transfers", () => {
+    it("rejects unauthenticated callers", async () => {
+      mockIsAdminApiAuthorized.mockResolvedValue(false);
+
+      const res = await getPayoutTransfers(new NextRequest("http://localhost/api/admin/payout-transfers"));
+
+      expect(res.status).toBe(401);
+      expect(mockPayoutFindMany).not.toHaveBeenCalled();
+    });
+
+    it("allows authorized admin to list payout transfers", async () => {
+      mockIsAdminApiAuthorized.mockResolvedValue(true);
+      mockPayoutFindMany.mockResolvedValue([{ id: "vpt_1", status: "paid" }]);
+
+      const res = await getPayoutTransfers(new NextRequest("http://localhost/api/admin/payout-transfers"));
+
+      expect(res.status).toBe(200);
+      expect(mockPayoutFindMany).toHaveBeenCalled();
+      const body = await res.json();
+      expect(body.transfers).toHaveLength(1);
     });
   });
 });

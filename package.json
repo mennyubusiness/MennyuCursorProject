@@ -17,7 +17,8 @@
     "cart:cleanup": "tsx scripts/cleanup-old-empty-carts.ts",
     "cart:cleanup:execute": "tsx scripts/cleanup-old-empty-carts.ts --execute",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "report:pdf": "tsx scripts/report-to-pdf.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -46,6 +47,7 @@
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
     "dotenv-cli": "^11.0.0",
+    "md-to-pdf": "^5.2.5",
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.15",
     "tsx": "^4.19.2",

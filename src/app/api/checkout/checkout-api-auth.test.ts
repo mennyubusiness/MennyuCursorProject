@@ -226,6 +226,68 @@ describe("POST /api/checkout cart session ownership", () => {
     );
   });
 
+  it("passes authUserId into createOrderFromCart for signed-in solo checkout", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user_1", email: "a@b.com" } });
+    mockAssertCartSessionAccess.mockResolvedValue({
+      ok: true,
+      cartId: CART_ID,
+      sessionId: SESSION_A,
+      podId: "pod_1",
+      isGroupOrder: false,
+    });
+    mockCreateOrderFromCart.mockResolvedValue({
+      order: { id: "ord_1", totalCents: 1000 },
+    });
+
+    const res = await POST(checkoutRequest(SESSION_A));
+
+    expect(res.status).toBe(200);
+    expect(mockCreateOrderFromCart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authUserId: "user_1",
+        groupOrderHostUserId: undefined,
+        mennyuSessionId: SESSION_A,
+      })
+    );
+  });
+
+  it("passes authUserId and groupOrderHostUserId for signed-in group host checkout", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user_host", email: "h@b.com" } });
+    mockAssertCartSessionAccess.mockResolvedValue({
+      ok: true,
+      cartId: CART_ID,
+      sessionId: SESSION_A,
+      podId: "pod_1",
+      isGroupOrder: true,
+    });
+    mockCreateOrderFromCart.mockResolvedValue({
+      order: { id: "ord_1", totalCents: 1000 },
+    });
+
+    const res = await POST(
+      new NextRequest("http://localhost/api/checkout", {
+        method: "POST",
+        headers: {
+          cookie: `mennyu_session=${SESSION_A}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...checkoutBody,
+          groupCheckoutFingerprint: "fp_locked",
+        }),
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCreateOrderFromCart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authUserId: "user_host",
+        groupOrderHostUserId: "user_host",
+        groupCheckoutFingerprint: "fp_locked",
+      })
+    );
+  });
+
   it("rejects group checkout for non-host", async () => {
     mockAssertCartSessionAccess.mockResolvedValue({
       ok: false,

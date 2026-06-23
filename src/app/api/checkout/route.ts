@@ -146,6 +146,7 @@ export async function POST(request: NextRequest) {
       scheduledPickupTime,
       groupCheckoutFingerprint: groupCheckoutFingerprint?.trim() ?? null,
       groupOrderHostUserId,
+      authUserId: authSession?.user?.id ?? null,
       mennyuSessionId: sessionId,
       customerAccountId: phoneVerification.customerAccountId,
     });

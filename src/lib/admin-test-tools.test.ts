@@ -1,72 +1,89 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
+vi.mock("server-only", () => ({}));
+
+const mockAuth = vi.fn();
+
+const envState = vi.hoisted(() => ({
+  NODE_ENV: "production" as string,
+  ENABLE_ADMIN_TEST_TOOLS: undefined as string | undefined,
+}));
+
+vi.mock("@/lib/env", () => ({
+  env: envState,
+}));
+
+vi.mock("@/auth", () => ({
+  auth: (...args: unknown[]) => mockAuth(...args),
+}));
+
+import {
+  assertAdminTestToolsApiAccess,
+  canShowAdminTestToolsUi,
+  isAdminTestToolsEnabled,
+} from "./admin-test-tools";
 
 describe("admin test tools gating", () => {
-  it("is disabled in production unless ENABLE_ADMIN_TEST_TOOLS=true", () => {
-    const src = readFileSync(join(root, "src/lib/admin-test-tools.ts"), "utf8");
-    expect(src).toMatch(/NODE_ENV !== "production"/);
-    expect(src).toMatch(/ENABLE_ADMIN_TEST_TOOLS === "true"/);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    envState.NODE_ENV = "production";
+    envState.ENABLE_ADMIN_TEST_TOOLS = undefined;
+    mockAuth.mockResolvedValue(null);
   });
 
-  it("simulate routing failure route requires platform admin", () => {
-    const src = readFileSync(
-      join(root, "src/app/api/admin/vendor-orders/[vendorOrderId]/simulate-routing-failure/route.ts"),
-      "utf8"
-    );
-    expect(src).toMatch(/assertAdminTestToolsApiAccess/);
-    expect(src).not.toMatch(/submitVendorOrder/);
-    expect(src).not.toMatch(/submitOrder/);
+  it("is disabled in production by default", () => {
+    expect(isAdminTestToolsEnabled()).toBe(false);
   });
 
-  it("simulate deliverect status route requires platform admin and shared service", () => {
-    const src = readFileSync(
-      join(
-        root,
-        "src/app/api/admin/vendor-orders/[vendorOrderId]/simulate-deliverect-status/route.ts"
-      ),
-      "utf8"
-    );
-    expect(src).toMatch(/assertAdminTestToolsApiAccess/);
-    expect(src).toMatch(/simulateVendorOrderDeliverectStatus/);
-    expect(src).not.toMatch(/submitVendorOrder/);
-    expect(src).not.toMatch(/deliverect.*fetch/i);
+  it("can be enabled explicitly in production", () => {
+    envState.ENABLE_ADMIN_TEST_TOOLS = "true";
+    expect(isAdminTestToolsEnabled()).toBe(true);
   });
 
-  it("admin order detail hides QA section unless canShowAdminTestToolsUi", () => {
-    const pageSrc = readFileSync(
-      join(root, "src/app/admin/(dashboard)/orders/[orderId]/page.tsx"),
-      "utf8"
-    );
-    const technicalSrc = readFileSync(
-      join(root, "src/app/admin/(dashboard)/orders/[orderId]/AdminOrderTechnicalDetailsSection.tsx"),
-      "utf8"
-    );
-    const qaSrc = readFileSync(
-      join(root, "src/app/admin/(dashboard)/orders/[orderId]/AdminOrderQaToolsSection.tsx"),
-      "utf8"
-    );
-    const buttonSrc = readFileSync(
-      join(root, "src/app/admin/(dashboard)/orders/[orderId]/AdminSimulateRoutingFailureButton.tsx"),
-      "utf8"
-    );
-    expect(pageSrc).toMatch(/canShowAdminTestToolsUi/);
-    expect(pageSrc).toMatch(/showAdminTestTools/);
-    expect(technicalSrc).toMatch(/AdminOrderQaToolsSection/);
-    expect(qaSrc).toMatch(/AdminSimulateRoutingFailureButton/);
-    expect(qaSrc).toMatch(/AdminSimulateDeliverectStatusButton/);
-    expect(buttonSrc).toMatch(/Simulate routing failure/);
-    const deliverectBtnSrc = readFileSync(
-      join(
-        root,
-        "src/app/admin/(dashboard)/orders/[orderId]/AdminSimulateDeliverectStatusButton.tsx"
-      ),
-      "utf8"
-    );
-    expect(deliverectBtnSrc).toMatch(/Apply simulated Deliverect status/);
-    expect(deliverectBtnSrc).toMatch(/simulate-deliverect-status/);
+  it("is enabled in non-production environments", () => {
+    envState.NODE_ENV = "development";
+    expect(isAdminTestToolsEnabled()).toBe(true);
+  });
+
+  it("returns 404 for simulate routing failure API when disabled", async () => {
+    const gate = await assertAdminTestToolsApiAccess();
+    expect(gate).toEqual({
+      ok: false,
+      status: 404,
+      error: "Not found",
+      code: "DISABLED",
+    });
+  });
+
+  it("returns 403 for non-platform-admin when tools enabled", async () => {
+    envState.ENABLE_ADMIN_TEST_TOOLS = "true";
+    mockAuth.mockResolvedValue({ user: { id: "user_customer", isPlatformAdmin: false } });
+
+    const gate = await assertAdminTestToolsApiAccess();
+    expect(gate).toEqual({
+      ok: false,
+      status: 403,
+      error: "Platform admin required.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("allows platform admin when tools enabled", async () => {
+    envState.ENABLE_ADMIN_TEST_TOOLS = "true";
+    mockAuth.mockResolvedValue({ user: { id: "user_admin", isPlatformAdmin: true } });
+
+    await expect(assertAdminTestToolsApiAccess()).resolves.toEqual({ ok: true });
+  });
+
+  it("hides admin test tools UI for customers even when tools enabled", async () => {
+    envState.ENABLE_ADMIN_TEST_TOOLS = "true";
+    mockAuth.mockResolvedValue({ user: { id: "user_customer", isPlatformAdmin: false } });
+    await expect(canShowAdminTestToolsUi()).resolves.toBe(false);
+  });
+
+  it("shows admin test tools UI only for platform admin", async () => {
+    envState.ENABLE_ADMIN_TEST_TOOLS = "true";
+    mockAuth.mockResolvedValue({ user: { id: "user_admin", isPlatformAdmin: true } });
+    await expect(canShowAdminTestToolsUi()).resolves.toBe(true);
   });
 });

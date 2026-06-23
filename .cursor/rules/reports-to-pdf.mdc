@@ -1,0 +1,19 @@
+---
+description: Save audit and analysis reports as Markdown + PDF under docs/reports
+alwaysApply: true
+---
+
+# Reports → Markdown + PDF
+
+When the user asks for an audit, investigation report, beta-readiness summary, or similar **deliverable report** (not a short chat reply):
+
+1. **Write the full report** to `docs/reports/<slug>.md` using clear headings, tables, and date in the title or front matter.
+2. **Generate PDF** by running: `npm run report:pdf -- <slug>.md` (or `npx tsx scripts/report-to-pdf.ts <slug>.md`).
+3. **Tell the user** both paths:
+   - Markdown: `docs/reports/<slug>.md`
+   - PDF: `docs/reports/<slug>.pdf`
+4. Do not put reports only in chat when a formal report was requested — persist them under `docs/reports/`.
+
+Slug naming: lowercase kebab-case (e.g. `beta-readiness-audit`, `cart-persistence-audit`).
+
+If PDF generation fails (missing Chromium), run `npm install` first; `md-to-pdf` bundles Puppeteer.

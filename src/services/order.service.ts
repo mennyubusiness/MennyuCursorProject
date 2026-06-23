@@ -567,6 +567,276 @@ export function getCartValidationMessage(code: string): string {
   return map[code] ?? "Your cart needs attention. Please review or remove items.";
 }
 
+type CheckoutCartLoaded = {
+  id: string;
+  podId: string;
+  items: Array<{
+    id: string;
+    groupOrderParticipantId: string | null;
+    menuItemId: string;
+    vendorId: string;
+    quantity: number;
+    priceCents: number;
+    specialInstructions: string | null;
+    menuItem: CartForValidation["items"][0]["menuItem"] & { name: string };
+    vendor: CartForValidation["items"][0]["vendor"];
+    selections: Array<{
+      modifierOptionId: string;
+      quantity: number;
+      modifierOption: { name: string; priceCents: number };
+    }>;
+  }>;
+  pod: { pickupSalesTaxBps: number | null; pickupTimezone: string | null };
+};
+
+export type PendingOrderForReuse = {
+  id: string;
+  subtotalCents: number;
+  serviceFeeCents: number;
+  tipCents: number;
+  taxCents: number;
+  totalCents: number;
+  requestedPickupAt: Date | null;
+  vendorOrders: Array<{
+    lineItems: Array<{
+      menuItemId: string;
+      quantity: number;
+      priceCents: number;
+      specialInstructions: string | null;
+      groupOrderParticipantId: string | null;
+      selections: Array<{ modifierOptionId: string; quantity: number }>;
+    }>;
+  }>;
+};
+
+export type PendingOrderReuseEvaluation =
+  | { action: "reuse" }
+  | { action: "stale" }
+  | {
+      action: "invalid";
+      validation: Extract<CartValidationResult, { valid: false }>;
+    };
+
+function checkoutLineFingerprint(line: {
+  menuItemId: string;
+  quantity: number;
+  unitPriceCents: number;
+  specialInstructions: string | null;
+  groupOrderParticipantId?: string | null;
+  selections: Array<{ modifierOptionId: string; quantity: number }>;
+}): string {
+  const selections = [...line.selections]
+    .sort((a, b) => a.modifierOptionId.localeCompare(b.modifierOptionId))
+    .map((s) => `${s.modifierOptionId}:${s.quantity}`)
+    .join(",");
+  return [
+    line.menuItemId,
+    line.quantity,
+    line.unitPriceCents,
+    line.specialInstructions ?? "",
+    line.groupOrderParticipantId ?? "",
+    selections,
+  ].join("|");
+}
+
+export function buildCheckoutLineFingerprintsFromCartItems(
+  items: CheckoutCartLoaded["items"]
+): string[] {
+  const groups = groupCartByVendorSubtotals(items);
+  return groups
+    .flatMap((g) =>
+      g.lines.map((line) =>
+        checkoutLineFingerprint({
+          menuItemId: line.menuItemId,
+          quantity: line.quantity,
+          unitPriceCents: line.unitPriceCents,
+          specialInstructions: line.specialInstructions,
+          groupOrderParticipantId: line.groupOrderParticipantId,
+          selections: line.selections.map((s) => ({
+            modifierOptionId: s.modifierOptionId,
+            quantity: s.quantity,
+          })),
+        })
+      )
+    )
+    .sort();
+}
+
+export function buildCheckoutLineFingerprintsFromPendingOrder(pending: PendingOrderForReuse): string[] {
+  return pending.vendorOrders
+    .flatMap((vo) =>
+      vo.lineItems.map((line) =>
+        checkoutLineFingerprint({
+          menuItemId: line.menuItemId,
+          quantity: line.quantity,
+          unitPriceCents: line.priceCents,
+          specialInstructions: line.specialInstructions,
+          groupOrderParticipantId: line.groupOrderParticipantId,
+          selections: line.selections.map((s) => ({
+            modifierOptionId: s.modifierOptionId,
+            quantity: s.quantity,
+          })),
+        })
+      )
+    )
+    .sort();
+}
+
+function pendingOrderTotalsMatch(
+  pending: PendingOrderForReuse,
+  totals: ReturnType<typeof computeOrderPricing>
+): boolean {
+  return (
+    pending.subtotalCents === totals.subtotalCents &&
+    pending.serviceFeeCents === totals.serviceFeeCents &&
+    pending.tipCents === totals.tipCents &&
+    pending.taxCents === totals.taxCents &&
+    pending.totalCents === totals.totalCents
+  );
+}
+
+function pickupTimesMatch(a: Date | null, b: Date | null): boolean {
+  if (a === null && b === null) return true;
+  if (a === null || b === null) return false;
+  return a.getTime() === b.getTime();
+}
+
+async function computeCheckoutTotalsFromCart(cart: CheckoutCartLoaded, tipCents: number) {
+  const vendorGroups = groupCartByVendorSubtotals(cart.items);
+  const { rates } = await getActivePricingRatesSnapshot();
+  return computeOrderPricing(
+    {
+      vendorSubtotalsCents: vendorGroups.map((v) => v.subtotalCents),
+      tipCents,
+      pickupSalesTaxBps: cart.pod.pickupSalesTaxBps,
+    },
+    rates
+  );
+}
+
+function resolveCheckoutRequestedPickupAt(
+  cart: CheckoutCartLoaded,
+  input: Pick<CheckoutInput, "pickupMode" | "scheduledPickupDate" | "scheduledPickupTime">
+): Date | null {
+  const pickupMode = input.pickupMode ?? "asap";
+  if (pickupMode === "asap") return null;
+
+  if (!input.scheduledPickupDate?.trim() || !input.scheduledPickupTime?.trim()) {
+    throw new OrderValidationError(
+      "PICKUP_SCHEDULE_INCOMPLETE",
+      "Choose a date and time for scheduled pickup."
+    );
+  }
+  const dateMatch = input.scheduledPickupDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const timeMatch = input.scheduledPickupTime.match(/^(\d{2}):(\d{2})$/);
+  if (!dateMatch || !timeMatch) {
+    throw new OrderValidationError("PICKUP_TIME_INVALID", "Enter a valid pickup date and time.");
+  }
+  const year = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]);
+  const day = Number(dateMatch[3]);
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) {
+    throw new OrderValidationError("PICKUP_TIME_INVALID", "Enter a valid pickup date and time.");
+  }
+  const tz = resolvePickupTimezone(cart.pod);
+  let atUtc: Date;
+  try {
+    atUtc = wallTimeInZoneToUtc(year, month, day, hour, minute, tz);
+  } catch {
+    throw new OrderValidationError(
+      "PICKUP_TIMEZONE_INVALID",
+      "Pickup timezone is not configured correctly."
+    );
+  }
+  const v = validateScheduledPickup(atUtc);
+  if (!v.ok) {
+    throw new OrderValidationError(v.code, v.message);
+  }
+  return atUtc;
+}
+
+/**
+ * Re-validate cart and compare checkout snapshot before reusing a pending_payment order.
+ */
+export async function evaluatePendingOrderReuse(params: {
+  pending: PendingOrderForReuse;
+  cart: CheckoutCartLoaded;
+  input: Pick<CheckoutInput, "tipCents" | "pickupMode" | "scheduledPickupDate" | "scheduledPickupTime">;
+}): Promise<PendingOrderReuseEvaluation> {
+  const { pending, cart, input } = params;
+  const validation = await validateCartForOrder(cart);
+  if (!validation.valid) {
+    return { action: "invalid", validation };
+  }
+
+  let requestedPickupAt: Date | null;
+  try {
+    requestedPickupAt = resolveCheckoutRequestedPickupAt(cart, input);
+  } catch (err) {
+    if (err instanceof OrderValidationError) {
+      return {
+        action: "invalid",
+        validation: {
+          valid: false,
+          code: err.code,
+          message: err.message,
+          cartItemId: err.details?.cartItemId,
+          menuItemId: err.details?.menuItemId,
+          menuItemName: err.details?.menuItemName,
+        },
+      };
+    }
+    throw err;
+  }
+
+  const totals = await computeCheckoutTotalsFromCart(cart, input.tipCents);
+  if (!pendingOrderTotalsMatch(pending, totals)) {
+    return { action: "stale" };
+  }
+  if (!pickupTimesMatch(pending.requestedPickupAt, requestedPickupAt)) {
+    return { action: "stale" };
+  }
+
+  const cartLines = buildCheckoutLineFingerprintsFromCartItems(cart.items);
+  const orderLines = buildCheckoutLineFingerprintsFromPendingOrder(pending);
+  if (cartLines.length !== orderLines.length || cartLines.some((fp, i) => fp !== orderLines[i])) {
+    return { action: "stale" };
+  }
+
+  return { action: "reuse" };
+}
+
+async function abandonStalePendingCheckoutOrder(orderId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.updateMany({
+      where: { id: orderId, status: "pending_payment" },
+      data: { status: "failed", sourceCartId: null },
+    });
+    if (updated.count === 0) return;
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId,
+        status: "failed",
+        source: "system",
+        note: "Checkout snapshot no longer valid; abandoned for fresh checkout.",
+      },
+    });
+  });
+}
+
+const CHECKOUT_CART_INCLUDE = {
+  items: {
+    include: {
+      menuItem: true,
+      vendor: true,
+      selections: { include: { modifierOption: true } },
+    },
+  },
+  pod: true,
+} as const;
+
 export async function createOrderFromCart(input: CheckoutInput): Promise<CreateOrderResult | null> {
   const idemKey = buildIdempotencyKey("order", input.idempotencyKey);
   const existing = await prisma.order.findUnique({
@@ -581,7 +851,7 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
   }
 
   const access = await assertCartSessionAccess(input.cartId, input.mennyuSessionId ?? null, {
-    authUserId: input.groupOrderHostUserId ?? null,
+    authUserId: input.authUserId ?? input.groupOrderHostUserId ?? null,
     mode: "checkout",
   });
   if (!access.ok) {
@@ -624,31 +894,49 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
     }
   }
 
-  /** One unpaid checkout per cart — reuse existing pending order instead of duplicating. */
-  const pendingFromSameCart = await prisma.order.findFirst({
-    where: { sourceCartId: input.cartId, status: "pending_payment" },
-    include: { vendorOrders: true },
-  });
-  if (pendingFromSameCart) {
-    return {
-      order: toOrder(pendingFromSameCart),
-      vendorOrders: pendingFromSameCart.vendorOrders.map(toVendorOrder),
-    };
-  }
-
   const cart = await prisma.cart.findUnique({
     where: { id: input.cartId },
+    include: CHECKOUT_CART_INCLUDE,
+  });
+
+  /** One unpaid checkout per cart — reuse only when cart/checkout snapshot still matches. */
+  const pendingFromSameCart = await prisma.order.findFirst({
+    where: { sourceCartId: input.cartId, status: "pending_payment" },
     include: {
-      items: {
+      vendorOrders: {
         include: {
-          menuItem: true,
-          vendor: true,
-          selections: { include: { modifierOption: true } },
+          lineItems: { include: { selections: true } },
         },
       },
-      pod: true,
     },
   });
+  if (pendingFromSameCart) {
+    if (!cart || cart.items.length === 0) {
+      await abandonStalePendingCheckoutOrder(pendingFromSameCart.id);
+    } else {
+      const reuseEvaluation = await evaluatePendingOrderReuse({
+        pending: pendingFromSameCart,
+        cart,
+        input,
+      });
+      if (reuseEvaluation.action === "reuse") {
+        return {
+          order: toOrder(pendingFromSameCart),
+          vendorOrders: pendingFromSameCart.vendorOrders.map(toVendorOrder),
+        };
+      }
+      await abandonStalePendingCheckoutOrder(pendingFromSameCart.id);
+      if (reuseEvaluation.action === "invalid") {
+        const { validation } = reuseEvaluation;
+        throw new OrderValidationError(validation.code, validation.message, {
+          cartItemId: validation.cartItemId,
+          menuItemId: validation.menuItemId,
+          menuItemName: validation.menuItemName,
+        });
+      }
+    }
+  }
+
   if (!cart || cart.items.length === 0) {
     throw new OrderValidationError("CART_EMPTY", "Cart not found or empty");
   }
@@ -680,44 +968,7 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
     rates
   );
 
-  const pickupMode = input.pickupMode ?? "asap";
-  let requestedPickupAt: Date | null = null;
-  if (pickupMode === "scheduled") {
-    if (!input.scheduledPickupDate?.trim() || !input.scheduledPickupTime?.trim()) {
-      throw new OrderValidationError(
-        "PICKUP_SCHEDULE_INCOMPLETE",
-        "Choose a date and time for scheduled pickup."
-      );
-    }
-    const dateMatch = input.scheduledPickupDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    const timeMatch = input.scheduledPickupTime.match(/^(\d{2}):(\d{2})$/);
-    if (!dateMatch || !timeMatch) {
-      throw new OrderValidationError("PICKUP_TIME_INVALID", "Enter a valid pickup date and time.");
-    }
-    const year = Number(dateMatch[1]);
-    const month = Number(dateMatch[2]);
-    const day = Number(dateMatch[3]);
-    const hour = Number(timeMatch[1]);
-    const minute = Number(timeMatch[2]);
-    if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) {
-      throw new OrderValidationError("PICKUP_TIME_INVALID", "Enter a valid pickup date and time.");
-    }
-    const tz = resolvePickupTimezone(cart.pod);
-    let atUtc: Date;
-    try {
-      atUtc = wallTimeInZoneToUtc(year, month, day, hour, minute, tz);
-    } catch {
-      throw new OrderValidationError(
-        "PICKUP_TIMEZONE_INVALID",
-        "Pickup timezone is not configured correctly."
-      );
-    }
-    const v = validateScheduledPickup(atUtc);
-    if (!v.ok) {
-      throw new OrderValidationError(v.code, v.message);
-    }
-    requestedPickupAt = atUtc;
-  }
+  const requestedPickupAt = resolveCheckoutRequestedPickupAt(cart, input);
 
   const result = await prisma.$transaction(async (tx) => {
     const order = await tx.order.create({
