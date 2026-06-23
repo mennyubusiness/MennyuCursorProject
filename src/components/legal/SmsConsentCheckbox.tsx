@@ -3,7 +3,6 @@
 import Link from "next/link";
 
 import {
-  SMS_MARKETING_NOT_OFFERED_LABEL,
   SMS_PHONE_NUMBER_LABEL,
   SMS_PHONE_OPTIONAL_TAG,
   SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL,
@@ -15,7 +14,7 @@ type SmsConsentCheckboxProps = {
   onChange: (checked: boolean) => void;
   className?: string;
   disabled?: boolean;
-  /** @deprecated Checkout and account share the same Twilio disclosure layout. */
+  /** @deprecated Checkout and account share the same disclosure layout. */
   layout?: "checkout" | "account" | "full";
 };
 
@@ -23,7 +22,7 @@ const checkboxClassName =
   "mt-0.5 h-4 w-4 shrink-0 rounded border-stone-300 text-brand focus:ring-brand";
 
 const disclosureBoxClassName =
-  "rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-3";
+  "rounded-lg border border-oo-light-stone bg-white px-3 py-3";
 
 /** Shared phone field label: "Phone Number" with inline Optional tag. */
 export function SmsPhoneNumberLabel({ className = "" }: { className?: string }) {
@@ -52,8 +51,7 @@ function SmsLegalLinks({ className = "" }: { className?: string }) {
 }
 
 /**
- * Twilio-aligned SMS consent block: disabled marketing row, active transactional row, legal links.
- * Transactional checkbox is unchecked by default unless parent restores stored consent.
+ * Transactional SMS opt-in only (TCPA / A2P). Unchecked by default unless parent restores stored consent.
  */
 export function SmsConsentCheckbox({
   id,
@@ -62,27 +60,9 @@ export function SmsConsentCheckbox({
   className = "",
   disabled = false,
 }: SmsConsentCheckboxProps) {
-  const marketingId = `${id}-marketing`;
-
   return (
     <div className={`space-y-3 ${className}`.trim()}>
       <div className={disclosureBoxClassName}>
-        <label htmlFor={marketingId} className="flex gap-2.5 text-sm text-oo-stone-gray">
-          <input
-            id={marketingId}
-            name="smsMarketingConsent"
-            type="checkbox"
-            checked={false}
-            disabled
-            readOnly
-            aria-disabled="true"
-            className={`${checkboxClassName} cursor-not-allowed opacity-60`}
-          />
-          <span>{SMS_MARKETING_NOT_OFFERED_LABEL}</span>
-        </label>
-      </div>
-
-      <div className={`${disclosureBoxClassName} bg-white`}>
         <label htmlFor={id} className="flex cursor-pointer gap-2.5 text-sm leading-relaxed text-oo-charcoal">
           <input
             id={id}

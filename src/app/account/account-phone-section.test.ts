@@ -97,10 +97,10 @@ describe("account phone settings card", () => {
     expect(phoneSectionSrc).toMatch(/smsConsent,/);
   });
 
-  it("uses Twilio-aligned disclosure with disabled marketing row and legal links", () => {
-    expect(smsCheckboxSrc).toMatch(/SMS_MARKETING_NOT_OFFERED_LABEL/);
+  it("uses transactional SMS disclosure with legal links (no marketing checkbox)", () => {
     expect(smsCheckboxSrc).toMatch(/SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL/);
-    expect(smsCheckboxSrc).toMatch(/disabled/);
+    expect(smsCheckboxSrc).not.toMatch(/SMS_MARKETING/);
+    expect(smsCheckboxSrc).not.toMatch(/smsMarketingConsent/);
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("order updates");
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("account notifications");
     expect(SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL).toContain("verification codes");

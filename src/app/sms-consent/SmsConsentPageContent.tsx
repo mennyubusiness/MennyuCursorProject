@@ -30,9 +30,9 @@ export function SmsConsentPageContent() {
           </p>
           <p className="mt-3">
             Open Order does <strong className="font-semibold text-oo-charcoal">not</strong> send
-            marketing or promotional SMS. The transactional checkbox below is the only active web
-            opt-in path. Group order join is <strong className="font-semibold text-oo-charcoal">not</strong>{" "}
-            an SMS opt-in path.
+            marketing or promotional SMS. There is no marketing SMS opt-in on checkout or account
+            settings. The transactional checkbox is the only active web opt-in path. Group order join is{" "}
+            <strong className="font-semibold text-oo-charcoal">not</strong> an SMS opt-in path.
           </p>
           <p className="mt-3">
             SMS is <strong className="font-semibold text-oo-charcoal">optional</strong> and not required
@@ -126,10 +126,7 @@ export function SmsConsentPageContent() {
             <dd className="mt-1">
               <ol className="list-decimal space-y-1 pl-5 text-oo-stone-gray">
                 <li>Optionally enter a phone number (not required to checkout).</li>
-                <li>
-                  Review the marketing SMS row (disabled — not offered) and optionally check the
-                  transactional SMS disclosure box.
-                </li>
+                <li>Optionally check the transactional SMS disclosure box.</li>
                 <li>If SMS is checked, verify the number with a one-time code.</li>
                 <li>Place the order. Transactional SMS consent is stored when the order is placed.</li>
               </ol>
@@ -180,10 +177,7 @@ export function SmsConsentPageContent() {
               <ol className="list-decimal space-y-1 pl-5 text-oo-stone-gray">
                 <li>Click Add phone number or Change.</li>
                 <li>Enter a phone number.</li>
-                <li>
-                  Review the disabled marketing SMS row and check the transactional SMS disclosure box
-                  to enable order updates.
-                </li>
+                <li>Check the transactional SMS disclosure box to enable order updates.</li>
                 <li>Send verification code and enter the one-time code.</li>
                 <li>
                   Transactional SMS consent is stored when verification completes with the checkbox
@@ -253,21 +247,16 @@ export function SmsConsentPageContent() {
 
       <LegalSection id="checkbox-copy" title="Exact in-app consent language">
         <p>
-          Checkout and account show a disabled marketing SMS row (Open Order does not send marketing
-          texts), an active transactional SMS disclosure checkbox, and Privacy Policy / Terms of Service
-          links directly below the checkboxes.
+          Checkout and account show a single transactional SMS disclosure checkbox with Privacy Policy
+          and Terms of Service links directly below. Open Order does not send marketing or promotional
+          SMS and does not offer a marketing opt-in.
         </p>
-        <p className="mt-4 font-medium text-oo-charcoal">Marketing SMS row (disabled, not stored)</p>
-        <blockquote className="mt-2 rounded-lg border border-oo-light-stone bg-oo-cream/80 px-4 py-3 text-sm leading-relaxed text-oo-charcoal">
-          Marketing SMS is not currently offered by Open Order. Open Order does not send marketing or
-          promotional text messages.
-        </blockquote>
         <p className="mt-4 font-medium text-oo-charcoal">Transactional SMS checkbox (active opt-in)</p>
         <blockquote className="mt-2 rounded-lg border border-oo-light-stone bg-oo-cream/80 px-4 py-3 text-sm leading-relaxed text-oo-charcoal">
           {SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL}
         </blockquote>
         <p className="mt-3 text-sm text-oo-stone-gray">
-          Below the checkboxes, customers see links to{" "}
+          Below the checkbox, customers see links to{" "}
           <Link href="/privacy" className="font-semibold text-brand hover:underline">
             Privacy Policy
           </Link>{" "}
@@ -298,7 +287,7 @@ export function SmsConsentPageContent() {
           >
             <Image
               src={TWILIO_CONSENT_FORM_SCREENSHOT_PATH}
-              alt="Open Order SMS consent form showing Phone Number Optional, disabled marketing SMS row, transactional SMS opt-in checkbox, and Privacy Policy and Terms of Service links"
+              alt="Open Order SMS consent form showing Phone Number Optional, transactional SMS opt-in checkbox, and Privacy Policy and Terms of Service links"
               width={960}
               height={720}
               className="h-auto w-full max-w-2xl"
@@ -306,8 +295,8 @@ export function SmsConsentPageContent() {
             />
           </a>
           <figcaption className="mt-2 text-sm text-oo-stone-gray">
-            Checkout-style consent UI: optional phone number, disabled marketing SMS disclosure, active
-            transactional SMS opt-in, and legal links.
+            Checkout-style consent UI: optional phone number, transactional SMS opt-in checkbox, and legal
+            links. No marketing SMS opt-in is shown.
           </figcaption>
         </figure>
       </LegalSection>

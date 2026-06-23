@@ -8,10 +8,6 @@ export const TWILIO_CONSENT_FORM_SCREENSHOT_PATH = "/twilio/consent-form.png";
 export const SMS_PHONE_NUMBER_LABEL = "Phone Number";
 export const SMS_PHONE_OPTIONAL_TAG = "Optional";
 
-/** Disabled marketing row — Open Order does not send marketing SMS. */
-export const SMS_MARKETING_NOT_OFFERED_LABEL =
-  "Marketing SMS is not currently offered by Open Order. Open Order does not send marketing or promotional text messages.";
-
 /** Active transactional opt-in checkbox disclosure (TCPA / Twilio layout). */
 export const SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL =
   "By checking this box you agree to receive Transactional SMS communication regarding order updates, account notifications, and verification codes from Open Order. Message frequency may vary. Message and data rates may apply. Reply HELP for help or STOP to opt-out.";

@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import {
-  SMS_MARKETING_NOT_OFFERED_LABEL,
   SMS_PHONE_NUMBER_LABEL,
   SMS_PHONE_OPTIONAL_TAG,
   SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL,
@@ -29,7 +28,7 @@ function MockPanel({
 }
 
 const disclosureBoxClassName =
-  "rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-3";
+  "rounded-lg border border-oo-light-stone bg-white px-3 py-3";
 
 function MockPhoneNumberLabel() {
   return (
@@ -39,37 +38,6 @@ function MockPhoneNumberLabel() {
         {SMS_PHONE_OPTIONAL_TAG}
       </span>
     </p>
-  );
-}
-
-function MockCheckboxBox({
-  id,
-  label,
-  checked = false,
-  disabled = false,
-  variant = "muted",
-}: {
-  id: string;
-  label: string;
-  checked?: boolean;
-  disabled?: boolean;
-  variant?: "muted" | "active";
-}) {
-  return (
-    <div className={`${disclosureBoxClassName} ${variant === "active" ? "bg-white" : ""}`.trim()}>
-      <label htmlFor={id} className="flex cursor-default gap-2.5 text-sm leading-relaxed text-oo-charcoal">
-        <input
-          id={id}
-          type="checkbox"
-          readOnly
-          checked={checked}
-          disabled={disabled}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-stone-300 text-brand"
-          aria-hidden
-        />
-        <span className={disabled ? "text-oo-stone-gray" : undefined}>{label}</span>
-      </label>
-    </div>
   );
 }
 
@@ -90,16 +58,18 @@ function MockLegalLinks() {
 function MockSmsConsentStack({ transactionalId }: { transactionalId: string }) {
   return (
     <div className="space-y-3">
-      <MockCheckboxBox
-        id={`${transactionalId}-marketing`}
-        label={SMS_MARKETING_NOT_OFFERED_LABEL}
-        disabled
-      />
-      <MockCheckboxBox
-        id={transactionalId}
-        label={SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL}
-        variant="active"
-      />
+      <div className={disclosureBoxClassName}>
+        <label htmlFor={transactionalId} className="flex cursor-default gap-2.5 text-sm leading-relaxed text-oo-charcoal">
+          <input
+            id={transactionalId}
+            type="checkbox"
+            readOnly
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-stone-300 text-brand"
+            aria-hidden
+          />
+          <span>{SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL}</span>
+        </label>
+      </div>
       <MockLegalLinks />
     </div>
   );
@@ -128,10 +98,10 @@ export function SmsConsentCheckoutReviewerMockup() {
           You can still track your order on the order status page.
         </p>
         <p className="text-xs text-oo-stone-gray">
-          Open Order does not send marketing or promotional SMS. The transactional checkbox is the
-          active opt-in path. SMS is optional and not required to place an order. The transactional
-          checkbox is <strong className="text-oo-charcoal">unchecked by default</strong> unless the
-          signed-in customer already has stored transactional consent.
+          Open Order does not send marketing or promotional SMS. The transactional checkbox is the only
+          SMS opt-in on this form. SMS is optional and not required to place an order. The checkbox is{" "}
+          <strong className="text-oo-charcoal">unchecked by default</strong> unless the signed-in
+          customer already has stored transactional consent.
         </p>
       </div>
     </MockPanel>
@@ -164,8 +134,8 @@ export function SmsConsentAccountReviewerMockup() {
           still checked.
         </p>
         <p className="text-xs text-oo-stone-gray">
-          Marketing SMS is disabled and not offered. Group order join is not an SMS opt-in path. The
-          transactional checkbox is <strong className="text-oo-charcoal">optional</strong> and{" "}
+          Open Order does not send marketing or promotional SMS. Group order join is not an SMS opt-in
+          path. The transactional checkbox is <strong className="text-oo-charcoal">optional</strong> and{" "}
           <strong className="text-oo-charcoal">unchecked by default</strong> unless editing the same
           verified number that already has stored consent.
         </p>

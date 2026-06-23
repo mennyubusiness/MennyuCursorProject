@@ -63,10 +63,10 @@ describe("checkout contact SMS UX", () => {
     );
   });
 
-  it("uses Twilio-aligned disclosure boxes with transactional opt-in and legal links", () => {
-    expect(smsCheckboxSrc).toMatch(/SMS_MARKETING_NOT_OFFERED_LABEL/);
+  it("uses Twilio-aligned disclosure with transactional opt-in and legal links", () => {
     expect(smsCheckboxSrc).toMatch(/SMS_TRANSACTIONAL_CONSENT_CHECKBOX_LABEL/);
-    expect(smsCheckboxSrc).toMatch(/disabled/);
+    expect(smsCheckboxSrc).not.toMatch(/SMS_MARKETING/);
+    expect(smsCheckboxSrc).not.toMatch(/smsMarketingConsent/);
     expect(smsCheckboxSrc).toMatch(/href="\/privacy"/);
     expect(smsCheckboxSrc).toMatch(/href="\/terms"/);
     expect(smsCheckboxSrc).toMatch(/type="checkbox"/);
