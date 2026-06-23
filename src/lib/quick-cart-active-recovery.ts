@@ -51,7 +51,7 @@ export function buildActiveCartRecovery(params: {
 /** Solo recovery with zero items is stale after clear — do not render an empty card. */
 export function isActiveCartRecoveryDisplayable(
   recovery: ActiveCartRecovery | null | undefined
-): boolean {
+): recovery is ActiveCartRecovery {
   if (!recovery) return false;
   if (recovery.kind === "solo_cart") {
     return (recovery.itemCount ?? 0) > 0;

@@ -123,6 +123,7 @@ export function QuickCartProvider({
     const recovery = isActiveCartRecoveryDisplayable(payload.activeCartRecovery)
       ? payload.activeCartRecovery
       : null;
+    const normalizedRecovery = recovery ?? null;
     rememberAcceptedCartSnapshot(displayCart);
     setCart(displayCart);
     setPodContext(
@@ -135,15 +136,15 @@ export function QuickCartProvider({
         requiresClearToSwitchPod: payload.requiresClearToSwitchPod,
       })
     );
-    setActiveCartRecovery(recovery);
+    setActiveCartRecovery(normalizedRecovery);
     setShowActiveRecovery(
       shouldShowActiveRecovery(
-        recovery,
+        normalizedRecovery,
         payload.scope,
         payload.requiresClearToSwitchPod
       )
     );
-    if (!displayCart && !recovery && !quickCartHasActiveGroupOrder(displayCart)) {
+    if (!displayCart && !normalizedRecovery && !quickCartHasActiveGroupOrder(displayCart)) {
       setIsOpen(false);
     }
     setLoading(false);
