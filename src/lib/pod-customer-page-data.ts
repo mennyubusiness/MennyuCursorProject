@@ -6,6 +6,7 @@ import type { PodContactInfo } from "@/components/pod/PodPageContactSection";
 import type { PodVendorGridRow } from "@/components/pod/PodVendorGrid";
 import { prisma } from "@/lib/db";
 import { parsePodAmenities, parsePodCustomAmenities, type PodAmenityId } from "@/lib/pod-amenities";
+import { getPublicPodAnnouncementText } from "@/lib/pod-announcement";
 import { buildPodPageNavItems } from "@/lib/pod-page-nav";
 import { getPodOrderingStatus } from "@/lib/pod-page-status";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
@@ -80,6 +81,8 @@ export type PodCustomerPagePod = {
 
 export type PodCustomerPageData = {
   pod: PodCustomerPagePod;
+  /** Active plain-text announcement for public banner; null when inactive or empty. */
+  activeAnnouncement: string | null;
   vendorRows: PodVendorGridRow[];
   amenities: PodAmenityId[];
   customAmenities: string[];
@@ -179,6 +182,10 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
       websiteUrl: pod.websiteUrl,
       instagramUrl: pod.instagramUrl,
     },
+    activeAnnouncement: getPublicPodAnnouncementText(
+      pod.announcementText,
+      pod.announcementIsActive
+    ),
     vendorRows,
     amenities,
     customAmenities,

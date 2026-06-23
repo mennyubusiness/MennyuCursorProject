@@ -52,6 +52,10 @@ model Pod {
   amenities          Json?
   /// JSON string array of owner-defined amenity labels (plain text).
   customAmenities    Json?
+  /// Short plain-text promo shown on the public pod page when active.
+  announcementText       String?
+  announcementIsActive   Boolean                @default(false)
+  announcementUpdatedAt  DateTime?
   latitude           Float?
   longitude          Float?
   /// IANA timezone for scheduled pickup (e.g. America/Chicago). Falls back to DEFAULT_PICKUP_TIMEZONE env when null.

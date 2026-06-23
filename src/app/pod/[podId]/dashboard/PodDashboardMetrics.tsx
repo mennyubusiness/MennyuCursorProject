@@ -22,7 +22,7 @@ export function PodDashboardMetrics({ summary, orderableVendorCount }: PodDashbo
   const hasOrders = podDashboardHasOrderActivity(summary);
 
   return (
-    <section className="rounded-xl border border-oo-light-stone bg-oo-cream/50 p-4">
+    <section className="rounded-xl border border-oo-light-stone bg-oo-cream/50 p-3 sm:p-4">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
         Open Order at your pod
       </h2>
@@ -37,28 +37,28 @@ export function PodDashboardMetrics({ summary, orderableVendorCount }: PodDashbo
         </p>
       ) : null}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
+        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 sm:p-4">
           <p className="text-xs font-medium text-oo-stone-gray">Orders today</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums text-oo-charcoal">{summary.ordersToday}</p>
         </div>
 
-        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 sm:p-4">
           <p className="text-xs font-medium text-oo-stone-gray">Orders (last 7 days)</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums text-oo-charcoal">{summary.ordersLast7}</p>
         </div>
 
-        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+        <div className="col-span-2 rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 sm:col-span-1 sm:p-4 lg:col-span-1">
           <p className="text-xs font-medium text-oo-stone-gray">Orderable vendors</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums text-oo-charcoal">
             {orderableVendorCount}
           </p>
           <p className="mt-1 text-xs text-oo-stone-gray">
-            of {summary.activeVendors} active in pod
+            of {summary.activeVendors} vendors active in your pod
           </p>
         </div>
 
-        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 sm:col-span-2 lg:col-span-1">
+        <div className="col-span-2 rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 sm:col-span-2 sm:p-4 lg:col-span-1">
           <p className="text-xs font-medium text-oo-stone-gray">Open Order volume (last 7 days)</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums text-oo-charcoal">
             {formatMoney(summary.grossSalesLast7Cents)}
@@ -66,7 +66,7 @@ export function PodDashboardMetrics({ summary, orderableVendorCount }: PodDashbo
           <p className="mt-1 text-xs text-oo-stone-gray">Order volume through Open Order at this pod</p>
         </div>
 
-        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
+        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 sm:p-4">
           <p className="text-xs font-medium text-oo-stone-gray">Average order (last 7 days)</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums text-oo-charcoal">
             {summary.ordersLast7 > 0 ? formatMoney(summary.avgOrderValueCents) : "—"}

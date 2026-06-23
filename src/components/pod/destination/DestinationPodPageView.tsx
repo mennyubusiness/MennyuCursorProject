@@ -4,6 +4,7 @@ import { DestinationPodGroupOrderPromptGate } from "@/components/pod/destination
 import { DestinationPodHero } from "@/components/pod/destination/DestinationPodHero";
 import { DestinationPodStickyNav } from "@/components/pod/destination/DestinationPodStickyNav";
 import { DestinationPodVendorSection } from "@/components/pod/destination/DestinationPodVendorSection";
+import { PodAnnouncementBanner } from "@/components/pod/PodAnnouncementBanner";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
 import { PageShell } from "@/components/layout/page-shell";
 import type { PodCustomerPageData } from "@/lib/pod-customer-page-data";
@@ -17,6 +18,7 @@ type DestinationPodPageViewProps = PodCustomerPageData & {
 
 export function DestinationPodPageView({
   pod,
+  activeAnnouncement,
   vendorRows,
   amenities,
   customAmenities,
@@ -78,6 +80,8 @@ export function DestinationPodPageView({
       )}
 
       <ScrollPodVendorIntoView vendorId={highlightVendor} />
+
+      {activeAnnouncement ? <PodAnnouncementBanner text={activeAnnouncement} /> : null}
 
       <DestinationPodVendorSection
         podSlug={pod.slug}

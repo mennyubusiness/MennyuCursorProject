@@ -6,6 +6,7 @@ import { PodPageLocationSection } from "@/components/pod/PodPageLocationSection"
 import { PodPageStickyNav } from "@/components/pod/PodPageStickyNav";
 import { PodPageStickyCta } from "@/components/pod/PodPageStickyCta";
 import { PodPageVendorSection } from "@/components/pod/PodPageVendorSection";
+import { PodAnnouncementBanner } from "@/components/pod/PodAnnouncementBanner";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
 import { PageShell } from "@/components/layout/page-shell";
 import type { PodCustomerPageData } from "@/lib/pod-customer-page-data";
@@ -18,6 +19,7 @@ type StandardPodPageViewProps = PodCustomerPageData & {
 
 export function StandardPodPageView({
   pod,
+  activeAnnouncement,
   vendorRows,
   amenities,
   orderingStatus,
@@ -65,6 +67,8 @@ export function StandardPodPageView({
       )}
 
       <ScrollPodVendorIntoView vendorId={highlightVendor} />
+
+      {activeAnnouncement ? <PodAnnouncementBanner text={activeAnnouncement} /> : null}
 
       <PodPageVendorSection
         podSlug={pod.slug}

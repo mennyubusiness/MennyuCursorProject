@@ -13,6 +13,7 @@ import {
   normalizeVendorLogoUrl,
   parseSafeHexAccentColor,
 } from "@/lib/vendor-brand";
+import { validatePodAnnouncementText } from "@/lib/pod-announcement";
 
 function normalizeOptionalText(raw: string | undefined | null, maxLen: number): string | null {
   const t = raw?.trim() ?? "";
@@ -190,6 +191,44 @@ export async function updatePodBrandProfile(
   revalidatePath(buildPodCustomerPath(pod.slug));
   revalidatePath(`/pod/${id}/settings`);
   revalidatePath("/explore");
+  return { ok: true };
+}
+
+export type PodAnnouncementInput = {
+  text: string;
+  isActive: boolean;
+};
+
+export async function updatePodAnnouncement(
+  podId: string,
+  input: PodAnnouncementInput
+): Promise<{ ok: boolean; error?: string }> {
+  const id = podId.trim();
+  const authz = await authorizePodSettingsWrite(id);
+  if (!authz.ok) return authz;
+
+  const pod = await prisma.pod.findUnique({ where: { id }, select: { id: true, slug: true } });
+  if (!pod) return { ok: false, error: "Pod not found." };
+
+  const validated = validatePodAnnouncementText(input.text);
+  if (!validated.ok) return { ok: false, error: validated.error };
+
+  const now = new Date();
+  const text = validated.value;
+  const isActive = Boolean(input.isActive && text.length > 0);
+
+  await prisma.pod.update({
+    where: { id },
+    data: {
+      announcementText: text.length > 0 ? text : null,
+      announcementIsActive: isActive,
+      announcementUpdatedAt: now,
+    },
+  });
+
+  revalidatePath(`/pod/${id}/dashboard`);
+  revalidatePath(buildPodCustomerPath(pod.slug));
+  revalidatePath(`/pod/${id}/settings`);
   return { ok: true };
 }
 

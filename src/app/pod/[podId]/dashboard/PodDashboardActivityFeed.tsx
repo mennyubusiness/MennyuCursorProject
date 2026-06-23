@@ -19,7 +19,7 @@ function ActivityList({ items, showTimestamps }: { items: PodActivityFeed["recen
           key={item.id}
           className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2.5 text-sm text-oo-charcoal"
         >
-          <p>{item.message}</p>
+          <p className="break-words [overflow-wrap:anywhere]">{item.message}</p>
           {showTimestamps && item.occurredAt ? (
             <p className="mt-1 text-xs text-oo-stone-gray">{formatPodActivityTimestamp(item.occurredAt)}</p>
           ) : null}

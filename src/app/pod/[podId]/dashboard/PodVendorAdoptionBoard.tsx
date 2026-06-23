@@ -114,7 +114,7 @@ export function PodVendorAdoptionBoard({
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-base font-semibold text-oo-charcoal">Vendor adoption</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">Vendor adoption</h2>
         <p className="mt-1 text-sm text-oo-stone-gray">
           See who still needs setup before customers can order, and send friendly reminders to vendors.
         </p>
@@ -151,7 +151,7 @@ export function PodVendorAdoptionBoard({
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-oo-charcoal">{row.name}</span>
+                      <span className="min-w-0 break-words font-medium text-oo-charcoal">{row.name}</span>
                       <span className={displayStatusBadgeClass(row.displayStatus)}>{row.displayStatus}</span>
                     </div>
                     <AttentionRowActions row={row} podSlug={podSlug} />
@@ -164,7 +164,7 @@ export function PodVendorAdoptionBoard({
       ) : launchSummary.activeVendorCount > 0 ? (
         <p className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-3 text-sm text-oo-stone-gray">
           Every active vendor in your pod is orderable. Drag vendors below to set how they appear on your
-          public page.
+          public pod page.
         </p>
       ) : null}
     </section>

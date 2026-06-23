@@ -108,7 +108,7 @@ function SortableRosterRow({
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-oo-charcoal">{row.name}</span>
+          <span className="min-w-0 break-words font-medium text-oo-charcoal">{row.name}</span>
           {row.isFeatured && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
               Featured
@@ -125,7 +125,7 @@ function SortableRosterRow({
         </div>
         <PodRosterReadinessSummary readiness={row.readiness} />
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+      <div className="flex w-full shrink-0 flex-wrap items-stretch gap-2 sm:w-auto sm:flex-nowrap sm:items-center sm:justify-end">
         <label className="flex cursor-pointer items-center gap-2 text-sm text-oo-charcoal">
           <input
             type="checkbox"
@@ -155,7 +155,7 @@ function SortableRosterRow({
           <summary className="list-none cursor-pointer rounded border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm font-medium text-oo-charcoal hover:bg-oo-cream [&::-webkit-details-marker]:hidden">
             More
           </summary>
-          <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-oo-light-stone bg-oo-warm-white py-1 shadow-lg">
+          <div className="absolute left-0 z-20 mt-1 w-48 rounded-lg border border-oo-light-stone bg-oo-warm-white py-1 shadow-lg sm:left-auto sm:right-0">
             <Link
               href={buildVendorMenuCustomerPath(podSlug, row.vendorSlug)}
               target="_blank"

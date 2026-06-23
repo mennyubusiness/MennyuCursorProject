@@ -98,3 +98,92 @@ describe("pod dashboard activity feed UI", () => {
     expect(service).toContain("buildCurrentStatusActivityItems");
   });
 });
+
+describe("pod dashboard promotion tools UI", () => {
+  it("places promotion card after activity feed", () => {
+    const page = readFileSync(join(root, "app/pod/[podId]/dashboard/page.tsx"), "utf8");
+    expect(page).toContain("PodPromotionCard");
+    expect(page).toMatch(/PodDashboardActivityFeed[\s\S]*PodPromotionCard[\s\S]*PodDashboardSetupChecklist/);
+  });
+
+  it("renders announcement management and featured vendor summary", () => {
+    const card = readFileSync(join(root, "app/pod/[podId]/dashboard/PodPromotionCard.tsx"), "utf8");
+    expect(card).toContain("Promote your pod");
+    expect(card).toContain("updatePodAnnouncement");
+    expect(card).toContain("Show on public pod page");
+    expect(card).toContain("Feature a vendor from the roster");
+    expect(card).toContain("Copy public page link");
+    expect(card).toContain("POD_ANNOUNCEMENT_MAX_LENGTH");
+  });
+
+  it("shows active announcements only on public pod views", () => {
+    const data = readFileSync(join(root, "lib/pod-customer-page-data.ts"), "utf8");
+    expect(data).toContain("getPublicPodAnnouncementText");
+    expect(data).toContain("activeAnnouncement");
+
+    const standard = readFileSync(join(root, "components/pod/StandardPodPageView.tsx"), "utf8");
+    expect(standard).toContain("PodAnnouncementBanner");
+    expect(standard).toMatch(/activeAnnouncement \? <PodAnnouncementBanner/);
+
+    const destination = readFileSync(
+      join(root, "components/pod/destination/DestinationPodPageView.tsx"),
+      "utf8"
+    );
+    expect(destination).toContain("PodAnnouncementBanner");
+  });
+});
+
+describe("pod dashboard beta polish", () => {
+  const dashboardFiles = [
+    "app/pod/[podId]/dashboard/page.tsx",
+    "app/pod/[podId]/dashboard/PodDashboardMetrics.tsx",
+    "app/pod/[podId]/dashboard/PodDashboardQuickActions.tsx",
+    "app/pod/[podId]/dashboard/PodVendorAdoptionBoard.tsx",
+    "app/pod/[podId]/dashboard/PodDashboardActivityFeed.tsx",
+    "app/pod/[podId]/dashboard/PodPromotionCard.tsx",
+    "app/pod/[podId]/dashboard/PodDashboardSetupChecklist.tsx",
+    "app/pod/[podId]/dashboard/PodDashboardInviteVendorSection.tsx",
+  ];
+
+  it("uses null-safe announcement state on the dashboard page", () => {
+    const page = readFileSync(join(root, "app/pod/[podId]/dashboard/page.tsx"), "utf8");
+    expect(page).toContain("resolvePodDashboardAnnouncementState");
+    expect(page).toContain("announcementState.initialText");
+    expect(page).toContain("announcementState.initialIsActive");
+  });
+
+  it("does not use earnings or payout language in dashboard surfaces", () => {
+    for (const file of dashboardFiles) {
+      const src = readFileSync(join(root, file), "utf8");
+      expect(src).not.toMatch(/\bearnings\b|\brevenue share\b|\bpayout\b/i);
+    }
+  });
+
+  it("includes mobile overflow guards on long text surfaces", () => {
+    const promotion = readFileSync(
+      join(root, "app/pod/[podId]/dashboard/PodPromotionCard.tsx"),
+      "utf8"
+    );
+    const activity = readFileSync(
+      join(root, "app/pod/[podId]/dashboard/PodDashboardActivityFeed.tsx"),
+      "utf8"
+    );
+    const banner = readFileSync(join(root, "components/pod/PodAnnouncementBanner.tsx"), "utf8");
+
+    expect(promotion).toContain("overflow-wrap:anywhere");
+    expect(activity).toContain("overflow-wrap:anywhere");
+    expect(banner).toContain("overflow-wrap:anywhere");
+    expect(promotion).toContain("compact");
+  });
+
+  it("only highlights orderable featured vendors on public cards", () => {
+    const gridCard = readFileSync(join(root, "components/pod/PodVendorCard.tsx"), "utf8");
+    const destinationCard = readFileSync(
+      join(root,
+        "components/pod/destination/DestinationPodVendorCard.tsx"),
+      "utf8"
+    );
+    expect(gridCard).toMatch(/isFeatured && !availability\.unavailable/);
+    expect(destinationCard).toMatch(/isFeatured && !unavailable/);
+  });
+});

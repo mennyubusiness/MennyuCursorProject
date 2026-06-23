@@ -87,6 +87,7 @@ export function DestinationPodVendorCard({
       className={cn(
         "group flex h-full min-h-[44px] flex-col overflow-hidden rounded-2xl border border-oo-light-stone bg-oo-warm-white shadow-sm transition duration-200",
         "hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md motion-reduce:hover:translate-y-0",
+        isFeatured && !unavailable && "ring-1 ring-brand/25",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-oo-cream",
         unavailable && "hover:border-oo-light-stone"
       )}

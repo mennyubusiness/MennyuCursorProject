@@ -91,6 +91,7 @@ export function PodVendorCard({ podSlug, variant, vendor, isFeatured, availabili
       className={cn(
         "group flex h-full flex-col overflow-hidden rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm transition duration-200",
         "hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md motion-reduce:hover:translate-y-0",
+        isFeatured && !availability.unavailable && "ring-1 ring-brand/20",
         grid ? "w-full" : "w-[min(10.5rem,40vw)] shrink-0",
         availability.unavailable && "opacity-95"
       )}
