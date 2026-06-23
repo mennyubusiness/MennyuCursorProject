@@ -11,7 +11,7 @@ describe("pod dashboard P0 UI", () => {
     expect(page).toContain("PodDashboardMetrics");
     expect(page).toContain("PodDashboardQuickActions");
     expect(page).toContain("demoteSetupChecklist");
-    expect(page).toMatch(/PodDashboardMetrics[\s\S]*PodDashboardQuickActions[\s\S]*PodDashboardSetupChecklist/);
+    expect(page).toMatch(/PodDashboardMetrics[\s\S]*PodDashboardQuickActions[\s\S]*PodVendorAdoptionBoard/);
   });
 
   it("uses canonical slug URLs in quick actions", () => {
@@ -68,5 +68,33 @@ describe("pod dashboard vendor adoption UI", () => {
   it("uses owner-facing live and blocker labels in roster", () => {
     const roster = readFileSync(join(root, "app/pod/[podId]/dashboard/PodVendorRosterPanel.tsx"), "utf8");
     expect(roster).toContain("podOwnerVendorDisplayStatus");
+  });
+});
+
+describe("pod dashboard activity feed UI", () => {
+  it("wires activity feed after adoption board and before setup checklist", () => {
+    const page = readFileSync(join(root, "app/pod/[podId]/dashboard/page.tsx"), "utf8");
+    expect(page).toContain("getPodActivityFeed");
+    expect(page).toContain("PodDashboardActivityFeed");
+    expect(page).toMatch(
+      /PodVendorAdoptionBoard[\s\S]*PodDashboardActivityFeed[\s\S]*PodDashboardSetupChecklist/
+    );
+  });
+
+  it("renders empty-state guidance with quick links", () => {
+    const feed = readFileSync(
+      join(root, "app/pod/[podId]/dashboard/PodDashboardActivityFeed.tsx"),
+      "utf8"
+    );
+    expect(feed).toContain("No recent pod activity yet");
+    expect(feed).toContain("QR &amp; signage");
+    expect(feed).toContain("buildPodCustomerPath");
+    expect(feed).not.toMatch(/customerPhone|customerEmail|revenue|payout/i);
+  });
+
+  it("keeps activity service queries free of customer fields", () => {
+    const service = readFileSync(join(root, "services/pod-activity.service.ts"), "utf8");
+    expect(service).not.toMatch(/customerPhone|customerEmail|customerAccountId|totalCents|vendorGross/i);
+    expect(service).toContain("buildCurrentStatusActivityItems");
   });
 });

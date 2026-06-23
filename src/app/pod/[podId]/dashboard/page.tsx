@@ -5,10 +5,12 @@ import { derivePodSetupChecklist, deriveVendorPodReadinessForRoster } from "@/li
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { getPodAnalytics } from "@/services/pod-analytics.service";
+import { getPodActivityFeed } from "@/services/pod-activity.service";
 import {
   buildPodAdoptionAttentionRows,
   computePodLaunchReadinessSummary,
 } from "@/lib/pod-vendor-adoption";
+import { PodDashboardActivityFeed } from "./PodDashboardActivityFeed";
 import { PodDashboardAddVendor } from "./PodDashboardAddVendor";
 import { PodDashboardMetrics } from "./PodDashboardMetrics";
 import { PodDashboardPendingRequests } from "./PodDashboardPendingRequests";
@@ -190,6 +192,19 @@ export default async function PodDashboardPage({
   const demoteSetupChecklist = pod.isActive && orderableVendorCount > 0;
   const launchSummary = computePodLaunchReadinessSummary(rosterRows);
   const adoptionAttentionRows = buildPodAdoptionAttentionRows(rosterRows);
+  const activityFeed = await getPodActivityFeed(podId, {
+    roster: rosterRows.map((row) => ({
+      vendorId: row.vendorId,
+      name: row.name,
+      podVendorActive: row.podVendorActive,
+      vendorGloballyActive: row.vendorGloballyActive,
+      readiness: {
+        status: row.readiness.status,
+        canAcceptOrders: row.readiness.canAcceptOrders,
+      },
+    })),
+    ordersToday: analytics.summary.ordersToday,
+  });
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
@@ -204,6 +219,15 @@ export default async function PodDashboardPage({
       <PodDashboardMetrics summary={analytics.summary} orderableVendorCount={orderableVendorCount} />
 
       <PodDashboardQuickActions podId={pod.id} podSlug={pod.slug} />
+
+      <PodVendorAdoptionBoard
+        podSlug={pod.slug}
+        launchSummary={launchSummary}
+        attentionRows={adoptionAttentionRows}
+        pendingCount={pendingForUi.length}
+      />
+
+      <PodDashboardActivityFeed podId={pod.id} podSlug={pod.slug} feed={activityFeed} />
 
       <PodDashboardSetupChecklist items={podSetupChecklist} demoted={demoteSetupChecklist} />
 
@@ -230,13 +254,6 @@ export default async function PodDashboardPage({
           />
         )}
       </section>
-
-      <PodVendorAdoptionBoard
-        podSlug={pod.slug}
-        launchSummary={launchSummary}
-        attentionRows={adoptionAttentionRows}
-        pendingCount={pendingForUi.length}
-      />
 
       <section>
         <h2 className="mb-3 text-base font-semibold text-oo-charcoal">Vendor roster</h2>
