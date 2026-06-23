@@ -36,7 +36,7 @@ export async function PodOrderingQrSection({
   }
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white p-4">
+    <section id="ordering-qr" className="rounded-lg border border-stone-200 bg-white p-4 scroll-mt-4">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Ordering link &amp; QR</h2>
       <p className="mt-1 text-sm text-stone-600">
         Customers can scan this code at the pod to start ordering. It links directly to this pod&apos;s

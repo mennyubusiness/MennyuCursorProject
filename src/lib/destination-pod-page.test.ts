@@ -92,7 +92,7 @@ describe("DestinationPodMarquee", () => {
     expect(marqueeSrc).toMatch(/whitespace-nowrap/);
     expect(marqueeSrc).toMatch(/min-w-max/);
     expect(marqueeSrc).toMatch(/shrink-0/);
-    expect(marqueeSrc).toMatch(/animate-destination-pod-marquee/);
+    expect(marqueeSrc).toMatch(/animate-destination-pod-marquee sm:animate-destination-pod-marquee-desktop/);
     expect(marqueeSrc).toMatch(/MarqueeRow items=\{items\}/);
     expect(marqueeSrc).toMatch(/MarqueeRow items=\{items\} ariaHidden/);
     expect(marqueeSrc).not.toMatch(/flex-wrap/);

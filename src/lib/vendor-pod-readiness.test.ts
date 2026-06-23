@@ -172,6 +172,7 @@ describe("deriveVendorPodReadiness pod owner view", () => {
     const result = deriveVendorPodReadiness(
       {
         podId: "pod_1",
+        podSlug: "riverside",
         vendorId: "vendor_1",
         pod: { isActive: true },
         podVendor: { isActive: true },
@@ -187,6 +188,9 @@ describe("deriveVendorPodReadiness pod owner view", () => {
     expect(stripe?.complete).toBe(false);
     expect(stripe?.actionHref).toBeUndefined();
     expect(result.blockingReasons[0]?.owner).toBe("vendor");
+
+    const profile = result.checklist.find((item) => item.key === "profile");
+    expect(profile?.actionHref).toBe("/riverside/test-kitchen");
   });
 });
 

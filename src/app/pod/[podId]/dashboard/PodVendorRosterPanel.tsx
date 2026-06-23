@@ -19,11 +19,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { updatePodVendorPresentation } from "@/actions/pod-settings.actions";
+import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { VendorLogo } from "@/components/images/VendorLogo";
 import { PodRosterReadinessSummary, type PodRosterReadinessSnapshot } from "./PodRosterReadinessSummary";
 
 export type PodRosterVendorRow = {
   vendorId: string;
+  vendorSlug: string;
   name: string;
   description: string | null;
   imageUrl: string | null;
@@ -60,14 +62,14 @@ function rosterStatusBadge(readiness: PodRosterReadinessSnapshot) {
 }
 
 function SortableRosterRow({
-  podId,
+  podSlug,
   row,
   onToggleFeatured,
   onTogglePodVendorActive,
   onOpenRemove,
   disabled,
 }: {
-  podId: string;
+  podSlug: string;
   row: PodRosterVendorRow;
   onToggleFeatured: (vendorId: string, next: boolean) => void;
   onTogglePodVendorActive: (vendorId: string, next: boolean) => void;
@@ -161,7 +163,9 @@ function SortableRosterRow({
           </summary>
           <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-oo-light-stone bg-oo-warm-white py-1 shadow-lg">
             <Link
-              href={`/pod/${podId}/vendor/${row.vendorId}`}
+              href={buildVendorMenuCustomerPath(podSlug, row.vendorSlug)}
+              target="_blank"
+              rel="noopener noreferrer"
               className="block px-3 py-2 text-sm text-oo-charcoal hover:bg-oo-cream"
             >
               View vendor page
@@ -183,9 +187,11 @@ function SortableRosterRow({
 
 export function PodVendorRosterPanel({
   podId,
+  podSlug,
   initialRows,
 }: {
   podId: string;
+  podSlug: string;
   initialRows: PodRosterVendorRow[];
 }) {
   const router = useRouter();
@@ -310,7 +316,7 @@ export function PodVendorRosterPanel({
             {rows.map((row) => (
               <SortableRosterRow
                 key={row.vendorId}
-                podId={podId}
+                podSlug={podSlug}
                 row={row}
                 onToggleFeatured={onToggleFeatured}
                 onTogglePodVendorActive={(vendorId, next) => void onTogglePodVendorActive(vendorId, next)}

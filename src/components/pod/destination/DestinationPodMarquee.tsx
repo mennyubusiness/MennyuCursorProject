@@ -40,7 +40,7 @@ export function DestinationPodMarquee({ items }: DestinationPodMarqueeProps) {
 
         {/* Animated seamless loop: two identical rows, track animates -50% */}
         <div className="w-full overflow-hidden motion-reduce:hidden">
-          <div className="flex w-max shrink-0 will-change-transform animate-destination-pod-marquee">
+          <div className="flex w-max shrink-0 will-change-transform animate-destination-pod-marquee sm:animate-destination-pod-marquee-desktop">
             <MarqueeRow items={items} />
             <MarqueeRow items={items} ariaHidden />
           </div>

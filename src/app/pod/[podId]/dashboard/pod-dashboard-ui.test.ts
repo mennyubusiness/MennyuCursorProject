@@ -1,0 +1,44 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const root = join(process.cwd(), "src");
+
+describe("pod dashboard P0 UI", () => {
+  it("loads analytics and renders business-first dashboard sections", () => {
+    const page = readFileSync(join(root, "app/pod/[podId]/dashboard/page.tsx"), "utf8");
+    expect(page).toContain("getPodAnalytics");
+    expect(page).toContain("PodDashboardMetrics");
+    expect(page).toContain("PodDashboardQuickActions");
+    expect(page).toContain("demoteSetupChecklist");
+    expect(page).toMatch(/PodDashboardMetrics[\s\S]*PodDashboardQuickActions[\s\S]*PodDashboardSetupChecklist/);
+  });
+
+  it("uses canonical slug URLs in quick actions", () => {
+    const quickActions = readFileSync(
+      join(root, "app/pod/[podId]/dashboard/PodDashboardQuickActions.tsx"),
+      "utf8"
+    );
+    expect(quickActions).toContain("buildPodCustomerPath");
+    expect(quickActions).toContain("#ordering-qr");
+    expect(quickActions).toContain("View public pod page");
+  });
+
+  it("uses canonical slug URLs in roster vendor links", () => {
+    const roster = readFileSync(join(root, "app/pod/[podId]/dashboard/PodVendorRosterPanel.tsx"), "utf8");
+    expect(roster).toContain("buildVendorMenuCustomerPath");
+    expect(roster).not.toMatch(/\/pod\/\$\{podId\}\/vendor\/\$\{row\.vendorId\}/);
+  });
+
+  it("labels metrics without earnings language", () => {
+    const metrics = readFileSync(join(root, "app/pod/[podId]/dashboard/PodDashboardMetrics.tsx"), "utf8");
+    expect(metrics).toContain("Open Order volume");
+    expect(metrics).toContain("No Open Order sales yet");
+    expect(metrics).not.toMatch(/earnings|revenue share|payout/i);
+  });
+
+  it("anchors QR section on settings page", () => {
+    const qr = readFileSync(join(root, "components/pod/PodOrderingQrSection.tsx"), "utf8");
+    expect(qr).toContain('id="ordering-qr"');
+  });
+});

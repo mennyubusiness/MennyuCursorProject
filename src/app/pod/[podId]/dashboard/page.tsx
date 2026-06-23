@@ -4,8 +4,11 @@ import { env } from "@/lib/env";
 import { derivePodSetupChecklist, deriveVendorPodReadinessForRoster } from "@/lib/vendor-pod-readiness";
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
+import { getPodAnalytics } from "@/services/pod-analytics.service";
 import { PodDashboardAddVendor } from "./PodDashboardAddVendor";
+import { PodDashboardMetrics } from "./PodDashboardMetrics";
 import { PodDashboardPendingRequests } from "./PodDashboardPendingRequests";
+import { PodDashboardQuickActions } from "./PodDashboardQuickActions";
 import { PodDashboardSetupChecklist } from "./PodDashboardSetupChecklist";
 import { PodVendorRosterPanel, type PodRosterVendorRow } from "./PodVendorRosterPanel";
 
@@ -20,6 +23,7 @@ export default async function PodDashboardPage({
     where: { id: podId },
     select: {
       id: true,
+      slug: true,
       name: true,
       description: true,
       imageUrl: true,
@@ -57,7 +61,7 @@ export default async function PodDashboardPage({
   if (!pod) notFound();
 
   const vendorIdsInPod = pod.vendors.map((pv) => pv.vendor.id);
-  const [vendorsNotInPod, pendingRequests, menuSummaries, unmatchedFlags] = await Promise.all([
+  const [vendorsNotInPod, pendingRequests, menuSummaries, unmatchedFlags, analytics] = await Promise.all([
     prisma.vendor.findMany({
       where: { id: { notIn: vendorIdsInPod } },
       select: { id: true, name: true, slug: true, isActive: true, mennyuOrdersPaused: true },
@@ -79,7 +83,9 @@ export default async function PodDashboardPage({
         hasUnmatched: await hasUnmatchedChannelRegistrationForVendorById(vendorId),
       }))
     ),
+    getPodAnalytics(podId),
   ]);
+  if (!analytics) notFound();
   const unmatchedByVendor = new Map(unmatchedFlags.map((row) => [row.vendorId, row.hasUnmatched]));
   const stripeConnectConfigured = Boolean(env.STRIPE_SECRET_KEY);
 
@@ -87,6 +93,7 @@ export default async function PodDashboardPage({
     const vendor = pv.vendor;
     const readiness = deriveVendorPodReadinessForRoster({
       podId: pod.id,
+      podSlug: pod.slug,
       vendorId: vendor.id,
       pod: { isActive: pod.isActive },
       podVendor: { isActive: pv.isActive },
@@ -123,6 +130,7 @@ export default async function PodDashboardPage({
 
     return {
       vendorId: vendor.id,
+      vendorSlug: vendor.slug,
       name: vendor.name,
       description: vendor.description,
       imageUrl: vendor.imageUrl,
@@ -173,20 +181,29 @@ export default async function PodDashboardPage({
     createdAt: r.createdAt.toISOString(),
   }));
 
+  const orderableVendorCount = rosterRows.filter((row) => row.readiness.canAcceptOrders).length;
+  const demoteSetupChecklist = pod.isActive && orderableVendorCount > 0;
+
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
       <div>
-        <h1 className="text-xl font-semibold text-oo-charcoal">Overview</h1>
+        <h1 className="text-xl font-semibold text-oo-charcoal">{pod.name}</h1>
         <p className="mt-1 text-sm text-oo-stone-gray">
-          Invite vendors, track setup readiness, and curate your roster — pause flags update the public pod
-          page without removing membership.
+          See how Open Order is performing at your pod, share your public page, and keep vendors ready for
+          customers.
         </p>
       </div>
 
-      <PodDashboardSetupChecklist items={podSetupChecklist} />
+      <PodDashboardMetrics summary={analytics.summary} orderableVendorCount={orderableVendorCount} />
+
+      <PodDashboardQuickActions podId={pod.id} podSlug={pod.slug} />
+
+      <PodDashboardSetupChecklist items={podSetupChecklist} demoted={demoteSetupChecklist} />
+
+      <PodDashboardPendingRequests podId={pod.id} requests={pendingForUi} />
 
       <section>
-        <h2 className="mb-3 font-medium text-oo-charcoal">Request vendor to join</h2>
+        <h2 className="mb-3 text-base font-semibold text-oo-charcoal">Request vendor to join</h2>
         <p className="mb-2 text-sm text-oo-stone-gray">
           We&apos;ll notify the vendor. They choose whether to accept or decline. If they&apos;re already
           in another pod, accepting your invitation moves them here.
@@ -207,15 +224,13 @@ export default async function PodDashboardPage({
         )}
       </section>
 
-      <PodDashboardPendingRequests podId={pod.id} requests={pendingForUi} />
-
       <section>
         <h2 className="mb-3 text-base font-semibold text-oo-charcoal">Vendor roster</h2>
         <p className="mb-3 text-sm text-oo-stone-gray">
           Setup flags show what each vendor still needs before they can take orders. Stripe and POS are
           completed by the vendor — you can pause visibility in your pod anytime.
         </p>
-        <PodVendorRosterPanel podId={pod.id} initialRows={rosterRows} />
+        <PodVendorRosterPanel podId={pod.id} podSlug={pod.slug} initialRows={rosterRows} />
       </section>
     </div>
   );
