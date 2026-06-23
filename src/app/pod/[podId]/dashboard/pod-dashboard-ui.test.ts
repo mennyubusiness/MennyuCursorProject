@@ -42,3 +42,31 @@ describe("pod dashboard P0 UI", () => {
     expect(qr).toContain('id="ordering-qr"');
   });
 });
+
+describe("pod dashboard vendor adoption UI", () => {
+  it("renders adoption board without reordering roster drag sort", () => {
+    const page = readFileSync(join(root, "app/pod/[podId]/dashboard/page.tsx"), "utf8");
+    expect(page).toContain("PodVendorAdoptionBoard");
+    expect(page).toContain("buildPodAdoptionAttentionRows");
+
+    const roster = readFileSync(join(root, "app/pod/[podId]/dashboard/PodVendorRosterPanel.tsx"), "utf8");
+    expect(roster).toContain("DndContext");
+    expect(roster).toContain("arrayMove");
+    expect(roster).toContain("Pause in pod");
+    expect(roster).toContain("Remove from pod");
+  });
+
+  it("surfaces needs-attention section and copy actions", () => {
+    const board = readFileSync(join(root, "app/pod/[podId]/dashboard/PodVendorAdoptionBoard.tsx"), "utf8");
+    expect(board).toContain("Needs attention");
+    expect(board).toContain("Copy reminder");
+    expect(board).toContain("Copy setup link");
+    expect(board).toContain("buildVendorMenuCustomerPath");
+    expect(board).not.toMatch(/fetch\(|sendEmail|twilio|sms/i);
+  });
+
+  it("uses owner-facing live and blocker labels in roster", () => {
+    const roster = readFileSync(join(root, "app/pod/[podId]/dashboard/PodVendorRosterPanel.tsx"), "utf8");
+    expect(roster).toContain("podOwnerVendorDisplayStatus");
+  });
+});

@@ -5,11 +5,16 @@ import { derivePodSetupChecklist, deriveVendorPodReadinessForRoster } from "@/li
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { getPodAnalytics } from "@/services/pod-analytics.service";
+import {
+  buildPodAdoptionAttentionRows,
+  computePodLaunchReadinessSummary,
+} from "@/lib/pod-vendor-adoption";
 import { PodDashboardAddVendor } from "./PodDashboardAddVendor";
 import { PodDashboardMetrics } from "./PodDashboardMetrics";
 import { PodDashboardPendingRequests } from "./PodDashboardPendingRequests";
 import { PodDashboardQuickActions } from "./PodDashboardQuickActions";
 import { PodDashboardSetupChecklist } from "./PodDashboardSetupChecklist";
+import { PodVendorAdoptionBoard } from "./PodVendorAdoptionBoard";
 import { PodVendorRosterPanel, type PodRosterVendorRow } from "./PodVendorRosterPanel";
 
 export default async function PodDashboardPage({
@@ -183,6 +188,8 @@ export default async function PodDashboardPage({
 
   const orderableVendorCount = rosterRows.filter((row) => row.readiness.canAcceptOrders).length;
   const demoteSetupChecklist = pod.isActive && orderableVendorCount > 0;
+  const launchSummary = computePodLaunchReadinessSummary(rosterRows);
+  const adoptionAttentionRows = buildPodAdoptionAttentionRows(rosterRows);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
@@ -224,11 +231,18 @@ export default async function PodDashboardPage({
         )}
       </section>
 
+      <PodVendorAdoptionBoard
+        podSlug={pod.slug}
+        launchSummary={launchSummary}
+        attentionRows={adoptionAttentionRows}
+        pendingCount={pendingForUi.length}
+      />
+
       <section>
         <h2 className="mb-3 text-base font-semibold text-oo-charcoal">Vendor roster</h2>
         <p className="mb-3 text-sm text-oo-stone-gray">
-          Setup flags show what each vendor still needs before they can take orders. Stripe and POS are
-          completed by the vendor — you can pause visibility in your pod anytime.
+          Public display order for your pod page. Setup flags show what each vendor still needs — Stripe and
+          POS are completed by the vendor. You can pause visibility anytime.
         </p>
         <PodVendorRosterPanel podId={pod.id} podSlug={pod.slug} initialRows={rosterRows} />
       </section>

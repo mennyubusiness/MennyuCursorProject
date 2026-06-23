@@ -20,6 +20,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { updatePodVendorPresentation } from "@/actions/pod-settings.actions";
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
+import { podOwnerVendorDisplayStatus } from "@/lib/pod-vendor-adoption";
 import { VendorLogo } from "@/components/images/VendorLogo";
 import { PodRosterReadinessSummary, type PodRosterReadinessSnapshot } from "./PodRosterReadinessSummary";
 
@@ -40,25 +41,18 @@ export type PodRosterVendorRow = {
 };
 
 function rosterStatusBadge(readiness: PodRosterReadinessSnapshot) {
-  const status = readiness.status;
-  const label = readiness.label;
-  if (status === "active") {
-    return { label, className: "rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-900" };
+  const displayStatus = podOwnerVendorDisplayStatus(readiness.status, readiness.canAcceptOrders);
+  if (displayStatus === "Live") {
+    return { label: displayStatus, className: "rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-900" };
   }
   if (
-    status === "paused_in_pod" ||
-    status === "paused_by_vendor" ||
-    status === "needs_profile" ||
-    status === "needs_payment" ||
-    status === "needs_pos" ||
-    status === "needs_menu"
+    displayStatus.startsWith("Needs ") ||
+    displayStatus === "Paused in pod" ||
+    displayStatus === "Paused by vendor"
   ) {
-    return { label, className: "rounded bg-amber-50 px-1.5 py-0.5 text-amber-900" };
+    return { label: displayStatus, className: "rounded bg-amber-50 px-1.5 py-0.5 text-amber-900" };
   }
-  if (status === "inactive_by_open_order" || status === "pod_inactive") {
-    return { label, className: "rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-800" };
-  }
-  return { label, className: "rounded bg-sky-50 px-1.5 py-0.5 text-sky-900" };
+  return { label: displayStatus, className: "rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-800" };
 }
 
 function SortableRosterRow({

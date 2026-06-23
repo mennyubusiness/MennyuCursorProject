@@ -1,4 +1,5 @@
 import type { ReadinessOwner, VendorPodReadinessStatus } from "@/lib/vendor-pod-readiness";
+import { podOwnerVendorDisplayStatus } from "@/lib/pod-vendor-adoption";
 
 export type PodRosterReadinessSnapshot = {
   status: VendorPodReadinessStatus;
@@ -49,7 +50,9 @@ export function PodRosterReadinessSummary({ readiness }: { readiness: PodRosterR
         <SetupFlag label="Menu" complete={readiness.setupSummary.menu} />
       </div>
       <p className="text-xs text-oo-stone-gray">
-        <span className="font-medium text-oo-charcoal">{readiness.label}</span>
+        <span className="font-medium text-oo-charcoal">
+          {podOwnerVendorDisplayStatus(readiness.status, readiness.canAcceptOrders)}
+        </span>
         {readiness.canAcceptOrders ? " · Accepting orders" : null}
       </p>
       {readiness.primaryBlocker ? (
