@@ -16,7 +16,15 @@ describe("Quick Cart clear-state wiring", () => {
   it("clears Quick Cart snapshot to null after cart clear events", () => {
     expect(contextSrc).toContain("applyCartSnapshot(null)");
     expect(contextSrc).toContain("resolveQuickCartSnapshotAfterUpdate");
-    expect(contextSrc).toContain("setIsOpen(false)");
+    expect(contextSrc).toMatch(/applyCartSnapshot[\s\S]*setIsOpen\(false\)/);
+  });
+
+  it("does not auto-close drawer when API refresh returns empty", () => {
+    const applyPayloadBlock = contextSrc.slice(
+      contextSrc.indexOf("const applyPayload = useCallback"),
+      contextSrc.indexOf("const applyCartSnapshot = useCallback")
+    );
+    expect(applyPayloadBlock).not.toMatch(/setIsOpen\(false\)/);
   });
 
   it("closes drawer after clearActiveSoloCart succeeds", () => {
@@ -24,9 +32,11 @@ describe("Quick Cart clear-state wiring", () => {
     expect(contextSrc).toMatch(/clearAndSwitchSoloCart[\s\S]*setIsOpen\(false\)/);
   });
 
-  it("does not render residual empty Quick Cart shell", () => {
-    expect(drawerSrc).toContain("isActiveCartRecoveryDisplayable");
-    expect(drawerSrc).toMatch(/!hasItems && !hasActiveGroupOrder && !hasDisplayableRecovery/);
+  it("renders empty Quick Cart states while open", () => {
+    expect(drawerSrc).toContain("showNeutralEmpty");
+    expect(drawerSrc).not.toMatch(
+      /!hasItems && !hasActiveGroupOrder && !hasDisplayableRecovery && !loading/
+    );
   });
 
   it("broadcasts null cart snapshot on clear", () => {

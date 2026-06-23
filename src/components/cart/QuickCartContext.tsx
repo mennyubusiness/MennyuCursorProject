@@ -149,9 +149,6 @@ export function QuickCartProvider({
         payload.requiresClearToSwitchPod
       )
     );
-    if (!displayCart && !normalizedRecovery && !quickCartHasActiveGroupOrder(displayCart)) {
-      setIsOpen(false);
-    }
     setLoading(false);
   }, []);
 
