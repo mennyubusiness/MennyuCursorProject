@@ -44,9 +44,12 @@ const NEUTRAL_POD_CONTEXT: CartPodContext = {
   cartScope: "neutral",
   cartPodId: null,
   cartPodName: null,
+  cartPodSlug: null,
   browsingPodId: null,
   browsingPodName: null,
+  browsingPodSlug: null,
   assignedPodId: null,
+  assignedPodSlug: null,
   canStartOrderHere: false,
   requiresClearToSwitchPod: false,
 };
@@ -131,8 +134,10 @@ export function QuickCartProvider({
         cart: displayCart,
         browsingPodId: payload.browsingPodId,
         browsingPodName: payload.browsingPodName,
+        browsingPodSlug: payload.browsingPodSlug,
         assignedPodId: payload.assignedPodId,
         assignedPodName: payload.assignedPodName,
+        assignedPodSlug: payload.assignedPodSlug,
         requiresClearToSwitchPod: payload.requiresClearToSwitchPod,
       })
     );
@@ -173,12 +178,14 @@ export function QuickCartProvider({
         buildCartPodContextForDisplay({
           cart: displayCart,
           browsingPodId: getBrowsingPodIdFromClient(),
-          browsingPodName: null,
+          browsingPodName: displayCart.podName ?? null,
+          browsingPodSlug: displayCart.podSlug ?? null,
           assignedPodId:
             displayCart.cartScope === "assigned_pod" || displayCart.cartScope === "group_order"
               ? displayCart.podId
               : null,
           assignedPodName: displayCart.podName ?? null,
+          assignedPodSlug: displayCart.podSlug ?? null,
           requiresClearToSwitchPod: false,
         })
       );

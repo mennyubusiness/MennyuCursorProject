@@ -279,7 +279,7 @@ function cartLineParticipantMap(
   return new Map(items.map((i) => [i.id, i.groupOrderParticipantId ?? null]));
 }
 
-type CartRowWithPod = CartRowForGrouping & { pod?: { name: string } | null };
+type CartRowWithPod = CartRowForGrouping & { pod?: { name: string; slug: string } | null };
 
 const ACTIVE_GROUP_SESSION_STATUSES = ["active", "locked_checkout"] as const;
 
@@ -328,7 +328,7 @@ async function scopeCartForGroupViewer(
   );
   const scoped = applyGroupOrderVisibilityToCart(full, ctx, map);
   const scope = displayScope ?? inferCartScopeFromViewer(scoped, ctx);
-  return attachQuickCartDisplay(scoped, ctx, raw.pod?.name ?? null, scope);
+  return attachQuickCartDisplay(scoped, ctx, raw.pod?.name ?? null, scope, raw.pod?.slug ?? null);
 }
 
 export async function getCartByIdForMutation(
@@ -1096,10 +1096,12 @@ async function hostParticipantCount(cartId: string): Promise<number | undefined>
 async function packageQuickCartForActiveAssignment(params: {
   assignedPodId: string;
   assignedPodName: string;
+  assignedPodSlug: string;
   cart: Cart;
   scope: CartPodScope;
   browsePodId: string | null;
   browsePodName: string | null;
+  browsePodSlug?: string | null;
 }): Promise<QuickCartApiResponse> {
   const requiresClearToSwitchPod = Boolean(
     params.browsePodId && params.browsePodId !== params.assignedPodId
@@ -1117,6 +1119,7 @@ async function packageQuickCartForActiveAssignment(params: {
     cart: params.cart,
     browsePodId: params.browsePodId,
     browsePodName: params.browsePodName,
+    podSlug: params.assignedPodSlug,
     participantCount,
   });
 
@@ -1126,8 +1129,10 @@ async function packageQuickCartForActiveAssignment(params: {
       cart: params.cart,
       browsingPodId: params.browsePodId,
       browsingPodName: params.browsePodName,
+      browsingPodSlug: params.browsePodSlug ?? null,
       assignedPodId: params.assignedPodId,
       assignedPodName: params.assignedPodName,
+      assignedPodSlug: params.assignedPodSlug,
       requiresClearToSwitchPod: false,
       activeCartRecovery,
     };
@@ -1138,8 +1143,10 @@ async function packageQuickCartForActiveAssignment(params: {
     cart: null,
     browsingPodId: params.browsePodId,
     browsingPodName: params.browsePodName,
+    browsingPodSlug: params.browsePodSlug ?? null,
     assignedPodId: params.assignedPodId,
     assignedPodName: params.assignedPodName,
+    assignedPodSlug: params.assignedPodSlug,
     requiresClearToSwitchPod,
     activeCartRecovery,
   };
@@ -1219,15 +1226,18 @@ export async function getQuickCartPayload(
       });
       const scoped = await scopeCartForGroupViewer(row, groupCartIdFromContext, actor, "group_order");
       const browsePodName = browsePodId
-        ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ?? null
+        ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true, slug: true } })) ??
+          null
         : null;
       return packageQuickCartForActiveAssignment({
         assignedPodId: scoped.podId,
         assignedPodName: scoped.podName ?? row.pod.name,
+        assignedPodSlug: row.pod.slug,
         cart: scoped,
         scope: "group_order",
         browsePodId,
-        browsePodName,
+        browsePodName: browsePodName?.name ?? null,
+        browsePodSlug: browsePodName?.slug ?? null,
       });
     }
   }
@@ -1242,17 +1252,21 @@ export async function getQuickCartPayload(
       });
       if (row) {
         const scoped = await scopeCartForGroupViewer(row, accountCartId, null, "assigned_pod");
-        const browsePodName = browsePodId
-          ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ??
-            null
+        const browsePod = browsePodId
+          ? await prisma.pod.findUnique({
+              where: { id: browsePodId },
+              select: { name: true, slug: true },
+            })
           : null;
         return packageQuickCartForActiveAssignment({
           assignedPodId: scoped.podId,
           assignedPodName: scoped.podName ?? row.pod.name,
+          assignedPodSlug: row.pod.slug,
           cart: scoped,
           scope: "assigned_pod",
           browsePodId,
-          browsePodName,
+          browsePodName: browsePod?.name ?? null,
+          browsePodSlug: browsePod?.slug ?? null,
         });
       }
     }
@@ -1280,16 +1294,21 @@ export async function getQuickCartPayload(
         ? "group_order"
         : "assigned_pod";
     const cart = await scopeCartForGroupViewer(assignedRow, assignedRow.id, actor, scope);
-    const browsePodName = browsePodId
-      ? (await prisma.pod.findUnique({ where: { id: browsePodId }, select: { name: true } }))?.name ?? null
+    const browsePod = browsePodId
+      ? await prisma.pod.findUnique({
+          where: { id: browsePodId },
+          select: { name: true, slug: true },
+        })
       : null;
     return packageQuickCartForActiveAssignment({
       assignedPodId: assignedRow.podId,
       assignedPodName: assignedRow.pod.name,
+      assignedPodSlug: assignedRow.pod.slug,
       cart,
       scope,
       browsePodId,
-      browsePodName,
+      browsePodName: browsePod?.name ?? null,
+      browsePodSlug: browsePod?.slug ?? null,
     });
   }
 
@@ -1299,7 +1318,7 @@ export async function getQuickCartPayload(
 
   const browsePod = await prisma.pod.findUnique({
     where: { id: browsePodId, isActive: true },
-    select: { id: true, name: true },
+    select: { id: true, name: true, slug: true },
   });
   if (!browsePod) {
     return neutral;
@@ -1326,10 +1345,12 @@ export async function getQuickCartPayload(
         return packageQuickCartForActiveAssignment({
           assignedPodId: scoped.podId,
           assignedPodName: scoped.podName ?? groupRow.pod.name,
+          assignedPodSlug: groupRow.pod.slug,
           cart: scoped,
           scope: "group_order",
           browsePodId: browsePod.id,
           browsePodName: browsePod.name,
+          browsePodSlug: browsePod.slug,
         });
       }
     }
@@ -1339,6 +1360,7 @@ export async function getQuickCartPayload(
       cart,
       browsingPodId: browsePod.id,
       browsingPodName: browsePod.name,
+      browsingPodSlug: browsePod.slug,
       assignedPodId: null,
       assignedPodName: null,
       requiresClearToSwitchPod: false,
@@ -1350,6 +1372,7 @@ export async function getQuickCartPayload(
     cart: null,
     browsingPodId: browsePod.id,
     browsingPodName: browsePod.name,
+    browsingPodSlug: browsePod.slug,
     assignedPodId: null,
     assignedPodName: null,
     requiresClearToSwitchPod: false,

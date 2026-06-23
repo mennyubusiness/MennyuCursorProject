@@ -6,10 +6,13 @@ export type CartPodContext = {
   cartScope: CartPodScope;
   cartPodId: string | null;
   cartPodName: string | null;
+  cartPodSlug: string | null;
   browsingPodId: string | null;
   browsingPodName: string | null;
+  browsingPodSlug: string | null;
   /** Assigned cart pod when another pod is blocking browse (switch guard). */
   assignedPodId: string | null;
+  assignedPodSlug: string | null;
   canStartOrderHere: boolean;
   requiresClearToSwitchPod: boolean;
 };
@@ -44,8 +47,10 @@ export function getCartPodContext(params: {
   cart: Cart | null;
   browsingPodId: string | null;
   browsingPodName: string | null;
+  browsingPodSlug?: string | null;
   assignedPodId: string | null;
   assignedPodName: string | null;
+  assignedPodSlug?: string | null;
   requiresClearToSwitchPod: boolean;
 }): CartPodContext {
   const groupRole = params.cart?.groupOrder?.role;
@@ -84,6 +89,11 @@ export function getCartPodContext(params: {
       ? params.cart?.podName?.trim() || params.assignedPodName
       : null;
 
+  const cartPodSlug =
+    cartScope === "assigned_pod" || cartScope === "group_order"
+      ? params.cart?.podSlug?.trim() || params.assignedPodSlug?.trim() || null
+      : null;
+
   const canStartOrderHere =
     cartScope === "browsing_pod" &&
     Boolean(params.browsingPodId) &&
@@ -93,9 +103,12 @@ export function getCartPodContext(params: {
     cartScope,
     cartPodId,
     cartPodName,
+    cartPodSlug,
     browsingPodId: params.browsingPodId,
     browsingPodName: params.browsingPodName,
+    browsingPodSlug: params.browsingPodSlug?.trim() || null,
     assignedPodId: params.assignedPodId,
+    assignedPodSlug: params.assignedPodSlug?.trim() || null,
     canStartOrderHere,
     requiresClearToSwitchPod: params.requiresClearToSwitchPod,
   };

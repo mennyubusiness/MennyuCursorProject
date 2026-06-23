@@ -4,7 +4,7 @@ import { ButtonLink } from "@/components/ui/button";
 import type { PodOrderingStatus } from "@/lib/pod-page-status";
 
 type PodPageVendorSectionProps = {
-  podId: string;
+  podSlug: string;
   podName: string;
   rows: PodVendorGridRow[];
   highlightVendorId: string | null;
@@ -14,7 +14,7 @@ type PodPageVendorSectionProps = {
 };
 
 export function PodPageVendorSection({
-  podId,
+  podSlug,
   podName,
   rows,
   highlightVendorId,
@@ -78,7 +78,7 @@ export function PodPageVendorSection({
                   {orderingStatus.label}. Open kitchens below — pickup timing may vary by vendor.
                 </div>
               )}
-              <PodVendorGrid podId={podId} rows={rows} highlightVendorId={highlightVendorId} />
+              <PodVendorGrid podSlug={podSlug} rows={rows} highlightVendorId={highlightVendorId} />
             </>
           )}
         </section>

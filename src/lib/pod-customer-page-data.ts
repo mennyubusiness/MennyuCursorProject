@@ -38,6 +38,7 @@ function toGridRow(pv: {
   isFeatured: boolean;
   vendor: {
     id: string;
+    slug: string;
     name: string;
     description: string | null;
     imageUrl: string | null;
@@ -49,6 +50,7 @@ function toGridRow(pv: {
   return {
     vendor: {
       id: pv.vendor.id,
+      slug: pv.vendor.slug,
       name: pv.vendor.name,
       description: pv.vendor.description,
       imageUrl: pv.vendor.imageUrl,
@@ -102,6 +104,7 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
             vendor: {
               select: {
                 id: true,
+                slug: true,
                 name: true,
                 description: true,
                 isActive: true,

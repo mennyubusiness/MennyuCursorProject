@@ -8,6 +8,8 @@ import {
   GROUP_ORDER_JOIN_COPY,
   resolveGroupOrderJoinState,
 } from "@/lib/group-order-join-state";
+import { buildPodCustomerPath } from "@/lib/customer-public-url";
+import { getPodCustomerPathForPodId } from "@/lib/pod-route-resolve";
 import { GroupOrderJoinForm } from "./GroupOrderJoinForm";
 
 function JoinStateShell({
@@ -52,8 +54,10 @@ export default async function GroupOrderJoinPage({
   switch (state.kind) {
     case "host_view":
       redirect("/cart");
-    case "already_joined":
-      redirect(`/pod/${state.podId}`);
+    case "already_joined": {
+      const podPath = await getPodCustomerPathForPodId(state.podId);
+      redirect(podPath);
+    }
     case "submitted_with_access":
       redirect(`/order/${state.orderId}`);
     case "can_join":
@@ -79,7 +83,7 @@ export default async function GroupOrderJoinPage({
             <>
               <p>{GROUP_ORDER_JOIN_COPY.lockedBodyExisting}</p>
               <Link
-                href={`/pod/${state.podId}`}
+                href={buildPodCustomerPath(state.podSlug)}
                 className="mt-4 inline-flex rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-stone-800"
               >
                 View group cart

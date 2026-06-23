@@ -5,8 +5,10 @@ import { VendorMenuExperienceClient } from "@/components/vendor-menu/VendorMenuE
 
 type VendorMenuExperienceProps = {
   podId: string;
+  podSlug: string;
   podName: string;
   vendorId: string;
+  vendorSlug: string;
   vendorName: string;
   vendorAccentColor: string | null;
   sections: CustomerVendorMenuCategorySection[];

@@ -13,8 +13,11 @@ import { cn } from "@/lib/cn";
 import { useVendorMenuCart } from "@/components/vendor-menu/VendorMenuCartContext";
 import { VendorMenuCartMutationBanner } from "@/components/vendor-menu/VendorMenuCartMutationBanner";
 
+import { buildPodCustomerPath } from "@/lib/customer-public-url";
+
 export type VendorMenuExperienceClientProps = {
   podId: string;
+  podSlug: string;
   podName: string;
   vendorId: string;
   vendorName: string;
@@ -103,6 +106,7 @@ function MenuSectionGrid({
 
 export function VendorMenuExperienceClient({
   podId,
+  podSlug,
   podName,
   vendorId,
   vendorName,
@@ -173,7 +177,7 @@ export function VendorMenuExperienceClient({
                   <p className="font-medium text-oo-charcoal">No menu items available right now</p>
                   <p className="mt-2 text-sm text-oo-stone-gray">Check back later.</p>
                   <Link
-                    href={`/pod/${podId}`}
+                    href={buildPodCustomerPath(podSlug)}
                     className="mt-4 inline-block text-sm font-semibold text-oo-charcoal hover:underline"
                   >
                     Back to {podName}

@@ -6,12 +6,14 @@ import {
 
 export type ExploreVendorHit = {
   vendorId: string;
+  vendorSlug: string;
   vendorName: string;
   description: string | null;
   cuisineCategory: string | null;
   locationSummary: string | null;
   imageUrl: string | null;
   podId: string;
+  podSlug: string;
   podName: string;
   menuCategoryNames: string[];
   matchedMenuCategory: string | null;
@@ -101,12 +103,14 @@ export function flattenExploreVendors(pods: PodCardPod[]): ExploreVendorHit[] {
       const v = pv.vendor;
       rows.push({
         vendorId: v.id,
+        vendorSlug: v.slug,
         vendorName: v.name,
         description: v.description,
         cuisineCategory: v.cuisineCategory ?? null,
         locationSummary: v.locationSummary ?? null,
         imageUrl: v.imageUrl ?? null,
         podId: pod.id,
+        podSlug: pod.slug,
         podName: pod.name,
         menuCategoryNames: v.menuCategoryNames ?? [],
         matchedMenuCategory: null,

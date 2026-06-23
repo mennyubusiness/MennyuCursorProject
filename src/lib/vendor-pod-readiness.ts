@@ -2,6 +2,7 @@
  * Derived vendor readiness in a pod context — setup visibility only.
  * Does not replace customer orderability gates (see vendor-orderability-in-pod.ts).
  */
+import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { PosConnectionStatus } from "@prisma/client";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { isVendorOrderableInPod } from "@/lib/vendor-orderability-in-pod";
@@ -78,6 +79,7 @@ export type ReadinessBlockingReason = {
 
 export type VendorPodReadinessInput = {
   podId: string;
+  podSlug?: string;
   vendorId: string;
   pod: { isActive: boolean };
   podVendor: { isActive: boolean } | null;
@@ -171,12 +173,15 @@ export function vendorPodReadinessStatusLabel(status: VendorPodReadinessStatus):
   }
 }
 
-function podOwnerVendorHref(podId: string, vendorId: string): string {
-  return `/pod/${podId}/vendor/${vendorId}`;
+function podOwnerVendorHref(podId: string, podSlug: string | undefined, vendorSlug: string): string {
+  if (podSlug?.trim()) {
+    return buildVendorMenuCustomerPath(podSlug, vendorSlug);
+  }
+  return `/pod/${podId}/vendor/${vendorSlug}`;
 }
 
 function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owner" | "vendor"): ReadinessChecklistItem[] {
-  const { podId, vendorId, vendor, menuSummary, posSummary, stripeSummary } = input;
+  const { podId, podSlug, vendorId, vendor, menuSummary, posSummary, stripeSummary } = input;
   const profileComplete = isVendorProfileComplete(vendor);
   const stripeComplete = isVendorStripePayoutReady(stripeSummary);
   const posComplete = isVendorPosReady(posSummary);
@@ -191,7 +196,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
 
   const settingsBase = `/vendor/${vendorId}/settings`;
   const profileHref =
-    audience === "vendor" ? `${settingsBase}?section=profile` : podOwnerVendorHref(podId, vendorId);
+    audience === "vendor" ? `${settingsBase}?section=profile` : podOwnerVendorHref(podId, podSlug, vendor.slug);
   const profileAction =
     audience === "vendor" ? "Edit profile" : "View vendor page";
 
@@ -239,7 +244,8 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
           ? "At least one menu item is available to order."
           : "Menu items exist but none are available right now."
         : "Publish or import a menu with at least one available item.",
-      actionHref: audience === "vendor" ? `/vendor/${vendorId}/menu` : podOwnerVendorHref(podId, vendorId),
+      actionHref:
+        audience === "vendor" ? `/vendor/${vendorId}/menu` : podOwnerVendorHref(podId, podSlug, vendor.slug),
       actionLabel: audience === "vendor" ? "Review menu" : "View menu page",
     },
   ];

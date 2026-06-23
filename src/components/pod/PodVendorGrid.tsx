@@ -12,14 +12,14 @@ export type PodVendorGridRow = {
 };
 
 type PodVendorGridProps = {
-  podId: string;
+  podSlug: string;
   rows: PodVendorGridRow[];
   highlightVendorId?: string | null;
   listClassName?: string;
 };
 
 export function PodVendorGrid({
-  podId,
+  podSlug,
   rows,
   highlightVendorId = null,
   listClassName,
@@ -44,7 +44,7 @@ export function PodVendorGrid({
             }
           >
             <PodVendorCard
-              podId={podId}
+              podSlug={podSlug}
               variant="grid"
               vendor={vendor}
               isFeatured={isFeatured}

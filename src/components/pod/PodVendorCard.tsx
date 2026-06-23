@@ -7,8 +7,11 @@ import { isHttpsImageUrl } from "@/lib/remote-image-url";
 import { vendorInitials } from "@/lib/vendor-initials";
 import { cn } from "@/lib/cn";
 
+import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
+
 export type PodVendorCardVendor = {
   id: string;
+  slug: string;
   name: string;
   description: string | null;
   imageUrl: string | null;
@@ -22,7 +25,7 @@ type AvailabilityLabel = {
 };
 
 type PodVendorCardProps = {
-  podId: string;
+  podSlug: string;
   variant: "grid" | "strip";
   vendor: PodVendorCardVendor;
   isFeatured: boolean;
@@ -76,8 +79,8 @@ function VendorCardMedia({
 }
 
 /** Vendor cards for pod marketplace grids and horizontal strips. */
-export function PodVendorCard({ podId, variant, vendor, isFeatured, availability }: PodVendorCardProps) {
-  const href = `/pod/${podId}/vendor/${vendor.id}`;
+export function PodVendorCard({ podSlug, variant, vendor, isFeatured, availability }: PodVendorCardProps) {
+  const href = buildVendorMenuCustomerPath(podSlug, vendor.slug);
   const grid = variant === "grid";
   const cuisine = vendor.cuisineCategory?.trim();
   const ctaLabel = availability.unavailable ? "View menu" : "Order now";

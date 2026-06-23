@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { buildPodCustomerPath } from "@/lib/customer-public-url";
 import { quickCartPodLinkLabel, quickCartSubtitle } from "@/lib/quick-cart-display";
 import type { CartPodContext } from "@/lib/cart-pod-context";
 
@@ -12,7 +13,7 @@ type Props = {
 
 export function QuickCartHeader({ podContext, onClose, onNavigate }: Props) {
   const subtitle = quickCartSubtitle(podContext);
-  const linkPodId = podContext.cartPodId ?? podContext.browsingPodId;
+  const linkPodSlug = podContext.cartPodSlug ?? podContext.browsingPodSlug;
 
   return (
     <header className="flex items-start justify-between gap-3 border-b border-oo-light-stone px-4 py-4 sm:px-5">
@@ -21,9 +22,9 @@ export function QuickCartHeader({ podContext, onClose, onNavigate }: Props) {
           Your cart
         </h2>
         <p className="mt-0.5 text-xs text-oo-stone-gray">{subtitle}</p>
-        {linkPodId ? (
+        {linkPodSlug ? (
           <Link
-            href={`/pod/${linkPodId}`}
+            href={buildPodCustomerPath(linkPodSlug)}
             onClick={onNavigate}
             className="mt-2 inline-block text-xs font-semibold text-brand hover:underline"
           >

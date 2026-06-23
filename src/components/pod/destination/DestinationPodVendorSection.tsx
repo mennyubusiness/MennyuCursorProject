@@ -5,7 +5,7 @@ import type { PodOrderingStatus } from "@/lib/pod-page-status";
 import { ButtonLink } from "@/components/ui/button";
 
 type DestinationPodVendorSectionProps = {
-  podId: string;
+  podSlug: string;
   podName: string;
   rows: PodVendorGridRow[];
   highlightVendorId: string | null;
@@ -15,7 +15,7 @@ type DestinationPodVendorSectionProps = {
 };
 
 export function DestinationPodVendorSection({
-  podId,
+  podSlug,
   podName,
   rows,
   highlightVendorId,
@@ -93,7 +93,7 @@ export function DestinationPodVendorSection({
                       }
                     >
                       <DestinationPodVendorCard
-                        podId={podId}
+                        podSlug={podSlug}
                         vendor={vendor}
                         isFeatured={isFeatured}
                         availability={availability}

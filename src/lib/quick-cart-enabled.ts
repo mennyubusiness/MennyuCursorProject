@@ -1,4 +1,6 @@
 /** Whether the global quick cart drawer should be available on this route. */
+import { isCustomerPodSlugPath } from "@/lib/customer-public-url";
+
 export function isQuickCartEnabledForPath(pathname: string): boolean {
   if (!pathname || pathname.startsWith("/admin")) return false;
   if (pathname === "/cart" || pathname.startsWith("/checkout")) return false;
@@ -10,6 +12,8 @@ export function isQuickCartEnabledForPath(pathname: string): boolean {
   }
 
   if (/^\/pod\/[^/]+\/(dashboard|settings|analytics)/.test(pathname)) return false;
+
+  if (isCustomerPodSlugPath(pathname)) return true;
 
   return true;
 }

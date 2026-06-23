@@ -45,6 +45,7 @@ type CartPageMutationContextValue = {
   liveValidation: CartPageValidationSnapshot;
   cartId: string;
   podId: string;
+  podSlug: string;
   itemById: (cartItemId: string) => Cart["items"][number] | undefined;
   vendorSubtotalCents: (vendorId: string) => number;
   vendorLineCount: (vendorId: string) => number;
@@ -70,6 +71,7 @@ function useCartPageMutation(): CartPageMutationContextValue {
 export function CartPageMutationProvider({
   cartId,
   podId,
+  podSlug,
   initialCart,
   initialValidation,
   allowCheckout = true,
@@ -77,6 +79,7 @@ export function CartPageMutationProvider({
 }: {
   cartId: string;
   podId: string;
+  podSlug: string;
   initialCart: Cart;
   initialValidation: CartPageValidationSnapshot;
   allowCheckout?: boolean;
@@ -234,6 +237,7 @@ export function CartPageMutationProvider({
       liveValidation,
       cartId,
       podId,
+      podSlug,
       itemById,
       vendorSubtotalCents: (vendorId: string) =>
         cart.items
@@ -248,7 +252,7 @@ export function CartPageMutationProvider({
       isRevalidating,
       isSyncingCart,
     };
-  }, [cart, liveValidation, cartId, podId, errorByCartItemId, checkoutState, isRevalidating, isSyncingCart, allowCheckout]);
+  }, [cart, liveValidation, cartId, podId, podSlug, errorByCartItemId, checkoutState, isRevalidating, isSyncingCart, allowCheckout]);
 
   return (
     <CartPageMutationContext.Provider value={value}>{children}</CartPageMutationContext.Provider>
@@ -457,6 +461,7 @@ export function CartPageLiveCheckoutActions({
   const {
     cartId,
     podId,
+    podSlug,
     cart,
     canCheckout,
     isRevalidating,
@@ -467,6 +472,7 @@ export function CartPageLiveCheckoutActions({
     <CartPageSummaryCheckoutActions
       cartId={cartId}
       podId={podId}
+      podSlug={podSlug}
       cart={cart}
       canCheckout={canCheckout}
       isRevalidating={isRevalidating}

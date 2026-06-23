@@ -1,0 +1,128 @@
+import { notFound, redirect } from "next/navigation";
+
+import { RecentVendorViewTracker } from "@/components/retention/RecentViewTracker";
+import { VendorMenuExperience } from "@/components/vendor-menu/VendorMenuExperience";
+import { VendorMenuHero } from "@/components/vendor-menu/VendorMenuHero";
+import { getOrCreateCartForVendorMenuAction } from "@/actions/cart.actions";
+import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
+import { prisma } from "@/lib/db";
+import { looksLikePodOrVendorId, resolvePodBySlugOrId, resolveVendorInPodBySlugOrId } from "@/lib/pod-route-resolve";
+import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
+import { loadCustomerVendorMenuSections } from "@/services/vendor-customer-menu.service";
+
+const DEBUG_VENDOR_MENU_PAGE = process.env.NODE_ENV === "development";
+
+export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: string) {
+  const pod = await resolvePodBySlugOrId(podRef);
+  if (!pod?.isActive) notFound();
+
+  const resolved = await resolveVendorInPodBySlugOrId(pod.id, vendorRef);
+  if (!resolved) notFound();
+
+  const { vendor, podVendor: pv } = resolved;
+  if (!vendor.isActive) notFound();
+
+  if (
+    (looksLikePodOrVendorId(podRef) && podRef !== pod.slug) ||
+    (looksLikePodOrVendorId(vendorRef) && vendorRef !== vendor.slug)
+  ) {
+    redirect(buildVendorMenuCustomerPath(pod.slug, vendor.slug));
+  }
+
+  const podId = pod.id;
+  const vendorId = vendor.id;
+
+  const pageStarted = DEBUG_VENDOR_MENU_PAGE ? Date.now() : 0;
+  const menuStarted = DEBUG_VENDOR_MENU_PAGE ? Date.now() : 0;
+  const cartStarted = DEBUG_VENDOR_MENU_PAGE ? Date.now() : 0;
+
+  const podRow = await prisma.pod.findUnique({
+    where: { id: podId },
+    select: { id: true, name: true, slug: true, isActive: true, accentColor: true },
+  });
+  if (!podRow?.isActive) notFound();
+
+  const [{ sections, variantChildCountByParentPlu }, cart] = await Promise.all([
+    loadCustomerVendorMenuSections(vendorId),
+    getOrCreateCartForVendorMenuAction(podId),
+  ]);
+
+  if (DEBUG_VENDOR_MENU_PAGE) {
+    console.info("[vendor-menu-page] load timing", {
+      vendorId,
+      podId,
+      menuMs: Date.now() - menuStarted,
+      cartMs: Date.now() - cartStarted,
+      totalMs: Date.now() - pageStarted,
+      sectionCount: sections.length,
+      cartItemCount: cart.items.length,
+    });
+  }
+
+  const orderability = getVendorOrderabilityInPod({
+    podActive: podRow.isActive,
+    podVendorExists: Boolean(pv),
+    podVendorActive: pv?.isActive ?? false,
+    vendor,
+  });
+  const orderingDisabled = !orderability.orderable;
+  const bannerLine = orderingDisabled ? orderability.message ?? null : null;
+  const availabilityStatus = orderingDisabled
+    ? orderability.reason === "vendor_closed"
+      ? ("closed" as const)
+      : orderability.reason === "vendor_paused" || orderability.reason === "pod_vendor_paused"
+        ? ("mennyu_paused" as const)
+        : ("inactive" as const)
+    : ("open" as const);
+
+  return (
+    <div className="w-full min-h-0">
+      <RecentVendorViewTracker
+        vendorId={vendorId}
+        podId={podId}
+        podSlug={podRow.slug}
+        vendorSlug={vendor.slug}
+        vendorName={vendor.name}
+      />
+
+      <VendorMenuHero
+        podId={podId}
+        podSlug={podRow.slug}
+        podName={podRow.name}
+        podAccentColor={podRow.accentColor}
+        vendorId={vendorId}
+        vendorName={vendor.name}
+        vendorDescription={vendor.description}
+        vendorImageUrl={vendor.imageUrl}
+        vendorAccentColor={vendor.accentColor}
+        cuisineCategory={vendor.cuisineCategory}
+        availabilityStatus={availabilityStatus}
+        bannerLine={bannerLine}
+      />
+
+      {sections.length === 0 ? (
+        <div className="oo-shell py-12">
+          <div className="oo-empty-state">
+            <p className="font-medium text-zinc-900">This vendor has no menu items available right now.</p>
+            <p className="mt-2 text-sm text-zinc-600">Check back later or browse other kitchens at {podRow.name}.</p>
+          </div>
+        </div>
+      ) : (
+        <VendorMenuExperience
+          podId={podId}
+          podSlug={podRow.slug}
+          podName={podRow.name}
+          vendorId={vendorId}
+          vendorSlug={vendor.slug}
+          vendorName={vendor.name}
+          vendorAccentColor={vendor.accentColor}
+          sections={sections}
+          variantChildCountByParentPlu={variantChildCountByParentPlu}
+          cart={cart}
+          orderingDisabled={orderingDisabled}
+          vendorUsesDeliverect={Boolean(vendor.deliverectChannelLinkId?.trim())}
+        />
+      )}
+    </div>
+  );
+}

@@ -44,7 +44,7 @@ export function DestinationPodPageView({
 
   return (
     <div className="w-full min-h-0">
-      <RecentPodViewTracker podId={pod.id} podName={pod.name} />
+      <RecentPodViewTracker podId={pod.id} podSlug={pod.slug} podName={pod.name} />
 
       <DestinationPodHero
         name={pod.name}
@@ -80,7 +80,7 @@ export function DestinationPodPageView({
       <ScrollPodVendorIntoView vendorId={highlightVendor} />
 
       <DestinationPodVendorSection
-        podId={podId}
+        podSlug={pod.slug}
         podName={pod.name}
         rows={vendorRows}
         highlightVendorId={highlightVendor}

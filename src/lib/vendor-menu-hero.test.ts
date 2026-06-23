@@ -11,8 +11,8 @@ describe("VendorMenuHero", () => {
   it("renders a subtle back link to the parent pod page", () => {
     expect(heroSrc).toMatch(/Back to \$\{trimmedPodName\}/);
     expect(heroSrc).toMatch(/Back to pod/);
+    expect(heroSrc).toMatch(/buildPodCustomerPath/);
     expect(heroSrc).toMatch(/href=\{podHref\}/);
-    expect(heroSrc).toMatch(/const podHref = `\/pod\/\$\{podId\}`/);
     expect(heroSrc).toMatch(/←/);
     expect(heroSrc).toMatch(/hover:text-brand/);
   });

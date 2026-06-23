@@ -126,6 +126,7 @@ export type ActiveCartRecovery = {
   kind: "solo_cart" | "group_host" | "group_participant";
   cartId: string;
   podId: string;
+  podSlug: string;
   podName: string;
   itemCount?: number;
   subtotalCents?: number;
@@ -145,8 +146,10 @@ export type QuickCartApiResponse = {
   cart: Cart | null;
   browsingPodId: string | null;
   browsingPodName: string | null;
+  browsingPodSlug?: string | null;
   assignedPodId: string | null;
   assignedPodName: string | null;
+  assignedPodSlug?: string | null;
   requiresClearToSwitchPod: boolean;
   activeCartRecovery?: ActiveCartRecovery | null;
 };
@@ -170,6 +173,8 @@ export interface Cart {
   subtotalCents: number;
   /** Pod display name when known (Quick Cart / API). */
   podName?: string | null;
+  /** Canonical customer pod slug when known (Quick Cart / API). */
+  podSlug?: string | null;
   /** Group-order role and host invite metadata for customer UI. */
   groupOrder?: CartGroupOrderDisplay;
   /** Pod scope for Quick Cart / display (from server). */

@@ -15,6 +15,7 @@ import {
   enforceRateLimits,
   rateLimitKeys,
 } from "@/lib/rate-limit";
+import { getPodCustomerPathForPodId } from "@/lib/pod-route-resolve";
 import { getClientIpFromHeaders } from "@/lib/rate-limit-http";
 import {
   joinGroupOrderSession,
@@ -128,7 +129,8 @@ export async function joinGroupOrderFormAction(formData: FormData) {
   const joinAttemptKey = String(formData.get("joinAttemptKey") ?? "").trim();
   const res = await joinGroupOrderAction({ groupOrderSessionId, displayName, phone, joinAttemptKey });
   if (res.success) {
-    redirect(`/pod/${res.podId}`, RedirectType.replace);
+    const podPath = await getPodCustomerPathForPodId(res.podId);
+    redirect(podPath, RedirectType.replace);
   }
   redirect(`/group-order/join?session=${encodeURIComponent(groupOrderSessionId)}&error=${encodeURIComponent(res.error)}`);
 }

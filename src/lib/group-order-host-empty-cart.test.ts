@@ -22,7 +22,7 @@ describe("GroupOrderHostEmptyCartCard", () => {
   });
 
   it("prioritizes add items and keeps invite secondary", () => {
-    expect(cardSrc).toMatch(/ButtonLink href=\{`\/pod\/\$\{podId\}`\} variant="primary"/);
+    expect(cardSrc).toMatch(/buildPodCustomerPath\(podSlug\)/);
     expect(cardSrc).toMatch(/Invite people/);
     expect(cardSrc).toMatch(/variant="compact"/);
     expect(cardSrc).not.toMatch(/Group cart created/);

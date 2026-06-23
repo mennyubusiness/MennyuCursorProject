@@ -1,5 +1,7 @@
 /** Client-side pod hints for Quick Cart (browsing = route only; assigned = cookie). */
 import { CURRENT_POD_COOKIE } from "@/lib/session";
+import { BROWSE_POD_ID_SESSION_KEY } from "@/lib/customer-browse-pod";
+import { isCustomerPodSlugPath } from "@/lib/customer-public-url";
 
 function decodeCookieValue(raw: string): string {
   try {
@@ -9,12 +11,18 @@ function decodeCookieValue(raw: string): string {
   }
 }
 
-/** Pod id from `/pod/[podId]/…` when present — browsing context only (not cart assignment). */
+/** Pod id from `/pod/[podId]/…` or canonical `/{podSlug}` customer routes. */
 export function getRoutePodIdFromClient(): string | null {
   if (typeof window === "undefined") return null;
-  const podPage = window.location.pathname.match(/^\/pod\/([^/]+)/);
-  const id = podPage?.[1]?.trim();
-  return id ? decodeCookieValue(id) : null;
+  const legacy = window.location.pathname.match(/^\/pod\/([^/]+)/);
+  const legacyId = legacy?.[1]?.trim();
+  if (legacyId) return decodeCookieValue(legacyId);
+
+  if (isCustomerPodSlugPath(window.location.pathname)) {
+    const stored = sessionStorage.getItem(BROWSE_POD_ID_SESSION_KEY)?.trim();
+    if (stored) return stored;
+  }
+  return null;
 }
 
 /** Cookie set when cart is assigned (first item, group join, reorder) — not on passive pod visits. */

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { isHttpsImageUrl } from "@/lib/remote-image-url";
 import { vendorInitials } from "@/lib/vendor-initials";
 import { cn } from "@/lib/cn";
+import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { PodVendorCardVendor } from "@/components/pod/PodVendorCard";
 
 type AvailabilityLabel = {
@@ -15,7 +16,7 @@ type AvailabilityLabel = {
 };
 
 type DestinationPodVendorCardProps = {
-  podId: string;
+  podSlug: string;
   vendor: PodVendorCardVendor;
   isFeatured: boolean;
   availability: AvailabilityLabel;
@@ -70,12 +71,12 @@ function VendorMedia({
 
 /** Showcase-style vendor card for the Destination pod page — visual, low-clutter, fully tappable. */
 export function DestinationPodVendorCard({
-  podId,
+  podSlug,
   vendor,
   isFeatured,
   availability,
 }: DestinationPodVendorCardProps) {
-  const href = `/pod/${podId}/vendor/${vendor.id}`;
+  const href = buildVendorMenuCustomerPath(podSlug, vendor.slug);
   const cuisine = vendor.cuisineCategory?.trim();
   const description = vendor.description?.trim();
   const unavailable = availability.unavailable;

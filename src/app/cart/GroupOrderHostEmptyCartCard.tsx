@@ -1,5 +1,6 @@
 import Link from "next/link";
 import QRCode from "qrcode";
+import { buildPodCustomerPath } from "@/lib/customer-public-url";
 import { endGroupOrderHostFormAction } from "@/actions/group-order.actions";
 import { EndGroupOrderHostButton } from "@/components/cart/EndGroupOrderHostButton";
 import { ButtonLink } from "@/components/ui/button";
@@ -28,12 +29,12 @@ const endGroupOrderButtonClass =
 
 export async function GroupOrderHostEmptyCartCard({
   cartId,
-  podId,
+  podSlug,
   podName,
   goState,
 }: {
   cartId: string;
-  podId: string;
+  podSlug: string;
   podName: string;
   goState: GroupOrderStateForCartPage;
 }) {
@@ -105,7 +106,7 @@ export async function GroupOrderHostEmptyCartCard({
         </p>
 
         <div className="mx-auto mt-6 flex max-w-sm flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
-          <ButtonLink href={`/pod/${podId}`} variant="primary" size="md" className="w-full sm:w-auto">
+          <ButtonLink href={buildPodCustomerPath(podSlug)} variant="primary" size="md" className="w-full sm:w-auto">
             Add items
           </ButtonLink>
           <Link

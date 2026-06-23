@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { getPodPageHref } from "./explore-pod-navigation";
 
 describe("explore-pod-navigation", () => {
-  it("pod card href navigates to pod detail route", () => {
-    expect(getPodPageHref("p1")).toBe("/pod/p1");
-    expect(getPodPageHref("  cuid_abc  ")).toBe("/pod/cuid_abc");
+  it("pod card href navigates to canonical slug route", () => {
+    expect(getPodPageHref("willamette-garage")).toBe("/willamette-garage");
+    expect(getPodPageHref("  downtown-food-pod  ")).toBe("/downtown-food-pod");
   });
 
   it("does not use explore query param for primary pod navigation", () => {

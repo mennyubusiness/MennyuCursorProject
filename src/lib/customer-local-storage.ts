@@ -12,12 +12,27 @@ const KEY_RECENT = "mennyu_recent_views_v1";
 const MAX_FAVORITES = 32;
 const MAX_RECENT = 6;
 
-export type FavoritePodEntry = { id: string; name: string; savedAt: number };
-export type FavoriteVendorEntry = { id: string; podId: string; name: string; savedAt: number };
+export type FavoritePodEntry = { id: string; slug?: string; name: string; savedAt: number };
+export type FavoriteVendorEntry = {
+  id: string;
+  podId: string;
+  podSlug?: string;
+  vendorSlug?: string;
+  name: string;
+  savedAt: number;
+};
 
 export type RecentViewEntry =
-  | { kind: "pod"; id: string; name: string; viewedAt: number }
-  | { kind: "vendor"; id: string; podId: string; name: string; viewedAt: number };
+  | { kind: "pod"; id: string; slug?: string; name: string; viewedAt: number }
+  | {
+      kind: "vendor";
+      id: string;
+      podId: string;
+      podSlug?: string;
+      vendorSlug?: string;
+      name: string;
+      viewedAt: number;
+    };
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -56,7 +71,7 @@ export function isFavoriteVendor(vendorId: string, podId: string): boolean {
   return getFavoriteVendors().some((v) => v.id === vendorId && v.podId === podId);
 }
 
-export function toggleFavoritePod(podId: string, podName: string): boolean {
+export function toggleFavoritePod(podId: string, podName: string, podSlug?: string): boolean {
   const list = getFavoritePods();
   const idx = list.findIndex((p) => p.id === podId);
   if (idx >= 0) {
@@ -64,12 +79,17 @@ export function toggleFavoritePod(podId: string, podName: string): boolean {
     writeJson(KEY_FAV_PODS, list);
     return false;
   }
-  const next = [{ id: podId, name: podName, savedAt: Date.now() }, ...list.filter((p) => p.id !== podId)];
+  const next = [{ id: podId, slug: podSlug, name: podName, savedAt: Date.now() }, ...list.filter((p) => p.id !== podId)];
   writeJson(KEY_FAV_PODS, next.slice(0, MAX_FAVORITES));
   return true;
 }
 
-export function toggleFavoriteVendor(vendorId: string, podId: string, vendorName: string): boolean {
+export function toggleFavoriteVendor(
+  vendorId: string,
+  podId: string,
+  vendorName: string,
+  slugs?: { podSlug?: string; vendorSlug?: string }
+): boolean {
   const list = getFavoriteVendors();
   const idx = list.findIndex((v) => v.id === vendorId && v.podId === podId);
   if (idx >= 0) {
@@ -78,7 +98,14 @@ export function toggleFavoriteVendor(vendorId: string, podId: string, vendorName
     return false;
   }
   const next = [
-    { id: vendorId, podId, name: vendorName, savedAt: Date.now() },
+    {
+      id: vendorId,
+      podId,
+      podSlug: slugs?.podSlug,
+      vendorSlug: slugs?.vendorSlug,
+      name: vendorName,
+      savedAt: Date.now(),
+    },
     ...list.filter((v) => !(v.id === vendorId && v.podId === podId)),
   ];
   writeJson(KEY_FAV_VENDORS, next.slice(0, MAX_FAVORITES));
@@ -101,10 +128,23 @@ function pushRecent(entry: RecentViewEntry): void {
   writeJson(KEY_RECENT, next);
 }
 
-export function recordPodView(podId: string, podName: string): void {
-  pushRecent({ kind: "pod", id: podId, name: podName, viewedAt: Date.now() });
+export function recordPodView(podId: string, podName: string, podSlug?: string): void {
+  pushRecent({ kind: "pod", id: podId, slug: podSlug, name: podName, viewedAt: Date.now() });
 }
 
-export function recordVendorView(vendorId: string, podId: string, vendorName: string): void {
-  pushRecent({ kind: "vendor", id: vendorId, podId, name: vendorName, viewedAt: Date.now() });
+export function recordVendorView(
+  vendorId: string,
+  podId: string,
+  vendorName: string,
+  slugs?: { podSlug?: string; vendorSlug?: string }
+): void {
+  pushRecent({
+    kind: "vendor",
+    id: vendorId,
+    podId,
+    podSlug: slugs?.podSlug,
+    vendorSlug: slugs?.vendorSlug,
+    name: vendorName,
+    viewedAt: Date.now(),
+  });
 }

@@ -10,6 +10,8 @@ import {
   SIGN_IN_PATH,
 } from "@/lib/auth/login-return-path";
 
+import { isCustomerPodSlugPath } from "@/lib/customer-public-url";
+
 const PUBLIC_STATIC_PATHS = new Set([
   "/",
   "/explore",
@@ -32,6 +34,7 @@ export function isPublicCustomerSafePath(pathname: string): boolean {
   if (/^\/order\/[^/]+$/.test(clean)) return true;
   if (/^\/pod\/[^/]+$/.test(clean)) return true;
   if (/^\/pod\/[^/]+\/vendor\/[^/]+$/.test(clean)) return true;
+  if (isCustomerPodSlugPath(clean)) return true;
 
   return false;
 }
@@ -64,6 +67,8 @@ export function isProtectedAuthPath(pathname: string): boolean {
   if (clean === "/orders" || clean.startsWith("/orders/")) return true;
   if (clean === "/vendor" || clean.startsWith("/vendor/")) return true;
   if (clean === "/pod/dashboard") return true;
+
+  if (isCustomerPodSlugPath(clean)) return false;
 
   const podSubMatch = clean.match(/^\/pod\/([^/]+)\/(.+)/);
   if (podSubMatch) {

@@ -20,7 +20,7 @@ export async function PodOrderingQrSection({
   podName,
   publicOrigin,
 }: PodOrderingQrSectionProps) {
-  const absoluteUrl = buildPodOrderingAbsoluteUrl(publicOrigin, podId);
+  const absoluteUrl = buildPodOrderingAbsoluteUrl(publicOrigin, podSlug);
   const safeSlug = podSlug.replace(/[^a-zA-Z0-9-_]+/g, "-").slice(0, 48) || "pod";
 
   let qrDataUrl: string;

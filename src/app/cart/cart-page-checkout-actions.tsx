@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AwaitCartNavigationLink } from "@/components/cart/AwaitCartNavigationLink";
 import { buttonClassName } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { buildPodCustomerPath } from "@/lib/customer-public-url";
 import { resolveCartCheckoutCtaState } from "@/lib/cart-checkout-cta-state";
 import type { Cart } from "@/domain/types";
 
@@ -12,6 +13,7 @@ export const CART_CHECKOUT_PRIMARY_LABEL = "Proceed to checkout";
 export type CartPageCheckoutActionProps = {
   cartId: string;
   podId: string;
+  podSlug: string;
   cart: Cart;
   canCheckout: boolean;
   isRevalidating: boolean;
@@ -68,6 +70,7 @@ export function CartPageSummaryCheckoutActions(props: CartPageCheckoutActionProp
   const {
     cartId,
     podId,
+    podSlug,
     groupSubmitted,
     submittedOrderId,
     showParticipantTotalsOnly,
@@ -100,7 +103,7 @@ export function CartPageSummaryCheckoutActions(props: CartPageCheckoutActionProp
             : "The host will check out when everyone is ready."}
         </p>
         <Link
-          href={`/pod/${podId}`}
+          href={buildPodCustomerPath(podSlug)}
           className={cn(
             buttonClassName({ variant: "outline", size: "touch" }),
             "mt-3 inline-flex w-full items-center justify-center"

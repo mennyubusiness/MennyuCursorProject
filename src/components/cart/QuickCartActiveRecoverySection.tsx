@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { ActiveCartRecovery } from "@/domain/types";
+import { buildPodCustomerPath } from "@/lib/customer-public-url";
 import { recoveryItemCountLabel } from "@/lib/quick-cart-active-recovery";
 import { cn } from "@/lib/cn";
 
@@ -34,7 +35,9 @@ export function QuickCartActiveRecoverySection({
   const [clearingCart, setClearingCart] = useState(false);
   const [clearError, setClearError] = useState<string | null>(null);
 
-  const podHref = `/pod/${recovery.podId}`;
+  const podHref = recovery.podSlug
+    ? buildPodCustomerPath(recovery.podSlug)
+    : `/pod/${recovery.podId}`;
   const inviteHref = recovery.groupOrderSessionId
     ? `/group-order/join?session=${encodeURIComponent(recovery.groupOrderSessionId)}`
     : "/group-order/join";

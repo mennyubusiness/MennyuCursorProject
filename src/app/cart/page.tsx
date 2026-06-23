@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { auth } from "@/auth";
+import { buildPodCustomerPath, buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { getCurrentPodIdFromHeaders, getCustomerPhoneFromHeaders } from "@/lib/session";
 import { getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
@@ -331,7 +332,7 @@ export default async function CartPage({
         {hostGroupStartSyncCart ? <GroupOrderStartCartSync cart={hostGroupStartSyncCart} /> : null}
         <GroupOrderHostEmptyCartCard
           cartId={cart.id}
-          podId={cart.podId}
+          podSlug={cart.pod.slug}
           podName={cart.pod.name}
           goState={goState}
         />
@@ -366,7 +367,7 @@ export default async function CartPage({
             <span className="font-semibold text-stone-800">{cart.pod.name}</span>
           </p>
         </header>
-        <GroupOrderParticipantEmptyCartState podId={cart.podId} />
+        <GroupOrderParticipantEmptyCartState podSlug={cart.pod.slug} />
       </div>
     );
   }
@@ -386,7 +387,7 @@ export default async function CartPage({
             Review your items before checkout — add from any open vendor at this pod.
           </p>
           <Link
-            href={`/pod/${cart.podId}`}
+            href={buildPodCustomerPath(cart.pod.slug)}
             className="mt-8 inline-flex min-h-[3.25rem] w-full items-center justify-center rounded-xl bg-brand px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-brand-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto"
           >
             Browse vendors
@@ -407,7 +408,7 @@ export default async function CartPage({
 
   const byVendor = new Map<
     string,
-    { name: string; items: typeof cart.items; subtotalCents: number }
+    { name: string; slug: string; items: typeof cart.items; subtotalCents: number }
   >();
   for (const item of displayItems) {
     const sub = item.priceCents * item.quantity;
@@ -418,6 +419,7 @@ export default async function CartPage({
     } else {
       byVendor.set(item.vendorId, {
         name: item.vendor.name,
+        slug: item.vendor.slug,
         items: [item],
         subtotalCents: sub,
       });
@@ -637,6 +639,7 @@ export default async function CartPage({
       <CartPageMutationProvider
         cartId={cart.id}
         podId={cart.podId}
+        podSlug={cart.pod.slug}
         initialCart={initialCartSnapshot}
         initialValidation={initialValidation}
         allowCheckout={viewerCanCheckout}
@@ -663,7 +666,7 @@ export default async function CartPage({
                   {group.name}
                 </h2>
                 <Link
-                  href={`/pod/${cart.podId}/vendor/${vendorId}`}
+                  href={buildVendorMenuCustomerPath(cart.pod.slug, group.slug)}
                   className="text-sm font-semibold text-oo-stone-gray transition hover:text-brand"
                 >
                   Add more
@@ -841,7 +844,7 @@ export default async function CartPage({
                 />
               </CartPageLiveCheckoutGate>
               <Link
-                href={`/pod/${cart.podId}`}
+                href={buildPodCustomerPath(cart.pod.slug)}
                 className="mt-4 hidden text-sm font-semibold text-oo-stone-gray transition hover:text-brand lg:inline-flex"
               >
                 ← Back to pod

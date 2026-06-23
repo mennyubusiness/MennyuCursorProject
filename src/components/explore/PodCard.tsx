@@ -16,6 +16,7 @@ import { cn } from "@/lib/cn";
 
 export type PodCardPod = {
   id: string;
+  slug: string;
   name: string;
   description: string | null;
   imageUrl: string | null;
@@ -24,6 +25,7 @@ export type PodCardPod = {
   vendors: {
     vendor: {
       id: string;
+      slug: string;
       name: string;
       description: string | null;
       cuisineCategory?: string | null;
@@ -85,7 +87,7 @@ export function PodCard({ pod, variant = "full" }: PodCardProps) {
   const counts = getPodVendorCounts(pod);
   const cuisineLine = formatPodCuisinePreviewLine(pod);
   const locationLine = pod.address?.trim() || null;
-  const podHref = getPodPageHref(pod.id);
+  const podHref = getPodPageHref(pod.slug);
 
   const mediaSizes = isCompact
     ? "(max-width: 640px) 78vw, 304px"

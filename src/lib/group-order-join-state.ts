@@ -24,11 +24,12 @@ export type GroupOrderJoinState =
       podName: string;
       participantAccess: boolean;
       podId: string;
+      podSlug: string;
     }
   | { kind: "submitted_with_access"; orderId: string }
   | { kind: "submitted_no_access"; podName: string }
   | { kind: "can_join"; sessionId: string; podName: string }
-  | { kind: "already_joined"; podId: string }
+  | { kind: "already_joined"; podId: string; podSlug: string }
   | { kind: "host_view"; podId: string };
 
 export async function resolveGroupOrderJoinState(args: {
@@ -47,7 +48,7 @@ export async function resolveGroupOrderJoinState(args: {
     podId: string;
     cartId: string;
     hostUserId: string;
-    pod: { name: string };
+    pod: { name: string; slug: string };
   };
 
   let session: SessionRow | null = null;
@@ -56,13 +57,13 @@ export async function resolveGroupOrderJoinState(args: {
   if (sessionId) {
     session = await prisma.groupOrderSession.findUnique({
       where: { id: sessionId },
-      include: { pod: { select: { name: true } } },
+      include: { pod: { select: { name: true, slug: true } } },
     });
   } else if (args.joinCode?.trim()) {
     const code = normalizeGroupOrderJoinCode(args.joinCode);
     session = await prisma.groupOrderSession.findFirst({
       where: { joinCode: code },
-      include: { pod: { select: { name: true } } },
+      include: { pod: { select: { name: true, slug: true } } },
     });
   }
 
@@ -77,12 +78,13 @@ export async function resolveGroupOrderJoinState(args: {
       status: true,
       podId: true,
       hostUserId: true,
-      pod: { select: { name: true } },
+      pod: { select: { name: true, slug: true } },
     },
   });
   if (!fresh) return { kind: "not_found" };
 
   const podName = fresh.pod.name;
+  const podSlug = fresh.pod.slug;
   const authHostId = args.hostUserId?.trim();
   if (authHostId && authHostId === fresh.hostUserId) {
     return { kind: "host_view", podId: fresh.podId };
@@ -93,7 +95,7 @@ export async function resolveGroupOrderJoinState(args: {
   switch (fresh.status) {
     case "active":
       if (participant?.role === "participant") {
-        return { kind: "already_joined", podId: fresh.podId };
+        return { kind: "already_joined", podId: fresh.podId, podSlug };
       }
       return { kind: "can_join", sessionId: fresh.id, podName };
 
@@ -103,6 +105,7 @@ export async function resolveGroupOrderJoinState(args: {
         podName,
         participantAccess: participant?.role === "participant",
         podId: fresh.podId,
+        podSlug,
       };
 
     case "submitted": {

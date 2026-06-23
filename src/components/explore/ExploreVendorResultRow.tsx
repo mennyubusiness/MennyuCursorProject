@@ -8,6 +8,7 @@ import type { ExploreVendorHit } from "@/lib/explore-discovery";
 import type { VendorAvailabilityStatus } from "@/lib/vendor-availability";
 import { isHttpsImageUrl } from "@/lib/remote-image-url";
 import { vendorInitials } from "@/lib/vendor-initials";
+import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { cn } from "@/lib/cn";
 
 function ExploreVendorStatusBadge({ status }: { status: VendorAvailabilityStatus }) {
@@ -79,7 +80,7 @@ export function ExploreVendorResultRow({
   hit: ExploreVendorHit;
   showPodContext?: boolean;
 }) {
-  const menuHref = `/pod/${hit.podId}/vendor/${hit.vendorId}`;
+  const menuHref = buildVendorMenuCustomerPath(hit.podSlug, hit.vendorSlug);
   const cuisine = hit.cuisineCategory?.trim();
   const matchedMenuCategory = hit.matchedMenuCategory?.trim();
 

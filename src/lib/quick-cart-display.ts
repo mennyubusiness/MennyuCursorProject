@@ -36,7 +36,8 @@ export function attachQuickCartDisplay(
   cart: Cart,
   ctx: GroupOrderViewerContext,
   podName: string | null | undefined,
-  cartScope: CartPodScope
+  cartScope: CartPodScope,
+  podSlug?: string | null
 ): Cart {
   const groupOrder: CartGroupOrderDisplay = {
     role: ctx.viewerRole,
@@ -52,6 +53,7 @@ export function attachQuickCartDisplay(
   return {
     ...cart,
     podName: podName?.trim() || null,
+    podSlug: podSlug?.trim() || cart.podSlug?.trim() || null,
     groupOrder,
     cartScope,
   };
@@ -61,8 +63,10 @@ export function buildCartPodContextForDisplay(params: {
   cart: Cart | null;
   browsingPodId: string | null;
   browsingPodName: string | null;
+  browsingPodSlug?: string | null;
   assignedPodId: string | null;
   assignedPodName: string | null;
+  assignedPodSlug?: string | null;
   requiresClearToSwitchPod: boolean;
 }): CartPodContext {
   return getCartPodContext(params);

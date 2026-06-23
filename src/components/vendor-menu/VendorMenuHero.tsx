@@ -27,8 +27,11 @@ function VendorStatusBadge({ status }: { status: VendorAvailabilityStatus }) {
   );
 }
 
+import { buildPodCustomerPath } from "@/lib/customer-public-url";
+
 type VendorMenuHeroProps = {
   podId: string;
+  podSlug: string;
   podName: string;
   podAccentColor: string | null;
   vendorId: string;
@@ -43,6 +46,7 @@ type VendorMenuHeroProps = {
 
 export function VendorMenuHero({
   podId,
+  podSlug,
   podName,
   podAccentColor,
   vendorId,
@@ -56,7 +60,7 @@ export function VendorMenuHero({
 }: VendorMenuHeroProps) {
   const trimmedPodName = podName?.trim();
   const backLabel = trimmedPodName ? `Back to ${trimmedPodName}` : "Back to pod";
-  const podHref = `/pod/${podId}`;
+  const podHref = buildPodCustomerPath(podSlug);
 
   return (
     <header className="border-b border-oo-light-stone bg-oo-warm-white">

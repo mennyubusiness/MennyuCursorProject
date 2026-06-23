@@ -15,6 +15,7 @@ export function buildActiveCartRecovery(params: {
   cart: Cart;
   browsePodId: string | null;
   browsePodName: string | null;
+  podSlug?: string | null;
   participantCount?: number;
 }): ActiveCartRecovery {
   const role = params.cart.groupOrder?.role ?? "solo";
@@ -33,6 +34,7 @@ export function buildActiveCartRecovery(params: {
     kind,
     cartId: params.cart.id,
     podId: params.cart.podId,
+    podSlug: params.podSlug?.trim() || params.cart.podSlug?.trim() || "",
     podName: params.cart.podName?.trim() || "Food pod",
     itemCount,
     subtotalCents: itemCount > 0 ? params.cart.subtotalCents : undefined,

@@ -17,6 +17,8 @@ describe("isPublicCustomerSafePath", () => {
     expect(isPublicCustomerSafePath("/checkout")).toBe(true);
     expect(isPublicCustomerSafePath("/pod/abc")).toBe(true);
     expect(isPublicCustomerSafePath("/pod/abc/vendor/xyz")).toBe(true);
+    expect(isPublicCustomerSafePath("/willamette-garage")).toBe(true);
+    expect(isPublicCustomerSafePath("/willamette-garage/billys-jams-and-crams")).toBe(true);
     expect(isPublicCustomerSafePath("/")).toBe(true);
     expect(isPublicCustomerSafePath("/privacy")).toBe(true);
   });
@@ -42,12 +44,14 @@ describe("isProtectedAuthPath", () => {
     expect(isProtectedAuthPath("/explore")).toBe(false);
     expect(isProtectedAuthPath("/pod/abc")).toBe(false);
     expect(isProtectedAuthPath("/pod/abc/vendor/xyz")).toBe(false);
+    expect(isProtectedAuthPath("/willamette-garage")).toBe(false);
+    expect(isProtectedAuthPath("/willamette-garage/billys-jams-and-crams")).toBe(false);
   });
 });
 
 describe("getPostLogoutRedirect", () => {
   it("keeps user on public customer pages", () => {
-    expect(getPostLogoutRedirect("/pod/abc")).toBe("/pod/abc");
+    expect(getPostLogoutRedirect("/willamette-garage")).toBe("/willamette-garage");
     expect(getPostLogoutRedirect("/explore")).toBe("/explore");
     expect(getPostLogoutRedirect("/cart")).toBe("/cart");
   });

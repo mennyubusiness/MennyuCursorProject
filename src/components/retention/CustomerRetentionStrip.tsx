@@ -9,10 +9,17 @@ import {
   MENNYU_LOCAL_RETENTION_EVENT,
   type RecentViewEntry,
 } from "@/lib/customer-local-storage";
+import { buildPodCustomerPath, buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { cn } from "@/lib/cn";
 
 function hrefFor(entry: RecentViewEntry): string {
-  return entry.kind === "pod" ? `/pod/${entry.id}` : `/pod/${entry.podId}/vendor/${entry.id}`;
+  if (entry.kind === "pod") {
+    return entry.slug ? buildPodCustomerPath(entry.slug) : `/pod/${entry.id}`;
+  }
+  if (entry.podSlug && entry.vendorSlug) {
+    return buildVendorMenuCustomerPath(entry.podSlug, entry.vendorSlug);
+  }
+  return `/pod/${entry.podId}/vendor/${entry.id}`;
 }
 
 function labelFor(entry: RecentViewEntry): string {
@@ -84,10 +91,21 @@ export function CustomerRetentionStrip({
   const favoriteLinks = useMemo(() => {
     const out: { href: string; label: string; sub: string }[] = [];
     for (const p of favPods.slice(0, 4)) {
-      out.push({ href: `/pod/${p.id}`, label: p.name, sub: "Pod" });
+      out.push({
+        href: p.slug ? buildPodCustomerPath(p.slug) : `/pod/${p.id}`,
+        label: p.name,
+        sub: "Pod",
+      });
     }
     for (const v of favVendors.slice(0, 4)) {
-      out.push({ href: `/pod/${v.podId}/vendor/${v.id}`, label: v.name, sub: "Vendor" });
+      out.push({
+        href:
+          v.podSlug && v.vendorSlug
+            ? buildVendorMenuCustomerPath(v.podSlug, v.vendorSlug)
+            : `/pod/${v.podId}/vendor/${v.id}`,
+        label: v.name,
+        sub: "Vendor",
+      });
     }
     return out.slice(0, 6);
   }, [favPods, favVendors]);

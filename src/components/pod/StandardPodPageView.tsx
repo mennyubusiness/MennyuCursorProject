@@ -34,7 +34,7 @@ export function StandardPodPageView({
 
   return (
     <div className="w-full min-h-0 pb-20 lg:pb-0">
-      <RecentPodViewTracker podId={pod.id} podName={pod.name} />
+      <RecentPodViewTracker podId={pod.id} podSlug={pod.slug} podName={pod.name} />
 
       <PodPageHero
         podId={podId}
@@ -67,7 +67,7 @@ export function StandardPodPageView({
       <ScrollPodVendorIntoView vendorId={highlightVendor} />
 
       <PodPageVendorSection
-        podId={podId}
+        podSlug={pod.slug}
         podName={pod.name}
         rows={vendorRows}
         highlightVendorId={highlightVendor}

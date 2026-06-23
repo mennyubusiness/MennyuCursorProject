@@ -2,6 +2,7 @@
 
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { buildPodCustomerPath, buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { prisma } from "@/lib/db";
 import { canAccessPodDashboardLayout } from "@/lib/permissions";
 import { deleteSupabasePublicObjectIfInBucket } from "@/lib/supabase/storage-cleanup";
@@ -91,7 +92,7 @@ export async function updatePodBrandProfile(
   const authz = await authorizePodSettingsWrite(id);
   if (!authz.ok) return authz;
 
-  const pod = await prisma.pod.findUnique({ where: { id }, select: { id: true, imageUrl: true } });
+  const pod = await prisma.pod.findUnique({ where: { id }, select: { id: true, slug: true, imageUrl: true } });
   if (!pod) return { ok: false, error: "Pod not found." };
 
   const nameResult = normalizeVendorDisplayName(input.name);
@@ -186,6 +187,7 @@ export async function updatePodBrandProfile(
   }
 
   revalidatePath(`/pod/${id}`);
+  revalidatePath(buildPodCustomerPath(pod.slug));
   revalidatePath(`/pod/${id}/settings`);
   revalidatePath("/explore");
   return { ok: true };
@@ -208,7 +210,7 @@ export async function updatePodVendorPresentation(
   const authz = await authorizePodSettingsWrite(id);
   if (!authz.ok) return authz;
 
-  const pod = await prisma.pod.findUnique({ where: { id }, select: { id: true } });
+  const pod = await prisma.pod.findUnique({ where: { id }, select: { id: true, slug: true } });
   if (!pod) return { ok: false, error: "Pod not found." };
 
   const existing = await prisma.podVendor.findMany({
@@ -237,10 +239,18 @@ export async function updatePodVendorPresentation(
   );
 
   revalidatePath(`/pod/${id}`);
+  revalidatePath(buildPodCustomerPath(pod.slug));
   revalidatePath(`/pod/${id}/settings`);
   revalidatePath(`/pod/${id}/dashboard`);
   for (const r of rows) {
     revalidatePath(`/pod/${id}/vendor/${r.vendorId}`);
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: r.vendorId },
+      select: { slug: true },
+    });
+    if (vendor) {
+      revalidatePath(buildVendorMenuCustomerPath(pod.slug, vendor.slug));
+    }
   }
   return { ok: true };
 }

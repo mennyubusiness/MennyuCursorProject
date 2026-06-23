@@ -25,6 +25,7 @@ export default async function ExplorePage() {
           vendor: {
             select: {
               id: true,
+              slug: true,
               name: true,
               description: true,
               cuisineCategory: true,
@@ -71,6 +72,7 @@ export default async function ExplorePage() {
 
   const podCards = pods.map((p) => ({
     id: p.id,
+    slug: p.slug,
     name: p.name,
     description: p.description,
     imageUrl: p.imageUrl,
