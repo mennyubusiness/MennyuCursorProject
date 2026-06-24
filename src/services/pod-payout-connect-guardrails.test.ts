@@ -39,9 +39,12 @@ describe("pod payout connect P3 guardrails", () => {
       join(root, "src/app/pod/[podId]/settings/PodPayoutSetupCard.tsx"),
       "utf8"
     );
-    expect(card.toLowerCase()).toContain("payout setup");
+    expect(card).toContain("Payout account");
+    expect(card).toContain("Manage payout account");
     expect(card).not.toMatch(/earnings are available|your earnings/i);
     expect(card).not.toMatch(/stripe\.transfers\.create/i);
+    expect(card.toLowerCase()).not.toContain("designated recipient");
+    expect(card.toLowerCase()).not.toContain("earnings available");
   });
 
   it("pod dashboard still has no payout amounts", () => {

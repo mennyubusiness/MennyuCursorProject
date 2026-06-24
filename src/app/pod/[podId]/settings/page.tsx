@@ -159,8 +159,8 @@ export default async function PodSettingsPage({
 
         <DashboardSection
           id="payout-setup"
-          title="Payout setup"
-          description="Connect your payout account when you are the designated recipient for this pod."
+          title="Payout account"
+          description="Set up the payout account used for this pod's future payout transfers."
         >
           <div className="max-w-3xl">
             <PodPayoutSetupCard

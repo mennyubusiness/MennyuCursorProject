@@ -37,12 +37,12 @@ describe("pod settings workspace layout", () => {
     expect(page).toContain("Back to overview");
   });
 
-  it("organizes profile, QR, and payout setup sections", () => {
+  it("organizes profile, QR, and payout account sections", () => {
     const page = readSettings("page.tsx");
     expect(page).toContain('id="profile"');
     expect(page).toContain("Public page profile");
     expect(page).toContain('id="payout-setup"');
-    expect(page).toContain("Payout setup");
+    expect(page).toContain("Payout account");
     expect(page).toContain("PodPayoutSetupCard");
     expect(page).toContain("DashboardSection");
     expect(page).toContain("DashboardCard");
@@ -58,7 +58,7 @@ describe("pod settings workspace layout", () => {
   });
 });
 
-describe("pod settings customer note copy", () => {
+describe("pod settings payout account copy", () => {
   it("does not frame pickup instructions as required on settings surfaces", () => {
     const page = readSettings("page.tsx");
     const form = readSettings("PodBrandProfileForm.tsx");
@@ -70,14 +70,41 @@ describe("pod settings customer note copy", () => {
     expect(form).toContain("pod-customer-note");
   });
 
-  it("uses payout setup copy without earnings amounts on settings page", () => {
+  it("uses payout account copy without earnings amounts", () => {
     const page = readSettings("page.tsx");
     const setupCard = readSettings("PodPayoutSetupCard.tsx");
     const form = readSettings("PodBrandProfileForm.tsx");
-    expect(page).toContain("Payout setup");
-    expect(setupCard.toLowerCase()).toContain("payout setup");
+    expect(page).toContain("Payout account");
+    expect(setupCard).toContain("Payout account ready");
+    expect(setupCard).toContain("Manage payout account");
+    expect(setupCard).toContain("openPodPayoutAccountManagement");
     expect(setupCard).not.toMatch(/earnings are available|your earnings|\$[\d,]+/i);
+    expect(setupCard).not.toMatch(/\brecipient\b|\bclaim\b|basis points/i);
     expect(form).not.toMatch(/\bearnings\b|\brevenue share\b/i);
+  });
+
+  it("shows setup and manage actions only for the payout account owner", () => {
+    const setupCard = readSettings("PodPayoutSetupCard.tsx");
+    expect(setupCard).toContain("isDesignatedRecipient");
+    expect(setupCard).toContain("Set up payout account");
+    expect(setupCard).toContain("Continue payout setup");
+    expect(setupCard).toContain("Manage payout account");
+    expect(setupCard).toContain("startPodPayoutConnectOnboarding");
+    expect(setupCard).toMatch(/if \(!isDesignatedRecipient\)/);
+    expect(setupCard).toContain("payout account owner");
+    expect(setupCard).not.toMatch(/return null;/);
+  });
+
+  it("shows read-only payout message for non-owner pod members", () => {
+    const setupCard = readSettings("PodPayoutSetupCard.tsx");
+    const normalized = setupCard.replace(/\s+/g, " ");
+    expect(normalized).toContain("managed by the payout account owner");
+    const nonOwnerBranch = setupCard.split("if (!isDesignatedRecipient)")[1]?.split("async function")[0];
+    expect(nonOwnerBranch).toBeDefined();
+    expect(nonOwnerBranch).not.toContain("Set up payout account");
+    expect(nonOwnerBranch).not.toContain("Manage payout account");
+    expect(nonOwnerBranch).not.toContain("startPodPayoutConnectOnboarding");
+    expect(nonOwnerBranch).not.toContain("openPodPayoutAccountManagement");
   });
 
   it("handles null payoutContext with optional chaining", () => {

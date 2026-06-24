@@ -1,9 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { updatePodPayoutSettingsAction } from "@/actions/admin-pod-payout-settings.actions";
-import { podRevenueShareBpsToPercentLabel } from "@/lib/pod-payout-settings";
+import {
+  formatMinimumPayoutDollarsForInput,
+  formatPodSharePercentForInput,
+  minimumPayoutDollarsToCents,
+  podRevenueShareBpsToPercentLabel,
+  podRevenueSharePercentToBps,
+} from "@/lib/pod-payout-settings";
 import type {
   PodPayoutAllocationSummary,
   PodPayoutRecipientOption,
@@ -12,6 +19,16 @@ import type { PodPayoutConnectStatusView } from "@/lib/pod-payout-connect-status
 
 function formatMoney(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+}
+
+function payoutAccountStatusLabel(
+  connectReady: boolean,
+  recipientConnectStatus: PodPayoutConnectStatusView | null,
+  recipientId: string
+): string {
+  if (connectReady) return "Ready";
+  if (recipientConnectStatus?.adminLabel) return recipientConnectStatus.adminLabel;
+  return recipientId ? "Not started" : "No owner selected";
 }
 
 export type PodPayoutSettingsCardProps = {
@@ -42,18 +59,27 @@ export function PodPayoutSettingsCard({
   const bps = settings?.podRevenueShareBps ?? 0;
   const recipientId = settings?.podPayoutRecipientUserId ?? "";
   const minimumCents = settings?.minimumPayoutCents ?? 0;
+  const payoutAccountOwner = recipientOptions.find((opt) => opt.userId === recipientId);
+  const connectReady = recipientConnectStatus?.ready ?? false;
+  const showOwnerActionRequired =
+    enabled && Boolean(recipientId) && recipientConnectStatus != null && !connectReady;
+  const showPayoutAccountReady =
+    enabled && Boolean(recipientId) && recipientConnectStatus != null && connectReady;
+  const payoutAccountStatus = payoutAccountStatusLabel(connectReady, recipientConnectStatus, recipientId);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setPending(true);
     const fd = new FormData(e.currentTarget);
+    const podSharePercent = Number(fd.get("podSharePercent"));
+    const minimumPayoutDollars = Number(fd.get("minimumPayoutDollars"));
     const result = await updatePodPayoutSettingsAction({
       podId,
       podPayoutsEnabled: fd.get("podPayoutsEnabled") === "on",
-      podRevenueShareBps: Number(fd.get("podRevenueShareBps")),
+      podRevenueShareBps: podRevenueSharePercentToBps(podSharePercent),
       podPayoutRecipientUserId: String(fd.get("podPayoutRecipientUserId") ?? "") || null,
-      minimumPayoutCents: Number(fd.get("minimumPayoutCents")),
+      minimumPayoutCents: minimumPayoutDollarsToCents(minimumPayoutDollars),
     });
     setPending(false);
     if (!result.ok) {
@@ -69,7 +95,7 @@ export function PodPayoutSettingsCard({
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Pod payouts</h2>
           <p className="mt-1 text-sm text-oo-stone-gray">
-            Revenue share on eligible food subtotal at this pod. Calculation records only — payouts are not sent yet.
+            The pod share is calculated from eligible food sales at this pod. Transfers are not active yet.
           </p>
         </div>
         <span
@@ -81,20 +107,83 @@ export function PodPayoutSettingsCard({
         </span>
       </div>
 
-      <dl className="mt-4 grid gap-3 border-b border-oo-light-stone pb-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div>
-          <dt className="text-xs text-oo-stone-gray">Recipient payout setup</dt>
-          <dd className="mt-0.5 text-sm font-medium text-oo-charcoal">
-            {recipientConnectStatus?.adminLabel ?? (recipientId ? "Not started" : "No recipient")}
-          </dd>
-          {recipientId && recipientConnectStatus && !recipientConnectStatus.ready ? (
-            <p className="mt-0.5 text-[10px] text-oo-stone-gray">
-              Recipient must complete payout setup from pod settings.
+      {enabled ? (
+        <dl className="mt-4 grid gap-3 rounded-lg border border-oo-light-stone bg-oo-cream/40 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-xs text-oo-stone-gray">Pod share</dt>
+            <dd className="mt-0.5 text-sm font-medium text-oo-charcoal">
+              {bps > 0 ? podRevenueShareBpsToPercentLabel(bps) : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-oo-stone-gray">Minimum payout</dt>
+            <dd className="mt-0.5 text-sm font-medium text-oo-charcoal">
+              {minimumCents > 0 ? formatMoney(minimumCents) : "No minimum"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-oo-stone-gray">Payout account owner</dt>
+            <dd className="mt-0.5 text-sm font-medium text-oo-charcoal">
+              {payoutAccountOwner ? payoutAccountOwner.displayName : recipientId ? "Unknown owner" : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-oo-stone-gray">Payout account</dt>
+            <dd className="mt-0.5 text-sm font-medium text-oo-charcoal">{payoutAccountStatus}</dd>
+          </div>
+        </dl>
+      ) : null}
+
+      {showOwnerActionRequired ? (
+        <div
+          className="mt-4 rounded-lg border border-amber-200 bg-amber-50/80 p-4"
+          data-testid="pod-payout-recipient-action-required"
+        >
+          <p className="text-sm font-semibold text-amber-950">Payout account owner action required</p>
+          <p className="mt-1 text-sm text-amber-900/90">
+            Pod payouts are sent to the pod payout account. This owner manages the Stripe payout account
+            for the pod and must sign in to finish setup from pod settings. Admins can view status here
+            only.
+          </p>
+          {payoutAccountOwner ? (
+            <p className="mt-2 text-sm text-amber-950">
+              <span className="font-medium">Payout account owner:</span> {payoutAccountOwner.displayName}{" "}
+              · {payoutAccountOwner.email}
             </p>
           ) : null}
+          <p className="mt-2 text-sm text-amber-950">
+            <span className="font-medium">Payout account:</span> {payoutAccountStatus}
+          </p>
+          <p className="mt-3 text-xs text-amber-900/90">
+            Ask the payout account owner to visit{" "}
+            <Link
+              href={`/pod/${podId}/settings#payout-setup`}
+              className="font-medium text-amber-950 underline hover:text-amber-900"
+            >
+              Pod settings → Payout account
+            </Link>{" "}
+            while signed in as the payout account owner.
+          </p>
         </div>
+      ) : null}
+
+      {showPayoutAccountReady ? (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/80 p-4">
+          <p className="text-sm font-medium text-emerald-900">Payout account ready</p>
+          {payoutAccountOwner ? (
+            <p className="mt-1 text-xs text-emerald-800/90">
+              {payoutAccountOwner.displayName} · {payoutAccountOwner.email}
+            </p>
+          ) : null}
+          <p className="mt-1 text-xs text-emerald-800/90">
+            The pod payout account is connected in Stripe. Pod payout transfers are not active yet.
+          </p>
+        </div>
+      ) : null}
+
+      <dl className="mt-4 grid gap-3 border-b border-oo-light-stone pb-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <dt className="text-xs text-oo-stone-gray">Pending allocations</dt>
+          <dt className="text-xs text-oo-stone-gray">Pending payout records</dt>
           <dd className="mt-0.5 text-sm font-medium tabular-nums text-oo-charcoal">
             {allocationSummary.pending.count}
             <span className="ml-1 text-xs font-normal text-oo-stone-gray">
@@ -103,7 +192,7 @@ export function PodPayoutSettingsCard({
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-oo-stone-gray">Blocked allocations</dt>
+          <dt className="text-xs text-oo-stone-gray">Needs review</dt>
           <dd className="mt-0.5 text-sm font-medium tabular-nums text-oo-charcoal">
             {allocationSummary.blocked.count}
             <span className="ml-1 text-xs font-normal text-oo-stone-gray">
@@ -112,13 +201,13 @@ export function PodPayoutSettingsCard({
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-oo-stone-gray">Cancelled (refund)</dt>
+          <dt className="text-xs text-oo-stone-gray">Cancelled after refund</dt>
           <dd className="mt-0.5 text-sm font-medium tabular-nums text-oo-charcoal">
             {allocationSummary.cancelledDueToRefund.count}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-oo-stone-gray">Total allocated</dt>
+          <dt className="text-xs text-oo-stone-gray">Total calculated</dt>
           <dd className="mt-0.5 text-sm font-medium tabular-nums text-oo-charcoal">
             {allocationSummary.total.count}
             <span className="ml-1 text-xs font-normal text-oo-stone-gray">
@@ -141,39 +230,47 @@ export function PodPayoutSettingsCard({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
-            <span className="font-medium text-oo-charcoal">Revenue share (basis points)</span>
-            <input
-              name="podRevenueShareBps"
-              type="number"
-              min={0}
-              max={500}
-              step={1}
-              required
-              defaultValue={bps}
-              className="mt-1 w-full rounded border border-oo-light-stone px-2 py-1.5 text-oo-charcoal"
-            />
+            <span className="font-medium text-oo-charcoal">Pod share</span>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                name="podSharePercent"
+                type="number"
+                min={0}
+                max={5}
+                step={0.01}
+                required
+                defaultValue={formatPodSharePercentForInput(bps)}
+                className="w-full rounded border border-oo-light-stone px-2 py-1.5 text-oo-charcoal"
+              />
+              <span className="text-oo-stone-gray">%</span>
+            </div>
             <p className="mt-1 text-xs text-oo-stone-gray">
-              {bps > 0 ? podRevenueShareBpsToPercentLabel(bps) : "0.00%"} of eligible food subtotal · max 500 bps (5.00%)
+              Percentage of eligible food subtotal paid to the pod. Max 5.00%.
             </p>
           </label>
 
           <label className="block text-sm">
-            <span className="font-medium text-oo-charcoal">Minimum payout (¢)</span>
-            <input
-              name="minimumPayoutCents"
-              type="number"
-              min={0}
-              step={1}
-              required
-              defaultValue={minimumCents}
-              className="mt-1 w-full rounded border border-oo-light-stone px-2 py-1.5 text-oo-charcoal"
-            />
-            <p className="mt-1 text-xs text-oo-stone-gray">Used when batch payouts ship (not enforced yet).</p>
+            <span className="font-medium text-oo-charcoal">Minimum payout</span>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-oo-stone-gray">$</span>
+              <input
+                name="minimumPayoutDollars"
+                type="number"
+                min={0}
+                step={0.01}
+                required
+                defaultValue={formatMinimumPayoutDollarsForInput(minimumCents)}
+                className="w-full rounded border border-oo-light-stone px-2 py-1.5 text-oo-charcoal"
+              />
+            </div>
+            <p className="mt-1 text-xs text-oo-stone-gray">
+              Pod payouts below this amount will wait until they are eligible to send.
+            </p>
           </label>
         </div>
 
         <label className="block text-sm">
-          <span className="font-medium text-oo-charcoal">Designated recipient</span>
+          <span className="font-medium text-oo-charcoal">Payout account owner</span>
           <select
             name="podPayoutRecipientUserId"
             defaultValue={recipientId}
@@ -187,7 +284,8 @@ export function PodPayoutSettingsCard({
             ))}
           </select>
           <p className="mt-1 text-xs text-oo-stone-gray">
-            Must be a pod owner. Required when payouts are enabled.
+            The payout account owner must be a pod owner. They will manage the Stripe account used for
+            this pod&apos;s payouts.
           </p>
           {recipientOptions.length === 0 ? (
             <p className="mt-1 text-xs text-amber-800">No pod owners found — add an owner membership first.</p>

@@ -22,7 +22,7 @@ describe("derivePodPayoutConnectStatus", () => {
     });
     expect(status.code).toBe("ready");
     expect(status.adminLabel).toBe("Ready");
-    expect(status.ownerLabel).toBe("Payout setup complete");
+    expect(status.ownerLabel).toBe("Payout account ready");
   });
 
   it("returns needs_attention when requirements are due", () => {
@@ -33,6 +33,7 @@ describe("derivePodPayoutConnectStatus", () => {
       podPayoutStripeRequirementsCurrentlyDue: ["individual.verification.document"],
     });
     expect(status.code).toBe("needs_attention");
+    expect(status.adminLabel).toBe("Needs attention");
     expect(status.requirementsPendingCount).toBe(1);
   });
 

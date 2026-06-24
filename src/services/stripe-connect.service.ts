@@ -155,6 +155,29 @@ export async function createConnectOnboardingLink(
   return link.url;
 }
 
+/** Express Dashboard login link for a connected account with completed onboarding. */
+export async function createConnectExpressLoginLink(accountId: string): Promise<string> {
+  const s = requireStripe();
+  const link = await s.accounts.createLoginLink(accountId);
+  return link.url;
+}
+
+/** Account Link for updating payout account details or resolving requirements. */
+export async function createConnectAccountUpdateLink(
+  accountId: string,
+  returnUrl: string,
+  refreshUrl: string
+): Promise<string> {
+  const s = requireStripe();
+  const link = await s.accountLinks.create({
+    account: accountId,
+    refresh_url: refreshUrl,
+    return_url: returnUrl,
+    type: "account_update",
+  });
+  return link.url;
+}
+
 /** @deprecated Use createConnectOnboardingLink */
 export async function createVendorOnboardingLink(
   accountId: string,

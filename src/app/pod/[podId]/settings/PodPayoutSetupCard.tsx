@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  openPodPayoutAccountManagement,
   startPodPayoutConnectOnboarding,
   syncPodPayoutConnectStatusAction,
 } from "@/actions/pod-payout-connect.actions";
@@ -41,7 +42,14 @@ export function PodPayoutSetupCard({
   }
 
   if (!isDesignatedRecipient) {
-    return null;
+    return (
+      <DashboardPayoutSetupShell>
+        <p className="text-sm text-oo-stone-gray">
+          This pod&apos;s payout account is managed by the payout account owner. Only they can set up or
+          manage the Stripe payout account here when signed in with their account.
+        </p>
+      </DashboardPayoutSetupShell>
+    );
   }
 
   async function goToSetup() {
@@ -49,6 +57,21 @@ export function PodPayoutSetupCard({
     setPending(true);
     try {
       const r = await startPodPayoutConnectOnboarding(podId);
+      if (r.ok) {
+        window.location.assign(r.url);
+        return;
+      }
+      setError(r.error);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function goToManage() {
+    setError(null);
+    setPending(true);
+    try {
+      const r = await openPodPayoutAccountManagement(podId);
       if (r.ok) {
         window.location.assign(r.url);
         return;
@@ -84,12 +107,14 @@ export function PodPayoutSetupCard({
 
   const ready = connectStatus?.ready ?? false;
   const hasAccount = connectStatus?.hasAccount ?? false;
+  const needsAttention = connectStatus?.code === "needs_attention";
+  const canManageAccount = ready || needsAttention;
 
   return (
     <DashboardPayoutSetupShell>
       <p className="text-sm text-oo-stone-gray">
-        Connect a payout account so Open Order can send pod payout transfers when they become available.
-        This does not show earnings or send payouts yet.
+        Set up the payout account used for this pod&apos;s future payout transfers. Pod payout transfers
+        are not active yet.
       </p>
 
       {payoutNotice === "link_expired" && (
@@ -101,7 +126,7 @@ export function PodPayoutSetupCard({
       <div className="mt-4 space-y-3">
         {ready ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2">
-            <p className="text-sm font-medium text-emerald-900">Payout setup complete</p>
+            <p className="text-sm font-medium text-emerald-900">Payout account ready</p>
             <p className="mt-1 text-xs text-emerald-800/90">
               Your payout account is ready. Pod payout transfers are not active yet.
             </p>
@@ -109,9 +134,7 @@ export function PodPayoutSetupCard({
         ) : hasAccount ? (
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream px-3 py-2">
             <p className="text-sm font-medium text-oo-charcoal">
-              {connectStatus?.code === "needs_attention"
-                ? "Additional information required"
-                : "Continue payout setup"}
+              {needsAttention ? "Additional information required" : "Continue payout setup"}
             </p>
             <p className="mt-1 text-xs text-oo-stone-gray">
               {connectStatus?.requirementsPendingCount
@@ -120,7 +143,7 @@ export function PodPayoutSetupCard({
             </p>
           </div>
         ) : (
-          <p className="text-sm text-oo-stone-gray">Payout setup has not been started yet.</p>
+          <p className="text-sm text-oo-stone-gray">Payout account setup has not been started yet.</p>
         )}
 
         {error ? (
@@ -130,16 +153,30 @@ export function PodPayoutSetupCard({
         ) : null}
 
         <div className="flex flex-wrap gap-2">
-          {!ready ? (
+          {canManageAccount ? (
+            <>
+              <button
+                type="button"
+                onClick={() => void goToManage()}
+                disabled={pending}
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
+              >
+                Manage payout account
+              </button>
+              <p className="w-full text-xs text-oo-stone-gray">
+                Update bank details, business information, or payout account requirements in Stripe.
+              </p>
+            </>
+          ) : (
             <button
               type="button"
               onClick={() => void goToSetup()}
               disabled={pending}
               className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
             >
-              {hasAccount ? "Continue payout setup" : "Set up payouts"}
+              {hasAccount ? "Continue payout setup" : "Set up payout account"}
             </button>
-          ) : null}
+          )}
           {hasAccount ? (
             <button
               type="button"

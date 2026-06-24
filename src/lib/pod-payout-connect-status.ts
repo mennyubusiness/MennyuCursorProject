@@ -50,7 +50,7 @@ export function derivePodPayoutConnectStatus(
     return {
       code: "ready",
       adminLabel: "Ready",
-      ownerLabel: "Payout setup complete",
+      ownerLabel: "Payout account ready",
       ready: true,
       requirementsPendingCount,
       hasAccount: true,
@@ -61,7 +61,7 @@ export function derivePodPayoutConnectStatus(
     return {
       code: "not_started",
       adminLabel: "Not started",
-      ownerLabel: "Payout setup not started",
+      ownerLabel: "Payout account not started",
       ready: false,
       requirementsPendingCount: 0,
       hasAccount: false,
@@ -71,7 +71,7 @@ export function derivePodPayoutConnectStatus(
   if (requirementsPendingCount > 0) {
     return {
       code: "needs_attention",
-      adminLabel: "Requirements due",
+      adminLabel: "Needs attention",
       ownerLabel: "Additional information required",
       ready: false,
       requirementsPendingCount,

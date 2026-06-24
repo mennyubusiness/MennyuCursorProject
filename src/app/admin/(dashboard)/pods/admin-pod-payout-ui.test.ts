@@ -19,20 +19,42 @@ describe("admin pod payout P2 UI", () => {
     expect(page).toContain("getPodPayoutRecipientConnectStatusForPod");
   });
 
-  it("settings card shows recipient connect status", () => {
+  it("settings card shows payout account status and owner action copy", () => {
     const card = readAdminPod("PodPayoutSettingsCard.tsx");
-    expect(card).toContain("Recipient payout setup");
+    expect(card).toContain("Payout account");
     expect(card).toContain("recipientConnectStatus");
-    expect(card).toContain("Recipient must complete payout setup from pod settings");
+    expect(card).toContain("Payout account owner action required");
+    expect(card).toContain("Pod payouts are sent to the pod payout account");
+    expect(card).toContain("Pod settings → Payout account");
+    expect(card).toContain("/settings#payout-setup");
+    expect(card).toContain("Payout account ready");
+    expect(card).toContain("signed in as the payout account owner");
   });
 
-  it("settings card uses admin action and pod payout copy", () => {
+  it("settings card does not offer admin payout setup or manage actions", () => {
+    const card = readAdminPod("PodPayoutSettingsCard.tsx");
+    expect(card).not.toContain("Set up payout account");
+    expect(card).not.toContain("Manage payout account");
+    expect(card).not.toContain("Continue payout setup");
+    expect(card).not.toContain("startPodPayoutConnectOnboarding");
+    expect(card).not.toContain("openPodPayoutAccountManagement");
+    expect(card).not.toContain("pod-payout-connect.actions");
+  });
+
+  it("settings card uses layman-friendly pod payout fields", () => {
     const card = readAdminPod("PodPayoutSettingsCard.tsx");
     expect(card).toContain("updatePodPayoutSettingsAction");
     expect(card).toContain("Pod payouts");
-    expect(card).toContain("Revenue share");
-    expect(card).toContain("Designated recipient");
-    expect(card.toLowerCase()).toContain("eligible food subtotal");
+    expect(card).toContain("Pod share");
+    expect(card).toContain("Payout account owner");
+    expect(card).toContain("podSharePercent");
+    expect(card).toContain("minimumPayoutDollars");
+    expect(card).toContain("podRevenueSharePercentToBps");
+    expect(card).toContain("minimumPayoutDollarsToCents");
+    expect(card).toContain("Pending payout records");
+    expect(card).toContain("Needs review");
+    expect(card).toContain("Total calculated");
+    expect(card.toLowerCase()).toContain("eligible food");
     expect(card).not.toMatch(/Stripe transfer/i);
     expect(card).not.toContain("VendorPayoutTransfer");
   });
@@ -54,7 +76,7 @@ describe("admin pod payout P2 UI", () => {
   });
 });
 
-describe("admin pod payout P2 guardrails", () => {
+describe("admin pod payout P3.1 guardrails", () => {
   it("pod owner routes do not import admin pod payout actions", () => {
     const podAppDir = join(root, "app/pod");
     const walk = (dir: string): string[] => {
@@ -71,6 +93,21 @@ describe("admin pod payout P2 guardrails", () => {
     }
   });
 
+  it("admin pod payout UI avoids legacy recipient/bps/cents copy", () => {
+    const card = readAdminPod("PodPayoutSettingsCard.tsx");
+    expect(card.toLowerCase()).not.toContain("basis points");
+    expect(card).not.toContain("Designated recipient");
+    expect(card).not.toContain("Minimum payout (¢)");
+    expect(card).not.toContain("Revenue share (basis points)");
+  });
+
+  it("admin pod page does not import executable pod payout connect actions", () => {
+    const page = readAdminPod("page.tsx");
+    expect(page).not.toContain("pod-payout-connect.actions");
+    expect(page).not.toContain("openPodPayoutAccountManagement");
+    expect(page).not.toContain("startPodPayoutConnectOnboarding");
+  });
+
   it("pod dashboard still has no earnings UI", () => {
     const metrics = readFileSync(
       join(root, "app/pod/[podId]/dashboard/PodDashboardMetrics.tsx"),
@@ -79,7 +116,7 @@ describe("admin pod payout P2 guardrails", () => {
     expect(metrics).not.toMatch(/podPayout|PodPayoutAllocation|earnings|payout amount/i);
   });
 
-  it("P2 services do not create Stripe transfers", () => {
+  it("P2/P3 services do not create Stripe transfers", () => {
     const settingsService = readFileSync(
       join(root, "services/pod-payout-settings.service.ts"),
       "utf8"
@@ -88,12 +125,14 @@ describe("admin pod payout P2 guardrails", () => {
       join(root, "services/pod-payout-allocation.service.ts"),
       "utf8"
     );
+    const connectService = readFileSync(join(root, "services/pod-payout-connect.service.ts"), "utf8");
     const actions = readFileSync(
       join(root, "actions/admin-pod-payout-settings.actions.ts"),
       "utf8"
     );
-    for (const src of [settingsService, allocationService, actions]) {
-      expect(src).not.toMatch(/stripe\.transfers/i);
+    const connectActions = readFileSync(join(root, "actions/pod-payout-connect.actions.ts"), "utf8");
+    for (const src of [settingsService, allocationService, actions, connectService, connectActions]) {
+      expect(src).not.toMatch(/stripe\.transfers\.create/i);
       expect(src).not.toContain("VendorPayoutTransfer");
     }
   });

@@ -11,6 +11,8 @@ import {
   type PodPayoutConnectUserSnapshot,
 } from "@/lib/pod-payout-connect-status";
 import {
+  createConnectAccountUpdateLink,
+  createConnectExpressLoginLink,
   createConnectOnboardingLink,
   StripeConnectNotConfiguredError,
   stripeAccountToPodPayoutUserUpdateInput,
@@ -143,6 +145,49 @@ export async function createPodPayoutOnboardingLink(
 ): Promise<string> {
   const accountId = await getOrCreatePodPayoutConnectedAccountForUser(userId, opts);
   return createConnectOnboardingLink(accountId, returnUrl, refreshUrl);
+}
+
+/**
+ * Opens Stripe-hosted payout account management for an existing Connect account.
+ * Ready accounts use the Express Dashboard login link; accounts with open requirements use account_update.
+ */
+export async function createPodPayoutAccountManagementLink(
+  userId: string,
+  returnUrl: string,
+  refreshUrl: string
+): Promise<string> {
+  requireStripeConfigured();
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      podPayoutStripeConnectedAccountId: true,
+      podPayoutStripeChargesEnabled: true,
+      podPayoutStripePayoutsEnabled: true,
+      podPayoutStripeRequirementsCurrentlyDue: true,
+      podPayoutStripeDetailsSubmitted: true,
+    },
+  });
+  if (!user?.podPayoutStripeConnectedAccountId?.trim()) {
+    throw new Error("Payout account has not been created yet.");
+  }
+
+  const accountId = user.podPayoutStripeConnectedAccountId.trim();
+  const status = derivePodPayoutConnectStatus(toUserSnapshot(user));
+
+  if (status.ready) {
+    return createConnectExpressLoginLink(accountId);
+  }
+
+  if (status.code === "needs_attention") {
+    return createConnectAccountUpdateLink(accountId, returnUrl, refreshUrl);
+  }
+
+  if (user.podPayoutStripeDetailsSubmitted) {
+    return createConnectAccountUpdateLink(accountId, returnUrl, refreshUrl);
+  }
+
+  throw new Error("Complete payout setup before managing the payout account.");
 }
 
 export async function syncPodPayoutConnectedAccountStatus(userId: string): Promise<void> {
