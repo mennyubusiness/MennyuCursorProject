@@ -8,9 +8,14 @@ import {
   getPodPayoutRecipientOptions,
   getPodPayoutSettingsForAdmin,
 } from "@/services/pod-payout-settings.service";
+import {
+  getPodPayoutTransferAdminSummary,
+  listRecentPodPayoutTransfersForAdmin,
+} from "@/services/pod-payout-transfer.service";
 import { AdminPodToggle } from "../AdminPodToggle";
 import { PodPayoutAllocationsCard } from "./PodPayoutAllocationsCard";
 import { PodPayoutSettingsCard } from "./PodPayoutSettingsCard";
+import { PodPayoutTransfersCard } from "./PodPayoutTransfersCard";
 
 export default async function AdminPodDetailPage({
   params,
@@ -37,7 +42,7 @@ export default async function AdminPodDetailPage({
   });
   if (!pod) notFound();
 
-  const [ordersAllTime, ordersToday, lastOrderAgg, payoutSettings, allocationSummary, recipientOptions, allocations, recipientConnect] =
+  const [ordersAllTime, ordersToday, lastOrderAgg, payoutSettings, allocationSummary, recipientOptions, allocations, recipientConnect, transferSummary, transfers] =
     await Promise.all([
       prisma.order.count({ where: { podId: id } }),
       prisma.order.count({ where: { podId: id, createdAt: { gte: startOfToday } } }),
@@ -50,6 +55,8 @@ export default async function AdminPodDetailPage({
       getPodPayoutRecipientOptions(id),
       listRecentPodPayoutAllocationsForAdmin(id),
       getPodPayoutRecipientConnectStatusForPod(id),
+      getPodPayoutTransferAdminSummary(id),
+      listRecentPodPayoutTransfersForAdmin(id),
     ]);
 
   const lastOrderAt = lastOrderAgg._max.createdAt;
@@ -117,6 +124,13 @@ export default async function AdminPodDetailPage({
       />
 
       <PodPayoutAllocationsCard podId={id} allocations={allocations} />
+
+      <PodPayoutTransfersCard
+        podId={id}
+        transferSummary={transferSummary}
+        transfers={transfers}
+        payoutAccountStatus={recipientConnect}
+      />
 
       <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Quick links</h2>

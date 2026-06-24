@@ -14,9 +14,12 @@ describe("admin pod payout P2 UI", () => {
     const page = readAdminPod("page.tsx");
     expect(page).toContain("PodPayoutSettingsCard");
     expect(page).toContain("PodPayoutAllocationsCard");
+    expect(page).toContain("PodPayoutTransfersCard");
     expect(page).toContain("getPodPayoutAllocationSummary");
     expect(page).toContain("listRecentPodPayoutAllocationsForAdmin");
     expect(page).toContain("getPodPayoutRecipientConnectStatusForPod");
+    expect(page).toContain("getPodPayoutTransferAdminSummary");
+    expect(page).toContain("listRecentPodPayoutTransfersForAdmin");
   });
 
   it("settings card shows payout account status and owner action copy", () => {
@@ -68,6 +71,15 @@ describe("admin pod payout P2 UI", () => {
     expect(card).not.toMatch(/Stripe transfer/i);
   });
 
+  it("transfers card supports manual admin batch", () => {
+    const card = readAdminPod("PodPayoutTransfersCard.tsx");
+    const normalized = card.replace(/\s+/g, " ");
+    expect(card).toContain("Run pod payout batch");
+    expect(card).toContain("adminRunPodPayoutTransferBatchAction");
+    expect(normalized).toContain("Run vendor payouts before pod payouts");
+    expect(card).not.toMatch(/stripe\.transfers\.create/);
+  });
+
   it("allocations card supports status filters", () => {
     const card = readAdminPod("PodPayoutAllocationsCard.tsx");
     expect(card).toContain("POD_PAYOUT_ALLOCATION_STATUS.pending");
@@ -116,7 +128,7 @@ describe("admin pod payout P3.1 guardrails", () => {
     expect(metrics).not.toMatch(/podPayout|PodPayoutAllocation|earnings|payout amount/i);
   });
 
-  it("P2/P3 services do not create Stripe transfers", () => {
+  it("P2/P3/P4 services do not cross vendor pod payout transfer tables", () => {
     const settingsService = readFileSync(
       join(root, "services/pod-payout-settings.service.ts"),
       "utf8"
@@ -126,6 +138,7 @@ describe("admin pod payout P3.1 guardrails", () => {
       "utf8"
     );
     const connectService = readFileSync(join(root, "services/pod-payout-connect.service.ts"), "utf8");
+    const transferService = readFileSync(join(root, "services/pod-payout-transfer.service.ts"), "utf8");
     const actions = readFileSync(
       join(root, "actions/admin-pod-payout-settings.actions.ts"),
       "utf8"
@@ -135,5 +148,7 @@ describe("admin pod payout P3.1 guardrails", () => {
       expect(src).not.toMatch(/stripe\.transfers\.create/i);
       expect(src).not.toContain("VendorPayoutTransfer");
     }
+    expect(transferService).not.toContain("VendorPayoutTransfer");
+    expect(transferService).toMatch(/stripe\.transfers\.create/);
   });
 });

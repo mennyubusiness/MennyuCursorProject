@@ -74,6 +74,7 @@ model Pod {
   groupOrderSessions GroupOrderSession[]
   payoutSettings     PodPayoutSettings?
   podPayoutAllocations PodPayoutAllocation[]
+  podPayoutTransfers   PodPayoutTransfer[]
 }
 
 /// Per-pod revenue share configuration for pod owner payouts (allocation only in P1; transfers in later phases).
@@ -118,11 +119,46 @@ model PodPayoutAllocation {
   order                  Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   payment                Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   podPayoutRecipientUser User?   @relation("PodPayoutAllocationRecipient", fields: [podPayoutRecipientUserId], references: [id], onDelete: SetNull)
+  podPayoutTransfer      PodPayoutTransfer?
 
   @@index([podId, createdAt])
   @@index([status])
   @@index([podId, status])
   @@index([orderId])
+}
+
+/// Stripe Connect transfer execution for a pod payout allocation (one row per allocation).
+model PodPayoutTransfer {
+  id                    String    @id @default(cuid())
+  podPayoutAllocationId String    @unique
+  podId                 String
+  /// Connected account acct_… when payout-ready; literal "blocked" when recipient not ready.
+  destinationAccountId  String?
+  amountCents           Int
+  currency              String    @default("usd")
+  /// pending | blocked | blocked_insufficient_balance | blocked_connect_not_ready | blocked_below_minimum | blocked_partial_refund_review | cancelled_due_to_refund | submitted | paid | failed | blocked_idempotency_mismatch
+  status                String
+  stripeTransferId      String?   @unique
+  /// Stable key for Stripe idempotency (openorder_ppt_<podPayoutAllocationId>).
+  idempotencyKey        String    @unique
+  batchKey              String?
+  blockedReason         String?
+  failureCode           String?
+  failureMessage        String?
+  submittedAt           DateTime?
+  paidAt                DateTime?
+  failedAt              DateTime?
+  reconciledAt          DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  podPayoutAllocation PodPayoutAllocation @relation(fields: [podPayoutAllocationId], references: [id], onDelete: Cascade)
+  pod                 Pod                 @relation(fields: [podId], references: [id], onDelete: Cascade)
+
+  @@index([podId, status])
+  @@index([status, createdAt])
+  @@index([batchKey])
+  @@index([podId, createdAt])
 }
 
 model PodVendor {
