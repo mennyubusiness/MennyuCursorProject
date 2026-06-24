@@ -1,14 +1,8 @@
 import { prisma } from "@/lib/db";
 import { fetchStripePlatformBalance } from "@/services/stripe-balance.service";
 import { platformPayoutDisplayForListRow } from "@/services/stripe-platform-payout-lookup.service";
-import { buildPayoutTransferMoneyContext, ADMIN_VENDOR_TRANSFERS_PAGE_INTRO } from "@/lib/stripe-money-movement";
-import {
-  ADMIN_STRIPE_PLATFORM_MINIMUM_BALANCE_INSTRUCTION,
-  ADMIN_VENDOR_AUTO_TRANSFER_WARNING,
-  ADMIN_VENDOR_TRANSFER_VS_PLATFORM_PAYOUT,
-  formatRecommendedStripePlatformMinimumBalance,
-} from "@/lib/stripe-platform-payout-config";
-import { getVendorPayoutTransferGlobalSummary } from "@/services/vendor-payout-transfer.service";
+import { buildPayoutTransferMoneyContext } from "@/lib/stripe-money-movement";
+import { formatRecommendedStripePlatformMinimumBalance } from "@/lib/stripe-platform-payout-config";
 import type {
   AdminPayoutTransferRow,
   AdminTransferReversalRow,
@@ -21,7 +15,7 @@ const TRANSFER_TAKE = 400;
 const REVERSAL_TAKE = 400;
 
 export default async function AdminPayoutTransfersPage() {
-  const [vendors, transfers, reversals, balanceResult, globalSummary] = await Promise.all([
+  const [vendors, transfers, reversals, balanceResult] = await Promise.all([
     prisma.vendor.findMany({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
@@ -61,6 +55,7 @@ export default async function AdminPayoutTransfersPage() {
                 amountCents: true,
                 stripeProcessingFeeCents: true,
                 stripeBalanceTransactionId: true,
+                stripeChargeId: true,
               },
             },
           },
@@ -92,7 +87,6 @@ export default async function AdminPayoutTransfersPage() {
       },
     }),
     fetchStripePlatformBalance("usd"),
-    getVendorPayoutTransferGlobalSummary(),
   ]);
 
   const clawbackBadgeByTransferId = await clawbackBadgesForPayoutTransfers(transfers, reversals);
@@ -125,6 +119,7 @@ export default async function AdminPayoutTransfersPage() {
       idempotencyKey: t.idempotencyKey,
       batchKey: t.batchKey,
       failureMessage: t.failureMessage,
+      stripeChargeId: payment.stripeChargeId,
       createdAt: t.createdAt.toISOString(),
       submittedAt: t.submittedAt?.toISOString() ?? null,
       failedAt: t.failedAt?.toISOString() ?? null,
@@ -164,35 +159,13 @@ export default async function AdminPayoutTransfersPage() {
   const vendorOptions: AdminVendorOption[] = vendors.map((v) => ({ id: v.id, name: v.name }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-oo-charcoal">Vendor Transfers</h1>
-        <p className="mt-1 max-w-3xl text-sm text-oo-stone-gray">
-          Send vendor Connect transfers and monitor vendor clawbacks after refunds.
-        </p>
-        <p className="mt-1 max-w-3xl text-xs text-oo-stone-gray">{ADMIN_VENDOR_TRANSFERS_PAGE_INTRO}</p>
-        <p className="mt-2 max-w-3xl text-xs text-oo-stone-gray">{ADMIN_VENDOR_TRANSFER_VS_PLATFORM_PAYOUT}</p>
-        <p className="mt-2 max-w-3xl rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-2 text-xs text-amber-950">
-          {ADMIN_VENDOR_AUTO_TRANSFER_WARNING}
-        </p>
-        <p className="mt-2 max-w-3xl text-xs text-oo-stone-gray">
-          {ADMIN_STRIPE_PLATFORM_MINIMUM_BALANCE_INSTRUCTION} Recommended minimum:{" "}
-          <span className="font-semibold text-oo-charcoal">
-            {formatRecommendedStripePlatformMinimumBalance()}
-          </span>{" "}
-          (Stripe Dashboard → Settings → Payouts → Minimum balance).
-        </p>
-      </div>
-
-      <PayoutTransfersDashboard
-        initialTransfers={initialTransfers}
-        initialReversals={initialReversals}
-        vendors={vendorOptions}
-        initialBalance={balanceResult.ok ? balanceResult.balance : null}
-        initialBalanceError={balanceResult.ok ? null : balanceResult.error}
-        globalSummary={globalSummary}
-        recommendedMinimumBalanceLabel={formatRecommendedStripePlatformMinimumBalance()}
-      />
-    </div>
+    <PayoutTransfersDashboard
+      initialTransfers={initialTransfers}
+      initialReversals={initialReversals}
+      vendors={vendorOptions}
+      initialBalance={balanceResult.ok ? balanceResult.balance : null}
+      initialBalanceError={balanceResult.ok ? null : balanceResult.error}
+      recommendedMinimumBalanceLabel={formatRecommendedStripePlatformMinimumBalance()}
+    />
   );
 }

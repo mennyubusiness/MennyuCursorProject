@@ -85,6 +85,11 @@ export function reversalIsRecoveredHistory(row: TransferReversalRowLike): boolea
 }
 
 export function transferIssueLabel(row: PayoutTransferRowLike): string {
+  return transferProblemLabel(row);
+}
+
+/** Compact problem text for the Needs action table. */
+export function transferProblemLabel(row: PayoutTransferRowLike): string {
   if (clawbackBadgeNeedsAction(row.clawbackBadge)) {
     switch (row.clawbackBadge) {
       case "missing":
@@ -102,14 +107,44 @@ export function transferIssueLabel(row: PayoutTransferRowLike): string {
     }
   }
   if (row.status === "pending" || row.status === "submitted") return "Ready to send";
-  if (isInsufficientBalanceTransfer(row)) return "Blocked: insufficient balance";
-  if (isIdempotencyMismatchTransfer(row)) return "Blocked: idempotency mismatch";
-  if (isPartialRefundManualReviewTransfer(row)) return "Manual review required";
+  if (isInsufficientBalanceTransfer(row)) return "Insufficient Stripe balance";
+  if (isIdempotencyMismatchTransfer(row)) return "Idempotency mismatch";
+  if (isPartialRefundManualReviewTransfer(row)) return "Partial refund review";
   if (row.status === "failed") return "Transfer failed";
   if (row.status === "blocked" || row.destinationAccountId === "blocked") {
-    return "Transfer blocked";
+    return "Connect setup blocked";
   }
   return "Needs attention";
+}
+
+/** Compact status label for the Needs action table. */
+export function transferStatusShortLabel(row: PayoutTransferRowLike): string {
+  if (isInsufficientBalanceTransfer(row) || (row.status === "failed" && isRetryablePayoutTransfer(row))) {
+    return "Retryable";
+  }
+  if (isIdempotencyMismatchTransfer(row) || isPartialRefundManualReviewTransfer(row)) {
+    return "Manual review";
+  }
+  if (row.status === "pending" || row.status === "submitted") return "Ready";
+  if (row.status === "paid") return "Sent";
+  if (row.status === "blocked" || row.destinationAccountId === "blocked") return "Blocked";
+  if (row.status === "failed") return "Failed";
+  if (clawbackBadgeNeedsAction(row.clawbackBadge)) return "Action needed";
+  return row.status;
+}
+
+export type TransferFundingKind = "charge_linked" | "balance_dependent" | null;
+
+export function transferFundingKind(stripeChargeId?: string | null): TransferFundingKind {
+  const chargeId = stripeChargeId?.trim();
+  if (!chargeId) return "balance_dependent";
+  return "charge_linked";
+}
+
+export function transferFundingBadgeLabel(kind: TransferFundingKind): string | null {
+  if (kind === "charge_linked") return "Charge-linked";
+  if (kind === "balance_dependent") return "Balance-dependent";
+  return null;
 }
 
 export function transferRecommendedAction(row: PayoutTransferRowLike): string {

@@ -17,7 +17,6 @@ import {
   adminRunTransferReversalBatchAction,
 } from "@/actions/admin-payout-transfer-reversal.actions";
 import {
-  displayPayoutTransferFailure,
   IDEMPOTENCY_MISMATCH_STATUS,
   INSUFFICIENT_BALANCE_STATUS,
   isInsufficientBalanceTransfer,
@@ -29,13 +28,16 @@ import {
   isReconcilablePayoutTransfer,
 } from "@/lib/vendor-payout-transfer-reconciliation";
 import {
-  computeVendorLiabilityTotals,
-  vendorTransferStatusBadgeLabel,
-  ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE,
   ADMIN_VENDOR_TRANSFERS_AUTO_TRANSFER_NOTE,
-  VENDOR_PAID_VIA_CONNECT_LABEL,
+  ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE,
+  ADMIN_VENDOR_TRANSFERS_PAGE_INTRO,
+  computeVendorLiabilityTotals,
 } from "@/lib/stripe-money-movement";
-import type { VendorPayoutTransferGlobalSummary } from "@/services/vendor-payout-transfer.service";
+import {
+  ADMIN_STRIPE_PLATFORM_MINIMUM_BALANCE_INSTRUCTION,
+  ADMIN_VENDOR_AUTO_TRANSFER_WARNING,
+  ADMIN_VENDOR_TRANSFER_VS_PLATFORM_PAYOUT,
+} from "@/lib/stripe-platform-payout-config";
 import {
   CANCELLED_DUE_TO_REFUND_STATUS,
   isCancelledDueToRefundTransfer,
@@ -46,7 +48,6 @@ import { VendorTransferRowDetails } from "@/components/admin/VendorTransferRowDe
 import {
   transferClawbackBadgeClass,
   transferClawbackBadgeLabel,
-  transferClawbackBadgeTitle,
 } from "@/lib/admin-payout-transfer-clawback-badge";
 import {
   countActionItems,
@@ -60,12 +61,13 @@ import {
   reversalIssueLabel,
   reversalIsRecoveredHistory,
   reversalNeedsAction,
-  reversalRecommendedAction,
   sortBySentDateDesc,
-  transferIssueLabel,
   transferMatchesQuickFilter,
   transferNeedsAction,
-  transferRecommendedAction,
+  transferProblemLabel,
+  transferFundingBadgeLabel,
+  transferFundingKind,
+  transferStatusShortLabel,
   transferShowsFinancialReviewActions,
   type SectionQuickFilter,
 } from "@/lib/admin-payout-transfers-ux";
@@ -86,20 +88,6 @@ function formatMoney(cents: number, currency: string) {
   );
 }
 
-function shortenDestination(id: string): string {
-  const t = id.trim();
-  if (t === "blocked") return "blocked";
-  if (t.startsWith("acct_") && t.length > 14) return `${t.slice(0, 10)}…${t.slice(-4)}`;
-  if (t.length > 18) return `${t.slice(0, 10)}…${t.slice(-4)}`;
-  return t;
-}
-
-function shortenStripeId(id: string | null | undefined): string {
-  if (!id) return "—";
-  if (id.length <= 16) return id;
-  return `${id.slice(0, 10)}…${id.slice(-4)}`;
-}
-
 function statusFilterBucket(status: string): "pending" | "paid" | "failed" | "blocked" {
   if (status === CANCELLED_DUE_TO_REFUND_STATUS) return "blocked";
   if (status === PARTIAL_REFUND_MANUAL_REVIEW_STATUS) return "blocked";
@@ -112,8 +100,8 @@ function statusFilterBucket(status: string): "pending" | "paid" | "failed" | "bl
   return "pending";
 }
 
-function statusLabel(status: string): string {
-  return vendorTransferStatusBadgeLabel(status);
+function statusLabel(row: AdminPayoutTransferRow): string {
+  return transferStatusShortLabel(row);
 }
 
 function statusBadgeClass(status: string): string {
@@ -206,30 +194,6 @@ function inDateRange(iso: string, preset: DatePreset): boolean {
   return new Date(iso).getTime() >= start.getTime();
 }
 
-function PayoutFailureCell({
-  row,
-}: {
-  row: Pick<AdminPayoutTransferRow, "status" | "blockedReason" | "failureMessage">;
-}) {
-  if (row.status === "blocked" && row.blockedReason) {
-    return (
-      <div>
-        <span className="font-mono text-xs">{row.blockedReason}</span>
-      </div>
-    );
-  }
-  const failure = displayPayoutTransferFailure(row);
-  if (failure.primary === "—") {
-    return <span className="text-oo-stone-gray">—</span>;
-  }
-  return (
-    <div>
-      <p className="text-xs font-medium text-oo-charcoal">{failure.primary}</p>
-      {failure.detail ? <p className="mt-0.5 text-[11px] text-oo-stone-gray">{failure.detail}</p> : null}
-    </div>
-  );
-}
-
 function ReversalFailureText({ text }: { text: string | null }) {
   const [open, setOpen] = useState(false);
   if (!text?.trim()) return <span className="text-oo-stone-gray">—</span>;
@@ -270,7 +234,6 @@ export function PayoutTransfersDashboard({
   vendors,
   initialBalance,
   initialBalanceError,
-  globalSummary,
   recommendedMinimumBalanceLabel,
 }: {
   initialTransfers: AdminPayoutTransferRow[];
@@ -278,7 +241,6 @@ export function PayoutTransfersDashboard({
   vendors: AdminVendorOption[];
   initialBalance: StripePlatformBalanceSnapshot | null;
   initialBalanceError: string | null;
-  globalSummary: VendorPayoutTransferGlobalSummary;
   recommendedMinimumBalanceLabel: string;
 }) {
   const router = useRouter();
@@ -623,11 +585,19 @@ export function PayoutTransfersDashboard({
         ? "bg-emerald-50/80 text-emerald-800 ring-emerald-100"
         : transferClawbackBadgeClass(t.clawbackBadge);
     return (
-      <span
-        title={transferClawbackBadgeTitle(t.clawbackBadge)}
-        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${extra}`}
-      >
+      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${extra}`}>
         {transferClawbackBadgeLabel(t.clawbackBadge)}
+      </span>
+    );
+  }
+
+  function renderFundingBadge(t: AdminPayoutTransferRow) {
+    if (!isInsufficientBalanceTransfer(t) && t.status !== "failed") return null;
+    const label = transferFundingBadgeLabel(transferFundingKind(t.stripeChargeId));
+    if (!label) return null;
+    return (
+      <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-800 ring-1 ring-slate-200">
+        {label}
       </span>
     );
   }
@@ -660,7 +630,7 @@ export function PayoutTransfersDashboard({
             href={`/admin/orders/${t.vendorOrder.orderId}`}
             className="block text-center text-xs font-semibold text-oo-charcoal underline"
           >
-            View order
+            View
           </Link>
         </div>
       );
@@ -681,7 +651,7 @@ export function PayoutTransfersDashboard({
             onClick={() => void retryTransfer(t.id)}
             className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
           >
-            {retryPayoutId === t.id ? "Retrying…" : "Retry vendor transfer"}
+            {retryPayoutId === t.id ? "Retrying…" : "Retry"}
           </button>
         ) : null}
         {reconcilable ? (
@@ -691,7 +661,7 @@ export function PayoutTransfersDashboard({
             onClick={() => void checkStripeTransfer(t.id)}
             className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-950 hover:bg-sky-100 disabled:opacity-50"
           >
-            {reconcilePayoutId === t.id ? "Checking…" : "Check Stripe"}
+            {reconcilePayoutId === t.id ? "Checking…" : "Check"}
           </button>
         ) : null}
         {newKeyRetry ? (
@@ -701,14 +671,14 @@ export function PayoutTransfersDashboard({
             onClick={() => void retryWithNewTransferKey(t.id)}
             className="rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-950 hover:bg-violet-100 disabled:opacity-50"
           >
-            {newKeyRetryId === t.id ? "Retrying…" : "Retry with new transfer key"}
+            {newKeyRetryId === t.id ? "Retrying…" : "New key"}
           </button>
         ) : null}
         <Link
           href={`/admin/orders/${t.vendorOrder.orderId}`}
           className="rounded-md border border-oo-light-stone bg-oo-warm-white px-2 py-1 text-center text-xs font-semibold text-oo-charcoal hover:bg-oo-cream"
         >
-          View order
+          View
         </Link>
       </div>
     );
@@ -716,13 +686,12 @@ export function PayoutTransfersDashboard({
 
   function renderTransferDetailsRow(t: AdminPayoutTransferRow, rowTint: string, colSpan: number) {
     if (!t.moneyMovement) return null;
-    const insufficient = isInsufficientBalanceTransfer(t);
     return (
       <tr key={`${t.id}-money`} className={rowTint}>
         <td colSpan={colSpan} className="border-t border-oo-light-stone/60 px-3 py-3">
           <details>
             <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
-              Transfer details
+              Details
             </summary>
             <div className="mt-2">
               <VendorTransferRowDetails
@@ -734,11 +703,10 @@ export function PayoutTransfersDashboard({
                 idempotencyKey={t.idempotencyKey}
                 batchKey={t.batchKey}
                 stripeTransferId={t.stripeTransferId}
+                stripeChargeId={t.stripeChargeId}
+                orderId={t.vendorOrder.orderId}
                 reconcileNote={reconcileNotes[t.id]}
-                showBlockedNote={
-                  t.moneyMovement.vendorStillOwedCents > 0 &&
-                  (insufficient || t.status === "failed" || t.status === "blocked")
-                }
+                showBlockedNote={false}
                 moneyMovement={t.moneyMovement}
               />
             </div>
@@ -770,18 +738,16 @@ export function PayoutTransfersDashboard({
             </td>
             <td className="px-3 py-2 tabular-nums">{formatMoney(t.amountCents, t.currency)}</td>
             {opts.showIssue ? (
-              <td className="px-3 py-2 text-xs text-oo-charcoal">
-                <p className="font-medium">{transferIssueLabel(t)}</p>
-                <p className="mt-0.5 text-oo-stone-gray">{transferRecommendedAction(t)}</p>
-              </td>
+              <td className="px-3 py-2 text-xs text-oo-charcoal">{transferProblemLabel(t)}</td>
             ) : null}
             <td className="px-3 py-2">
               <div className="flex flex-wrap items-center gap-1">
                 <span
                   className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${statusBadgeClass(t.status)}`}
                 >
-                  {statusLabel(t.status)}
+                  {statusLabel(t)}
                 </span>
+                {renderFundingBadge(t)}
                 {renderClawbackBadge(t, Boolean(opts.subtleClawback))}
               </div>
             </td>
@@ -803,189 +769,116 @@ export function PayoutTransfersDashboard({
   const needsActionCount =
     sectionData.needsActionTransfers.length + sectionData.needsActionReversals.length;
 
+  const needsActionAmountCents = useMemo(() => {
+    const transferTotal = sectionData.needsActionTransfers.reduce((sum, row) => sum + row.amountCents, 0);
+    const reversalTotal = sectionData.needsActionReversals.reduce((sum, row) => sum + row.amountCents, 0);
+    return transferTotal + reversalTotal;
+  }, [sectionData]);
+
+  const blockedAmountCents =
+    liabilityTotals.blockedInsufficientBalanceCents + liabilityTotals.idempotencyMismatchCents;
+  const blockedMetricCount = blockedCount + manualReviewCount;
+
   return (
     <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-oo-charcoal">Vendor Transfers</h1>
+        <p className="mt-1 text-sm text-oo-stone-gray">
+          Track vendor Connect transfers and recover blocked payouts.
+        </p>
+      </div>
+
       <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm sm:p-5">
         {balanceError ? (
-          <p className="text-sm text-amber-900" role="status">
+          <p className="mb-3 text-sm text-amber-900" role="status">
             Unable to fetch Stripe balance: {balanceError}
           </p>
         ) : null}
-        {actionItemCount === 0 ? (
-          <p className="rounded-lg border border-emerald-200/80 bg-emerald-50/40 px-3 py-2 text-sm font-medium text-emerald-950">
-            No vendor transfer actions needed right now.
-          </p>
-        ) : (
-          <p className="rounded-lg border border-amber-200/80 bg-amber-50/40 px-3 py-2 text-sm font-medium text-amber-950">
-            {actionItemCount} item{actionItemCount === 1 ? "" : "s"} need attention — review the Needs action section
-            below.
-          </p>
-        )}
 
-        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Action priority</p>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-2 lg:grid-cols-5">
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Needs action</p>
-            <p className="mt-0.5 text-lg font-semibold text-amber-950">{actionItemCount}</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Needs action</p>
+            <p className="mt-1 text-base font-semibold tabular-nums text-amber-950">
+              {formatMoney(needsActionAmountCents, "usd")}
+            </p>
+            <p className="text-xs text-oo-stone-gray">{actionItemCount}</p>
           </div>
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Ready to send</p>
-            <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Ready to send</p>
+            <p className="mt-1 text-base font-semibold tabular-nums text-oo-charcoal">
               {formatMoney(liabilityTotals.readyToTransferCents, "usd")}
             </p>
-            <p className="text-[10px] text-oo-stone-gray">{readyCount} transfer{readyCount === 1 ? "" : "s"}</p>
+            <p className="text-xs text-oo-stone-gray">{readyCount}</p>
           </div>
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Blocked</p>
-            <p className="mt-0.5 text-lg font-semibold tabular-nums text-orange-900">
-              {formatMoney(liabilityTotals.blockedInsufficientBalanceCents, "usd")}
+            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Blocked</p>
+            <p className="mt-1 text-base font-semibold tabular-nums text-orange-900">
+              {formatMoney(blockedAmountCents, "usd")}
             </p>
-            <p className="text-[10px] text-oo-stone-gray">{blockedCount} row{blockedCount === 1 ? "" : "s"}</p>
+            <p className="text-xs text-oo-stone-gray">{blockedMetricCount}</p>
           </div>
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Needs review</p>
-            <p className="mt-0.5 text-lg font-semibold tabular-nums text-violet-900">
-              {formatMoney(liabilityTotals.idempotencyMismatchCents, "usd")}
-            </p>
-            <p className="text-[10px] text-oo-stone-gray">{manualReviewCount} row{manualReviewCount === 1 ? "" : "s"}</p>
-          </div>
-          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Clawbacks needing action</p>
-            <p className="mt-0.5 text-lg font-semibold text-red-900">{clawbackActionCount}</p>
-          </div>
-        </div>
-
-        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
-          Vendor Connect transfers (all records)
-        </p>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Pending vendor transfers</p>
-            <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
-              {formatMoney(globalSummary.pendingAmountCents, "usd")}
-            </p>
-            <p className="text-[10px] text-oo-stone-gray">
-              {globalSummary.pendingCount} transfer{globalSummary.pendingCount === 1 ? "" : "s"}
-            </p>
-          </div>
-          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Retryable (failed / insufficient balance)</p>
-            <p className="mt-0.5 text-lg font-semibold tabular-nums text-orange-900">
-              {formatMoney(globalSummary.retryableAmountCents, "usd")}
-            </p>
-            <p className="text-[10px] text-oo-stone-gray">
-              {globalSummary.retryableCount} transfer{globalSummary.retryableCount === 1 ? "" : "s"}
-            </p>
-          </div>
-          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Total vendor owed (unsent)</p>
-            <p className="mt-0.5 text-lg font-semibold tabular-nums text-amber-950">
-              {formatMoney(globalSummary.vendorOwedAmountCents, "usd")}
-            </p>
-            <p className="text-[10px] text-oo-stone-gray">Connect transfers Open Order still owes</p>
-          </div>
-          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Blocked for manual review</p>
-            <p className="mt-0.5 text-lg font-semibold tabular-nums text-violet-900">
-              {globalSummary.blockedReviewCount}
-            </p>
-            <p className="text-[10px] text-oo-stone-gray">Partial refund / idempotency mismatch</p>
-          </div>
-        </div>
-
-        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
-          Stripe platform balance (Open Order bank payouts)
-        </p>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Stripe available balance</p>
-            <p className="mt-0.5 text-lg font-semibold text-emerald-900">
-              {balance ? formatMoney(balance.availableCents, balance.currency) : "—"}
-            </p>
-            <p className="text-[10px] text-oo-stone-gray">Funds not yet paid to Open Order bank</p>
-          </div>
-          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Stripe pending balance</p>
-            <p className="mt-0.5 text-lg font-semibold text-oo-charcoal">
-              {balance ? formatMoney(balance.pendingCents, balance.currency) : "—"}
-            </p>
-            <p className="text-[10px] text-oo-stone-gray">Customer charges still settling</p>
-          </div>
-          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Recommended platform minimum balance</p>
-            <p className="mt-0.5 text-lg font-semibold text-oo-charcoal">{recommendedMinimumBalanceLabel}</p>
-            <p className="text-[10px] text-oo-stone-gray">Set in Stripe Dashboard payout settings</p>
-          </div>
-        </div>
-
-        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">History</p>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Sent to vendors</p>
-            <p className="mt-0.5 text-lg font-semibold text-emerald-900">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Sent</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-emerald-900">
               {formatMoney(liabilityTotals.vendorPaidCents, "usd")}
             </p>
           </div>
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-xs text-oo-stone-gray">Cancelled due to refund</p>
-            <p className="mt-0.5 text-lg font-semibold text-slate-800">
-              {formatMoney(liabilityTotals.cancelledDueToRefundCents, "usd")}
+            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Stripe balance</p>
+            <p className="mt-1 text-xs tabular-nums text-oo-charcoal">
+              <span className="font-medium">Available:</span>{" "}
+              {balance ? formatMoney(balance.availableCents, balance.currency) : "—"}
+            </p>
+            <p className="text-xs tabular-nums text-oo-charcoal">
+              <span className="font-medium">Pending:</span>{" "}
+              {balance ? formatMoney(balance.pendingCents, balance.currency) : "—"}
+            </p>
+            <p className="text-xs tabular-nums text-oo-charcoal">
+              <span className="font-medium">Minimum:</span> {recommendedMinimumBalanceLabel}
             </p>
           </div>
         </div>
-        {balance?.retrievedAt ? (
-          <p className="mt-3 font-mono text-[10px] text-oo-stone-gray">
-            Balance as of {balance.retrievedAt.slice(0, 19).replace("T", " ")}Z
-          </p>
-        ) : null}
 
-        <p className="mt-4 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">
-          {ADMIN_VENDOR_TRANSFERS_AUTO_TRANSFER_NOTE}
-        </p>
-        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">{ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE}</p>
-
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={actionLocked || retryAllDisabled}
+            onClick={() => void runRetryAllPayouts()}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+              retryAllDisabled
+                ? "border-oo-light-stone bg-oo-cream text-oo-stone-gray"
+                : "border-orange-300 bg-orange-50 text-orange-950 hover:bg-orange-100"
+            }`}
+          >
+            {batchBusy === "retry_all" ? "Retrying…" : "Retry eligible transfers"}
+          </button>
+          <button
+            type="button"
+            disabled={actionLocked || batchDisabled}
+            onClick={() => void runPayoutBatch()}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+              batchDisabled
+                ? "border border-oo-light-stone bg-oo-cream text-oo-stone-gray"
+                : "bg-brand text-white hover:bg-brand-hover"
+            }`}
+          >
+            {batchBusy === "payout" ? "Running…" : "Run batch"}
+          </button>
           <button
             type="button"
             disabled={balanceBusy || actionLocked}
             onClick={() => void refreshBalance()}
             className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-white disabled:opacity-50"
           >
-            {balanceBusy ? "Refreshing…" : "Refresh Stripe balance"}
-          </button>
-          <button
-            type="button"
-            disabled={actionLocked || batchDisabled}
-            title={batchDisabled ? "No vendor transfers are ready to send." : undefined}
-            onClick={() => void runPayoutBatch()}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold shadow disabled:opacity-50 ${
-              batchDisabled
-                ? "border border-oo-light-stone bg-oo-cream text-oo-stone-gray"
-                : "bg-brand text-white hover:bg-brand-hover"
-            }`}
-          >
-            {batchBusy === "payout" ? "Running…" : "Run vendor transfer batch"}
-          </button>
-          <button
-            type="button"
-            disabled={actionLocked || retryAllDisabled}
-            title={retryAllDisabled ? "No blocked or failed transfers are retryable." : undefined}
-            onClick={() => void runRetryAllPayouts()}
-            className={`rounded-lg border px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 ${
-              retryAllDisabled
-                ? "border-oo-light-stone bg-oo-cream text-oo-stone-gray"
-                : "border-orange-300 bg-orange-50 text-orange-950 hover:bg-orange-100"
-            }`}
-          >
-            {batchBusy === "retry_all" ? "Retrying…" : "Retry all eligible vendor transfers"}
+            {balanceBusy ? "Refreshing…" : "Refresh balance"}
           </button>
           <button
             type="button"
             disabled={actionLocked}
             onClick={() => void runBulkReconcile()}
-            className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-2 text-sm font-medium text-oo-charcoal shadow-sm hover:bg-oo-cream disabled:opacity-50"
+            className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
           >
-            {batchBusy === "reconcile" ? "Reconciling…" : "Reconcile with Stripe"}
+            {batchBusy === "reconcile" ? "Reconciling…" : "Reconcile"}
           </button>
         </div>
 
@@ -1078,9 +971,6 @@ export function PayoutTransfersDashboard({
 
       <section className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
         <h2 className="text-lg font-semibold text-oo-charcoal">Needs action</h2>
-        <p className="text-sm text-oo-stone-gray">
-          Transfers and clawbacks that need a decision or batch action now.
-        </p>
         {needsActionCount === 0 ? (
           <p className="rounded-lg border border-dashed border-emerald-200 bg-emerald-50/30 p-6 text-center text-sm text-emerald-950">
             No vendor transfers or clawbacks need action.
@@ -1093,7 +983,7 @@ export function PayoutTransfersDashboard({
                   <th className="px-3 py-2">Vendor</th>
                   <th className="px-3 py-2">Order</th>
                   <th className="px-3 py-2">Amount</th>
-                  <th className="px-3 py-2">Issue</th>
+                  <th className="px-3 py-2">Problem</th>
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Submitted</th>
                   <th className="px-3 py-2">Action</th>
@@ -1116,15 +1006,12 @@ export function PayoutTransfersDashboard({
                       </Link>
                     </td>
                     <td className="px-3 py-2 tabular-nums">{formatMoney(r.amountCents, r.currency)}</td>
-                    <td className="px-3 py-2 text-xs">
-                      <p className="font-medium">{reversalIssueLabel(r)}</p>
-                      <p className="text-oo-stone-gray">{reversalRecommendedAction(r)}</p>
-                    </td>
+                    <td className="px-3 py-2 text-xs">{reversalIssueLabel(r)}</td>
                     <td className="px-3 py-2">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${reversalStatusBadgeClass(r.status)}`}
                       >
-                        {r.status === "failed" ? "Clawback failed" : "Clawback pending"}
+                        {r.status === "failed" ? "Retryable" : "Pending"}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs text-oo-stone-gray">
@@ -1138,10 +1025,10 @@ export function PayoutTransfersDashboard({
                           onClick={() => void retryReversal(r.id)}
                           className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
                         >
-                          {retryReversalId === r.id ? "Retrying…" : "Retry reversal"}
+                          {retryReversalId === r.id ? "Retrying…" : "Retry"}
                         </button>
                       ) : (
-                        <span className="text-xs text-oo-stone-gray">Run reversal batch below</span>
+                        <span className="text-xs text-oo-stone-gray">Batch</span>
                       )}
                     </td>
                   </tr>
@@ -1153,24 +1040,13 @@ export function PayoutTransfersDashboard({
       </section>
 
       <section className="space-y-3 rounded-xl border border-violet-200/60 bg-violet-50/20 p-4 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-oo-charcoal">Vendor clawbacks / transfer reversals</h2>
-            <p className="mt-1 max-w-2xl text-sm text-oo-stone-gray">
-              These recover funds from vendor connected accounts after a customer refund when the vendor had
-              already been paid via Connect. Customer refund success does not imply vendor clawback success.
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-oo-charcoal">Vendor clawbacks</h2>
           <button
             type="button"
             disabled={actionLocked || reversalBatchDisabled}
-            title={
-              reversalBatchDisabled
-                ? "No prepared vendor reversals are pending."
-                : "Execute prepared reversals in Stripe"
-            }
             onClick={() => void runReversalBatch()}
-            className={`rounded-lg border px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 ${
+            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
               reversalBatchDisabled
                 ? "border-oo-light-stone bg-oo-cream text-oo-stone-gray"
                 : "border-violet-300 bg-violet-100 text-violet-950 hover:bg-violet-200/80"
@@ -1259,10 +1135,6 @@ export function PayoutTransfersDashboard({
           <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-900">
             Cancelled vendor transfers ({sectionData.cancelled.length})
           </summary>
-          <p className="border-t border-slate-200 px-4 py-2 text-xs text-slate-700">
-            These vendor transfers were not sent because the customer was refunded first. No Connect transfer
-            should be sent.
-          </p>
           <div className="overflow-x-auto border-t border-slate-200">
             <table className="min-w-full text-left text-sm">
               <thead className="text-xs uppercase text-slate-600">
@@ -1279,7 +1151,7 @@ export function PayoutTransfersDashboard({
                     <td className="px-3 py-2">{t.vendor.name}</td>
                     <td className="px-3 py-2 font-mono text-xs">{t.vendorOrder.orderId.slice(-10)}</td>
                     <td className="px-3 py-2 tabular-nums">{formatMoney(t.amountCents, t.currency)}</td>
-                    <td className="px-3 py-2 text-xs">{statusLabel(t.status)}</td>
+                    <td className="px-3 py-2 text-xs">{statusLabel(t)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1296,10 +1168,6 @@ export function PayoutTransfersDashboard({
         <summary className="cursor-pointer px-4 py-3 text-lg font-semibold text-oo-charcoal">
           Transfer history
         </summary>
-        <p className="border-t border-oo-light-stone px-4 py-2 text-xs text-oo-stone-gray">
-          Full batch-grouped ledger with filters. Expand a row for destination, Stripe IDs, and accounting
-          context.
-        </p>
         <div className="space-y-3 border-t border-oo-light-stone p-4">
         {transferGroups.length === 0 ? (
           <p className="rounded-lg border border-dashed border-oo-light-stone bg-oo-warm-white p-8 text-center text-oo-stone-gray">
@@ -1347,6 +1215,18 @@ export function PayoutTransfersDashboard({
             );
           })
         )}
+        </div>
+      </details>
+
+      <details className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
+        <summary className="cursor-pointer text-sm font-semibold text-oo-charcoal">How this works</summary>
+        <div className="mt-3 space-y-2 text-xs leading-relaxed text-oo-stone-gray">
+          <p>{ADMIN_VENDOR_TRANSFERS_PAGE_INTRO}</p>
+          <p>{ADMIN_VENDOR_TRANSFER_VS_PLATFORM_PAYOUT}</p>
+          <p>{ADMIN_VENDOR_AUTO_TRANSFER_WARNING}</p>
+          <p>{ADMIN_VENDOR_TRANSFERS_AUTO_TRANSFER_NOTE}</p>
+          <p>{ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE}</p>
+          <p>{ADMIN_STRIPE_PLATFORM_MINIMUM_BALANCE_INSTRUCTION}</p>
         </div>
       </details>
     </div>

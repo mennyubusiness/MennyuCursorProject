@@ -27,6 +27,7 @@ export type AdminPayoutTransferRow = {
   legacyClawbackReviewedAt: string | null;
   legacyClawbackReviewedBy: string | null;
   financialReviewKind: "manual" | "legacy" | null;
+  stripeChargeId: string | null;
   moneyMovement: {
     customerPaymentCents: number;
     stripeProcessingFeeCents: number | null;

@@ -26,56 +26,59 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).toMatch(/Unable to fetch Stripe balance/);
   });
 
-  it("uses Vendor Transfers title and operational intro copy", () => {
-    expect(pageSrc).toMatch(/Vendor Transfers/);
-    expect(pageSrc).toMatch(/Send vendor Connect transfers and monitor vendor clawbacks/);
-    expect(pageSrc).toMatch(/ADMIN_VENDOR_TRANSFERS_PAGE_INTRO/);
-    expect(pageSrc).not.toMatch(/Payout transfers/);
+  it("uses compact operational subtitle and keeps educational copy collapsed", () => {
+    expect(dashboardSrc).toMatch(/Vendor Transfers/);
+    expect(dashboardSrc).toMatch(/Track vendor Connect transfers and recover blocked payouts/);
+    expect(dashboardSrc).toMatch(/How this works/);
+    expect(dashboardSrc).toMatch(/ADMIN_VENDOR_AUTO_TRANSFER_WARNING/);
+    expect(pageSrc).not.toMatch(/ADMIN_VENDOR_TRANSFERS_PAGE_INTRO/);
+    expect(dashboardSrc).not.toMatch(/ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE[\s\S]{0,120}mt-4 max-w-3xl/);
   });
 
-  it("shows no actions needed message when action totals are zero", () => {
-    expect(dashboardSrc).toMatch(/No vendor transfer actions needed right now/);
-    expect(dashboardSrc).toMatch(/actionItemCount === 0/);
-  });
-
-  it("renders Needs action section before transfer history", () => {
+  it("renders compact summary metric labels by default", () => {
     expect(dashboardSrc).toMatch(/Needs action/);
+    expect(dashboardSrc).toMatch(/Ready to send/);
+    expect(dashboardSrc).toMatch(/>Blocked</);
+    expect(dashboardSrc).toMatch(/>Sent</);
+    expect(dashboardSrc).toMatch(/Stripe balance/);
+    expect(dashboardSrc).toMatch(/Minimum:/);
+    expect(dashboardSrc).not.toMatch(/Retryable \(failed \/ insufficient balance\)/);
+    expect(dashboardSrc).not.toMatch(/Total vendor owed \(unsent\)/);
+    expect(dashboardSrc).not.toMatch(/Recommended platform minimum balance/);
+  });
+
+  it("uses short primary action labels in the recommended order", () => {
+    const actionsBlock = dashboardSrc.slice(
+      dashboardSrc.indexOf("Retry eligible transfers"),
+      dashboardSrc.indexOf("mt-4 flex flex-col gap-4 border-t border-oo-light-stone pt-4")
+    );
+    const retryIdx = actionsBlock.indexOf("Retry eligible transfers");
+    const batchIdx = actionsBlock.indexOf("Run batch");
+    const refreshIdx = actionsBlock.indexOf("Refresh balance");
+    const reconcileIdx = actionsBlock.indexOf(': "Reconcile"');
+    expect(retryIdx).toBeGreaterThan(-1);
+    expect(batchIdx).toBeGreaterThan(retryIdx);
+    expect(refreshIdx).toBeGreaterThan(batchIdx);
+    expect(reconcileIdx).toBeGreaterThan(refreshIdx);
+    expect(dashboardSrc).not.toMatch(/Run vendor transfer batch/);
+    expect(dashboardSrc).not.toMatch(/Retry all eligible vendor transfers/);
+  });
+
+  it("renders Needs action table with Problem column and collapsed Details", () => {
     expect(dashboardSrc.indexOf("Needs action")).toBeLessThan(
       dashboardSrc.indexOf("Transfer history")
     );
-    expect(dashboardSrc).toMatch(/No vendor transfers or clawbacks need action/);
-    expect(dashboardSrc).toMatch(/transferNeedsAction/);
+    expect(dashboardSrc).toMatch(/>Problem</);
+    expect(dashboardSrc).toMatch(/transferProblemLabel/);
+    expect(dashboardSrc).toMatch(/transferStatusShortLabel/);
+    expect(dashboardSrc).toMatch(/>\s*Details\s*</);
+    expect(dashboardSrc).toMatch(/showBlockedNote=\{false\}/);
   });
 
-  it("shows recently sent section separate from needs action", () => {
-    expect(dashboardSrc).toMatch(/Recently sent to vendors/);
-    expect(dashboardSrc).toMatch(/RECENTLY_SENT_TRANSFER_LIMIT/);
-    expect(dashboardSrc).toMatch(/isRecentlySentTransfer/);
-  });
-
-  it("puts cancelled transfers in collapsible section", () => {
-    expect(dashboardSrc).toMatch(/Cancelled vendor transfers/);
-    expect(dashboardSrc).toMatch(/customer was refunded first/);
-    expect(dashboardSrc).toMatch(/sectionData\.cancelled\.length > 0/);
-  });
-
-  it("disables batch and retry when nothing eligible", () => {
-    expect(dashboardSrc).toMatch(/batchDisabled/);
-    expect(dashboardSrc).toMatch(/No vendor transfers are ready to send/);
-    expect(dashboardSrc).toMatch(/retryAllDisabled/);
-    expect(dashboardSrc).toMatch(/No blocked or failed transfers are retryable/);
-  });
-
-  it("moves reversal batch near clawback section with disabled copy", () => {
-    expect(dashboardSrc).toMatch(/reversalBatchDisabled/);
-    expect(dashboardSrc).toMatch(/No prepared vendor reversals are pending/);
-    const clawbackSection = dashboardSrc.indexOf("Vendor clawbacks / transfer reversals");
-    expect(dashboardSrc.indexOf("Run reversal batch", clawbackSection)).toBeGreaterThan(
-      clawbackSection
-    );
-    expect(dashboardSrc).not.toMatch(
-      /Run vendor transfer batch[\s\S]{0,800}Run reversal batch/
-    );
+  it("shows charge-linked badges without top-level source_transaction essays", () => {
+    expect(dashboardSrc).toMatch(/transferFundingBadgeLabel/);
+    expect(dashboardSrc).toMatch(/renderFundingBadge/);
+    expect(dashboardSrc).not.toMatch(/ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE[\s\S]{0,80}mt-4 max-w-3xl text-xs/);
   });
 
   it("collapses full transfer history by default", () => {
@@ -83,30 +86,21 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).toMatch(/historyOpen/);
   });
 
-  it("keeps expanded transfer details with destination and Stripe IDs", () => {
+  it("keeps technical fields inside expanded row details", () => {
     expect(dashboardSrc).toMatch(/VendorTransferRowDetails/);
-    expect(detailsSrc).toMatch(/destinationAccountId/);
-    expect(detailsSrc).toMatch(/Stripe transfer ID/);
+    expect(detailsSrc).toMatch(/Source transaction/);
+    expect(detailsSrc).toMatch(/Transfer group/);
     expect(detailsSrc).toMatch(/Idempotency key/);
-    expect(detailsSrc).toMatch(/Additional accounting context/);
+    expect(detailsSrc).toMatch(/Platform payout information/);
+    expect(detailsSrc).not.toMatch(/Additional accounting context/);
   });
 
-  it("recovered clawbacks are in collapsed history not urgent", () => {
-    expect(dashboardSrc).toMatch(/Recovered clawback history/);
-    expect(dashboardSrc).toMatch(/reversalIsRecoveredHistory/);
-    expect(dashboardSrc).toMatch(/subtleClawback/);
-  });
-
-  it("shows financial review actions on needs action rows", () => {
-    expect(dashboardSrc).toMatch(/VendorClawbackReviewActions/);
-    expect(dashboardSrc).toMatch(/preferFinancialReview/);
-    expect(dashboardSrc).toMatch(/transferShowsFinancialReviewActions/);
-    expect(dashboardSrc).toMatch(/View order/);
-  });
-
-  it("does not use payout terminology for vendor transfers", () => {
-    expect(dashboardSrc).toMatch(/Run vendor transfer batch/);
-    expect(dashboardSrc).not.toMatch(/Run payout batch/);
-    expect(dashboardSrc).not.toMatch(/Retry payout/);
+  it("preserves payout actions and retry controls", () => {
+    expect(dashboardSrc).toMatch(/runPayoutBatch/);
+    expect(dashboardSrc).toMatch(/runRetryAllPayouts/);
+    expect(dashboardSrc).toMatch(/refreshBalance/);
+    expect(dashboardSrc).toMatch(/runBulkReconcile/);
+    expect(dashboardSrc).toMatch(/adminRetryVendorPayoutTransferAction/);
+    expect(dashboardSrc).toMatch(/Retrying…" : "Retry"/);
   });
 });

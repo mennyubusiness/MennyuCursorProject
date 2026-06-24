@@ -5,8 +5,11 @@ import {
   isRecentlySentTransfer,
   reversalIsRecoveredHistory,
   reversalNeedsAction,
-  transferIssueLabel,
+  transferFundingBadgeLabel,
+  transferFundingKind,
   transferNeedsAction,
+  transferProblemLabel,
+  transferStatusShortLabel,
 } from "./admin-payout-transfers-ux";
 
 const baseTransfer = {
@@ -82,7 +85,19 @@ describe("admin-payout-transfers-ux", () => {
       financialReviewKind: "manual" as const,
     };
     expect(transferNeedsAction(row)).toBe(true);
-    expect(transferIssueLabel(row)).toBe("Manual review");
+    expect(transferProblemLabel(row)).toBe("Manual review");
+  });
+
+  it("uses compact labels for insufficient balance rows", () => {
+    const row = {
+      ...baseTransfer,
+      status: "blocked_insufficient_balance",
+      stripeTransferId: null,
+    };
+    expect(transferProblemLabel(row)).toBe("Insufficient Stripe balance");
+    expect(transferStatusShortLabel(row)).toBe("Retryable");
+    expect(transferFundingBadgeLabel(transferFundingKind("ch_123"))).toBe("Charge-linked");
+    expect(transferFundingBadgeLabel(transferFundingKind(null))).toBe("Balance-dependent");
   });
 
   it("counts retryable failed transfers", () => {

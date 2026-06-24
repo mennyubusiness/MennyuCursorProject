@@ -4,6 +4,7 @@ import {
   adminVendorConnectTransferStatusLabel,
   type PlatformPayoutDisplayStatus,
 } from "@/lib/stripe-money-movement";
+import { buildVendorPayoutTransferGroup } from "@/lib/vendor-payout-transfer-stripe-metadata";
 import { StripeMoneyMovementBreakdown } from "@/components/admin/StripeMoneyMovementBreakdown";
 
 function formatMoney(cents: number, currency = "usd") {
@@ -22,6 +23,8 @@ export type VendorTransferRowDetailsProps = {
   idempotencyKey: string | null;
   batchKey: string | null;
   stripeTransferId: string | null;
+  stripeChargeId?: string | null;
+  orderId?: string | null;
   reconcileNote?: string | null;
   showBlockedNote?: boolean;
   moneyMovement: {
@@ -45,12 +48,15 @@ export function VendorTransferRowDetails({
   idempotencyKey,
   batchKey,
   stripeTransferId,
+  stripeChargeId,
+  orderId,
   reconcileNote,
   showBlockedNote,
   moneyMovement: mm,
 }: VendorTransferRowDetailsProps) {
   const customerPaid =
     mm.customerPaymentCents > 0 || Boolean(mm.stripeBalanceTransactionId?.trim());
+  const transferGroup = orderId?.trim() ? buildVendorPayoutTransferGroup(orderId.trim()) : null;
 
   const transferRows = [
     {
@@ -94,6 +100,26 @@ export function VendorTransferRowDetails({
             </dd>
           </div>
         ))}
+        {stripeChargeId?.trim() ? (
+          <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-3">
+            <dt className="text-oo-stone-gray" title="Stripe source_transaction for charge-linked transfers">
+              Source transaction
+            </dt>
+            <dd className="break-all font-mono text-[10px] text-oo-charcoal sm:max-w-md sm:text-right">
+              {stripeChargeId.trim()}
+            </dd>
+          </div>
+        ) : null}
+        {transferGroup ? (
+          <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-3">
+            <dt className="text-oo-stone-gray" title="Stripe transfer_group scoped to the order">
+              Transfer group
+            </dt>
+            <dd className="break-all font-mono text-[10px] text-oo-charcoal sm:max-w-md sm:text-right">
+              {transferGroup}
+            </dd>
+          </div>
+        ) : null}
         {failureMessage?.trim() ? (
           <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-3">
             <dt className="text-oo-stone-gray">Raw Stripe error</dt>
@@ -132,7 +158,9 @@ export function VendorTransferRowDetails({
         ) : null}
         {idempotencyKey?.trim() ? (
           <div className="flex justify-between gap-3">
-            <dt className="text-oo-stone-gray">Idempotency key</dt>
+            <dt className="text-oo-stone-gray" title="Stripe idempotency key for transfer create">
+              Idempotency key
+            </dt>
             <dd className="break-all font-mono text-[10px] text-oo-charcoal">{idempotencyKey.trim()}</dd>
           </div>
         ) : null}
@@ -152,7 +180,7 @@ export function VendorTransferRowDetails({
 
       <details className="max-w-xl">
         <summary className="cursor-pointer font-medium text-oo-stone-gray hover:text-oo-charcoal">
-          Additional accounting context
+          Platform payout information
         </summary>
         <div className="mt-2 rounded-lg border border-oo-light-stone bg-white/80 p-3">
           <p className="mb-2 leading-relaxed text-oo-stone-gray">{ADMIN_ACCOUNTING_CONTEXT_INTRO}</p>
