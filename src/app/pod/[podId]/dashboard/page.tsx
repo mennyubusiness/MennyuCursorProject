@@ -15,11 +15,13 @@ import { PodDashboardActivityFeed } from "./PodDashboardActivityFeed";
 import { PodDashboardInviteVendorSection } from "./PodDashboardInviteVendorSection";
 import { PodDashboardMetrics } from "./PodDashboardMetrics";
 import { PodDashboardPendingRequests } from "./PodDashboardPendingRequests";
-import { PodDashboardQuickActions } from "./PodDashboardQuickActions";
 import { PodPromotionCard } from "./PodPromotionCard";
 import { PodDashboardSetupChecklist } from "./PodDashboardSetupChecklist";
+import { PodDashboardSidebar } from "./PodDashboardSidebar";
 import { PodVendorAdoptionBoard } from "./PodVendorAdoptionBoard";
 import { PodVendorRosterPanel, type PodRosterVendorRow } from "./PodVendorRosterPanel";
+
+const sectionScrollClass = "scroll-mt-32";
 
 export default async function PodDashboardPage({
   params,
@@ -37,7 +39,6 @@ export default async function PodDashboardPage({
       description: true,
       imageUrl: true,
       address: true,
-      pickupInstructions: true,
       isActive: true,
       announcementText: true,
       announcementIsActive: true,
@@ -175,7 +176,6 @@ export default async function PodDashboardPage({
       description: pod.description,
       imageUrl: pod.imageUrl,
       address: pod.address,
-      pickupInstructions: pod.pickupInstructions,
     },
     vendorStatuses: rosterRows.map((row) => ({
       status: row.readiness.status,
@@ -220,61 +220,94 @@ export default async function PodDashboardPage({
   );
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-4 pb-8">
-      <div>
-        <h1 className="text-xl font-semibold text-oo-charcoal">{pod.name}</h1>
-        <p className="mt-1 text-sm text-oo-stone-gray">
-          Track Open Order at your pod, promote your public pod page, and keep vendors ready for customers.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-7xl px-4 pb-8 pt-4">
+      <div className="lg:flex lg:items-start lg:gap-8">
+        <PodDashboardSidebar
+          podId={pod.id}
+          podSlug={pod.slug}
+          podName={pod.name}
+          isActive={pod.isActive}
+          orderableVendorCount={orderableVendorCount}
+        />
 
-      <PodDashboardMetrics summary={analytics.summary} orderableVendorCount={orderableVendorCount} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+            <section id="overview" className={`${sectionScrollClass} space-y-6 lg:col-start-1 lg:row-start-1`}>
+              <div>
+                <h2 className="text-lg font-semibold text-oo-charcoal">Overview</h2>
+                <p className="mt-1 text-sm text-oo-stone-gray">
+                  Track Open Order at your pod, promote your public pod page, and keep vendors ready for
+                  customer orders.
+                </p>
+              </div>
+              <PodDashboardMetrics summary={analytics.summary} orderableVendorCount={orderableVendorCount} />
+            </section>
 
-      <PodDashboardQuickActions podId={pod.id} podSlug={pod.slug} />
+            <div className="lg:col-start-1 lg:row-start-2">
+              <PodVendorAdoptionBoard
+                podSlug={pod.slug}
+                launchSummary={launchSummary}
+                attentionRows={adoptionAttentionRows}
+                pendingCount={pendingForUi.length}
+              />
+            </div>
 
-      <PodVendorAdoptionBoard
-        podSlug={pod.slug}
-        launchSummary={launchSummary}
-        attentionRows={adoptionAttentionRows}
-        pendingCount={pendingForUi.length}
-      />
+            <section id="promote" className={`${sectionScrollClass} lg:col-start-2 lg:row-start-1`}>
+              <PodPromotionCard
+                podId={pod.id}
+                podSlug={pod.slug}
+                initialText={announcementState.initialText}
+                initialIsActive={announcementState.initialIsActive}
+                featuredVendors={featuredVendors}
+              />
+            </section>
 
-      <PodDashboardActivityFeed podId={pod.id} podSlug={pod.slug} feed={activityFeed} />
+            <section id="activity" className={`${sectionScrollClass} lg:col-start-2 lg:row-start-2`}>
+              <PodDashboardActivityFeed feed={activityFeed} />
+            </section>
 
-      <PodPromotionCard
-        podId={pod.id}
-        podSlug={pod.slug}
-        initialText={announcementState.initialText}
-        initialIsActive={announcementState.initialIsActive}
-        featuredVendors={featuredVendors}
-      />
+            <section id="setup" className={`${sectionScrollClass} lg:col-start-2 lg:row-start-3`}>
+              <PodDashboardSetupChecklist items={podSetupChecklist} demoted={demoteSetupChecklist} />
+            </section>
 
-      <PodDashboardSetupChecklist items={podSetupChecklist} demoted={demoteSetupChecklist} />
+            <section id="vendors" className={`${sectionScrollClass} space-y-6 lg:col-start-1 lg:row-start-3`}>
+              <div>
+                <h2 className="text-lg font-semibold text-oo-charcoal">Vendors</h2>
+                <p className="mt-1 text-sm text-oo-stone-gray">
+                  Review requests, invite restaurants, and manage how vendors appear on your public pod page.
+                </p>
+              </div>
 
-      <PodDashboardPendingRequests podId={pod.id} requests={pendingForUi} />
+              <PodDashboardPendingRequests podId={pod.id} requests={pendingForUi} />
 
-      <PodDashboardInviteVendorSection
-        podId={pod.id}
-        collapsedByDefault={demoteSetupChecklist}
-        eligibleVendors={vendorsNotInPod.map((v) => ({
-          id: v.id,
-          name: v.name,
-          slug: v.slug,
-          isActive: v.isActive,
-          mennyuOrdersPaused: v.mennyuOrdersPaused ?? false,
-        }))}
-      />
+              <PodDashboardInviteVendorSection
+                podId={pod.id}
+                collapsedByDefault={demoteSetupChecklist}
+                eligibleVendors={vendorsNotInPod.map((v) => ({
+                  id: v.id,
+                  name: v.name,
+                  slug: v.slug,
+                  isActive: v.isActive,
+                  mennyuOrdersPaused: v.mennyuOrdersPaused ?? false,
+                }))}
+              />
 
-      <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">Vendor roster</h2>
-        <p className="mt-2 text-sm text-oo-stone-gray">
-          Set the order vendors appear on your public pod page. Use Featured in each row to highlight a vendor.
-          Stripe and menu setup are completed by the vendor — you can pause visibility anytime.
-        </p>
-        <div className="mt-4">
-          <PodVendorRosterPanel podId={pod.id} podSlug={pod.slug} initialRows={rosterRows} />
+              <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
+                  Vendor roster
+                </h3>
+                <p className="mt-2 text-sm text-oo-stone-gray">
+                  Set the order vendors appear on your public pod page. Use Featured in each row to highlight a
+                  vendor. Stripe and menu setup are completed by the vendor — you can pause visibility anytime.
+                </p>
+                <div className="mt-4">
+                  <PodVendorRosterPanel podId={pod.id} podSlug={pod.slug} initialRows={rosterRows} />
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

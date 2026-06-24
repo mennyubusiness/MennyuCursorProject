@@ -3,35 +3,38 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = join(process.cwd(), "src");
+const dashboardDir = join(root, "app/pod/[podId]/dashboard");
+
+function readDashboard(relativePath: string): string {
+  return readFileSync(join(dashboardDir, relativePath), "utf8");
+}
 
 describe("pod dashboard P0 UI", () => {
   it("loads analytics and renders business-first dashboard sections", () => {
-    const page = readFileSync(join(root, "app/pod/[podId]/dashboard/page.tsx"), "utf8");
+    const page = readDashboard("page.tsx");
     expect(page).toContain("getPodAnalytics");
     expect(page).toContain("PodDashboardMetrics");
-    expect(page).toContain("PodDashboardQuickActions");
+    expect(page).toContain("PodDashboardSidebar");
     expect(page).toContain("demoteSetupChecklist");
-    expect(page).toMatch(/PodDashboardMetrics[\s\S]*PodDashboardQuickActions[\s\S]*PodVendorAdoptionBoard/);
+    expect(page).toContain("PodVendorAdoptionBoard");
   });
 
-  it("uses canonical slug URLs in quick actions", () => {
-    const quickActions = readFileSync(
-      join(root, "app/pod/[podId]/dashboard/PodDashboardQuickActions.tsx"),
-      "utf8"
-    );
-    expect(quickActions).toContain("buildPodCustomerPath");
-    expect(quickActions).toContain("#ordering-qr");
-    expect(quickActions).toContain("View public pod page");
+  it("uses canonical slug URLs in sidebar quick links", () => {
+    const sidebar = readDashboard("PodDashboardSidebar.tsx");
+    expect(sidebar).toContain("buildPodCustomerPath");
+    expect(sidebar).toContain("#ordering-qr");
+    expect(sidebar).toContain("View public pod page");
+    expect(sidebar).toContain("Brand, location, and public page details");
   });
 
   it("uses canonical slug URLs in roster vendor links", () => {
-    const roster = readFileSync(join(root, "app/pod/[podId]/dashboard/PodVendorRosterPanel.tsx"), "utf8");
+    const roster = readDashboard("PodVendorRosterPanel.tsx");
     expect(roster).toContain("buildVendorMenuCustomerPath");
     expect(roster).not.toMatch(/\/pod\/\$\{podId\}\/vendor\/\$\{row\.vendorId\}/);
   });
 
   it("labels metrics without earnings language", () => {
-    const metrics = readFileSync(join(root, "app/pod/[podId]/dashboard/PodDashboardMetrics.tsx"), "utf8");
+    const metrics = readDashboard("PodDashboardMetrics.tsx");
     expect(metrics).toContain("Open Order volume");
     expect(metrics).toContain("No Open Order sales yet");
     expect(metrics).not.toMatch(/earnings|revenue share|payout/i);
@@ -43,13 +46,90 @@ describe("pod dashboard P0 UI", () => {
   });
 });
 
+describe("pod dashboard command center layout", () => {
+  it("uses a full-width dashboard shell with sidebar", () => {
+    const page = readDashboard("page.tsx");
+    const layout = readFileSync(join(dashboardDir, "layout.tsx"), "utf8");
+    const sidebar = readDashboard("PodDashboardSidebar.tsx");
+
+    expect(page).toContain("max-w-7xl");
+    expect(page).not.toContain("max-w-2xl");
+    expect(layout).toContain("max-w-7xl");
+    expect(sidebar).toContain("POD_DASHBOARD_SECTIONS");
+    expect(sidebar).toContain('href={`#${id}`}');
+  });
+
+  it("sidebar contains Overview, Vendors, Promote, Activity, and Setup anchors", () => {
+    const sidebar = readDashboard("PodDashboardSidebar.tsx");
+    expect(sidebar).toContain('"overview"');
+    expect(sidebar).toContain('"vendors"');
+    expect(sidebar).toContain('"promote"');
+    expect(sidebar).toContain('"activity"');
+    expect(sidebar).toContain('"setup"');
+    expect(sidebar).toContain("Overview");
+    expect(sidebar).toContain("Vendors");
+    expect(sidebar).toContain("Promote");
+    expect(sidebar).toContain("Activity");
+    expect(sidebar).toContain("Setup");
+  });
+
+  it("maps section ids on the dashboard page", () => {
+    const page = readDashboard("page.tsx");
+    expect(page).toContain('id="overview"');
+    expect(page).toContain('id="vendors"');
+    expect(page).toContain('id="promote"');
+    expect(page).toContain('id="activity"');
+    expect(page).toContain('id="setup"');
+  });
+
+  it("uses a responsive two-column main grid on large screens", () => {
+    const page = readDashboard("page.tsx");
+    expect(page).toMatch(/lg:grid lg:grid-cols-2/);
+  });
+
+  it("includes mobile section navigation in the sidebar component", () => {
+    const sidebar = readDashboard("PodDashboardSidebar.tsx");
+    expect(sidebar).toContain("lg:hidden");
+    expect(sidebar).toContain("overflow-x-auto");
+    expect(sidebar).toContain('aria-label="Dashboard sections"');
+  });
+});
+
+describe("pod dashboard pickup instruction removal", () => {
+  const dashboardFiles = [
+    "page.tsx",
+    "PodDashboardSidebar.tsx",
+    "PodDashboardSetupChecklist.tsx",
+    "PodDashboardMetrics.tsx",
+    "PodVendorAdoptionBoard.tsx",
+    "PodDashboardActivityFeed.tsx",
+    "PodPromotionCard.tsx",
+    "PodDashboardInviteVendorSection.tsx",
+    "PodVendorRosterPanel.tsx",
+  ];
+
+  it("does not mention pickup instructions on dashboard surfaces", () => {
+    for (const file of dashboardFiles) {
+      const src = readDashboard(file);
+      expect(src).not.toMatch(/pickup instructions/i);
+    }
+  });
+
+  it("removes pickup instruction checklist item from derivePodSetupChecklist", () => {
+    const readiness = readFileSync(join(root, "lib/vendor-pod-readiness.ts"), "utf8");
+    expect(readiness).not.toContain("pickup_instructions");
+    expect(readiness).not.toContain("Pickup instructions added");
+    expect(readiness).not.toContain("Help customers find pickup at your pod");
+  });
+});
+
 describe("pod dashboard vendor adoption UI", () => {
   it("renders adoption board without reordering roster drag sort", () => {
-    const page = readFileSync(join(root, "app/pod/[podId]/dashboard/page.tsx"), "utf8");
+    const page = readDashboard("page.tsx");
     expect(page).toContain("PodVendorAdoptionBoard");
     expect(page).toContain("buildPodAdoptionAttentionRows");
 
-    const roster = readFileSync(join(root, "app/pod/[podId]/dashboard/PodVendorRosterPanel.tsx"), "utf8");
+    const roster = readDashboard("PodVendorRosterPanel.tsx");
     expect(roster).toContain("DndContext");
     expect(roster).toContain("arrayMove");
     expect(roster).toContain("Pause in pod");
@@ -57,7 +137,7 @@ describe("pod dashboard vendor adoption UI", () => {
   });
 
   it("surfaces needs-attention section and copy actions", () => {
-    const board = readFileSync(join(root, "app/pod/[podId]/dashboard/PodVendorAdoptionBoard.tsx"), "utf8");
+    const board = readDashboard("PodVendorAdoptionBoard.tsx");
     expect(board).toContain("Needs attention");
     expect(board).toContain("Copy reminder");
     expect(board).toContain("Copy setup link");
@@ -66,29 +146,24 @@ describe("pod dashboard vendor adoption UI", () => {
   });
 
   it("uses owner-facing live and blocker labels in roster", () => {
-    const roster = readFileSync(join(root, "app/pod/[podId]/dashboard/PodVendorRosterPanel.tsx"), "utf8");
+    const roster = readDashboard("PodVendorRosterPanel.tsx");
     expect(roster).toContain("podOwnerVendorDisplayStatus");
   });
 });
 
 describe("pod dashboard activity feed UI", () => {
-  it("wires activity feed after adoption board and before setup checklist", () => {
-    const page = readFileSync(join(root, "app/pod/[podId]/dashboard/page.tsx"), "utf8");
+  it("wires activity feed in the activity section after promote tools", () => {
+    const page = readDashboard("page.tsx");
     expect(page).toContain("getPodActivityFeed");
     expect(page).toContain("PodDashboardActivityFeed");
-    expect(page).toMatch(
-      /PodVendorAdoptionBoard[\s\S]*PodDashboardActivityFeed[\s\S]*PodDashboardSetupChecklist/
-    );
+    expect(page).toMatch(/id="promote"[\s\S]*id="activity"[\s\S]*id="setup"/);
   });
 
-  it("renders empty-state guidance with quick links", () => {
-    const feed = readFileSync(
-      join(root, "app/pod/[podId]/dashboard/PodDashboardActivityFeed.tsx"),
-      "utf8"
-    );
+  it("renders empty-state guidance without duplicate sidebar links", () => {
+    const feed = readDashboard("PodDashboardActivityFeed.tsx");
     expect(feed).toContain("No recent pod activity yet");
-    expect(feed).toContain("QR &amp; signage");
-    expect(feed).toContain("buildPodCustomerPath");
+    expect(feed).not.toContain("QR &amp; signage");
+    expect(feed).not.toContain("View public pod page");
     expect(feed).not.toMatch(/customerPhone|customerEmail|revenue|payout/i);
   });
 
@@ -100,20 +175,26 @@ describe("pod dashboard activity feed UI", () => {
 });
 
 describe("pod dashboard promotion tools UI", () => {
-  it("places promotion card after activity feed", () => {
-    const page = readFileSync(join(root, "app/pod/[podId]/dashboard/page.tsx"), "utf8");
+  it("places promotion card in the promote section", () => {
+    const page = readDashboard("page.tsx");
     expect(page).toContain("PodPromotionCard");
-    expect(page).toMatch(/PodDashboardActivityFeed[\s\S]*PodPromotionCard[\s\S]*PodDashboardSetupChecklist/);
+    expect(page).toMatch(/id="promote"[\s\S]*PodPromotionCard/);
   });
 
   it("renders announcement management and featured vendor summary", () => {
-    const card = readFileSync(join(root, "app/pod/[podId]/dashboard/PodPromotionCard.tsx"), "utf8");
+    const card = readDashboard("PodPromotionCard.tsx");
     expect(card).toContain("Promote your pod");
     expect(card).toContain("updatePodAnnouncement");
     expect(card).toContain("Show on public pod page");
     expect(card).toContain("Feature a vendor from the roster");
     expect(card).toContain("Copy public page link");
     expect(card).toContain("POD_ANNOUNCEMENT_MAX_LENGTH");
+  });
+
+  it("avoids duplicating sidebar public page and QR links in the promotion card", () => {
+    const card = readDashboard("PodPromotionCard.tsx");
+    expect(card).not.toContain("View public pod page");
+    expect(card).not.toContain("QR &amp; signage");
   });
 
   it("shows active announcements only on public pod views", () => {
@@ -135,18 +216,18 @@ describe("pod dashboard promotion tools UI", () => {
 
 describe("pod dashboard beta polish", () => {
   const dashboardFiles = [
-    "app/pod/[podId]/dashboard/page.tsx",
-    "app/pod/[podId]/dashboard/PodDashboardMetrics.tsx",
-    "app/pod/[podId]/dashboard/PodDashboardQuickActions.tsx",
-    "app/pod/[podId]/dashboard/PodVendorAdoptionBoard.tsx",
-    "app/pod/[podId]/dashboard/PodDashboardActivityFeed.tsx",
-    "app/pod/[podId]/dashboard/PodPromotionCard.tsx",
-    "app/pod/[podId]/dashboard/PodDashboardSetupChecklist.tsx",
-    "app/pod/[podId]/dashboard/PodDashboardInviteVendorSection.tsx",
+    "page.tsx",
+    "PodDashboardMetrics.tsx",
+    "PodVendorAdoptionBoard.tsx",
+    "PodDashboardActivityFeed.tsx",
+    "PodPromotionCard.tsx",
+    "PodDashboardSetupChecklist.tsx",
+    "PodDashboardInviteVendorSection.tsx",
+    "PodDashboardSidebar.tsx",
   ];
 
   it("uses null-safe announcement state on the dashboard page", () => {
-    const page = readFileSync(join(root, "app/pod/[podId]/dashboard/page.tsx"), "utf8");
+    const page = readDashboard("page.tsx");
     expect(page).toContain("resolvePodDashboardAnnouncementState");
     expect(page).toContain("announcementState.initialText");
     expect(page).toContain("announcementState.initialIsActive");
@@ -154,20 +235,14 @@ describe("pod dashboard beta polish", () => {
 
   it("does not use earnings or payout language in dashboard surfaces", () => {
     for (const file of dashboardFiles) {
-      const src = readFileSync(join(root, file), "utf8");
+      const src = readDashboard(file);
       expect(src).not.toMatch(/\bearnings\b|\brevenue share\b|\bpayout\b/i);
     }
   });
 
   it("includes mobile overflow guards on long text surfaces", () => {
-    const promotion = readFileSync(
-      join(root, "app/pod/[podId]/dashboard/PodPromotionCard.tsx"),
-      "utf8"
-    );
-    const activity = readFileSync(
-      join(root, "app/pod/[podId]/dashboard/PodDashboardActivityFeed.tsx"),
-      "utf8"
-    );
+    const promotion = readDashboard("PodPromotionCard.tsx");
+    const activity = readDashboard("PodDashboardActivityFeed.tsx");
     const banner = readFileSync(join(root, "components/pod/PodAnnouncementBanner.tsx"), "utf8");
 
     expect(promotion).toContain("overflow-wrap:anywhere");
@@ -179,11 +254,17 @@ describe("pod dashboard beta polish", () => {
   it("only highlights orderable featured vendors on public cards", () => {
     const gridCard = readFileSync(join(root, "components/pod/PodVendorCard.tsx"), "utf8");
     const destinationCard = readFileSync(
-      join(root,
-        "components/pod/destination/DestinationPodVendorCard.tsx"),
+      join(root, "components/pod/destination/DestinationPodVendorCard.tsx"),
       "utf8"
     );
     expect(gridCard).toMatch(/isFeatured && !availability\.unavailable/);
     expect(destinationCard).toMatch(/isFeatured && !unavailable/);
+  });
+
+  it("preserves roster panel controls", () => {
+    const roster = readDashboard("PodVendorRosterPanel.tsx");
+    expect(roster).toContain("PodVendorRosterPanel");
+    expect(roster).toContain("updatePodVendorPresentation");
+    expect(roster).toContain("Featured");
   });
 });

@@ -50,7 +50,7 @@ export function PodDashboardSetupChecklist({
     ? "text-sm font-semibold uppercase tracking-wide text-oo-stone-gray"
     : "text-base font-semibold text-oo-charcoal";
 
-  if (demoted && allComplete) {
+  if (allComplete) {
     return (
       <details className={sectionClass}>
         <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">

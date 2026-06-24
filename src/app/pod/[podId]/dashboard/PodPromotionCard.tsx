@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { updatePodAnnouncement } from "@/actions/pod-settings.actions";
@@ -212,28 +211,14 @@ export function PodPromotionCard({
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-3 text-sm">
-        <Link
-          href={publicPodPath}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-medium text-oo-charcoal underline hover:text-oo-charcoal"
-        >
-          View public pod page
-        </Link>
+      <div className="mt-4">
         <button
           type="button"
           onClick={() => void handleCopyPublicLink()}
-          className="font-medium text-oo-charcoal underline hover:text-oo-charcoal"
+          className="text-sm font-medium text-oo-charcoal underline hover:text-oo-charcoal"
         >
           {copiedLink ? "Link copied!" : "Copy public page link"}
         </button>
-        <Link
-          href={`/pod/${podId}/settings#ordering-qr`}
-          className="font-medium text-oo-charcoal underline hover:text-oo-charcoal"
-        >
-          QR &amp; signage
-        </Link>
       </div>
     </section>
   );

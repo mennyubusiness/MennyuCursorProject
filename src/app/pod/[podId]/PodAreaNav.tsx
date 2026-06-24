@@ -8,17 +8,18 @@ const NAV_LINKS = [
   { href: "settings", label: "Settings" },
 ] as const;
 
-export function PodAreaNav() {
+export function PodAreaNav({ wide = false }: { wide?: boolean }) {
   const pathname = usePathname();
   const params = useParams();
   const podId = params?.podId as string | undefined;
   if (!podId) return null;
 
   const base = `/pod/${podId}`;
+  const widthClass = wide ? "mx-auto flex max-w-7xl gap-1 px-4 py-2" : "mx-auto flex max-w-2xl gap-1 px-4 py-2";
 
   return (
     <nav className="oo-dash-nav" aria-label="Pod area">
-      <div className="mx-auto flex max-w-2xl gap-1 px-4 py-2">
+      <div className={widthClass}>
         {NAV_LINKS.map(({ href, label }) => {
           const path = `${base}/${href}`;
           const isActive = pathname === path;

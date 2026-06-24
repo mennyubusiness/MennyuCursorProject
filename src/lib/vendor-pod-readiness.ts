@@ -444,7 +444,6 @@ export type PodSetupChecklistInput = {
     description: string | null;
     imageUrl: string | null;
     address: string | null;
-    pickupInstructions: string | null;
   };
   vendorStatuses: Array<{ canAcceptOrders: boolean; status: VendorPodReadinessStatus }>;
 };
@@ -454,7 +453,6 @@ export function derivePodSetupChecklist(input: PodSetupChecklistInput): Readines
   const profileComplete = Boolean(
     pod.name?.trim() && (pod.description?.trim() || pod.address?.trim()) && pod.imageUrl?.trim()
   );
-  const pickupComplete = Boolean(pod.pickupInstructions?.trim());
   const hasOrderableVendor = vendorStatuses.some((v) => v.canAcceptOrders);
   const hasReadyVendor = vendorStatuses.some(
     (v) => v.canAcceptOrders || v.status === "ready" || v.status === "active"
@@ -469,15 +467,6 @@ export function derivePodSetupChecklist(input: PodSetupChecklistInput): Readines
       description: "Name, hero image, and description or address on the public pod page.",
       actionHref: `/pod/${podId}/settings`,
       actionLabel: "Edit pod settings",
-    },
-    {
-      key: "pickup_instructions",
-      label: "Pickup instructions added",
-      complete: pickupComplete,
-      owner: "pod_owner",
-      description: "Help customers find pickup at your pod.",
-      actionHref: `/pod/${podId}/settings`,
-      actionLabel: "Add pickup instructions",
     },
     {
       key: "order_link",

@@ -38,11 +38,11 @@ export default async function PodDashboardLayout({
   return (
     <div className="oo-dash">
       <header className="oo-dash-titlebar">
-        <div className="mx-auto max-w-2xl px-4 pb-2 pt-4">
+        <div className="mx-auto max-w-7xl px-4 pb-2 pt-4">
           <h1 className="oo-dash-titlebar-heading">Pod</h1>
           <p className="oo-dash-titlebar-sub">{pod.name}</p>
         </div>
-        <PodAreaNav />
+        <PodAreaNav wide />
       </header>
       {children}
     </div>
