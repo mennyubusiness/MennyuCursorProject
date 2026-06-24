@@ -8,10 +8,16 @@ const mockSubmitVendorOrder = vi.fn();
 const mockClearCart = vi.fn();
 const mockSendSms = vi.fn();
 
+const mockPaymentFindFirst = vi.fn();
+const mockAutoTransfer = vi.fn();
+
 vi.mock("@/lib/db", () => ({
   prisma: {
     order: {
       findUnique: (...args: unknown[]) => mockOrderFindUnique(...args),
+    },
+    payment: {
+      findFirst: (...args: unknown[]) => mockPaymentFindFirst(...args),
     },
   },
 }));
@@ -41,13 +47,19 @@ vi.mock("@/services/order-status.service", () => ({
   deriveParentStatusFromVendorOrders: vi.fn(() => "routing"),
 }));
 
+vi.mock("@/services/vendor-payout-transfer.service", () => ({
+  executeVendorPayoutTransfersForPayment: (...args: unknown[]) => mockAutoTransfer(...args),
+}));
+
 import { processSuccessfulPayment } from "./post-payment.service";
 
 describe("processSuccessfulPayment validation gate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockValidate.mockResolvedValue({ ok: true });
-    mockRecordPayment.mockResolvedValue({ created: true });
+    mockRecordPayment.mockResolvedValue({ created: true, paymentId: "pay_1" });
+    mockAutoTransfer.mockResolvedValue({ examined: 0, settled: 0, skipped: 0, failed: 0, blockedInsufficientBalance: 0 });
+    mockPaymentFindFirst.mockResolvedValue(null);
     mockOrderFindUnique
       .mockResolvedValueOnce({ status: "pending_payment" })
       .mockResolvedValue({
@@ -68,6 +80,10 @@ describe("processSuccessfulPayment validation gate", () => {
       orderId: "ord_1",
       paymentIntentId: "pi_1",
     });
+    expect(mockAutoTransfer).toHaveBeenCalledWith(
+      "pay_1",
+      expect.objectContaining({ batchKey: expect.stringContaining("auto-order-") })
+    );
   });
 
   it("skips validation when order is already past pending_payment", async () => {
@@ -117,5 +133,21 @@ describe("processSuccessfulPayment validation gate", () => {
     expect(mockSetOrderStatus).not.toHaveBeenCalled();
     expect(mockSendSms).not.toHaveBeenCalled();
     expect(mockClearCart).toHaveBeenCalledWith("ord_1");
+    expect(mockAutoTransfer).not.toHaveBeenCalled();
+  });
+
+  it("attempts auto vendor transfers when paymentId is resolved after idempotent record", async () => {
+    mockRecordPayment.mockResolvedValue({ created: false, paymentId: "pay_existing" });
+
+    await processSuccessfulPayment({
+      orderId: "ord_1",
+      paymentIntentId: "pi_1",
+      idempotencyKey: "confirm_1",
+    });
+
+    expect(mockAutoTransfer).toHaveBeenCalledWith(
+      "pay_existing",
+      expect.objectContaining({ batchKey: expect.stringContaining("auto-order-") })
+    );
   });
 });

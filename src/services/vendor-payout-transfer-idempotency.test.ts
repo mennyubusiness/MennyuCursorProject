@@ -34,6 +34,10 @@ vi.mock("@/services/stripe-balance.service", () => ({
   })),
 }));
 
+vi.mock("@/services/stripe-payment-charge-details.service", () => ({
+  resolvePaymentStripeChargeId: vi.fn(async () => null),
+}));
+
 vi.mock("./vendor-payout-transfer-reconciliation.service", () => ({
   reconcileVendorPayoutTransfer: (...args: unknown[]) => mockReconcile(...args),
 }));
@@ -71,6 +75,24 @@ const baseRow = {
   idempotencyKey: "mennyu_vpt_pa_1",
   stripeTransferId: null,
   vendorOrder: { orderId: "ord_1" },
+  paymentAllocation: {
+    id: "pa_1",
+    paymentId: "pay_1",
+    payment: { stripeChargeId: null, stripePaymentIntentId: "pi_1" },
+  },
+};
+
+const baseStripeParamsRow = {
+  id: "vpt_1",
+  paymentAllocationId: "pa_1",
+  paymentId: "pay_1",
+  vendorOrderId: "vo_1",
+  vendorId: "v_1",
+  orderId: "ord_1",
+  amountCents: 1833,
+  currency: "usd",
+  destinationAccountId: "acct_1",
+  stripeChargeId: null,
 };
 
 describe("vendor payout transfer idempotency mismatch", () => {
@@ -228,6 +250,6 @@ describe("vendor payout transfer idempotency mismatch", () => {
     const secondCall = mockTransferCreate.mock.calls[1]![0];
 
     expect(secondCall).toEqual(firstCall);
-    expect(buildStripeTransferCreateParams(baseRow)).toEqual(firstCall);
+    expect(buildStripeTransferCreateParams(baseStripeParamsRow)).toEqual(firstCall);
   });
 });

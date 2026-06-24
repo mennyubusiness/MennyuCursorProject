@@ -2,6 +2,13 @@ import { prisma } from "@/lib/db";
 import { fetchStripePlatformBalance } from "@/services/stripe-balance.service";
 import { platformPayoutDisplayForListRow } from "@/services/stripe-platform-payout-lookup.service";
 import { buildPayoutTransferMoneyContext, ADMIN_VENDOR_TRANSFERS_PAGE_INTRO } from "@/lib/stripe-money-movement";
+import {
+  ADMIN_STRIPE_PLATFORM_MINIMUM_BALANCE_INSTRUCTION,
+  ADMIN_VENDOR_AUTO_TRANSFER_WARNING,
+  ADMIN_VENDOR_TRANSFER_VS_PLATFORM_PAYOUT,
+  formatRecommendedStripePlatformMinimumBalance,
+} from "@/lib/stripe-platform-payout-config";
+import { getVendorPayoutTransferGlobalSummary } from "@/services/vendor-payout-transfer.service";
 import type {
   AdminPayoutTransferRow,
   AdminTransferReversalRow,
@@ -14,7 +21,7 @@ const TRANSFER_TAKE = 400;
 const REVERSAL_TAKE = 400;
 
 export default async function AdminPayoutTransfersPage() {
-  const [vendors, transfers, reversals, balanceResult] = await Promise.all([
+  const [vendors, transfers, reversals, balanceResult, globalSummary] = await Promise.all([
     prisma.vendor.findMany({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
@@ -85,6 +92,7 @@ export default async function AdminPayoutTransfersPage() {
       },
     }),
     fetchStripePlatformBalance("usd"),
+    getVendorPayoutTransferGlobalSummary(),
   ]);
 
   const clawbackBadgeByTransferId = await clawbackBadgesForPayoutTransfers(transfers, reversals);
@@ -163,6 +171,17 @@ export default async function AdminPayoutTransfersPage() {
           Send vendor Connect transfers and monitor vendor clawbacks after refunds.
         </p>
         <p className="mt-1 max-w-3xl text-xs text-oo-stone-gray">{ADMIN_VENDOR_TRANSFERS_PAGE_INTRO}</p>
+        <p className="mt-2 max-w-3xl text-xs text-oo-stone-gray">{ADMIN_VENDOR_TRANSFER_VS_PLATFORM_PAYOUT}</p>
+        <p className="mt-2 max-w-3xl rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-2 text-xs text-amber-950">
+          {ADMIN_VENDOR_AUTO_TRANSFER_WARNING}
+        </p>
+        <p className="mt-2 max-w-3xl text-xs text-oo-stone-gray">
+          {ADMIN_STRIPE_PLATFORM_MINIMUM_BALANCE_INSTRUCTION} Recommended minimum:{" "}
+          <span className="font-semibold text-oo-charcoal">
+            {formatRecommendedStripePlatformMinimumBalance()}
+          </span>{" "}
+          (Stripe Dashboard → Settings → Payouts → Minimum balance).
+        </p>
       </div>
 
       <PayoutTransfersDashboard
@@ -171,6 +190,8 @@ export default async function AdminPayoutTransfersPage() {
         vendors={vendorOptions}
         initialBalance={balanceResult.ok ? balanceResult.balance : null}
         initialBalanceError={balanceResult.ok ? null : balanceResult.error}
+        globalSummary={globalSummary}
+        recommendedMinimumBalanceLabel={formatRecommendedStripePlatformMinimumBalance()}
       />
     </div>
   );

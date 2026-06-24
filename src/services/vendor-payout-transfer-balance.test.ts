@@ -33,6 +33,10 @@ vi.mock("@/services/stripe-balance.service", () => ({
   fetchStripePlatformBalance: (...args: unknown[]) => mockBalance(...args),
 }));
 
+vi.mock("@/services/stripe-payment-charge-details.service", () => ({
+  resolvePaymentStripeChargeId: vi.fn(async () => null),
+}));
+
 import {
   BALANCE_UNAVAILABLE_ADMIN_MESSAGE,
   executeVendorPayoutTransfer,
@@ -61,7 +65,15 @@ describe("vendor payout transfer balance checks", () => {
       destinationAccountId: "acct_1",
       idempotencyKey: "key_1",
       paymentAllocationId: "pa_1",
+      vendorOrderId: "vo_1",
+      vendorId: "v_1",
       stripeTransferId: null,
+      vendorOrder: { orderId: "ord_1" },
+      paymentAllocation: {
+        id: "pa_1",
+        paymentId: "pay_1",
+        payment: { stripeChargeId: null, stripePaymentIntentId: "pi_1" },
+      },
     });
 
     const result = await executeVendorPayoutTransfer("vpt_1");
@@ -90,6 +102,11 @@ describe("vendor payout transfer balance checks", () => {
       vendorId: "v_2",
       stripeTransferId: null,
       vendorOrder: { orderId: "ord_2" },
+      paymentAllocation: {
+        id: "pa_2",
+        paymentId: "pay_2",
+        payment: { stripeChargeId: null, stripePaymentIntentId: "pi_2" },
+      },
     });
     mockTransferCreate.mockResolvedValue({ id: "tr_abc" });
 
@@ -138,6 +155,11 @@ describe("vendor payout transfer balance checks", () => {
       vendorId: "v_4",
       stripeTransferId: null,
       vendorOrder: { orderId: "ord_4" },
+      paymentAllocation: {
+        id: "pa_4",
+        paymentId: "pay_4",
+        payment: { stripeChargeId: null, stripePaymentIntentId: "pi_4" },
+      },
     });
     mockTransferCreate.mockRejectedValue({
       code: "balance_insufficient",
@@ -165,7 +187,15 @@ describe("vendor payout transfer balance checks", () => {
       destinationAccountId: "acct_1",
       idempotencyKey: "key_5",
       paymentAllocationId: "pa_5",
+      vendorOrderId: "vo_5",
+      vendorId: "v_5",
       stripeTransferId: null,
+      vendorOrder: { orderId: "ord_5" },
+      paymentAllocation: {
+        id: "pa_5",
+        paymentId: "pay_5",
+        payment: { stripeChargeId: null, stripePaymentIntentId: "pi_5" },
+      },
     });
 
     const result = await executeVendorPayoutTransfer("vpt_5");
@@ -185,6 +215,11 @@ describe("vendor payout transfer balance checks", () => {
       stripeTransferId: null,
       blockedReason: "customer_refund_extinguished_obligation",
       vendorOrder: { orderId: "ord_1" },
+      paymentAllocation: {
+        id: "pa_c",
+        paymentId: "pay_c",
+        payment: { stripeChargeId: null, stripePaymentIntentId: "pi_c" },
+      },
     });
 
     const result = await executeVendorPayoutTransfer("vpt_cancelled");

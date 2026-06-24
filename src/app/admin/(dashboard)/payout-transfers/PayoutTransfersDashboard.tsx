@@ -32,8 +32,10 @@ import {
   computeVendorLiabilityTotals,
   vendorTransferStatusBadgeLabel,
   ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE,
+  ADMIN_VENDOR_TRANSFERS_AUTO_TRANSFER_NOTE,
   VENDOR_PAID_VIA_CONNECT_LABEL,
 } from "@/lib/stripe-money-movement";
+import type { VendorPayoutTransferGlobalSummary } from "@/services/vendor-payout-transfer.service";
 import {
   CANCELLED_DUE_TO_REFUND_STATUS,
   isCancelledDueToRefundTransfer,
@@ -268,12 +270,16 @@ export function PayoutTransfersDashboard({
   vendors,
   initialBalance,
   initialBalanceError,
+  globalSummary,
+  recommendedMinimumBalanceLabel,
 }: {
   initialTransfers: AdminPayoutTransferRow[];
   initialReversals: AdminTransferReversalRow[];
   vendors: AdminVendorOption[];
   initialBalance: StripePlatformBalanceSnapshot | null;
   initialBalanceError: string | null;
+  globalSummary: VendorPayoutTransferGlobalSummary;
+  recommendedMinimumBalanceLabel: string;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -849,19 +855,66 @@ export function PayoutTransfersDashboard({
           </div>
         </div>
 
-        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Stripe balance</p>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
+          Vendor Connect transfers (all records)
+        </p>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
+            <p className="text-xs text-oo-stone-gray">Pending vendor transfers</p>
+            <p className="mt-0.5 text-lg font-semibold tabular-nums text-oo-charcoal">
+              {formatMoney(globalSummary.pendingAmountCents, "usd")}
+            </p>
+            <p className="text-[10px] text-oo-stone-gray">
+              {globalSummary.pendingCount} transfer{globalSummary.pendingCount === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
+            <p className="text-xs text-oo-stone-gray">Retryable (failed / insufficient balance)</p>
+            <p className="mt-0.5 text-lg font-semibold tabular-nums text-orange-900">
+              {formatMoney(globalSummary.retryableAmountCents, "usd")}
+            </p>
+            <p className="text-[10px] text-oo-stone-gray">
+              {globalSummary.retryableCount} transfer{globalSummary.retryableCount === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
+            <p className="text-xs text-oo-stone-gray">Total vendor owed (unsent)</p>
+            <p className="mt-0.5 text-lg font-semibold tabular-nums text-amber-950">
+              {formatMoney(globalSummary.vendorOwedAmountCents, "usd")}
+            </p>
+            <p className="text-[10px] text-oo-stone-gray">Connect transfers Open Order still owes</p>
+          </div>
+          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
+            <p className="text-xs text-oo-stone-gray">Blocked for manual review</p>
+            <p className="mt-0.5 text-lg font-semibold tabular-nums text-violet-900">
+              {globalSummary.blockedReviewCount}
+            </p>
+            <p className="text-[10px] text-oo-stone-gray">Partial refund / idempotency mismatch</p>
+          </div>
+        </div>
+
+        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
+          Stripe platform balance (Open Order bank payouts)
+        </p>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
             <p className="text-xs text-oo-stone-gray">Stripe available balance</p>
             <p className="mt-0.5 text-lg font-semibold text-emerald-900">
               {balance ? formatMoney(balance.availableCents, balance.currency) : "—"}
             </p>
+            <p className="text-[10px] text-oo-stone-gray">Funds not yet paid to Open Order bank</p>
           </div>
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
             <p className="text-xs text-oo-stone-gray">Stripe pending balance</p>
             <p className="mt-0.5 text-lg font-semibold text-oo-charcoal">
               {balance ? formatMoney(balance.pendingCents, balance.currency) : "—"}
             </p>
+            <p className="text-[10px] text-oo-stone-gray">Customer charges still settling</p>
+          </div>
+          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
+            <p className="text-xs text-oo-stone-gray">Recommended platform minimum balance</p>
+            <p className="mt-0.5 text-lg font-semibold text-oo-charcoal">{recommendedMinimumBalanceLabel}</p>
+            <p className="text-[10px] text-oo-stone-gray">Set in Stripe Dashboard payout settings</p>
           </div>
         </div>
 
@@ -886,7 +939,10 @@ export function PayoutTransfersDashboard({
           </p>
         ) : null}
 
-        <p className="mt-4 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">{ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE}</p>
+        <p className="mt-4 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">
+          {ADMIN_VENDOR_TRANSFERS_AUTO_TRANSFER_NOTE}
+        </p>
+        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-oo-stone-gray">{ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE}</p>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <button

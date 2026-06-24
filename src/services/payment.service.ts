@@ -514,11 +514,16 @@ export async function refreshDeferredPaymentStripeFeeSnapshot(
   return { updated: true };
 }
 
+export type RecordPaymentAndAllocationsResult = {
+  created: boolean;
+  paymentId: string | null;
+};
+
 export async function recordPaymentAndAllocations(
   orderId: string,
   stripePaymentIntentId: string,
   idempotencyKey: string
-): Promise<{ created: boolean }> {
+): Promise<RecordPaymentAndAllocationsResult> {
   const key = buildIdempotencyKey("payment", idempotencyKey);
 
   const existingByKey = await prisma.payment.findUnique({
@@ -527,7 +532,7 @@ export async function recordPaymentAndAllocations(
   });
   if (existingByKey) {
     await verifyExistingPaymentSnapshots(existingByKey, stripePaymentIntentId);
-    return { created: false };
+    return { created: false, paymentId: existingByKey.id };
   }
 
   const existingByPi = await prisma.payment.findUnique({
@@ -536,7 +541,7 @@ export async function recordPaymentAndAllocations(
   });
   if (existingByPi) {
     await verifyExistingPaymentSnapshots(existingByPi, stripePaymentIntentId);
-    return { created: false };
+    return { created: false, paymentId: existingByPi.id };
   }
 
   const order = await prisma.order.findUnique({
@@ -544,7 +549,7 @@ export async function recordPaymentAndAllocations(
     include: { vendorOrders: true },
   });
   if (!order) throw new Error("Order not found");
-  if (order.status !== "pending_payment") return { created: false }; // already processed
+  if (order.status !== "pending_payment") return { created: false, paymentId: null };
 
   const chargeDetails = await fetchPaymentIntentChargeDetails(stripePaymentIntentId);
   const feeCents =
@@ -589,6 +594,7 @@ export async function recordPaymentAndAllocations(
   }
 
   const amountCents = order.totalCents;
+  let paymentId = "";
   await prisma.$transaction(async (tx) => {
     const payment = await tx.payment.create({
       data: {
@@ -602,6 +608,7 @@ export async function recordPaymentAndAllocations(
         stripeBalanceTransactionId: chargeDetails?.balanceTransactionId ?? null,
       },
     });
+    paymentId = payment.id;
     for (let i = 0; i < order.vendorOrders.length; i++) {
       const vo = order.vendorOrders[i]!;
       await tx.paymentAllocation.create({
@@ -627,7 +634,7 @@ export async function recordPaymentAndAllocations(
       eligibleSubtotalCents: order.subtotalCents,
     });
   });
-  return { created: true };
+  return { created: true, paymentId };
 }
 
 const REDIRECT_RECONCILE_IDEMPOTENCY_PREFIX = "redirect_reconcile_";

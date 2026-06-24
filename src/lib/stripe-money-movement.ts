@@ -17,7 +17,10 @@ export const ADMIN_VENDOR_TRANSFERS_PAGE_INTRO =
   "Vendor transfers move funds from Open Order's Stripe platform balance to vendor connected Stripe accounts.";
 
 export const ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE =
-  "Transfers can only be sent from Stripe available balance. Pending funds and funds already paid to the Open Order bank cannot fund vendor transfers.";
+  "Transfers without a linked charge (source_transaction) can only be sent from Stripe available balance. Pending charge funds and platform payouts to Open Order's bank do not fund those transfers. When source_transaction is set, Stripe waits for the customer charge to become available.";
+
+export const ADMIN_VENDOR_TRANSFERS_AUTO_TRANSFER_NOTE =
+  "Vendor transfers are attempted automatically when a payment succeeds. Use manual batch/retry only for recovery.";
 
 export const ADMIN_ACCOUNTING_CONTEXT_INTRO =
   "Platform payout information explains whether Stripe paid Open Order's bank. It does not determine whether the vendor was paid.";

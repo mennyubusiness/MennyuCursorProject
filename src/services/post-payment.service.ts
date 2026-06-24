@@ -1,97 +1,156 @@
-/**
- * Shared post-payment processing: one idempotent flow for webhook and redirect reconciliation.
- * Records payment, moves order out of pending_payment, submits vendor orders via routing layer
- * (only when pending), updates routing status, sends confirmation SMS (idempotent per order).
- */
-import { prisma } from "@/lib/db";
-import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
-import { recordPaymentAndAllocations, validatePaymentIntentForOrderProcessing } from "@/services/payment.service";
-import { setOrderStatus } from "@/services/order.service";
-import { submitVendorOrder } from "@/services/routing.service";
-import { sendOrderReceivedMilestone } from "@/services/customer-order-notification.service";
-import { deriveParentStatusFromVendorOrders } from "@/services/order-status.service";
-
-/**
- * Run full post-payment flow: record payment (or skip if already recorded), set status,
- * submit vendor orders to Deliverect only when still pending, derive routing status, send SMS once.
- * Safe to call from both Stripe webhook and redirect reconciliation; duplicate calls are idempotent.
- */
-export async function processSuccessfulPayment(params: {
-  orderId: string;
-  paymentIntentId: string;
-  idempotencyKey: string;
-}): Promise<void> {
-  const { orderId, paymentIntentId, idempotencyKey } = params;
-
-  const orderForValidation = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: { status: true },
-  });
-  if (!orderForValidation) {
-    throw new Error("Order not found");
-  }
-  if (orderForValidation.status !== "pending_payment") {
-    await clearCheckoutSourceCartForOrder(orderId);
-    return;
-  }
-
-  const validation = await validatePaymentIntentForOrderProcessing({
-    orderId,
-    paymentIntentId,
-  });
-  if (!validation.ok) {
-    throw new Error(validation.message);
-  }
-
-  try {
-    await recordPaymentAndAllocations(orderId, paymentIntentId, idempotencyKey);
-  } catch (recordErr: unknown) {
-    const isP2002 =
-      recordErr &&
-      typeof recordErr === "object" &&
-      "code" in recordErr &&
-      (recordErr as { code: string }).code === "P2002";
-    if (!isP2002) {
-      throw recordErr;
-    }
-  }
-
-  await setOrderStatus(orderId, "paid", "stripe");
-  await setOrderStatus(orderId, "routing", "system");
-
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: { vendorOrders: true, pod: true },
-  });
-  if (order) {
-    for (const vo of order.vendorOrders) {
-      if (vo.routingStatus === "pending") {
-        await submitVendorOrder(vo.id, {
-          customerPhone: order.customerPhone,
-          customerEmail: order.customerEmail ?? null,
-          preparationTimeMinutes: 15,
-        });
-      }
-    }
-    const updatedOrder = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        vendorOrders: {
-          select: {
-            routingStatus: true,
-            fulfillmentStatus: true,
-            statusHistory: { select: { source: true } },
-          },
-        },
-      },
-    });
-    const parentStatus = deriveParentStatusFromVendorOrders(
-      updatedOrder?.vendorOrders ?? []
-    );
-    await setOrderStatus(orderId, parentStatus, "system");
-
-    await sendOrderReceivedMilestone(orderId, order.customerPhone);
-  }
-
-  await clearCheckoutSourceCartForOrder(orderId);
-}
+/**
+ * Shared post-payment processing: one idempotent flow for webhook and redirect reconciliation.
+ * Records payment, moves order out of pending_payment, submits vendor orders via routing layer
+ * (only when pending), updates routing status, sends confirmation SMS (idempotent per order).
+ */
+import { prisma } from "@/lib/db";
+import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
+import { recordPaymentAndAllocations, validatePaymentIntentForOrderProcessing } from "@/services/payment.service";
+import { setOrderStatus } from "@/services/order.service";
+import { submitVendorOrder } from "@/services/routing.service";
+import { sendOrderReceivedMilestone } from "@/services/customer-order-notification.service";
+import { deriveParentStatusFromVendorOrders } from "@/services/order-status.service";
+import { executeVendorPayoutTransfersForPayment } from "@/services/vendor-payout-transfer.service";
+
+async function resolvePaymentIdAfterRecord(params: {
+  orderId: string;
+  paymentIntentId: string;
+  recordResult: { paymentId: string | null };
+}): Promise<string | null> {
+  if (params.recordResult.paymentId) return params.recordResult.paymentId;
+  const payment = await prisma.payment.findFirst({
+    where: {
+      OR: [{ orderId: params.orderId }, { stripePaymentIntentId: params.paymentIntentId }],
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  return payment?.id ?? null;
+}
+
+async function attemptAutomaticVendorPayoutTransfers(params: {
+  orderId: string;
+  paymentId: string;
+}): Promise<void> {
+  try {
+    const summary = await executeVendorPayoutTransfersForPayment(params.paymentId, {
+      batchKey: `auto-order-${params.orderId.slice(0, 8)}`,
+    });
+    console.info(
+      JSON.stringify({
+        event: "vendor_payout_auto_transfer_completed",
+        orderId: params.orderId,
+        paymentId: params.paymentId,
+        summary,
+      })
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      JSON.stringify({
+        event: "vendor_payout_auto_transfer_failed",
+        orderId: params.orderId,
+        paymentId: params.paymentId,
+        message,
+      })
+    );
+  }
+}
+
+/**
+ * Run full post-payment flow: record payment (or skip if already recorded), set status,
+ * submit vendor orders to Deliverect only when still pending, derive routing status, send SMS once.
+ * Safe to call from both Stripe webhook and redirect reconciliation; duplicate calls are idempotent.
+ */
+export async function processSuccessfulPayment(params: {
+  orderId: string;
+  paymentIntentId: string;
+  idempotencyKey: string;
+}): Promise<void> {
+  const { orderId, paymentIntentId, idempotencyKey } = params;
+
+  const orderForValidation = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { status: true },
+  });
+  if (!orderForValidation) {
+    throw new Error("Order not found");
+  }
+  if (orderForValidation.status !== "pending_payment") {
+    await clearCheckoutSourceCartForOrder(orderId);
+    return;
+  }
+
+  const validation = await validatePaymentIntentForOrderProcessing({
+    orderId,
+    paymentIntentId,
+  });
+  if (!validation.ok) {
+    throw new Error(validation.message);
+  }
+
+  let recordResult: { created: boolean; paymentId: string | null } = {
+    created: false,
+    paymentId: null,
+  };
+  try {
+    recordResult = await recordPaymentAndAllocations(orderId, paymentIntentId, idempotencyKey);
+  } catch (recordErr: unknown) {
+    const isP2002 =
+      recordErr &&
+      typeof recordErr === "object" &&
+      "code" in recordErr &&
+      (recordErr as { code: string }).code === "P2002";
+    if (!isP2002) {
+      throw recordErr;
+    }
+  }
+
+  const paymentId = await resolvePaymentIdAfterRecord({
+    orderId,
+    paymentIntentId,
+    recordResult,
+  });
+  if (paymentId) {
+    await attemptAutomaticVendorPayoutTransfers({ orderId, paymentId });
+  }
+
+  await setOrderStatus(orderId, "paid", "stripe");
+  await setOrderStatus(orderId, "routing", "system");
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { vendorOrders: true, pod: true },
+  });
+  if (order) {
+    for (const vo of order.vendorOrders) {
+      if (vo.routingStatus === "pending") {
+        await submitVendorOrder(vo.id, {
+          customerPhone: order.customerPhone,
+          customerEmail: order.customerEmail ?? null,
+          preparationTimeMinutes: 15,
+        });
+      }
+    }
+    const updatedOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        vendorOrders: {
+          select: {
+            routingStatus: true,
+            fulfillmentStatus: true,
+            statusHistory: { select: { source: true } },
+          },
+        },
+      },
+    });
+    const parentStatus = deriveParentStatusFromVendorOrders(
+      updatedOrder?.vendorOrders ?? []
+    );
+    await setOrderStatus(orderId, parentStatus, "system");
+
+    await sendOrderReceivedMilestone(orderId, order.customerPhone);
+  }
+
+  await clearCheckoutSourceCartForOrder(orderId);
+}

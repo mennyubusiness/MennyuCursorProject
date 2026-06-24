@@ -33,6 +33,7 @@ import {
   fetchStripePlatformBalance,
   type StripePlatformBalanceSnapshot,
 } from "@/services/stripe-balance.service";
+import { resolvePaymentStripeChargeId } from "@/services/stripe-payment-charge-details.service";
 
 export const VENDOR_PAYOUT_TRANSFER_STATUS = {
   pending: "pending",
@@ -94,29 +95,60 @@ export function buildRotatedIdempotencyKey(
 type VendorPayoutTransferStripeRow = {
   id: string;
   paymentAllocationId: string;
+  paymentId: string;
   vendorOrderId: string;
   vendorId: string;
+  orderId: string;
   amountCents: number;
   currency: string;
   destinationAccountId: string;
-  vendorOrder: { orderId: string };
+  stripeChargeId: string | null;
 };
 
 export function buildStripeTransferCreateParams(row: VendorPayoutTransferStripeRow) {
-  return {
+  const params: {
+    amount: number;
+    currency: string;
+    destination: string;
+    transfer_group: string;
+    metadata: Record<string, string>;
+    source_transaction?: string;
+  } = {
     amount: row.amountCents,
     currency: row.currency,
     destination: row.destinationAccountId,
-    transfer_group: buildVendorPayoutTransferGroup(row.vendorOrder.orderId),
+    transfer_group: buildVendorPayoutTransferGroup(row.orderId),
     metadata: buildVendorPayoutTransferStripeMetadata({
       id: row.id,
       paymentAllocationId: row.paymentAllocationId,
+      paymentId: row.paymentId,
       vendorOrderId: row.vendorOrderId,
       vendorId: row.vendorId,
-      orderId: row.vendorOrder.orderId,
+      orderId: row.orderId,
     }),
   };
+  const chargeId = row.stripeChargeId?.trim();
+  if (chargeId) {
+    params.source_transaction = chargeId;
+  }
+  return params;
 }
+
+const vendorPayoutTransferExecuteInclude = {
+  vendorOrder: { select: { orderId: true } },
+  paymentAllocation: {
+    select: {
+      id: true,
+      paymentId: true,
+      payment: {
+        select: {
+          stripeChargeId: true,
+          stripePaymentIntentId: true,
+        },
+      },
+    },
+  },
+} as const;
 
 type AllocationWithVendor = Prisma.PaymentAllocationGetPayload<{
   include: { vendorOrder: { include: { vendor: true } } };
@@ -280,7 +312,7 @@ export async function executeVendorPayoutTransfer(
 
   const row = await prisma.vendorPayoutTransfer.findUnique({
     where: { id: transferId },
-    include: { vendorOrder: { select: { orderId: true } } },
+    include: vendorPayoutTransferExecuteInclude,
   });
   if (!row) {
     return { outcome: "skipped", reason: "not_found" };
@@ -322,26 +354,49 @@ export async function executeVendorPayoutTransfer(
     return { outcome: "paid", stripeTransferId: "" };
   }
 
-  const balanceResolved = await resolveBalanceTracker(row.currency, opts);
-  if (!balanceResolved.ok) {
-    return {
-      outcome: "blocked_balance_unavailable",
-      message: BALANCE_UNAVAILABLE_ADMIN_MESSAGE,
-    };
+  let stripeChargeId = row.paymentAllocation.payment.stripeChargeId?.trim() ?? null;
+  if (!stripeChargeId) {
+    stripeChargeId = await resolvePaymentStripeChargeId(row.paymentAllocation.paymentId);
   }
-  const tracker = balanceResolved.tracker;
-  if (!hasSufficientTrackedBalance(tracker, row.amountCents)) {
-    await markBlockedInsufficientBalance(transferId, INSUFFICIENT_BALANCE_DISPLAY, opts);
-    return { outcome: "blocked_insufficient_balance", message: INSUFFICIENT_BALANCE_DISPLAY };
+  const usesSourceTransaction = Boolean(stripeChargeId);
+
+  if (!usesSourceTransaction) {
+    const balanceResolved = await resolveBalanceTracker(row.currency, opts);
+    if (!balanceResolved.ok) {
+      return {
+        outcome: "blocked_balance_unavailable",
+        message: BALANCE_UNAVAILABLE_ADMIN_MESSAGE,
+      };
+    }
+    const tracker = balanceResolved.tracker;
+    if (!hasSufficientTrackedBalance(tracker, row.amountCents)) {
+      await markBlockedInsufficientBalance(transferId, INSUFFICIENT_BALANCE_DISPLAY, opts);
+      return { outcome: "blocked_insufficient_balance", message: INSUFFICIENT_BALANCE_DISPLAY };
+    }
   }
+
+  const balanceTrackerForConsume = opts?.balanceTracker;
 
   try {
     const tr = await stripe.transfers.create(
-      buildStripeTransferCreateParams(row),
+      buildStripeTransferCreateParams({
+        id: row.id,
+        paymentAllocationId: row.paymentAllocationId,
+        paymentId: row.paymentAllocation.paymentId,
+        vendorOrderId: row.vendorOrderId,
+        vendorId: row.vendorId,
+        orderId: row.vendorOrder.orderId,
+        amountCents: row.amountCents,
+        currency: row.currency,
+        destinationAccountId: row.destinationAccountId,
+        stripeChargeId,
+      }),
       { idempotencyKey: row.idempotencyKey }
     );
 
-    consumeTrackedBalance(tracker, row.amountCents);
+    if (!usesSourceTransaction && balanceTrackerForConsume) {
+      consumeTrackedBalance(balanceTrackerForConsume, row.amountCents);
+    }
 
     await prisma.vendorPayoutTransfer.update({
       where: { id: transferId },
@@ -682,6 +737,201 @@ export async function retryAllEligibleFailedVendorPayoutTransfers(params?: {
 
   for (const row of rows) {
     const r = await retryFailedVendorPayoutTransfer(row.id, { batchKey, balanceTracker: tracker });
+    summarizeExecuteResult(row.id, r, summary);
+  }
+
+  return { ok: true, summary };
+}
+
+export type AutoVendorPayoutTransferSummary = {
+  examined: number;
+  settled: number;
+  skipped: number;
+  failed: number;
+  blockedInsufficientBalance: number;
+};
+
+/**
+ * After payment success: ensure transfer rows exist and attempt Stripe Connect transfers.
+ * Failures are logged but do not throw — post-payment flow must continue.
+ */
+export async function executeVendorPayoutTransfersForPayment(
+  paymentId: string,
+  opts?: { batchKey?: string }
+): Promise<AutoVendorPayoutTransferSummary> {
+  await ensureVendorPayoutTransferRecordsForPayment(paymentId);
+
+  const rows = await prisma.vendorPayoutTransfer.findMany({
+    where: {
+      paymentAllocation: { paymentId },
+      status: VENDOR_PAYOUT_TRANSFER_STATUS.pending,
+      destinationAccountId: { not: BLOCKED_DESTINATION_SENTINEL },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const summary: AutoVendorPayoutTransferSummary = {
+    examined: rows.length,
+    settled: 0,
+    skipped: 0,
+    failed: 0,
+    blockedInsufficientBalance: 0,
+  };
+
+  if (rows.length === 0) return summary;
+
+  const balanceResult = await fetchStripePlatformBalance("usd");
+  const tracker = balanceResult.ok
+    ? {
+        currency: balanceResult.balance.currency,
+        remainingAvailableCents: balanceResult.balance.availableCents,
+      }
+    : undefined;
+
+  const batchKey = opts?.batchKey ?? `auto-payment-${paymentId.slice(0, 8)}`;
+
+  for (const row of rows) {
+    const r = await executeVendorPayoutTransfer(row.id, { batchKey, balanceTracker: tracker });
+    if (r.outcome === "paid" || r.outcome === "reconciled_paid") {
+      summary.settled++;
+    } else if (r.outcome === "skipped" || r.outcome === "blocked_balance_unavailable") {
+      summary.skipped++;
+    } else if (r.outcome === "blocked_insufficient_balance") {
+      summary.blockedInsufficientBalance++;
+    } else {
+      summary.failed++;
+    }
+  }
+
+  return summary;
+}
+
+export type VendorPayoutTransferGlobalSummary = {
+  pendingCount: number;
+  pendingAmountCents: number;
+  retryableCount: number;
+  retryableAmountCents: number;
+  blockedReviewCount: number;
+  vendorOwedAmountCents: number;
+};
+
+export async function getVendorPayoutTransferGlobalSummary(): Promise<VendorPayoutTransferGlobalSummary> {
+  const [pendingRows, retryableRows, blockedReviewRows, owedRows] = await Promise.all([
+    prisma.vendorPayoutTransfer.findMany({
+      where: {
+        status: { in: [VENDOR_PAYOUT_TRANSFER_STATUS.pending, VENDOR_PAYOUT_TRANSFER_STATUS.submitted] },
+        destinationAccountId: { not: BLOCKED_DESTINATION_SENTINEL },
+      },
+      select: { amountCents: true },
+    }),
+    prisma.vendorPayoutTransfer.findMany({
+      where: {
+        status: {
+          in: [
+            VENDOR_PAYOUT_TRANSFER_STATUS.failed,
+            VENDOR_PAYOUT_TRANSFER_STATUS.blockedInsufficientBalance,
+          ],
+        },
+        destinationAccountId: { not: BLOCKED_DESTINATION_SENTINEL },
+        OR: [{ stripeTransferId: null }, { stripeTransferId: "" }],
+      },
+      select: { amountCents: true },
+    }),
+    prisma.vendorPayoutTransfer.findMany({
+      where: {
+        status: {
+          in: [
+            VENDOR_PAYOUT_TRANSFER_STATUS.blockedPartialRefundReview,
+            VENDOR_PAYOUT_TRANSFER_STATUS.blockedIdempotencyMismatch,
+          ],
+        },
+      },
+      select: { amountCents: true },
+    }),
+    prisma.vendorPayoutTransfer.findMany({
+      where: {
+        status: {
+          in: [
+            VENDOR_PAYOUT_TRANSFER_STATUS.pending,
+            VENDOR_PAYOUT_TRANSFER_STATUS.submitted,
+            VENDOR_PAYOUT_TRANSFER_STATUS.failed,
+            VENDOR_PAYOUT_TRANSFER_STATUS.blockedInsufficientBalance,
+          ],
+        },
+        destinationAccountId: { not: BLOCKED_DESTINATION_SENTINEL },
+        OR: [{ stripeTransferId: null }, { stripeTransferId: "" }],
+      },
+      select: { amountCents: true },
+    }),
+  ]);
+
+  const sum = (rows: { amountCents: number }[]) =>
+    rows.reduce((total, row) => total + row.amountCents, 0);
+
+  return {
+    pendingCount: pendingRows.length,
+    pendingAmountCents: sum(pendingRows),
+    retryableCount: retryableRows.length,
+    retryableAmountCents: sum(retryableRows),
+    blockedReviewCount: blockedReviewRows.length,
+    vendorOwedAmountCents: sum(owedRows),
+  };
+}
+
+/**
+ * Cron-safe retry for pending/failed/retryable vendor transfers (excludes refund-blocked rows).
+ */
+export async function retryEligibleVendorPayoutTransfersJob(params?: {
+  take?: number;
+  batchKey?: string;
+}): Promise<PayoutTransferBatchRunResult> {
+  const take = params?.take ?? 100;
+  const batchKey = params?.batchKey ?? `retry-${new Date().toISOString().slice(0, 10)}`;
+
+  const rows = await prisma.vendorPayoutTransfer.findMany({
+    where: {
+      destinationAccountId: { not: BLOCKED_DESTINATION_SENTINEL },
+      OR: [{ stripeTransferId: null }, { stripeTransferId: "" }],
+      status: {
+        in: [
+          VENDOR_PAYOUT_TRANSFER_STATUS.pending,
+          VENDOR_PAYOUT_TRANSFER_STATUS.failed,
+          VENDOR_PAYOUT_TRANSFER_STATUS.blockedInsufficientBalance,
+        ],
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    take,
+  });
+
+  const summary = emptyBatchSummary(batchKey);
+  summary.examined = rows.length;
+
+  if (rows.length === 0) {
+    return { ok: true, summary };
+  }
+
+  const balanceResult = await fetchStripePlatformBalance("usd");
+  if (!balanceResult.ok) {
+    return {
+      ok: false,
+      code: "balance_unavailable",
+      error: BALANCE_UNAVAILABLE_ADMIN_MESSAGE,
+      balanceError: balanceResult.error,
+      summary,
+    };
+  }
+
+  const tracker: BalanceTracker = {
+    currency: balanceResult.balance.currency,
+    remainingAvailableCents: balanceResult.balance.availableCents,
+  };
+
+  for (const row of rows) {
+    const r =
+      row.status === VENDOR_PAYOUT_TRANSFER_STATUS.pending
+        ? await executeVendorPayoutTransfer(row.id, { batchKey, balanceTracker: tracker })
+        : await retryFailedVendorPayoutTransfer(row.id, { batchKey, balanceTracker: tracker });
     summarizeExecuteResult(row.id, r, summary);
   }
 

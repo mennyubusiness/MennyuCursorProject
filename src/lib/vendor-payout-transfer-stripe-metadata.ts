@@ -5,6 +5,7 @@
 export type VendorPayoutTransferStripeContext = {
   id: string;
   paymentAllocationId: string;
+  paymentId: string;
   vendorOrderId: string;
   vendorId: string;
   orderId: string;
@@ -16,6 +17,7 @@ export function buildVendorPayoutTransferStripeMetadata(
   return {
     openOrderVendorPayoutTransferId: row.id,
     paymentAllocationId: row.paymentAllocationId,
+    paymentId: row.paymentId,
     orderId: row.orderId,
     vendorOrderId: row.vendorOrderId,
     vendorId: row.vendorId,

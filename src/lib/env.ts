@@ -12,6 +12,11 @@ const envSchema = z.object({
   /** ISO country code for new Stripe Connect Express accounts (default US). */
   STRIPE_CONNECT_ACCOUNT_COUNTRY: z.string().length(2).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  /**
+   * Recommended Stripe Dashboard minimum platform balance (cents) for admin guidance.
+   * Default 250000 ($2,500). Not applied via API — operators set this in Stripe Dashboard.
+   */
+  STRIPE_RECOMMENDED_PLATFORM_MINIMUM_BALANCE_CENTS: z.string().optional(),
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
