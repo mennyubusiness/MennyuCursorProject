@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { fetchStripePlatformBalance } from "@/services/stripe-balance.service";
 import { platformPayoutDisplayForListRow } from "@/services/stripe-platform-payout-lookup.service";
 import { buildPayoutTransferMoneyContext } from "@/lib/stripe-money-movement";
-import { formatRecommendedStripePlatformMinimumBalance } from "@/lib/stripe-platform-payout-config";
+import { getStripeRecommendedPlatformMinimumBalanceCents } from "@/lib/stripe-platform-payout-config.server";
 import type {
   AdminPayoutTransferRow,
   AdminTransferReversalRow,
@@ -157,6 +157,7 @@ export default async function AdminPayoutTransfersPage() {
   }));
 
   const vendorOptions: AdminVendorOption[] = vendors.map((v) => ({ id: v.id, name: v.name }));
+  const recommendedMinimumBalanceCents = getStripeRecommendedPlatformMinimumBalanceCents();
 
   return (
     <PayoutTransfersDashboard
@@ -165,7 +166,7 @@ export default async function AdminPayoutTransfersPage() {
       vendors={vendorOptions}
       initialBalance={balanceResult.ok ? balanceResult.balance : null}
       initialBalanceError={balanceResult.ok ? null : balanceResult.error}
-      recommendedMinimumBalanceLabel={formatRecommendedStripePlatformMinimumBalance()}
+      recommendedMinimumBalanceCents={recommendedMinimumBalanceCents}
     />
   );
 }

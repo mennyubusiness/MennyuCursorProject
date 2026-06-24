@@ -19,6 +19,13 @@ describe("admin vendor transfers page terminology", () => {
     "utf8"
   );
 
+  it("passes server-derived minimum balance cents from page to dashboard", () => {
+    expect(pageSrc).toMatch(/getStripeRecommendedPlatformMinimumBalanceCents/);
+    expect(pageSrc).toMatch(/recommendedMinimumBalanceCents=/);
+    expect(dashboardSrc).toMatch(/recommendedMinimumBalanceCents: number/);
+    expect(dashboardSrc).toMatch(/formatRecommendedPlatformMinimumBalanceLabel/);
+  });
+
   it("passes balance error to dashboard so page still renders", () => {
     expect(pageSrc).toMatch(/fetchStripePlatformBalance/);
     expect(pageSrc).toMatch(/initialBalanceError/);
@@ -30,8 +37,9 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).toMatch(/Vendor Transfers/);
     expect(dashboardSrc).toMatch(/Track vendor Connect transfers and recover blocked payouts/);
     expect(dashboardSrc).toMatch(/How this works/);
+    expect(dashboardSrc).toMatch(/stripe-platform-payout-config\.shared/);
     expect(dashboardSrc).toMatch(/ADMIN_VENDOR_AUTO_TRANSFER_WARNING/);
-    expect(pageSrc).not.toMatch(/ADMIN_VENDOR_TRANSFERS_PAGE_INTRO/);
+    expect(dashboardSrc).not.toMatch(/stripe-platform-payout-config\.server/);
     expect(dashboardSrc).not.toMatch(/ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE[\s\S]{0,120}mt-4 max-w-3xl/);
   });
 

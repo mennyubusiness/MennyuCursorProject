@@ -37,7 +37,8 @@ import {
   ADMIN_STRIPE_PLATFORM_MINIMUM_BALANCE_INSTRUCTION,
   ADMIN_VENDOR_AUTO_TRANSFER_WARNING,
   ADMIN_VENDOR_TRANSFER_VS_PLATFORM_PAYOUT,
-} from "@/lib/stripe-platform-payout-config";
+  formatRecommendedPlatformMinimumBalanceLabel,
+} from "@/lib/stripe-platform-payout-config.shared";
 import {
   CANCELLED_DUE_TO_REFUND_STATUS,
   isCancelledDueToRefundTransfer,
@@ -234,14 +235,14 @@ export function PayoutTransfersDashboard({
   vendors,
   initialBalance,
   initialBalanceError,
-  recommendedMinimumBalanceLabel,
+  recommendedMinimumBalanceCents,
 }: {
   initialTransfers: AdminPayoutTransferRow[];
   initialReversals: AdminTransferReversalRow[];
   vendors: AdminVendorOption[];
   initialBalance: StripePlatformBalanceSnapshot | null;
   initialBalanceError: string | null;
-  recommendedMinimumBalanceLabel: string;
+  recommendedMinimumBalanceCents: number;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -834,7 +835,8 @@ export function PayoutTransfersDashboard({
               {balance ? formatMoney(balance.pendingCents, balance.currency) : "—"}
             </p>
             <p className="text-xs tabular-nums text-oo-charcoal">
-              <span className="font-medium">Minimum:</span> {recommendedMinimumBalanceLabel}
+              <span className="font-medium">Minimum:</span>{" "}
+              {formatRecommendedPlatformMinimumBalanceLabel(recommendedMinimumBalanceCents)}
             </p>
           </div>
         </div>
