@@ -142,3 +142,12 @@ describe("orders page hub alignment", () => {
     expect(page).toContain("ORDERS_SIGN_IN_PATH");
   });
 });
+
+describe("account-hub-styles.ts status", () => {
+  it("keeps only shared muted text helper after card migration", () => {
+    const styles = readAccount("account-hub-styles.ts");
+    expect(styles).toContain("accountHubMutedClass");
+    expect(styles).not.toContain("accountHubCardClass");
+    expect(styles).not.toContain("accountHubSectionTitleClass");
+  });
+});

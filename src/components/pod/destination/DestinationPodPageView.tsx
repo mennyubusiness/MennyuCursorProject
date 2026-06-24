@@ -5,8 +5,8 @@ import { DestinationPodHero } from "@/components/pod/destination/DestinationPodH
 import { DestinationPodStickyNav } from "@/components/pod/destination/DestinationPodStickyNav";
 import { DestinationPodVendorSection } from "@/components/pod/destination/DestinationPodVendorSection";
 import { PodAnnouncementBanner } from "@/components/pod/PodAnnouncementBanner";
-import { PodQrEntryBanner } from "@/components/pod/PodQrEntryBanner";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
+import { PageShell } from "@/components/layout/page-shell";
 import type { PodCustomerPageData } from "@/lib/pod-customer-page-data";
 import { buildDestinationMarqueeContent } from "@/lib/pod-destination-marquee";
 import { buildDestinationPodNavItems } from "@/lib/pod-page-nav";
@@ -25,7 +25,6 @@ export function DestinationPodPageView({
   orderingStatus,
   hasVisitSection,
   contactDetails,
-  groupOrderHref,
   isQrEntry,
   highlightVendor,
 }: DestinationPodPageViewProps) {
@@ -45,11 +44,6 @@ export function DestinationPodPageView({
     hasAboutSection: hasDestinationAboutSection,
   });
 
-  const announcementBlock =
-    activeAnnouncement != null ? (
-      <PodAnnouncementBanner text={activeAnnouncement} compact={isQrEntry} />
-    ) : null;
-
   return (
     <div className="w-full min-h-0">
       <RecentPodViewTracker podId={pod.id} podSlug={pod.slug} podName={pod.name} />
@@ -60,10 +54,7 @@ export function DestinationPodPageView({
         imageUrl={pod.imageUrl}
         accentColor={pod.accentColor}
         marqueeItems={marqueeItems}
-        isQrEntry={isQrEntry}
       />
-
-      {isQrEntry ? <PodQrEntryBanner podName={pod.name} /> : null}
 
       <DestinationPodStickyNav items={navItems} podId={pod.id} podName={pod.name} />
 
@@ -74,9 +65,23 @@ export function DestinationPodPageView({
         orderingStatus={orderingStatus}
       />
 
+      {isQrEntry && (
+        <PageShell className="py-4">
+          <div
+            className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-oo-charcoal"
+            role="status"
+          >
+            <p className="font-semibold">You&apos;re ordering from {pod.name}</p>
+            <p className="mt-0.5 text-oo-stone-gray">
+              Pick a vendor below — one cart, one checkout, one pickup.
+            </p>
+          </div>
+        </PageShell>
+      )}
+
       <ScrollPodVendorIntoView vendorId={highlightVendor} />
 
-      {!isQrEntry ? announcementBlock : null}
+      {activeAnnouncement ? <PodAnnouncementBanner text={activeAnnouncement} /> : null}
 
       <DestinationPodVendorSection
         podSlug={pod.slug}
@@ -86,11 +91,7 @@ export function DestinationPodPageView({
         orderingStatus={orderingStatus}
         showContactLink={hasDestinationAboutSection}
         contactAnchorId={hasDestinationAboutSection ? "pod-about" : null}
-        groupOrderHref={hasVendors ? groupOrderHref : null}
-        pickupAddress={pod.address}
       />
-
-      {isQrEntry ? announcementBlock : null}
 
       {hasDestinationAboutSection && (
         <DestinationPodAboutSection

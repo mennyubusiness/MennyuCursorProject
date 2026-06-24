@@ -94,7 +94,7 @@ export function AuthShell({ children, title, subtitle, className }: AuthShellPro
     >
       <AuthBrandPanel />
 
-      <div className="flex flex-1 flex-col justify-center border-oo-light-stone bg-oo-cream px-4 py-10 sm:px-8 sm:py-12 lg:w-1/2 lg:border-l lg:px-12 xl:px-16">
+      <div className="flex flex-1 flex-col justify-center border-oo-light-stone bg-[#EDE6DC] px-4 py-10 sm:px-8 sm:py-12 lg:w-1/2 lg:border-l lg:px-12 xl:px-16">
         <div className="mx-auto w-full max-w-md">
           {(title || subtitle) && (
             <div className="mb-8">

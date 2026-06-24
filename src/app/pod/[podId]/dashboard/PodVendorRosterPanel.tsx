@@ -21,8 +21,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { updatePodVendorPresentation } from "@/actions/pod-settings.actions";
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { podOwnerVendorDisplayStatus } from "@/lib/pod-vendor-adoption";
-import { podVendorDisplayStatusTone } from "@/lib/pod-vendor-display-badge";
-import { DashboardStatusBadge } from "@/components/dashboard";
 import { VendorLogo } from "@/components/images/VendorLogo";
 import { PodRosterReadinessSummary, type PodRosterReadinessSnapshot } from "./PodRosterReadinessSummary";
 
@@ -43,8 +41,18 @@ export type PodRosterVendorRow = {
 };
 
 function rosterStatusBadge(readiness: PodRosterReadinessSnapshot) {
-  const label = podOwnerVendorDisplayStatus(readiness.status, readiness.canAcceptOrders);
-  return { label, tone: podVendorDisplayStatusTone(label) };
+  const displayStatus = podOwnerVendorDisplayStatus(readiness.status, readiness.canAcceptOrders);
+  if (displayStatus === "Live") {
+    return { label: displayStatus, className: "rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-900" };
+  }
+  if (
+    displayStatus.startsWith("Needs ") ||
+    displayStatus === "Paused in pod" ||
+    displayStatus === "Paused by vendor"
+  ) {
+    return { label: displayStatus, className: "rounded bg-amber-50 px-1.5 py-0.5 text-amber-900" };
+  }
+  return { label: displayStatus, className: "rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-800" };
 }
 
 function SortableRosterRow({
@@ -102,7 +110,9 @@ function SortableRosterRow({
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 break-words font-medium text-oo-charcoal">{row.name}</span>
           {row.isFeatured && (
-            <DashboardStatusBadge tone="info">Featured</DashboardStatusBadge>
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+              Featured
+            </span>
           )}
         </div>
         {row.description ? (
@@ -111,7 +121,7 @@ function SortableRosterRow({
           <p className="mt-0.5 text-sm text-oo-stone-gray">No description</p>
         )}
         <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
-          <DashboardStatusBadge tone={badges.tone}>{badges.label}</DashboardStatusBadge>
+          <span className={badges.className}>{badges.label}</span>
         </div>
         <PodRosterReadinessSummary readiness={row.readiness} />
       </div>

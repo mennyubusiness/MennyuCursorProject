@@ -61,9 +61,8 @@ export function PodPageStickyCta({
                 buttonClassName({ variant: "outline", size: "md" }),
                 "min-h-11 shrink-0 px-3 text-sm sm:px-4"
               )}
-              aria-label="Start or join a group order"
             >
-              Group order
+              Group
             </Link>
           ) : undefined
         }

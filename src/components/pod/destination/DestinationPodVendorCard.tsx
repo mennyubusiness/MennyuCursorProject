@@ -80,7 +80,6 @@ export function DestinationPodVendorCard({
   const cuisine = vendor.cuisineCategory?.trim();
   const description = vendor.description?.trim();
   const unavailable = availability.unavailable;
-  const ctaLabel = unavailable ? "View menu" : "Order now";
 
   return (
     <Link
@@ -92,21 +91,14 @@ export function DestinationPodVendorCard({
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-oo-cream",
         unavailable && "hover:border-oo-light-stone"
       )}
-      aria-label={`${vendor.name}${cuisine ? `, ${cuisine}` : ""} — ${availability.statusLabel}. ${ctaLabel}.`}
+      aria-label={`${vendor.name}${cuisine ? `, ${cuisine}` : ""}${unavailable ? ` — ${availability.statusLabel}` : ""}. View menu.`}
     >
       <VendorMedia imageUrl={vendor.imageUrl} vendorName={vendor.name} muted={unavailable} />
       <div className="flex flex-1 flex-col p-4 sm:p-5">
         <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
-          <h3 className="break-words text-lg font-bold leading-snug text-oo-charcoal sm:text-xl">
-            {vendor.name}
-          </h3>
+          <h3 className="text-lg font-bold leading-snug text-oo-charcoal sm:text-xl">{vendor.name}</h3>
           {isFeatured && (
-            <span
-              className={cn(
-                "rounded-full border border-brand/20 bg-brand/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand",
-                unavailable && "opacity-60"
-              )}
-            >
+            <span className="rounded-full border border-brand/20 bg-brand/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
               Featured
             </span>
           )}
@@ -114,18 +106,9 @@ export function DestinationPodVendorCard({
 
         {cuisine && <p className="mt-1 text-sm font-medium text-oo-stone-gray">{cuisine}</p>}
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {!unavailable ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-900 ring-1 ring-emerald-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
-              Open
-            </span>
-          ) : (
-            <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-amber-950 ring-1 ring-amber-200">
-              {availability.statusLabel}
-            </span>
-          )}
-        </div>
+        {unavailable && (
+          <p className="mt-2 text-xs font-medium text-oo-stone-gray">{availability.statusLabel}</p>
+        )}
 
         {description && (
           <p
@@ -137,21 +120,6 @@ export function DestinationPodVendorCard({
             {description}
           </p>
         )}
-
-        {availability.showBrowseHint && (
-          <p className="mt-2 text-xs text-oo-stone-gray">Menu still browsable</p>
-        )}
-
-        <span
-          className={cn(
-            "mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg text-sm font-semibold transition duration-200",
-            unavailable
-              ? "border border-oo-light-stone bg-oo-cream text-oo-charcoal group-hover:bg-oo-warm-white"
-              : "bg-brand text-white group-hover:bg-brand-hover"
-          )}
-        >
-          {ctaLabel} →
-        </span>
       </div>
     </Link>
   );

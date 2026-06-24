@@ -62,6 +62,7 @@ describe("DestinationPodHero", () => {
     expect(heroSrc).not.toMatch(/Start order/);
     expect(heroSrc).not.toMatch(/Get directions/);
     expect(heroSrc).not.toMatch(/One cart/);
+    expect(heroSrc).not.toMatch(/vendor/);
     expect(heroSrc).not.toMatch(/orderingStatus/);
     expect(heroSrc).not.toMatch(/address/);
   });
@@ -69,7 +70,7 @@ describe("DestinationPodHero", () => {
   it("renders marquee outside the hero header for full bleed", () => {
     expect(heroSrc).toMatch(/<\/header>/);
     expect(heroSrc).toMatch(/DestinationPodMarquee items=\{marqueeItems\}/);
-    expect(heroSrc).toMatch(/\{marqueeItems\.length > 0 && !isQrEntry/);
+    expect(heroSrc).toMatch(/\{marqueeItems\.length > 0 && <DestinationPodMarquee/);
   });
 });
 
@@ -116,8 +117,7 @@ describe("DestinationPodPageView layout", () => {
     expect(pageViewSrc).not.toMatch(/Join with code/);
   });
 
-  it("mounts QR banner and defers announcement on direct QR entry", () => {
-    expect(pageViewSrc).toMatch(/PodQrEntryBanner/);
+  it("mounts the first-visit group-order prompt gate instead of inline actions", () => {
     expect(pageViewSrc).toMatch(/DestinationPodGroupOrderPromptGate/);
     expect(groupPromptGateSrc).toMatch(/shouldOfferDestinationGroupOrderPrompt/);
     expect(groupPromptGateSrc).toMatch(/getPodPageGroupOrderCtaState/);
@@ -234,28 +234,29 @@ describe("buildDestinationPodNavItems", () => {
 });
 
 describe("DestinationPodVendorSection", () => {
-  it("uses conversion-focused vendor heading copy", () => {
-    expect(vendorSectionSrc).toMatch(/Order from multiple vendors/);
-    expect(vendorSectionSrc).toContain("PodPageGroupOrderHint");
-    expect(vendorSectionSrc).not.toMatch(/Check out our vendors/);
+  it("uses the simplified vendor heading", () => {
+    expect(vendorSectionSrc).toMatch(/Check out our vendors/);
+    expect(vendorSectionSrc).not.toMatch(/Order from vendors at/);
   });
 });
 
 describe("DestinationPodVendorCard", () => {
-  it("shows customer-facing status and order CTA", () => {
+  it("is a showcase card without order CTA buttons or open badges", () => {
     expect(vendorCardSrc).toMatch(/href=\{href\}/);
-    expect(vendorCardSrc).toContain("Order now");
-    expect(vendorCardSrc).toContain("View menu");
-    expect(vendorCardSrc).toContain("Open");
-    expect(vendorCardSrc).toContain("bg-brand");
+    expect(vendorCardSrc).toMatch(/View menu/);
+    expect(vendorCardSrc).not.toMatch(/Order now/);
+    expect(vendorCardSrc).not.toMatch(/Open for orders/);
+    expect(vendorCardSrc).not.toMatch(/bg-emerald-50/);
+    expect(vendorCardSrc).not.toMatch(/min-h-11 items-center justify-center/);
   });
 
-  it("mutes unavailable featured vendors", () => {
-    expect(vendorCardSrc).toMatch(/isFeatured && !unavailable/);
-    expect(vendorCardSrc).toMatch(/unavailable && "opacity-60"/);
+  it("shows a muted unavailable label only when ordering is blocked", () => {
+    expect(vendorCardSrc).toMatch(/unavailable &&/);
+    expect(vendorCardSrc).toMatch(/availability\.statusLabel/);
+    expect(vendorCardSrc).toMatch(/text-xs font-medium text-oo-stone-gray/);
   });
 
-  it("does not change the standard pod vendor card order CTA", () => {
+  it("does not change the standard pod vendor card", () => {
     expect(standardVendorCardSrc).toMatch(/Order now/);
     expect(standardVendorCardSrc).toMatch(/Open/);
   });

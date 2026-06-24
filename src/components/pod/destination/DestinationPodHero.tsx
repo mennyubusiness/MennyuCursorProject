@@ -9,8 +9,6 @@ type DestinationPodHeroProps = {
   imageUrl: string | null;
   accentColor: string | null;
   marqueeItems: string[];
-  /** Shorter masthead for QR direct-ordering entry. */
-  isQrEntry?: boolean;
 };
 
 export function DestinationPodHero({
@@ -19,12 +17,9 @@ export function DestinationPodHero({
   imageUrl,
   accentColor,
   marqueeItems,
-  isQrEntry = false,
 }: DestinationPodHeroProps) {
   const hasImage = isHttpsImageUrl(imageUrl);
-  const shortTagline =
-    tagline?.trim() ||
-    (isQrEntry ? "Order from multiple vendors with one checkout and pickup here." : null);
+  const shortTagline = tagline?.trim() || null;
 
   return (
     <>
@@ -60,13 +55,7 @@ export function DestinationPodHero({
           />
         )}
 
-        <div
-          className={
-            isQrEntry
-              ? "relative z-20 flex min-h-[min(30vh,220px)] items-center justify-center px-4 py-8 sm:min-h-[min(34vh,260px)] sm:px-6 sm:py-10"
-              : "relative z-20 flex min-h-[min(38vh,280px)] items-center justify-center px-4 py-10 sm:min-h-[min(42vh,340px)] sm:px-6 sm:py-12"
-          }
-        >
+        <div className="relative z-20 flex min-h-[min(38vh,280px)] items-center justify-center px-4 py-10 sm:min-h-[min(42vh,340px)] sm:px-6 sm:py-12">
           <div className="max-w-4xl text-center">
             <h1 className="text-balance text-4xl font-black tracking-tight text-oo-warm-white [text-shadow:0_2px_28px_rgba(0,0,0,0.65)] sm:text-5xl lg:text-6xl">
               {name}
@@ -80,7 +69,7 @@ export function DestinationPodHero({
         </div>
       </header>
 
-      {marqueeItems.length > 0 && !isQrEntry ? <DestinationPodMarquee items={marqueeItems} /> : null}
+      {marqueeItems.length > 0 && <DestinationPodMarquee items={marqueeItems} />}
     </>
   );
 }

@@ -1,6 +1,7 @@
 import type { LoadedAccountPageContext } from "@/lib/account-page-context";
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
 import { DashboardCard, DashboardStatusBadge } from "@/components/dashboard";
+import { accountHubMutedClass } from "./account-hub-styles";
 
 type AccountHubHeaderProps = {
   ctx: LoadedAccountPageContext;
@@ -55,7 +56,7 @@ export function AccountHubHeader({ ctx, primaryMode }: AccountHubHeaderProps) {
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-black tracking-tight text-oo-charcoal sm:text-3xl">{name}</h1>
           {ctx.emailAccount?.email && (
-            <p className="mt-1 text-sm text-oo-stone-gray">{ctx.emailAccount.email}</p>
+            <p className={`mt-1 ${accountHubMutedClass}`}>{ctx.emailAccount.email}</p>
           )}
           {roleBadges.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
@@ -66,7 +67,7 @@ export function AccountHubHeader({ ctx, primaryMode }: AccountHubHeaderProps) {
               ))}
             </div>
           )}
-          <p className="mt-3 text-sm text-oo-stone-gray">{hubSubtitle(primaryMode)}</p>
+          <p className={`mt-3 ${accountHubMutedClass}`}>{hubSubtitle(primaryMode)}</p>
         </div>
       </div>
     </DashboardCard>
