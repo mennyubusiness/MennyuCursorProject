@@ -1,5 +1,6 @@
 import type { PodActivityFeed } from "@/services/pod-activity.service";
 import { formatPodActivityTimestamp } from "@/services/pod-activity.service";
+import { DashboardCard, DashboardEmptyState } from "@/components/dashboard";
 
 type PodDashboardActivityFeedProps = {
   feed: PodActivityFeed;
@@ -28,23 +29,23 @@ function ActivityList({ items, showTimestamps }: { items: PodActivityFeed["recen
 export function PodDashboardActivityFeed({ feed }: PodDashboardActivityFeedProps) {
   if (feed.isEmpty) {
     return (
-      <section className="rounded-xl border border-oo-light-stone bg-oo-cream/50 p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">Recent activity</h2>
-        <p className="mt-3 rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-3 text-sm text-oo-charcoal">
-          No recent pod activity yet. Share your pod QR code and make sure vendors are orderable to start
-          capturing orders.
-        </p>
-      </section>
+      <DashboardCard variant="muted" title="Recent activity" className="p-4">
+        <DashboardEmptyState
+          title="No recent pod activity yet."
+          description="Share your pod QR code and make sure vendors are orderable to start capturing orders."
+          className="mt-3"
+        />
+      </DashboardCard>
     );
   }
 
   return (
-    <section className="rounded-xl border border-oo-light-stone bg-oo-cream/50 p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">Recent activity</h2>
-      <p className="mt-1 text-sm text-oo-stone-gray">
-        What&apos;s been happening at your pod — order and vendor updates only.
-      </p>
-
+    <DashboardCard
+      variant="muted"
+      title="Recent activity"
+      description="What's been happening at your pod — order and vendor updates only."
+      className="p-4"
+    >
       {feed.recent.length > 0 ? (
         <div className="mt-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Latest</h3>
@@ -58,6 +59,6 @@ export function PodDashboardActivityFeed({ feed }: PodDashboardActivityFeedProps
           <ActivityList items={feed.currentStatus} showTimestamps={false} />
         </div>
       ) : null}
-    </section>
+    </DashboardCard>
   );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DashboardCard, DashboardStatusBadge } from "@/components/dashboard";
 import { buildPodCustomerPath } from "@/lib/customer-public-url";
 
 export const POD_DASHBOARD_SECTIONS = [
@@ -42,9 +43,6 @@ export function PodDashboardSidebar({
 }: PodDashboardSidebarProps) {
   const publicPodPath = buildPodCustomerPath(podSlug);
   const statusLabel = isActive ? "Active" : "Inactive";
-  const statusClass = isActive
-    ? "bg-emerald-100 text-emerald-900"
-    : "bg-amber-100 text-amber-900";
 
   return (
     <>
@@ -63,17 +61,17 @@ export function PodDashboardSidebar({
         aria-label="Pod dashboard"
       >
         <div className="sticky top-24 space-y-5 pb-8">
-          <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4">
+          <DashboardCard className="p-4">
             <p className="break-words text-base font-semibold text-oo-charcoal">{podName}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass}`}>
+              <DashboardStatusBadge tone={isActive ? "success" : "warning"}>
                 {statusLabel}
-              </span>
+              </DashboardStatusBadge>
               <span className="text-xs text-oo-stone-gray">
                 {orderableVendorCount} orderable vendor{orderableVendorCount === 1 ? "" : "s"}
               </span>
             </div>
-          </div>
+          </DashboardCard>
 
           <nav aria-label="Dashboard sections">
             <p className="px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-oo-stone-gray">
@@ -84,7 +82,7 @@ export function PodDashboardSidebar({
             </div>
           </nav>
 
-          <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4">
+          <DashboardCard className="p-4">
             <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-oo-stone-gray">
               Quick links
             </p>
@@ -119,7 +117,7 @@ export function PodDashboardSidebar({
                 </p>
               </li>
             </ul>
-          </div>
+          </DashboardCard>
         </div>
       </aside>
     </>

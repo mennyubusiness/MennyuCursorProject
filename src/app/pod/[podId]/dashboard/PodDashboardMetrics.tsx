@@ -1,4 +1,10 @@
 import type { PodAnalytics } from "@/services/pod-analytics.service";
+import {
+  DashboardCard,
+  DashboardEmptyState,
+  DashboardMetricCard,
+  DashboardMetricGrid,
+} from "@/components/dashboard";
 
 function formatMoney(cents: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -22,57 +28,41 @@ export function PodDashboardMetrics({ summary, orderableVendorCount }: PodDashbo
   const hasOrders = podDashboardHasOrderActivity(summary);
 
   return (
-    <section className="rounded-xl border border-oo-light-stone bg-oo-cream/50 p-3 sm:p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">
-        Open Order at your pod
-      </h2>
-      <p className="mt-1 text-sm text-oo-stone-gray">
-        Aggregated order activity at your pod through Open Order.
-      </p>
-
+    <DashboardCard
+      variant="muted"
+      title="Open Order at your pod"
+      description="Aggregated order activity at your pod through Open Order."
+      className="p-3 sm:p-4"
+    >
       {!hasOrders ? (
-        <p className="mt-4 rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-3 text-sm text-oo-charcoal">
-          No Open Order sales yet. Share your pod QR code and make sure vendors are orderable to start
-          capturing orders.
-        </p>
+        <DashboardEmptyState
+          title="No Open Order sales yet."
+          description="Share your pod QR code and make sure vendors are orderable to start capturing orders."
+          className="mt-4"
+        />
       ) : null}
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
-        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 sm:p-4">
-          <p className="text-xs font-medium text-oo-stone-gray">Orders today</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-oo-charcoal">{summary.ordersToday}</p>
-        </div>
-
-        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 sm:p-4">
-          <p className="text-xs font-medium text-oo-stone-gray">Orders (last 7 days)</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-oo-charcoal">{summary.ordersLast7}</p>
-        </div>
-
-        <div className="col-span-2 rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 sm:col-span-1 sm:p-4 lg:col-span-1">
-          <p className="text-xs font-medium text-oo-stone-gray">Orderable vendors</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-oo-charcoal">
-            {orderableVendorCount}
-          </p>
-          <p className="mt-1 text-xs text-oo-stone-gray">
-            of {summary.activeVendors} vendors active in your pod
-          </p>
-        </div>
-
-        <div className="col-span-2 rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 sm:col-span-2 sm:p-4 lg:col-span-1">
-          <p className="text-xs font-medium text-oo-stone-gray">Open Order volume (last 7 days)</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-oo-charcoal">
-            {formatMoney(summary.grossSalesLast7Cents)}
-          </p>
-          <p className="mt-1 text-xs text-oo-stone-gray">Order volume through Open Order at this pod</p>
-        </div>
-
-        <div className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-3 sm:p-4">
-          <p className="text-xs font-medium text-oo-stone-gray">Average order (last 7 days)</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-oo-charcoal">
-            {summary.ordersLast7 > 0 ? formatMoney(summary.avgOrderValueCents) : "—"}
-          </p>
-        </div>
-      </div>
-    </section>
+      <DashboardMetricGrid className="mt-4">
+        <DashboardMetricCard label="Orders today" value={summary.ordersToday} />
+        <DashboardMetricCard label="Orders (last 7 days)" value={summary.ordersLast7} />
+        <DashboardMetricCard
+          label="Orderable vendors"
+          value={orderableVendorCount}
+          helper={`of ${summary.activeVendors} vendors active in your pod`}
+          className="col-span-2 sm:col-span-1 lg:col-span-1"
+        />
+        <DashboardMetricCard
+          label="Open Order volume (last 7 days)"
+          value={formatMoney(summary.grossSalesLast7Cents)}
+          helper="Order volume through Open Order at this pod"
+          className="col-span-2 sm:col-span-2 lg:col-span-1"
+        />
+        <DashboardMetricCard
+          label="Average order (last 7 days)"
+          value={summary.ordersLast7 > 0 ? formatMoney(summary.avgOrderValueCents) : "—"}
+          empty={summary.ordersLast7 === 0}
+        />
+      </DashboardMetricGrid>
+    </DashboardCard>
   );
 }

@@ -51,8 +51,12 @@ describe("pod dashboard command center layout", () => {
     const page = readDashboard("page.tsx");
     const layout = readFileSync(join(dashboardDir, "layout.tsx"), "utf8");
     const sidebar = readDashboard("PodDashboardSidebar.tsx");
+    const shell = readFileSync(join(root, "components/dashboard/dashboard-styles.ts"), "utf8");
 
-    expect(page).toContain("max-w-7xl");
+    expect(page).toContain("DashboardShell");
+    expect(page).toContain('tier="command"');
+    expect(page).toContain("withSidebar");
+    expect(shell).toContain("max-w-7xl");
     expect(page).not.toContain("max-w-2xl");
     expect(layout).toContain("max-w-7xl");
     expect(sidebar).toContain("POD_DASHBOARD_SECTIONS");
@@ -80,6 +84,7 @@ describe("pod dashboard command center layout", () => {
     expect(page).toContain('id="promote"');
     expect(page).toContain('id="activity"');
     expect(page).toContain('id="setup"');
+    expect(page).toContain("DashboardSection");
   });
 
   it("uses a responsive two-column main grid on large screens", () => {
@@ -92,6 +97,30 @@ describe("pod dashboard command center layout", () => {
     expect(sidebar).toContain("lg:hidden");
     expect(sidebar).toContain("overflow-x-auto");
     expect(sidebar).toContain('aria-label="Dashboard sections"');
+  });
+});
+
+describe("pod dashboard shared primitives integration", () => {
+  it("uses dashboard primitives on the pod command center page", () => {
+    const page = readDashboard("page.tsx");
+    expect(page).toContain("DashboardShell");
+    expect(page).toContain("DashboardShellMain");
+    expect(page).toContain("DashboardSection");
+    expect(page).toContain("DashboardCard");
+  });
+
+  it("uses metric and empty-state primitives in pod metrics", () => {
+    const metrics = readDashboard("PodDashboardMetrics.tsx");
+    expect(metrics).toContain("DashboardMetricGrid");
+    expect(metrics).toContain("DashboardMetricCard");
+    expect(metrics).toContain("DashboardEmptyState");
+    expect(metrics).toContain("DashboardCard");
+  });
+
+  it("uses status badge primitive in pod sidebar", () => {
+    const sidebar = readDashboard("PodDashboardSidebar.tsx");
+    expect(sidebar).toContain("DashboardStatusBadge");
+    expect(sidebar).toContain("DashboardCard");
   });
 });
 
