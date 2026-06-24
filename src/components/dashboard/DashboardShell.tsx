@@ -14,9 +14,7 @@ type DashboardShellProps = {
 
 /**
  * Content shell for role dashboards (width + padding). Does not include global oo-dash titlebar.
- *
- * TODO(dashboard-system): globals.css defines .oo-dash-panel / .oo-dash-heading — prefer these
- * React primitives for new work; migrate legacy pages incrementally.
+ * Prefer React primitives under src/components/dashboard/ for new dashboard work.
  */
 export function DashboardShell({
   children,

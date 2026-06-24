@@ -12,7 +12,7 @@ type LegalDocumentPageProps = {
 
 export function LegalDocumentPage({ title, intro, children }: LegalDocumentPageProps) {
   return (
-    <div className="min-h-[calc(100dvh-4.25rem)] bg-[#EDE6DC] py-8 sm:py-12 lg:py-14">
+    <div className="min-h-[calc(100dvh-4.25rem)] bg-oo-cream py-8 sm:py-12 lg:py-14">
       <PageShell width="tight">
         <article className="rounded-xl border border-oo-light-stone bg-oo-warm-white px-6 py-8 shadow-[0_6px_28px_-10px_rgba(31,31,28,0.12)] sm:px-10 sm:py-10 lg:px-12 lg:py-12">
           <header className="border-b border-oo-light-stone pb-8">

@@ -16,6 +16,7 @@ type PodPageHeroProps = {
   accentColor: string | null;
   orderingStatus: PodOrderingStatus;
   hasVendors: boolean;
+  isQrEntry?: boolean;
 };
 
 const DEFAULT_TAGLINE = "Mix vendors in one cart — one payment, one trip.";
@@ -33,6 +34,7 @@ export function PodPageHero({
   accentColor,
   orderingStatus,
   hasVendors,
+  isQrEntry = false,
 }: PodPageHeroProps) {
   const hasImage = isHttpsImageUrl(imageUrl);
   const heroTagline =
@@ -85,7 +87,7 @@ export function PodPageHero({
       )}
 
       {/* Layer 20: hero content — no card wrapper, sits directly on gradient */}
-      <PageShell className="relative z-20 py-8 sm:py-10 lg:py-12">
+      <PageShell className={cn("relative z-20", isQrEntry ? "py-6 sm:py-8" : "py-8 sm:py-10 lg:py-12")}>
         <div className="max-w-3xl">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/70">
             Food pod
@@ -125,7 +127,7 @@ export function PodPageHero({
           </div>
 
           <div className="mt-6">
-            <PodPageHeroActions podId={podId} hasVendors={hasVendors} />
+            <PodPageHeroActions podId={podId} hasVendors={hasVendors} isQrEntry={isQrEntry} />
           </div>
         </div>
       </PageShell>

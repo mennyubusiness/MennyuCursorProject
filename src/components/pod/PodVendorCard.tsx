@@ -111,14 +111,19 @@ export function PodVendorCard({ podSlug, variant, vendor, isFeatured, availabili
         <div className="flex flex-wrap items-center gap-1.5 gap-y-1">
           <h3
             className={cn(
-              "font-semibold text-oo-charcoal",
-              grid ? "line-clamp-1 text-base leading-snug" : "line-clamp-2 text-xs leading-snug"
+              "break-words font-semibold text-oo-charcoal",
+              grid ? "line-clamp-2 text-base leading-snug" : "line-clamp-2 text-xs leading-snug"
             )}
           >
             {vendor.name}
           </h3>
           {isFeatured && (
-            <span className="rounded-full border border-brand/25 bg-brand/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
+            <span
+              className={cn(
+                "rounded-full border border-brand/25 bg-brand/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand",
+                availability.unavailable && "opacity-60"
+              )}
+            >
               Featured
             </span>
           )}
@@ -151,8 +156,10 @@ export function PodVendorCard({ podSlug, variant, vendor, isFeatured, availabili
         )}
         <span
           className={cn(
-            "mt-3 inline-flex w-fit min-h-11 items-center rounded-lg font-semibold transition duration-200",
-            "bg-oo-charcoal px-4 py-2.5 text-sm text-oo-warm-white group-hover:bg-brand group-focus-visible:bg-brand",
+            "mt-3 inline-flex w-fit min-h-11 items-center rounded-lg px-4 py-2.5 text-sm font-semibold transition duration-200",
+            availability.unavailable
+              ? "border border-oo-light-stone bg-oo-cream text-oo-charcoal group-hover:bg-oo-warm-white"
+              : "bg-brand text-white group-hover:bg-brand-hover group-focus-visible:bg-brand-hover",
             grid ? "text-base" : "px-3 py-2 text-xs"
           )}
         >

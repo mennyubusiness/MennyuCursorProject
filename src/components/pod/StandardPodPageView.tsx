@@ -7,8 +7,8 @@ import { PodPageStickyNav } from "@/components/pod/PodPageStickyNav";
 import { PodPageStickyCta } from "@/components/pod/PodPageStickyCta";
 import { PodPageVendorSection } from "@/components/pod/PodPageVendorSection";
 import { PodAnnouncementBanner } from "@/components/pod/PodAnnouncementBanner";
+import { PodQrEntryBanner } from "@/components/pod/PodQrEntryBanner";
 import { ScrollPodVendorIntoView } from "@/components/pod/ScrollPodVendorIntoView";
-import { PageShell } from "@/components/layout/page-shell";
 import type { PodCustomerPageData } from "@/lib/pod-customer-page-data";
 
 /** Legacy/classic pod page template. Destination is the current default. */
@@ -33,6 +33,12 @@ export function StandardPodPageView({
   highlightVendor,
 }: StandardPodPageViewProps) {
   const podId = pod.id;
+  const hasVendors = vendorRows.length > 0;
+
+  const announcementBlock =
+    activeAnnouncement != null ? (
+      <PodAnnouncementBanner text={activeAnnouncement} compact={isQrEntry} />
+    ) : null;
 
   return (
     <div className="w-full min-h-0 pb-20 lg:pb-0">
@@ -47,28 +53,17 @@ export function StandardPodPageView({
         imageUrl={pod.imageUrl}
         accentColor={pod.accentColor}
         orderingStatus={orderingStatus}
-        hasVendors={vendorRows.length > 0}
+        hasVendors={hasVendors}
+        isQrEntry={isQrEntry}
       />
+
+      {isQrEntry ? <PodQrEntryBanner podName={pod.name} /> : null}
 
       <PodPageStickyNav items={navItems} podId={pod.id} podName={pod.name} />
 
-      {isQrEntry && (
-        <PageShell className="py-4">
-          <div
-            className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-oo-charcoal"
-            role="status"
-          >
-            <p className="font-semibold">You&apos;re ordering from {pod.name}</p>
-            <p className="mt-0.5 text-oo-stone-gray">
-              Pick a vendor below — one cart, one checkout, one pickup.
-            </p>
-          </div>
-        </PageShell>
-      )}
-
       <ScrollPodVendorIntoView vendorId={highlightVendor} />
 
-      {activeAnnouncement ? <PodAnnouncementBanner text={activeAnnouncement} /> : null}
+      {!isQrEntry ? announcementBlock : null}
 
       <PodPageVendorSection
         podSlug={pod.slug}
@@ -80,7 +75,11 @@ export function StandardPodPageView({
         contactAnchorId={
           hasLocationSection ? "pod-location" : hasContactSection ? "pod-contact" : null
         }
+        groupOrderHref={hasVendors ? groupOrderHref : null}
+        pickupAddress={pod.address}
       />
+
+      {isQrEntry ? announcementBlock : null}
 
       {hasAboutSection && (
         <PodPageIdentitySection
@@ -103,8 +102,8 @@ export function StandardPodPageView({
 
       <PodPageStickyCta
         podName={pod.name}
-        showVendorsCta={vendorRows.length > 0}
-        showGroupOrderCta={vendorRows.length > 0}
+        showVendorsCta={hasVendors}
+        showGroupOrderCta={hasVendors}
         groupOrderHref={groupOrderHref}
       />
     </div>

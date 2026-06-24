@@ -4,21 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { PodAdoptionAttentionRow, PodLaunchReadinessSummary } from "@/lib/pod-vendor-adoption";
+import { podVendorDisplayStatusTone } from "@/lib/pod-vendor-display-badge";
+import { DashboardStatusBadge } from "@/components/dashboard";
 import { VendorLogo } from "@/components/images/VendorLogo";
-
-function displayStatusBadgeClass(displayStatus: string): string {
-  if (displayStatus === "Live") {
-    return "rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-900";
-  }
-  if (
-    displayStatus.startsWith("Needs ") ||
-    displayStatus === "Paused in pod" ||
-    displayStatus === "Paused by vendor"
-  ) {
-    return "rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900";
-  }
-  return "rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-800";
-}
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -152,7 +140,9 @@ export function PodVendorAdoptionBoard({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="min-w-0 break-words font-medium text-oo-charcoal">{row.name}</span>
-                      <span className={displayStatusBadgeClass(row.displayStatus)}>{row.displayStatus}</span>
+                      <DashboardStatusBadge tone={podVendorDisplayStatusTone(row.displayStatus)}>
+                        {row.displayStatus}
+                      </DashboardStatusBadge>
                     </div>
                     <AttentionRowActions row={row} podSlug={podSlug} />
                   </div>

@@ -13,6 +13,7 @@ import { cn } from "@/lib/cn";
 type PodPageHeroActionsProps = {
   podId: string;
   hasVendors: boolean;
+  isQrEntry?: boolean;
 };
 
 const heroPrimaryCta = cn(
@@ -25,7 +26,11 @@ const heroSecondaryCta = cn(
   "min-h-11 border-white/80 bg-oo-warm-white/90 text-oo-charcoal shadow-sm hover:border-oo-warm-white hover:bg-oo-warm-white"
 );
 
-export async function PodPageHeroActions({ podId, hasVendors }: PodPageHeroActionsProps) {
+export async function PodPageHeroActions({
+  podId,
+  hasVendors,
+  isQrEntry = false,
+}: PodPageHeroActionsProps) {
   if (!hasVendors) {
     return (
       <ButtonLink href="/explore" className={heroPrimaryCta}>
@@ -41,7 +46,17 @@ export async function PodPageHeroActions({ podId, hasVendors }: PodPageHeroActio
     ? groupOrderCartUrl
     : buildLoginHrefWithReturn(groupOrderCartUrl);
 
+  const browseVendorsCta = (
+    <ButtonLink href="#pod-vendors" className={heroPrimaryCta}>
+      Browse vendors
+    </ButtonLink>
+  );
+
   const joinButton = <PodPageJoinWithCodeButton className={heroSecondaryCta} />;
+
+  if (isQrEntry) {
+    return <div className="flex flex-wrap items-center gap-3">{browseVendorsCta}</div>;
+  }
 
   if (ctaState.kind === "host_active") {
     return (
@@ -52,6 +67,7 @@ export async function PodPageHeroActions({ podId, hasVendors }: PodPageHeroActio
           size="md"
           className={heroPrimaryCta}
         />
+        {browseVendorsCta}
         {joinButton}
       </div>
     );
@@ -66,6 +82,7 @@ export async function PodPageHeroActions({ podId, hasVendors }: PodPageHeroActio
           size="md"
           className={heroPrimaryCta}
         />
+        {browseVendorsCta}
         {joinButton}
       </div>
     );
@@ -83,6 +100,7 @@ export async function PodPageHeroActions({ podId, hasVendors }: PodPageHeroActio
         >
           Host checking out
         </span>
+        {browseVendorsCta}
         {joinButton}
       </div>
     );
@@ -90,15 +108,16 @@ export async function PodPageHeroActions({ podId, hasVendors }: PodPageHeroActio
 
   return (
     <div className="flex flex-wrap items-center gap-3">
+      {browseVendorsCta}
       {session?.user ? (
         <PodPageStartGroupOrderButton
           podId={podId}
           fallbackHref={groupOrderCartUrl}
           size="md"
-          className={heroPrimaryCta}
+          className={heroSecondaryCta}
         />
       ) : (
-        <Link href={groupOrderHref} className={heroPrimaryCta}>
+        <Link href={groupOrderHref} className={heroSecondaryCta}>
           Start group order
         </Link>
       )}

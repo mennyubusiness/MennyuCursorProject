@@ -1,4 +1,5 @@
 import { PodVendorGrid, type PodVendorGridRow } from "@/components/pod/PodVendorGrid";
+import { PodPageGroupOrderHint } from "@/components/pod/PodPageGroupOrderHint";
 import { PageSection, PageShell } from "@/components/layout/page-shell";
 import { ButtonLink } from "@/components/ui/button";
 import type { PodOrderingStatus } from "@/lib/pod-page-status";
@@ -11,6 +12,8 @@ type PodPageVendorSectionProps = {
   orderingStatus: PodOrderingStatus;
   showContactLink: boolean;
   contactAnchorId?: string | null;
+  groupOrderHref?: string | null;
+  pickupAddress?: string | null;
 };
 
 export function PodPageVendorSection({
@@ -21,7 +24,13 @@ export function PodPageVendorSection({
   orderingStatus,
   showContactLink,
   contactAnchorId,
+  groupOrderHref,
+  pickupAddress,
 }: PodPageVendorSectionProps) {
+  const pickupLine = pickupAddress?.trim()
+    ? `Checkout once and pick up at ${podName} (${pickupAddress.trim()}).`
+    : `Checkout once and pick up at ${podName}.`;
+
   return (
     <PageSection className="!py-8 sm:!py-10">
       <PageShell>
@@ -31,16 +40,17 @@ export function PodPageVendorSection({
               id="pod-vendors-heading"
               className="text-xl font-bold tracking-tight text-oo-charcoal sm:text-2xl"
             >
-              Order from vendors at {podName}
+              Order from multiple vendors
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-oo-stone-gray sm:text-base">
-              Choose from participating vendors and check out once across the pod.
+              Add items from different kitchens to one cart. {pickupLine}
             </p>
+            {groupOrderHref ? <PodPageGroupOrderHint groupOrderHref={groupOrderHref} /> : null}
           </header>
 
           {rows.length === 0 ? (
             <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white px-6 py-10 text-center shadow-sm">
-              <p className="text-lg font-bold text-oo-charcoal">No participating vendors listed yet</p>
+              <p className="text-lg font-bold text-oo-charcoal">No vendors taking orders yet</p>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-oo-stone-gray">
                 {podName} is on Open Order, but no kitchens are listed right now. Check back soon
                 {showContactLink ? " or contact the pod for current hours" : ""}.

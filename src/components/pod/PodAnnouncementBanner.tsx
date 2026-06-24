@@ -23,5 +23,5 @@ export function PodAnnouncementBanner({ text, compact = false }: PodAnnouncement
     return <div className="p-2">{banner}</div>;
   }
 
-  return <PageShell className="py-3">{banner}</PageShell>;
+  return <PageShell className={compact ? "py-2" : "py-3"}>{banner}</PageShell>;
 }
