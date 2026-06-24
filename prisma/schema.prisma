@@ -72,6 +72,57 @@ model Pod {
   vendors            PodVendor[]
   memberships        PodMembership[]
   groupOrderSessions GroupOrderSession[]
+  payoutSettings     PodPayoutSettings?
+  podPayoutAllocations PodPayoutAllocation[]
+}
+
+/// Per-pod revenue share configuration for pod owner payouts (allocation only in P1; transfers in later phases).
+model PodPayoutSettings {
+  id                       String   @id @default(cuid())
+  podId                    String   @unique
+  podPayoutsEnabled        Boolean  @default(false)
+  /// Basis points of eligible food subtotal (e.g. 50 = 0.50%).
+  podRevenueShareBps       Int      @default(0)
+  /// User who receives pod payout transfers when enabled (explicit — pods may have multiple owners).
+  podPayoutRecipientUserId String?
+  minimumPayoutCents       Int      @default(0)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  pod                    Pod   @relation(fields: [podId], references: [id], onDelete: Cascade)
+  podPayoutRecipientUser User? @relation("PodPayoutRecipient", fields: [podPayoutRecipientUserId], references: [id], onDelete: SetNull)
+
+  @@index([podPayoutRecipientUserId])
+}
+
+/// Per-payment pod owner revenue share calculation (one row per successful Payment).
+model PodPayoutAllocation {
+  id                                String   @id @default(cuid())
+  podId                             String
+  orderId                           String
+  paymentId                         String   @unique
+  /// Food subtotal at payment time (Order.subtotalCents) — excludes tip, tax, service fee.
+  eligibleSubtotalCents             Int
+  /// Updated when refund sync is implemented (P2/P6).
+  eligibleSubtotalCentsAfterRefunds Int?
+  revenueShareBps                   Int
+  podPayoutAmountCents              Int
+  /// pending | blocked | cancelled_due_to_refund | blocked_partial_refund_review
+  status                            String
+  blockedReason                     String?
+  podPayoutRecipientUserId          String?
+  createdAt                         DateTime @default(now())
+  updatedAt                         DateTime @updatedAt
+
+  pod                    Pod     @relation(fields: [podId], references: [id], onDelete: Cascade)
+  order                  Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment                Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  podPayoutRecipientUser User?   @relation("PodPayoutAllocationRecipient", fields: [podPayoutRecipientUserId], references: [id], onDelete: SetNull)
+
+  @@index([podId, createdAt])
+  @@index([status])
+  @@index([podId, status])
+  @@index([orderId])
 }
 
 model PodVendor {
@@ -162,6 +213,8 @@ model User {
   passwordResetTokens      PasswordResetToken[]
   /// Solo carts owned by this customer account (not group-order host carts).
   customerCarts            Cart[]                 @relation("CustomerAccountCart")
+  podPayoutSettingsAsRecipient   PodPayoutSettings[]   @relation("PodPayoutRecipient")
+  podPayoutAllocationsAsRecipient PodPayoutAllocation[] @relation("PodPayoutAllocationRecipient")
 }
 
 /// Single-use email password reset token (raw token never stored).
@@ -730,6 +783,7 @@ model Order {
   smsMessageLogs        SmsMessageLog[]
   vendorOrders          VendorOrder[]
   vendorPayoutTransferReversals VendorPayoutTransferReversal[]
+  podPayoutAllocations  PodPayoutAllocation[]
 
   @@index([stripePaymentIntentId])
   @@index([sourceCartId])
@@ -879,6 +933,7 @@ model Payment {
   order                    Order               @relation(fields: [orderId], references: [id])
   allocations              PaymentAllocation[]
   orderRefunds             OrderRefund[]
+  podPayoutAllocation      PodPayoutAllocation?
 
   @@index([stripeChargeId])
 }

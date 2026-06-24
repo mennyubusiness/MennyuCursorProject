@@ -10,6 +10,7 @@ const mockVptFindUnique = vi.fn();
 const mockVptUpdate = vi.fn();
 const mockTransaction = vi.fn();
 const mockEnsureVpt = vi.fn();
+const mockEnsurePodPayout = vi.fn();
 const mockFetchChargeDetails = vi.fn();
 const mockFetchFee = vi.fn();
 
@@ -52,6 +53,10 @@ vi.mock("@/services/vendor-payout-transfer.service", () => ({
   ensureVendorPayoutTransferRecordsForPaymentInTx: (...args: unknown[]) => mockEnsureVpt(...args),
 }));
 
+vi.mock("@/services/pod-payout-allocation.service", () => ({
+  ensurePodPayoutAllocationForPaymentInTx: (...args: unknown[]) => mockEnsurePodPayout(...args),
+}));
+
 import {
   recordPaymentAndAllocations,
   refreshDeferredPaymentStripeFeeSnapshot,
@@ -73,6 +78,8 @@ const vendorOrder = {
 function pendingOrder() {
   return {
     id: ORDER_ID,
+    podId: "pod_1",
+    subtotalCents: 2000,
     status: "pending_payment",
     totalCents: 2350,
     vendorOrders: [vendorOrder],
@@ -106,6 +113,7 @@ describe("recordPaymentAndAllocations fee timing", () => {
       fn(makeTx())
     );
     mockEnsureVpt.mockResolvedValue(undefined);
+    mockEnsurePodPayout.mockResolvedValue({ created: false, skipped: true });
     mockFetchFee.mockResolvedValue(null);
   });
 
@@ -136,6 +144,15 @@ describe("recordPaymentAndAllocations fee timing", () => {
           allocatedProcessingFeeCents: 85,
           netVendorTransferCents: 2300 - 85,
         }),
+      })
+    );
+    expect(mockEnsurePodPayout).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        paymentId: "pay_1",
+        orderId: ORDER_ID,
+        podId: "pod_1",
+        eligibleSubtotalCents: 2000,
       })
     );
     expect(warnSpy).not.toHaveBeenCalledWith(
@@ -216,7 +233,7 @@ describe("recordPaymentAndAllocations fee timing", () => {
 
     expect(result.created).toBe(false);
     expect(mockPaymentCreate).not.toHaveBeenCalled();
-    expect(mockOrderFindUnique).not.toHaveBeenCalled();
+    expect(mockEnsurePodPayout).not.toHaveBeenCalled();
   });
 
   it("returns created:false when order is no longer pending_payment", async () => {
@@ -230,6 +247,7 @@ describe("recordPaymentAndAllocations fee timing", () => {
 
     expect(result.created).toBe(false);
     expect(mockPaymentCreate).not.toHaveBeenCalled();
+    expect(mockEnsurePodPayout).not.toHaveBeenCalled();
   });
 });
 

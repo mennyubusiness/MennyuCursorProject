@@ -19,6 +19,7 @@ import {
   ensureVendorPayoutTransferRecordsForPayment,
   ensureVendorPayoutTransferRecordsForPaymentInTx,
 } from "@/services/vendor-payout-transfer.service";
+import { ensurePodPayoutAllocationForPaymentInTx } from "@/services/pod-payout-allocation.service";
 
 /** Development-only: bypass real Stripe when key is missing or placeholder. Not used in production. */
 function isDevPaymentBypass(): boolean {
@@ -619,6 +620,12 @@ export async function recordPaymentAndAllocations(
       });
     }
     await ensureVendorPayoutTransferRecordsForPaymentInTx(tx, payment.id);
+    await ensurePodPayoutAllocationForPaymentInTx(tx, {
+      paymentId: payment.id,
+      orderId: order.id,
+      podId: order.podId,
+      eligibleSubtotalCents: order.subtotalCents,
+    });
   });
   return { created: true };
 }
