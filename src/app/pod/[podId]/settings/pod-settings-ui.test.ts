@@ -79,6 +79,14 @@ describe("pod settings customer note copy", () => {
     expect(setupCard).not.toMatch(/earnings are available|your earnings|\$[\d,]+/i);
     expect(form).not.toMatch(/\bearnings\b|\brevenue share\b/i);
   });
+
+  it("handles null payoutContext with optional chaining", () => {
+    const page = readSettings("page.tsx");
+    expect(page).toContain("payoutContext?.podPayoutRecipientUserId");
+    expect(page).toContain("payoutContext?.podPayoutsEnabled ?? false");
+    expect(page).not.toMatch(/payoutContext\.podPayoutRecipientUserId(?!\?)/);
+    expect(page).not.toMatch(/payoutContext\.podPayoutsEnabled(?!\?)/);
+  });
 });
 
 describe("pod settings preserved behavior", () => {

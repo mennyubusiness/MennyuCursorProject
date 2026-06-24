@@ -90,7 +90,7 @@ export default async function PodSettingsPage({
   const customAmenities = parsePodCustomAmenities(pod.customAmenities);
   const isDesignatedRecipient =
     Boolean(userId) &&
-    payoutContext.podPayoutRecipientUserId?.trim() === userId;
+    payoutContext?.podPayoutRecipientUserId?.trim() === userId;
   const connectStatus =
     isDesignatedRecipient && recipientUser
       ? derivePodPayoutConnectStatus({
@@ -165,7 +165,7 @@ export default async function PodSettingsPage({
           <div className="max-w-3xl">
             <PodPayoutSetupCard
               podId={pod.id}
-              podPayoutsEnabled={payoutContext.podPayoutsEnabled}
+              podPayoutsEnabled={payoutContext?.podPayoutsEnabled ?? false}
               isDesignatedRecipient={isDesignatedRecipient}
               stripeConnectConfigured={Boolean(env.STRIPE_SECRET_KEY)}
               connectStatus={connectStatus}

@@ -45,6 +45,16 @@ type ConnectFieldPrefix = "vendor" | "podPayout";
 function stripeAccountToConnectFields(
   acct: Stripe.Account,
   previousOnboardingCompletedAt: Date | null,
+  prefix: "vendor"
+): Prisma.VendorUpdateInput;
+function stripeAccountToConnectFields(
+  acct: Stripe.Account,
+  previousOnboardingCompletedAt: Date | null,
+  prefix: "podPayout"
+): Prisma.UserUpdateInput;
+function stripeAccountToConnectFields(
+  acct: Stripe.Account,
+  previousOnboardingCompletedAt: Date | null,
   prefix: ConnectFieldPrefix
 ): Prisma.VendorUpdateInput | Prisma.UserUpdateInput {
   const currentlyDue = acct.requirements?.currently_due ?? [];
