@@ -1,10 +1,6 @@
 import Link from "next/link";
 
-import {
-  accountHubCardClass,
-  accountHubMutedClass,
-  accountHubSectionTitleClass,
-} from "./account-hub-styles";
+import { DashboardCard } from "@/components/dashboard";
 
 type AccountSecurityCardProps = {
   email: string;
@@ -14,12 +10,11 @@ export function AccountSecurityCard({ email }: AccountSecurityCardProps) {
   const forgotPasswordHref = `/forgot-password?email=${encodeURIComponent(email)}`;
 
   return (
-    <section className={accountHubCardClass}>
-      <h2 className={accountHubSectionTitleClass}>Security</h2>
-      <p className={`mt-1 ${accountHubMutedClass}`}>
-        Manage how you sign in to Open Order with email and password.
-      </p>
-      <div className="mt-5 rounded-lg border border-oo-light-stone bg-oo-cream/50 p-4">
+    <DashboardCard
+      title="Security"
+      description="Manage how you sign in to Open Order with email and password."
+    >
+      <div className="rounded-lg border border-oo-light-stone bg-oo-cream/50 p-4">
         <p className="text-sm font-medium text-oo-charcoal">Password</p>
         <p className="mt-1 text-sm text-oo-stone-gray">
           To change your password, we&apos;ll email you a secure reset link.
@@ -31,6 +26,6 @@ export function AccountSecurityCard({ email }: AccountSecurityCardProps) {
           Change password
         </Link>
       </div>
-    </section>
+    </DashboardCard>
   );
 }

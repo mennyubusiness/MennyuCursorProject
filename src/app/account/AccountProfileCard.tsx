@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { DashboardCard } from "@/components/dashboard";
 import { updateAccountNameAction } from "./actions";
-import { accountHubCardClass, accountHubMutedClass, accountHubSectionTitleClass } from "./account-hub-styles";
 import { buttonClassName } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
@@ -40,11 +40,8 @@ export function AccountProfileCard({ email, name: initialName }: AccountProfileC
   }
 
   return (
-    <section className={accountHubCardClass}>
-      <h2 className={accountHubSectionTitleClass}>Profile</h2>
-      <p className={`mt-1 ${accountHubMutedClass}`}>Your sign-in identity for Open Order.</p>
-
-      <dl className="mt-5 space-y-4 text-sm">
+    <DashboardCard title="Profile" description="Your sign-in identity for Open Order.">
+      <dl className="space-y-4 text-sm">
         <div>
           <dt className="text-oo-stone-gray">Display name</dt>
           {editing ? (
@@ -115,6 +112,6 @@ export function AccountProfileCard({ email, name: initialName }: AccountProfileC
           {error}
         </p>
       )}
-    </section>
+    </DashboardCard>
   );
 }

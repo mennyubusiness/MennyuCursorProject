@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
 import { ACCOUNT_ROLE_PATH } from "@/lib/auth/account-paths";
+import { DashboardCard } from "@/components/dashboard";
 import { RolePicker } from "./RolePicker";
 
 export default async function AccountRolePage() {
@@ -23,5 +24,9 @@ export default async function AccountRolePage() {
     redirect("/");
   }
 
-  return <RolePicker />;
+  return (
+    <DashboardCard>
+      <RolePicker />
+    </DashboardCard>
+  );
 }

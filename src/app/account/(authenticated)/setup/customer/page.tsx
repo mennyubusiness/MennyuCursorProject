@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
 import { ACCOUNT_SETUP_CUSTOMER_PATH } from "@/lib/auth/account-paths";
+import { DashboardCard } from "@/components/dashboard";
 import { CustomerSetupForm } from "./CustomerSetupForm";
 
 export default async function CustomerSetupPage() {
@@ -23,5 +24,9 @@ export default async function CustomerSetupPage() {
     redirect("/");
   }
 
-  return <CustomerSetupForm />;
+  return (
+    <DashboardCard>
+      <CustomerSetupForm />
+    </DashboardCard>
+  );
 }

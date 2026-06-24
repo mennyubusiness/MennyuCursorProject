@@ -270,19 +270,6 @@ export function PodBrandProfileForm({
             />
           </div>
         </div>
-        <div>
-          <label htmlFor="pod-pickup" className="block text-sm font-medium text-oo-charcoal">
-            Pickup instructions
-          </label>
-          <textarea
-            id="pod-pickup"
-            value={pickupInstructions}
-            onChange={(e) => setPickupInstructions(e.target.value)}
-            maxLength={2000}
-            rows={3}
-            className={inputClass}
-          />
-        </div>
       </div>
 
       <div className="space-y-3 border-t border-oo-light-stone pt-6">
@@ -315,6 +302,28 @@ export function PodBrandProfileForm({
             onChange={(e) => setCustomAmenities(e.target.value)}
             rows={2}
             placeholder="Live music, Fire pits, Trivia nights"
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-4 border-t border-oo-light-stone pt-6">
+        <h3 className="text-sm font-semibold text-oo-charcoal">Optional customer note</h3>
+        <p className="text-xs text-oo-stone-gray">
+          Add a short note customers may see on your public pod page. Optional — leave blank if you do not
+          need one.
+        </p>
+        <div>
+          <label htmlFor="pod-customer-note" className="block text-sm font-medium text-oo-charcoal">
+            Customer note
+          </label>
+          <textarea
+            id="pod-customer-note"
+            value={pickupInstructions}
+            onChange={(e) => setPickupInstructions(e.target.value)}
+            maxLength={2000}
+            rows={3}
+            placeholder="Example: Pick up at the north entrance near the fountain."
             className={inputClass}
           />
         </div>

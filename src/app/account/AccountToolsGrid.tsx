@@ -1,13 +1,10 @@
 import Link from "next/link";
 
 import type { AccountStaffIdentity } from "@/lib/account-page-view-model";
+import { formatAccountMembershipRole } from "@/lib/account-membership-labels";
 import { ORDER_HISTORY_PATH } from "@/lib/auth/account-paths";
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
-import {
-  accountHubCardClass,
-  accountHubMutedClass,
-  accountHubSectionTitleClass,
-} from "./account-hub-styles";
+import { DashboardCard } from "@/components/dashboard";
 
 type ToolCard = {
   title: string;
@@ -22,7 +19,7 @@ function buildToolCards(staff: AccountStaffIdentity | null, primaryMode: HeaderN
     cards.push(
       {
         title: "Order history",
-        description: "Past orders, details, and reorder.",
+        description: "View your orders, details, and reorder.",
         href: ORDER_HISTORY_PATH,
       },
       {
@@ -35,10 +32,11 @@ function buildToolCards(staff: AccountStaffIdentity | null, primaryMode: HeaderN
 
   if (primaryMode === "vendor" && staff) {
     for (const v of staff.vendorMemberships) {
+      const roleLabel = formatAccountMembershipRole(v.role);
       cards.push(
         {
           title: v.vendorName,
-          description: `Vendor dashboard · ${v.role.replace(/_/g, " ")}`,
+          description: `Manage your vendor account · ${roleLabel}`,
           href: v.href,
         },
         {
@@ -53,7 +51,7 @@ function buildToolCards(staff: AccountStaffIdentity | null, primaryMode: HeaderN
         },
         {
           title: `${v.vendorName} · Settings`,
-          description: "Stripe Connect, POS, menu, and notifications.",
+          description: "Set up payments, menu, and notifications.",
           href: `${v.href}/settings`,
         }
       );
@@ -62,16 +60,17 @@ function buildToolCards(staff: AccountStaffIdentity | null, primaryMode: HeaderN
 
   if (primaryMode === "pod" && staff) {
     for (const p of staff.podMemberships) {
+      const roleLabel = formatAccountMembershipRole(p.role);
       cards.push(
         {
           title: p.podName,
-          description: `Pod dashboard · ${p.role.replace(/_/g, " ")}`,
+          description: `Manage your pod · ${roleLabel}`,
           href: p.href,
         },
         {
           title: `${p.podName} · Settings`,
-          description: "Pod profile, QR link, and availability.",
-          href: `${p.href.replace(/\/dashboard$/, "")}/settings`,
+          description: "Pod profile, ordering QR, and availability.",
+          href: p.href.replace(/\/dashboard$/, "") + "/settings",
         },
         {
           title: `${p.podName} · Vendors`,
@@ -95,7 +94,7 @@ function buildToolCards(staff: AccountStaffIdentity | null, primaryMode: HeaderN
       if (primaryMode === "vendor") continue;
       cards.push({
         title: v.vendorName,
-        description: `Vendor dashboard · ${v.role.replace(/_/g, " ")}`,
+        description: `Manage your vendor account · ${formatAccountMembershipRole(v.role)}`,
         href: v.href,
       });
     }
@@ -103,7 +102,7 @@ function buildToolCards(staff: AccountStaffIdentity | null, primaryMode: HeaderN
       if (primaryMode === "pod") continue;
       cards.push({
         title: p.podName,
-        description: `Pod dashboard · ${p.role.replace(/_/g, " ")}`,
+        description: `Manage your pod · ${formatAccountMembershipRole(p.role)}`,
         href: p.href,
       });
     }
@@ -128,12 +127,8 @@ export function AccountToolsGrid({ staff, primaryMode }: AccountToolsGridProps) 
   const tools = buildToolCards(staff, primaryMode);
 
   return (
-    <section className={accountHubCardClass}>
-      <h2 className={accountHubSectionTitleClass}>Your tools</h2>
-      <p className={`mt-1 ${accountHubMutedClass}`}>
-        Shortcuts based on your account and roles.
-      </p>
-      <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+    <DashboardCard title="Your tools" description="Shortcuts based on your account and roles.">
+      <ul className="grid gap-3 sm:grid-cols-2">
         {tools.map((tool) => (
           <li key={`${tool.href}-${tool.title}`}>
             <Link
@@ -147,6 +142,6 @@ export function AccountToolsGrid({ staff, primaryMode }: AccountToolsGridProps) 
           </li>
         ))}
       </ul>
-    </section>
+    </DashboardCard>
   );
 }

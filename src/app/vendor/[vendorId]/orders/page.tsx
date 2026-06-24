@@ -1,5 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  DashboardCard,
+  DashboardPageHeader,
+  DashboardSection,
+  DashboardShell,
+} from "@/components/dashboard";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
@@ -38,9 +44,9 @@ export default async function VendorOrdersPage({
   const posConnected = posUi === "connected";
   const posSyncLine = posConnected
     ? "POS connected — orders auto-syncing"
-    : "Manual mode — orders require confirmation";
+    : "Manual mode — confirm orders in Open Order when needed";
 
-  const payoutsReady = Boolean(
+  const paymentsReady = Boolean(
     vendor.stripeConnectedAccountId?.trim() &&
       vendor.stripeChargesEnabled &&
       vendor.stripePayoutsEnabled
@@ -53,48 +59,65 @@ export default async function VendorOrdersPage({
     initialNowMs
   );
 
-  const setupBannerVisible = !posConnected || !payoutsReady;
+  const setupBannerVisible = !posConnected || !paymentsReady;
 
   return (
-    <div className="space-y-8 pb-8">
-      <header className="flex flex-col gap-4 border-b border-oo-light-stone/70 pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-oo-charcoal">Orders</h1>
-          <p className="mt-1 text-sm text-oo-stone-gray">Live queue — newest actions first</p>
-          <p className="mt-3 text-sm text-oo-stone-gray">{posSyncLine}</p>
-        </div>
-        <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
+    <DashboardShell tier="command" className="px-0 pb-0 pt-0">
+      <DashboardPageHeader
+        headingLevel={1}
+        eyebrow={vendor.name}
+        title="Orders"
+        description="Manage incoming orders, kitchen status, and customer pickup flow."
+        actions={
           <Link
             href={`/vendor/${vendor.id}/kitchen`}
             className="inline-flex items-center justify-center rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-brand-hover"
           >
             Kitchen Mode
           </Link>
-          <VendorOrdersSystemStatusStrip
-            vendorId={vendor.id}
-            posConnected={posConnected}
-            payoutsReady={payoutsReady}
-            ordersPaused={vendor.mennyuOrdersPaused ?? false}
-          />
+        }
+      />
+
+      <div className="mt-8 space-y-6">
+        <VendorOrdersSetupBanner vendorId={vendor.id} show={setupBannerVisible} />
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,360px)]">
+          <DashboardSection
+            title="Live orders"
+            description="Newest actions first — accept, prepare, and mark ready from here."
+            className="min-w-0"
+            contentClassName="space-y-0"
+          >
+            <VendorDashboardLiveOrders
+              vendorId={vendor.id}
+              vendorDeliverectChannelLinkId={vendor.deliverectChannelLinkId}
+              initialVendorOrders={initialVendorOrdersForClient}
+              initialNowMs={initialNowMs}
+              isDeliverectLive={isDeliverectLive}
+            />
+          </DashboardSection>
+
+          <div className="flex min-w-0 flex-col gap-6">
+            <DashboardCard title="System status" description={posSyncLine}>
+              <VendorOrdersSystemStatusStrip
+                vendorId={vendor.id}
+                posConnected={posConnected}
+                paymentsReady={paymentsReady}
+                ordersPaused={vendor.mennyuOrdersPaused ?? false}
+              />
+            </DashboardCard>
+
+            <DashboardCard title="Order intake">
+              <VendorOrdersOperationsBar
+                vendorId={vendor.id}
+                initialPaused={vendor.mennyuOrdersPaused ?? false}
+                posOpen={undefined}
+                layout="compact"
+              />
+            </DashboardCard>
+          </div>
         </div>
-      </header>
-
-      <VendorOrdersSetupBanner vendorId={vendor.id} show={setupBannerVisible} />
-
-      <VendorOrdersOperationsBar
-        vendorId={vendor.id}
-        initialPaused={vendor.mennyuOrdersPaused ?? false}
-        posOpen={undefined}
-        layout="compact"
-      />
-
-      <VendorDashboardLiveOrders
-        vendorId={vendor.id}
-        vendorDeliverectChannelLinkId={vendor.deliverectChannelLinkId}
-        initialVendorOrders={initialVendorOrdersForClient}
-        initialNowMs={initialNowMs}
-        isDeliverectLive={isDeliverectLive}
-      />
-    </div>
+      </div>
+    </DashboardShell>
   );
 }

@@ -4,11 +4,9 @@ import { customerOrderHeaderStatus } from "@/domain/order-state";
 import type { ParentOrderStatus } from "@/domain/types";
 import type { OrderHistoryEntry } from "@/services/customer-account-orders.service";
 import { ORDER_HISTORY_PATH } from "@/lib/auth/account-paths";
-import {
-  accountHubCardClass,
-  accountHubMutedClass,
-  accountHubSectionTitleClass,
-} from "./account-hub-styles";
+import { DashboardCard, DashboardEmptyState } from "@/components/dashboard";
+import { buttonClassName } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 
 function formatOrderDate(d: Date): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -30,49 +28,45 @@ type AccountRecentOrdersProps = {
 };
 
 export function AccountRecentOrders({ orders, showPhoneLinkHint }: AccountRecentOrdersProps) {
+  const emptyDescription = showPhoneLinkHint
+    ? "Orders placed while signed in appear here automatically. Link your checkout phone above to include phone checkout orders."
+    : "Orders placed while signed in appear here automatically. Placed an order with phone checkout? Link your phone above to add those orders.";
+
   return (
-    <section className={accountHubCardClass}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className={accountHubSectionTitleClass}>Recent orders</h2>
-          <p className={`mt-1 ${accountHubMutedClass}`}>Your latest orders on this account.</p>
-        </div>
-        {orders.length > 0 && (
+    <DashboardCard
+      title="Recent orders"
+      description="Your latest orders on this account."
+      actions={
+        orders.length > 0 ? (
           <Link
             href={ORDER_HISTORY_PATH}
             className="text-sm font-semibold text-brand underline-offset-4 hover:underline"
           >
             View all →
           </Link>
-        )}
-      </div>
-
+        ) : undefined
+      }
+    >
       {orders.length === 0 ? (
-        <div className="mt-5 rounded-lg border border-dashed border-oo-light-stone bg-oo-cream/60 px-4 py-8 text-center">
-          <p className="text-sm font-medium text-oo-charcoal">No orders yet</p>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-oo-stone-gray">
-            Orders placed while signed in appear here automatically.
-            {showPhoneLinkHint
-              ? " Link your checkout phone above to include phone checkout orders."
-              : " Placed an order with phone checkout? Link your phone above to add those orders."}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/explore"
-              className="rounded-lg bg-oo-charcoal px-4 py-2 text-sm font-semibold text-white hover:bg-black"
-            >
-              Browse pods
-            </Link>
-            <Link
-              href={ORDER_HISTORY_PATH}
-              className="text-sm font-semibold text-brand underline-offset-4 hover:underline"
-            >
-              Order history
-            </Link>
-          </div>
-        </div>
+        <DashboardEmptyState
+          title="No orders yet"
+          description={emptyDescription}
+          action={
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href="/explore" className={cn(buttonClassName({ variant: "primary", size: "sm" }))}>
+                Browse pods
+              </Link>
+              <Link
+                href={ORDER_HISTORY_PATH}
+                className="text-sm font-semibold text-brand underline-offset-4 hover:underline"
+              >
+                Order history
+              </Link>
+            </div>
+          }
+        />
       ) : (
-        <ul className="mt-5 space-y-3">
+        <ul className="space-y-3">
           {orders.map((order) => (
             <li
               key={order.id}
@@ -104,6 +98,6 @@ export function AccountRecentOrders({ orders, showPhoneLinkHint }: AccountRecent
           ))}
         </ul>
       )}
-    </section>
+    </DashboardCard>
   );
 }

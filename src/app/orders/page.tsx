@@ -7,6 +7,13 @@ import { ACCOUNT_HUB_PATH, ORDERS_SIGN_IN_PATH } from "@/lib/auth/account-paths"
 import { customerOrderHeaderStatus } from "@/domain/order-state";
 import type { ParentOrderStatus } from "@/domain/types";
 import { ReorderButton } from "@/components/orders/ReorderButton";
+import {
+  DashboardCard,
+  DashboardEmptyState,
+  DashboardPageHeader,
+} from "@/components/dashboard";
+import { buttonClassName } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 
 function formatDate(d: Date): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -33,78 +40,79 @@ export default async function OrdersPage() {
   const orders = history.ok ? history.orders : [];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold text-stone-900">Order history</h1>
-        <p className="text-sm text-stone-600">
-          Signed in as <span className="font-medium text-stone-800">{session.user.email}</span>
-        </p>
-      </header>
+    <div className="space-y-6">
+      <DashboardPageHeader
+        headingLevel={1}
+        title="Order history"
+        description={`Signed in as ${session.user.email}`}
+      />
 
       {!history.ok && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-          {history.error}
-        </p>
+        <DashboardCard variant="warning">
+          <p className="text-sm text-amber-950">{history.error}</p>
+        </DashboardCard>
       )}
 
       {orders.length === 0 ? (
-        <div className="rounded-xl border border-stone-200 bg-stone-50 p-6 text-center">
-          <p className="text-stone-600">No orders on this account yet.</p>
-          <p className="mt-2 text-sm text-stone-500">
-            Orders placed while signed in appear here automatically. Placed an order with phone
-            checkout? Sign in on the same device, go to Account, and choose{" "}
-            <span className="font-medium text-stone-700">Link phone to account</span>.
-          </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
-            <Link
-              href={ACCOUNT_HUB_PATH}
-              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800"
-            >
-              Go to account
-            </Link>
-            <Link href="/explore" className="text-sm font-medium text-stone-900 hover:underline">
-              Browse pods →
-            </Link>
-          </div>
-        </div>
+        <DashboardEmptyState
+          title="No orders on this account yet"
+          description="Orders placed while signed in appear here automatically. Placed an order with phone checkout? Go to Account and link your phone to include those orders."
+          action={
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href={ACCOUNT_HUB_PATH} className={cn(buttonClassName({ variant: "primary", size: "sm" }))}>
+                Go to account
+              </Link>
+              <Link
+                href="/explore"
+                className="text-sm font-semibold text-brand underline-offset-4 hover:underline"
+              >
+                Browse pods →
+              </Link>
+            </div>
+          }
+        />
       ) : (
         <ul className="space-y-4">
           {orders.map((order) => (
-            <li
-              key={order.id}
-              className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-stone-200 bg-white p-4"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="font-mono text-sm text-stone-500">
-                  Order #{order.id.slice(-8).toUpperCase()}
-                </p>
-                <p className="mt-1 text-sm text-stone-600">{formatDate(order.createdAt)}</p>
-                <p className="mt-0.5 text-sm text-stone-700">{order.podName}</p>
-                <p className="text-xs text-stone-600">{order.pickupDisplayLine}</p>
-                <p className="text-xs text-stone-500">{order.vendorNames.join(", ")}</p>
-                <p className="mt-1 font-medium text-stone-900">
-                  ${(order.totalCents / 100).toFixed(2)}
-                </p>
-                <p className="text-xs text-stone-600">
-                  {customerOrderHeaderStatus(order.status as ParentOrderStatus, stubVendorOrders(order.vendorNames.length))}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <Link
-                  href={`/order/${order.id}`}
-                  className="rounded border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
-                >
-                  View details
-                </Link>
-                <ReorderButton orderId={order.id} />
-              </div>
+            <li key={order.id}>
+              <DashboardCard>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-sm text-oo-stone-gray">
+                      Order #{order.id.slice(-8).toUpperCase()}
+                    </p>
+                    <p className="mt-1 text-sm text-oo-stone-gray">{formatDate(order.createdAt)}</p>
+                    <p className="mt-0.5 text-sm text-oo-charcoal">{order.podName}</p>
+                    <p className="text-xs text-oo-stone-gray">{order.pickupDisplayLine}</p>
+                    <p className="text-xs text-oo-stone-gray">{order.vendorNames.join(", ")}</p>
+                    <p className="mt-1 font-medium text-oo-charcoal">
+                      ${(order.totalCents / 100).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-oo-stone-gray">
+                      {customerOrderHeaderStatus(
+                        order.status as ParentOrderStatus,
+                        stubVendorOrders(order.vendorNames.length)
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Link
+                      href={`/order/${order.id}`}
+                      className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-sm font-medium text-oo-charcoal hover:bg-oo-cream"
+                    >
+                      View details
+                    </Link>
+                    <ReorderButton orderId={order.id} />
+                  </div>
+                </div>
+              </DashboardCard>
             </li>
           ))}
         </ul>
       )}
 
-      <p className="text-sm text-stone-500">
-        <Link href="/explore" className="text-stone-900 hover:underline">
+      <p className="text-sm text-oo-stone-gray">
+        <Link href="/explore" className="font-medium text-oo-charcoal hover:underline">
           ← Back to explore
         </Link>
       </p>

@@ -17,7 +17,7 @@ describe("dashboard primitives", () => {
     expect(shell).toContain("DashboardShellMain");
     expect(styles).toContain('command: "mx-auto w-full max-w-7xl px-4"');
     expect(styles).toContain('hub: "mx-auto w-full max-w-3xl px-4"');
-    expect(styles).toContain('admin: "oo-shell w-full"');
+    expect(styles).toContain('admin: "w-full"');
   });
 
   it("DashboardPageHeader renders semantic heading and action layout", () => {

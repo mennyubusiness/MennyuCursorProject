@@ -41,9 +41,11 @@ describe("/account signed-out behavior", () => {
 });
 
 describe("/account hub layout", () => {
-  it("uses centered max-width warm layout", () => {
-    expect(accountLayoutSrc).toMatch(/max-w-3xl/);
-    expect(accountLayoutSrc).toMatch(/#EDE6DC/);
+  it("uses centered hub-tier dashboard shell with warm background token", () => {
+    expect(accountLayoutSrc).toMatch(/DashboardShell/);
+    expect(accountLayoutSrc).toMatch(/tier="hub"/);
+    expect(accountLayoutSrc).toMatch(/bg-oo-cream/);
+    expect(accountLayoutSrc).not.toMatch(/#EDE6DC/);
   });
 
   it("composes hub sections", () => {

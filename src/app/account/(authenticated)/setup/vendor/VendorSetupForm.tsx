@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createVendorProfile } from "@/actions/account-setup.actions";
+import { DashboardPageHeader } from "@/components/dashboard";
+import { buttonClassName } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 
 const POS_OPTIONS = [
   { value: "toast", label: "Toast" },
@@ -48,76 +51,67 @@ export function VendorSetupForm() {
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-stone-900">Restaurant profile</h1>
-        <p className="mt-1 text-sm text-stone-600">
-          Create your workspace now — payouts and POS connection are next steps you can finish when you&apos;re ready.
-        </p>
-      </div>
+    <form onSubmit={(e) => void onSubmit(e)} className="space-y-6">
+      <DashboardPageHeader
+        headingLevel={1}
+        title="Restaurant profile"
+        description="Create your workspace now — set up payments and connect your menu system when you're ready."
+      />
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Business name</span>
-        <input
-          name="businessName"
-          required
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
-        />
+        <span className="font-medium text-oo-charcoal">Business name</span>
+        <input name="businessName" required className="oo-input mt-1 w-full" />
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Contact name</span>
+        <span className="font-medium text-oo-charcoal">Contact name</span>
         <input
           name="contactName"
           required
           autoComplete="name"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+          className="oo-input mt-1 w-full"
         />
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-sm">
-          <span className="font-medium text-stone-800">Contact email</span>
+          <span className="font-medium text-oo-charcoal">Contact email</span>
           <input
             name="contactEmail"
             type="email"
             required
             autoComplete="email"
-            className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+            className="oo-input mt-1 w-full"
           />
         </label>
         <label className="block text-sm">
-          <span className="font-medium text-stone-800">Contact phone</span>
+          <span className="font-medium text-oo-charcoal">Contact phone</span>
           <input
             name="contactPhone"
             type="tel"
             required
             autoComplete="tel"
-            className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+            className="oo-input mt-1 w-full"
           />
         </label>
       </div>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Cuisine / category</span>
+        <span className="font-medium text-oo-charcoal">Cuisine / category</span>
         <input
           name="cuisineCategory"
           required
           placeholder="e.g. Pizza, Mexican, Coffee"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+          className="oo-input mt-1 w-full"
         />
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Location (city or area)</span>
+        <span className="font-medium text-oo-charcoal">Location (city or area)</span>
         <input
           name="locationSummary"
           placeholder="e.g. Austin, TX"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+          className="oo-input mt-1 w-full"
         />
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">POS / order system</span>
-        <select
-          name="posType"
-          defaultValue="unknown"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
-        >
+        <span className="font-medium text-oo-charcoal">Menu system</span>
+        <select name="posType" defaultValue="unknown" className="oo-input mt-1 w-full">
           {POS_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
@@ -126,12 +120,8 @@ export function VendorSetupForm() {
         </select>
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Short description (optional)</span>
-        <textarea
-          name="description"
-          rows={2}
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
-        />
+        <span className="font-medium text-oo-charcoal">Short description (optional)</span>
+        <textarea name="description" rows={2} className="oo-input mt-1 w-full" />
       </label>
       {error ? (
         <p className="text-sm text-red-700" role="alert">
@@ -141,7 +131,7 @@ export function VendorSetupForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-stone-900 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+        className={cn(buttonClassName({ variant: "primary", size: "md" }), "w-full")}
       >
         {loading ? "Creating…" : "Open vendor dashboard"}
       </button>

@@ -1,9 +1,15 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
 import { parsePodAmenities, parsePodCustomAmenities } from "@/lib/pod-amenities";
 import { PodOrderingQrSection } from "@/components/pod/PodOrderingQrSection";
-import Link from "next/link";
+import {
+  DashboardCard,
+  DashboardPageHeader,
+  DashboardSection,
+  DashboardShell,
+} from "@/components/dashboard";
 import { PodBrandProfileForm } from "./PodBrandProfileForm";
 
 export default async function PodSettingsPage({
@@ -40,47 +46,60 @@ export default async function PodSettingsPage({
   const customAmenities = parsePodCustomAmenities(pod.customAmenities);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 p-4">
-      <div>
-        <h1 className="text-xl font-semibold text-oo-charcoal">Settings</h1>
-        <p className="mt-1 text-sm text-oo-stone-gray">
-          How this pod looks to customers. Manage vendor order and featured flags on{" "}
-          <Link href={`/pod/${pod.id}/dashboard`} className="font-medium text-oo-charcoal underline">
-            Overview
+    <DashboardShell tier="workspace" className="pb-8 pt-4">
+      <DashboardPageHeader
+        headingLevel={1}
+        eyebrow={pod.name}
+        title="Pod settings"
+        description="Manage how your pod appears on Open Order, update public page details, and access QR signage."
+        actions={
+          <Link
+            href={`/pod/${pod.id}/dashboard`}
+            className="inline-flex items-center justify-center rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-2 text-sm font-medium text-oo-charcoal transition-colors hover:bg-oo-cream"
+          >
+            Back to overview
           </Link>
-          .
-        </p>
+        }
+      />
+
+      <div className="mt-8 space-y-8">
+        <DashboardSection
+          id="profile"
+          title="Public page profile"
+          description="Brand, location, amenities, and contact details customers see on your public pod page."
+        >
+          <DashboardCard className="max-w-3xl">
+            <p className="text-xs text-oo-stone-gray">
+              URL slug: <span className="font-mono text-oo-charcoal">{pod.slug}</span> (not editable here)
+            </p>
+            <div className="mt-4">
+              <PodBrandProfileForm
+                podId={pod.id}
+                initialName={pod.name}
+                initialTagline={pod.tagline}
+                initialDescription={pod.description}
+                initialImageUrl={pod.imageUrl}
+                initialAccentColor={pod.accentColor}
+                initialAddress={pod.address}
+                initialContactEmail={pod.contactEmail}
+                initialContactPhone={pod.ownerContactPhone}
+                initialWebsiteUrl={pod.websiteUrl}
+                initialInstagramUrl={pod.instagramUrl}
+                initialPickupInstructions={pod.pickupInstructions}
+                initialAmenities={amenities}
+                initialCustomAmenities={customAmenities}
+              />
+            </div>
+          </DashboardCard>
+        </DashboardSection>
+
+        <PodOrderingQrSection
+          podId={pod.id}
+          podSlug={pod.slug}
+          podName={pod.name}
+          publicOrigin={publicOrigin}
+        />
       </div>
-
-      <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">Public profile</h2>
-        <p className="mt-1 text-sm text-oo-stone-gray">
-          Brand, contact, amenities, and pickup details on the customer pod page.
-        </p>
-        <p className="mt-2 text-xs text-oo-stone-gray">
-          URL slug: <span className="font-mono text-oo-charcoal">{pod.slug}</span> (not editable here)
-        </p>
-        <div className="mt-4">
-          <PodBrandProfileForm
-            podId={pod.id}
-            initialName={pod.name}
-            initialTagline={pod.tagline}
-            initialDescription={pod.description}
-            initialImageUrl={pod.imageUrl}
-            initialAccentColor={pod.accentColor}
-            initialAddress={pod.address}
-            initialContactEmail={pod.contactEmail}
-            initialContactPhone={pod.ownerContactPhone}
-            initialWebsiteUrl={pod.websiteUrl}
-            initialInstagramUrl={pod.instagramUrl}
-            initialPickupInstructions={pod.pickupInstructions}
-            initialAmenities={amenities}
-            initialCustomAmenities={customAmenities}
-          />
-        </div>
-      </section>
-
-      <PodOrderingQrSection podId={pod.id} podSlug={pod.slug} podName={pod.name} publicOrigin={publicOrigin} />
-    </div>
+    </DashboardShell>
   );
 }

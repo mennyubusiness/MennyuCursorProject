@@ -19,6 +19,7 @@ export function VendorLayoutChrome({
   const isSettings = pathname?.includes(`/vendor/${vendorId}/settings`);
   const isWideWorkspace =
     isSettings ||
+    pathname?.includes(`/vendor/${vendorId}/orders`) ||
     pathname?.includes(`/vendor/${vendorId}/menu`) ||
     pathname?.includes(`/vendor/${vendorId}/menu-imports`);
 
@@ -26,8 +27,12 @@ export function VendorLayoutChrome({
     return <div className="min-h-dvh bg-oo-cream">{children}</div>;
   }
 
-  const headerWidth = isWideWorkspace ? "mx-auto max-w-7xl px-4 pb-2 pt-4" : "mx-auto max-w-2xl px-4 pb-2 pt-4";
-  const mainWidth = isWideWorkspace ? "mx-auto w-full max-w-7xl px-4 py-6" : "mx-auto max-w-2xl p-4";
+  const headerWidth = isWideWorkspace
+    ? "mx-auto max-w-7xl px-4 pb-2 pt-4"
+    : "mx-auto max-w-2xl px-4 pb-2 pt-4";
+  const mainWidth = isWideWorkspace
+    ? "mx-auto w-full max-w-7xl px-4 py-6"
+    : "mx-auto max-w-2xl p-4";
 
   return (
     <div className="oo-dash">
@@ -35,7 +40,7 @@ export function VendorLayoutChrome({
         <div className={headerWidth}>
           <h1 className="oo-dash-titlebar-heading">{vendorName}</h1>
         </div>
-        <VendorAreaNav vendorId={vendorId} />
+        <VendorAreaNav vendorId={vendorId} wide={isWideWorkspace} />
       </header>
       <main className={mainWidth}>{children}</main>
     </div>

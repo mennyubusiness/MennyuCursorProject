@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
 import { ACCOUNT_SETUP_POD_PATH } from "@/lib/auth/account-paths";
+import { DashboardCard } from "@/components/dashboard";
 import { PodSetupForm } from "./PodSetupForm";
 
 export default async function PodSetupPage() {
@@ -23,5 +24,9 @@ export default async function PodSetupPage() {
     redirect("/");
   }
 
-  return <PodSetupForm />;
+  return (
+    <DashboardCard>
+      <PodSetupForm />
+    </DashboardCard>
+  );
 }

@@ -4,11 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import type { AccountCheckoutPhone } from "@/lib/account-page-view-model";
-import {
-  accountHubCardClass,
-  accountHubMutedClass,
-  accountHubSectionTitleClass,
-} from "./account-hub-styles";
+import { DashboardCard } from "@/components/dashboard";
 import { buttonClassName } from "@/components/ui/button";
 import { SmsConsentCheckbox, SmsPhoneNumberLabel } from "@/components/legal/SmsConsentCheckbox";
 import { cn } from "@/lib/cn";
@@ -176,12 +172,10 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
   }
 
   return (
-    <section className={accountHubCardClass}>
-      <h2 className={accountHubSectionTitleClass}>Phone number</h2>
-      <p className={`mt-1 ${accountHubMutedClass}`}>
-        Use your phone number for verification and optional order updates. You can also track orders
-        from the order status screen after checkout.
-      </p>
+    <DashboardCard
+      title="Phone number"
+      description="Use your phone number for verification and optional order updates. You can also track orders from the order status screen after checkout."
+    >
 
       {checkoutPhone?.linkStatus === "linked_other" && mode === "readonly" && (
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -191,7 +185,7 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
       )}
 
       {checkoutPhone?.linkStatus === "user_has_other" && mode === "readonly" && (
-        <p className="mt-3 rounded-lg border border-stone-200 bg-oo-cream px-4 py-3 text-sm text-oo-charcoal">
+        <p className="mt-3 rounded-lg border border-oo-light-stone bg-oo-cream px-4 py-3 text-sm text-oo-charcoal">
           This device has a different phone than the one linked to your account (
           {checkoutPhone.phoneDisplay}).
         </p>
@@ -397,6 +391,6 @@ export function AccountPhoneSection({ checkoutPhone }: AccountPhoneSectionProps)
           )}
         </div>
       )}
-    </section>
+    </DashboardCard>
   );
 }

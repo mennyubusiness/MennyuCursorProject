@@ -23,7 +23,15 @@ describe("vendor settings section routing", () => {
 
 describe("vendor settings workspace layout", () => {
   it("uses full-width shell on settings route", () => {
-    expect(readFileSync(join(dir, "../VendorLayoutChrome.tsx"), "utf8")).toMatch(/max-w-7xl/);
+    const chrome = readFileSync(join(dir, "../VendorLayoutChrome.tsx"), "utf8");
+    expect(chrome).toMatch(/max-w-7xl/);
+    expect(chrome).toContain("wide={isWideWorkspace}");
+  });
+
+  it("aligns VendorAreaNav to wide workspace routes", () => {
+    const nav = readFileSync(join(dir, "../VendorAreaNav.tsx"), "utf8");
+    expect(nav).toContain("max-w-7xl");
+    expect(nav).toContain("wide");
   });
 
   it("renders sidebar section navigation", () => {

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { RegistrationIntent } from "@prisma/client";
 import { setRegistrationRole } from "@/actions/account-setup.actions";
+import { DashboardPageHeader } from "@/components/dashboard";
 
 const OPTIONS: {
   id: RegistrationIntent;
@@ -17,8 +18,8 @@ const OPTIONS: {
   },
   {
     id: RegistrationIntent.vendor,
-    title: "Restaurant / vendor",
-    body: "Manage your menu, orders, and kitchen settings. You’ll add integrations later.",
+    title: "Vendor",
+    body: "Manage your menu, orders, and kitchen settings. You can add integrations later.",
   },
   {
     id: RegistrationIntent.pod_owner,
@@ -51,26 +52,25 @@ export function RolePicker() {
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-stone-900">How will you use Open Order?</h1>
-        <p className="mt-1 text-sm text-stone-600">
-          You can add other roles later as we expand accounts — pick what fits you now.
-        </p>
-      </div>
-      <div className="space-y-2">
+    <div className="space-y-6">
+      <DashboardPageHeader
+        headingLevel={1}
+        title="How will you use Open Order?"
+        description="You can add other roles later as we expand accounts — pick what fits you now."
+      />
+      <div className="space-y-3">
         {OPTIONS.map((opt) => (
           <button
             key={opt.id}
             type="button"
             disabled={loading !== null}
             onClick={() => void choose(opt.id)}
-            className="w-full rounded-lg border border-stone-200 bg-white p-4 text-left text-sm shadow-sm transition hover:border-stone-900 hover:bg-stone-900/5 disabled:opacity-60"
+            className="w-full rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 text-left text-sm shadow-sm transition hover:border-brand/30 hover:bg-oo-cream/60 disabled:opacity-60"
           >
-            <span className="font-semibold text-stone-900">{opt.title}</span>
-            <span className="mt-1 block text-stone-600">{opt.body}</span>
+            <span className="font-semibold text-oo-charcoal">{opt.title}</span>
+            <span className="mt-1 block text-oo-stone-gray">{opt.body}</span>
             {loading === opt.id ? (
-              <span className="mt-2 block text-xs text-stone-500">Loading…</span>
+              <span className="mt-2 block text-xs text-oo-stone-gray">Loading…</span>
             ) : null}
           </button>
         ))}

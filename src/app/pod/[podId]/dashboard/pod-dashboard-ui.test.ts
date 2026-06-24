@@ -43,6 +43,7 @@ describe("pod dashboard P0 UI", () => {
   it("anchors QR section on settings page", () => {
     const qr = readFileSync(join(root, "components/pod/PodOrderingQrSection.tsx"), "utf8");
     expect(qr).toContain('id="ordering-qr"');
+    expect(qr).toContain("DashboardCard");
   });
 });
 

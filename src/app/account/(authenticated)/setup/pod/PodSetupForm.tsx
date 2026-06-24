@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createPodProfile } from "@/actions/account-setup.actions";
+import { DashboardPageHeader } from "@/components/dashboard";
+import { buttonClassName } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 
 export function PodSetupForm() {
   const router = useRouter();
@@ -36,56 +39,55 @@ export function PodSetupForm() {
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-stone-900">Pod profile</h1>
-        <p className="mt-1 text-sm text-stone-600">
-          A pod is a pickup hub with one or more vendors. You can invite restaurants after this step.
-        </p>
-      </div>
+    <form onSubmit={(e) => void onSubmit(e)} className="space-y-6">
+      <DashboardPageHeader
+        headingLevel={1}
+        title="Pod profile"
+        description="A pod is a pickup hub with one or more vendors. You can invite restaurants after this step."
+      />
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Pod name</span>
+        <span className="font-medium text-oo-charcoal">Pod name</span>
         <input
           name="podName"
           required
           placeholder="e.g. Downtown Food Hall"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+          className="oo-input mt-1 w-full"
         />
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Your name</span>
+        <span className="font-medium text-oo-charcoal">Your name</span>
         <input
           name="ownerContactName"
           required
           autoComplete="name"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+          className="oo-input mt-1 w-full"
         />
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Phone</span>
+        <span className="font-medium text-oo-charcoal">Phone</span>
         <input
           name="ownerContactPhone"
           type="tel"
           required
           autoComplete="tel"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+          className="oo-input mt-1 w-full"
         />
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Location / address (optional)</span>
+        <span className="font-medium text-oo-charcoal">Location / address (optional)</span>
         <input
           name="address"
           autoComplete="street-address"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+          className="oo-input mt-1 w-full"
         />
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-stone-800">Short description (optional)</span>
+        <span className="font-medium text-oo-charcoal">Short description (optional)</span>
         <textarea
           name="description"
           rows={2}
           placeholder="What should diners know?"
-          className="mt-1 w-full rounded border border-stone-300 px-3 py-2 text-sm"
+          className="oo-input mt-1 w-full"
         />
       </label>
       {error ? (
@@ -96,7 +98,7 @@ export function PodSetupForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-stone-900 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+        className={cn(buttonClassName({ variant: "primary", size: "md" }), "w-full")}
       >
         {loading ? "Creating…" : "Open pod dashboard"}
       </button>

@@ -26,13 +26,16 @@ function navLinkIsActive(pathname: string, base: string, href: string): boolean 
   return pathname === path;
 }
 
-export function VendorAreaNav({ vendorId }: { vendorId: string }) {
+export function VendorAreaNav({ vendorId, wide = false }: { vendorId: string; wide?: boolean }) {
   const pathname = usePathname();
   const base = `/vendor/${vendorId}`;
+  const widthClass = wide
+    ? "mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-2"
+    : "mx-auto flex max-w-2xl flex-wrap items-center gap-2 px-4 py-2";
 
   return (
     <nav className="oo-dash-nav" aria-label="Vendor area">
-      <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-2 px-4 py-2">
+      <div className={widthClass}>
         <div className="flex flex-wrap gap-1">
           {NAV_LINKS.map(({ href, label }) => {
             const path = `${base}/${href}`;

@@ -7,6 +7,7 @@ import {
   type VendorOrdersBoardGroup,
 } from "@/lib/vendor-orders-board";
 import { useVendorOrdersPoll } from "@/hooks/useVendorOrdersPoll";
+import { DashboardEmptyState } from "@/components/dashboard";
 import {
   getVendorOrderOperatingMode,
   type VendorOrderOperatingMode,
@@ -162,7 +163,10 @@ export function VendorDashboardLiveOrders({
         />
       </div>
       {vendorOrders.length === 0 ? (
-        <p className="text-sm text-oo-stone-gray">No orders yet.</p>
+        <DashboardEmptyState
+          title="No active orders right now."
+          description="New orders will appear here when customers place them."
+        />
       ) : (
         <div className="space-y-12">
           {order.map((key) => {

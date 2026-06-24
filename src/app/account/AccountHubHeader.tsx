@@ -1,6 +1,7 @@
 import type { LoadedAccountPageContext } from "@/lib/account-page-context";
 import type { HeaderNavMode } from "@/lib/auth/header-nav-types";
-import { accountHubCardClass, accountHubMutedClass } from "./account-hub-styles";
+import { DashboardCard, DashboardStatusBadge } from "@/components/dashboard";
+import { accountHubMutedClass } from "./account-hub-styles";
 
 type AccountHubHeaderProps = {
   ctx: LoadedAccountPageContext;
@@ -15,21 +16,12 @@ function displayName(ctx: LoadedAccountPageContext): string {
   return "Account";
 }
 
-function roleSummary(ctx: LoadedAccountPageContext): string | null {
-  const parts: string[] = [];
-  if (ctx.staff?.isPlatformAdmin) parts.push("Platform admin");
-  if (ctx.staff?.vendorMemberships.length) parts.push("Vendor");
-  if (ctx.staff?.podMemberships.length) parts.push("Pod");
-  if (parts.length === 0) return null;
-  return parts.join(" · ");
-}
-
 function hubSubtitle(primaryMode: HeaderNavMode): string {
   switch (primaryMode) {
     case "vendor":
-      return "Vendor account settings, kitchen access, and operational shortcuts.";
+      return "Manage your vendor account, kitchen access, and shortcuts.";
     case "pod":
-      return "Pod profile, vendor roster, and operational shortcuts.";
+      return "Manage your pod profile, vendor roster, and shortcuts.";
     case "admin":
       return "Platform admin account and operational shortcuts.";
     default:
@@ -40,10 +32,20 @@ function hubSubtitle(primaryMode: HeaderNavMode): string {
 export function AccountHubHeader({ ctx, primaryMode }: AccountHubHeaderProps) {
   const name = displayName(ctx);
   const initial = name.charAt(0).toUpperCase();
-  const roles = roleSummary(ctx);
+  const roleBadges: Array<{ key: string; label: string; tone: "info" | "success" | "neutral" }> = [];
+
+  if (ctx.staff?.isPlatformAdmin) {
+    roleBadges.push({ key: "admin", label: "Platform admin", tone: "info" });
+  }
+  if (ctx.staff?.vendorMemberships.length) {
+    roleBadges.push({ key: "vendor", label: "Vendor", tone: "success" });
+  }
+  if (ctx.staff?.podMemberships.length) {
+    roleBadges.push({ key: "pod", label: "Pod owner", tone: "neutral" });
+  }
 
   return (
-    <header className={accountHubCardClass}>
+    <DashboardCard className="shadow-[0_4px_20px_-8px_rgba(31,31,28,0.12)]">
       <div className="flex items-start gap-4">
         <div
           className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-oo-cream text-xl font-bold text-oo-charcoal ring-2 ring-oo-light-stone"
@@ -56,12 +58,18 @@ export function AccountHubHeader({ ctx, primaryMode }: AccountHubHeaderProps) {
           {ctx.emailAccount?.email && (
             <p className={`mt-1 ${accountHubMutedClass}`}>{ctx.emailAccount.email}</p>
           )}
-          {roles && (
-            <p className="mt-2 text-xs font-medium uppercase tracking-wide text-brand">{roles}</p>
+          {roleBadges.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {roleBadges.map((badge) => (
+                <DashboardStatusBadge key={badge.key} tone={badge.tone}>
+                  {badge.label}
+                </DashboardStatusBadge>
+              ))}
+            </div>
           )}
           <p className={`mt-3 ${accountHubMutedClass}`}>{hubSubtitle(primaryMode)}</p>
         </div>
       </div>
-    </header>
+    </DashboardCard>
   );
 }

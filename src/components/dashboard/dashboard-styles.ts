@@ -11,7 +11,7 @@ export const DASHBOARD_TIER_CLASS: Record<DashboardShellTier, string> = {
   command: "mx-auto w-full max-w-7xl px-4",
   workspace: "mx-auto w-full max-w-7xl px-4",
   hub: "mx-auto w-full max-w-3xl px-4",
-  admin: "oo-shell w-full",
+  admin: "w-full",
 };
 
 /** Offset for in-page anchor links under sticky titlebar / section nav. */

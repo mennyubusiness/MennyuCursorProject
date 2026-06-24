@@ -107,7 +107,7 @@ export function PodDashboardSidebar({
               </li>
               <li>
                 <Link
-                  href={`/pod/${podId}/settings`}
+                  href={`/pod/${podId}/settings#profile`}
                   className="font-medium text-oo-charcoal hover:underline"
                 >
                   Edit pod profile
