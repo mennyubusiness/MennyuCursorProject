@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { listRecentPodPayoutAllocationsForAdmin } from "@/services/pod-payout-allocation.service";
+import { getPodPayoutRecipientConnectStatusForPod } from "@/services/pod-payout-connect.service";
+import {
+  getPodPayoutAllocationSummary,
+  getPodPayoutRecipientOptions,
+  getPodPayoutSettingsForAdmin,
+} from "@/services/pod-payout-settings.service";
 import { AdminPodToggle } from "../AdminPodToggle";
+import { PodPayoutAllocationsCard } from "./PodPayoutAllocationsCard";
+import { PodPayoutSettingsCard } from "./PodPayoutSettingsCard";
 
 export default async function AdminPodDetailPage({
   params,
@@ -28,36 +37,22 @@ export default async function AdminPodDetailPage({
   });
   if (!pod) notFound();
 
-  const [ordersAllTime, ordersToday, lastOrderAgg, payoutSettings, payoutAllocationCounts] =
+  const [ordersAllTime, ordersToday, lastOrderAgg, payoutSettings, allocationSummary, recipientOptions, allocations, recipientConnect] =
     await Promise.all([
-    prisma.order.count({ where: { podId: id } }),
-    prisma.order.count({ where: { podId: id, createdAt: { gte: startOfToday } } }),
-    prisma.order.aggregate({
-      where: { podId: id },
-      _max: { createdAt: true },
-    }),
-    prisma.podPayoutSettings.findUnique({
-      where: { podId: id },
-      select: {
-        podPayoutsEnabled: true,
-        podRevenueShareBps: true,
-        podPayoutRecipientUserId: true,
-        minimumPayoutCents: true,
-      },
-    }),
-    prisma.podPayoutAllocation.groupBy({
-      by: ["status"],
-      where: { podId: id },
-      _count: true,
-    }),
-  ]);
+      prisma.order.count({ where: { podId: id } }),
+      prisma.order.count({ where: { podId: id, createdAt: { gte: startOfToday } } }),
+      prisma.order.aggregate({
+        where: { podId: id },
+        _max: { createdAt: true },
+      }),
+      getPodPayoutSettingsForAdmin(id),
+      getPodPayoutAllocationSummary(id),
+      getPodPayoutRecipientOptions(id),
+      listRecentPodPayoutAllocationsForAdmin(id),
+      getPodPayoutRecipientConnectStatusForPod(id),
+    ]);
 
   const lastOrderAt = lastOrderAgg._max.createdAt;
-  const totalPayoutAllocations = payoutAllocationCounts.reduce((sum, row) => sum + row._count, 0);
-  const pendingPayoutAllocations =
-    payoutAllocationCounts.find((row) => row.status === "pending")?._count ?? 0;
-  const blockedPayoutAllocations =
-    payoutAllocationCounts.find((row) => row.status === "blocked")?._count ?? 0;
 
   return (
     <div className="space-y-10">
@@ -113,47 +108,15 @@ export default async function AdminPodDetailPage({
         </dl>
       </section>
 
-      <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
-          Pod owner payouts (admin)
-        </h2>
-        <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <dt className="text-sm text-oo-stone-gray">Payouts enabled</dt>
-            <dd className="mt-1 text-sm font-medium text-oo-charcoal">
-              {payoutSettings?.podPayoutsEnabled ? "Yes" : "No"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-sm text-oo-stone-gray">Revenue share</dt>
-            <dd className="mt-1 text-sm font-medium tabular-nums text-oo-charcoal">
-              {payoutSettings?.podPayoutsEnabled
-                ? `${((payoutSettings.podRevenueShareBps ?? 0) / 100).toFixed(2)}%`
-                : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-sm text-oo-stone-gray">Recipient user</dt>
-            <dd className="mt-1 font-mono text-xs text-oo-charcoal">
-              {payoutSettings?.podPayoutRecipientUserId?.trim() ?? "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-sm text-oo-stone-gray">Allocations recorded</dt>
-            <dd className="mt-1 text-sm font-medium tabular-nums text-oo-charcoal">
-              {totalPayoutAllocations}
-              {totalPayoutAllocations > 0 ? (
-                <span className="ml-1 text-xs font-normal text-oo-stone-gray">
-                  ({pendingPayoutAllocations} pending, {blockedPayoutAllocations} blocked)
-                </span>
-              ) : null}
-            </dd>
-          </div>
-        </dl>
-        <p className="mt-3 text-xs text-oo-stone-gray">
-          Calculation records only — no Stripe transfers in this phase. Settings editing ships in P2.
-        </p>
-      </section>
+      <PodPayoutSettingsCard
+        podId={id}
+        settings={payoutSettings}
+        recipientOptions={recipientOptions}
+        allocationSummary={allocationSummary}
+        recipientConnectStatus={recipientConnect}
+      />
+
+      <PodPayoutAllocationsCard podId={id} allocations={allocations} />
 
       <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Quick links</h2>

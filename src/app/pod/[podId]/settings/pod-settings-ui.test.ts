@@ -37,10 +37,13 @@ describe("pod settings workspace layout", () => {
     expect(page).toContain("Back to overview");
   });
 
-  it("organizes profile and QR sections with dashboard primitives", () => {
+  it("organizes profile, QR, and payout setup sections", () => {
     const page = readSettings("page.tsx");
     expect(page).toContain('id="profile"');
     expect(page).toContain("Public page profile");
+    expect(page).toContain('id="payout-setup"');
+    expect(page).toContain("Payout setup");
+    expect(page).toContain("PodPayoutSetupCard");
     expect(page).toContain("DashboardSection");
     expect(page).toContain("DashboardCard");
     expect(page).toContain("PodOrderingQrSection");
@@ -67,11 +70,14 @@ describe("pod settings customer note copy", () => {
     expect(form).toContain("pod-customer-note");
   });
 
-  it("does not use earnings or payout language on settings page", () => {
+  it("uses payout setup copy without earnings amounts on settings page", () => {
     const page = readSettings("page.tsx");
+    const setupCard = readSettings("PodPayoutSetupCard.tsx");
     const form = readSettings("PodBrandProfileForm.tsx");
-    expect(page).not.toMatch(/\bearnings\b|\brevenue share\b|\bpayout\b/i);
-    expect(form).not.toMatch(/\bearnings\b|\brevenue share\b|\bpayout\b/i);
+    expect(page).toContain("Payout setup");
+    expect(setupCard.toLowerCase()).toContain("payout setup");
+    expect(setupCard).not.toMatch(/earnings are available|your earnings|\$[\d,]+/i);
+    expect(form).not.toMatch(/\bearnings\b|\brevenue share\b/i);
   });
 });
 

@@ -125,3 +125,63 @@ export function resolvePodPayoutAllocationDecision(
     podPayoutRecipientUserId: recipientId,
   };
 }
+
+export const REPAIRABLE_POD_PAYOUT_BLOCKED_REASONS = [
+  POD_PAYOUT_BLOCKED_REASON.missingRecipient,
+  POD_PAYOUT_BLOCKED_REASON.invalidBps,
+] as const;
+
+export function isRepairablePodPayoutBlockedReason(
+  blockedReason: string | null | undefined
+): boolean {
+  if (!blockedReason) return false;
+  return (REPAIRABLE_POD_PAYOUT_BLOCKED_REASONS as readonly string[]).includes(blockedReason);
+}
+
+export const POD_PAYOUT_BLOCKED_REASON_LABELS: Record<string, string> = {
+  [POD_PAYOUT_BLOCKED_REASON.missingRecipient]: "Missing designated recipient",
+  [POD_PAYOUT_BLOCKED_REASON.zeroSubtotal]: "Eligible food subtotal was zero",
+  [POD_PAYOUT_BLOCKED_REASON.invalidBps]: "Revenue share outside allowed range",
+};
+
+export type BlockedPodPayoutAllocationRepair =
+  | { repair: false }
+  | {
+      repair: true;
+      status: typeof POD_PAYOUT_ALLOCATION_STATUS.pending;
+      blockedReason: null;
+      revenueShareBps: number;
+      podPayoutAmountCents: number;
+      podPayoutRecipientUserId: string;
+    };
+
+/**
+ * Re-evaluate a blocked allocation after settings are fixed. Does not change eligibleSubtotalCents.
+ */
+export function resolveBlockedPodPayoutAllocationRepair(
+  eligibleSubtotalCents: number,
+  blockedReason: string | null,
+  settings: PodPayoutSettingsSnapshot | null | undefined
+): BlockedPodPayoutAllocationRepair {
+  if (!isRepairablePodPayoutBlockedReason(blockedReason)) {
+    return { repair: false };
+  }
+
+  const decision = resolvePodPayoutAllocationDecision(eligibleSubtotalCents, settings);
+  if (
+    decision.action !== "create" ||
+    decision.status !== POD_PAYOUT_ALLOCATION_STATUS.pending ||
+    !decision.podPayoutRecipientUserId
+  ) {
+    return { repair: false };
+  }
+
+  return {
+    repair: true,
+    status: POD_PAYOUT_ALLOCATION_STATUS.pending,
+    blockedReason: null,
+    revenueShareBps: decision.revenueShareBps,
+    podPayoutAmountCents: decision.podPayoutAmountCents,
+    podPayoutRecipientUserId: decision.podPayoutRecipientUserId,
+  };
+}

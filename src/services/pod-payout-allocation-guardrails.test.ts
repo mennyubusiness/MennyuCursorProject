@@ -54,12 +54,12 @@ describe("pod payout P1 guardrails", () => {
     }
   });
 
-  it("admin pod detail shows allocation summary without pod owner route exposure", () => {
+  it("admin pod detail uses payout settings and allocations cards", () => {
     const adminPod = readFileSync(
       join(root, "app/admin/(dashboard)/pods/[podId]/page.tsx"),
       "utf8"
     );
-    expect(adminPod).toContain("podPayoutAllocation");
-    expect(adminPod).toContain("Pod owner payouts (admin)");
+    expect(adminPod).toContain("getPodPayoutRecipientConnectStatusForPod");
+    expect(adminPod).toContain("recipientConnectStatus");
   });
 });

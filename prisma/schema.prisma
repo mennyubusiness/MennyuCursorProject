@@ -215,6 +215,14 @@ model User {
   customerCarts            Cart[]                 @relation("CustomerAccountCart")
   podPayoutSettingsAsRecipient   PodPayoutSettings[]   @relation("PodPayoutRecipient")
   podPayoutAllocationsAsRecipient PodPayoutAllocation[] @relation("PodPayoutAllocationRecipient")
+  /// Stripe Connect Express account for pod owner payout transfers (separate from vendor Connect).
+  podPayoutStripeConnectedAccountId    String? @unique
+  podPayoutStripeDetailsSubmitted      Boolean @default(false)
+  podPayoutStripeChargesEnabled        Boolean @default(false)
+  podPayoutStripePayoutsEnabled        Boolean @default(false)
+  podPayoutStripeOnboardingCompletedAt DateTime?
+  podPayoutStripeRequirementsCurrentlyDue Json?
+  podPayoutStripeLastSyncedAt          DateTime?
 }
 
 /// Single-use email password reset token (raw token never stored).

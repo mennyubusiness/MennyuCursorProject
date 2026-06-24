@@ -29,6 +29,24 @@ export function stripeAccountToVendorUpdateInput(
   acct: Stripe.Account,
   previousOnboardingCompletedAt: Date | null
 ): Prisma.VendorUpdateInput {
+  return stripeAccountToConnectFields(acct, previousOnboardingCompletedAt, "vendor");
+}
+
+/** Maps a Stripe Account to persisted User pod payout Connect fields (pure, for tests). */
+export function stripeAccountToPodPayoutUserUpdateInput(
+  acct: Stripe.Account,
+  previousOnboardingCompletedAt: Date | null
+): Prisma.UserUpdateInput {
+  return stripeAccountToConnectFields(acct, previousOnboardingCompletedAt, "podPayout");
+}
+
+type ConnectFieldPrefix = "vendor" | "podPayout";
+
+function stripeAccountToConnectFields(
+  acct: Stripe.Account,
+  previousOnboardingCompletedAt: Date | null,
+  prefix: ConnectFieldPrefix
+): Prisma.VendorUpdateInput | Prisma.UserUpdateInput {
   const currentlyDue = acct.requirements?.currently_due ?? [];
   const detailsSubmitted = acct.details_submitted ?? false;
   const chargesEnabled = acct.charges_enabled ?? false;
@@ -37,13 +55,26 @@ export function stripeAccountToVendorUpdateInput(
   const onboardingCompletedAt =
     previousOnboardingCompletedAt ?? (nowReady ? new Date() : null);
 
+  const requirementsValue =
+    currentlyDue.length > 0 ? (currentlyDue as Prisma.InputJsonValue) : Prisma.DbNull;
+
+  if (prefix === "vendor") {
+    return {
+      stripeDetailsSubmitted: detailsSubmitted,
+      stripeChargesEnabled: chargesEnabled,
+      stripePayoutsEnabled: payoutsEnabled,
+      stripeOnboardingCompletedAt: onboardingCompletedAt,
+      stripeRequirementsCurrentlyDue: requirementsValue,
+    };
+  }
+
   return {
-    stripeDetailsSubmitted: detailsSubmitted,
-    stripeChargesEnabled: chargesEnabled,
-    stripePayoutsEnabled: payoutsEnabled,
-    stripeOnboardingCompletedAt: onboardingCompletedAt,
-    stripeRequirementsCurrentlyDue:
-      currentlyDue.length > 0 ? (currentlyDue as Prisma.InputJsonValue) : Prisma.DbNull,
+    podPayoutStripeDetailsSubmitted: detailsSubmitted,
+    podPayoutStripeChargesEnabled: chargesEnabled,
+    podPayoutStripePayoutsEnabled: payoutsEnabled,
+    podPayoutStripeOnboardingCompletedAt: onboardingCompletedAt,
+    podPayoutStripeRequirementsCurrentlyDue: requirementsValue,
+    podPayoutStripeLastSyncedAt: new Date(),
   };
 }
 
@@ -99,7 +130,11 @@ export async function createVendorConnectedAccount(vendorId: string): Promise<st
 }
 
 /** Creates a Stripe-hosted Account Link for onboarding or re-onboarding. */
-export async function createVendorOnboardingLink(accountId: string, returnUrl: string, refreshUrl: string): Promise<string> {
+export async function createConnectOnboardingLink(
+  accountId: string,
+  returnUrl: string,
+  refreshUrl: string
+): Promise<string> {
   const s = requireStripe();
   const link = await s.accountLinks.create({
     account: accountId,
@@ -108,6 +143,15 @@ export async function createVendorOnboardingLink(accountId: string, returnUrl: s
     type: "account_onboarding",
   });
   return link.url;
+}
+
+/** @deprecated Use createConnectOnboardingLink */
+export async function createVendorOnboardingLink(
+  accountId: string,
+  returnUrl: string,
+  refreshUrl: string
+): Promise<string> {
+  return createConnectOnboardingLink(accountId, returnUrl, refreshUrl);
 }
 
 /** Retrieves the connected account from Stripe and updates local payout readiness fields. */

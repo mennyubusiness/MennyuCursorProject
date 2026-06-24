@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
 import type Stripe from "stripe";
-import { stripeAccountToVendorUpdateInput } from "./stripe-connect.service";
+import {
+  stripeAccountToPodPayoutUserUpdateInput,
+  stripeAccountToVendorUpdateInput,
+} from "./stripe-connect.service";
 
 describe("stripeAccountToVendorUpdateInput", () => {
   it("maps charges, payouts, and outstanding requirements", () => {
@@ -44,5 +47,23 @@ describe("stripeAccountToVendorUpdateInput", () => {
 
     const patch = stripeAccountToVendorUpdateInput(acct, prior);
     expect(patch.stripeOnboardingCompletedAt).toEqual(prior);
+  });
+});
+
+describe("stripeAccountToPodPayoutUserUpdateInput", () => {
+  it("maps pod payout User fields and last synced timestamp", () => {
+    const acct = {
+      details_submitted: true,
+      charges_enabled: true,
+      payouts_enabled: true,
+      requirements: { currently_due: [] },
+    } as unknown as Stripe.Account;
+
+    const patch = stripeAccountToPodPayoutUserUpdateInput(acct, null);
+    expect(patch.podPayoutStripeChargesEnabled).toBe(true);
+    expect(patch.podPayoutStripePayoutsEnabled).toBe(true);
+    expect(patch.podPayoutStripeOnboardingCompletedAt).toBeInstanceOf(Date);
+    expect(patch.podPayoutStripeLastSyncedAt).toBeInstanceOf(Date);
+    expect(patch.podPayoutStripeRequirementsCurrentlyDue).toEqual(Prisma.DbNull);
   });
 });

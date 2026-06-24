@@ -6,6 +6,7 @@ import {
   isPodPayoutSettingsEligibleForAllocation,
   isValidPodRevenueShareBps,
   podPayoutAmountCentsFromSubtotal,
+  resolveBlockedPodPayoutAllocationRepair,
   resolvePodPayoutAllocationDecision,
 } from "./pod-payout-allocation";
 
@@ -128,6 +129,46 @@ describe("resolvePodPayoutAllocationDecision", () => {
     if (decision.action === "create") {
       expect(decision.podPayoutRecipientUserId).toBe("user_designated_payee");
     }
+  });
+});
+
+describe("resolveBlockedPodPayoutAllocationRepair", () => {
+  const fixedSettings = {
+    podPayoutsEnabled: true,
+    podRevenueShareBps: 50,
+    podPayoutRecipientUserId: "user_owner",
+  };
+
+  it("repairs missing_recipient blocked row when settings are fixed", () => {
+    const repair = resolveBlockedPodPayoutAllocationRepair(
+      10_000,
+      POD_PAYOUT_BLOCKED_REASON.missingRecipient,
+      fixedSettings
+    );
+    expect(repair.repair).toBe(true);
+    if (repair.repair) {
+      expect(repair.status).toBe(POD_PAYOUT_ALLOCATION_STATUS.pending);
+      expect(repair.podPayoutAmountCents).toBe(50);
+      expect(repair.podPayoutRecipientUserId).toBe("user_owner");
+    }
+  });
+
+  it("does not repair zero_subtotal blocked rows", () => {
+    const repair = resolveBlockedPodPayoutAllocationRepair(
+      0,
+      POD_PAYOUT_BLOCKED_REASON.zeroSubtotal,
+      fixedSettings
+    );
+    expect(repair).toEqual({ repair: false });
+  });
+
+  it("does not repair when payouts remain disabled", () => {
+    const repair = resolveBlockedPodPayoutAllocationRepair(
+      10_000,
+      POD_PAYOUT_BLOCKED_REASON.missingRecipient,
+      { ...fixedSettings, podPayoutsEnabled: false }
+    );
+    expect(repair).toEqual({ repair: false });
   });
 });
 
