@@ -52,9 +52,11 @@ function blockedReasonLabel(reason: string | null): string {
 export function PodPayoutAllocationsCard({
   podId,
   allocations,
+  showTable = true,
 }: {
   podId: string;
   allocations: AdminPodPayoutAllocationRow[];
+  showTable?: boolean;
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterId>("all");
@@ -93,8 +95,8 @@ export function PodPayoutAllocationsCard({
     <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Allocations</h2>
-          <p className="mt-1 text-sm text-oo-stone-gray">
+          <h2 className="text-sm font-semibold text-oo-charcoal">Allocation history</h2>
+          <p className="mt-1 text-xs text-oo-stone-gray">
             Recent pod payout calculation records after successful customer payment.
           </p>
         </div>
@@ -112,8 +114,9 @@ export function PodPayoutAllocationsCard({
 
       {reevalMessage ? <p className="mt-3 text-xs text-oo-stone-gray">{reevalMessage}</p> : null}
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {FILTER_OPTIONS.map((opt) => (
+      {allocations.length > 0 && showTable ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {FILTER_OPTIONS.map((opt) => (
           <button
             key={opt.id}
             type="button"
@@ -127,9 +130,16 @@ export function PodPayoutAllocationsCard({
             {opt.label}
           </button>
         ))}
-      </div>
+        </div>
+      ) : null}
 
-      {filtered.length === 0 ? (
+      {allocations.length === 0 ? (
+        <p className="mt-4 text-sm text-oo-stone-gray">No pod payout allocations yet.</p>
+      ) : !showTable ? (
+        <p className="mt-4 text-sm text-oo-stone-gray">
+          {allocations.length} allocation record{allocations.length === 1 ? "" : "s"} on file.
+        </p>
+      ) : filtered.length === 0 ? (
         <p className="mt-4 text-sm text-oo-stone-gray">No allocations match this filter.</p>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-lg border border-oo-light-stone">

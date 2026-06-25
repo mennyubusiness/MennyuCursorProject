@@ -31,7 +31,12 @@ export function PodPayoutTransfersCard({
   transferSummary,
   transfers,
   payoutAccountStatus,
-}: PodPayoutTransfersCardProps) {
+  showTransferTable = true,
+  showRunBatch = false,
+}: PodPayoutTransfersCardProps & {
+  showTransferTable?: boolean;
+  showRunBatch?: boolean;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -62,12 +67,9 @@ export function PodPayoutTransfersCard({
     <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
-            Pod payout transfers
-          </h2>
-          <p className="mt-1 text-sm text-oo-stone-gray">
-            Manually send pod payout transfers for eligible pending allocations. Run vendor payouts before
-            pod payouts so vendor obligations are handled first.
+          <h2 className="text-sm font-semibold text-oo-charcoal">Payout transfers</h2>
+          <p className="mt-1 text-xs text-oo-stone-gray">
+            Send eligible pod payout transfers after vendor payouts are handled.
           </p>
         </div>
       </div>
@@ -126,26 +128,33 @@ export function PodPayoutTransfersCard({
       </dl>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void runBatch()}
-          disabled={pending}
-          className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-60"
-        >
-          {pending ? "Running batch…" : "Run pod payout batch"}
-        </button>
+        {showRunBatch ? (
+          <button
+            type="button"
+            onClick={() => void runBatch()}
+            disabled={pending}
+            className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-60"
+          >
+            {pending ? "Running batch…" : "Run payout batch"}
+          </button>
+        ) : (
+          <p className="text-sm text-oo-stone-gray">No eligible pod payout transfers right now.</p>
+        )}
         <Link
           href="/admin/payout-transfers"
           className="text-sm text-sky-800 underline hover:text-sky-900"
         >
-          Vendor payout transfers
+          Vendor payouts
         </Link>
       </div>
 
       {message ? <p className="mt-3 text-sm text-emerald-800">{message}</p> : null}
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-oo-light-stone">
+      {transfers.length === 0 ? (
+        <p className="mt-4 text-sm text-oo-stone-gray">No pod payout transfers yet.</p>
+      ) : showTransferTable ? (
+        <div className="mt-6 overflow-x-auto rounded-lg border border-oo-light-stone">
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-oo-light-stone bg-oo-cream text-left">
@@ -173,54 +182,51 @@ export function PodPayoutTransfersCard({
             </tr>
           </thead>
           <tbody>
-            {transfers.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-4 text-oo-stone-gray">
-                  No pod payout transfer rows yet. Transfer rows are created when you run a batch.
+            {transfers.map((row) => (
+              <tr key={row.id} className="border-b border-oo-light-stone last:border-b-0">
+                <td className="px-3 py-2 text-xs text-oo-charcoal">
+                  {new Intl.DateTimeFormat("en-US", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(row.createdAt)}
                 </td>
+                <td className="px-3 py-2">
+                  <Link
+                    href={`/admin/orders/${row.orderId}`}
+                    className="font-medium text-sky-800 hover:underline"
+                  >
+                    {row.orderId.slice(0, 8)}…
+                  </Link>
+                </td>
+                <td className="px-3 py-2 tabular-nums text-oo-charcoal">
+                  {formatMoney(row.amountCents)}
+                </td>
+                <td className="px-3 py-2 font-mono text-xs text-oo-stone-gray">
+                  {shortAccountId(row.destinationAccountId)}
+                </td>
+                <td className="px-3 py-2 text-oo-charcoal">
+                  <div>{row.statusLabel}</div>
+                  {row.blockedReasonLabel ? (
+                    <div className="text-xs text-oo-stone-gray">{row.blockedReasonLabel}</div>
+                  ) : null}
+                  {row.failureMessage ? (
+                    <div className="text-xs text-red-700">{row.failureMessage}</div>
+                  ) : null}
+                </td>
+                <td className="px-3 py-2 font-mono text-xs text-oo-stone-gray">
+                  {row.stripeTransferId ?? "—"}
+                </td>
+                <td className="px-3 py-2 text-xs text-oo-stone-gray">{row.batchKey ?? "—"}</td>
               </tr>
-            ) : (
-              transfers.map((row) => (
-                <tr key={row.id} className="border-b border-oo-light-stone last:border-b-0">
-                  <td className="px-3 py-2 text-xs text-oo-charcoal">
-                    {new Intl.DateTimeFormat("en-US", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(row.createdAt)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <Link
-                      href={`/admin/orders/${row.orderId}`}
-                      className="font-medium text-sky-800 hover:underline"
-                    >
-                      {row.orderId.slice(0, 8)}…
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 tabular-nums text-oo-charcoal">
-                    {formatMoney(row.amountCents)}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs text-oo-stone-gray">
-                    {shortAccountId(row.destinationAccountId)}
-                  </td>
-                  <td className="px-3 py-2 text-oo-charcoal">
-                    <div>{row.statusLabel}</div>
-                    {row.blockedReasonLabel ? (
-                      <div className="text-xs text-oo-stone-gray">{row.blockedReasonLabel}</div>
-                    ) : null}
-                    {row.failureMessage ? (
-                      <div className="text-xs text-red-700">{row.failureMessage}</div>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs text-oo-stone-gray">
-                    {row.stripeTransferId ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-oo-stone-gray">{row.batchKey ?? "—"}</td>
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </table>
-      </div>
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-oo-stone-gray">
+          {transfers.length} transfer record{transfers.length === 1 ? "" : "s"} on file.
+        </p>
+      )}
     </section>
   );
 }

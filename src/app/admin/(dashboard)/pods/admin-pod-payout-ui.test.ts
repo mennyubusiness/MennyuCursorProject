@@ -10,16 +10,16 @@ function readAdminPod(relativePath: string): string {
 }
 
 describe("admin pod payout P2 UI", () => {
-  it("pod detail loads payout settings and allocations cards", () => {
+  it("pod detail loads payout section with summary and expandable details", () => {
     const page = readAdminPod("page.tsx");
-    expect(page).toContain("PodPayoutSettingsCard");
-    expect(page).toContain("PodPayoutAllocationsCard");
-    expect(page).toContain("PodPayoutTransfersCard");
+    expect(page).toContain("AdminPodPayoutSection");
+    expect(page).toContain("deriveAdminPodDetailLayout");
     expect(page).toContain("getPodPayoutAllocationSummary");
     expect(page).toContain("listRecentPodPayoutAllocationsForAdmin");
     expect(page).toContain("getPodPayoutRecipientConnectStatusForPod");
     expect(page).toContain("getPodPayoutTransferAdminSummary");
     expect(page).toContain("listRecentPodPayoutTransfersForAdmin");
+    expect(page).toMatch(/Admin actions[\s\S]*Vendors[\s\S]*AdminPodPayoutSection/);
   });
 
   it("settings card shows payout account status and owner action copy", () => {
@@ -54,9 +54,9 @@ describe("admin pod payout P2 UI", () => {
     expect(card).toContain("minimumPayoutDollars");
     expect(card).toContain("podRevenueSharePercentToBps");
     expect(card).toContain("minimumPayoutDollarsToCents");
-    expect(card).toContain("Pending payout records");
+    expect(card).toContain("Pending");
     expect(card).toContain("Needs review");
-    expect(card).toContain("Total calculated");
+    expect(card).toContain("Calculated total");
     expect(card.toLowerCase()).toContain("eligible food");
     expect(card).not.toMatch(/Stripe transfer/i);
     expect(card).not.toContain("VendorPayoutTransfer");
@@ -74,9 +74,9 @@ describe("admin pod payout P2 UI", () => {
   it("transfers card supports manual admin batch", () => {
     const card = readAdminPod("PodPayoutTransfersCard.tsx");
     const normalized = card.replace(/\s+/g, " ");
-    expect(card).toContain("Run pod payout batch");
+    expect(card).toContain("Run payout batch");
     expect(card).toContain("adminRunPodPayoutTransferBatchAction");
-    expect(normalized).toContain("Run vendor payouts before pod payouts");
+    expect(normalized).toContain("Send eligible pod payout transfers after vendor payouts are handled");
     expect(card).not.toMatch(/stripe\.transfers\.create/);
   });
 
@@ -85,6 +85,14 @@ describe("admin pod payout P2 UI", () => {
     expect(card).toContain("POD_PAYOUT_ALLOCATION_STATUS.pending");
     expect(card).toContain("POD_PAYOUT_ALLOCATION_STATUS.blocked");
     expect(card).toContain("cancelledDueToRefund");
+  });
+
+  it("pod detail page prioritizes activity, actions, and vendors before payouts", () => {
+    const page = readAdminPod("page.tsx");
+    expect(page).toContain("Admin actions");
+    expect(page).toContain("adminPodReadinessLabel");
+    expect(page).not.toContain("{pod.onboardingStatus}");
+    expect(page).toMatch(/Activity[\s\S]*Admin actions[\s\S]*Vendors[\s\S]*AdminPodPayoutSection/);
   });
 });
 
