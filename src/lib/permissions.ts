@@ -65,9 +65,23 @@ export async function canViewPod(userId: string, podId: string): Promise<boolean
   return Boolean(m);
 }
 
-/** Owner or manager (or admin). Extend with role-specific rules later. */
+/** Same as view until owner-only actions are split out. */
 export async function canManagePod(userId: string, podId: string): Promise<boolean> {
   return canViewPod(userId, podId);
+}
+
+/**
+ * Pod payout amounts on pod-owner routes: designated payout account owner only.
+ * Platform admins use admin routes — not broad pod membership.
+ */
+export async function canViewPodPayouts(userId: string, podId: string): Promise<boolean> {
+  const settings = await prisma.podPayoutSettings.findUnique({
+    where: { podId },
+    select: { podPayoutRecipientUserId: true },
+  });
+  const recipientId = settings?.podPayoutRecipientUserId?.trim();
+  if (!recipientId) return false;
+  return recipientId === userId.trim();
 }
 
 export type UserAccessContext = {

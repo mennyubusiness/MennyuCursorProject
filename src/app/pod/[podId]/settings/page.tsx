@@ -18,6 +18,7 @@ import {
   loadPodPayoutRecipientContext,
   syncPodPayoutConnectedAccountStatus,
 } from "@/services/pod-payout-connect.service";
+import { getPodOwnerPayoutSummary } from "@/services/pod-payout-summary.service";
 import { PodBrandProfileForm } from "./PodBrandProfileForm";
 import { PodPayoutSetupCard } from "./PodPayoutSetupCard";
 
@@ -70,7 +71,7 @@ export default async function PodSettingsPage({
   });
   if (!pod) notFound();
 
-  const [publicOrigin, payoutContext, recipientUser] = await Promise.all([
+  const [publicOrigin, payoutContext, recipientUser, payoutSummary] = await Promise.all([
     getPublicSiteOrigin(),
     loadPodPayoutRecipientContext(podId),
     userId
@@ -84,6 +85,7 @@ export default async function PodSettingsPage({
           },
         })
       : Promise.resolve(null),
+    userId ? getPodOwnerPayoutSummary(podId, userId) : Promise.resolve(null),
   ]);
 
   const amenities = parsePodAmenities(pod.amenities);
@@ -170,6 +172,8 @@ export default async function PodSettingsPage({
               stripeConnectConfigured={Boolean(env.STRIPE_SECRET_KEY)}
               connectStatus={connectStatus}
               payoutNotice={sp.payout_notice === "link_expired" ? "link_expired" : null}
+              podSharePercentLabel={payoutSummary?.podSharePercentLabel ?? null}
+              minimumPayoutLabel={payoutSummary?.minimumPayoutLabel ?? null}
             />
           </div>
         </DashboardSection>

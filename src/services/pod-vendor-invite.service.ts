@@ -1,5 +1,6 @@
 import "server-only";
 
+import { revalidatePath } from "next/cache";
 import { normalizeAccountEmail, validateAccountEmail } from "@/lib/auth/password-policy";
 import {
   buildPodVendorInviteUrl,
@@ -68,6 +69,127 @@ function inviteOrigin(requestOrigin?: string): string {
     return fromEnv.replace(/\/$/, "");
   }
   return (requestOrigin ?? fromEnv).replace(/\/$/, "");
+}
+
+export function revalidatePodInviteSurfaces(podId: string, vendorId?: string): void {
+  revalidatePath(`/pod/${podId}/dashboard`);
+  if (vendorId) {
+    revalidatePath(`/vendor/${vendorId}/settings`);
+    revalidatePath(`/vendor/${vendorId}/dashboard`);
+  }
+}
+
+type MarkPodVendorInviteAcceptedInput = {
+  inviteId: string;
+  vendorId: string;
+  acceptedByUserId?: string | null;
+};
+
+/** Mark a single invite accepted (idempotent when already accepted for same vendor). */
+export async function markPodVendorInviteAccepted(
+  input: MarkPodVendorInviteAcceptedInput
+): Promise<void> {
+  const now = new Date();
+  await prisma.podVendorInvite.updateMany({
+    where: {
+      id: input.inviteId,
+      status: POD_VENDOR_INVITE_STATUS.pending,
+    },
+    data: {
+      status: POD_VENDOR_INVITE_STATUS.accepted,
+      acceptedAt: now,
+      acceptedByUserId: input.acceptedByUserId ?? null,
+      acceptedVendorId: input.vendorId,
+      updatedAt: now,
+    },
+  });
+}
+
+/** Close all pending pod invites that match a vendor now attached to the pod. */
+export async function markPodVendorInvitesAcceptedForVendorPod(input: {
+  podId: string;
+  vendorId: string;
+  acceptedByUserId?: string | null;
+  membershipRequestId?: string | null;
+}): Promise<number> {
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: input.vendorId },
+    select: { contactEmail: true },
+  });
+  const normalizedEmail = vendor?.contactEmail
+    ? normalizeAccountEmail(vendor.contactEmail)
+    : null;
+
+  const orConditions: Array<
+    | { targetVendorId: string }
+    | { invitedEmail: string }
+    | { membershipRequestId: string }
+  > = [{ targetVendorId: input.vendorId }];
+  if (normalizedEmail) {
+    orConditions.push({ invitedEmail: normalizedEmail });
+  }
+  if (input.membershipRequestId?.trim()) {
+    orConditions.push({ membershipRequestId: input.membershipRequestId.trim() });
+  }
+
+  const now = new Date();
+  const result = await prisma.podVendorInvite.updateMany({
+    where: {
+      podId: input.podId,
+      status: POD_VENDOR_INVITE_STATUS.pending,
+      OR: orConditions,
+    },
+    data: {
+      status: POD_VENDOR_INVITE_STATUS.accepted,
+      acceptedAt: now,
+      acceptedByUserId: input.acceptedByUserId ?? null,
+      acceptedVendorId: input.vendorId,
+      updatedAt: now,
+    },
+  });
+
+  return result.count;
+}
+
+/**
+ * Repair pending invites whose vendor is already attached to the pod.
+ * Corrects legacy rows where membership succeeded but invite status was not updated.
+ */
+export async function repairStalePendingPodVendorInvites(podId: string): Promise<number> {
+  const members = await prisma.podVendor.findMany({
+    where: { podId },
+    select: { vendorId: true },
+  });
+
+  let repaired = 0;
+  for (const member of members) {
+    repaired += await markPodVendorInvitesAcceptedForVendorPod({
+      podId,
+      vendorId: member.vendorId,
+    });
+  }
+  return repaired;
+}
+
+async function finalizePodVendorInviteAcceptance(input: {
+  inviteId: string;
+  podId: string;
+  vendorId: string;
+  userId: string;
+  membershipRequestId?: string | null;
+}): Promise<void> {
+  await markPodVendorInviteAccepted({
+    inviteId: input.inviteId,
+    vendorId: input.vendorId,
+    acceptedByUserId: input.userId,
+  });
+  await markPodVendorInvitesAcceptedForVendorPod({
+    podId: input.podId,
+    vendorId: input.vendorId,
+    acceptedByUserId: input.userId,
+    membershipRequestId: input.membershipRequestId,
+  });
+  revalidatePodInviteSurfaces(input.podId, input.vendorId);
 }
 
 export async function resolvePodVendorInviteByToken(rawToken: string): Promise<PodVendorInvitePublicView> {
@@ -409,6 +531,29 @@ export async function acceptPodVendorInvite(input: {
     return { ok: false, code: vendorResolution.code, message: vendorResolution.error };
   }
 
+  const alreadyInPod = await prisma.podVendor.findUnique({
+    where: {
+      podId_vendorId: { podId: invite.podId, vendorId: vendorResolution.vendorId },
+    },
+    select: { vendorId: true },
+  });
+  if (alreadyInPod) {
+    await finalizePodVendorInviteAcceptance({
+      inviteId: invite.id,
+      podId: invite.podId,
+      vendorId: vendorResolution.vendorId,
+      userId: input.userId,
+      membershipRequestId: invite.membershipRequestId,
+    });
+    return {
+      ok: true,
+      vendorId: vendorResolution.vendorId,
+      podId: invite.podId,
+      podName: invite.pod.name,
+      alreadyAccepted: true,
+    };
+  }
+
   const vendorInOtherPod = await prisma.podVendor.findFirst({
     where: { vendorId: vendorResolution.vendorId },
     select: { podId: true },
@@ -425,16 +570,12 @@ export async function acceptPodVendorInvite(input: {
     }
   }
 
-  const now = new Date();
-  await prisma.podVendorInvite.update({
-    where: { id: invite.id },
-    data: {
-      status: POD_VENDOR_INVITE_STATUS.accepted,
-      acceptedAt: now,
-      acceptedByUserId: input.userId,
-      acceptedVendorId: vendorResolution.vendorId,
-      updatedAt: now,
-    },
+  await finalizePodVendorInviteAcceptance({
+    inviteId: invite.id,
+    podId: invite.podId,
+    vendorId: vendorResolution.vendorId,
+    userId: input.userId,
+    membershipRequestId: invite.membershipRequestId,
   });
 
   return {
@@ -467,34 +608,63 @@ export async function acceptPodVendorInviteForUser(input: {
 }
 
 export async function listPendingPodVendorInvites(podId: string) {
-  const now = new Date();
-  const invites = await prisma.podVendorInvite.findMany({
-    where: {
-      podId,
-      status: POD_VENDOR_INVITE_STATUS.pending,
-      expiresAt: { gt: now },
-    },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      invitedEmail: true,
-      invitedVendorName: true,
-      invitedContactName: true,
-      targetVendorId: true,
-      lastSentAt: true,
-      createdAt: true,
-      expiresAt: true,
-    },
-  });
+  await repairStalePendingPodVendorInvites(podId);
 
-  return invites.map((invite) => ({
-    id: invite.id,
-    invitedEmail: invite.invitedEmail,
-    invitedVendorName: invite.invitedVendorName,
-    invitedContactName: invite.invitedContactName,
-    targetVendorId: invite.targetVendorId,
-    lastSentAt: invite.lastSentAt?.toISOString() ?? invite.createdAt.toISOString(),
-    createdAt: invite.createdAt.toISOString(),
-    expiresAt: invite.expiresAt.toISOString(),
-  }));
+  const now = new Date();
+  const [invites, podMembers] = await Promise.all([
+    prisma.podVendorInvite.findMany({
+      where: {
+        podId,
+        status: POD_VENDOR_INVITE_STATUS.pending,
+        expiresAt: { gt: now },
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        invitedEmail: true,
+        invitedVendorName: true,
+        invitedContactName: true,
+        targetVendorId: true,
+        lastSentAt: true,
+        createdAt: true,
+        expiresAt: true,
+      },
+    }),
+    prisma.podVendor.findMany({
+      where: { podId },
+      select: {
+        vendorId: true,
+        vendor: { select: { contactEmail: true } },
+      },
+    }),
+  ]);
+
+  const memberVendorIds = new Set(podMembers.map((row) => row.vendorId));
+  const memberEmails = new Set(
+    podMembers
+      .map((row) => row.vendor.contactEmail)
+      .filter((email): email is string => Boolean(email?.trim()))
+      .map((email) => normalizeAccountEmail(email))
+  );
+
+  return invites
+    .filter((invite) => {
+      if (invite.targetVendorId && memberVendorIds.has(invite.targetVendorId)) {
+        return false;
+      }
+      if (memberEmails.has(normalizeAccountEmail(invite.invitedEmail))) {
+        return false;
+      }
+      return true;
+    })
+    .map((invite) => ({
+      id: invite.id,
+      invitedEmail: invite.invitedEmail,
+      invitedVendorName: invite.invitedVendorName,
+      invitedContactName: invite.invitedContactName,
+      targetVendorId: invite.targetVendorId,
+      lastSentAt: invite.lastSentAt?.toISOString() ?? invite.createdAt.toISOString(),
+      createdAt: invite.createdAt.toISOString(),
+      expiresAt: invite.expiresAt.toISOString(),
+    }));
 }

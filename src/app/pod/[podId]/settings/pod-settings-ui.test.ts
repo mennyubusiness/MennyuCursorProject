@@ -107,10 +107,20 @@ describe("pod settings payout account copy", () => {
     expect(nonOwnerBranch).not.toContain("openPodPayoutAccountManagement");
   });
 
+  it("shows read-only payout summary for designated payout account owner", () => {
+    const setupCard = readSettings("PodPayoutSetupCard.tsx");
+    expect(setupCard).toContain("podSharePercentLabel");
+    expect(setupCard).toContain("minimumPayoutLabel");
+    expect(setupCard).toContain("Transfers are sent manually during beta.");
+    expect(setupCard).toContain("Pod share");
+    expect(setupCard).toContain("Minimum payout");
+  });
+
   it("handles null payoutContext with optional chaining", () => {
     const page = readSettings("page.tsx");
     expect(page).toContain("payoutContext?.podPayoutRecipientUserId");
     expect(page).toContain("payoutContext?.podPayoutsEnabled ?? false");
+    expect(page).toContain("getPodOwnerPayoutSummary");
     expect(page).not.toMatch(/payoutContext\.podPayoutRecipientUserId(?!\?)/);
     expect(page).not.toMatch(/payoutContext\.podPayoutsEnabled(?!\?)/);
   });

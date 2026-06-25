@@ -1,5 +1,9 @@
 import { attachVendorToPod } from "@/lib/attach-vendor-to-pod";
 import { prisma } from "@/lib/db";
+import {
+  markPodVendorInvitesAcceptedForVendorPod,
+  revalidatePodInviteSurfaces,
+} from "@/services/pod-vendor-invite.service";
 
 const PENDING = "pending";
 
@@ -25,6 +29,13 @@ export async function acceptPodMembershipRequest(requestId: string): Promise<Acc
   if (!attach.ok) {
     return { ok: false, status: 500, error: attach.error };
   }
+
+  await markPodVendorInvitesAcceptedForVendorPod({
+    podId: req.podId,
+    vendorId: req.vendorId,
+    membershipRequestId: req.id,
+  });
+  revalidatePodInviteSurfaces(req.podId, req.vendorId);
 
   return { ok: true };
 }

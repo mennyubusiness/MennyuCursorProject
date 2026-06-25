@@ -303,10 +303,10 @@ describe("pod dashboard beta polish", () => {
     expect(page).toContain("announcementState.initialIsActive");
   });
 
-  it("does not use earnings or payout language in dashboard surfaces", () => {
+  it("does not use earnings language in non-payout dashboard surfaces", () => {
     for (const file of dashboardFiles) {
       const src = readDashboard(file);
-      expect(src).not.toMatch(/\bearnings\b|\brevenue share\b|\bpayout\b/i);
+      expect(src).not.toMatch(/\bearnings\b|\brevenue share\b/i);
     }
   });
 
@@ -336,5 +336,49 @@ describe("pod dashboard beta polish", () => {
     expect(roster).toContain("PodVendorRosterPanel");
     expect(roster).toContain("updatePodVendorPresentation");
     expect(roster).toContain("Featured");
+  });
+});
+
+describe("pod dashboard P6 payout visibility", () => {
+  it("loads payout summary only for authorized viewer", () => {
+    const page = readDashboard("page.tsx");
+    expect(page).toContain("getPodOwnerPayoutSummary");
+    expect(page).toContain("PodPayoutSummaryCard");
+    expect(page).toMatch(/payoutSummary \?/);
+  });
+
+  it("does not render payout card without summary", () => {
+    const page = readDashboard("page.tsx");
+    expect(page).toContain("{payoutSummary ? (");
+    expect(page).not.toContain("adminRunPodPayoutTransferBatchAction");
+    expect(page).not.toMatch(/stripe\.transfers\.create/);
+  });
+
+  it("PodPayoutSummaryCard uses owner-safe payout copy only", () => {
+    const card = readDashboard("PodPayoutSummaryCard.tsx");
+    expect(card).toContain("Pod payouts");
+    expect(card).toContain("Pending calculated payout");
+    expect(card).toContain("Transfers are sent manually by Open Order during beta.");
+    expect(card).toContain("/settings#payout-setup");
+    expect(card).not.toMatch(/\bbasis points\b|\brecipient\b|\bvendor payout\b|\bStripe fees\b/i);
+    expect(card).not.toMatch(/\bavailable balance\b|\bwithdraw\b|\bguaranteed\b/i);
+  });
+
+  it("summary service stays separate from vendor payout code", () => {
+    const service = readFileSync(join(root, "services/pod-payout-summary.service.ts"), "utf8");
+    expect(service).toContain("canViewPodPayouts");
+    expect(service).not.toContain("VendorPayoutTransfer");
+    expect(service).not.toContain("getPodAnalytics");
+    expect(service).not.toMatch(/stripe\.transfers\.create/);
+  });
+
+  it("public pod page does not show payout info", () => {
+    const standard = readFileSync(join(root, "components/pod/StandardPodPageView.tsx"), "utf8");
+    const destination = readFileSync(
+      join(root, "components/pod/destination/DestinationPodPageView.tsx"),
+      "utf8"
+    );
+    expect(standard).not.toMatch(/PodPayoutSummary|getPodOwnerPayoutSummary|Pending calculated payout/i);
+    expect(destination).not.toMatch(/PodPayoutSummary|getPodOwnerPayoutSummary|Pending calculated payout/i);
   });
 });

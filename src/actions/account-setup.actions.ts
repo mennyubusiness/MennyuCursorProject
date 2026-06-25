@@ -197,7 +197,6 @@ export async function createVendorProfile(input: {
     if (accept.ok) {
       podConnected = true;
       redirectPath = `/vendor/${accept.vendorId}/settings?section=pod-membership&access=pod_connected`;
-      revalidatePath(`/pod/${accept.podId}/dashboard`);
     }
   }
 

@@ -9,15 +9,21 @@ const mockPrisma = {
     findMany: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
   },
   pod: { findUnique: vi.fn() },
   vendor: { findUnique: vi.fn(), findFirst: vi.fn() },
-  podVendor: { findUnique: vi.fn(), findFirst: vi.fn() },
+  podVendor: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
   podMembershipRequest: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   vendorMembership: { findMany: vi.fn() },
   user: { findUnique: vi.fn() },
   $transaction: vi.fn(),
 };
+
+const mockRevalidatePath = vi.fn();
+vi.mock("next/cache", () => ({
+  revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
+}));
 
 const mockAttachVendorToPod = vi.fn();
 const mockSendPodVendorInviteEmail = vi.fn();
@@ -38,6 +44,9 @@ describe("pod vendor invite service", () => {
     vi.clearAllMocks();
     mockSendPodVendorInviteEmail.mockResolvedValue({ status: "dry_run" });
     mockAttachVendorToPod.mockResolvedValue({ ok: true, alreadyAttached: false });
+    mockPrisma.podVendorInvite.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.podVendor.findUnique.mockResolvedValue(null);
+    mockPrisma.vendor.findUnique.mockResolvedValue({ contactEmail: "vendor@example.com" });
   });
 
   it("resolves pending invite by token", async () => {
@@ -119,7 +128,7 @@ describe("pod vendor invite service", () => {
     });
     mockPrisma.vendorMembership.findMany.mockResolvedValue([{ vendorId: "vendor_1", role: "owner" }]);
     mockPrisma.podVendor.findFirst.mockResolvedValue(null);
-    mockPrisma.podVendorInvite.update.mockResolvedValue({});
+    mockPrisma.podVendorInvite.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await acceptPodVendorInvite({
       rawToken: "token",
@@ -129,6 +138,37 @@ describe("pod vendor invite service", () => {
 
     expect(result.ok).toBe(true);
     expect(mockAttachVendorToPod).toHaveBeenCalledWith("pod_1", "vendor_1");
+    expect(mockPrisma.podVendorInvite.updateMany).toHaveBeenCalled();
+  });
+
+  it("marks invite accepted when vendor is already attached to pod", async () => {
+    const { acceptPodVendorInvite } = await import("@/services/pod-vendor-invite.service");
+    mockPrisma.podVendorInvite.findUnique.mockResolvedValue({
+      id: "inv_1",
+      status: "pending",
+      expiresAt: new Date(Date.now() + 60_000),
+      invitedEmail: "vendor@example.com",
+      targetVendorId: "vendor_1",
+      podId: "pod_1",
+      membershipRequestId: null,
+      acceptedVendorId: null,
+      acceptedByUserId: null,
+      pod: { id: "pod_1", name: "Garage Pod" },
+    });
+    mockPrisma.vendorMembership.findMany.mockResolvedValue([{ vendorId: "vendor_1", role: "owner" }]);
+    mockPrisma.podVendor.findUnique.mockResolvedValue({ vendorId: "vendor_1" });
+    mockPrisma.podVendorInvite.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await acceptPodVendorInvite({
+      rawToken: "token",
+      userId: "user_1",
+      userEmail: "vendor@example.com",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.alreadyAccepted).toBe(true);
+    expect(mockAttachVendorToPod).not.toHaveBeenCalled();
+    expect(mockPrisma.podVendorInvite.updateMany).toHaveBeenCalled();
   });
 
   it("acceptPodVendorInviteForUser loads email and accepts", async () => {
@@ -198,5 +238,41 @@ describe("pod vendor invite service", () => {
     });
 
     expect(result.ok).toBe(false);
+  });
+
+  it("repairs and excludes invites for vendors already in pod from open list", async () => {
+    const { listPendingPodVendorInvites } = await import("@/services/pod-vendor-invite.service");
+    mockPrisma.podVendor.findMany.mockResolvedValue([
+      { vendorId: "vendor_1", vendor: { contactEmail: "vendor@example.com" } },
+    ]);
+    mockPrisma.podVendorInvite.findMany.mockResolvedValue([
+      {
+        id: "inv_attached",
+        invitedEmail: "vendor@example.com",
+        invitedVendorName: "Iron Skewer",
+        invitedContactName: null,
+        targetVendorId: "vendor_1",
+        lastSentAt: new Date("2026-01-01"),
+        createdAt: new Date("2026-01-01"),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+      {
+        id: "inv_open",
+        invitedEmail: "other@example.com",
+        invitedVendorName: "Other",
+        invitedContactName: null,
+        targetVendorId: null,
+        lastSentAt: new Date("2026-01-02"),
+        createdAt: new Date("2026-01-02"),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    ]);
+    mockPrisma.podVendorInvite.updateMany.mockResolvedValue({ count: 1 });
+
+    const open = await listPendingPodVendorInvites("pod_1");
+
+    expect(open).toHaveLength(1);
+    expect(open[0]?.id).toBe("inv_open");
+    expect(mockPrisma.podVendorInvite.updateMany).toHaveBeenCalled();
   });
 });

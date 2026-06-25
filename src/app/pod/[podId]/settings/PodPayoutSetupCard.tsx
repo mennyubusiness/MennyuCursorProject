@@ -16,6 +16,8 @@ export type PodPayoutSetupCardProps = {
   stripeConnectConfigured: boolean;
   connectStatus: PodPayoutConnectStatusView | null;
   payoutNotice: "link_expired" | null;
+  podSharePercentLabel?: string | null;
+  minimumPayoutLabel?: string | null;
 };
 
 export function PodPayoutSetupCard({
@@ -25,6 +27,8 @@ export function PodPayoutSetupCard({
   stripeConnectConfigured,
   connectStatus,
   payoutNotice,
+  podSharePercentLabel,
+  minimumPayoutLabel,
 }: PodPayoutSetupCardProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +119,27 @@ export function PodPayoutSetupCard({
       <p className="text-sm text-oo-stone-gray">
         Set up the payout account used for this pod&apos;s future payout transfers. Pod payout transfers
         are not active yet.
+      </p>
+
+      {podSharePercentLabel ? (
+        <dl className="mt-4 grid gap-3 rounded-lg border border-oo-light-stone bg-oo-cream/40 p-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Pod share</dt>
+            <dd className="mt-1 text-sm font-medium text-oo-charcoal">{podSharePercentLabel}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
+              Minimum payout
+            </dt>
+            <dd className="mt-1 text-sm font-medium text-oo-charcoal">
+              {minimumPayoutLabel ?? "No minimum"}
+            </dd>
+          </div>
+        </dl>
+      ) : null}
+
+      <p className="mt-4 text-xs text-oo-stone-gray">
+        Transfers are sent manually during beta.
       </p>
 
       {payoutNotice === "link_expired" && (

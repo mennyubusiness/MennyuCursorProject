@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { derivePodSetupChecklist, deriveVendorPodReadinessForRoster } from "@/lib/vendor-pod-readiness";
@@ -13,6 +14,7 @@ import {
 import { derivePodDashboardLayoutState } from "@/lib/pod-dashboard-layout";
 import { resolvePodDashboardAnnouncementState } from "@/lib/pod-announcement";
 import { listPendingPodVendorInvites } from "@/services/pod-vendor-invite.service";
+import { getPodOwnerPayoutSummary } from "@/services/pod-payout-summary.service";
 import {
   DashboardCard,
   DashboardSection,
@@ -24,6 +26,7 @@ import { PodDashboardInviteVendorSection } from "./PodDashboardInviteVendorSecti
 import { PodDashboardMetrics } from "./PodDashboardMetrics";
 import { PodDashboardPendingRequests } from "./PodDashboardPendingRequests";
 import { PodPromotionCard } from "./PodPromotionCard";
+import { PodPayoutSummaryCard } from "./PodPayoutSummaryCard";
 import { PodDashboardSetupChecklist } from "./PodDashboardSetupChecklist";
 import { PodDashboardSidebar } from "./PodDashboardSidebar";
 import { PodVendorAdoptionBoard } from "./PodVendorAdoptionBoard";
@@ -79,7 +82,10 @@ export default async function PodDashboardPage({
   if (!pod) notFound();
 
   const vendorIdsInPod = pod.vendors.map((pv) => pv.vendor.id);
-  const [pendingRequests, pendingEmailInvites, menuSummaries, unmatchedFlags, analytics] = await Promise.all([
+  const session = await auth();
+  const viewerUserId = session?.user?.id;
+  const [pendingRequests, pendingEmailInvites, menuSummaries, unmatchedFlags, analytics, payoutSummary] =
+    await Promise.all([
     prisma.podMembershipRequest.findMany({
       where: { podId, status: "pending" },
       include: {
@@ -98,6 +104,7 @@ export default async function PodDashboardPage({
       }))
     ),
     getPodAnalytics(podId),
+    viewerUserId ? getPodOwnerPayoutSummary(podId, viewerUserId) : Promise.resolve(null),
   ]);
   if (!analytics) notFound();
   const unmatchedByVendor = new Map(unmatchedFlags.map((row) => [row.vendorId, row.hasUnmatched]));
@@ -303,6 +310,12 @@ export default async function PodDashboardPage({
           <DashboardSection id="activity" showHeader={false} className="lg:col-start-2 lg:row-start-2">
             <PodDashboardActivityFeed feed={activityFeed} />
           </DashboardSection>
+
+          {payoutSummary ? (
+            <DashboardSection id="payouts" showHeader={false} className="lg:col-start-2 lg:row-start-3">
+              <PodPayoutSummaryCard podId={pod.id} summary={payoutSummary} />
+            </DashboardSection>
+          ) : null}
         </div>
       </DashboardShellMain>
     </DashboardShell>

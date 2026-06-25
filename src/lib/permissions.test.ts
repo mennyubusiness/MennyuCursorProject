@@ -6,6 +6,7 @@ const mockAuth = vi.fn();
 const mockUserFindUnique = vi.fn();
 const mockVendorMembershipFindUnique = vi.fn();
 const mockPodMembershipFindUnique = vi.fn();
+const mockPodPayoutSettingsFindUnique = vi.fn();
 const mockIsAdminApiRequestAuthorized = vi.fn();
 const mockIsAdminDashboardLayoutAuthorized = vi.fn();
 
@@ -24,6 +25,9 @@ vi.mock("@/lib/db", () => ({
     podMembership: {
       findUnique: (...args: unknown[]) => mockPodMembershipFindUnique(...args),
     },
+    podPayoutSettings: {
+      findUnique: (...args: unknown[]) => mockPodPayoutSettingsFindUnique(...args),
+    },
   },
 }));
 
@@ -39,6 +43,7 @@ import {
   canManageVendor,
   canViewAdmin,
   canViewPod,
+  canViewPodPayouts,
   canViewVendor,
   getUserAccessContext,
   isAuthenticatedSession,
@@ -143,6 +148,37 @@ describe("canViewPod / canManagePod", () => {
 
     await expect(canViewPod(USER_ADMIN, POD_B)).resolves.toBe(true);
     expect(mockPodMembershipFindUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe("canViewPodPayouts", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("allows only the designated payout account owner", async () => {
+    mockPodPayoutSettingsFindUnique.mockResolvedValue({
+      podPayoutRecipientUserId: USER_POD,
+    });
+
+    await expect(canViewPodPayouts(USER_POD, POD_A)).resolves.toBe(true);
+    await expect(canViewPodPayouts(USER_CUSTOMER, POD_A)).resolves.toBe(false);
+  });
+
+  it("denies platform admin on pod-owner payout routes", async () => {
+    mockPodPayoutSettingsFindUnique.mockResolvedValue({
+      podPayoutRecipientUserId: USER_POD,
+    });
+
+    await expect(canViewPodPayouts(USER_ADMIN, POD_A)).resolves.toBe(false);
+  });
+
+  it("denies when no designated payout account owner is configured", async () => {
+    mockPodPayoutSettingsFindUnique.mockResolvedValue({
+      podPayoutRecipientUserId: null,
+    });
+
+    await expect(canViewPodPayouts(USER_POD, POD_A)).resolves.toBe(false);
   });
 });
 
