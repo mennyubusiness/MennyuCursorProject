@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buildLoginHrefWithReturn, buildRegisterHrefWithReturn } from "@/lib/auth/invite-auth-links";
 import type { PodVendorInvitePublicView } from "@/services/pod-vendor-invite.types";
 
@@ -11,21 +11,67 @@ export function VendorInviteLanding({
   invite,
   signedIn,
   userEmail,
+  initialEmailMismatch = null,
 }: {
   token: string;
   invite: PodVendorInvitePublicView;
   signedIn: boolean;
   userEmail: string | null;
+  initialEmailMismatch?: { invitedEmail: string; currentEmail: string } | null;
 }) {
   const router = useRouter();
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [emailMismatch, setEmailMismatch] = useState<{
-    invitedEmail: string;
-    currentEmail: string;
-  } | null>(null);
+  const [emailMismatch, setEmailMismatch] = useState(initialEmailMismatch);
+  const autoAcceptStarted = useRef(false);
 
   const invitePath = `/vendor/invite/${encodeURIComponent(token)}`;
+
+  async function handleAccept() {
+    setError(null);
+    setEmailMismatch(null);
+    setAccepting(true);
+    try {
+      const res = await fetch("/api/vendor/invite/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        invitedEmail?: string;
+        currentEmail?: string;
+        redirectPath?: string;
+      };
+
+      if (!res.ok) {
+        if (data.code === "email_mismatch" && data.invitedEmail && data.currentEmail) {
+          setEmailMismatch({ invitedEmail: data.invitedEmail, currentEmail: data.currentEmail });
+          return;
+        }
+        if (data.code === "no_vendor_account") {
+          router.push(`/account/setup/vendor?next=${encodeURIComponent(invitePath)}`);
+          return;
+        }
+        setError(data.error ?? "Could not accept invite.");
+        return;
+      }
+
+      const redirectPath = data.redirectPath ?? "/vendor/dashboard";
+      router.push(redirectPath);
+      router.refresh();
+    } finally {
+      setAccepting(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!signedIn || !invite.ok || invite.status !== "pending" || initialEmailMismatch) return;
+    if (autoAcceptStarted.current) return;
+    autoAcceptStarted.current = true;
+    void handleAccept();
+  }, [signedIn, invite, initialEmailMismatch]);
 
   if (!invite.ok) {
     return (
@@ -52,46 +98,6 @@ export function VendorInviteLanding({
         <p className="mt-2 text-sm text-oo-stone-gray">{message}</p>
       </div>
     );
-  }
-
-  async function handleAccept() {
-    setError(null);
-    setEmailMismatch(null);
-    setAccepting(true);
-    try {
-      const res = await fetch("/api/vendor/invite/accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        code?: string;
-        invitedEmail?: string;
-        currentEmail?: string;
-        redirectPath?: string;
-        podName?: string;
-      };
-
-      if (!res.ok) {
-        if (data.code === "email_mismatch" && data.invitedEmail && data.currentEmail) {
-          setEmailMismatch({ invitedEmail: data.invitedEmail, currentEmail: data.currentEmail });
-          return;
-        }
-        if (data.code === "no_vendor_account") {
-          router.push(`/account/setup/vendor?next=${encodeURIComponent(invitePath)}`);
-          return;
-        }
-        setError(data.error ?? "Could not accept invite.");
-        return;
-      }
-
-      const redirectPath = data.redirectPath ?? "/vendor/dashboard";
-      router.push(redirectPath);
-      router.refresh();
-    } finally {
-      setAccepting(false);
-    }
   }
 
   const vendorLabel = invite.invitedVendorName ? ` for ${invite.invitedVendorName}` : "";

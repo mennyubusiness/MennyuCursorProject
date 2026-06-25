@@ -1,18 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { RegistrationIntent } from "@prisma/client";
 import { registerWithEmailPassword } from "@/actions/register.actions";
+import { setRegistrationRole } from "@/actions/account-setup.actions";
 import { ACCOUNT_ROLE_PATH } from "@/lib/auth/account-paths";
+import {
+  appendNextQueryParam,
+  isVendorInvitePath,
+} from "@/lib/auth/invite-token-path";
+import {
+  readLoginReturnParam,
+  sanitizeLoginReturnPath,
+} from "@/lib/auth/login-return-path";
 import { AuthFormCard } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 
 export function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const returnPathRaw = readLoginReturnParam(searchParams);
+  const returnPathSafe = sanitizeLoginReturnPath(returnPathRaw);
+  const registrationIntent = searchParams.get("intent") === "vendor" ? "vendor" : null;
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -41,7 +56,28 @@ export function RegisterForm() {
         setError("Account created but sign-in failed. Try signing in from the login page.");
         return;
       }
-      router.push(ACCOUNT_ROLE_PATH);
+
+      if (registrationIntent === "vendor") {
+        const role = await setRegistrationRole(RegistrationIntent.vendor);
+        if (!role.ok) {
+          setError(role.error);
+          return;
+        }
+        const setupPath = role.nextPath ?? "/account/setup/vendor";
+        router.push(
+          returnPathSafe && isVendorInvitePath(returnPathSafe)
+            ? appendNextQueryParam(setupPath, returnPathSafe)
+            : setupPath
+        );
+        router.refresh();
+        return;
+      }
+
+      if (returnPathSafe) {
+        router.push(appendNextQueryParam(ACCOUNT_ROLE_PATH, returnPathSafe));
+      } else {
+        router.push(ACCOUNT_ROLE_PATH);
+      }
       router.refresh();
     } finally {
       setLoading(false);

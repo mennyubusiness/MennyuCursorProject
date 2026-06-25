@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createVendorProfile } from "@/actions/account-setup.actions";
+import { extractInviteTokenFromPath } from "@/lib/auth/invite-token-path";
 import { DashboardPageHeader } from "@/components/dashboard";
 import { buttonClassName } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -27,6 +28,7 @@ export function VendorSetupForm({ nextPath = null }: { nextPath?: string | null 
     const fd = new FormData(e.currentTarget);
     setLoading(true);
     try {
+      const inviteToken = extractInviteTokenFromPath(nextPath);
       const r = await createVendorProfile({
         businessName: String(fd.get("businessName") ?? ""),
         contactName: String(fd.get("contactName") ?? ""),
@@ -36,13 +38,14 @@ export function VendorSetupForm({ nextPath = null }: { nextPath?: string | null 
         posType: String(fd.get("posType") ?? "unknown"),
         description: String(fd.get("description") ?? "") || undefined,
         locationSummary: String(fd.get("locationSummary") ?? "").trim() || undefined,
+        inviteToken: inviteToken ?? undefined,
       });
       if (!r.ok) {
         setError(r.error);
         return;
       }
       if (r.vendorId) {
-        router.push(nextPath ?? `/vendor/${r.vendorId}/settings`);
+        router.push(r.redirectPath ?? nextPath ?? `/vendor/${r.vendorId}/settings`);
         router.refresh();
       }
     } finally {

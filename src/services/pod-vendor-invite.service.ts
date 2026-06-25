@@ -364,12 +364,19 @@ export async function acceptPodVendorInvite(input: {
 
   if (invite.status === POD_VENDOR_INVITE_STATUS.accepted) {
     if (invite.acceptedVendorId) {
+      if (invite.acceptedByUserId === input.userId) {
+        return {
+          ok: true,
+          vendorId: invite.acceptedVendorId,
+          podId: invite.podId,
+          podName: invite.pod.name,
+          alreadyAccepted: true,
+        };
+      }
       return {
-        ok: true,
-        vendorId: invite.acceptedVendorId,
-        podId: invite.podId,
-        podName: invite.pod.name,
-        alreadyAccepted: true,
+        ok: false,
+        code: "invalid",
+        message: "This invite has already been used.",
       };
     }
     return { ok: false, code: "invalid", message: "This invite has already been used." };
@@ -437,6 +444,26 @@ export async function acceptPodVendorInvite(input: {
     podName: invite.pod.name,
     alreadyAccepted: false,
   };
+}
+
+/** Accept a pod-scoped vendor invite for the signed-in user (alias for invite onboarding flows). */
+export async function acceptPodVendorInviteForUser(input: {
+  token: string;
+  userId: string;
+}): Promise<AcceptPodVendorInviteResult> {
+  const user = await prisma.user.findUnique({
+    where: { id: input.userId },
+    select: { email: true },
+  });
+  if (!user?.email) {
+    return { ok: false, code: "not_signed_in", message: "Not signed in." };
+  }
+
+  return acceptPodVendorInvite({
+    rawToken: input.token,
+    userId: input.userId,
+    userEmail: user.email,
+  });
 }
 
 export async function listPendingPodVendorInvites(podId: string) {

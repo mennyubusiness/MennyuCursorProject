@@ -15,6 +15,7 @@ import {
   ACCOUNT_SETUP_VENDOR_PATH,
 } from "@/lib/auth/account-paths";
 import { uniquePodSlugFromName, uniqueVendorSlugFromName } from "@/lib/slug-server";
+import { acceptPodVendorInviteForUser } from "@/services/pod-vendor-invite.service";
 
 async function requireUserId(): Promise<string | null> {
   const session = await auth();
@@ -56,6 +57,34 @@ export async function setRegistrationRole(
   });
   revalidatePath("/account");
   return { ok: true, nextPath };
+}
+
+/** Sets vendor registration intent for pod invite onboarding when the user has no vendor yet. */
+export async function ensureVendorRegistrationIntentForInvite(): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Not signed in." };
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      registrationIntent: true,
+      needsAccountRoleSelection: true,
+      vendorMemberships: { select: { id: true }, take: 1 },
+    },
+  });
+  if (!user) return { ok: false, error: "Account not found." };
+  if (user.vendorMemberships.length > 0) return { ok: true };
+  if (user.registrationIntent === RegistrationIntent.vendor) return { ok: true };
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      registrationIntent: RegistrationIntent.vendor,
+      needsAccountRoleSelection: false,
+    },
+  });
+  revalidatePath("/account");
+  return { ok: true };
 }
 
 export async function saveCustomerProfile(input: {
@@ -107,7 +136,8 @@ export async function createVendorProfile(input: {
   description?: string;
   /** City / area — optional onboarding field */
   locationSummary?: string;
-}): Promise<ActionResult & { vendorId?: string }> {
+  inviteToken?: string;
+}): Promise<ActionResult & { vendorId?: string; redirectPath?: string; podConnected?: boolean }> {
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "Not signed in." };
 
@@ -157,7 +187,21 @@ export async function createVendorProfile(input: {
   });
 
   revalidatePath("/account");
-  return { ok: true, vendorId: vendor.id };
+  revalidatePath(`/vendor/${vendor.id}/settings`);
+
+  let redirectPath = `/vendor/${vendor.id}/settings`;
+  let podConnected = false;
+  const inviteToken = input.inviteToken?.trim();
+  if (inviteToken) {
+    const accept = await acceptPodVendorInviteForUser({ token: inviteToken, userId });
+    if (accept.ok) {
+      podConnected = true;
+      redirectPath = `/vendor/${accept.vendorId}/settings?section=pod-membership&access=pod_connected`;
+      revalidatePath(`/pod/${accept.podId}/dashboard`);
+    }
+  }
+
+  return { ok: true, vendorId: vendor.id, redirectPath, podConnected };
 }
 
 export async function createPodProfile(input: {

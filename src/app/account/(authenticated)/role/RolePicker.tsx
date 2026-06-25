@@ -1,9 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { RegistrationIntent } from "@prisma/client";
 import { setRegistrationRole } from "@/actions/account-setup.actions";
+import { appendNextQueryParam } from "@/lib/auth/invite-token-path";
+import {
+  readLoginReturnParam,
+  sanitizeLoginReturnPath,
+} from "@/lib/auth/login-return-path";
 import { DashboardPageHeader } from "@/components/dashboard";
 
 const OPTIONS: {
@@ -30,8 +35,11 @@ const OPTIONS: {
 
 export function RolePicker() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState<RegistrationIntent | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const returnPathSafe = sanitizeLoginReturnPath(readLoginReturnParam(searchParams));
 
   async function choose(intent: RegistrationIntent) {
     setError(null);
@@ -43,7 +51,9 @@ export function RolePicker() {
         return;
       }
       if (r.nextPath) {
-        router.push(r.nextPath);
+        const dest =
+          returnPathSafe != null ? appendNextQueryParam(r.nextPath, returnPathSafe) : r.nextPath;
+        router.push(dest);
         router.refresh();
       }
     } finally {

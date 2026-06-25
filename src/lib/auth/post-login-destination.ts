@@ -8,6 +8,7 @@ import "server-only";
 import { extractVendorIdFromVendorPath } from "@/lib/auth/login-intent";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
 import { isPublicCustomerSafePath } from "@/lib/auth/customer-safe-paths";
+import { appendNextQueryParam, isVendorInvitePath } from "@/lib/auth/invite-token-path";
 import {
   DEFAULT_CUSTOMER_POST_LOGIN_PATH,
   isAdminReturnPath,
@@ -103,8 +104,12 @@ export async function resolvePostLoginDestination(
   userId: string,
   returnPath: string | null
 ): Promise<PostLoginDestinationResult> {
+  const safeReturn = sanitizeLoginReturnPath(returnPath);
   const pendingSetup = await getPendingAccountSetupRedirect(userId);
   if (pendingSetup) {
+    if (safeReturn && isVendorInvitePath(safeReturn)) {
+      return { kind: "redirect", path: appendNextQueryParam(pendingSetup, safeReturn) };
+    }
     return { kind: "redirect", path: pendingSetup };
   }
 
@@ -112,8 +117,6 @@ export async function resolvePostLoginDestination(
     where: { id: userId },
     select: { isPlatformAdmin: true },
   });
-
-  const safeReturn = sanitizeLoginReturnPath(returnPath);
 
   if (user?.isPlatformAdmin) {
     if (safeReturn && isAdminReturnPath(safeReturn) && (await canRedirectToPath(userId, safeReturn))) {

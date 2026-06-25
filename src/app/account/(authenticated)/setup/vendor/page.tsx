@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
 import { ACCOUNT_SETUP_VENDOR_PATH } from "@/lib/auth/account-paths";
 import { sanitizeLoginReturnPath } from "@/lib/auth/login-return-path";
+import { appendNextQueryParam } from "@/lib/auth/invite-token-path";
 import { DashboardCard } from "@/components/dashboard";
 import { VendorSetupForm } from "./VendorSetupForm";
 
@@ -17,8 +18,10 @@ export default async function VendorSetupPage({
   if (!session?.user?.id) redirect("/login");
 
   const pending = await getPendingAccountSetupRedirect(session.user.id);
+  const { next: nextRaw } = await searchParams;
+  const nextPath = sanitizeLoginReturnPath(nextRaw ?? null);
   if (pending && pending !== ACCOUNT_SETUP_VENDOR_PATH) {
-    redirect(pending);
+    redirect(nextPath ? appendNextQueryParam(pending, nextPath) : pending);
   }
 
   const user = await prisma.user.findUnique({
@@ -28,9 +31,6 @@ export default async function VendorSetupPage({
   if (user?.registrationIntent !== RegistrationIntent.vendor) {
     redirect("/");
   }
-
-  const { next: nextRaw } = await searchParams;
-  const nextPath = sanitizeLoginReturnPath(nextRaw ?? null);
 
   return (
     <DashboardCard>
