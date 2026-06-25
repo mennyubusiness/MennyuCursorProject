@@ -27,6 +27,7 @@ import {
 } from "@/domain/stale-refund-attempt";
 import type { StaleRefundAttemptSummary } from "@/services/stale-refund-attempt.service";
 import { syncVendorTransferEligibilityAfterRefundSuccess } from "@/services/vendor-payout-transfer-refund-eligibility.service";
+import { syncPodPayoutEligibilityAfterRefundSuccess } from "@/services/pod-payout-refund-eligibility.service";
 
 export type InFlightRefundBlockerSummary = {
   source: "order_refund" | "refund_attempt";
@@ -553,6 +554,12 @@ export async function markRefundSucceeded(args: {
     await syncVendorTransferEligibilityAfterRefundSuccess({
       orderId: refundRow.orderId,
       vendorOrderId: refundRow.vendorOrderId,
+      orderRefundId: args.orderRefundId,
+      refundAttemptId: refundRow.refundAttemptId,
+    }).catch(() => undefined);
+
+    await syncPodPayoutEligibilityAfterRefundSuccess({
+      orderId: refundRow.orderId,
       orderRefundId: args.orderRefundId,
       refundAttemptId: refundRow.refundAttemptId,
     }).catch(() => undefined);

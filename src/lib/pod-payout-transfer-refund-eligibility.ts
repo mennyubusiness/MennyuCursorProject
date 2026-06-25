@@ -2,6 +2,8 @@
  * Refund-aware pod payout transfer eligibility (pure helpers).
  */
 
+import { POD_PAYOUT_TRANSFER_STATUS } from "@/lib/pod-payout-transfer-decision";
+
 export const POD_PAYOUT_CANCELLED_DUE_TO_REFUND_STATUS = "cancelled_due_to_refund" as const;
 export const POD_PAYOUT_CANCELLED_DUE_TO_REFUND_BLOCKED_REASON =
   "customer_refund_extinguished_obligation" as const;
@@ -27,6 +29,29 @@ export function isPodPayoutPartialRefundReviewTransfer(row: {
     row.status === POD_PAYOUT_PARTIAL_REFUND_REVIEW_STATUS ||
     row.blockedReason === POD_PAYOUT_PARTIAL_REFUND_REVIEW_BLOCKED_REASON
   );
+}
+
+/** True when a Connect transfer was sent (paid/submitted with or without tr_ id). */
+export function isSentPodPayoutTransfer(row: {
+  status: string;
+  stripeTransferId?: string | null;
+}): boolean {
+  if (row.stripeTransferId?.trim()) return true;
+  return (
+    row.status === POD_PAYOUT_TRANSFER_STATUS.paid ||
+    row.status === POD_PAYOUT_TRANSFER_STATUS.submitted
+  );
+}
+
+/** Unsent rows that refund sync may cancel or block (never submitted/paid via Connect). */
+export function isUnsentPodPayoutTransferForRefund(row: {
+  status: string;
+  blockedReason?: string | null;
+  stripeTransferId?: string | null;
+}): boolean {
+  if (isSentPodPayoutTransfer(row)) return false;
+  if (isPodPayoutCancelledDueToRefundTransfer(row)) return false;
+  return true;
 }
 
 export function isPodPayoutTransferExecutionBlockedByRefund(row: {

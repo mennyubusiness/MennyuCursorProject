@@ -133,8 +133,8 @@ export const POD_PAYOUT_TRANSFER_STATUS_LABELS: Record<string, string> = {
   [POD_PAYOUT_TRANSFER_STATUS.blockedInsufficientBalance]: "Insufficient balance",
   [POD_PAYOUT_TRANSFER_STATUS.blockedConnectNotReady]: "Payout account not ready",
   [POD_PAYOUT_TRANSFER_STATUS.blockedBelowMinimum]: "Below minimum payout",
-  [POD_PAYOUT_TRANSFER_STATUS.blockedPartialRefundReview]: "Partial refund review",
-  [POD_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund]: "Cancelled (refund)",
+  [POD_PAYOUT_TRANSFER_STATUS.blockedPartialRefundReview]: "Needs review",
+  [POD_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund]: "Cancelled after refund",
   [POD_PAYOUT_TRANSFER_STATUS.submitted]: "Submitted",
   [POD_PAYOUT_TRANSFER_STATUS.paid]: "Paid",
   [POD_PAYOUT_TRANSFER_STATUS.failed]: "Failed",
@@ -146,4 +146,6 @@ export const POD_PAYOUT_TRANSFER_BLOCKED_REASON_LABELS: Record<string, string> =
   [POD_PAYOUT_TRANSFER_BLOCKED_REASON.connectAccountMissing]: "Payout account owner has no Stripe Connect account",
   [POD_PAYOUT_TRANSFER_BLOCKED_REASON.connectDetailsNotSubmitted]: "Payout account onboarding is incomplete",
   [POD_PAYOUT_TRANSFER_BLOCKED_REASON.connectPayoutsNotEnabled]: "Stripe payouts are not enabled for the payout account",
+  customer_refund_extinguished_obligation: "Customer refund — pod payout no longer payable",
+  partial_refund_manual_review: "Partial or pending refund — admin review required before transfer",
 };

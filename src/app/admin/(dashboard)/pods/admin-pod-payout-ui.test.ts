@@ -85,6 +85,21 @@ describe("admin pod payout P2 UI", () => {
     expect(card).toContain("POD_PAYOUT_ALLOCATION_STATUS.pending");
     expect(card).toContain("POD_PAYOUT_ALLOCATION_STATUS.blocked");
     expect(card).toContain("cancelledDueToRefund");
+    expect(card).toContain("blockedPartialRefundReview");
+    expect(card).toContain("Cancelled after refund");
+    expect(card).toContain("Needs review");
+  });
+
+  it("refund sync hooks markRefundSucceeded alongside vendor sync", () => {
+    const ledger = readFileSync(join(root, "services/refund-ledger.service.ts"), "utf8");
+    expect(ledger).toContain("syncVendorTransferEligibilityAfterRefundSuccess");
+    expect(ledger).toContain("syncPodPayoutEligibilityAfterRefundSuccess");
+  });
+
+  it("pod refund sync service does not create stripe transfers", () => {
+    const service = readFileSync(join(root, "services/pod-payout-refund-eligibility.service.ts"), "utf8");
+    expect(service).not.toMatch(/stripe\.transfers\.create/);
+    expect(service).not.toContain("PodPayoutTransferReversal");
   });
 
   it("pod detail page prioritizes activity, actions, and vendors before payouts", () => {

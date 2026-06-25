@@ -142,6 +142,9 @@ export const POD_PAYOUT_BLOCKED_REASON_LABELS: Record<string, string> = {
   [POD_PAYOUT_BLOCKED_REASON.missingRecipient]: "Missing designated recipient",
   [POD_PAYOUT_BLOCKED_REASON.zeroSubtotal]: "Eligible food subtotal was zero",
   [POD_PAYOUT_BLOCKED_REASON.invalidBps]: "Revenue share outside allowed range",
+  customer_refund_extinguished_obligation: "Customer refund — pod payout no longer payable",
+  partial_refund_manual_review: "Partial or pending refund — admin review required before transfer",
+  post_transfer_refund_review: "Refund occurred after pod payout transfer — review manually",
 };
 
 export type BlockedPodPayoutAllocationRepair =

@@ -8,6 +8,10 @@ import {
   POD_PAYOUT_BLOCKED_REASON_LABELS,
   POD_PAYOUT_ALLOCATION_STATUS,
 } from "@/lib/pod-payout-allocation";
+import {
+  podPayoutAllocationRefundBlockedReasonLabel,
+  podPayoutAllocationRefundStatusLabel,
+} from "@/lib/pod-payout-refund-eligibility.constants";
 import { podRevenueShareBpsToPercentLabel } from "@/lib/pod-payout-settings";
 import type { AdminPodPayoutAllocationRow } from "@/services/pod-payout-allocation.service";
 
@@ -24,29 +28,23 @@ const FILTER_OPTIONS = [
   { id: "all", label: "All" },
   { id: POD_PAYOUT_ALLOCATION_STATUS.pending, label: "Pending" },
   { id: POD_PAYOUT_ALLOCATION_STATUS.blocked, label: "Blocked" },
-  { id: POD_PAYOUT_ALLOCATION_STATUS.cancelledDueToRefund, label: "Cancelled" },
+  { id: POD_PAYOUT_ALLOCATION_STATUS.cancelledDueToRefund, label: "Cancelled after refund" },
+  { id: POD_PAYOUT_ALLOCATION_STATUS.blockedPartialRefundReview, label: "Needs review" },
 ] as const;
 
 type FilterId = (typeof FILTER_OPTIONS)[number]["id"];
 
-function statusLabel(status: string): string {
-  switch (status) {
-    case POD_PAYOUT_ALLOCATION_STATUS.pending:
-      return "Pending";
-    case POD_PAYOUT_ALLOCATION_STATUS.blocked:
-      return "Blocked";
-    case POD_PAYOUT_ALLOCATION_STATUS.cancelledDueToRefund:
-      return "Cancelled";
-    case POD_PAYOUT_ALLOCATION_STATUS.blockedPartialRefundReview:
-      return "Refund review";
-    default:
-      return status;
-  }
+function statusLabel(status: string, blockedReason: string | null): string {
+  return podPayoutAllocationRefundStatusLabel(status, blockedReason);
 }
 
 function blockedReasonLabel(reason: string | null): string {
   if (!reason) return "—";
-  return POD_PAYOUT_BLOCKED_REASON_LABELS[reason] ?? reason;
+  return (
+    podPayoutAllocationRefundBlockedReasonLabel(reason) ??
+    POD_PAYOUT_BLOCKED_REASON_LABELS[reason] ??
+    reason
+  );
 }
 
 export function PodPayoutAllocationsCard({
@@ -191,10 +189,12 @@ export function PodPayoutAllocationsCard({
                           ? "bg-emerald-100 text-emerald-900"
                           : row.status === POD_PAYOUT_ALLOCATION_STATUS.blocked
                             ? "bg-amber-100 text-amber-900"
-                            : "bg-stone-200 text-oo-charcoal"
+                            : row.status === POD_PAYOUT_ALLOCATION_STATUS.blockedPartialRefundReview
+                              ? "bg-orange-100 text-orange-900"
+                              : "bg-stone-200 text-oo-charcoal"
                       }`}
                     >
-                      {statusLabel(row.status)}
+                      {statusLabel(row.status, row.blockedReason)}
                     </span>
                     {row.blockedReason ? (
                       <p className="mt-0.5 text-[10px] text-oo-stone-gray">
