@@ -4,10 +4,15 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
 import { ACCOUNT_SETUP_VENDOR_PATH } from "@/lib/auth/account-paths";
+import { sanitizeLoginReturnPath } from "@/lib/auth/login-return-path";
 import { DashboardCard } from "@/components/dashboard";
 import { VendorSetupForm } from "./VendorSetupForm";
 
-export default async function VendorSetupPage() {
+export default async function VendorSetupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -24,9 +29,12 @@ export default async function VendorSetupPage() {
     redirect("/");
   }
 
+  const { next: nextRaw } = await searchParams;
+  const nextPath = sanitizeLoginReturnPath(nextRaw ?? null);
+
   return (
     <DashboardCard>
-      <VendorSetupForm />
+      <VendorSetupForm nextPath={nextPath} />
     </DashboardCard>
   );
 }

@@ -16,7 +16,7 @@ const POS_OPTIONS = [
   { value: "unknown", label: "Not sure yet" },
 ];
 
-export function VendorSetupForm() {
+export function VendorSetupForm({ nextPath = null }: { nextPath?: string | null }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function VendorSetupForm() {
         return;
       }
       if (r.vendorId) {
-        router.push(`/vendor/${r.vendorId}`);
+        router.push(nextPath ?? `/vendor/${r.vendorId}/settings`);
         router.refresh();
       }
     } finally {

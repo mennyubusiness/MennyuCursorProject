@@ -181,7 +181,15 @@ describe("pod dashboard onboarding layout", () => {
   it("supports prominent invite mode when the pod has no vendors", () => {
     const invite = readDashboard("PodDashboardInviteVendorSection.tsx");
     expect(invite).toContain("prominent");
-    expect(invite).toContain("Invite vendors to your pod");
+    expect(invite).toContain("Invite your first vendor");
+    expect(invite).toContain("PodDashboardVendorSearch");
+    expect(invite).not.toContain("PodDashboardAddVendor");
+  });
+
+  it("does not load all vendors on the pod dashboard page", () => {
+    const page = readDashboard("page.tsx");
+    expect(page).not.toContain("vendorsNotInPod");
+    expect(page).toContain("listPendingPodVendorInvites");
   });
 });
 

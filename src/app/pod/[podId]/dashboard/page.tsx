@@ -12,6 +12,7 @@ import {
 } from "@/lib/pod-vendor-adoption";
 import { derivePodDashboardLayoutState } from "@/lib/pod-dashboard-layout";
 import { resolvePodDashboardAnnouncementState } from "@/lib/pod-announcement";
+import { listPendingPodVendorInvites } from "@/services/pod-vendor-invite.service";
 import {
   DashboardCard,
   DashboardSection,
@@ -78,12 +79,7 @@ export default async function PodDashboardPage({
   if (!pod) notFound();
 
   const vendorIdsInPod = pod.vendors.map((pv) => pv.vendor.id);
-  const [vendorsNotInPod, pendingRequests, menuSummaries, unmatchedFlags, analytics] = await Promise.all([
-    prisma.vendor.findMany({
-      where: { id: { notIn: vendorIdsInPod } },
-      select: { id: true, name: true, slug: true, isActive: true, mennyuOrdersPaused: true },
-      orderBy: { name: "asc" },
-    }),
+  const [pendingRequests, pendingEmailInvites, menuSummaries, unmatchedFlags, analytics] = await Promise.all([
     prisma.podMembershipRequest.findMany({
       where: { podId, status: "pending" },
       include: {
@@ -93,6 +89,7 @@ export default async function PodDashboardPage({
       },
       orderBy: { createdAt: "desc" },
     }),
+    listPendingPodVendorInvites(podId),
     loadVendorMenuReadinessSummaries(vendorIdsInPod),
     Promise.all(
       vendorIdsInPod.map(async (vendorId) => ({
@@ -188,7 +185,13 @@ export default async function PodDashboardPage({
     })),
   });
 
-  const pendingForUi = pendingRequests.map((r) => ({
+  const pendingInviteVendorIds = new Set(
+    pendingEmailInvites.map((invite) => invite.targetVendorId).filter((id): id is string => Boolean(id))
+  );
+
+  const pendingForUi = pendingRequests
+    .filter((r) => !pendingInviteVendorIds.has(r.vendor.id))
+    .map((r) => ({
     id: r.id,
     vendorId: r.vendor.id,
     vendorName: r.vendor.name,
@@ -255,15 +258,10 @@ export default async function PodDashboardPage({
 
               <PodDashboardInviteVendorSection
                 podId={pod.id}
+                podName={pod.name}
                 prominent={layout.shouldPromoteInviteSection}
                 collapsedByDefault={layout.hasVendors}
-                eligibleVendors={vendorsNotInPod.map((v) => ({
-                  id: v.id,
-                  name: v.name,
-                  slug: v.slug,
-                  isActive: v.isActive,
-                  mennyuOrdersPaused: v.mennyuOrdersPaused ?? false,
-                }))}
+                pendingEmailInvites={pendingEmailInvites}
               />
 
               {layout.shouldShowPodSetupSection ? (

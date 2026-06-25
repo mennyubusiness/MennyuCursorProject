@@ -63,6 +63,10 @@ async function canRedirectToPath(userId: string, path: string): Promise<boolean>
     return true;
   }
 
+  if (clean.startsWith("/vendor/invite/")) {
+    return true;
+  }
+
   return false;
 }
 

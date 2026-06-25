@@ -69,6 +69,7 @@ model Pod {
   carts              Cart[]
   orders             Order[]
   membershipRequests PodMembershipRequest[]
+  vendorInvites      PodVendorInvite[]
   vendors            PodVendor[]
   memberships        PodMembership[]
   groupOrderSessions GroupOrderSession[]
@@ -198,6 +199,41 @@ model PodMembershipRequest {
   @@index([vendorId, status])
 }
 
+/// Secure pod-scoped vendor invite (email link). Raw token is never stored — only tokenHash.
+model PodVendorInvite {
+  id                  String    @id @default(cuid())
+  podId               String
+  invitedEmail        String
+  invitedVendorName   String?
+  invitedContactName  String?
+  invitedPhone        String?
+  note                String?
+  tokenHash           String    @unique
+  /// pending | accepted | cancelled | expired
+  status              String
+  expiresAt           DateTime
+  createdByUserId     String
+  acceptedAt          DateTime?
+  acceptedByUserId    String?
+  acceptedVendorId    String?
+  /// When inviting a known existing vendor (search flow).
+  targetVendorId      String?
+  membershipRequestId String?
+  lastSentAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  pod            Pod     @relation(fields: [podId], references: [id], onDelete: Cascade)
+  createdByUser  User    @relation("PodVendorInviteCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  acceptedByUser User?   @relation("PodVendorInviteAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  acceptedVendor Vendor? @relation("PodVendorInviteAcceptedVendor", fields: [acceptedVendorId], references: [id], onDelete: SetNull)
+  targetVendor   Vendor? @relation("PodVendorInviteTargetVendor", fields: [targetVendorId], references: [id], onDelete: SetNull)
+
+  @@index([podId, status])
+  @@index([invitedEmail])
+  @@index([podId, invitedEmail, status])
+}
+
 enum RegistrationIntent {
   customer
   vendor
@@ -259,6 +295,8 @@ model User {
   podPayoutStripeOnboardingCompletedAt DateTime?
   podPayoutStripeRequirementsCurrentlyDue Json?
   podPayoutStripeLastSyncedAt          DateTime?
+  podVendorInvitesCreated              PodVendorInvite[] @relation("PodVendorInviteCreatedBy")
+  podVendorInvitesAccepted             PodVendorInvite[] @relation("PodVendorInviteAcceptedBy")
 }
 
 /// Single-use email password reset token (raw token never stored).
@@ -428,6 +466,8 @@ model Vendor {
   menuItems               MenuItem[]
   modifierGroups          ModifierGroup[]
   podMembershipRequests   PodMembershipRequest[]
+  podVendorInvitesAccepted PodVendorInvite[] @relation("PodVendorInviteAcceptedVendor")
+  podVendorInvitesTarget   PodVendorInvite[] @relation("PodVendorInviteTargetVendor")
   pods                    PodVendor[]
   vendorOrders            VendorOrder[]
   vendorPayoutTransfers   VendorPayoutTransfer[]
