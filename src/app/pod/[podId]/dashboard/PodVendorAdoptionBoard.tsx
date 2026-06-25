@@ -96,17 +96,75 @@ function AttentionRowActions({
   );
 }
 
+function VendorAttentionList({
+  podSlug,
+  attentionRows,
+}: {
+  podSlug: string;
+  attentionRows: PodAdoptionAttentionRow[];
+}) {
+  return (
+    <ul className="mt-4 space-y-3">
+      {attentionRows.map((row) => (
+        <li
+          key={row.vendorId}
+          className="rounded-lg border border-oo-light-stone bg-oo-cream/40 p-3 sm:p-4"
+        >
+          <div className="flex gap-3">
+            <VendorLogo
+              imageUrl={row.imageUrl}
+              vendorName={row.name}
+              className="h-12 w-12 shrink-0 rounded-lg"
+              sizes="48px"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="min-w-0 break-words font-medium text-oo-charcoal">{row.name}</span>
+                <span className={displayStatusBadgeClass(row.displayStatus)}>{row.displayStatus}</span>
+              </div>
+              <AttentionRowActions row={row} podSlug={podSlug} />
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function PodVendorAdoptionBoard({
   podSlug,
   launchSummary,
   attentionRows,
   pendingCount,
+  variant = "setup-only",
 }: {
   podSlug: string;
   launchSummary: PodLaunchReadinessSummary;
   attentionRows: PodAdoptionAttentionRow[];
   pendingCount: number;
+  variant?: "setup-only" | "full";
 }) {
+  if (variant === "setup-only") {
+    if (attentionRows.length === 0) {
+      return null;
+    }
+
+    return (
+      <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-oo-stone-gray">Vendor setup</h2>
+        <p className="mt-1 text-sm text-oo-stone-gray">
+          These vendors still need setup before customers can order from them.
+        </p>
+        {pendingCount > 0 ? (
+          <p className="mt-2 text-sm text-oo-stone-gray">
+            {pendingCount} invitation{pendingCount === 1 ? "" : "s"} still awaiting vendor response.
+          </p>
+        ) : null}
+        <VendorAttentionList podSlug={podSlug} attentionRows={attentionRows} />
+      </section>
+    );
+  }
+
   const bannerClass = launchSummary.allOrderable
     ? "border-emerald-200 bg-emerald-50/80"
     : "border-amber-200 bg-amber-50/60";
@@ -136,30 +194,7 @@ export function PodVendorAdoptionBoard({
           <p className="mt-1 text-sm text-oo-stone-gray">
             Vendors who are not orderable yet. Your public roster order below is unchanged.
           </p>
-          <ul className="mt-4 space-y-3">
-            {attentionRows.map((row) => (
-              <li
-                key={row.vendorId}
-                className="rounded-lg border border-oo-light-stone bg-oo-cream/40 p-3 sm:p-4"
-              >
-                <div className="flex gap-3">
-                  <VendorLogo
-                    imageUrl={row.imageUrl}
-                    vendorName={row.name}
-                    className="h-12 w-12 shrink-0 rounded-lg"
-                    sizes="48px"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="min-w-0 break-words font-medium text-oo-charcoal">{row.name}</span>
-                      <span className={displayStatusBadgeClass(row.displayStatus)}>{row.displayStatus}</span>
-                    </div>
-                    <AttentionRowActions row={row} podSlug={podSlug} />
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <VendorAttentionList podSlug={podSlug} attentionRows={attentionRows} />
         </div>
       ) : launchSummary.activeVendorCount > 0 ? (
         <p className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-3 text-sm text-oo-stone-gray">

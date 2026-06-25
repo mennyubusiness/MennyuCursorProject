@@ -10,6 +10,7 @@ import {
   buildPodAdoptionAttentionRows,
   computePodLaunchReadinessSummary,
 } from "@/lib/pod-vendor-adoption";
+import { derivePodDashboardLayoutState } from "@/lib/pod-dashboard-layout";
 import { resolvePodDashboardAnnouncementState } from "@/lib/pod-announcement";
 import {
   DashboardCard,
@@ -197,9 +198,13 @@ export default async function PodDashboardPage({
   }));
 
   const orderableVendorCount = rosterRows.filter((row) => row.readiness.canAcceptOrders).length;
-  const demoteSetupChecklist = pod.isActive && orderableVendorCount > 0;
   const launchSummary = computePodLaunchReadinessSummary(rosterRows);
   const adoptionAttentionRows = buildPodAdoptionAttentionRows(rosterRows);
+  const layout = derivePodDashboardLayoutState({
+    vendorCount: rosterRows.length,
+    podSetupChecklist,
+    adoptionAttentionRows,
+  });
   const activityFeed = await getPodActivityFeed(podId, {
     roster: rosterRows.map((row) => ({
       vendorId: row.vendorId,
@@ -235,23 +240,56 @@ export default async function PodDashboardPage({
 
       <DashboardShellMain>
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-          <DashboardSection
-            id="overview"
-            title="Overview"
-            description="Track Open Order at your pod, promote your public pod page, and keep vendors ready for customer orders."
-            className="lg:col-start-1 lg:row-start-1"
-            contentClassName="space-y-0"
-          >
-            <PodDashboardMetrics summary={analytics.summary} orderableVendorCount={orderableVendorCount} />
-          </DashboardSection>
+          <div className="flex flex-col gap-6 lg:col-start-1 lg:row-start-1 lg:row-span-3">
+            <DashboardSection
+              id="overview"
+              title="Overview"
+              description="Track Open Order at your pod, promote your public pod page, and keep vendors ready for customer orders."
+              contentClassName="space-y-0"
+            >
+              <PodDashboardMetrics summary={analytics.summary} orderableVendorCount={orderableVendorCount} />
+            </DashboardSection>
 
-          <div className="lg:col-start-1 lg:row-start-2">
-            <PodVendorAdoptionBoard
-              podSlug={pod.slug}
-              launchSummary={launchSummary}
-              attentionRows={adoptionAttentionRows}
-              pendingCount={pendingForUi.length}
-            />
+            <div id="vendors" className="space-y-6">
+              <PodDashboardPendingRequests podId={pod.id} requests={pendingForUi} />
+
+              <PodDashboardInviteVendorSection
+                podId={pod.id}
+                prominent={layout.shouldPromoteInviteSection}
+                collapsedByDefault={layout.hasVendors}
+                eligibleVendors={vendorsNotInPod.map((v) => ({
+                  id: v.id,
+                  name: v.name,
+                  slug: v.slug,
+                  isActive: v.isActive,
+                  mennyuOrdersPaused: v.mennyuOrdersPaused ?? false,
+                }))}
+              />
+
+              {layout.shouldShowPodSetupSection ? (
+                <div id="setup">
+                  <PodDashboardSetupChecklist items={layout.actionablePodSetupItems} />
+                </div>
+              ) : null}
+
+              {layout.shouldShowVendorSetupSection ? (
+                <PodVendorAdoptionBoard
+                  podSlug={pod.slug}
+                  launchSummary={launchSummary}
+                  attentionRows={adoptionAttentionRows}
+                  pendingCount={pendingForUi.length}
+                />
+              ) : null}
+
+              {layout.shouldShowVendorRoster ? (
+                <DashboardCard
+                  title="Vendors in your pod"
+                  description="Set the order vendors appear on your public pod page. Use Featured in each row to highlight a vendor. Stripe and menu setup are completed by the vendor — you can pause visibility anytime."
+                >
+                  <PodVendorRosterPanel podId={pod.id} podSlug={pod.slug} initialRows={rosterRows} />
+                </DashboardCard>
+              ) : null}
+            </div>
           </div>
 
           <DashboardSection id="promote" showHeader={false} className="lg:col-start-2 lg:row-start-1">
@@ -266,39 +304,6 @@ export default async function PodDashboardPage({
 
           <DashboardSection id="activity" showHeader={false} className="lg:col-start-2 lg:row-start-2">
             <PodDashboardActivityFeed feed={activityFeed} />
-          </DashboardSection>
-
-          <DashboardSection id="setup" showHeader={false} className="lg:col-start-2 lg:row-start-3">
-            <PodDashboardSetupChecklist items={podSetupChecklist} demoted={demoteSetupChecklist} />
-          </DashboardSection>
-
-          <DashboardSection
-            id="vendors"
-            title="Vendors"
-            description="Review requests, invite restaurants, and manage how vendors appear on your public pod page."
-            className="lg:col-start-1 lg:row-start-3"
-            contentClassName="space-y-6"
-          >
-            <PodDashboardPendingRequests podId={pod.id} requests={pendingForUi} />
-
-            <PodDashboardInviteVendorSection
-              podId={pod.id}
-              collapsedByDefault={demoteSetupChecklist}
-              eligibleVendors={vendorsNotInPod.map((v) => ({
-                id: v.id,
-                name: v.name,
-                slug: v.slug,
-                isActive: v.isActive,
-                mennyuOrdersPaused: v.mennyuOrdersPaused ?? false,
-              }))}
-            />
-
-            <DashboardCard
-              title="Vendor roster"
-              description="Set the order vendors appear on your public pod page. Use Featured in each row to highlight a vendor. Stripe and menu setup are completed by the vendor — you can pause visibility anytime."
-            >
-              <PodVendorRosterPanel podId={pod.id} podSlug={pod.slug} initialRows={rosterRows} />
-            </DashboardCard>
           </DashboardSection>
         </div>
       </DashboardShellMain>

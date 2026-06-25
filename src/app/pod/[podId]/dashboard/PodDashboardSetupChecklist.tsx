@@ -34,53 +34,17 @@ function ChecklistBody({ items }: { items: ReadinessChecklistItem[] }) {
   );
 }
 
-export function PodDashboardSetupChecklist({
-  items,
-  demoted = false,
-}: {
-  items: ReadinessChecklistItem[];
-  demoted?: boolean;
-}) {
-  const completeCount = items.filter((i) => i.complete).length;
-  const allComplete = completeCount === items.length;
-  const sectionClass = demoted
-    ? "rounded-xl border border-oo-light-stone bg-oo-warm-white p-4"
-    : "rounded-xl border border-oo-light-stone bg-oo-cream/80 p-4";
-  const titleClass = demoted
-    ? "text-sm font-semibold uppercase tracking-wide text-oo-stone-gray"
-    : "text-base font-semibold text-oo-charcoal";
-
-  if (allComplete) {
-    return (
-      <details className={sectionClass}>
-        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className={titleClass}>Setup checklist</span>
-            <span className="text-xs text-oo-stone-gray">All complete</span>
-          </div>
-        </summary>
-        <ChecklistBody items={items} />
-      </details>
-    );
+export function PodDashboardSetupChecklist({ items }: { items: ReadinessChecklistItem[] }) {
+  if (items.length === 0) {
+    return null;
   }
 
   return (
-    <section className={sectionClass}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className={titleClass}>{demoted ? "Setup checklist" : "Pod setup"}</h2>
-        <p className="text-xs text-oo-stone-gray">
-          {completeCount} of {items.length} complete
-        </p>
-      </div>
-      {!demoted ? (
-        <p className="mt-1 text-sm text-oo-stone-gray">
-          Finish these steps so customers can find and order from your pod.
-        </p>
-      ) : (
-        <p className="mt-1 text-sm text-oo-stone-gray">
-          Your pod is live — revisit setup items anytime.
-        </p>
-      )}
+    <section className="rounded-xl border border-oo-light-stone bg-oo-cream/80 p-4">
+      <h2 className="text-base font-semibold text-oo-charcoal">Pod setup</h2>
+      <p className="mt-1 text-sm text-oo-stone-gray">
+        Finish these steps so customers can find and order from your pod.
+      </p>
       <ChecklistBody items={items} />
     </section>
   );

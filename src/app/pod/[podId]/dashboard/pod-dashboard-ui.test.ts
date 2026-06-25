@@ -15,7 +15,7 @@ describe("pod dashboard P0 UI", () => {
     expect(page).toContain("getPodAnalytics");
     expect(page).toContain("PodDashboardMetrics");
     expect(page).toContain("PodDashboardSidebar");
-    expect(page).toContain("demoteSetupChecklist");
+    expect(page).toContain("derivePodDashboardLayoutState");
     expect(page).toContain("PodVendorAdoptionBoard");
   });
 
@@ -86,6 +86,8 @@ describe("pod dashboard command center layout", () => {
     expect(page).toContain('id="activity"');
     expect(page).toContain('id="setup"');
     expect(page).toContain("DashboardSection");
+    expect(page).toContain("shouldShowPodSetupSection");
+    expect(page).toContain("shouldShowVendorSetupSection");
   });
 
   it("uses a responsive two-column main grid on large screens", () => {
@@ -153,6 +155,36 @@ describe("pod dashboard pickup instruction removal", () => {
   });
 });
 
+describe("pod dashboard onboarding layout", () => {
+  it("derives workflow visibility from pod and vendor readiness", () => {
+    const layout = readFileSync(join(root, "lib/pod-dashboard-layout.ts"), "utf8");
+    expect(layout).toContain("shouldShowPodSetupSection");
+    expect(layout).toContain("shouldShowVendorSetupSection");
+    expect(layout).toContain("shouldPromoteInviteSection");
+    expect(layout).toContain("filterActionablePodSetupItems");
+  });
+
+  it("orders main content as analytics, invite, setup, vendor setup, then roster", () => {
+    const page = readDashboard("page.tsx");
+    expect(page).toMatch(/PodDashboardMetrics[\s\S]*PodDashboardInviteVendorSection/);
+    expect(page).toMatch(/PodDashboardInviteVendorSection[\s\S]*shouldShowPodSetupSection/);
+    expect(page).toMatch(/shouldShowPodSetupSection[\s\S]*shouldShowVendorSetupSection/);
+    expect(page).toMatch(/shouldShowVendorSetupSection[\s\S]*shouldShowVendorRoster/);
+  });
+
+  it("hides completed pod setup checklist surfaces", () => {
+    const checklist = readDashboard("PodDashboardSetupChecklist.tsx");
+    expect(checklist).not.toContain("All complete");
+    expect(checklist).toContain("if (items.length === 0)");
+  });
+
+  it("supports prominent invite mode when the pod has no vendors", () => {
+    const invite = readDashboard("PodDashboardInviteVendorSection.tsx");
+    expect(invite).toContain("prominent");
+    expect(invite).toContain("Invite vendors to your pod");
+  });
+});
+
 describe("pod dashboard vendor adoption UI", () => {
   it("renders adoption board without reordering roster drag sort", () => {
     const page = readDashboard("page.tsx");
@@ -186,7 +218,7 @@ describe("pod dashboard activity feed UI", () => {
     const page = readDashboard("page.tsx");
     expect(page).toContain("getPodActivityFeed");
     expect(page).toContain("PodDashboardActivityFeed");
-    expect(page).toMatch(/id="promote"[\s\S]*id="activity"[\s\S]*id="setup"/);
+    expect(page).toMatch(/id="promote"[\s\S]*id="activity"/);
   });
 
   it("renders empty-state guidance without duplicate sidebar links", () => {

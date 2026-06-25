@@ -12,11 +12,13 @@ type EligibleVendor = {
 
 export function PodDashboardInviteVendorSection({
   podId,
-  collapsedByDefault,
+  prominent = false,
+  collapsedByDefault = false,
   eligibleVendors,
 }: {
   podId: string;
-  collapsedByDefault: boolean;
+  prominent?: boolean;
+  collapsedByDefault?: boolean;
   eligibleVendors: EligibleVendor[];
 }) {
   const hasEligibleVendors = eligibleVendors.length > 0;
@@ -37,6 +39,18 @@ export function PodDashboardInviteVendorSection({
       )}
     </>
   );
+
+  if (prominent) {
+    return (
+      <section className="rounded-xl border border-oo-charcoal/15 bg-oo-cream/80 p-6">
+        <h2 className="text-lg font-semibold text-oo-charcoal">Invite vendors to your pod</h2>
+        <p className="mt-2 text-sm text-oo-stone-gray">
+          Add your first restaurant to start building your pod page and taking customer orders.
+        </p>
+        <div className="mt-4">{body}</div>
+      </section>
+    );
+  }
 
   if (collapsedByDefault && !hasEligibleVendors) {
     return (
