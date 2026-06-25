@@ -99,6 +99,11 @@ describe("vendor payout transfer idempotency mismatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpdate.mockResolvedValue({});
+    mockReconcile.mockResolvedValue({
+      vendorPayoutTransferId: "vpt_1",
+      outcome: "unchanged_not_found",
+      message: "No matching Stripe transfer found",
+    });
   });
 
   it("maps Stripe idempotency mismatch to blocked_idempotency_mismatch", async () => {

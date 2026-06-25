@@ -299,6 +299,41 @@ function stripeErrorMessage(e: unknown): string {
   return String(e);
 }
 
+/** Check Stripe for an existing matching transfer before creating a new one. */
+async function reconcileBeforeSendIfNeeded(
+  transferId: string
+): Promise<ExecuteStripeTransferResult | null> {
+  const { reconcileVendorPayoutTransfer } = await import(
+    "./vendor-payout-transfer-reconciliation.service"
+  );
+  const reconcile = await reconcileVendorPayoutTransfer(transferId);
+  if (reconcile.outcome === "updated_paid" || reconcile.outcome === "already_paid") {
+    return {
+      outcome: "reconciled_paid",
+      stripeTransferId: reconcile.stripeTransferId ?? "",
+    };
+  }
+  return null;
+}
+
+const ELIGIBLE_RETRY_TRANSFER_STATUSES = [
+  VENDOR_PAYOUT_TRANSFER_STATUS.pending,
+  VENDOR_PAYOUT_TRANSFER_STATUS.failed,
+  VENDOR_PAYOUT_TRANSFER_STATUS.blockedInsufficientBalance,
+] as const;
+
+function eligibleRetryTransferWhere(take?: number) {
+  return {
+    where: {
+      destinationAccountId: { not: BLOCKED_DESTINATION_SENTINEL },
+      OR: [{ stripeTransferId: null }, { stripeTransferId: "" }],
+      status: { in: [...ELIGIBLE_RETRY_TRANSFER_STATUSES] },
+    },
+    orderBy: { createdAt: "asc" as const },
+    ...(take != null ? { take } : {}),
+  };
+}
+
 /**
  * Executes one pending transfer: idempotent via Stripe idempotency key; skips blocked/non-positive safely.
  */
@@ -352,6 +387,17 @@ export async function executeVendorPayoutTransfer(
       },
     });
     return { outcome: "paid", stripeTransferId: "" };
+  }
+
+  const reconciledEarly = await reconcileBeforeSendIfNeeded(transferId);
+  if (reconciledEarly) {
+    if (opts?.batchKey) {
+      await prisma.vendorPayoutTransfer.update({
+        where: { id: transferId },
+        data: { batchKey: opts.batchKey },
+      });
+    }
+    return reconciledEarly;
   }
 
   let stripeChargeId = row.paymentAllocation.payment.stripeChargeId?.trim() ?? null;
@@ -481,6 +527,17 @@ export async function retryFailedVendorPayoutTransfer(
     return { outcome: "skipped", reason: "blocked_destination" };
   }
 
+  const reconciledEarly = await reconcileBeforeSendIfNeeded(transferId);
+  if (reconciledEarly) {
+    if (opts?.batchKey) {
+      await prisma.vendorPayoutTransfer.update({
+        where: { id: transferId },
+        data: { batchKey: opts.batchKey },
+      });
+    }
+    return reconciledEarly;
+  }
+
   let executeOpts = opts;
   if (row.amountCents > 0 && !opts?.balanceTracker) {
     const balanceResolved = await resolveBalanceTracker(row.currency, opts);
@@ -591,11 +648,14 @@ export async function retryVendorPayoutTransferWithNewKey(
 export type PayoutTransferBatchSummary = {
   batchKey: string;
   examined: number;
-  /** New Stripe transfers created (or zero-amount settled without API). */
+  /** Transfers settled (updated from Stripe + newly sent). */
   settled: number;
+  updatedFromStripe: number;
+  retried: number;
   skipped: number;
   failed: number;
   blockedInsufficientBalance: number;
+  stillBlocked: number;
   failures: Array<{ transferId: string; message: string }>;
 };
 
@@ -614,15 +674,21 @@ function summarizeExecuteResult(
   r: ExecuteStripeTransferResult,
   summary: PayoutTransferBatchSummary
 ): void {
-  if (r.outcome === "paid" || r.outcome === "reconciled_paid") {
+  if (r.outcome === "reconciled_paid") {
     summary.settled++;
+    summary.updatedFromStripe++;
+  } else if (r.outcome === "paid") {
+    summary.settled++;
+    summary.retried++;
   } else if (r.outcome === "skipped" || r.outcome === "blocked_balance_unavailable") {
     summary.skipped++;
   } else if (r.outcome === "blocked_insufficient_balance") {
     summary.blockedInsufficientBalance++;
+    summary.stillBlocked++;
     summary.failures.push({ transferId, message: r.message });
   } else if (r.outcome === "blocked_idempotency_mismatch") {
     summary.failed++;
+    summary.stillBlocked++;
     summary.failures.push({ transferId, message: r.message });
   } else if (r.outcome === "failed") {
     summary.failed++;
@@ -635,11 +701,54 @@ function emptyBatchSummary(batchKey: string): PayoutTransferBatchSummary {
     batchKey,
     examined: 0,
     settled: 0,
+    updatedFromStripe: 0,
+    retried: 0,
     skipped: 0,
     failed: 0,
     blockedInsufficientBalance: 0,
+    stillBlocked: 0,
     failures: [],
   };
+}
+
+async function runEligibleVendorPayoutTransferRetries(params: {
+  batchKey: string;
+  take?: number;
+}): Promise<PayoutTransferBatchRunResult> {
+  const rows = await prisma.vendorPayoutTransfer.findMany(eligibleRetryTransferWhere(params.take));
+
+  const summary = emptyBatchSummary(params.batchKey);
+  summary.examined = rows.length;
+
+  if (rows.length === 0) {
+    return { ok: true, summary };
+  }
+
+  const balanceResult = await fetchStripePlatformBalance("usd");
+  if (!balanceResult.ok) {
+    return {
+      ok: false,
+      code: "balance_unavailable",
+      error: BALANCE_UNAVAILABLE_ADMIN_MESSAGE,
+      balanceError: balanceResult.error,
+      summary,
+    };
+  }
+
+  const tracker: BalanceTracker = {
+    currency: balanceResult.balance.currency,
+    remainingAvailableCents: balanceResult.balance.availableCents,
+  };
+
+  for (const row of rows) {
+    const r =
+      row.status === VENDOR_PAYOUT_TRANSFER_STATUS.pending
+        ? await executeVendorPayoutTransfer(row.id, { batchKey: params.batchKey, balanceTracker: tracker })
+        : await retryFailedVendorPayoutTransfer(row.id, { batchKey: params.batchKey, balanceTracker: tracker });
+    summarizeExecuteResult(row.id, r, summary);
+  }
+
+  return { ok: true, summary };
 }
 
 /**
@@ -687,60 +796,22 @@ export async function runManualVendorPayoutTransferBatch(params?: {
 }
 
 /**
- * Retry all failed or blocked-insufficient-balance transfers with one balance fetch (safe/idempotent).
+ * Retry eligible transfers (pending/failed/blocked insufficient balance) with reconcile-before-send.
  */
 export async function retryAllEligibleFailedVendorPayoutTransfers(params?: {
   batchKey?: string;
 }): Promise<PayoutTransferBatchRunResult> {
   const batchKey = params?.batchKey ?? `retry-${new Date().toISOString().slice(0, 10)}`;
+  return runEligibleVendorPayoutTransferRetries({ batchKey });
+}
 
-  const rows = await prisma.vendorPayoutTransfer.findMany({
-    where: {
-      status: {
-        in: [
-          VENDOR_PAYOUT_TRANSFER_STATUS.failed,
-          VENDOR_PAYOUT_TRANSFER_STATUS.blockedInsufficientBalance,
-        ],
-      },
-      destinationAccountId: { not: BLOCKED_DESTINATION_SENTINEL },
-      OR: [{ stripeTransferId: null }, { stripeTransferId: "" }],
-      NOT: {
-        status: {
-          in: [
-            VENDOR_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund,
-            VENDOR_PAYOUT_TRANSFER_STATUS.blockedPartialRefundReview,
-          ],
-        },
-      },
-    },
-    orderBy: { createdAt: "asc" },
-  });
-
-  const summary = emptyBatchSummary(batchKey);
-  summary.examined = rows.length;
-
-  const balanceResult = await fetchStripePlatformBalance("usd");
-  if (!balanceResult.ok) {
-    return {
-      ok: false,
-      code: "balance_unavailable",
-      error: BALANCE_UNAVAILABLE_ADMIN_MESSAGE,
-      balanceError: balanceResult.error,
-      summary,
-    };
-  }
-
-  const tracker: BalanceTracker = {
-    currency: balanceResult.balance.currency,
-    remainingAvailableCents: balanceResult.balance.availableCents,
-  };
-
-  for (const row of rows) {
-    const r = await retryFailedVendorPayoutTransfer(row.id, { batchKey, balanceTracker: tracker });
-    summarizeExecuteResult(row.id, r, summary);
-  }
-
-  return { ok: true, summary };
+/** Cron-safe retry for pending/failed/retryable vendor transfers (excludes refund-blocked rows). */
+export async function retryEligibleVendorPayoutTransfersJob(params?: {
+  take?: number;
+  batchKey?: string;
+}): Promise<PayoutTransferBatchRunResult> {
+  const batchKey = params?.batchKey ?? `retry-${new Date().toISOString().slice(0, 10)}`;
+  return runEligibleVendorPayoutTransferRetries({ batchKey, take: params?.take ?? 100 });
 }
 
 export type AutoVendorPayoutTransferSummary = {
@@ -876,66 +947,6 @@ export async function getVendorPayoutTransferGlobalSummary(): Promise<VendorPayo
     blockedReviewCount: blockedReviewRows.length,
     vendorOwedAmountCents: sum(owedRows),
   };
-}
-
-/**
- * Cron-safe retry for pending/failed/retryable vendor transfers (excludes refund-blocked rows).
- */
-export async function retryEligibleVendorPayoutTransfersJob(params?: {
-  take?: number;
-  batchKey?: string;
-}): Promise<PayoutTransferBatchRunResult> {
-  const take = params?.take ?? 100;
-  const batchKey = params?.batchKey ?? `retry-${new Date().toISOString().slice(0, 10)}`;
-
-  const rows = await prisma.vendorPayoutTransfer.findMany({
-    where: {
-      destinationAccountId: { not: BLOCKED_DESTINATION_SENTINEL },
-      OR: [{ stripeTransferId: null }, { stripeTransferId: "" }],
-      status: {
-        in: [
-          VENDOR_PAYOUT_TRANSFER_STATUS.pending,
-          VENDOR_PAYOUT_TRANSFER_STATUS.failed,
-          VENDOR_PAYOUT_TRANSFER_STATUS.blockedInsufficientBalance,
-        ],
-      },
-    },
-    orderBy: { createdAt: "asc" },
-    take,
-  });
-
-  const summary = emptyBatchSummary(batchKey);
-  summary.examined = rows.length;
-
-  if (rows.length === 0) {
-    return { ok: true, summary };
-  }
-
-  const balanceResult = await fetchStripePlatformBalance("usd");
-  if (!balanceResult.ok) {
-    return {
-      ok: false,
-      code: "balance_unavailable",
-      error: BALANCE_UNAVAILABLE_ADMIN_MESSAGE,
-      balanceError: balanceResult.error,
-      summary,
-    };
-  }
-
-  const tracker: BalanceTracker = {
-    currency: balanceResult.balance.currency,
-    remainingAvailableCents: balanceResult.balance.availableCents,
-  };
-
-  for (const row of rows) {
-    const r =
-      row.status === VENDOR_PAYOUT_TRANSFER_STATUS.pending
-        ? await executeVendorPayoutTransfer(row.id, { batchKey, balanceTracker: tracker })
-        : await retryFailedVendorPayoutTransfer(row.id, { batchKey, balanceTracker: tracker });
-    summarizeExecuteResult(row.id, r, summary);
-  }
-
-  return { ok: true, summary };
 }
 
 export type { StripePlatformBalanceSnapshot };

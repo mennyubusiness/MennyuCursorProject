@@ -58,18 +58,26 @@ describe("admin vendor transfers page terminology", () => {
   it("uses short primary action labels in the recommended order", () => {
     const actionsBlock = dashboardSrc.slice(
       dashboardSrc.indexOf("Retry eligible transfers"),
-      dashboardSrc.indexOf("mt-4 flex flex-col gap-4 border-t border-oo-light-stone pt-4")
+      dashboardSrc.indexOf("More actions")
     );
     const retryIdx = actionsBlock.indexOf("Retry eligible transfers");
     const batchIdx = actionsBlock.indexOf("Run batch");
     const refreshIdx = actionsBlock.indexOf("Refresh balance");
-    const reconcileIdx = actionsBlock.indexOf(': "Reconcile"');
     expect(retryIdx).toBeGreaterThan(-1);
     expect(batchIdx).toBeGreaterThan(retryIdx);
     expect(refreshIdx).toBeGreaterThan(batchIdx);
-    expect(reconcileIdx).toBeGreaterThan(refreshIdx);
+    expect(actionsBlock).not.toMatch(/Reconcile with Stripe/);
+    expect(dashboardSrc).toMatch(/More actions/);
+    expect(dashboardSrc).toMatch(/Reconcile with Stripe/);
     expect(dashboardSrc).not.toMatch(/Run vendor transfer batch/);
     expect(dashboardSrc).not.toMatch(/Retry all eligible vendor transfers/);
+  });
+
+  it("hides default row Check action and keeps Check Stripe in advanced actions", () => {
+    expect(dashboardSrc).toMatch(/renderTransferAdvancedActions/);
+    expect(dashboardSrc).toMatch(/Check Stripe/);
+    expect(dashboardSrc).not.toMatch(/Retrying…" : "Check"/);
+    expect(dashboardSrc).toMatch(/window\.confirm/);
   });
 
   it("renders Needs action table with Problem column and collapsed Details", () => {
@@ -110,5 +118,6 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).toMatch(/runBulkReconcile/);
     expect(dashboardSrc).toMatch(/adminRetryVendorPayoutTransferAction/);
     expect(dashboardSrc).toMatch(/Retrying…" : "Retry"/);
+    expect(dashboardSrc).toMatch(/updatedFromStripe/);
   });
 });

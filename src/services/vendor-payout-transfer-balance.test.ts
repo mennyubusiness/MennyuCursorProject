@@ -37,6 +37,14 @@ vi.mock("@/services/stripe-payment-charge-details.service", () => ({
   resolvePaymentStripeChargeId: vi.fn(async () => null),
 }));
 
+vi.mock("./vendor-payout-transfer-reconciliation.service", () => ({
+  reconcileVendorPayoutTransfer: vi.fn(async () => ({
+    vendorPayoutTransferId: "vpt_1",
+    outcome: "unchanged_not_found",
+    message: "No matching Stripe transfer found",
+  })),
+}));
+
 import {
   BALANCE_UNAVAILABLE_ADMIN_MESSAGE,
   executeVendorPayoutTransfer,

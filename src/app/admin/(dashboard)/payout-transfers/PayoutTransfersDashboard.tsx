@@ -407,7 +407,7 @@ export function PayoutTransfersDashboard({
         return;
       }
       setBatchMsg(
-        `Retry all vendor transfers: examined ${r.summary.examined}, settled ${r.summary.settled}, skipped ${r.summary.skipped}, failed ${r.summary.failed}, blocked (balance) ${r.summary.blockedInsufficientBalance}.`
+        `Updated from Stripe: ${r.summary.updatedFromStripe}. Retried: ${r.summary.retried}. Still blocked: ${r.summary.stillBlocked}. Skipped: ${r.summary.skipped}.`
       );
       startTransition(() => router.refresh());
     } catch (e) {
@@ -538,6 +538,10 @@ export function PayoutTransfersDashboard({
   }
 
   async function retryTransfer(id: string) {
+    const confirmed = window.confirm(
+      "This checks Stripe first to avoid duplicate transfers, then retries if no matching transfer exists."
+    );
+    if (!confirmed) return;
     setRetryPayoutId(id);
     try {
       const r = await adminRetryVendorPayoutTransferAction(id);
@@ -548,6 +552,9 @@ export function PayoutTransfersDashboard({
       if (!r.transfer) {
         alert("Retry failed");
         return;
+      }
+      if (r.result.outcome === "reconciled_paid") {
+        alert("Existing Stripe transfer found. Status updated.");
       }
       const row = normalizeTransferRow(r.transfer);
       setTransfers((prev) => prev.map((t) => (t.id === id ? row : t)));
@@ -641,8 +648,6 @@ export function PayoutTransfersDashboard({
 
   function renderTransferActions(t: AdminPayoutTransferRow) {
     const retryable = isRetryablePayoutTransfer(t);
-    const reconcilable = isReconcilablePayoutTransfer(t);
-    const newKeyRetry = canRetryWithNewIdempotencyKey(t, reconcileOutcomes[t.id]);
     return (
       <div className="flex flex-col gap-1">
         {retryable ? (
@@ -655,33 +660,42 @@ export function PayoutTransfersDashboard({
             {retryPayoutId === t.id ? "Retrying…" : "Retry"}
           </button>
         ) : null}
-        {reconcilable ? (
-          <button
-            type="button"
-            disabled={reconcilePayoutId !== null || retryPayoutId !== null}
-            onClick={() => void checkStripeTransfer(t.id)}
-            className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-950 hover:bg-sky-100 disabled:opacity-50"
-          >
-            {reconcilePayoutId === t.id ? "Checking…" : "Check"}
-          </button>
-        ) : null}
-        {newKeyRetry ? (
-          <button
-            type="button"
-            disabled={newKeyRetryId !== null || reconcilePayoutId !== null}
-            onClick={() => void retryWithNewTransferKey(t.id)}
-            className="rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-950 hover:bg-violet-100 disabled:opacity-50"
-          >
-            {newKeyRetryId === t.id ? "Retrying…" : "New key"}
-          </button>
-        ) : null}
-        <Link
-          href={`/admin/orders/${t.vendorOrder.orderId}`}
-          className="rounded-md border border-oo-light-stone bg-oo-warm-white px-2 py-1 text-center text-xs font-semibold text-oo-charcoal hover:bg-oo-cream"
-        >
-          View
-        </Link>
       </div>
+    );
+  }
+
+  function renderTransferAdvancedActions(t: AdminPayoutTransferRow) {
+    const reconcilable = isReconcilablePayoutTransfer(t);
+    const newKeyRetry = canRetryWithNewIdempotencyKey(t, reconcileOutcomes[t.id]);
+    if (!reconcilable && !newKeyRetry) return null;
+    return (
+      <details className="mt-3 border-t border-oo-light-stone/60 pt-2">
+        <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
+          Advanced actions
+        </summary>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {reconcilable ? (
+            <button
+              type="button"
+              disabled={reconcilePayoutId !== null || retryPayoutId !== null}
+              onClick={() => void checkStripeTransfer(t.id)}
+              className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-950 hover:bg-sky-100 disabled:opacity-50"
+            >
+              {reconcilePayoutId === t.id ? "Checking…" : "Check Stripe"}
+            </button>
+          ) : null}
+          {newKeyRetry ? (
+            <button
+              type="button"
+              disabled={newKeyRetryId !== null || reconcilePayoutId !== null}
+              onClick={() => void retryWithNewTransferKey(t.id)}
+              className="rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-950 hover:bg-violet-100 disabled:opacity-50"
+            >
+              {newKeyRetryId === t.id ? "Retrying…" : "Retry with new key"}
+            </button>
+          ) : null}
+        </div>
+      </details>
     );
   }
 
@@ -710,6 +724,7 @@ export function PayoutTransfersDashboard({
                 showBlockedNote={false}
                 moneyMovement={t.moneyMovement}
               />
+              {renderTransferAdvancedActions(t)}
             </div>
           </details>
         </td>
@@ -874,15 +889,23 @@ export function PayoutTransfersDashboard({
           >
             {balanceBusy ? "Refreshing…" : "Refresh balance"}
           </button>
-          <button
-            type="button"
-            disabled={actionLocked}
-            onClick={() => void runBulkReconcile()}
-            className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
-          >
-            {batchBusy === "reconcile" ? "Reconciling…" : "Reconcile"}
-          </button>
         </div>
+
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs font-semibold text-oo-stone-gray hover:text-oo-charcoal">
+            More actions
+          </summary>
+          <div className="mt-2">
+            <button
+              type="button"
+              disabled={actionLocked}
+              onClick={() => void runBulkReconcile()}
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+            >
+              {batchBusy === "reconcile" ? "Reconciling…" : "Reconcile with Stripe"}
+            </button>
+          </div>
+        </details>
 
         <div className="mt-4 flex flex-col gap-4 border-t border-oo-light-stone pt-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-wrap items-end gap-3">
