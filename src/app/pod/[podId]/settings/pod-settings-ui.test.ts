@@ -36,16 +36,14 @@ describe("pod settings workspace layout", () => {
     expect(page).toContain("public identity");
   });
 
-  it("links promote elsewhere and only mentions payouts when configured", () => {
+  it("focuses on profile without cross-page guidance", () => {
     const page = readSettings("page.tsx");
     expect(page).toContain('id="profile"');
     expect(page).toContain("PodBrandProfileForm");
     expect(page).not.toContain("PodOrderingQrSection");
     expect(page).not.toContain("PodPayoutSetupCard");
     expect(page).not.toContain("Promote & QR");
-    expect(page).toContain("/promote");
-    expect(page).toContain("showPayouts");
-    expect(page).toContain("arePodOwnerPayoutsConfigured");
+    expect(page).not.toMatch(/QR codes, signage|Pod share payouts are on the/i);
   });
 });
 
@@ -61,8 +59,10 @@ describe("pod settings payout account copy", () => {
 
   it("uses payout account copy without earnings amounts in setup card", () => {
     const setupCard = readSettings("PodPayoutSetupCard.tsx");
-    expect(setupCard).toContain("Payout account ready");
+    expect(setupCard).toContain("Payout account");
     expect(setupCard).toContain("Update payout account");
+    expect(setupCard).not.toContain("Your payout account is ready to receive pod owner payments");
+    expect(setupCard).not.toMatch(/border-emerald-200 bg-emerald-50/);
     expect(setupCard).not.toMatch(/earnings are available|your earnings|\$[\d,]+/i);
     expect(setupCard).not.toMatch(/\brecipient\b|\bclaim\b|basis points/i);
   });

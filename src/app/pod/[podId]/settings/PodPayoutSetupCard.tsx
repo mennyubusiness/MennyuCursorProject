@@ -156,14 +156,7 @@ export function PodPayoutSetupCard({
       ) : null}
 
       <div className="space-y-3">
-        {ready ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2">
-            <p className="text-sm font-medium text-emerald-900">Payout account ready</p>
-            <p className="mt-1 text-xs text-emerald-800/90">
-              Your payout account is ready to receive pod owner payments.
-            </p>
-          </div>
-        ) : hasAccount ? (
+        {!ready && hasAccount ? (
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream px-3 py-2">
             <p className="text-sm font-medium text-oo-charcoal">
               {needsAttention ? "Additional information required" : "Continue payout setup"}
@@ -174,9 +167,9 @@ export function PodPayoutSetupCard({
                 : "Complete the remaining steps to finish payout setup."}
             </p>
           </div>
-        ) : (
+        ) : !ready ? (
           <p className="text-sm text-oo-stone-gray">Payout account setup has not been started yet.</p>
-        )}
+        ) : null}
 
         {error ? (
           <p className="text-sm text-red-700" role="alert">
