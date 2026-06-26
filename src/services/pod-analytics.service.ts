@@ -6,6 +6,7 @@
 import { prisma } from "@/lib/db";
 import { getExceptionType } from "@/lib/admin-exceptions";
 import { isManuallyRecovered } from "@/lib/admin-manual-recovery";
+import { POD_PAYOUT_ALLOCATION_STATUS } from "@/lib/pod-payout-allocation";
 
 function startOfToday(): Date {
   const d = new Date();
@@ -287,6 +288,7 @@ export async function getPodAnalyticsExtended(
   ordersInRange: number;
   salesInRangeCents: number;
   avgOrderValueInRangeCents: number;
+  podRevenueShareInRangeCents: number;
   vendorBreakdown: PodVendorAnalyticsRow[];
 }) | null> {
   const base = await getPodAnalytics(podId);
@@ -295,7 +297,7 @@ export async function getPodAnalyticsExtended(
   const rangeStart =
     range === "today" ? startOfToday() : range === "30d" ? startOfDaysAgo(30) : startOfLast7Days();
 
-  const [ordersInRange, completedVendorOrders] = await Promise.all([
+  const [ordersInRange, completedVendorOrders, revenueShareInRange] = await Promise.all([
     prisma.order.count({
       where: { podId, createdAt: { gte: rangeStart } },
     }),
@@ -311,9 +313,18 @@ export async function getPodAnalyticsExtended(
         vendor: { select: { name: true } },
       },
     }),
+    prisma.podPayoutAllocation.aggregate({
+      where: {
+        podId,
+        createdAt: { gte: rangeStart },
+        status: { not: POD_PAYOUT_ALLOCATION_STATUS.cancelledDueToRefund },
+      },
+      _sum: { podPayoutAmountCents: true },
+    }),
   ]);
 
   const salesInRangeCents = completedVendorOrders.reduce((sum, row) => sum + row.totalCents, 0);
+  const podRevenueShareInRangeCents = revenueShareInRange._sum.podPayoutAmountCents ?? 0;
   const avgOrderValueInRangeCents =
     ordersInRange > 0 ? Math.round(salesInRangeCents / ordersInRange) : 0;
 
@@ -347,6 +358,7 @@ export async function getPodAnalyticsExtended(
     ordersInRange,
     salesInRangeCents,
     avgOrderValueInRangeCents,
+    podRevenueShareInRangeCents,
     vendorBreakdown,
   };
 }

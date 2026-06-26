@@ -1,20 +1,27 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { buttonClassName } from "@/components/ui/button";
 
 type PodQrActionsProps = {
-  absoluteUrl: string;
-  /** PNG data URL from server-generated QR */
+  publicPageUrl: string;
+  publicPageHref: string;
   qrDataUrl: string;
   downloadFileName: string;
 };
 
-export function PodQrActions({ absoluteUrl, qrDataUrl, downloadFileName }: PodQrActionsProps) {
+export function PodQrActions({
+  publicPageUrl,
+  publicPageHref,
+  qrDataUrl,
+  downloadFileName,
+}: PodQrActionsProps) {
   const [copied, setCopied] = useState(false);
 
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(absoluteUrl);
+      await navigator.clipboard.writeText(publicPageUrl);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -27,17 +34,25 @@ export function PodQrActions({ absoluteUrl, qrDataUrl, downloadFileName }: PodQr
       <button
         type="button"
         onClick={() => void copyLink()}
-        className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400 active:scale-[0.99]"
+        className={buttonClassName({ variant: "outline", size: "sm" })}
       >
-        {copied ? "Copied" : "Copy link"}
+        {copied ? "Copied!" : "Copy link"}
       </button>
       <a
         href={qrDataUrl}
         download={downloadFileName}
-        className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400"
+        className={buttonClassName({ variant: "outline", size: "sm" })}
       >
-        Download QR (PNG)
+        Download QR
       </a>
+      <Link
+        href={publicPageHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={buttonClassName({ variant: "secondary", size: "sm" })}
+      >
+        View public page
+      </Link>
     </div>
   );
 }

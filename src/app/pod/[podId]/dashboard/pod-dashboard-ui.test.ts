@@ -70,11 +70,33 @@ describe("pod dedicated pages", () => {
     expect(readPod("vendors/page.tsx")).not.toContain("PodDashboardInviteVendorSection");
     expect(readPod("analytics/page.tsx")).toContain("getPodAnalyticsExtended");
     expect(readPod("analytics/page.tsx")).not.toContain("redirect(");
-    expect(readPod("promote/page.tsx")).toContain("PodPromotionCard");
     expect(readPod("promote/page.tsx")).toContain("PodOrderingQrSection");
+    expect(readPod("promote/page.tsx")).toContain("PodPromotionCard");
+    expect(readPod("promote/page.tsx")).not.toContain("featuredVendors");
     expect(readPod("payouts/page.tsx")).toContain("PodPayoutSummaryCard");
     expect(readPod("setup/page.tsx")).toContain("VendorSetupChecklist");
     expect(readPod("setup/page.tsx")).not.toContain("Recommended");
+  });
+});
+
+describe("pod promote page", () => {
+  it("focuses on share and announcement without featured vendors or developer notes", () => {
+    const page = readPod("promote/page.tsx");
+    const share = readFileSync(join(root, "components/pod/PodOrderingQrSection.tsx"), "utf8");
+    const announcement = readDashboard("PodPromotionCard.tsx");
+    const qrActions = readFileSync(join(root, "components/pod/PodQrActions.tsx"), "utf8");
+
+    expect(page).toContain("Share your public pod page and keep announcements fresh");
+    expect(share).toContain("Share your pod");
+    expect(share).not.toContain("PUBLIC_APP_URL");
+    expect(share).not.toContain("Developer");
+    expect(share).toContain("QR code is not available yet");
+    expect(qrActions).toContain("Copy link");
+    expect(qrActions).toContain("Download QR");
+    expect(qrActions).toContain("View public page");
+    expect(announcement).toContain('title="Announcement"');
+    expect(announcement).not.toContain("Featured vendors");
+    expect(announcement).not.toContain("featuredVendors");
   });
 });
 
@@ -104,6 +126,9 @@ describe("pod analytics aggregate-only", () => {
     const analytics = readFileSync(join(root, "services/pod-analytics.service.ts"), "utf8");
     expect(analytics).toContain("getPodAnalyticsExtended");
     expect(analytics).toContain("vendorBreakdown");
+    expect(analytics).toContain("podRevenueShareInRangeCents");
+    expect(analytics).toContain("podPayoutAllocation");
+    expect(analytics).toContain("POD_PAYOUT_ALLOCATION_STATUS.cancelledDueToRefund");
     expect(analytics).not.toMatch(/customerPhone|customerEmail|pickupCode/i);
   });
 
@@ -111,7 +136,10 @@ describe("pod analytics aggregate-only", () => {
     const view = readPod("analytics/PodAnalyticsView.tsx");
     expect(view).toContain("Vendor breakdown");
     expect(view).toContain("Orders and sales by day");
-    expect(view).not.toMatch(/pickup code|customer name/i);
+    expect(view).toContain("Pod revenue share");
+    expect(view).toContain("From eligible pod sales");
+    expect(view).toContain("podRevenueShareInRangeCents");
+    expect(view).not.toMatch(/pickup code|customer name|basis point|transfer id/i);
   });
 });
 

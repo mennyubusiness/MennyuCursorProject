@@ -2,6 +2,7 @@ import QRCode from "qrcode";
 
 import { DashboardCard } from "@/components/dashboard";
 import { DASHBOARD_SECTION_SCROLL_CLASS } from "@/components/dashboard/dashboard-styles";
+import { buildPodCustomerPath } from "@/lib/customer-public-url";
 import { buildPodOrderingAbsoluteUrl } from "@/lib/pod-ordering-url";
 import { cn } from "@/lib/cn";
 
@@ -23,60 +24,70 @@ export async function PodOrderingQrSection({
   podName,
   publicOrigin,
 }: PodOrderingQrSectionProps) {
-  const absoluteUrl = buildPodOrderingAbsoluteUrl(publicOrigin, podSlug);
-  const safeSlug = podSlug.replace(/[^a-zA-Z0-9-_]+/g, "-").slice(0, 48) || "pod";
+  const slug = podSlug.trim();
+  const publicPageHref = slug ? buildPodCustomerPath(slug) : "";
+  const origin = publicOrigin.replace(/\/$/, "");
+  const publicPageUrl = slug && origin ? `${origin}${publicPageHref}` : "";
+  const safeSlug = slug.replace(/[^a-zA-Z0-9-_]+/g, "-").slice(0, 48) || "pod";
 
-  let qrDataUrl: string;
-  try {
-    qrDataUrl = await QRCode.toDataURL(absoluteUrl, {
-      width: QR_RENDER_PX,
-      margin: 2,
-      errorCorrectionLevel: "M",
-      color: { dark: "#1c1917ff", light: "#ffffffff" },
-    });
-  } catch {
-    qrDataUrl = "";
+  let qrDataUrl = "";
+  if (slug && origin) {
+    const qrTargetUrl = buildPodOrderingAbsoluteUrl(origin, slug);
+    try {
+      qrDataUrl = await QRCode.toDataURL(qrTargetUrl, {
+        width: QR_RENDER_PX,
+        margin: 2,
+        errorCorrectionLevel: "M",
+        color: { dark: "#1c1917ff", light: "#ffffffff" },
+      });
+    } catch {
+      qrDataUrl = "";
+    }
   }
 
   return (
-    <section id="ordering-qr" className={cn(DASHBOARD_SECTION_SCROLL_CLASS)}>
+    <section id="share-your-pod" className={cn(DASHBOARD_SECTION_SCROLL_CLASS)}>
       <DashboardCard
-        title="QR & signage"
-        description="Customers can scan this code at your pod to open your public pod page and start ordering."
+        title="Share your pod"
+        description="Use your public link or QR code to help customers start an order."
       >
-        <p className="break-all font-mono text-xs text-oo-stone-gray">{absoluteUrl}</p>
-        <p className="mt-1 text-xs text-oo-stone-gray">
-          Set <code className="rounded bg-oo-cream px-1">PUBLIC_APP_URL</code> or{" "}
-          <code className="rounded bg-oo-cream px-1">NEXT_PUBLIC_APP_URL</code> in production so this
-          matches your live domain (otherwise the request host is used).
-        </p>
-
-        {qrDataUrl ? (
-          <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-start">
-            <div className="shrink-0 rounded-xl border border-oo-light-stone bg-oo-warm-white p-3 shadow-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element -- data URL from server */}
-              <img
-                src={qrDataUrl}
-                alt={`QR code — order at ${podName}`}
-                width={200}
-                height={200}
-                className="h-auto w-[200px] max-w-full"
-              />
-            </div>
-            <div className="min-w-0 flex-1 space-y-3">
-              <p className="text-sm text-oo-stone-gray">
-                Preview is scaled for the screen. Downloaded PNG is {QR_RENDER_PX}px — suitable for
-                printing or scaling for signage.
-              </p>
-              <PodQrActions
-                absoluteUrl={absoluteUrl}
-                qrDataUrl={qrDataUrl}
-                downloadFileName={`open-order-pod-${safeSlug}-qr.png`}
-              />
-            </div>
-          </div>
+        {!publicPageHref ? (
+          <p className="text-sm text-oo-stone-gray">Public page link is not available yet.</p>
         ) : (
-          <p className="mt-4 text-sm text-amber-900">Could not generate QR code. Try again or copy the link.</p>
+          <div className="space-y-5">
+            <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2.5">
+              <p className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Public page</p>
+              <p className="mt-1 break-all text-sm font-medium text-oo-charcoal">{publicPageHref}</p>
+              {publicPageUrl ? (
+                <p className="mt-1 break-all text-xs text-oo-stone-gray">{publicPageUrl}</p>
+              ) : null}
+            </div>
+
+            {qrDataUrl ? (
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                <div className="mx-auto shrink-0 rounded-xl border border-oo-light-stone bg-oo-warm-white p-3 shadow-sm sm:mx-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- data URL from server */}
+                  <img
+                    src={qrDataUrl}
+                    alt={`QR code for ${podName}`}
+                    width={200}
+                    height={200}
+                    className="h-auto w-[200px] max-w-full"
+                  />
+                </div>
+                <div className="min-w-0 flex-1 space-y-3">
+                  <PodQrActions
+                    publicPageUrl={publicPageUrl}
+                    publicPageHref={publicPageHref}
+                    qrDataUrl={qrDataUrl}
+                    downloadFileName={`open-order-pod-${safeSlug}-qr.png`}
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-oo-stone-gray">QR code is not available yet.</p>
+            )}
+          </div>
         )}
       </DashboardCard>
     </section>

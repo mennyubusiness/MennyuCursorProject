@@ -47,6 +47,11 @@ export function PodAnalyticsView({
           <DashboardMetricCard label="Total orders" value={analytics.ordersInRange} />
           <DashboardMetricCard label="Total sales" value={formatMoney(analytics.salesInRangeCents)} />
           <DashboardMetricCard
+            label="Pod revenue share"
+            value={formatMoney(analytics.podRevenueShareInRangeCents)}
+            helper="From eligible pod sales"
+          />
+          <DashboardMetricCard
             label="Average order value"
             value={
               analytics.ordersInRange > 0
