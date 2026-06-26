@@ -21,9 +21,9 @@ export function vendorIntakeStatusLabel(input: {
   return "Not ready";
 }
 
-export function vendorIntakeStatusTone(
-  label: VendorIntakeStatusLabel
-): "success" | "warning" | "neutral" | "error" {
+export type VendorIntakeStatusTone = "success" | "warning" | "neutral" | "danger";
+
+export function vendorIntakeStatusTone(label: VendorIntakeStatusLabel): VendorIntakeStatusTone {
   switch (label) {
     case "Accepting orders":
       return "success";
@@ -32,7 +32,7 @@ export function vendorIntakeStatusTone(
     case "Closed":
       return "neutral";
     case "Not ready":
-      return "error";
+      return "danger";
     default:
       return "neutral";
   }

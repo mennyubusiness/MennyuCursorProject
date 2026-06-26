@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { DashboardStatusBadge } from "@/components/dashboard";
+import { DashboardStatusBadge, type DashboardStatusTone } from "@/components/dashboard";
 import {
   vendorIntakeStatusTone,
   VENDOR_POS_MANAGED_COPY,
@@ -33,7 +33,7 @@ export function VendorStoreStatusCard({
   initialPaused,
   storefrontHref,
 }: VendorStoreStatusCardProps) {
-  const tone = vendorIntakeStatusTone(intakeLabel);
+  const tone: DashboardStatusTone = vendorIntakeStatusTone(intakeLabel);
 
   return (
     <section className="rounded-2xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm sm:p-6">
