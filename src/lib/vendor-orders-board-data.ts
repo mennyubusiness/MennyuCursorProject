@@ -40,6 +40,7 @@ export const getVendorOrdersBoardData = cache(async (vendorId: string) => {
       manuallyRecoveredAt: true,
       totalCents: true,
       tipCents: true,
+      totalRefundedCents: true,
       order: {
         select: {
           id: true,
@@ -73,7 +74,7 @@ export const getVendorOrdersBoardData = cache(async (vendorId: string) => {
       },
       statusHistory: {
         orderBy: { createdAt: "asc" },
-        select: { source: true, fulfillmentStatus: true, createdAt: true },
+        select: { source: true, fulfillmentStatus: true, routingStatus: true, createdAt: true },
       },
     },
     orderBy: { createdAt: "desc" },

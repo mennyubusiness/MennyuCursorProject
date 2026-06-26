@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { MenuImportPublishPanel } from "@/components/menu-import/MenuImportPublishPanel";
-import { liveMenuSourceCopy, formatLiveMenuStatusLine } from "@/lib/vendor-menu-page.helpers";
+import {
+  liveMenuSourceCopy,
+  formatLiveMenuStatusLine,
+  formatRelativeSyncTime,
+} from "@/lib/vendor-menu-page.helpers";
 import { VENDOR_POS_MENU_MANAGED_COPY } from "@/lib/vendor-operational-copy";
 import type { VendorMenuPageData } from "@/lib/vendor-menu-page-data.server";
 import { VendorMenuHeaderActions } from "./VendorMenuHeaderActions";
@@ -14,9 +18,15 @@ function formatDate(iso: string | null): string {
 export function VendorMenuPageView({ data }: { data: VendorMenuPageData }) {
   const { vendorId } = data;
   const hasLiveMenu = data.liveSummary.itemCount > 0;
+  const unavailableCount = data.liveSummary.unavailableCount;
   const publishUrl = data.latestImport
     ? `/api/vendor/${encodeURIComponent(vendorId)}/menu-imports/${encodeURIComponent(data.latestImport.jobId)}/publish`
     : null;
+  const menuSourceLine = data.posConnected
+    ? "Menu synced from your POS."
+    : hasLiveMenu
+      ? "Managed in Open Order."
+      : "Menu sync needs attention.";
 
   return (
     <div className="space-y-8">
@@ -24,13 +34,8 @@ export function VendorMenuPageView({ data }: { data: VendorMenuPageData }) {
         <div className="min-w-0">
           <h2 className="text-2xl font-semibold text-oo-charcoal">Menu</h2>
           <p className="mt-2 max-w-2xl text-sm text-oo-stone-gray">
-            Manage what customers can order. Search items and control availability.
+            Menu visibility, availability, and sync status.
           </p>
-          {data.posConnected ? (
-            <p className="mt-3 rounded-lg bg-oo-cream/80 px-3 py-2 text-sm text-oo-stone-gray">
-              {VENDOR_POS_MENU_MANAGED_COPY}
-            </p>
-          ) : null}
         </div>
         <VendorMenuHeaderActions
           vendorId={vendorId}
@@ -39,6 +44,52 @@ export function VendorMenuPageView({ data }: { data: VendorMenuPageData }) {
           canPublish={data.publishGate.canPublish}
         />
       </header>
+
+      <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-oo-charcoal">Menu status</h3>
+        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-xs text-oo-stone-gray">Source</dt>
+            <dd className="mt-0.5 font-medium text-oo-charcoal">{menuSourceLine}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-oo-stone-gray">Last sync</dt>
+            <dd className="mt-0.5 font-medium text-oo-charcoal">
+              {data.publishedAtIso
+                ? formatRelativeSyncTime(data.publishedAtIso)
+                : data.latestImport?.importedAtIso
+                  ? formatRelativeSyncTime(data.latestImport.importedAtIso)
+                  : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-oo-stone-gray">Active items</dt>
+            <dd className="mt-0.5 font-medium text-oo-charcoal">{data.liveSummary.availableCount}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-oo-stone-gray">Unavailable</dt>
+            <dd className="mt-0.5 font-medium text-oo-charcoal">{unavailableCount}</dd>
+          </div>
+        </dl>
+        {!data.menuHealth.ready ? (
+          <p className="mt-3 text-sm text-amber-950">Menu sync needs attention — review health below.</p>
+        ) : null}
+        {data.posConnected ? (
+          <p className="mt-3 rounded-lg bg-oo-cream/80 px-3 py-2 text-sm text-oo-stone-gray">
+            {VENDOR_POS_MENU_MANAGED_COPY}
+          </p>
+        ) : null}
+        {data.storefrontHref ? (
+          <Link
+            href={data.storefrontHref}
+            className="mt-3 inline-block text-sm font-medium text-oo-charcoal underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View customer menu
+          </Link>
+        ) : null}
+      </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
@@ -151,7 +202,7 @@ export function VendorMenuPageView({ data }: { data: VendorMenuPageData }) {
         </div>
       </section>
 
-      <VendorMenuItemBrowser items={data.displayItems} />
+      <VendorMenuItemBrowser items={data.displayItems} posConnected={data.posConnected} />
     </div>
   );
 }

@@ -9,7 +9,6 @@ import {
 import { DeliverectMenuHealthPanel } from "@/components/deliverect/DeliverectMenuHealthPanel";
 import { MennyuLocationIdField } from "@/components/vendor/MennyuLocationIdField";
 import { VendorPosConnectionPanel } from "@/components/vendor/VendorPosConnectionPanel";
-import { VendorPauseToggle } from "../dashboard/VendorPauseToggle";
 import { VendorPodRequests } from "../dashboard/VendorPodRequests";
 import { VendorRecentPodRequests } from "../dashboard/VendorRecentPodRequests";
 import { VendorAutoPublishToggle } from "./VendorAutoPublishToggle";
@@ -67,11 +66,11 @@ function OverviewSectionCards({
   badges: Partial<Record<VendorSettingsSectionId, string>>;
 }) {
   const cards: Array<{ section: VendorSettingsSectionId; label: string; badge?: string }> = [
-    { section: "profile", label: "Profile", badge: badges.profile },
+    { section: "profile", label: "Business profile", badge: badges.profile },
     { section: "payouts", label: "Payouts", badge: badges.payouts },
     { section: "pos-menu", label: "POS & menu", badge: badges["pos-menu"] },
-    { section: "ordering", label: "Ordering", badge: badges.ordering },
     { section: "pod-membership", label: "Pod membership", badge: badges["pod-membership"] },
+    { section: "account", label: "Account", badge: badges.account },
   ];
 
   return (
@@ -128,7 +127,13 @@ export function VendorSettingsSectionPanels(props: VendorSettingsSectionPanelsPr
               Account settings live here. Day-to-day operations use Dashboard, Orders, Menu, and Hours.
             </p>
           </div>
-          <PrimaryNextAction items={props.checklist} />
+          {props.checklist.every((item) => item.complete) ? (
+            <p className="rounded-xl border border-oo-light-stone bg-oo-cream/50 px-4 py-3 text-sm text-oo-stone-gray">
+              No changes needed right now.
+            </p>
+          ) : (
+            <PrimaryNextAction items={props.checklist} />
+          )}
           <div className="flex flex-wrap gap-3 text-sm">
             <Link href={`/vendor/${vendorId}/setup`} className="font-medium text-oo-charcoal underline">
               Open setup checklist
@@ -249,11 +254,8 @@ export function VendorSettingsSectionPanels(props: VendorSettingsSectionPanelsPr
             <Link href={`/vendor/${vendorId}/hours`} className="font-medium text-oo-charcoal underline">
               Hours
             </Link>{" "}
-            page. This settings section is kept for compatibility only.
+            page — not from Settings.
           </p>
-          <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
-            <VendorPauseToggle vendorId={vendorId} initialPaused={props.ordersPaused} embedded />
-          </div>
           <div className="flex flex-wrap gap-4 text-sm">
             <Link href={`/vendor/${vendorId}/hours`} className="font-medium text-oo-charcoal underline">
               Open Hours

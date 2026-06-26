@@ -19,9 +19,9 @@ describe("vendor dashboard operating layout", () => {
     expect(page).not.toContain('redirect(`/vendor/${vendorId}/orders`)');
   });
 
-  it("nav prioritizes dashboard, orders, menu, hours, payouts, settings", () => {
+  it("nav prioritizes dashboard, orders, menu, hours, payouts, setup, settings", () => {
     const nav = readVendor("VendorAreaNav.tsx");
-    expect(nav).toMatch(/dashboard.*Orders.*Menu.*Hours.*Payouts.*Settings/s);
+    expect(nav).toMatch(/dashboard.*Orders.*Menu.*Hours.*Payouts.*Setup.*Settings/s);
     expect(nav).not.toContain('"analytics"');
     expect(nav).toContain("Kitchen");
   });
@@ -46,12 +46,13 @@ describe("vendor section pages", () => {
   it("defines dedicated hours, payouts, and setup pages", () => {
     expect(readVendor("hours/page.tsx")).toContain("VendorOrdersOperationsBar");
     expect(readVendor("payouts/page.tsx")).toContain("VendorStripePayoutCard");
+    expect(readVendor("payouts/page.tsx")).toContain("VendorPayoutTransferHistory");
     expect(readVendor("setup/page.tsx")).toContain("VendorSetupChecklist");
   });
 
-  it("keeps orders page focused on the live board", () => {
+  it("keeps orders page focused on the workbench", () => {
     const orders = readVendor("orders/page.tsx");
-    expect(orders).toContain("VendorDashboardLiveOrders");
+    expect(orders).toContain("VendorOrdersWorkbench");
     expect(orders).not.toContain("VendorOrdersSystemStatusStrip");
     expect(orders).not.toContain("VendorTodayPerformanceSection");
   });

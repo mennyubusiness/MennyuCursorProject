@@ -3,10 +3,13 @@ import { auth } from "@/auth";
 import { canManageVendor } from "@/lib/permissions";
 import { env } from "@/lib/env";
 import { retrieveAndSyncVendorConnectedAccount } from "@/services/stripe-connect.service";
+import { getVendorPayoutSummary } from "@/services/vendor-payout-summary.service";
 import { prisma } from "@/lib/db";
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { VENDOR_STRIPE_COPY } from "@/lib/vendor-operational-copy";
+import { vendorStripeConnectionLabel } from "@/lib/vendor-payout-vendor-display";
 import { VendorStripePayoutCard } from "../settings/VendorStripePayoutCard";
+import { VendorPayoutTransferHistory } from "./VendorPayoutTransferHistory";
 
 function countStripeRequirementsDue(value: unknown): number {
   if (value == null) return 0;
@@ -38,30 +41,50 @@ export default async function VendorPayoutsPage({
     redirect(`/vendor/${vendorId}/payouts${qs}`);
   }
 
-  const vendor = await prisma.vendor.findUnique({
-    where: { id: vendorId },
-    select: {
-      id: true,
-      name: true,
-      stripeConnectedAccountId: true,
-      stripeChargesEnabled: true,
-      stripePayoutsEnabled: true,
-      stripeOnboardingCompletedAt: true,
-      stripeRequirementsCurrentlyDue: true,
-    },
-  });
+  const [vendor, payoutSummary] = await Promise.all([
+    prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: {
+        id: true,
+        name: true,
+        stripeConnectedAccountId: true,
+        stripeChargesEnabled: true,
+        stripePayoutsEnabled: true,
+        stripeOnboardingCompletedAt: true,
+        stripeRequirementsCurrentlyDue: true,
+      },
+    }),
+    getVendorPayoutSummary(vendorId),
+  ]);
   if (!vendor) notFound();
+
+  const requirementsPending = countStripeRequirementsDue(vendor.stripeRequirementsCurrentlyDue) > 0;
+  const stripeStatus = vendorStripeConnectionLabel({
+    chargesEnabled: vendor.stripeChargesEnabled ?? false,
+    payoutsEnabled: vendor.stripePayoutsEnabled ?? false,
+    hasAccount: Boolean(vendor.stripeConnectedAccountId?.trim()),
+    requirementsPending,
+  });
 
   return (
     <DashboardShell tier="command" className="px-0 pb-0 pt-0">
       <DashboardPageHeader
         headingLevel={1}
         title="Payouts"
-        description="Payment setup and Stripe account status. This stays out of your daily order flow on purpose."
+        description="Payment setup and transfer history. This stays out of your daily order flow on purpose."
       />
 
-      <div className="mt-8 space-y-6">
-        <p className="text-sm text-oo-stone-gray">{VENDOR_STRIPE_COPY}</p>
+      <div className="mt-8 space-y-8">
+        <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
+          <p className="text-sm text-oo-stone-gray">{VENDOR_STRIPE_COPY}</p>
+          <p className="mt-2 text-sm font-medium text-oo-charcoal">{stripeStatus}</p>
+          {!vendor.stripeChargesEnabled || !vendor.stripePayoutsEnabled ? (
+            <p className="mt-2 text-sm text-amber-950">
+              Finish payment setup before accepting paid orders.
+            </p>
+          ) : null}
+        </section>
+
         <VendorStripePayoutCard
           vendorId={vendor.id}
           stripeConnectConfigured={Boolean(env.STRIPE_SECRET_KEY)}
@@ -72,6 +95,8 @@ export default async function VendorPayoutsPage({
           requirementsPendingCount={countStripeRequirementsDue(vendor.stripeRequirementsCurrentlyDue)}
           payoutNotice={sp.payout_notice === "link_expired" ? "link_expired" : null}
         />
+
+        <VendorPayoutTransferHistory summary={payoutSummary} />
       </div>
     </DashboardShell>
   );

@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { href: "menu", label: "Menu" },
   { href: "hours", label: "Hours" },
   { href: "payouts", label: "Payouts" },
+  { href: "setup", label: "Setup" },
   { href: "settings", label: "Settings" },
 ] as const;
 
@@ -58,11 +59,6 @@ export function VendorAreaNav({ vendorId, wide = false }: { vendorId: string; wi
           <Link href={`${base}/issues`} className="oo-dash-nav-link">
             Issues
           </Link>
-          {!pathname.includes("/setup") ? (
-            <Link href={`${base}/setup`} className="oo-dash-nav-link">
-              Setup
-            </Link>
-          ) : null}
         </div>
       </div>
     </nav>

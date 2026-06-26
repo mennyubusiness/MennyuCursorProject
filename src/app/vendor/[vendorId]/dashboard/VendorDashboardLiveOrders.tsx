@@ -33,6 +33,11 @@ const GROUP_LABELS: Record<GroupKey, string> = {
   cancelled_failed: "Cancelled / failed",
 };
 
+const ACTIVE_GROUP_LABELS: Partial<Record<GroupKey, string>> = {
+  new: "New",
+  ready: "Ready for pickup",
+};
+
 type VendorOrderFromApi = {
   id: string;
   orderId: string;
@@ -140,6 +145,12 @@ export function VendorDashboardLiveOrders({
     ? ["new", "preparing", "ready"]
     : ["new", "preparing", "ready", "completed", "cancelled_failed"];
 
+  const groupLabel = (key: GroupKey) =>
+    activeGroupsOnly ? (ACTIVE_GROUP_LABELS[key] ?? GROUP_LABELS[key]) : GROUP_LABELS[key];
+
+  const activeOrderCount = order.reduce((sum, key) => sum + (grouped[key]?.length ?? 0), 0);
+  const showActiveEmpty = activeGroupsOnly && activeOrderCount === 0;
+
   const highlightNow = Date.now();
   const newOrderIdsForSound = grouped.new?.map((vo) => vo.id) ?? [];
   const needsActionCount = grouped.new?.length ?? 0;
@@ -169,7 +180,7 @@ export function VendorDashboardLiveOrders({
           />
         </div>
       ) : null}
-      {vendorOrders.length === 0 ? (
+      {showActiveEmpty || vendorOrders.length === 0 ? (
         <DashboardEmptyState
           title="No active orders right now."
           description="New orders will appear here when customers place them."
@@ -292,7 +303,7 @@ export function VendorDashboardLiveOrders({
                       isTerminalSection ? "text-oo-stone-gray" : "text-oo-charcoal"
                     }`}
                   >
-                    {GROUP_LABELS[key]}
+                    {groupLabel(key)}
                     <span className="ml-2 font-normal text-oo-stone-gray">({list.length})</span>
                   </h2>
                   <span className="shrink-0 text-xs font-medium text-oo-charcoal">
@@ -311,7 +322,7 @@ export function VendorDashboardLiveOrders({
                   isTerminalSection ? "text-oo-stone-gray" : "text-oo-charcoal"
                 }`}
               >
-                {GROUP_LABELS[key]}
+                {groupLabel(key)}
               </h2>
               {sectionBody}
             </section>

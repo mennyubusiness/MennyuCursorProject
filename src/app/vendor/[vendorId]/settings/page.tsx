@@ -186,7 +186,6 @@ export default async function VendorSettingsPage({
 
   const badges = buildVendorSettingsSectionBadges({
     setupSummary: vendorReadiness.setupSummary,
-    ordersPaused: vendor.mennyuOrdersPaused ?? false,
     pendingPodInviteCount: pendingRequests.length,
     hasPodMembership: Boolean(currentPod),
   });

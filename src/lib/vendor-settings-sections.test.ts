@@ -18,10 +18,11 @@ describe("resolveVendorSettingsSection", () => {
     expect(resolveVendorSettingsSection("payout")).toBe("overview");
   });
 
-  it("accepts valid section ids", () => {
+  it("accepts valid section ids including legacy ordering", () => {
     expect(resolveVendorSettingsSection("profile")).toBe("profile");
     expect(resolveVendorSettingsSection("pos-menu")).toBe("pos-menu");
     expect(resolveVendorSettingsSection("pod-membership")).toBe("pod-membership");
+    expect(resolveVendorSettingsSection("ordering")).toBe("ordering");
   });
 });
 
@@ -37,13 +38,12 @@ describe("vendorSettingsSectionHref", () => {
 });
 
 describe("VENDOR_SETTINGS_SECTIONS", () => {
-  it("includes expected sidebar sections in order", () => {
+  it("includes expected sidebar sections without ordering controls", () => {
     expect(VENDOR_SETTINGS_SECTIONS.map((s) => s.label)).toEqual([
       "Overview",
-      "Profile",
+      "Business profile",
       "Payouts",
       "POS & menu",
-      "Ordering",
       "Pod membership",
       "Account",
     ]);
@@ -51,10 +51,9 @@ describe("VENDOR_SETTINGS_SECTIONS", () => {
 });
 
 describe("buildVendorSettingsSectionBadges", () => {
-  it("reflects setup, ordering, and pod state", () => {
+  it("reflects setup and pod state", () => {
     const badges = buildVendorSettingsSectionBadges({
       setupSummary: { profile: true, stripe: false, pos: true, menu: false },
-      ordersPaused: true,
       pendingPodInviteCount: 2,
       hasPodMembership: false,
     });
@@ -62,7 +61,7 @@ describe("buildVendorSettingsSectionBadges", () => {
     expect(badges.profile).toBe("Complete");
     expect(badges.payouts).toBe("Needs setup");
     expect(badges["pos-menu"]).toBe("Needs menu");
-    expect(badges.ordering).toBe("Paused");
     expect(badges["pod-membership"]).toBe("Invite pending");
+    expect(badges.ordering).toBeUndefined();
   });
 });

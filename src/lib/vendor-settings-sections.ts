@@ -6,9 +6,9 @@ export const VENDOR_SETTINGS_SECTION_IDS = [
   "profile",
   "payouts",
   "pos-menu",
-  "ordering",
   "pod-membership",
   "account",
+  "ordering",
 ] as const;
 
 export type VendorSettingsSectionId = (typeof VENDOR_SETTINGS_SECTION_IDS)[number];
@@ -20,11 +20,10 @@ export type VendorSettingsSectionDef = {
 };
 
 export const VENDOR_SETTINGS_SECTIONS: VendorSettingsSectionDef[] = [
-  { id: "overview", label: "Overview", subtitle: "Setup status and next steps" },
-  { id: "profile", label: "Profile", subtitle: "Customer-facing business details" },
-  { id: "payouts", label: "Payouts", subtitle: "Stripe payouts and payment readiness" },
-  { id: "pos-menu", label: "POS & menu", subtitle: "Deliverect, menu imports, and mapping health" },
-  { id: "ordering", label: "Ordering", subtitle: "Pause or resume Open Order intake" },
+  { id: "overview", label: "Overview", subtitle: "Quick links to account settings" },
+  { id: "profile", label: "Business profile", subtitle: "Name, logo, and customer-facing details" },
+  { id: "payouts", label: "Payouts", subtitle: "Stripe connection (see Payouts page for history)" },
+  { id: "pos-menu", label: "POS & menu", subtitle: "Deliverect connection and menu publishing" },
   { id: "pod-membership", label: "Pod membership", subtitle: "Pod invitations and activity" },
   { id: "account", label: "Account", subtitle: "Login and dashboard access" },
 ];
@@ -54,13 +53,12 @@ export type VendorSettingsBadgeInput = {
     pos: boolean;
     menu: boolean;
   };
-  ordersPaused: boolean;
   pendingPodInviteCount: number;
   hasPodMembership: boolean;
 };
 
 export function buildVendorSettingsSectionBadges(input: VendorSettingsBadgeInput): VendorSettingsSectionBadges {
-  const { setupSummary, ordersPaused, pendingPodInviteCount, hasPodMembership } = input;
+  const { setupSummary, pendingPodInviteCount, hasPodMembership } = input;
 
   let posMenuBadge = "Needs setup";
   if (setupSummary.pos && setupSummary.menu) {
@@ -82,7 +80,6 @@ export function buildVendorSettingsSectionBadges(input: VendorSettingsBadgeInput
     profile: setupSummary.profile ? "Complete" : "Needs setup",
     payouts: setupSummary.stripe ? "Connected" : "Needs setup",
     "pos-menu": posMenuBadge,
-    ordering: ordersPaused ? "Paused" : "Open",
     "pod-membership": podBadge,
   };
 }

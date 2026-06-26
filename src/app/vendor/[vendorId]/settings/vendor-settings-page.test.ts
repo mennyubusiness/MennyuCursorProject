@@ -42,10 +42,9 @@ describe("vendor settings workspace layout", () => {
 });
 
 describe("vendor settings section content", () => {
-  it("overview shows checklist and cards, not all forms", () => {
+  it("overview shows next action or calm empty state, not all forms", () => {
     const overviewBlock = panelsSrc.match(/case "overview":[\s\S]*?case "profile":/)?.[0] ?? "";
     expect(overviewBlock).toMatch(/data-settings-section="overview"/);
-    expect(overviewBlock).toMatch(/VendorSetupChecklist/);
     expect(overviewBlock).toMatch(/OverviewSectionCards/);
     expect(overviewBlock).not.toMatch(/VendorBrandProfileForm/);
     expect(overviewBlock).not.toMatch(/VendorStripePayoutCard/);
@@ -69,9 +68,10 @@ describe("vendor settings section content", () => {
     expect(panelsSrc).toMatch(/DeliverectMenuHealthPanel/);
   });
 
-  it("ordering section renders pause toggle", () => {
+  it("ordering section redirects to hours without pause toggle", () => {
     expect(panelsSrc).toMatch(/data-settings-section="ordering"/);
-    expect(panelsSrc).toMatch(/VendorPauseToggle/);
+    expect(panelsSrc).toMatch(/Open Hours/);
+    expect(panelsSrc).not.toMatch(/VendorPauseToggle/);
   });
 
   it("pod membership section renders invitations and activity", () => {
@@ -91,6 +91,5 @@ describe("vendor settings preserved actions", () => {
     expect(panelsSrc).toMatch(/VendorBrandProfileForm/);
     expect(panelsSrc).toMatch(/VendorStripePayoutCard/);
     expect(panelsSrc).toMatch(/VendorAutoPublishToggle/);
-    expect(panelsSrc).toMatch(/VendorPauseToggle/);
   });
 });

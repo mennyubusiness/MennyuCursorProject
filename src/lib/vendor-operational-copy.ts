@@ -76,6 +76,6 @@ export const VENDOR_POS_MENU_MANAGED_COPY =
 export const VENDOR_POS_HOURS_MANAGED_COPY =
   "Store hours are managed in your POS. You can still pause Open Order intake below.";
 export const VENDOR_STRIPE_COPY = "Your payments are processed through Stripe.";
-export const VENDOR_ALL_READY_COPY = "Everything looks ready for orders.";
+export const VENDOR_ALL_READY_COPY = "Everything is ready for orders.";
 export const VENDOR_NO_POD_COPY = "This vendor is not assigned to a pod yet.";
 export const VENDOR_NO_ACTIVE_ORDERS_COPY = "No active orders right now.";

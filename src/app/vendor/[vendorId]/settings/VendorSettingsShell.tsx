@@ -120,7 +120,8 @@ export function VendorSettingsShell({
         <h2 className="text-2xl font-semibold text-oo-charcoal">Settings</h2>
         <p className="mt-1 text-sm font-medium text-oo-charcoal">{vendorName}</p>
         <p className="mt-2 max-w-3xl text-sm text-oo-stone-gray">
-          Manage your profile, payouts, POS connection, ordering, pod membership, and account settings.
+          Business profile, payouts, POS connection, pod membership, and account access. Daily operations use Dashboard,
+          Orders, Menu, and Hours.
         </p>
       </header>
 

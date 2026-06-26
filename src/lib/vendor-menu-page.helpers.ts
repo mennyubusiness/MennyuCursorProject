@@ -85,6 +85,20 @@ export function formatLiveMenuStatusLine(summary: LiveMenuSummary, published: bo
   return parts.join(" · ");
 }
 
+/** Plain relative time for vendor menu sync display, e.g. "12 minutes ago". */
+export function formatRelativeSyncTime(iso: string, nowMs = Date.now()): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "—";
+  const diffSec = Math.max(0, Math.floor((nowMs - then) / 1000));
+  if (diffSec < 60) return "Just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 48) return `${diffHr} hour${diffHr === 1 ? "" : "s"} ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`;
+}
+
 export type LatestImportSummary = {
   jobId: string;
   importedAtIso: string;

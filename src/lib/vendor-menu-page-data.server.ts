@@ -3,6 +3,7 @@ import "server-only";
 import { MenuImportIssueSeverity } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { fetchLatestPublishedMenuVersionForVendor } from "@/lib/admin-menu-import-queries";
 import { menuImportFriendlySource } from "@/lib/menu-import-ui-labels";
 import { parseCanonicalSnapshot } from "@/lib/menu-import-canonical-preview";
@@ -35,6 +36,7 @@ export type VendorMenuPageData = {
   canAdminPull: boolean;
   posConnected: boolean;
   autoPublishMenus: boolean;
+  storefrontHref: string | null;
   menuHealth: {
     ready: boolean;
     criticalCount: number;
@@ -50,6 +52,7 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
     select: {
       id: true,
       name: true,
+      slug: true,
       autoPublishMenus: true,
       deliverectChannelLinkId: true,
       posConnectionStatus: true,
@@ -62,7 +65,7 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
   // Vendor dashboard layout already authorized access (membership, admin, or legacy token).
   const canManage = true;
 
-  const [{ sections, source }, publishedVersion, latestJob, integrity] = await Promise.all([
+  const [{ sections, source }, publishedVersion, latestJob, integrity, currentPod] = await Promise.all([
     loadCustomerVendorMenuSections(vendorId),
     fetchLatestPublishedMenuVersionForVendor(vendorId),
     prisma.menuImportJob.findFirst({
@@ -93,6 +96,10 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
     vendor.deliverectChannelLinkId?.trim()
       ? evaluateDeliverectMenuIntegrityForVendor(vendorId)
       : Promise.resolve(null),
+    prisma.podVendor.findFirst({
+      where: { vendorId },
+      select: { pod: { select: { slug: true } } },
+    }),
   ]);
 
   const liveSummary = summarizeLiveMenuSections(sections);
@@ -155,6 +162,11 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
     : `/vendor/${vendorId}/settings?section=pos-menu`;
   const healthDetailLabel = latestImport ? "Review import details" : "Open POS & menu settings";
 
+  const storefrontHref =
+    currentPod?.pod.slug && vendor.slug
+      ? buildVendorMenuCustomerPath(currentPod.pod.slug, vendor.slug)
+      : null;
+
   return {
     vendorId: vendor.id,
     vendorName: vendor.name,
@@ -171,6 +183,7 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
     canAdminPull: isPlatformAdmin,
     posConnected,
     autoPublishMenus: vendor.autoPublishMenus ?? false,
+    storefrontHref,
     menuHealth: {
       ready: integrity ? integrity.deliverectReady && liveSummary.availableCount > 0 : liveSummary.availableCount > 0,
       criticalCount: integrity?.criticalCount ?? 0,

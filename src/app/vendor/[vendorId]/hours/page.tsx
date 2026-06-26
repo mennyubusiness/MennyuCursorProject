@@ -16,12 +16,14 @@ export default async function VendorHoursPage({
   const ctx = await loadVendorDashboardContext(vendorId);
   if (!ctx) notFound();
 
+  const isClosed = ctx.intakeLabel === "Closed" || ctx.intakeLabel === "Not ready";
+
   return (
     <DashboardShell tier="command" className="px-0 pb-0 pt-0">
       <DashboardPageHeader
         headingLevel={1}
         title="Hours"
-        description="Pause orders, resume intake, and see how your store status looks to customers."
+        description="See whether you are accepting orders, pause intake, and understand your store status."
       />
 
       <div className="mt-8 space-y-6">
@@ -38,10 +40,17 @@ export default async function VendorHoursPage({
           storefrontHref={ctx.storefrontHref}
         />
 
+        {isClosed ? (
+          <p className="rounded-xl border border-oo-light-stone bg-oo-cream/60 px-4 py-3 text-sm text-oo-stone-gray">
+            This vendor is currently closed for new orders.
+            {ctx.intakeLabel === "Not ready" ? " Finish setup on the Setup page first." : null}
+          </p>
+        ) : null}
+
         <section className="rounded-2xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-oo-charcoal">Order intake controls</h2>
+          <h2 className="text-lg font-semibold text-oo-charcoal">Order intake</h2>
           <p className="mt-1 text-sm text-oo-stone-gray">
-            Use pause when you need a break. Customers will not be able to start new orders while paused.
+            Pause when you need a break. Customers cannot start new orders while paused.
           </p>
           {ctx.posManaged ? (
             <p className="mt-4 text-sm text-oo-stone-gray">{VENDOR_POS_HOURS_MANAGED_COPY}</p>
@@ -58,15 +67,27 @@ export default async function VendorHoursPage({
         </section>
 
         <section className="rounded-2xl border border-oo-light-stone bg-oo-cream/50 p-5 text-sm text-oo-stone-gray">
-          <h2 className="text-base font-semibold text-oo-charcoal">Weekly hours & closures</h2>
+          <h2 className="text-base font-semibold text-oo-charcoal">Regular weekly hours</h2>
+          <p className="mt-2">No regular hours have been set in Open Order yet.</p>
+          {ctx.posManaged ? (
+            <p className="mt-2">Availability is managed by your POS.</p>
+          ) : (
+            <p className="mt-2">
+              Contact your pod owner if customers should see different hours on the menu page.
+            </p>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-dashed border-oo-light-stone bg-oo-warm-white/80 p-5 text-sm text-oo-stone-gray">
+          <h2 className="text-base font-semibold text-oo-charcoal">Temporary closures</h2>
           <p className="mt-2">
-            Regular weekly hours and holiday closures are not editable in Open Order yet.
-            {ctx.posManaged
-              ? " Your POS controls when the store is open for kitchen orders."
-              : " Contact your pod owner if customers should see different hours on the menu page."}
+            Holiday hours and one-off closures are not editable here yet. Use pause orders above for short breaks.
           </p>
-          <Link href={`/vendor/${vendorId}/settings?section=profile`} className="mt-3 inline-block font-medium text-oo-charcoal underline">
-            Update pickup details in settings
+          <Link
+            href={`/vendor/${vendorId}/settings?section=profile`}
+            className="mt-3 inline-block font-medium text-oo-charcoal underline"
+          >
+            Update business profile in settings
           </Link>
         </section>
       </div>

@@ -33,13 +33,14 @@ function VendorMenuItemRow({ item }: { item: VendorMenuDisplayItem }) {
           <p className="mt-1 line-clamp-3 text-sm text-oo-stone-gray">{item.description}</p>
         ) : null}
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full bg-oo-cream px-2 py-0.5 text-oo-stone-gray">{item.categoryName}</span>
           {item.isAvailable ? (
             <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-900">Available</span>
           ) : (
             <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-950">Unavailable</span>
           )}
           {item.hasMappingWarning ? (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-950">Mapping warning</span>
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-950">Has modifiers</span>
           ) : null}
         </div>
       </div>
@@ -47,7 +48,13 @@ function VendorMenuItemRow({ item }: { item: VendorMenuDisplayItem }) {
   );
 }
 
-export function VendorMenuItemBrowser({ items }: { items: VendorMenuDisplayItem[] }) {
+export function VendorMenuItemBrowser({
+  items,
+  posConnected = false,
+}: {
+  items: VendorMenuDisplayItem[];
+  posConnected?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<MenuItemFilter>("all");
 
@@ -60,7 +67,12 @@ export function VendorMenuItemBrowser({ items }: { items: VendorMenuDisplayItem[
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-oo-light-stone bg-oo-cream px-4 py-10 text-center text-sm text-oo-stone-gray">
-        No active menu items yet.
+        <p className="font-medium text-oo-charcoal">No menu items found.</p>
+        <p className="mt-2">
+          {posConnected
+            ? "This menu is managed by your POS. Sync or publish from Deliverect to populate items."
+            : "Pull a menu from Deliverect or publish an import to get started."}
+        </p>
       </div>
     );
   }
@@ -107,7 +119,7 @@ export function VendorMenuItemBrowser({ items }: { items: VendorMenuDisplayItem[
 
       {grouped.length === 0 ? (
         <p className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-6 text-sm text-oo-stone-gray">
-          No items match your search or filter.
+          No menu items found for this filter.
         </p>
       ) : (
         <div className="space-y-8">

@@ -21,14 +21,15 @@ describe("vendor orders workbench layout", () => {
     expect(page).toContain("DashboardPageHeader");
     expect(page).toContain('title="Orders"');
     expect(page).toContain("operational workbench");
-    expect(page).toContain("Kitchen mode");
   });
 
-  it("centers the live orders board on the orders page", () => {
+  it("routes orders through VendorOrdersWorkbench with active/history tabs", () => {
     const page = readVendor("orders/page.tsx");
-    expect(page).toContain("DashboardSection");
-    expect(page).toContain("Active orders");
-    expect(page).toContain("VendorDashboardLiveOrders");
+    const workbench = readVendor("orders/VendorOrdersWorkbench.tsx");
+    expect(page).toContain("VendorOrdersWorkbench");
+    expect(workbench).toContain("VendorDashboardLiveOrders");
+    expect(workbench).toContain("VendorOrdersHistorySection");
+    expect(workbench).toContain("Kitchen mode");
     expect(page).not.toContain("VendorOrdersSystemStatusStrip");
     expect(page).not.toContain("VendorOrdersOperationsBar");
   });
@@ -39,6 +40,7 @@ describe("vendor orders empty state", () => {
     const live = readVendor("dashboard/VendorDashboardLiveOrders.tsx");
     expect(live).toContain("DashboardEmptyState");
     expect(live).toContain("No active orders right now.");
+    expect(live).toContain("showActiveEmpty");
   });
 });
 
@@ -47,6 +49,12 @@ describe("vendor area nav width", () => {
     const nav = readVendor("VendorAreaNav.tsx");
     expect(nav).toContain("wide");
     expect(nav).toContain("max-w-7xl");
+  });
+
+  it("includes setup in primary nav", () => {
+    const nav = readVendor("VendorAreaNav.tsx");
+    expect(nav).toContain('"setup"');
+    expect(nav).toMatch(/dashboard.*Orders.*Menu.*Hours.*Payouts.*Setup.*Settings/s);
   });
 
   it("enables wide chrome for dashboard, orders, menu, hours, payouts, setup, and settings", () => {
@@ -73,13 +81,15 @@ describe("vendor orders preserved behavior", () => {
 describe("vendor orders copy guardrails", () => {
   it("does not add payout or earnings language to orders surfaces", () => {
     const page = readVendor("orders/page.tsx");
+    const workbench = readVendor("orders/VendorOrdersWorkbench.tsx");
     const live = readVendor("dashboard/VendorDashboardLiveOrders.tsx");
     expect(page).not.toMatch(/\bearnings\b|\brevenue share\b/i);
+    expect(workbench).not.toMatch(/\bearnings\b|\brevenue share\b/i);
     expect(live).not.toMatch(/\bearnings\b|\brevenue share\b|\bpayouts?\b/i);
   });
 
   it("explains POS-controlled boards in plain English", () => {
-    const page = readVendor("orders/page.tsx");
-    expect(page).toContain("VENDOR_POS_BOARD_READONLY_COPY");
+    const workbench = readVendor("orders/VendorOrdersWorkbench.tsx");
+    expect(workbench).toContain("VENDOR_POS_BOARD_READONLY_COPY");
   });
 });
