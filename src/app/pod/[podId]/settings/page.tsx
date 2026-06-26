@@ -54,16 +54,8 @@ export default async function PodSettingsPage({
     <DashboardShell tier="workspace" className="px-0 pb-0 pt-0">
       <DashboardPageHeader
         headingLevel={1}
-        title="Settings"
-        description="Pod profile, location, branding, pickup instructions, and contact details."
-        actions={
-          <Link
-            href={`/pod/${pod.id}/promote`}
-            className="inline-flex items-center justify-center rounded-lg border border-oo-light-stone bg-oo-warm-white px-4 py-2 text-sm font-medium text-oo-charcoal transition-colors hover:bg-oo-cream"
-          >
-            Promote & QR
-          </Link>
-        }
+        title="Pod Profile"
+        description="Manage your pod's public identity, location, branding, and contact details."
       />
 
       <div className="mt-8 space-y-8">

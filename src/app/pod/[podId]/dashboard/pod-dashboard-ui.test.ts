@@ -19,7 +19,7 @@ describe("pod owner nav and layout", () => {
     const nav = readPod("PodAreaNav.tsx");
     const layout = readPod("layout.tsx");
     const chrome = readPod("PodLayoutChrome.tsx");
-    expect(nav).toMatch(/Dashboard.*Vendors.*Analytics.*Promote.*Payouts.*Readiness.*Settings/s);
+    expect(nav).toMatch(/Dashboard.*Vendors.*Analytics.*Promote.*Payouts.*Readiness.*Pod Profile/s);
     expect(nav).toContain("showPayouts");
     expect(nav).toContain('link.href !== "payouts" || showPayouts');
     expect(layout).toContain("arePodOwnerPayoutsConfigured");
@@ -177,7 +177,7 @@ describe("pod readiness page", () => {
     const readinessLib = readFileSync(join(root, "lib/pod-readiness-page.ts"), "utf8");
     expect(page).toContain('title="Readiness"');
     expect(page).toContain("PodReadinessSummarySection");
-    expect(page).toContain("PodReadinessPromotionSection");
+    expect(page).not.toContain("PodReadinessPromotionSection");
     expect(summary).toContain("Readiness summary");
     expect(vendors).toContain("deriveVendorMissingLines");
     expect(vendors).toContain("Invite vendors");

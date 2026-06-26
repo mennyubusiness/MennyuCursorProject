@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { isHttpsImageUrl } from "@/lib/remote-image-url";
 import { MAX_BRAND_IMAGE_BYTES } from "@/lib/image-upload-constants";
 
@@ -17,6 +17,7 @@ type Props = {
 
 export function BrandLogoUploadField({ scope, entityId, value, onChange, label }: Props) {
   const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showUrl, setShowUrl] = useState(false);
@@ -58,38 +59,58 @@ export function BrandLogoUploadField({ scope, entityId, value, onChange, label }
   );
 
   const previewSrc = value.trim() && isHttpsImageUrl(value.trim()) ? value.trim() : null;
+  const hasLogo = Boolean(previewSrc);
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-start gap-4">
-        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-stone-200 bg-stone-100">
-          {previewSrc ? (
-            // eslint-disable-next-line @next/next/no-img-element -- preview supports any https host (CDN, Supabase, etc.)
-            <img src={previewSrc} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full items-center justify-center text-xs text-stone-400">No logo</div>
-          )}
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium text-stone-800">{hasLogo ? "Current logo" : label}</p>
+          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-stone-200 bg-stone-100">
+            {previewSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element -- preview supports any https host (CDN, Supabase, etc.)
+              <img src={previewSrc} alt="Current logo" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full items-center justify-center px-2 text-center text-xs text-stone-500">
+                No logo uploaded yet.
+              </div>
+            )}
+          </div>
         </div>
         <div className="min-w-0 flex-1 space-y-2">
-          <label htmlFor={inputId} className="block text-sm font-medium text-stone-800">
-            {label}
-          </label>
+          {hasLogo ? (
+            <p className="text-sm text-stone-700">Choose a new file to replace it.</p>
+          ) : null}
           <p className="text-xs text-stone-500">
             PNG, JPEG, or WebP — up to {MAX_BRAND_IMAGE_BYTES / 1024 / 1024}MB. Uses secure upload when
             storage is configured.
           </p>
           <input
+            ref={inputRef}
             id={inputId}
             type="file"
             accept={ACCEPT}
             disabled={uploading}
-            className="block w-full max-w-md text-sm text-stone-800 file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-stone-800 hover:file:bg-stone-200 disabled:opacity-50"
+            className="sr-only"
             onChange={(e) => {
               const f = e.target.files?.[0];
               e.target.value = "";
               if (f) void uploadFile(f);
             }}
           />
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+            className="inline-flex rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+          >
+            {hasLogo ? "Choose new file" : "Upload logo"}
+          </button>
+          {hasLogo ? (
+            <p className="text-xs text-stone-500">
+              Your saved logo is kept when you save without choosing a new file.
+            </p>
+          ) : null}
           {uploading && <p className="text-sm text-stone-600">Uploading…</p>}
           {uploadError && (
             <p className="text-sm text-red-600" role="alert">

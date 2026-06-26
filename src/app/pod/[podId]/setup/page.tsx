@@ -5,7 +5,6 @@ import { loadPodDashboardContext } from "@/lib/pod-dashboard-data.server";
 import { derivePodReadinessPageSummary } from "@/lib/pod-readiness-page";
 import { POD_SETUP_REQUIRED_CHECKLIST_KEYS } from "@/lib/vendor-pod-readiness";
 import { PodReadinessPodSection } from "./PodReadinessPodSection";
-import { PodReadinessPromotionSection } from "./PodReadinessPromotionSection";
 import { PodReadinessSummarySection } from "./PodReadinessSummarySection";
 import { PodReadinessVendorSection } from "./PodReadinessVendorSection";
 
@@ -21,8 +20,6 @@ export default async function PodReadinessPage({
   if (!ctx) notFound();
 
   const requiredPodItems = ctx.podSetupChecklist.filter((item) => REQUIRED_KEYS.has(item.key));
-  const promotionItem =
-    ctx.podSetupChecklist.find((item) => item.key === "qr_signage") ?? null;
   const summary = derivePodReadinessPageSummary({
     requiredPodItems,
     rosterRows: ctx.rosterRows,
@@ -40,7 +37,6 @@ export default async function PodReadinessPage({
         <PodReadinessSummarySection summary={summary} />
         <PodReadinessPodSection items={requiredPodItems} />
         <PodReadinessVendorSection podId={podId} podSlug={ctx.pod.slug} rows={ctx.rosterRows} />
-        <PodReadinessPromotionSection podId={podId} promotionItem={promotionItem} />
       </div>
     </DashboardShell>
   );

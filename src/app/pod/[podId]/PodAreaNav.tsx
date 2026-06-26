@@ -10,7 +10,7 @@ const NAV_LINKS = [
   { href: "promote", label: "Promote" },
   { href: "payouts", label: "Payouts" },
   { href: "setup", label: "Readiness" },
-  { href: "settings", label: "Settings" },
+  { href: "settings", label: "Pod Profile" },
 ] as const;
 
 function navLinkIsActive(pathname: string, base: string, href: string): boolean {

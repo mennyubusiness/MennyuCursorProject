@@ -31,8 +31,9 @@ describe("pod settings workspace layout", () => {
   it("renders settings page header copy", () => {
     const page = readSettings("page.tsx");
     expect(page).toContain("DashboardPageHeader");
-    expect(page).toContain('title="Settings"');
-    expect(page).toContain("Pod profile, location, branding");
+    expect(page).toContain('title="Pod Profile"');
+    expect(page).not.toContain("Promote & QR");
+    expect(page).toContain("public identity");
   });
 
   it("links promote elsewhere and only mentions payouts when configured", () => {
@@ -41,6 +42,7 @@ describe("pod settings workspace layout", () => {
     expect(page).toContain("PodBrandProfileForm");
     expect(page).not.toContain("PodOrderingQrSection");
     expect(page).not.toContain("PodPayoutSetupCard");
+    expect(page).not.toContain("Promote & QR");
     expect(page).toContain("/promote");
     expect(page).toContain("showPayouts");
     expect(page).toContain("arePodOwnerPayoutsConfigured");
@@ -72,5 +74,16 @@ describe("pod settings preserved behavior", () => {
     expect(form).toContain("updatePodBrandProfile");
     expect(form).toContain("pickupInstructions");
     expect(form).toContain("Save profile");
+  });
+
+  it("uses clear logo preview copy without native file-input warning", () => {
+    const form = readSettings("PodBrandProfileForm.tsx");
+    const upload = readFileSync(join(root, "components/uploads/BrandLogoUploadField.tsx"), "utf8");
+    expect(form).toContain("BrandLogoUploadField");
+    expect(upload).toContain("Current logo");
+    expect(upload).toContain("Choose a new file to replace it");
+    expect(upload).toContain("No logo uploaded yet");
+    expect(upload).toContain("sr-only");
+    expect(upload).not.toContain("No file chosen");
   });
 });
