@@ -30,8 +30,8 @@ export function derivePodAttentionItems(input: {
       id: "no_vendors",
       title: "No vendors in pod",
       description: "Invite vendors so customers can order from your pod page.",
-      actionHref: `/pod/${input.podId}/vendors`,
-      actionLabel: "Invite vendor",
+      actionHref: `/pod/${input.podId}/vendors#invite`,
+      actionLabel: "Invite vendors",
       severity: "warning",
     });
   } else if (input.orderableVendorCount === 0) {

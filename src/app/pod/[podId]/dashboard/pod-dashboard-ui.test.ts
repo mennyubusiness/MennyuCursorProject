@@ -34,17 +34,27 @@ describe("pod owner nav and layout", () => {
 });
 
 describe("pod dashboard vendor-mirror structure", () => {
-  it("loads shared context and renders status, readiness, attention, activity, promote preview", () => {
+  it("loads shared context and renders focused dashboard sections only", () => {
     const page = readDashboard("page.tsx");
     expect(page).toContain("loadPodDashboardContext");
     expect(page).toContain("PodStatusCard");
     expect(page).toContain("PodVendorReadinessSection");
     expect(page).toContain("PodNeedsAttentionSection");
     expect(page).toContain("PodTodayActivitySection");
-    expect(page).toContain("PodPromotePreviewSection");
     expect(page).toContain("PodRecentActivitySection");
+    expect(page).not.toContain("PodPromotePreviewSection");
     expect(page).not.toContain("PodDashboardSidebar");
     expect(page).not.toContain("withSidebar");
+  });
+
+  it("does not duplicate vendors invite or promote tools on the dashboard", () => {
+    const page = readDashboard("page.tsx");
+    const readiness = readDashboard("PodVendorReadinessSection.tsx");
+    const attention = readDashboard("PodNeedsAttentionSection.tsx");
+    expect(readiness).not.toContain("Invite vendor");
+    expect(readiness).toContain("Manage vendors");
+    expect(attention).not.toContain("POD_ALL_READY_COPY");
+    expect(attention).toContain("return null");
   });
 
   it("does not load individual orders on the dashboard", () => {
@@ -56,6 +66,8 @@ describe("pod dashboard vendor-mirror structure", () => {
 describe("pod dedicated pages", () => {
   it("defines vendors, analytics, promote, payouts, and setup routes", () => {
     expect(readPod("vendors/page.tsx")).toContain("PodVendorsFilterBar");
+    expect(readPod("vendors/page.tsx")).toContain("PodVendorsPageActions");
+    expect(readPod("vendors/page.tsx")).not.toContain("PodDashboardInviteVendorSection");
     expect(readPod("analytics/page.tsx")).toContain("getPodAnalyticsExtended");
     expect(readPod("analytics/page.tsx")).not.toContain("redirect(");
     expect(readPod("promote/page.tsx")).toContain("PodPromotionCard");
@@ -63,6 +75,27 @@ describe("pod dedicated pages", () => {
     expect(readPod("payouts/page.tsx")).toContain("PodPayoutSummaryCard");
     expect(readPod("setup/page.tsx")).toContain("VendorSetupChecklist");
     expect(readPod("setup/page.tsx")).not.toContain("Recommended");
+  });
+});
+
+describe("pod vendors invite modal", () => {
+  it("moves invite flows into a modal with clear new vs existing paths", () => {
+    const page = readPod("vendors/page.tsx");
+    const actions = readPod("vendors/PodVendorsPageActions.tsx");
+    const modal = readPod("vendors/PodInviteVendorsModal.tsx");
+    const form = readPod("vendors/PodInviteNewVendorForm.tsx");
+    const search = readDashboard("PodDashboardVendorSearch.tsx");
+
+    expect(page).not.toContain("Add another vendor");
+    expect(actions).toContain("Invite vendors");
+    expect(modal).toContain("Invite a new vendor");
+    expect(modal).toContain("Add an existing vendor");
+    expect(modal).toContain("PodDashboardVendorSearch");
+    expect(form).toContain("Send invite");
+    expect(form).toContain("When the vendor creates an account");
+    expect(search).toContain("Search by vendor name or email");
+    expect(search).toContain("No vendors found.");
+    expect(search).toContain("Send pod invite");
   });
 });
 

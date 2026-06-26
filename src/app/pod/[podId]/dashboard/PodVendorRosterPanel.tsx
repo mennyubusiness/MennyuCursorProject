@@ -295,7 +295,7 @@ export function PodVendorRosterPanel({
   if (rows.length === 0) {
     return (
       <p className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4 text-sm text-oo-stone-gray">
-        No vendors in this pod yet. Invite vendors below.
+        No vendors in this pod yet. Use Invite vendors to add one.
       </p>
     );
   }

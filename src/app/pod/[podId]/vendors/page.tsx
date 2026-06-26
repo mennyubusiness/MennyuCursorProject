@@ -2,9 +2,9 @@ import { notFound } from "next/navigation";
 
 import { DashboardCard, DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { loadPodDashboardContext } from "@/lib/pod-dashboard-data.server";
-import { PodDashboardInviteVendorSection } from "../dashboard/PodDashboardInviteVendorSection";
 import { PodDashboardPendingRequests } from "../dashboard/PodDashboardPendingRequests";
 import { PodVendorAdoptionBoard } from "../dashboard/PodVendorAdoptionBoard";
+import { PodVendorsPageActions } from "./PodVendorsPageActions";
 import { PodVendorsFilterBar } from "./PodVendorsPageView";
 
 export default async function PodVendorsPage({
@@ -22,20 +22,13 @@ export default async function PodVendorsPage({
         headingLevel={1}
         title="Vendors"
         description="Manage your pod roster, vendor readiness, featured placement, and invitations."
+        actions={
+          <PodVendorsPageActions podId={podId} pendingEmailInvites={ctx.pendingEmailInvites} />
+        }
       />
 
       <div className="mt-8 space-y-8">
         <PodDashboardPendingRequests podId={podId} requests={ctx.pendingForUi} />
-
-        <div id="invite">
-          <PodDashboardInviteVendorSection
-            podId={podId}
-            podName={ctx.pod.name}
-            prominent={ctx.rosterRows.length === 0}
-            collapsedByDefault={ctx.rosterRows.length > 0}
-            pendingEmailInvites={ctx.pendingEmailInvites}
-          />
-        </div>
 
         {ctx.adoptionAttentionRows.length > 0 ? (
           <PodVendorAdoptionBoard

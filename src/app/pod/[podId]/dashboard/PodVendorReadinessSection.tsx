@@ -39,18 +39,16 @@ export function PodVendorReadinessSection({
           >
             Manage vendors
           </Link>
-          <Link
-            href={`/pod/${podId}/vendors#invite`}
-            className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover"
-          >
-            Invite vendor
-          </Link>
         </div>
       </div>
 
       {previewRows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/50 px-4 py-8 text-center text-sm text-oo-stone-gray">
-          No vendors in your pod yet. Invite vendors to get started.
+          No vendors in your pod yet.{" "}
+          <Link href={`/pod/${podId}/vendors`} className="font-medium text-oo-charcoal underline">
+            Add vendors on the Vendors page
+          </Link>
+          .
         </div>
       ) : (
         <ul className="space-y-2">

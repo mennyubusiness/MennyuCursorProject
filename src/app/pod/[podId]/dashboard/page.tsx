@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { loadPodDashboardContext } from "@/lib/pod-dashboard-data.server";
 import { PodNeedsAttentionSection } from "./PodNeedsAttentionSection";
-import { PodPromotePreviewSection } from "./PodPromotePreviewSection";
 import { PodRecentActivitySection } from "./PodRecentActivitySection";
 import { PodStatusCard } from "./PodStatusCard";
 import { PodTodayActivitySection } from "./PodTodayActivitySection";
@@ -58,24 +57,12 @@ export default async function PodDashboardPage({
 
         <PodVendorReadinessSection podId={podId} podSlug={ctx.pod.slug} rows={ctx.rosterRows} />
 
-        <PodNeedsAttentionSection
-          podId={podId}
-          items={ctx.attentionItems}
-          setupComplete={ctx.setupComplete}
-        />
+        <PodNeedsAttentionSection podId={podId} items={ctx.attentionItems} />
 
         <PodTodayActivitySection
           summary={ctx.analytics.summary}
           participation={ctx.analytics.participation}
           orderableVendorCount={ctx.orderableVendorCount}
-        />
-
-        <PodPromotePreviewSection
-          podId={podId}
-          publicPageHref={ctx.publicPageHref}
-          announcementText={ctx.announcementState.initialText}
-          announcementActive={ctx.announcementState.initialIsActive}
-          featuredVendors={ctx.featuredVendors}
         />
 
         <PodRecentActivitySection feed={ctx.activityFeed} />

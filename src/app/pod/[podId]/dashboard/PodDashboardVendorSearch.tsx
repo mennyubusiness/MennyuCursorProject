@@ -92,15 +92,11 @@ export function PodDashboardVendorSearch({ podId }: { podId: string }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-oo-stone-gray">
-        Search by vendor name, email, phone, or slug. Results are limited and vendors already in your pod are
-        hidden.
-      </p>
       <input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search vendors…"
+        placeholder="Search by vendor name or email"
         className="w-full rounded border border-oo-light-stone px-3 py-2 text-sm text-oo-charcoal focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
       />
       {query.trim().length > 0 && query.trim().length < MIN_QUERY_LENGTH ? (
@@ -135,14 +131,14 @@ export function PodDashboardVendorSearch({ podId }: { podId: string }) {
                 onClick={() => void inviteVendor(vendor)}
                 className="rounded bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-hover disabled:opacity-50"
               >
-                {invitingId === vendor.id ? "…" : "Invite"}
+                {invitingId === vendor.id ? "Sending…" : "Send pod invite"}
               </button>
             </li>
           ))}
         </ul>
       ) : null}
       {!loading && query.trim().length >= MIN_QUERY_LENGTH && results.length === 0 && !error ? (
-        <p className="text-xs text-oo-stone-gray">No matching vendors found.</p>
+        <p className="text-sm text-oo-stone-gray">No vendors found.</p>
       ) : null}
     </div>
   );
