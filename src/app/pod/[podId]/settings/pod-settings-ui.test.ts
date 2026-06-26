@@ -49,15 +49,16 @@ describe("pod settings workspace layout", () => {
 describe("pod settings payout account copy", () => {
   it("keeps payout setup on payouts page", () => {
     const payouts = readPod("payouts/page.tsx");
-    expect(payouts).toContain("PodPayoutSetupCard");
+    const view = readPod("payouts/PodPayoutsView.tsx");
     expect(payouts).toContain("loadPodDashboardContext");
-    expect(payouts).toContain("PodPayoutSummaryCard");
+    expect(payouts).toContain("PodPayoutsView");
+    expect(view).toContain("PodPayoutSetupCard");
   });
 
   it("uses payout account copy without earnings amounts in setup card", () => {
     const setupCard = readSettings("PodPayoutSetupCard.tsx");
     expect(setupCard).toContain("Payout account ready");
-    expect(setupCard).toContain("Manage payout account");
+    expect(setupCard).toContain("Update payout account");
     expect(setupCard).not.toMatch(/earnings are available|your earnings|\$[\d,]+/i);
     expect(setupCard).not.toMatch(/\brecipient\b|\bclaim\b|basis points/i);
   });

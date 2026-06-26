@@ -8,6 +8,7 @@ import { isSentPodPayoutTransfer } from "@/lib/pod-payout-transfer-refund-eligib
 export type PodOwnerPayoutAllocationRow = {
   status: string;
   podPayoutAmountCents: number;
+  eligibleSubtotalCents?: number;
 };
 
 export type PodOwnerPayoutTransferRow = {
@@ -47,6 +48,20 @@ function isAllocationNeedsReview(status: string): boolean {
     status === POD_PAYOUT_ALLOCATION_STATUS.blocked ||
     status === POD_PAYOUT_ALLOCATION_STATUS.blockedPartialRefundReview
   );
+}
+
+export function aggregateEligibleSalesCents(
+  allocations: Array<{ status: string; eligibleSubtotalCents: number }>
+): number {
+  return allocations
+    .filter((row) => row.status !== POD_PAYOUT_ALLOCATION_STATUS.cancelledDueToRefund)
+    .reduce((sum, row) => sum + row.eligibleSubtotalCents, 0);
+}
+
+export function aggregatePodRevenueShareCents(allocations: PodOwnerPayoutAllocationRow[]): number {
+  return allocations
+    .filter((row) => row.status !== POD_PAYOUT_ALLOCATION_STATUS.cancelledDueToRefund)
+    .reduce((sum, row) => sum + row.podPayoutAmountCents, 0);
 }
 
 export function aggregatePodOwnerPayoutTotals(
@@ -104,6 +119,31 @@ export function aggregatePodOwnerPayoutTotals(
   return totals;
 }
 
+export function ownerPayoutHistoryStatusLabel(status: string): string {
+  if (
+    status === POD_PAYOUT_TRANSFER_STATUS.paid ||
+    status === POD_PAYOUT_TRANSFER_STATUS.submitted
+  ) {
+    return "Paid";
+  }
+  if (status === POD_PAYOUT_TRANSFER_STATUS.pending) {
+    return "Pending";
+  }
+  if (status === POD_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund) {
+    return "Cancelled";
+  }
+  if (status === POD_PAYOUT_TRANSFER_STATUS.failed) {
+    return "Failed";
+  }
+  if (
+    status === POD_PAYOUT_TRANSFER_STATUS.blockedPartialRefundReview ||
+    BLOCKED_TRANSFER_STATUSES.has(status)
+  ) {
+    return "Needs review";
+  }
+  return "Needs review";
+}
+
 export function ownerTransferStatusLabel(status: string): string {
   if (
     status === POD_PAYOUT_TRANSFER_STATUS.paid ||
@@ -138,6 +178,24 @@ export function pickLastSentTransfer(
     const latestDate = latest.paidAt ?? latest.submittedAt ?? latest.createdAt;
     return rowDate.getTime() >= latestDate.getTime() ? row : latest;
   });
+}
+
+export function buildOwnerPayoutHistory(
+  transfers: PodOwnerPayoutTransferRow[]
+): Array<{ id: string; date: Date; amountCents: number; statusLabel: string }> {
+  return transfers
+    .slice()
+    .sort((a, b) => {
+      const dateA = (a.paidAt ?? a.submittedAt ?? a.createdAt).getTime();
+      const dateB = (b.paidAt ?? b.submittedAt ?? b.createdAt).getTime();
+      return dateB - dateA;
+    })
+    .map((row, index) => ({
+      id: row.id ?? `${row.createdAt.getTime()}-${index}`,
+      date: row.paidAt ?? row.submittedAt ?? row.createdAt,
+      amountCents: row.amountCents,
+      statusLabel: ownerPayoutHistoryStatusLabel(row.status),
+    }));
 }
 
 export function buildRecentOwnerTransfers(

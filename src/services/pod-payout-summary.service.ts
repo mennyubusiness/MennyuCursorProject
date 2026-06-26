@@ -6,8 +6,10 @@ import "server-only";
 import { canViewPodPayouts } from "@/lib/permissions";
 import { derivePodPayoutConnectStatus } from "@/lib/pod-payout-connect-status";
 import {
+  aggregateEligibleSalesCents,
   aggregatePodOwnerPayoutTotals,
-  buildRecentOwnerTransfers,
+  aggregatePodRevenueShareCents,
+  buildOwnerPayoutHistory,
   ownerTransferStatusLabel,
   pickLastSentTransfer,
 } from "@/lib/pod-payout-owner-summary";
@@ -17,7 +19,7 @@ import {
 } from "@/lib/pod-payout-settings";
 import { prisma } from "@/lib/db";
 
-export type PodOwnerPayoutRecentTransfer = {
+export type PodOwnerPayoutHistoryRow = {
   id: string;
   date: Date;
   amountCents: number;
@@ -38,12 +40,14 @@ export type PodOwnerPayoutSummary = {
   sentAmountCents: number;
   sentCount: number;
   needsReviewCount: number;
+  eligibleSalesCents: number;
+  podRevenueShareCents: number;
   lastTransferAmountCents: number | null;
   lastTransferDate: Date | null;
   lastTransferStatus: string | null;
   minimumPayoutCents: number;
   minimumPayoutLabel: string;
-  recentTransfers: PodOwnerPayoutRecentTransfer[];
+  payoutHistory: PodOwnerPayoutHistoryRow[];
 };
 
 /**
@@ -88,19 +92,21 @@ export async function getPodOwnerPayoutSummary(
       sentAmountCents: 0,
       sentCount: 0,
       needsReviewCount: 0,
+      eligibleSalesCents: 0,
+      podRevenueShareCents: 0,
       lastTransferAmountCents: null,
       lastTransferDate: null,
       lastTransferStatus: null,
       minimumPayoutCents,
       minimumPayoutLabel,
-      recentTransfers: [],
+      payoutHistory: [],
     };
   }
 
   const [allocations, transfers, recipientUser] = await Promise.all([
     prisma.podPayoutAllocation.findMany({
       where: { podId },
-      select: { status: true, podPayoutAmountCents: true },
+      select: { status: true, podPayoutAmountCents: true, eligibleSubtotalCents: true },
     }),
     prisma.podPayoutTransfer.findMany({
       where: { podId },
@@ -137,8 +143,10 @@ export async function getPodOwnerPayoutSummary(
     : null;
 
   const totals = aggregatePodOwnerPayoutTotals(allocations, transfers);
+  const eligibleSalesCents = aggregateEligibleSalesCents(allocations);
+  const podRevenueShareCents = aggregatePodRevenueShareCents(allocations);
   const lastSent = pickLastSentTransfer(transfers);
-  const recentTransfers = buildRecentOwnerTransfers(transfers);
+  const payoutHistory = buildOwnerPayoutHistory(transfers);
 
   return {
     enabled: true,
@@ -146,6 +154,8 @@ export async function getPodOwnerPayoutSummary(
     payoutSetupStatus: connectStatus?.ownerLabel ?? "Payout account setup needed",
     payoutSetupReady: connectStatus?.ready ?? false,
     ...totals,
+    eligibleSalesCents,
+    podRevenueShareCents,
     lastTransferAmountCents: lastSent?.amountCents ?? null,
     lastTransferDate: lastSent
       ? (lastSent.paidAt ?? lastSent.submittedAt ?? lastSent.createdAt)
@@ -153,6 +163,6 @@ export async function getPodOwnerPayoutSummary(
     lastTransferStatus: lastSent ? ownerTransferStatusLabel(lastSent.status) : null,
     minimumPayoutCents,
     minimumPayoutLabel,
-    recentTransfers,
+    payoutHistory,
   };
 }

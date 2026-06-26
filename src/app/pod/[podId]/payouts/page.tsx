@@ -1,19 +1,16 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 
-import { DashboardPageHeader, DashboardSection, DashboardShell } from "@/components/dashboard";
+import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { env } from "@/lib/env";
 import { derivePodPayoutConnectStatus } from "@/lib/pod-payout-connect-status";
 import { loadPodDashboardContext } from "@/lib/pod-dashboard-data.server";
 import {
   isUserDesignatedPodPayoutRecipient,
-  loadPodPayoutRecipientContext,
   syncPodPayoutConnectedAccountStatus,
 } from "@/services/pod-payout-connect.service";
 import { prisma } from "@/lib/db";
-import { PodPayoutSetupCard } from "../settings/PodPayoutSetupCard";
-import { PodPayoutSummaryCard } from "../dashboard/PodPayoutSummaryCard";
+import { PodPayoutsView } from "./PodPayoutsView";
 
 export default async function PodPayoutsPage({
   params,
@@ -76,42 +73,19 @@ export default async function PodPayoutsPage({
       <DashboardPageHeader
         headingLevel={1}
         title="Payouts"
-        description="Track your pod share from eligible Open Order sales."
+        description="See what your pod has earned from Open Order and manage payout details."
       />
 
-      <div className="mt-8 space-y-8">
-        {ctx.payoutSummary ? (
-          <PodPayoutSummaryCard podId={podId} summary={ctx.payoutSummary} />
-        ) : (
-          <div className="rounded-xl border border-oo-light-stone bg-oo-cream/50 px-4 py-6 text-sm text-oo-stone-gray">
-            Pod payout details are available to the designated payout recipient for this pod.
-          </div>
-        )}
-
-        <DashboardSection
-          title="Payout account"
-          description="Connect the account that receives your pod share."
-        >
-          <div className="max-w-3xl">
-            <PodPayoutSetupCard
-              podId={podId}
-              podPayoutsEnabled={ctx.payoutContext?.podPayoutsEnabled ?? false}
-              isDesignatedRecipient={isDesignatedRecipient}
-              stripeConnectConfigured={Boolean(env.STRIPE_SECRET_KEY)}
-              connectStatus={connectStatus}
-              payoutNotice={sp.payout_notice === "link_expired" ? "link_expired" : null}
-              podSharePercentLabel={ctx.payoutSummary?.podSharePercentLabel ?? null}
-              minimumPayoutLabel={ctx.payoutSummary?.minimumPayoutLabel ?? null}
-            />
-          </div>
-        </DashboardSection>
-
-        <p className="text-sm text-oo-stone-gray">
-          Need to update pod profile or pickup instructions?{" "}
-          <Link href={`/pod/${podId}/settings`} className="font-medium text-oo-charcoal underline">
-            Open settings
-          </Link>
-        </p>
+      <div className="mt-8">
+        <PodPayoutsView
+          podId={podId}
+          summary={ctx.payoutSummary}
+          podPayoutsEnabled={ctx.payoutContext?.podPayoutsEnabled ?? false}
+          isDesignatedRecipient={isDesignatedRecipient}
+          stripeConnectConfigured={Boolean(env.STRIPE_SECRET_KEY)}
+          connectStatus={connectStatus}
+          payoutNotice={sp.payout_notice === "link_expired" ? "link_expired" : null}
+        />
       </div>
     </DashboardShell>
   );

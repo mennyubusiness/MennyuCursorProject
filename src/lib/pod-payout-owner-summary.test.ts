@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { POD_PAYOUT_ALLOCATION_STATUS } from "@/lib/pod-payout-allocation";
 import {
+  aggregateEligibleSalesCents,
   aggregatePodOwnerPayoutTotals,
+  ownerPayoutHistoryStatusLabel,
   ownerTransferStatusLabel,
   pickLastSentTransfer,
 } from "@/lib/pod-payout-owner-summary";
@@ -89,6 +91,28 @@ describe("aggregatePodOwnerPayoutTotals", () => {
     );
     expect(totals.needsReviewCount).toBe(1);
     expect(totals.blockedAmountCents).toBe(500);
+  });
+});
+
+describe("ownerPayoutHistoryStatusLabel", () => {
+  it("uses plain pod-owner-facing labels", () => {
+    expect(ownerPayoutHistoryStatusLabel("paid")).toBe("Paid");
+    expect(ownerPayoutHistoryStatusLabel("submitted")).toBe("Paid");
+    expect(ownerPayoutHistoryStatusLabel("pending")).toBe("Pending");
+    expect(ownerPayoutHistoryStatusLabel("cancelled_due_to_refund")).toBe("Cancelled");
+    expect(ownerPayoutHistoryStatusLabel("failed")).toBe("Failed");
+    expect(ownerPayoutHistoryStatusLabel("blocked")).toBe("Needs review");
+  });
+});
+
+describe("aggregateEligibleSalesCents", () => {
+  it("sums eligible subtotals excluding cancelled allocations", () => {
+    expect(
+      aggregateEligibleSalesCents([
+        { status: POD_PAYOUT_ALLOCATION_STATUS.pending, eligibleSubtotalCents: 10_000 },
+        { status: POD_PAYOUT_ALLOCATION_STATUS.cancelledDueToRefund, eligibleSubtotalCents: 2_000 },
+      ])
+    ).toBe(10_000);
   });
 });
 

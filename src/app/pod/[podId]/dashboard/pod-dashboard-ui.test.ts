@@ -73,7 +73,7 @@ describe("pod dedicated pages", () => {
     expect(readPod("promote/page.tsx")).toContain("PodOrderingQrSection");
     expect(readPod("promote/page.tsx")).toContain("PodPromotionCard");
     expect(readPod("promote/page.tsx")).not.toContain("featuredVendors");
-    expect(readPod("payouts/page.tsx")).toContain("PodPayoutSummaryCard");
+    expect(readPod("payouts/page.tsx")).toContain("PodPayoutsView");
     expect(readPod("setup/page.tsx")).toContain("VendorSetupChecklist");
     expect(readPod("setup/page.tsx")).not.toContain("Recommended");
   });
@@ -95,6 +95,9 @@ describe("pod promote page", () => {
     expect(qrActions).toContain("Download QR");
     expect(qrActions).toContain("View public page");
     expect(announcement).toContain('title="Announcement"');
+    expect(announcement).toContain("Post a short update customers will see on your public pod page");
+    expect(announcement).toContain("Save announcement");
+    expect(announcement).toContain("Live music tonight");
     expect(announcement).not.toContain("Featured vendors");
     expect(announcement).not.toContain("featuredVendors");
   });
@@ -165,9 +168,22 @@ describe("pod roster and adoption preserved", () => {
 });
 
 describe("pod payout visibility", () => {
-  it("links payout card to dedicated payouts page", () => {
-    const card = readDashboard("PodPayoutSummaryCard.tsx");
-    expect(card).toContain("/payouts");
-    expect(card).not.toContain("/settings#payout-setup");
+  it("uses focused payouts page sections", () => {
+    const page = readPod("payouts/page.tsx");
+    const view = readPod("payouts/PodPayoutsView.tsx");
+    const earnings = readPod("payouts/PodPayoutEarningsSummary.tsx");
+    const history = readPod("payouts/PodPayoutHistorySection.tsx");
+
+    expect(page).toContain("PodPayoutsView");
+    expect(page).not.toContain("Open settings");
+    expect(page).not.toContain("pickup instructions");
+    expect(view).toContain("Payout settings");
+    expect(view).not.toContain("PodPayoutSummaryCard");
+    expect(earnings).toContain("Pending payout");
+    expect(earnings).toContain("Paid to date");
+    expect(earnings).toContain("Eligible sales");
+    expect(earnings).not.toContain("Pod share");
+    expect(history).toContain("No payouts yet");
+    expect(history).not.toMatch(/stripe|transfer id|basis point/i);
   });
 });

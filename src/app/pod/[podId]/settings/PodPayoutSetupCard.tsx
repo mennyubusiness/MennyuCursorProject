@@ -18,6 +18,10 @@ export type PodPayoutSetupCardProps = {
   payoutNotice: "link_expired" | null;
   podSharePercentLabel?: string | null;
   minimumPayoutLabel?: string | null;
+  payoutAccountStatusLabel?: string | null;
+  payoutSetupReady?: boolean;
+  /** When true, omit outer card shell (used inside DashboardCard on payouts page). */
+  embedded?: boolean;
 };
 
 export function PodPayoutSetupCard({
@@ -29,30 +33,37 @@ export function PodPayoutSetupCard({
   payoutNotice,
   podSharePercentLabel,
   minimumPayoutLabel,
+  payoutAccountStatusLabel,
+  payoutSetupReady = false,
+  embedded = false,
 }: PodPayoutSetupCardProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  const shellClass = embedded
+    ? "space-y-4"
+    : "rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm";
+
   if (!podPayoutsEnabled) {
     return (
-      <DashboardPayoutSetupShell>
+      <div className={shellClass}>
         <p className="text-sm text-oo-stone-gray">
-          Pod payouts are not enabled for this pod yet. An Open Order admin will turn this on when your
-          pod is ready.
+          Pod payouts are not enabled for this pod yet. Pod owner payouts are managed by Open Order
+          during beta. Contact Open Order to update payout details.
         </p>
-      </DashboardPayoutSetupShell>
+      </div>
     );
   }
 
   if (!isDesignatedRecipient) {
     return (
-      <DashboardPayoutSetupShell>
+      <div className={shellClass}>
         <p className="text-sm text-oo-stone-gray">
-          This pod&apos;s payout account is managed by the payout account owner. Only they can set up or
-          manage the Stripe payout account here when signed in with their account.
+          This pod&apos;s payout account is managed by the payout account owner. Only they can set up
+          or update the payout account when signed in with their account.
         </p>
-      </DashboardPayoutSetupShell>
+      </div>
     );
   }
 
@@ -100,60 +111,56 @@ export function PodPayoutSetupCard({
 
   if (!stripeConnectConfigured) {
     return (
-      <DashboardPayoutSetupShell>
+      <div className={shellClass}>
         <p className="text-sm text-oo-stone-gray">
-          Payout setup is not available in this environment yet. Contact Open Order support if you need
-          help.
+          Payout setup is not available in this environment yet. Contact Open Order if you need help.
         </p>
-      </DashboardPayoutSetupShell>
+      </div>
     );
   }
 
-  const ready = connectStatus?.ready ?? false;
+  const ready = connectStatus?.ready ?? payoutSetupReady;
   const hasAccount = connectStatus?.hasAccount ?? false;
   const needsAttention = connectStatus?.code === "needs_attention";
   const canManageAccount = ready || needsAttention;
 
   return (
-    <DashboardPayoutSetupShell>
-      <p className="text-sm text-oo-stone-gray">
-        Set up the payout account used for this pod&apos;s future payout transfers. Pod payout transfers
-        are not active yet.
-      </p>
+    <div className={shellClass}>
+      <dl className="grid gap-3 rounded-lg border border-oo-light-stone bg-oo-cream/40 p-4 sm:grid-cols-2">
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
+            Payout account
+          </dt>
+          <dd className="mt-1 text-sm font-medium text-oo-charcoal">
+            {payoutAccountStatusLabel ?? connectStatus?.ownerLabel ?? "Not started"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Pod share</dt>
+          <dd className="mt-1 text-sm font-medium text-oo-charcoal">{podSharePercentLabel ?? "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
+            Minimum payout
+          </dt>
+          <dd className="mt-1 text-sm font-medium text-oo-charcoal">
+            {minimumPayoutLabel ?? "No minimum"}
+          </dd>
+        </div>
+      </dl>
 
-      {podSharePercentLabel ? (
-        <dl className="mt-4 grid gap-3 rounded-lg border border-oo-light-stone bg-oo-cream/40 p-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">Pod share</dt>
-            <dd className="mt-1 text-sm font-medium text-oo-charcoal">{podSharePercentLabel}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-oo-stone-gray">
-              Minimum payout
-            </dt>
-            <dd className="mt-1 text-sm font-medium text-oo-charcoal">
-              {minimumPayoutLabel ?? "No minimum"}
-            </dd>
-          </div>
-        </dl>
-      ) : null}
-
-      <p className="mt-4 text-xs text-oo-stone-gray">
-        Transfers are sent manually during beta.
-      </p>
-
-      {payoutNotice === "link_expired" && (
-        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+      {payoutNotice === "link_expired" ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           That setup link expired. Use the button below to open a fresh one.
         </p>
-      )}
+      ) : null}
 
-      <div className="mt-4 space-y-3">
+      <div className="space-y-3">
         {ready ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2">
             <p className="text-sm font-medium text-emerald-900">Payout account ready</p>
             <p className="mt-1 text-xs text-emerald-800/90">
-              Your payout account is ready. Pod payout transfers are not active yet.
+              Your payout account is ready to receive pod owner payments.
             </p>
           </div>
         ) : hasAccount ? (
@@ -179,19 +186,14 @@ export function PodPayoutSetupCard({
 
         <div className="flex flex-wrap gap-2">
           {canManageAccount ? (
-            <>
-              <button
-                type="button"
-                onClick={() => void goToManage()}
-                disabled={pending}
-                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
-              >
-                Manage payout account
-              </button>
-              <p className="w-full text-xs text-oo-stone-gray">
-                Update bank details, business information, or payout account requirements in Stripe.
-              </p>
-            </>
+            <button
+              type="button"
+              onClick={() => void goToManage()}
+              disabled={pending}
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
+            >
+              Update payout account
+            </button>
           ) : (
             <button
               type="button"
@@ -213,13 +215,11 @@ export function PodPayoutSetupCard({
             </button>
           ) : null}
         </div>
-      </div>
-    </DashboardPayoutSetupShell>
-  );
-}
 
-function DashboardPayoutSetupShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">{children}</div>
+        <p className="text-xs text-oo-stone-gray">
+          Pod owner payouts are sent manually by Open Order during beta.
+        </p>
+      </div>
+    </div>
   );
 }
