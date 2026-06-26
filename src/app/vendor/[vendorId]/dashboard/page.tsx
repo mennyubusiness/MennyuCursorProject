@@ -24,14 +24,6 @@ export default async function VendorDashboardPage({
         headingLevel={1}
         title="Dashboard"
         description="Store status, live orders, and what needs your attention today."
-        actions={
-          <Link
-            href={`/vendor/${vendorId}/kitchen`}
-            className="inline-flex items-center justify-center rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-brand-hover"
-          >
-            Kitchen mode
-          </Link>
-        }
       />
 
       <div className="mt-8 space-y-8">
@@ -55,8 +47,6 @@ export default async function VendorDashboardPage({
           posConnectionLabel={ctx.posConnectionLabel}
           menuSyncLabel={ctx.menuSyncLabel}
           paymentsLabel={ctx.paymentsLabel}
-          posManaged={ctx.posManaged}
-          initialPaused={ctx.vendorRecord.mennyuOrdersPaused ?? false}
           storefrontHref={ctx.storefrontHref}
           todayHoursLabel={ctx.hoursSummary.todayLabel}
           nextOpeningLabel={ctx.hoursSummary.nextOpeningLabel}

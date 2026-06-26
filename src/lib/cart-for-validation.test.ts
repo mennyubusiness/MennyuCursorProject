@@ -55,4 +55,33 @@ describe("buildCartForValidationFromDisplayCart posOpen", () => {
     });
     expect(typeof built.items[0]?.vendor.posOpen).toBe("boolean");
   });
+
+  it("blocks orderability when Deliverect sync is on but no cached hours exist", () => {
+    const built = buildCartForValidationFromDisplayCart({
+      podId: "pod_1",
+      pod: { pickupTimezone: "America/Chicago" },
+      items: [
+        {
+          id: "line_1",
+          menuItemId: "mi_1",
+          vendorId: "v_1",
+          quantity: 1,
+          priceCents: 500,
+          menuItem: {
+            priceCents: 500,
+            isAvailable: true,
+            name: "Burger",
+          },
+          vendor: {
+            isActive: true,
+            mennyuOrdersPaused: false,
+            syncCustomerOrderingHoursFromDeliverect: true,
+            customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+            deliverectSyncedCustomerOrderingHours: null,
+          },
+        },
+      ],
+    });
+    expect(built.items[0]?.vendor.posOpen).toBe(false);
+  });
 });

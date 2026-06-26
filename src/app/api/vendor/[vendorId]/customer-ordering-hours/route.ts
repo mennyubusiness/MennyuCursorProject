@@ -7,6 +7,7 @@ import {
   validateVendorCustomerOrderingWeek,
   type VendorCustomerOrderingWeek,
 } from "@/lib/vendor-customer-ordering-hours";
+import { syncVendorCustomerOrderingHoursFromDeliverect } from "@/services/vendor-deliverect-hours-sync.service";
 
 type SaveBody = {
   syncFromDeliverect?: boolean;
@@ -89,6 +90,26 @@ export async function PATCH(
       ...(customerOrderingHours ? { customerOrderingHours } : {}),
     },
   });
+
+  if (syncFromDeliverect) {
+    const syncResult = await syncVendorCustomerOrderingHoursFromDeliverect(vendorId);
+    if ("skipped" in syncResult) {
+      return NextResponse.json({
+        ok: true,
+        syncFromDeliverect,
+        customHours: customerOrderingHours ?? null,
+        hoursSync: { ok: false, error: "Hours sync skipped" },
+      });
+    }
+    return NextResponse.json({
+      ok: true,
+      syncFromDeliverect,
+      customHours: customerOrderingHours ?? null,
+      hoursSync: syncResult.ok
+        ? { ok: true, syncedAt: syncResult.syncedAt }
+        : { ok: false, error: syncResult.error, keptPreviousHours: syncResult.keptPreviousHours },
+    });
+  }
 
   return NextResponse.json({
     ok: true,

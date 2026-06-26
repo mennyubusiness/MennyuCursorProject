@@ -69,7 +69,7 @@ function baseCart(items: CartForValidation["items"]): CartForValidation {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPodFindUnique.mockResolvedValue({ isActive: true });
+  mockPodFindUnique.mockResolvedValue({ isActive: true, pickupTimezone: "America/Chicago" });
   mockPodVendorFindUnique.mockResolvedValue({ isActive: true });
   mockPodVendorFindMany.mockResolvedValue([{ vendorId: "v_1", isActive: true }]);
   mockOperationalMenuIds.mockResolvedValue(new Set(["mi_1", "mi_2"]));
@@ -174,6 +174,24 @@ describe("validateCartForOrder", () => {
       baseCart([baseLine({ vendor: { isActive: true, mennyuOrdersPaused: false, posOpen: undefined } })])
     );
     expect(open.valid).toBe(true);
+  });
+
+  it("rejects vendor when Deliverect sync is on but synced hours are missing", async () => {
+    mockPodFindUnique.mockResolvedValue({ isActive: true, pickupTimezone: "America/Chicago" });
+    const result = await validateCartForOrder(
+      baseCart([
+        baseLine({
+          vendor: {
+            isActive: true,
+            mennyuOrdersPaused: false,
+            syncCustomerOrderingHoursFromDeliverect: true,
+            deliverectSyncedCustomerOrderingHours: null,
+          },
+        }),
+      ])
+    );
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe("VENDOR_CLOSED");
   });
 
   it("rejects inactive pod", async () => {

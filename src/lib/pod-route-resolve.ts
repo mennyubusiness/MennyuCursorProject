@@ -43,6 +43,9 @@ export async function resolveVendorInPodBySlugOrId(podId: string, vendorRef: str
           isActive: true,
           mennyuOrdersPaused: true,
           deliverectChannelLinkId: true,
+          syncCustomerOrderingHoursFromDeliverect: true,
+          customerOrderingHours: true,
+          deliverectSyncedCustomerOrderingHours: true,
         },
       })
     : await prisma.vendor.findUnique({
@@ -58,6 +61,9 @@ export async function resolveVendorInPodBySlugOrId(podId: string, vendorRef: str
           isActive: true,
           mennyuOrdersPaused: true,
           deliverectChannelLinkId: true,
+          syncCustomerOrderingHoursFromDeliverect: true,
+          customerOrderingHours: true,
+          deliverectSyncedCustomerOrderingHours: true,
         },
       });
 

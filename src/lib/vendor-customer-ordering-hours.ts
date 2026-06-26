@@ -37,7 +37,10 @@ export type VendorHoursSourceFields = {
   syncCustomerOrderingHoursFromDeliverect: boolean;
   customerOrderingHours: unknown;
   deliverectSyncedCustomerOrderingHours: unknown;
+  deliverectSyncedCustomerOrderingHoursSyncStatus?: string | null;
 };
+
+export type VendorHoursSyncStatus = "ok" | "failed" | null;
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -147,7 +150,8 @@ export function isOpenAtTime(
 
 /**
  * Returns whether the vendor is within customer ordering hours.
- * undefined = no hours configured for the active source (do not block orderability).
+ * undefined = no hours configured for the active source (custom mode only — do not block orderability).
+ * false = sync mode enabled but no usable synced hours, or currently outside hours.
  */
 export function isVendorWithinCustomerOrderingHours(input: {
   syncFromDeliverect: boolean;
@@ -156,7 +160,15 @@ export function isVendorWithinCustomerOrderingHours(input: {
   timeZone: string;
   now?: Date;
 }): boolean | undefined {
-  const week = input.syncFromDeliverect ? input.syncedHours : input.customHours;
+  if (input.syncFromDeliverect) {
+    if (!input.syncedHours) return false;
+    const now = input.now ?? new Date();
+    const weekday = getWeekdayInTimezone(now, input.timeZone);
+    const minutes = getMinutesInTimezone(now, input.timeZone);
+    return isOpenAtTime(input.syncedHours, weekday, minutes);
+  }
+
+  const week = input.customHours;
   if (!week) return undefined;
 
   const now = input.now ?? new Date();
@@ -182,11 +194,31 @@ export function resolveVendorPosOpen(
   });
 }
 
+/** Merge vendor flags with computed customer-ordering-hours open state for orderability checks. */
+export function vendorAvailabilityWithCustomerOrderingHours(
+  vendor: VendorHoursSourceFields & {
+    isActive?: boolean;
+    mennyuOrdersPaused?: boolean;
+    deliverectChannelLinkId?: string | null;
+  },
+  podTimezone: string | null | undefined,
+  now?: Date
+) {
+  return {
+    isActive: vendor.isActive,
+    mennyuOrdersPaused: vendor.mennyuOrdersPaused,
+    deliverectChannelLinkId: vendor.deliverectChannelLinkId,
+    posOpen: resolveVendorPosOpen(vendor, resolveVendorHoursTimezone(podTimezone), now),
+  };
+}
+
 export type VendorHoursStatusSummary = {
   sourceLabel: string;
   todayLabel: string;
   nextOpeningLabel: string | null;
   posOpen: boolean | undefined;
+  needsHoursAttention: boolean;
+  syncFailed: boolean;
 };
 
 export function summarizeVendorCustomerOrderingHours(input: {
@@ -199,6 +231,7 @@ export function summarizeVendorCustomerOrderingHours(input: {
   const customHours = parseVendorCustomerOrderingWeek(input.vendor.customerOrderingHours);
   const syncedHours = parseVendorCustomerOrderingWeek(input.vendor.deliverectSyncedCustomerOrderingHours);
   const syncOn = input.vendor.syncCustomerOrderingHoursFromDeliverect;
+  const syncFailed = input.vendor.deliverectSyncedCustomerOrderingHoursSyncStatus === "failed";
   const activeWeek = syncOn ? syncedHours : customHours;
 
   const posOpen = isVendorWithinCustomerOrderingHours({
@@ -216,14 +249,18 @@ export function summarizeVendorCustomerOrderingHours(input: {
         todayLabel: "Connect your POS to sync customer ordering hours.",
         nextOpeningLabel: null,
         posOpen,
+        needsHoursAttention: true,
+        syncFailed: false,
       };
     }
     if (!syncedHours) {
       return {
-        sourceLabel: "Synced from Deliverect",
+        sourceLabel: "Hours sync needs attention",
         todayLabel: "No synced hours are available yet.",
         nextOpeningLabel: null,
-        posOpen,
+        posOpen: false,
+        needsHoursAttention: true,
+        syncFailed,
       };
     }
   } else if (!customHours) {
@@ -232,6 +269,8 @@ export function summarizeVendorCustomerOrderingHours(input: {
       todayLabel: "Customer ordering hours are not configured yet.",
       nextOpeningLabel: null,
       posOpen,
+      needsHoursAttention: true,
+      syncFailed: false,
     };
   }
 
@@ -251,11 +290,18 @@ export function summarizeVendorCustomerOrderingHours(input: {
 
   const nextOpeningLabel = activeWeek ? findNextOpeningLabel(activeWeek, input.timeZone, now) : null;
 
+  let sourceLabel = "Custom Open Order hours";
+  if (syncOn) {
+    sourceLabel = syncFailed ? "Synced from Deliverect · latest sync failed" : "Synced from Deliverect";
+  }
+
   return {
-    sourceLabel: syncOn ? "Synced from Deliverect" : "Custom customer ordering hours",
+    sourceLabel,
     todayLabel,
     nextOpeningLabel,
     posOpen,
+    needsHoursAttention: syncOn ? syncFailed : false,
+    syncFailed: syncOn ? syncFailed : false,
   };
 }
 

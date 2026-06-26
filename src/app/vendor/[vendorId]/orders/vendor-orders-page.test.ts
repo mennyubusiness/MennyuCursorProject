@@ -30,6 +30,8 @@ describe("vendor orders workbench layout", () => {
     expect(workbench).toContain("VendorDashboardLiveOrders");
     expect(workbench).toContain("VendorOrdersHistorySection");
     expect(workbench).toContain("Kitchen mode");
+    expect(workbench).toContain("VendorKitchenPauseToggle");
+    expect(workbench).toContain('variant="orders"');
     expect(page).not.toContain("VendorOrdersSystemStatusStrip");
     expect(page).not.toContain("VendorOrdersOperationsBar");
   });

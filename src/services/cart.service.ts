@@ -9,6 +9,7 @@ import type { Cart, CartGroup, CartItem, CartPodScope, QuickCartApiResponse } fr
 import { computeEffectiveUnitPriceCents } from "@/domain/money";
 import { validateCartItemModifiers } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
+import { vendorAvailabilityWithCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
 import {
   getVendorOrderabilityInPod,
   cartLineOrderabilityCode,
@@ -396,6 +397,18 @@ export async function addCartItem(
       name: menuItemInitial.name,
     });
   }
+
+  const cart = await prisma.cart.findUnique({
+    where: { id: cartId },
+    include: { items: true, pod: { select: { pickupTimezone: true, isActive: true } } },
+  });
+  if (!cart) throw new Error("Cart not found");
+  await assertSessionAllowsAddToCart(cart.sessionId, cartId, cart.podId);
+
+  const vendorForOrderability = vendorAvailabilityWithCustomerOrderingHours(
+    menuItemInitial.vendor,
+    cart.pod?.pickupTimezone
+  );
   const operationalByVendor = new Map<string, Set<string>>();
   await requireOperationalMenuItem(
     operationalByVendor,
@@ -409,7 +422,7 @@ export async function addCartItem(
       menuItemName: menuItemInitial.name,
     });
   }
-  const vendorAvailability = getVendorAvailability(menuItemInitial.vendor);
+  const vendorAvailability = getVendorAvailability(vendorForOrderability);
   if (!vendorAvailability.orderable) {
     const message =
       vendorAvailability.status === "inactive"
@@ -426,12 +439,6 @@ export async function addCartItem(
     throw new CartValidationError(message, code);
   }
 
-  const cart = await prisma.cart.findUnique({
-    where: { id: cartId },
-    include: { items: true },
-  });
-  if (!cart) throw new Error("Cart not found");
-  await assertSessionAllowsAddToCart(cart.sessionId, cartId, cart.podId);
   if (groupOrderActor && cart.podId !== groupOrderActor.podId) {
     throw new CartValidationError(
       "This item isn’t available for the pod your group order is using.",
@@ -454,7 +461,7 @@ export async function addCartItem(
     podActive: pod?.isActive ?? false,
     podVendorExists: Boolean(vendorInPod),
     podVendorActive: vendorInPod?.isActive ?? false,
-    vendor: menuItemInitial.vendor,
+    vendor: vendorForOrderability,
   });
   if (!podOrderability.orderable) {
     throw new CartValidationError(

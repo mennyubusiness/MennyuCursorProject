@@ -31,6 +31,7 @@ export default async function VendorOrdersPage({
           initialNowMs={ctx.initialNowMs}
           isDeliverectLive={ctx.isDeliverectLive}
           posManaged={ctx.posManaged}
+          initialPaused={ctx.vendorRecord.mennyuOrdersPaused ?? false}
         />
       </div>
     </DashboardShell>

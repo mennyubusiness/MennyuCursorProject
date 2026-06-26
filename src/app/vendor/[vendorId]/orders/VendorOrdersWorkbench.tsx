@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { DashboardSection } from "@/components/dashboard";
 import { VENDOR_POS_BOARD_READONLY_COPY } from "@/lib/vendor-operational-copy";
+import { VendorKitchenPauseToggle } from "../kitchen/VendorKitchenPauseToggle";
 import { VendorDashboardLiveOrders } from "../dashboard/VendorDashboardLiveOrders";
 import { VendorOrdersHistorySection } from "./VendorOrdersHistorySection";
 
@@ -20,6 +21,7 @@ export function VendorOrdersWorkbench({
   initialNowMs,
   isDeliverectLive,
   posManaged,
+  initialPaused,
 }: {
   vendorId: string;
   vendorName: string;
@@ -28,6 +30,7 @@ export function VendorOrdersWorkbench({
   initialNowMs: number;
   isDeliverectLive: boolean;
   posManaged: boolean;
+  initialPaused: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("active");
 
@@ -53,12 +56,20 @@ export function VendorOrdersWorkbench({
             </button>
           ))}
         </div>
-        <Link
-          href={`/vendor/${vendorId}/kitchen`}
-          className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-hover"
-        >
-          Kitchen mode
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/vendor/${vendorId}/kitchen`}
+            className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-hover"
+          >
+            Kitchen mode
+          </Link>
+          <VendorKitchenPauseToggle
+            vendorId={vendorId}
+            initialPaused={initialPaused}
+            variant="orders"
+            posManaged={posManaged}
+          />
+        </div>
       </div>
 
       {posManaged ? (

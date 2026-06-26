@@ -68,6 +68,7 @@ export function vendorPaymentsReadinessLabel(ready: boolean): string {
   return ready ? "Payments ready" : "Finish payment setup";
 }
 
+export const VENDOR_POS_INTAKE_MANAGED_COPY = "Order intake is managed by your POS.";
 export const VENDOR_POS_MANAGED_COPY = "Order status is managed by your POS.";
 export const VENDOR_POS_BOARD_READONLY_COPY =
   "Order progress is managed by your POS. This board is read-only.";

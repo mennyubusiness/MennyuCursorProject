@@ -9,6 +9,7 @@ import {
   VENDOR_WEEKDAY_LABELS,
   type VendorCustomerOrderingWeek,
 } from "@/lib/vendor-customer-ordering-hours";
+import { maybeAutoSyncVendorDeliverectHours } from "@/services/vendor-deliverect-hours-sync.service";
 
 export type VendorHoursPageData = {
   vendorId: string;
@@ -18,6 +19,8 @@ export type VendorHoursPageData = {
   customHours: VendorCustomerOrderingWeek;
   syncedHours: VendorCustomerOrderingWeek | null;
   syncedHoursAt: string | null;
+  syncStatus: "ok" | "failed" | null;
+  syncLastError: string | null;
 };
 
 export const loadVendorHoursPageData = cache(async (vendorId: string): Promise<VendorHoursPageData | null> => {
@@ -32,6 +35,8 @@ export const loadVendorHoursPageData = cache(async (vendorId: string): Promise<V
       customerOrderingHours: true,
       deliverectSyncedCustomerOrderingHours: true,
       deliverectSyncedCustomerOrderingHoursAt: true,
+      deliverectSyncedCustomerOrderingHoursSyncStatus: true,
+      deliverectSyncedCustomerOrderingHoursLastError: true,
     },
   });
   if (!vendor) return null;
@@ -40,9 +45,27 @@ export const loadVendorHoursPageData = cache(async (vendorId: string): Promise<V
     vendor.deliverectChannelLinkId?.trim() && vendor.posConnectionStatus === "connected"
   );
 
+  if (vendor.syncCustomerOrderingHoursFromDeliverect && posConnected) {
+    await maybeAutoSyncVendorDeliverectHours(vendorId);
+  }
+
+  const refreshed = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: {
+      customerOrderingHours: true,
+      deliverectSyncedCustomerOrderingHours: true,
+      deliverectSyncedCustomerOrderingHoursAt: true,
+      deliverectSyncedCustomerOrderingHoursSyncStatus: true,
+      deliverectSyncedCustomerOrderingHoursLastError: true,
+    },
+  });
+
+  const hoursRow = refreshed ?? vendor;
   const parsedCustom =
-    parseVendorCustomerOrderingWeek(vendor.customerOrderingHours) ?? defaultVendorCustomerOrderingWeek();
-  const parsedSynced = parseVendorCustomerOrderingWeek(vendor.deliverectSyncedCustomerOrderingHours);
+    parseVendorCustomerOrderingWeek(hoursRow.customerOrderingHours) ?? defaultVendorCustomerOrderingWeek();
+  const parsedSynced = parseVendorCustomerOrderingWeek(hoursRow.deliverectSyncedCustomerOrderingHours);
+  const syncStatusRaw = hoursRow.deliverectSyncedCustomerOrderingHoursSyncStatus;
+  const syncStatus = syncStatusRaw === "ok" || syncStatusRaw === "failed" ? syncStatusRaw : null;
 
   return {
     vendorId: vendor.id,
@@ -51,7 +74,9 @@ export const loadVendorHoursPageData = cache(async (vendorId: string): Promise<V
     syncFromDeliverect: vendor.syncCustomerOrderingHoursFromDeliverect,
     customHours: parsedCustom,
     syncedHours: parsedSynced,
-    syncedHoursAt: vendor.deliverectSyncedCustomerOrderingHoursAt?.toISOString() ?? null,
+    syncedHoursAt: hoursRow.deliverectSyncedCustomerOrderingHoursAt?.toISOString() ?? null,
+    syncStatus,
+    syncLastError: hoursRow.deliverectSyncedCustomerOrderingHoursLastError ?? null,
   };
 });
 

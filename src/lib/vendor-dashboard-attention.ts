@@ -1,4 +1,5 @@
 import type { ReadinessBlockingReason } from "@/lib/vendor-pod-readiness";
+import type { VendorHoursStatusSummary } from "@/lib/vendor-customer-ordering-hours";
 import {
   VENDOR_NO_POD_COPY,
   VENDOR_POS_MANAGED_COPY,
@@ -23,6 +24,7 @@ export function deriveVendorAttentionItems(input: {
   pendingPodInviteCount: number;
   failedOrdersToday: number;
   intakeLabel: string;
+  hoursSummary?: Pick<VendorHoursStatusSummary, "needsHoursAttention" | "syncFailed" | "sourceLabel" | "todayLabel">;
 }): VendorAttentionItem[] {
   const items: VendorAttentionItem[] = [];
 
@@ -102,6 +104,33 @@ export function deriveVendorAttentionItems(input: {
       description: `${input.failedOrdersToday} order${input.failedOrdersToday === 1 ? "" : "s"} failed routing or were cancelled today.`,
       severity: "warning",
     });
+  }
+
+  if (input.hoursSummary?.needsHoursAttention) {
+    if (input.hoursSummary.sourceLabel === "Hours sync needs attention") {
+      items.push({
+        id: "hours_sync",
+        title: "Hours sync needs attention",
+        description:
+          "Deliverect hour sync is enabled but Open Order has not fetched usable hours yet. Refresh from the Hours page or enter custom hours.",
+        severity: "warning",
+      });
+    } else if (input.hoursSummary.syncFailed) {
+      items.push({
+        id: "hours_sync",
+        title: "Deliverect hours sync failed",
+        description:
+          "The latest Deliverect hours sync failed. Open Order will keep using the last synced hours until you refresh.",
+        severity: "warning",
+      });
+    } else if (input.hoursSummary.sourceLabel === "Custom hours not set") {
+      items.push({
+        id: "hours_sync",
+        title: "Customer ordering hours not set",
+        description: "Set customer ordering hours so customers know when they can place orders.",
+        severity: "info",
+      });
+    }
   }
 
   if (input.intakeLabel === "Closed" && input.posState === "connected") {

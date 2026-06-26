@@ -29,6 +29,8 @@ export default async function VendorHoursPage({
           initialCustomHours={data.customHours}
           syncedHours={data.syncedHours}
           syncedHoursAt={data.syncedHoursAt}
+          syncStatus={data.syncStatus}
+          syncLastError={data.syncLastError}
         />
       </div>
     </DashboardShell>

@@ -1,12 +1,7 @@
 import Link from "next/link";
 
 import { DashboardStatusBadge, type DashboardStatusTone } from "@/components/dashboard";
-import {
-  vendorIntakeStatusTone,
-  VENDOR_POS_MANAGED_COPY,
-  type VendorIntakeStatusLabel,
-} from "@/lib/vendor-operational-copy";
-import { VendorOrdersOperationsBar } from "./VendorOrdersOperationsBar";
+import { vendorIntakeStatusTone, type VendorIntakeStatusLabel } from "@/lib/vendor-operational-copy";
 
 type VendorStoreStatusCardProps = {
   vendorId: string;
@@ -16,8 +11,6 @@ type VendorStoreStatusCardProps = {
   posConnectionLabel: string;
   menuSyncLabel: string;
   paymentsLabel: string;
-  posManaged: boolean;
-  initialPaused: boolean;
   storefrontHref: string | null;
   todayHoursLabel: string;
   nextOpeningLabel: string | null;
@@ -32,8 +25,6 @@ export function VendorStoreStatusCard({
   posConnectionLabel,
   menuSyncLabel,
   paymentsLabel,
-  posManaged,
-  initialPaused,
   storefrontHref,
   todayHoursLabel,
   nextOpeningLabel,
@@ -97,16 +88,6 @@ export function VendorStoreStatusCard({
           <dd className="mt-1 text-sm font-medium text-oo-charcoal">{paymentsLabel}</dd>
         </div>
       </dl>
-
-      <div className="mt-6 border-t border-oo-light-stone pt-5">
-        <VendorOrdersOperationsBar
-          vendorId={vendorId}
-          initialPaused={initialPaused}
-          posOpen={undefined}
-          layout="compact"
-          posManaged={posManaged}
-        />
-      </div>
     </section>
   );
 }

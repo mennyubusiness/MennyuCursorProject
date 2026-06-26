@@ -450,6 +450,9 @@ model Vendor {
   /// Last known hours snapshot from Deliverect/POS (same JSON shape as customerOrderingHours).
   deliverectSyncedCustomerOrderingHours Json?
   deliverectSyncedCustomerOrderingHoursAt DateTime?
+  /// ok | failed — result of the most recent Deliverect hours fetch attempt.
+  deliverectSyncedCustomerOrderingHoursSyncStatus String?
+  deliverectSyncedCustomerOrderingHoursLastError String?
   /// Legacy: shared secret for Bearer/automation and magic-link cookie bootstrap. Prefer User session + VendorMembership.
   vendorDashboardToken    String?
   /// Business / kitchen contact (may match User email for sole operators).

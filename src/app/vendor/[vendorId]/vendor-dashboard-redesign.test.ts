@@ -30,15 +30,22 @@ describe("vendor dashboard operating layout", () => {
     const index = readVendor("page.tsx");
     expect(index).toContain("/dashboard");
   });
+
+  it("shows Kitchen mode only in the active orders section, not the page header", () => {
+    const page = readVendor("dashboard/page.tsx");
+    const active = readVendor("dashboard/VendorDashboardActiveOrdersSection.tsx");
+    expect(page).not.toMatch(/actions=\{/);
+    expect(page).not.toContain("Kitchen mode");
+    expect(active).toContain("Open kitchen mode");
+  });
 });
 
 describe("vendor operational copy", () => {
   it("avoids technical routing language on dashboard surfaces", () => {
     const store = readVendor("dashboard/VendorStoreStatusCard.tsx");
-    const ops = readVendor("dashboard/VendorOrdersOperationsBar.tsx");
     expect(store).not.toMatch(/routingStatus|fulfillmentStatus|basis points/i);
-    expect(ops).toContain("Pause orders");
-    expect(ops).toContain("VENDOR_POS_MANAGED_COPY");
+    expect(store).not.toContain("VendorOrdersOperationsBar");
+    expect(store).toContain("Edit hours");
   });
 });
 

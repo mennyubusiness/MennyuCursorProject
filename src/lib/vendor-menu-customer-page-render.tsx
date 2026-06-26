@@ -8,6 +8,7 @@ import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { prisma } from "@/lib/db";
 import { looksLikePodOrVendorId, resolvePodBySlugOrId, resolveVendorInPodBySlugOrId } from "@/lib/pod-route-resolve";
 import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
+import { vendorAvailabilityWithCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
 import { loadCustomerVendorMenuSections } from "@/services/vendor-customer-menu.service";
 
 const DEBUG_VENDOR_MENU_PAGE = process.env.NODE_ENV === "development";
@@ -38,7 +39,14 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
 
   const podRow = await prisma.pod.findUnique({
     where: { id: podId },
-    select: { id: true, name: true, slug: true, isActive: true, accentColor: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      isActive: true,
+      accentColor: true,
+      pickupTimezone: true,
+    },
   });
   if (!podRow?.isActive) notFound();
 
@@ -59,11 +67,16 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
     });
   }
 
+  const vendorForOrderability = vendorAvailabilityWithCustomerOrderingHours(
+    vendor,
+    podRow.pickupTimezone
+  );
+
   const orderability = getVendorOrderabilityInPod({
     podActive: podRow.isActive,
     podVendorExists: Boolean(pv),
     podVendorActive: pv?.isActive ?? false,
-    vendor,
+    vendor: vendorForOrderability,
   });
   const orderingDisabled = !orderability.orderable;
   const bannerLine = orderingDisabled ? orderability.message ?? null : null;

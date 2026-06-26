@@ -66,6 +66,8 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       syncCustomerOrderingHoursFromDeliverect: true,
       customerOrderingHours: true,
       deliverectSyncedCustomerOrderingHours: true,
+      deliverectSyncedCustomerOrderingHoursSyncStatus: true,
+      deliverectSyncedCustomerOrderingHoursLastError: true,
     },
   });
   if (!vendorRecord) return null;
@@ -158,6 +160,8 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
         vendorRecord.syncCustomerOrderingHoursFromDeliverect ?? false,
       customerOrderingHours: vendorRecord.customerOrderingHours,
       deliverectSyncedCustomerOrderingHours: vendorRecord.deliverectSyncedCustomerOrderingHours,
+      deliverectSyncedCustomerOrderingHoursSyncStatus:
+        vendorRecord.deliverectSyncedCustomerOrderingHoursSyncStatus,
     },
     posConnected,
     timeZone: hoursTimezone,
@@ -193,6 +197,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     pendingPodInviteCount: pendingInvites,
     failedOrdersToday: todayStats.failedOrCancelled,
     intakeLabel,
+    hoursSummary,
   }).map((item) => {
     if (item.id === "stripe" && !item.actionHref) {
       return { ...item, actionHref: `/vendor/${vendorId}/payouts`, actionLabel: "Finish setup" };
@@ -219,6 +224,9 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     }
     if (item.id === "failed_orders") {
       return { ...item, actionHref: `/vendor/${vendorId}/orders`, actionLabel: "View orders" };
+    }
+    if (item.id === "hours_sync") {
+      return { ...item, actionHref: `/vendor/${vendorId}/hours`, actionLabel: "Open hours" };
     }
     return item;
   });

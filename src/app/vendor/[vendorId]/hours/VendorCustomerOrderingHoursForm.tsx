@@ -15,6 +15,11 @@ import {
 
 const SUCCESS_COPY = "Hours updated.";
 const ERROR_COPY = "We couldn't update your hours. Please try again.";
+const REFRESH_SUCCESS_COPY = "Hours synced from Deliverect.";
+const REFRESH_ERROR_WITH_CACHE =
+  "We couldn't sync hours from Deliverect. Open Order will keep using the last synced hours.";
+const REFRESH_ERROR_NO_CACHE =
+  "We couldn't sync hours from Deliverect. Check the Deliverect connection or enter custom Open Order hours.";
 
 type Props = {
   vendorId: string;
@@ -23,6 +28,8 @@ type Props = {
   initialCustomHours: VendorCustomerOrderingWeek;
   syncedHours: VendorCustomerOrderingWeek | null;
   syncedHoursAt: string | null;
+  syncStatus: "ok" | "failed" | null;
+  syncLastError: string | null;
 };
 
 function formatSyncedAt(iso: string | null): string | null {
@@ -41,6 +48,8 @@ export function VendorCustomerOrderingHoursForm({
   initialCustomHours,
   syncedHours,
   syncedHoursAt,
+  syncStatus,
+  syncLastError,
 }: Props) {
   const router = useRouter();
   const [syncFromDeliverect, setSyncFromDeliverect] = useState(
@@ -48,6 +57,7 @@ export function VendorCustomerOrderingHoursForm({
   );
   const [customHours, setCustomHours] = useState<VendorCustomerOrderingWeek>(initialCustomHours);
   const [pending, setPending] = useState(false);
+  const [refreshPending, setRefreshPending] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
@@ -59,6 +69,42 @@ export function VendorCustomerOrderingHoursForm({
   function updateDay(day: VendorCustomerOrderingDayHours["day"], patch: Partial<VendorCustomerOrderingDayHours>) {
     setCustomHours((prev) => prev.map((row) => (row.day === day ? { ...row, ...patch } : row)));
     setFieldError(null);
+  }
+
+  async function onRefreshFromDeliverect() {
+    setMessage(null);
+    setFieldError(null);
+    setRefreshPending(true);
+    try {
+      const res = await fetch(
+        `/api/vendor/${encodeURIComponent(vendorId)}/customer-ordering-hours/sync`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+        }
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        keptPreviousHours?: boolean;
+      };
+      if (!res.ok) {
+        const copy =
+          data.keptPreviousHours === false
+            ? REFRESH_ERROR_NO_CACHE
+            : REFRESH_ERROR_WITH_CACHE;
+        setMessage({ text: data.error ? `${copy} ${data.error}` : copy, error: true });
+        return;
+      }
+      setMessage({ text: REFRESH_SUCCESS_COPY, error: false });
+      router.refresh();
+    } catch {
+      setMessage({
+        text: syncedHours ? REFRESH_ERROR_WITH_CACHE : REFRESH_ERROR_NO_CACHE,
+        error: true,
+      });
+    } finally {
+      setRefreshPending(false);
+    }
   }
 
   async function onSave() {
@@ -92,9 +138,17 @@ export function VendorCustomerOrderingHoursForm({
           customHours: payloadCustom,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as { error?: string; hoursSync?: { ok?: boolean } };
       if (!res.ok) {
         setMessage({ text: data.error ?? ERROR_COPY, error: true });
+        return;
+      }
+      if (syncFromDeliverect && data.hoursSync && data.hoursSync.ok === false) {
+        setMessage({
+          text: syncedHours ? REFRESH_ERROR_WITH_CACHE : REFRESH_ERROR_NO_CACHE,
+          error: true,
+        });
+        router.refresh();
         return;
       }
       setMessage({ text: SUCCESS_COPY, error: false });
@@ -146,10 +200,17 @@ export function VendorCustomerOrderingHoursForm({
           <h2 className="text-base font-semibold text-oo-charcoal">Hours are synced from Deliverect.</h2>
           <p className="mt-2 text-oo-stone-gray">
             Open Order will use the hours provided by your connected POS. To make changes, update your hours in
-            Deliverect or your POS.
+            Deliverect or your POS, then refresh below.
           </p>
           {syncedHoursAt ? (
             <p className="mt-2 text-xs text-oo-stone-gray">Last synced {formatSyncedAt(syncedHoursAt)}</p>
+          ) : null}
+          {syncStatus === "failed" ? (
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
+              The latest sync failed.
+              {syncLastError ? ` ${syncLastError}` : ""}
+              {syncedHours ? " Open Order will keep using the last synced hours." : ""}
+            </p>
           ) : null}
 
           {syncedList.length > 0 ? (
@@ -165,10 +226,21 @@ export function VendorCustomerOrderingHoursForm({
             <div className="mt-4 rounded-xl border border-dashed border-oo-light-stone bg-oo-warm-white px-4 py-5 text-oo-stone-gray">
               <p className="font-medium text-oo-charcoal">No synced hours are available yet.</p>
               <p className="mt-2">
-                Check your Deliverect/POS setup or switch off sync to enter customer ordering hours manually.
+                Use Refresh hours from Deliverect below, or switch off sync to enter customer ordering hours manually.
               </p>
             </div>
           )}
+
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => void onRefreshFromDeliverect()}
+              disabled={refreshPending || !posConnected}
+              className="inline-flex items-center justify-center rounded-xl border border-oo-light-stone bg-oo-warm-white px-4 py-2.5 text-sm font-semibold text-oo-charcoal hover:bg-oo-cream disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshPending ? "Refreshing…" : "Refresh hours from Deliverect"}
+            </button>
+          </div>
         </section>
       ) : (
         <section className="rounded-2xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">

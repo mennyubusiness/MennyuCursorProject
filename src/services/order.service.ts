@@ -355,7 +355,7 @@ export type CartForValidation = {
       deliverectPlu?: string | null;
       deliverectVariantParentPlu?: string | null;
     };
-    vendor: { isActive?: boolean; mennyuOrdersPaused?: boolean; posOpen?: boolean; deliverectChannelLinkId?: string | null };
+    vendor: { isActive?: boolean; mennyuOrdersPaused?: boolean; posOpen?: boolean; deliverectChannelLinkId?: string | null; syncCustomerOrderingHoursFromDeliverect?: boolean; customerOrderingHours?: unknown; deliverectSyncedCustomerOrderingHours?: unknown };
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
   }>;
 };
@@ -372,7 +372,7 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
 
   const pod = await prisma.pod.findUnique({
     where: { id: cart.podId },
-    select: { isActive: true },
+    select: { isActive: true, pickupTimezone: true },
   });
   if (!pod?.isActive) {
     errors.push({
@@ -381,6 +381,8 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
     });
     return { valid: false, errors };
   }
+
+  const hoursTimezone = resolveVendorHoursTimezone(pod.pickupTimezone);
 
   const vendorIdsDisplay = [...new Set(cart.items.map((i) => i.vendorId))];
   const menuItemIds = [...new Set(cart.items.map((i) => i.menuItemId))];
@@ -436,7 +438,19 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
       });
       continue;
     }
-    const vendorAvailability = getVendorAvailability(item.vendor);
+    const posOpen =
+      item.vendor.posOpen ??
+      resolveVendorPosOpen(
+        {
+          syncCustomerOrderingHoursFromDeliverect:
+            item.vendor.syncCustomerOrderingHoursFromDeliverect ?? false,
+          customerOrderingHours: item.vendor.customerOrderingHours ?? null,
+          deliverectSyncedCustomerOrderingHours:
+            item.vendor.deliverectSyncedCustomerOrderingHours ?? null,
+        },
+        hoursTimezone
+      );
+    const vendorAvailability = getVendorAvailability({ ...item.vendor, posOpen });
     if (!vendorAvailability.orderable) {
       const message =
         vendorAvailability.status === "inactive"
@@ -463,7 +477,7 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
         podActive: true,
         podVendorExists: podVendorActive.has(item.vendorId),
         podVendorActive: podVendorActive.get(item.vendorId) === true,
-        vendor: item.vendor,
+        vendor: { ...item.vendor, posOpen },
       });
       errors.push({
         code: cartLineOrderabilityCode(podOrderability),

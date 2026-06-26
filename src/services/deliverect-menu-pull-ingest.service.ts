@@ -15,6 +15,7 @@ import {
   ingestDeliverectMenuImportPhase1b,
   type Phase1bIngestResult,
 } from "@/services/menu-import-phase1b.service";
+import { maybeAutoSyncVendorDeliverectHours } from "@/services/vendor-deliverect-hours-sync.service";
 
 export class DeliverectMenuPullConfigError extends Error {
   constructor(message: string) {
@@ -152,6 +153,12 @@ export async function pullDeliverectMenuAndIngestPhase1b(
     },
     { prisma: client }
   );
+
+  void maybeAutoSyncVendorDeliverectHours(vendor.id).catch((e) => {
+    console.warn(
+      `[Deliverect menu pull] hours auto-sync failed vendorId=${vendor.id} error=${e instanceof Error ? e.message : String(e)}`
+    );
+  });
 
   return {
     ...ingest,
