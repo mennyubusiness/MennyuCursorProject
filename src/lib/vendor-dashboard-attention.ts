@@ -1,9 +1,6 @@
 import type { ReadinessBlockingReason } from "@/lib/vendor-pod-readiness";
 import type { VendorHoursStatusSummary } from "@/lib/vendor-customer-ordering-hours";
-import {
-  VENDOR_NO_POD_COPY,
-  VENDOR_POS_MANAGED_COPY,
-} from "@/lib/vendor-operational-copy";
+import { VENDOR_NO_POD_COPY } from "@/lib/vendor-operational-copy";
 import type { VendorPosUiState } from "@/lib/vendor-pos-ui-state";
 
 export type VendorAttentionItem = {
@@ -24,7 +21,7 @@ export function deriveVendorAttentionItems(input: {
   pendingPodInviteCount: number;
   failedOrdersToday: number;
   intakeLabel: string;
-  hoursSummary?: Pick<VendorHoursStatusSummary, "needsHoursAttention" | "syncFailed" | "sourceLabel" | "todayLabel">;
+  hoursSummary?: Pick<VendorHoursStatusSummary, "needsHoursAttention" | "sourceLabel">;
 }): VendorAttentionItem[] {
   const items: VendorAttentionItem[] = [];
 
@@ -107,38 +104,11 @@ export function deriveVendorAttentionItems(input: {
   }
 
   if (input.hoursSummary?.needsHoursAttention) {
-    if (input.hoursSummary.sourceLabel === "Hours sync needs attention") {
-      items.push({
-        id: "hours_sync",
-        title: "Hours sync needs attention",
-        description:
-          "Deliverect hour sync is enabled but Open Order has not fetched usable hours yet. Refresh from the Hours page or enter custom hours.",
-        severity: "warning",
-      });
-    } else if (input.hoursSummary.syncFailed) {
-      items.push({
-        id: "hours_sync",
-        title: "Deliverect hours sync failed",
-        description:
-          "The latest Deliverect hours sync failed. Open Order will keep using the last synced hours until you refresh.",
-        severity: "warning",
-      });
-    } else if (input.hoursSummary.sourceLabel === "Custom hours not set") {
-      items.push({
-        id: "hours_sync",
-        title: "Customer ordering hours not set",
-        description: "Set customer ordering hours so customers know when they can place orders.",
-        severity: "info",
-      });
-    }
-  }
-
-  if (input.intakeLabel === "Closed" && input.posState === "connected") {
     items.push({
-      id: "pos_closed",
-      title: "Store appears closed",
-      description: VENDOR_POS_MANAGED_COPY,
-      severity: "info",
+      id: "hours_setup",
+      title: "Customer ordering hours not set",
+      description: "Set customer ordering hours before accepting orders.",
+      severity: "warning",
     });
   }
 
@@ -146,6 +116,6 @@ export function deriveVendorAttentionItems(input: {
 }
 
 export function isVendorSetupComplete(checklistCompleteKeys: string[]): boolean {
-  const required = ["profile", "stripe", "pos", "menu", "pod_invite"];
+  const required = ["profile", "stripe", "pos", "menu", "hours", "pod_invite"];
   return required.every((key) => checklistCompleteKeys.includes(key));
 }

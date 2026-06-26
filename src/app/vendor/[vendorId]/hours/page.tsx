@@ -18,20 +18,11 @@ export default async function VendorHoursPage({
       <DashboardPageHeader
         headingLevel={1}
         title="Hours"
-        description="Choose how Open Order should determine when customers can place orders."
+        description="Set the customer ordering hours for this vendor."
       />
 
       <div className="mt-8">
-        <VendorCustomerOrderingHoursForm
-          vendorId={data.vendorId}
-          posConnected={data.posConnected}
-          initialSyncFromDeliverect={data.syncFromDeliverect}
-          initialCustomHours={data.customHours}
-          syncedHours={data.syncedHours}
-          syncedHoursAt={data.syncedHoursAt}
-          syncStatus={data.syncStatus}
-          syncLastError={data.syncLastError}
-        />
+        <VendorCustomerOrderingHoursForm vendorId={data.vendorId} initialCustomHours={data.customHours} />
       </div>
     </DashboardShell>
   );

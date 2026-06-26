@@ -4,7 +4,7 @@
  *
  * Sources (evaluation order):
  * 1. Vendor active state (isActive)
- * 2. Customer ordering hours (posOpen) — from synced Deliverect/POS hours or custom Open Order hours.
+ * 2. Customer ordering hours (posOpen) — from manual Open Order hours entered on the Hours page.
  *    Deliverect busy-mode PAUSED maps to mennyuOrdersPaused, not posOpen.
  * 3. Mennyu pause state (mennyuOrdersPaused)
  *

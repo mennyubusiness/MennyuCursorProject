@@ -145,6 +145,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       },
       pendingPodInviteCount: pendingInvites,
       hasPodMembership: Boolean(currentPod),
+      customerOrderingHours: vendorRecord.customerOrderingHours,
     },
     { audience: "vendor" }
   );
@@ -156,14 +157,8 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
   const hoursTimezone = resolveVendorHoursTimezone(currentPod?.pod.pickupTimezone);
   const hoursSummary = summarizeVendorCustomerOrderingHours({
     vendor: {
-      syncCustomerOrderingHoursFromDeliverect:
-        vendorRecord.syncCustomerOrderingHoursFromDeliverect ?? false,
       customerOrderingHours: vendorRecord.customerOrderingHours,
-      deliverectSyncedCustomerOrderingHours: vendorRecord.deliverectSyncedCustomerOrderingHours,
-      deliverectSyncedCustomerOrderingHoursSyncStatus:
-        vendorRecord.deliverectSyncedCustomerOrderingHoursSyncStatus,
     },
-    posConnected,
     timeZone: hoursTimezone,
   });
 
@@ -225,8 +220,8 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     if (item.id === "failed_orders") {
       return { ...item, actionHref: `/vendor/${vendorId}/orders`, actionLabel: "View orders" };
     }
-    if (item.id === "hours_sync") {
-      return { ...item, actionHref: `/vendor/${vendorId}/hours`, actionLabel: "Open hours" };
+    if (item.id === "hours_setup" || item.id === "hours") {
+      return { ...item, actionHref: `/vendor/${vendorId}/hours`, actionLabel: "Set hours" };
     }
     return item;
   });

@@ -3,7 +3,7 @@ import { defaultVendorCustomerOrderingWeek } from "./vendor-customer-ordering-ho
 import { buildCartForValidationFromDisplayCart } from "./cart-for-validation";
 
 describe("buildCartForValidationFromDisplayCart posOpen", () => {
-  it("leaves posOpen undefined when no customer ordering hours are configured", () => {
+  it("blocks orderability when no manual customer ordering hours are configured", () => {
     const built = buildCartForValidationFromDisplayCart({
       podId: "pod_1",
       items: [
@@ -25,7 +25,7 @@ describe("buildCartForValidationFromDisplayCart posOpen", () => {
         },
       ],
     });
-    expect(built.items[0]?.vendor.posOpen).toBeUndefined();
+    expect(built.items[0]?.vendor.posOpen).toBe(false);
   });
 
   it("derives posOpen from custom customer ordering hours", () => {
@@ -56,7 +56,7 @@ describe("buildCartForValidationFromDisplayCart posOpen", () => {
     expect(typeof built.items[0]?.vendor.posOpen).toBe("boolean");
   });
 
-  it("blocks orderability when Deliverect sync is on but no cached hours exist", () => {
+  it("blocks orderability when manual hours are missing even if Deliverect sync flag is on", () => {
     const built = buildCartForValidationFromDisplayCart({
       podId: "pod_1",
       pod: { pickupTimezone: "America/Chicago" },

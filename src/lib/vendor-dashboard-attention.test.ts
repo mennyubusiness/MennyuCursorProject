@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { deriveVendorAttentionItems } from "./vendor-dashboard-attention";
 
-describe("deriveVendorAttentionItems hours sync", () => {
+describe("deriveVendorAttentionItems manual hours", () => {
   const base = {
     blockingReasons: [],
     posState: "connected" as const,
@@ -13,29 +13,15 @@ describe("deriveVendorAttentionItems hours sync", () => {
     intakeLabel: "Accepting orders",
   };
 
-  it("warns when Deliverect sync is enabled but no hours fetched", () => {
+  it("warns when manual customer ordering hours are not set", () => {
     const items = deriveVendorAttentionItems({
       ...base,
       hoursSummary: {
         needsHoursAttention: true,
-        syncFailed: false,
-        sourceLabel: "Hours sync needs attention",
-        todayLabel: "No synced hours are available yet.",
+        sourceLabel: "Hours need setup",
       },
     });
-    expect(items.some((item) => item.id === "hours_sync")).toBe(true);
-  });
-
-  it("warns when latest Deliverect sync failed", () => {
-    const items = deriveVendorAttentionItems({
-      ...base,
-      hoursSummary: {
-        needsHoursAttention: true,
-        syncFailed: true,
-        sourceLabel: "Synced from Deliverect · latest sync failed",
-        todayLabel: "Open until 9:00 PM",
-      },
-    });
-    expect(items.some((item) => item.title.includes("sync failed"))).toBe(true);
+    expect(items.some((item) => item.id === "hours_setup")).toBe(true);
+    expect(items.some((item) => item.title.includes("Deliverect"))).toBe(false);
   });
 });

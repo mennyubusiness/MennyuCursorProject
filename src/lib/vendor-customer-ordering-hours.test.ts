@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultVendorCustomerOrderingWeek,
   formatDayHoursLabel,
+  hasValidVendorCustomerOrderingHours,
   isVendorWithinCustomerOrderingHours,
   parseVendorCustomerOrderingWeek,
   resolveVendorPosOpen,
@@ -27,47 +28,20 @@ describe("validateVendorCustomerOrderingWeek", () => {
 describe("resolveVendorPosOpen", () => {
   const week = defaultVendorCustomerOrderingWeek();
 
-  it("returns undefined when no hours are configured in custom mode", () => {
-    expect(
-      resolveVendorPosOpen(
-        {
-          syncCustomerOrderingHoursFromDeliverect: false,
-          customerOrderingHours: null,
-          deliverectSyncedCustomerOrderingHours: null,
-        },
-        "America/Chicago"
-      )
-    ).toBeUndefined();
-  });
-
-  it("returns false when sync is on but synced hours are missing", () => {
+  it("returns false when no manual hours are configured", () => {
     expect(
       resolveVendorPosOpen(
         {
           syncCustomerOrderingHoursFromDeliverect: true,
-          customerOrderingHours: week,
-          deliverectSyncedCustomerOrderingHours: null,
+          customerOrderingHours: null,
+          deliverectSyncedCustomerOrderingHours: week,
         },
         "America/Chicago"
       )
     ).toBe(false);
   });
 
-  it("uses custom hours when sync is off", () => {
-    const mondayMorning = new Date("2026-06-01T14:00:00.000Z");
-    const posOpen = resolveVendorPosOpen(
-      {
-        syncCustomerOrderingHoursFromDeliverect: false,
-        customerOrderingHours: week,
-        deliverectSyncedCustomerOrderingHours: null,
-      },
-      "America/Chicago",
-      mondayMorning
-    );
-    expect(posOpen).toBe(true);
-  });
-
-  it("uses synced hours when sync is on", () => {
+  it("uses manual hours and ignores Deliverect synced hours", () => {
     const closedWeek = week.map((row) => ({ ...row, isOpen: false }));
     const posOpen = resolveVendorPosOpen(
       {
@@ -78,57 +52,62 @@ describe("resolveVendorPosOpen", () => {
       "America/Chicago",
       new Date("2026-06-01T14:00:00.000Z")
     );
-    expect(posOpen).toBe(false);
+    expect(posOpen).toBe(true);
+  });
+
+  it("returns false outside configured open windows", () => {
+    const wednesdayOnly = week.map((row) =>
+      row.day === "wednesday"
+        ? { ...row, isOpen: true, openTime: "09:00", closeTime: "17:00" }
+        : { ...row, isOpen: false }
+    );
+    expect(
+      resolveVendorPosOpen(
+        {
+          syncCustomerOrderingHoursFromDeliverect: false,
+          customerOrderingHours: wednesdayOnly,
+          deliverectSyncedCustomerOrderingHours: null,
+        },
+        "America/Chicago",
+        new Date("2026-06-01T14:00:00.000Z")
+      )
+    ).toBe(false);
   });
 });
 
 describe("summarizeVendorCustomerOrderingHours", () => {
   const week = defaultVendorCustomerOrderingWeek();
 
-  it("does not claim synced from Deliverect before hours exist", () => {
+  it("shows hours need setup when manual hours are missing", () => {
     const summary = summarizeVendorCustomerOrderingHours({
-      vendor: {
-        syncCustomerOrderingHoursFromDeliverect: true,
-        customerOrderingHours: week,
-        deliverectSyncedCustomerOrderingHours: null,
-      },
-      posConnected: true,
+      vendor: { customerOrderingHours: null },
       timeZone: "America/Chicago",
     });
-    expect(summary.sourceLabel).toBe("Hours sync needs attention");
+    expect(summary.sourceLabel).toBe("Hours need setup");
+    expect(summary.todayLabel).toBe("Hours need setup");
     expect(summary.needsHoursAttention).toBe(true);
     expect(summary.posOpen).toBe(false);
   });
 
-  it("shows synced label when cached hours exist", () => {
+  it("shows customer ordering hours when manual hours exist", () => {
     const summary = summarizeVendorCustomerOrderingHours({
-      vendor: {
-        syncCustomerOrderingHoursFromDeliverect: true,
-        customerOrderingHours: week,
-        deliverectSyncedCustomerOrderingHours: week,
-        deliverectSyncedCustomerOrderingHoursSyncStatus: "ok",
-      },
-      posConnected: true,
+      vendor: { customerOrderingHours: week },
       timeZone: "America/Chicago",
+      now: new Date("2026-06-01T14:00:00.000Z"),
     });
-    expect(summary.sourceLabel).toBe("Synced from Deliverect");
+    expect(summary.sourceLabel).toBe("Customer ordering hours");
     expect(summary.needsHoursAttention).toBe(false);
+    expect(summary.syncFailed).toBe(false);
+  });
+});
+
+describe("hasValidVendorCustomerOrderingHours", () => {
+  it("accepts a valid saved week", () => {
+    expect(hasValidVendorCustomerOrderingHours(defaultVendorCustomerOrderingWeek())).toBe(true);
   });
 
-  it("warns when latest sync failed but cached hours remain", () => {
-    const summary = summarizeVendorCustomerOrderingHours({
-      vendor: {
-        syncCustomerOrderingHoursFromDeliverect: true,
-        customerOrderingHours: week,
-        deliverectSyncedCustomerOrderingHours: week,
-        deliverectSyncedCustomerOrderingHoursSyncStatus: "failed",
-      },
-      posConnected: true,
-      timeZone: "America/Chicago",
-    });
-    expect(summary.sourceLabel).toContain("latest sync failed");
-    expect(summary.syncFailed).toBe(true);
-    expect(summary.needsHoursAttention).toBe(true);
+  it("rejects empty input", () => {
+    expect(hasValidVendorCustomerOrderingHours(null)).toBe(false);
   });
 });
 
@@ -145,24 +124,11 @@ describe("formatDayHoursLabel", () => {
   });
 });
 
-describe("parseVendorCustomerOrderingWeek", () => {
-  it("normalizes partial input to full week", () => {
-    const parsed = parseVendorCustomerOrderingWeek([
-      { day: "monday", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    ]);
-    expect(parsed).toHaveLength(7);
-    expect(parsed?.[0]).toMatchObject({ day: "monday", isOpen: true });
-    expect(parsed?.[1]?.isOpen).toBe(false);
-  });
-});
-
 describe("isVendorWithinCustomerOrderingHours", () => {
-  it("returns false when synced hours are missing and sync is on", () => {
+  it("returns false when manual hours are missing", () => {
     expect(
       isVendorWithinCustomerOrderingHours({
-        syncFromDeliverect: true,
         customHours: null,
-        syncedHours: null,
         timeZone: "America/Chicago",
       })
     ).toBe(false);
@@ -176,7 +142,6 @@ describe("vendorAvailabilityWithCustomerOrderingHours", () => {
         ? { ...row, isOpen: true, openTime: "09:00", closeTime: "17:00" }
         : { ...row, isOpen: false }
     );
-    // Wed Jun 3 2026 20:00 UTC = 15:00 America/Chicago (open)
     const openNow = vendorAvailabilityWithCustomerOrderingHours(
       {
         isActive: true,
@@ -190,7 +155,6 @@ describe("vendorAvailabilityWithCustomerOrderingHours", () => {
     );
     expect(openNow.posOpen).toBe(true);
 
-    // Wed Jun 3 2026 23:30 UTC = 18:30 America/Chicago (closed)
     const closedNow = vendorAvailabilityWithCustomerOrderingHours(
       {
         isActive: true,

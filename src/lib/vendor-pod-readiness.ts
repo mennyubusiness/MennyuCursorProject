@@ -6,6 +6,7 @@ import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { PosConnectionStatus } from "@prisma/client";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { isVendorOrderableInPod } from "@/lib/vendor-orderability-in-pod";
+import { hasValidVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
 
 export type ReadinessOwner = "pod_owner" | "vendor" | "open_order";
 
@@ -18,6 +19,7 @@ export type VendorPodReadinessStatus =
   | "needs_payment"
   | "needs_pos"
   | "needs_menu"
+  | "needs_hours"
   | "ready"
   | "active";
 
@@ -91,6 +93,8 @@ export type VendorPodReadinessInput = {
   pendingPodInviteCount?: number;
   /** Vendor has accepted membership in any pod (for invite checklist). */
   hasPodMembership?: boolean;
+  /** Saved manual customer ordering hours JSON. */
+  customerOrderingHours?: unknown;
 };
 
 export type VendorPodReadinessResult = {
@@ -146,6 +150,10 @@ export function isVendorMenuReady(menu: VendorMenuReadinessSummary): boolean {
   return menu.hasAvailableOperationalItems;
 }
 
+export function isVendorCustomerOrderingHoursReady(customerOrderingHours: unknown): boolean {
+  return hasValidVendorCustomerOrderingHours(customerOrderingHours);
+}
+
 export function vendorPodReadinessStatusLabel(status: VendorPodReadinessStatus): string {
   switch (status) {
     case "pod_inactive":
@@ -164,6 +172,8 @@ export function vendorPodReadinessStatusLabel(status: VendorPodReadinessStatus):
       return "Waiting on POS/menu connection";
     case "needs_menu":
       return "Menu unavailable";
+    case "needs_hours":
+      return "Hours need setup";
     case "ready":
       return "Ready for orders";
     case "active":
@@ -257,6 +267,15 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
     const inviteComplete =
       (input.pendingPodInviteCount ?? 0) === 0 && Boolean(input.hasPodMembership);
     items.push({
+      key: "hours",
+      label: "Set customer ordering hours",
+      complete: isVendorCustomerOrderingHoursReady(input.customerOrderingHours),
+      owner: "vendor",
+      description: "Tell customers when they can place orders through Open Order.",
+      actionHref: `/vendor/${vendorId}/hours`,
+      actionLabel: "Set hours",
+    });
+    items.push({
       key: "pod_invite",
       label: "Accept pod invitations",
       complete: inviteComplete,
@@ -302,7 +321,7 @@ function blockingFromChecklist(
 
 function derivePrimaryStatus(
   input: VendorPodReadinessInput,
-  setup: { profile: boolean; stripe: boolean; pos: boolean; menu: boolean },
+  setup: { profile: boolean; stripe: boolean; pos: boolean; menu: boolean; hours: boolean },
   canAcceptOrders: boolean
 ): VendorPodReadinessStatus {
   if (!input.pod.isActive) return "pod_inactive";
@@ -313,6 +332,7 @@ function derivePrimaryStatus(
   if (!setup.stripe) return "needs_payment";
   if (!setup.pos) return "needs_pos";
   if (!setup.menu) return "needs_menu";
+  if (!setup.hours) return "needs_hours";
   return canAcceptOrders ? "active" : "ready";
 }
 
@@ -330,6 +350,7 @@ function statusDescription(status: VendorPodReadinessStatus, primaryBlocker: Rea
     case "needs_payment":
     case "needs_pos":
     case "needs_menu":
+    case "needs_hours":
       return primaryBlocker?.description ?? "Setup is still in progress.";
     case "active":
       return "Setup is complete and this vendor can accept orders in your pod.";
@@ -350,6 +371,7 @@ export function deriveVendorPodReadiness(
     stripe: isVendorStripePayoutReady(input.stripeSummary),
     pos: isVendorPosReady(input.posSummary),
     menu: isVendorMenuReady(input.menuSummary),
+    hours: isVendorCustomerOrderingHoursReady(input.customerOrderingHours),
   };
 
   const canAcceptOrders = isVendorOrderableInPod({
@@ -403,7 +425,9 @@ export function deriveVendorPodReadiness(
           ? "stripe"
           : status === "needs_pos"
             ? "pos"
-            : "menu";
+            : status === "needs_hours"
+              ? "hours"
+              : "menu";
     blockingReasons.push(...blockingFromChecklist(checklist, [code]));
   }
 

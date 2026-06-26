@@ -1,11 +1,10 @@
 /**
  * POST /api/vendor/[vendorId]/customer-ordering-hours/sync
- * Manually refresh customer ordering hours from Deliverect.
+ * Deliverect hours sync is disabled for vendor-facing use while API permissions are unresolved.
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
-import { syncVendorCustomerOrderingHoursFromDeliverect } from "@/services/vendor-deliverect-hours-sync.service";
 
 export async function POST(
   request: Request,
@@ -21,9 +20,6 @@ export async function POST(
     select: {
       id: true,
       vendorDashboardToken: true,
-      syncCustomerOrderingHoursFromDeliverect: true,
-      deliverectChannelLinkId: true,
-      posConnectionStatus: true,
     },
   });
   if (!vendor) {
@@ -35,42 +31,12 @@ export async function POST(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (!vendor.syncCustomerOrderingHoursFromDeliverect) {
-    return NextResponse.json(
-      { error: "Enable “Sync hours from Deliverect” before refreshing synced hours." },
-      { status: 400 }
-    );
-  }
-
-  const posConnected = Boolean(
-    vendor.deliverectChannelLinkId?.trim() && vendor.posConnectionStatus === "connected"
+  return NextResponse.json(
+    {
+      ok: false,
+      error:
+        "Deliverect hours sync is temporarily unavailable. Enter customer ordering hours manually on the Hours page.",
+    },
+    { status: 503 }
   );
-  if (!posConnected) {
-    return NextResponse.json(
-      { error: "Connect your POS before syncing customer ordering hours from Deliverect." },
-      { status: 400 }
-    );
-  }
-
-  const result = await syncVendorCustomerOrderingHoursFromDeliverect(vendorId);
-  if ("skipped" in result) {
-    return NextResponse.json({ error: "Hours sync is not available for this vendor." }, { status: 400 });
-  }
-
-  if (!result.ok) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: result.error,
-        keptPreviousHours: result.keptPreviousHours,
-      },
-      { status: 502 }
-    );
-  }
-
-  return NextResponse.json({
-    ok: true,
-    syncedAt: result.syncedAt,
-    hadPreviousHours: result.hadPreviousHours,
-  });
 }

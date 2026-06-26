@@ -42,6 +42,7 @@ vi.mock("@/services/cart-deliverect-variant-resolution", () => ({
 }));
 
 import type { CartForValidation } from "./order.service";
+import { defaultVendorCustomerOrderingWeek } from "@/lib/vendor-customer-ordering-hours";
 
 const { validateCartForOrder, validateCartItemsForDisplay } = await import("./order.service");
 
@@ -57,7 +58,12 @@ function baseLine(overrides?: Partial<CartForValidation["items"][0]>): CartForVa
       isAvailable: true,
       name: "Burger",
     },
-    vendor: { isActive: true, mennyuOrdersPaused: false },
+    vendor: {
+      isActive: true,
+      mennyuOrdersPaused: false,
+      customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+      posOpen: true,
+    },
     selections: [],
     ...overrides,
   };
@@ -116,7 +122,16 @@ describe("validateCartForOrder", () => {
 
   it("rejects paused vendor", async () => {
     const result = await validateCartForOrder(
-      baseCart([baseLine({ vendor: { isActive: true, mennyuOrdersPaused: true } })])
+      baseCart([
+        baseLine({
+          vendor: {
+            isActive: true,
+            mennyuOrdersPaused: true,
+            customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+            posOpen: true,
+          },
+        }),
+      ])
     );
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.code).toBe("VENDOR_PAUSED_MENNYU");
@@ -163,7 +178,7 @@ describe("validateCartForOrder", () => {
     if (!result.valid) expect(result.code).toBe("MODIFIER_OPTION_UNAVAILABLE");
   });
 
-  it("applies VENDOR_CLOSED only when posOpen is explicitly false", async () => {
+  it("applies VENDOR_CLOSED when vendor is outside manual hours or has none configured", async () => {
     const closed = await validateCartForOrder(
       baseCart([baseLine({ vendor: { isActive: true, mennyuOrdersPaused: false, posOpen: false } })])
     );
@@ -171,12 +186,21 @@ describe("validateCartForOrder", () => {
     if (!closed.valid) expect(closed.code).toBe("VENDOR_CLOSED");
 
     const open = await validateCartForOrder(
-      baseCart([baseLine({ vendor: { isActive: true, mennyuOrdersPaused: false, posOpen: undefined } })])
+      baseCart([
+        baseLine({
+          vendor: {
+            isActive: true,
+            mennyuOrdersPaused: false,
+            customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+            posOpen: true,
+          },
+        }),
+      ])
     );
     expect(open.valid).toBe(true);
   });
 
-  it("rejects vendor when Deliverect sync is on but synced hours are missing", async () => {
+  it("rejects vendor when manual customer ordering hours are missing", async () => {
     mockPodFindUnique.mockResolvedValue({ isActive: true, pickupTimezone: "America/Chicago" });
     const result = await validateCartForOrder(
       baseCart([
@@ -185,7 +209,8 @@ describe("validateCartForOrder", () => {
             isActive: true,
             mennyuOrdersPaused: false,
             syncCustomerOrderingHoursFromDeliverect: true,
-            deliverectSyncedCustomerOrderingHours: null,
+            deliverectSyncedCustomerOrderingHours: defaultVendorCustomerOrderingWeek(),
+            customerOrderingHours: null,
           },
         }),
       ])
@@ -228,7 +253,7 @@ describe("validateCartItemsForDisplay multi-vendor", () => {
         vendorId: "v_2",
         menuItem: { priceCents: 300, isAvailable: true, name: "Fries" },
         priceCents: 300,
-        vendor: { isActive: true, mennyuOrdersPaused: true },
+        vendor: { isActive: true, mennyuOrdersPaused: true, customerOrderingHours: defaultVendorCustomerOrderingWeek(), posOpen: true },
       }),
     ]);
     mockShellBase.mockImplementation(async (item: { priceCents: number }) => item.priceCents);

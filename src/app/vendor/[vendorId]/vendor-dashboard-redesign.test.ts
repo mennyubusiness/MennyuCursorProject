@@ -50,12 +50,16 @@ describe("vendor operational copy", () => {
 });
 
 describe("vendor section pages", () => {
-  it("defines dedicated hours page focused on customer ordering hours", () => {
+  it("defines dedicated manual hours page", () => {
     const hours = readVendor("hours/page.tsx");
+    const form = readVendor("hours/VendorCustomerOrderingHoursForm.tsx");
     expect(hours).toContain("VendorCustomerOrderingHoursForm");
-    expect(hours).toContain("Choose how Open Order should determine when customers can place orders.");
+    expect(hours).toContain("Set the customer ordering hours for this vendor.");
     expect(hours).not.toContain("VendorStoreStatusCard");
     expect(hours).not.toContain("VendorOrdersOperationsBar");
+    expect(form).not.toContain("Sync hours from Deliverect");
+    expect(form).not.toContain("Refresh hours from Deliverect");
+    expect(form).toContain("Save hours");
   });
 
   it("defines dedicated payouts and setup pages", () => {
