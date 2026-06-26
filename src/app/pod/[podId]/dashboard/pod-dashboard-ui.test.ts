@@ -83,11 +83,12 @@ describe("pod analytics aggregate-only", () => {
 });
 
 describe("pod setup checklist", () => {
-  it("requires pickup instructions and orderable vendor", () => {
+  it("requires orderable vendor but not pickup instructions", () => {
     const readiness = readFileSync(join(root, "lib/vendor-pod-readiness.ts"), "utf8");
-    expect(readiness).toContain("pickup_instructions");
-    expect(readiness).toContain("POD_SETUP_REQUIRED_CHECKLIST_KEYS");
     expect(readiness).toContain("vendor_ready");
+    expect(readiness).not.toContain('"pickup_instructions"');
+    const attention = readFileSync(join(root, "lib/pod-dashboard-attention.ts"), "utf8");
+    expect(attention).not.toMatch(/pickup instructions/i);
   });
 });
 

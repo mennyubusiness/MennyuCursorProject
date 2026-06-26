@@ -498,7 +498,6 @@ export const POD_SETUP_REQUIRED_CHECKLIST_KEYS = [
   "pod_profile",
   "location",
   "pod_active",
-  "pickup_instructions",
   "vendor_ready",
   "qr_signage",
 ] as const;
@@ -509,7 +508,6 @@ export function derivePodSetupChecklist(input: PodSetupChecklistInput): Readines
     pod.name?.trim() && (pod.description?.trim() || pod.address?.trim()) && pod.imageUrl?.trim()
   );
   const locationComplete = Boolean(pod.address?.trim());
-  const pickupComplete = Boolean(pod.pickupInstructions?.trim());
   const hasOrderableVendor = vendorStatuses.some((v) => v.canAcceptOrders);
   const hasReadyVendor = vendorStatuses.some(
     (v) => v.canAcceptOrders || v.status === "ready" || v.status === "active"
@@ -543,15 +541,6 @@ export function derivePodSetupChecklist(input: PodSetupChecklistInput): Readines
       description: pod.isActive
         ? "This pod is active for customer ordering."
         : "Open Order activates pods for public ordering.",
-    },
-    {
-      key: "pickup_instructions",
-      label: "Pickup instructions set",
-      complete: pickupComplete,
-      owner: "pod_owner",
-      description: "Tell customers where and how to pick up orders.",
-      actionHref: `/pod/${podId}/settings`,
-      actionLabel: "Set pickup instructions",
     },
     {
       key: "vendor_ready",

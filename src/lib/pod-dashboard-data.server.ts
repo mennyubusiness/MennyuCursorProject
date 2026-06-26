@@ -255,7 +255,6 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
     podId: pod.id,
     orderableVendorCount,
     vendorCount: rosterRows.length,
-    pickupInstructionsSet: Boolean(pod.pickupInstructions?.trim()),
     addressSet: Boolean(pod.address?.trim()),
     pendingInviteCount: pendingEmailInvites.length,
     pendingRequestCount: pendingForUi.length,

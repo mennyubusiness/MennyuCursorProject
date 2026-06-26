@@ -1,5 +1,8 @@
 import type { PodAdoptionAttentionRow } from "@/lib/pod-vendor-adoption";
-import type { ReadinessChecklistItem } from "@/lib/vendor-pod-readiness";
+import {
+  POD_SETUP_REQUIRED_CHECKLIST_KEYS,
+  type ReadinessChecklistItem,
+} from "@/lib/vendor-pod-readiness";
 
 export type PodAttentionItem = {
   id: string;
@@ -14,7 +17,6 @@ export function derivePodAttentionItems(input: {
   podId: string;
   orderableVendorCount: number;
   vendorCount: number;
-  pickupInstructionsSet: boolean;
   addressSet: boolean;
   pendingInviteCount: number;
   pendingRequestCount: number;
@@ -39,17 +41,6 @@ export function derivePodAttentionItems(input: {
       description: "Help vendors finish setup or unpause them in your pod.",
       actionHref: `/pod/${input.podId}/vendors`,
       actionLabel: "Manage vendors",
-      severity: "warning",
-    });
-  }
-
-  if (!input.pickupInstructionsSet) {
-    items.push({
-      id: "pickup_instructions",
-      title: "Pickup instructions missing",
-      description: "Set pod pickup instructions before accepting orders.",
-      actionHref: `/pod/${input.podId}/settings?section=profile`,
-      actionLabel: "Set pickup instructions",
       severity: "warning",
     });
   }
@@ -178,13 +169,5 @@ export function derivePodAttentionItems(input: {
 }
 
 export function isPodSetupComplete(checklistCompleteKeys: string[]): boolean {
-  const required = [
-    "pod_profile",
-    "location",
-    "pod_active",
-    "pickup_instructions",
-    "vendor_ready",
-    "qr_signage",
-  ];
-  return required.every((key) => checklistCompleteKeys.includes(key));
+  return POD_SETUP_REQUIRED_CHECKLIST_KEYS.every((key) => checklistCompleteKeys.includes(key));
 }

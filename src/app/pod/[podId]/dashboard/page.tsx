@@ -52,7 +52,6 @@ export default async function PodDashboardPage({
           isActive={ctx.pod.isActive}
           hasPublicProfile={hasPublicProfile}
           orderableVendorCount={ctx.orderableVendorCount}
-          pickupInstructionsSet={Boolean(ctx.pod.pickupInstructions?.trim())}
           announcementActive={ctx.announcementState.initialIsActive && Boolean(ctx.announcementState.initialText.trim())}
           publicPageHref={ctx.publicPageHref}
         />

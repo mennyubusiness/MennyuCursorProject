@@ -14,7 +14,6 @@ type PodStatusCardProps = {
   isActive: boolean;
   hasPublicProfile: boolean;
   orderableVendorCount: number;
-  pickupInstructionsSet: boolean;
   announcementActive: boolean;
   publicPageHref: string;
 };
@@ -28,7 +27,6 @@ function statusHeadline(podName: string, status: PodPublicStatusLabel): string {
 function statusSubline(input: {
   status: PodPublicStatusLabel;
   orderableVendorCount: number;
-  pickupInstructionsSet: boolean;
   announcementActive: boolean;
 }): string {
   const parts: string[] = [];
@@ -44,9 +42,6 @@ function statusSubline(input: {
   } else {
     parts.push("Open Order will activate this pod for public ordering");
   }
-  if (!input.pickupInstructionsSet) {
-    parts.push("Pickup instructions needed");
-  }
   if (input.announcementActive) {
     parts.push("Announcement active");
   }
@@ -59,7 +54,6 @@ export function PodStatusCard({
   isActive,
   hasPublicProfile,
   orderableVendorCount,
-  pickupInstructionsSet,
   announcementActive,
   publicPageHref,
 }: PodStatusCardProps) {
@@ -72,7 +66,9 @@ export function PodStatusCard({
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Pod status</p>
           <h2 className="mt-1 text-2xl font-bold text-oo-charcoal">{statusHeadline(podName, status)}</h2>
-          <p className="mt-1 text-sm text-oo-stone-gray">{statusSubline({ status, orderableVendorCount, pickupInstructionsSet, announcementActive })}</p>
+          <p className="mt-1 text-sm text-oo-stone-gray">
+            {statusSubline({ status, orderableVendorCount, announcementActive })}
+          </p>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <DashboardStatusBadge tone={tone}>{status}</DashboardStatusBadge>
           </div>
@@ -84,16 +80,10 @@ export function PodStatusCard({
         />
       </div>
 
-      <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="mt-6 grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
           <dt className="text-xs font-medium text-oo-stone-gray">Orderable vendors</dt>
           <dd className="mt-1 text-sm font-medium text-oo-charcoal">{orderableVendorCount}</dd>
-        </div>
-        <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
-          <dt className="text-xs font-medium text-oo-stone-gray">Pickup instructions</dt>
-          <dd className="mt-1 text-sm font-medium text-oo-charcoal">
-            {pickupInstructionsSet ? "Set" : "Not set"}
-          </dd>
         </div>
         <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
           <dt className="text-xs font-medium text-oo-stone-gray">QR & signage</dt>

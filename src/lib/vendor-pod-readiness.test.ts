@@ -260,7 +260,6 @@ describe("derivePodSetupChecklist", () => {
     expect(items.find((i) => i.key === "pod_profile")?.complete).toBe(false);
     expect(items.find((i) => i.key === "location")?.complete).toBe(false);
     expect(items.find((i) => i.key === "pod_active")?.complete).toBe(false);
-    expect(items.find((i) => i.key === "pickup_instructions")?.complete).toBe(false);
-    expect(items.find((i) => i.key === "pickup_instructions")).toBeDefined();
+    expect(items.find((i) => i.key === "pickup_instructions")).toBeUndefined();
   });
 });
