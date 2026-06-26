@@ -262,3 +262,91 @@ export async function getPodAnalytics(podId: string): Promise<PodAnalytics | nul
     },
   };
 }
+
+export type PodAnalyticsRange = "today" | "7d" | "30d";
+
+export type PodVendorAnalyticsRow = {
+  vendorId: string;
+  vendorName: string;
+  orderCount: number;
+  salesCents: number;
+  sharePercent: number;
+  avgOrderValueCents: number;
+};
+
+function startOfDaysAgo(days: number): Date {
+  const d = startOfToday();
+  d.setDate(d.getDate() - days);
+  return d;
+}
+
+export async function getPodAnalyticsExtended(
+  podId: string,
+  range: PodAnalyticsRange = "7d"
+): Promise<(PodAnalytics & {
+  ordersInRange: number;
+  salesInRangeCents: number;
+  avgOrderValueInRangeCents: number;
+  vendorBreakdown: PodVendorAnalyticsRow[];
+}) | null> {
+  const base = await getPodAnalytics(podId);
+  if (!base) return null;
+
+  const rangeStart =
+    range === "today" ? startOfToday() : range === "30d" ? startOfDaysAgo(30) : startOfLast7Days();
+
+  const [ordersInRange, completedVendorOrders] = await Promise.all([
+    prisma.order.count({
+      where: { podId, createdAt: { gte: rangeStart } },
+    }),
+    prisma.vendorOrder.findMany({
+      where: {
+        order: { podId },
+        fulfillmentStatus: "completed",
+        createdAt: { gte: rangeStart },
+      },
+      select: {
+        vendorId: true,
+        totalCents: true,
+        vendor: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  const salesInRangeCents = completedVendorOrders.reduce((sum, row) => sum + row.totalCents, 0);
+  const avgOrderValueInRangeCents =
+    ordersInRange > 0 ? Math.round(salesInRangeCents / ordersInRange) : 0;
+
+  const byVendor = new Map<string, { vendorName: string; orderCount: number; salesCents: number }>();
+  for (const row of completedVendorOrders) {
+    const existing = byVendor.get(row.vendorId) ?? {
+      vendorName: row.vendor.name,
+      orderCount: 0,
+      salesCents: 0,
+    };
+    existing.orderCount += 1;
+    existing.salesCents += row.totalCents;
+    byVendor.set(row.vendorId, existing);
+  }
+
+  const vendorBreakdown: PodVendorAnalyticsRow[] = [...byVendor.entries()]
+    .map(([vendorId, stats]) => ({
+      vendorId,
+      vendorName: stats.vendorName,
+      orderCount: stats.orderCount,
+      salesCents: stats.salesCents,
+      sharePercent:
+        salesInRangeCents > 0 ? Math.round((stats.salesCents / salesInRangeCents) * 100) : 0,
+      avgOrderValueCents:
+        stats.orderCount > 0 ? Math.round(stats.salesCents / stats.orderCount) : 0,
+    }))
+    .sort((a, b) => b.salesCents - a.salesCents);
+
+  return {
+    ...base,
+    ordersInRange,
+    salesInRangeCents,
+    avgOrderValueInRangeCents,
+    vendorBreakdown,
+  };
+}

@@ -5,6 +5,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
+import { buildPodCustomerPath, buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { buildHeaderAccountRoleHint } from "@/lib/auth/header-account-menu";
 import type { HeaderNavContext } from "@/lib/auth/header-nav-types";
 
@@ -25,11 +26,11 @@ async function contextForUserId(userId: string): Promise<HeaderNavContext> {
       name: true,
       isPlatformAdmin: true,
       vendorMemberships: {
-        select: { vendorId: true, vendor: { select: { name: true } } },
+        select: { vendorId: true, vendor: { select: { name: true, slug: true } } },
         orderBy: { createdAt: "asc" },
       },
       podMemberships: {
-        select: { podId: true, pod: { select: { name: true } } },
+        select: { podId: true, pod: { select: { name: true, slug: true } } },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -43,6 +44,26 @@ async function contextForUserId(userId: string): Promise<HeaderNavContext> {
   const podCount = user.podMemberships.length;
   const primaryVendorId = vendorCount > 0 ? user.vendorMemberships[0].vendorId : null;
   const primaryPodId = podCount > 0 ? user.podMemberships[0].podId : null;
+
+  let vendorPublicPageHref: string | null = null;
+  if (primaryVendorId) {
+    const primaryVendor = user.vendorMemberships[0].vendor;
+    const podVendor = await prisma.podVendor.findFirst({
+      where: { vendorId: primaryVendorId },
+      select: { pod: { select: { slug: true } } },
+    });
+    if (podVendor?.pod.slug && primaryVendor.slug) {
+      vendorPublicPageHref = buildVendorMenuCustomerPath(podVendor.pod.slug, primaryVendor.slug);
+    }
+  }
+
+  let podPublicPageHref: string | null = null;
+  if (primaryPodId) {
+    const primaryPod = user.podMemberships[0]?.pod;
+    if (primaryPod?.slug) {
+      podPublicPageHref = buildPodCustomerPath(primaryPod.slug);
+    }
+  }
 
   const accountMenu = {
     email: user.email,
@@ -63,11 +84,10 @@ async function contextForUserId(userId: string): Promise<HeaderNavContext> {
     primaryPodId,
     vendorSelectHref: vendorCount > 1 ? "/vendor/select" : null,
     podSelectHref: podCount > 1 ? "/pod/dashboard" : null,
-    vendorOrdersHref: primaryVendorId ? `/vendor/${primaryVendorId}/orders` : null,
-    vendorKitchenHref: primaryVendorId ? `/vendor/${primaryVendorId}/kitchen` : null,
-    vendorSettingsHref: primaryVendorId ? `/vendor/${primaryVendorId}/settings` : null,
+    vendorPublicPageHref,
+    podPublicPageHref,
     podSettingsHref: primaryPodId ? `/pod/${primaryPodId}/settings` : null,
-    podVendorsHref: primaryPodId ? `/pod/${primaryPodId}/dashboard` : null,
+    podVendorsHref: primaryPodId ? `/pod/${primaryPodId}/vendors` : null,
   };
 
   if (user.isPlatformAdmin) {

@@ -14,6 +14,8 @@ export function podOwnerVendorDisplayStatus(
       return "Needs Stripe";
     case "needs_menu":
       return "Needs menu";
+    case "needs_hours":
+      return "Missing customer ordering hours";
     case "needs_pos":
       return "Needs POS connection";
     case "needs_profile":
@@ -40,6 +42,7 @@ export function vendorAdoptionAttentionSortKey(status: VendorPodReadinessStatus)
     case "needs_payment":
     case "needs_pos":
     case "needs_menu":
+    case "needs_hours":
       return 0;
     case "paused_in_pod":
     case "paused_by_vendor":
@@ -109,6 +112,9 @@ function blockerReminderLine(blockerCode: string | null | undefined): string | n
     case "menu":
     case "needs_menu":
       return "Looks like your menu is not ready yet.";
+    case "hours":
+    case "needs_hours":
+      return "Looks like your customer ordering hours still need to be set.";
     case "pos":
     case "needs_pos":
       return "Looks like your POS connection still needs setup.";
@@ -174,6 +180,9 @@ export function buildVendorSetupSettingsPath(
     case "menu":
     case "needs_menu":
       return `/vendor/${vendorId}/menu`;
+    case "hours":
+    case "needs_hours":
+      return `/vendor/${vendorId}/hours`;
     case "paused_by_vendor":
       return settingsBase;
     default:

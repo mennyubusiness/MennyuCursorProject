@@ -40,54 +40,90 @@ export function shouldShowHeaderCart(input: {
   return input.hasActiveCart;
 }
 
+function vendorDashboardHref(
+  accountMenu: HeaderAccountMenu,
+  dashboardHref: string | null
+): string | null {
+  if (dashboardHref === accountMenu.vendorSelectHref) {
+    return dashboardHref;
+  }
+  if (accountMenu.primaryVendorId) {
+    return `/vendor/${accountMenu.primaryVendorId}/dashboard`;
+  }
+  return dashboardHref;
+}
+
+function podDashboardHref(
+  accountMenu: HeaderAccountMenu,
+  dashboardHref: string | null
+): string | null {
+  if (dashboardHref === accountMenu.podSelectHref) {
+    return dashboardHref;
+  }
+  if (accountMenu.primaryPodId) {
+    return `/pod/${accountMenu.primaryPodId}/dashboard`;
+  }
+  return dashboardHref;
+}
+
 export function buildRoleAccountActions(input: {
   mode: HeaderNavMode;
   accountMenu: HeaderAccountMenu;
   dashboardHref: string | null;
 }): RoleAccountAction[] {
   const { mode, accountMenu, dashboardHref } = input;
+
+  if (mode === "vendor") {
+    const actions: RoleAccountAction[] = [
+      { type: "link", href: ACCOUNT_HUB_PATH, label: "Account" },
+    ];
+    const vendorDashboard = vendorDashboardHref(accountMenu, dashboardHref);
+    if (vendorDashboard) {
+      actions.push({ type: "link", href: vendorDashboard, label: "Dashboard" });
+    }
+    if (accountMenu.vendorPublicPageHref) {
+      actions.push({
+        type: "link",
+        href: accountMenu.vendorPublicPageHref,
+        label: "Public page",
+      });
+    }
+    actions.push({ type: "sign-out", label: "Sign out", danger: true });
+    return actions;
+  }
+
+  if (mode === "pod") {
+    const actions: RoleAccountAction[] = [
+      { type: "link", href: ACCOUNT_HUB_PATH, label: "Account" },
+    ];
+    const podDashboard = podDashboardHref(accountMenu, dashboardHref);
+    if (podDashboard) {
+      actions.push({ type: "link", href: podDashboard, label: "Dashboard" });
+    }
+    if (accountMenu.podPublicPageHref) {
+      actions.push({
+        type: "link",
+        href: accountMenu.podPublicPageHref,
+        label: "Public page",
+      });
+    }
+    actions.push({ type: "sign-out", label: "Sign out", danger: true });
+    return actions;
+  }
+
   const actions: RoleAccountAction[] = [];
   const secondary: RoleAccountAction[] = [];
 
   const accountLabel =
-    mode === "vendor"
-      ? "Vendor account"
-      : mode === "pod"
-        ? "Pod account"
-        : mode === "admin"
-          ? "Admin account"
-          : "Account";
+    mode === "admin"
+      ? "Admin account"
+      : "Account";
 
   actions.push({ type: "link", href: ACCOUNT_HUB_PATH, label: accountLabel });
 
   switch (mode) {
     case "customer":
       actions.push({ type: "link", href: ORDER_HISTORY_PATH, label: "Orders" });
-      break;
-    case "vendor":
-      if (dashboardHref) {
-        actions.push({ type: "link", href: dashboardHref, label: "Vendor dashboard" });
-      }
-      if (accountMenu.vendorOrdersHref) {
-        actions.push({ type: "link", href: accountMenu.vendorOrdersHref, label: "Orders" });
-      }
-      if (accountMenu.vendorKitchenHref) {
-        actions.push({ type: "link", href: accountMenu.vendorKitchenHref, label: "Kitchen mode" });
-      }
-      if (accountMenu.vendorSettingsHref) {
-        actions.push({ type: "link", href: accountMenu.vendorSettingsHref, label: "Settings" });
-      }
-      break;
-    case "pod":
-      if (dashboardHref) {
-        actions.push({ type: "link", href: dashboardHref, label: "Pod dashboard" });
-      }
-      if (accountMenu.podSettingsHref) {
-        actions.push({ type: "link", href: accountMenu.podSettingsHref, label: "Pod settings" });
-      }
-      if (accountMenu.podVendorsHref) {
-        actions.push({ type: "link", href: accountMenu.podVendorsHref, label: "Manage vendors" });
-      }
       break;
     case "admin":
       if (accountMenu.adminDashboardHref) {
@@ -110,36 +146,32 @@ export function buildRoleAccountActions(input: {
     });
   }
 
-  if (mode !== "vendor") {
-    if (accountMenu.vendorDashboardHref && accountMenu.vendorDashboardLabel) {
-      secondary.push({
-        type: "link",
-        href: accountMenu.vendorDashboardHref,
-        label: accountMenu.vendorDashboardLabel,
-      });
-    } else if (accountMenu.vendorSelectHref) {
-      secondary.push({
-        type: "link",
-        href: accountMenu.vendorSelectHref,
-        label: "Vendor dashboards",
-      });
-    }
+  if (accountMenu.vendorDashboardHref && accountMenu.vendorDashboardLabel) {
+    secondary.push({
+      type: "link",
+      href: accountMenu.vendorDashboardHref,
+      label: accountMenu.vendorDashboardLabel,
+    });
+  } else if (accountMenu.vendorSelectHref) {
+    secondary.push({
+      type: "link",
+      href: accountMenu.vendorSelectHref,
+      label: "Vendor dashboards",
+    });
   }
 
-  if (mode !== "pod") {
-    if (accountMenu.podDashboardHref && accountMenu.podDashboardLabel) {
-      secondary.push({
-        type: "link",
-        href: accountMenu.podDashboardHref,
-        label: accountMenu.podDashboardLabel,
-      });
-    } else if (accountMenu.podSelectHref) {
-      secondary.push({
-        type: "link",
-        href: accountMenu.podSelectHref,
-        label: "Pod dashboards",
-      });
-    }
+  if (accountMenu.podDashboardHref && accountMenu.podDashboardLabel) {
+    secondary.push({
+      type: "link",
+      href: accountMenu.podDashboardHref,
+      label: accountMenu.podDashboardLabel,
+    });
+  } else if (accountMenu.podSelectHref) {
+    secondary.push({
+      type: "link",
+      href: accountMenu.podSelectHref,
+      label: "Pod dashboards",
+    });
   }
 
   actions.push(...secondary);

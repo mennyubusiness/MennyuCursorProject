@@ -1,8 +1,8 @@
 import type { PodAdoptionAttentionRow } from "@/lib/pod-vendor-adoption";
 import type { ReadinessChecklistItem } from "@/lib/vendor-pod-readiness";
 
-/** Pod checklist keys handled elsewhere (vendor adoption) or not pod-owner actionable. */
-const POD_SETUP_KEYS_EXCLUDED_FROM_SECTION = new Set(["order_link", "vendor_ready", "pod_active"]);
+/** Pod checklist keys handled elsewhere on dedicated pages. */
+const POD_SETUP_KEYS_EXCLUDED_FROM_SECTION = new Set(["vendor_ready", "pod_active", "qr_signage"]);
 
 export type PodDashboardLayoutState = {
   hasVendors: boolean;

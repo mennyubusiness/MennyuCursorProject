@@ -1,0 +1,118 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/auth";
+
+import { DashboardPageHeader, DashboardSection, DashboardShell } from "@/components/dashboard";
+import { env } from "@/lib/env";
+import { derivePodPayoutConnectStatus } from "@/lib/pod-payout-connect-status";
+import { loadPodDashboardContext } from "@/lib/pod-dashboard-data.server";
+import {
+  isUserDesignatedPodPayoutRecipient,
+  loadPodPayoutRecipientContext,
+  syncPodPayoutConnectedAccountStatus,
+} from "@/services/pod-payout-connect.service";
+import { prisma } from "@/lib/db";
+import { PodPayoutSetupCard } from "../settings/PodPayoutSetupCard";
+import { PodPayoutSummaryCard } from "../dashboard/PodPayoutSummaryCard";
+
+export default async function PodPayoutsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ podId: string }>;
+  searchParams: Promise<{ pod_payout_connect?: string; payout_notice?: string }>;
+}) {
+  const { podId } = await params;
+  const sp = await searchParams;
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  const connect = sp.pod_payout_connect;
+  if (connect === "return" || connect === "refresh") {
+    if (userId && (await isUserDesignatedPodPayoutRecipient(userId, podId))) {
+      try {
+        await syncPodPayoutConnectedAccountStatus(userId);
+      } catch (e) {
+        console.error("[pod payouts] pod payout Connect sync failed", e);
+      }
+    }
+    if (connect === "refresh") {
+      redirect(`/pod/${podId}/payouts?payout_notice=link_expired`);
+    }
+    redirect(`/pod/${podId}/payouts`);
+  }
+
+  const ctx = await loadPodDashboardContext(podId);
+  if (!ctx) notFound();
+
+  const recipientUser =
+    userId && ctx.payoutSummary
+      ? await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            podPayoutStripeConnectedAccountId: true,
+            podPayoutStripeChargesEnabled: true,
+            podPayoutStripePayoutsEnabled: true,
+            podPayoutStripeRequirementsCurrentlyDue: true,
+          },
+        })
+      : null;
+
+  const isDesignatedRecipient =
+    Boolean(userId) && ctx.payoutContext?.podPayoutRecipientUserId?.trim() === userId;
+  const connectStatus =
+    isDesignatedRecipient && recipientUser
+      ? derivePodPayoutConnectStatus({
+          podPayoutStripeConnectedAccountId: recipientUser.podPayoutStripeConnectedAccountId,
+          podPayoutStripeChargesEnabled: recipientUser.podPayoutStripeChargesEnabled,
+          podPayoutStripePayoutsEnabled: recipientUser.podPayoutStripePayoutsEnabled,
+          podPayoutStripeRequirementsCurrentlyDue:
+            recipientUser.podPayoutStripeRequirementsCurrentlyDue,
+        })
+      : null;
+
+  return (
+    <DashboardShell tier="command" className="px-0 pb-0 pt-0">
+      <DashboardPageHeader
+        headingLevel={1}
+        title="Payouts"
+        description="Track your pod share from eligible Open Order sales."
+      />
+
+      <div className="mt-8 space-y-8">
+        {ctx.payoutSummary ? (
+          <PodPayoutSummaryCard podId={podId} summary={ctx.payoutSummary} />
+        ) : (
+          <div className="rounded-xl border border-oo-light-stone bg-oo-cream/50 px-4 py-6 text-sm text-oo-stone-gray">
+            Pod payout details are available to the designated payout recipient for this pod.
+          </div>
+        )}
+
+        <DashboardSection
+          title="Payout account"
+          description="Connect the account that receives your pod share."
+        >
+          <div className="max-w-3xl">
+            <PodPayoutSetupCard
+              podId={podId}
+              podPayoutsEnabled={ctx.payoutContext?.podPayoutsEnabled ?? false}
+              isDesignatedRecipient={isDesignatedRecipient}
+              stripeConnectConfigured={Boolean(env.STRIPE_SECRET_KEY)}
+              connectStatus={connectStatus}
+              payoutNotice={sp.payout_notice === "link_expired" ? "link_expired" : null}
+              podSharePercentLabel={ctx.payoutSummary?.podSharePercentLabel ?? null}
+              minimumPayoutLabel={ctx.payoutSummary?.minimumPayoutLabel ?? null}
+            />
+          </div>
+        </DashboardSection>
+
+        <p className="text-sm text-oo-stone-gray">
+          Need to update pod profile or pickup instructions?{" "}
+          <Link href={`/pod/${podId}/settings`} className="font-medium text-oo-charcoal underline">
+            Open settings
+          </Link>
+        </p>
+      </div>
+    </DashboardShell>
+  );
+}

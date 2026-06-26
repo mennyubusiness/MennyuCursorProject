@@ -243,7 +243,7 @@ describe("deriveVendorPodReadiness pod owner view", () => {
 });
 
 describe("derivePodSetupChecklist", () => {
-  it("tracks pod profile and activation", () => {
+  it("tracks pod profile, location, and activation", () => {
     const items = derivePodSetupChecklist({
       podId: "pod_1",
       pod: {
@@ -252,12 +252,15 @@ describe("derivePodSetupChecklist", () => {
         description: null,
         imageUrl: null,
         address: null,
+        slug: "pod-slug",
+        pickupInstructions: null,
       },
       vendorStatuses: [],
     });
     expect(items.find((i) => i.key === "pod_profile")?.complete).toBe(false);
+    expect(items.find((i) => i.key === "location")?.complete).toBe(false);
     expect(items.find((i) => i.key === "pod_active")?.complete).toBe(false);
-    expect(items.find((i) => i.key === "pod_active")?.owner).toBe("open_order");
-    expect(items.find((i) => i.key === "pickup_instructions")).toBeUndefined();
+    expect(items.find((i) => i.key === "pickup_instructions")?.complete).toBe(false);
+    expect(items.find((i) => i.key === "pickup_instructions")).toBeDefined();
   });
 });

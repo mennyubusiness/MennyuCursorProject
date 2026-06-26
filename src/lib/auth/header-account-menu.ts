@@ -13,9 +13,10 @@ export type HeaderAccountMenu = {
   primaryPodId: string | null;
   vendorSelectHref: string | null;
   podSelectHref: string | null;
-  vendorOrdersHref: string | null;
-  vendorKitchenHref: string | null;
-  vendorSettingsHref: string | null;
+  /** Customer-facing menu URL for the primary vendor, when pod + slug are known. */
+  vendorPublicPageHref: string | null;
+  /** Customer-facing pod page URL for the primary pod, when slug is known. */
+  podPublicPageHref: string | null;
   podSettingsHref: string | null;
   podVendorsHref: string | null;
 };

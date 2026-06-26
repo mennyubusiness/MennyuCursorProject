@@ -17,7 +17,7 @@ export function PodPayoutSummaryCard({
   podId: string;
   summary: PodOwnerPayoutSummary;
 }) {
-  const setupHref = `/pod/${podId}/settings#payout-setup`;
+  const setupHref = `/pod/${podId}/payouts`;
 
   return (
     <DashboardCard
@@ -144,7 +144,7 @@ export function PodPayoutSummaryCard({
             href={setupHref}
             className="inline-flex text-sm font-medium text-brand underline-offset-4 hover:underline"
           >
-            Payout account settings
+            Payout settings
           </Link>
         </div>
       )}

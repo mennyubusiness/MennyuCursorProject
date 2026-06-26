@@ -166,8 +166,8 @@ describe("role-based nav helper", () => {
     expect(roleNavSrc).toMatch(/buildRoleNavConfig/);
     expect(roleNavSrc).toMatch(/buildRoleAccountActions/);
     expect(roleNavSrc).toMatch(/showBusinessCta/);
-    expect(roleNavSrc).toMatch(/Kitchen mode/);
-    expect(roleNavSrc).toMatch(/Manage vendors/);
+    expect(roleNavSrc).toMatch(/Public page/);
+    expect(roleNavSrc).not.toMatch(/Kitchen mode/);
     expect(roleNavSrc).not.toMatch(/headerLinks/);
   });
 });
@@ -176,8 +176,8 @@ describe("header account menu server context", () => {
   it("builds account menu for signed-in users", () => {
     expect(headerNavContextSrc).toMatch(/accountMenu/);
     expect(headerNavContextSrc).toMatch(/buildHeaderAccountRoleHint/);
-    expect(headerNavContextSrc).toMatch(/vendorKitchenHref/);
-    expect(headerNavContextSrc).toMatch(/podSettingsHref/);
+    expect(headerNavContextSrc).toMatch(/vendorPublicPageHref/);
+    expect(headerNavContextSrc).toMatch(/podPublicPageHref/);
   });
 
   it("does not expose account menu when signed out", () => {

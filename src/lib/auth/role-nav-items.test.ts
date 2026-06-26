@@ -21,9 +21,8 @@ const baseAccountMenu: HeaderAccountMenu = {
   primaryPodId: null,
   vendorSelectHref: null,
   podSelectHref: null,
-  vendorOrdersHref: "/vendor/v1/orders",
-  vendorKitchenHref: "/vendor/v1/kitchen",
-  vendorSettingsHref: "/vendor/v1/settings",
+  vendorPublicPageHref: "/willamette-garage/taco-cart",
+  podPublicPageHref: "/riverside-pod",
   podSettingsHref: null,
   podVendorsHref: null,
 };
@@ -88,21 +87,59 @@ describe("buildRoleNavConfig", () => {
       dashboardHref: "/vendor/v1",
     });
     expect(vendor).not.toHaveProperty("headerLinks");
-    expect(vendor.accountActions.some((a) => a.type === "link" && a.label === "Kitchen mode")).toBe(
-      true
-    );
+    expect(vendor.accountActions.map((a) => (a.type === "link" ? a.label : a.label))).toEqual([
+      "Account",
+      "Dashboard",
+      "Public page",
+      "Sign out",
+    ]);
   });
 });
 
 describe("buildRoleAccountActions", () => {
-  it("omits customer order history for vendor primary mode", () => {
+  it("shows a compact vendor menu without operational shortcuts", () => {
     const actions = buildRoleAccountActions({
       mode: "vendor",
       accountMenu: baseAccountMenu,
       dashboardHref: "/vendor/v1",
     });
     expect(actions.some((a) => a.type === "link" && a.href === "/orders")).toBe(false);
-    expect(actions.some((a) => a.type === "link" && a.label === "Kitchen mode")).toBe(true);
+    expect(actions.some((a) => a.type === "link" && a.label === "Kitchen mode")).toBe(false);
+    expect(actions.some((a) => a.type === "link" && a.label === "Settings")).toBe(false);
+    expect(actions.some((a) => a.type === "link" && a.label === "Vendor account")).toBe(false);
+    expect(actions.some((a) => a.type === "link" && a.label === "Account")).toBe(true);
+    expect(actions.some((a) => a.type === "link" && a.label === "Dashboard")).toBe(true);
+    expect(actions.some((a) => a.type === "link" && a.href === "/vendor/v1/dashboard")).toBe(true);
+    expect(actions.some((a) => a.type === "link" && a.label === "Public page")).toBe(true);
+    expect(actions.some((a) => a.type === "sign-out")).toBe(true);
+  });
+
+  it("omits public page when vendor has no customer-facing URL", () => {
+    const actions = buildRoleAccountActions({
+      mode: "vendor",
+      accountMenu: { ...baseAccountMenu, vendorPublicPageHref: null },
+      dashboardHref: "/vendor/v1",
+    });
+    expect(actions.some((a) => a.type === "link" && a.label === "Public page")).toBe(false);
+  });
+
+  it("shows a compact pod menu without operational shortcuts", () => {
+    const actions = buildRoleAccountActions({
+      mode: "pod",
+      accountMenu: {
+        ...baseAccountMenu,
+        roleHint: "Pod",
+        primaryPodId: "pod_1",
+        podPublicPageHref: "/riverside-pod",
+        podSelectHref: null,
+      },
+      dashboardHref: "/pod/pod_1/dashboard",
+    });
+    expect(actions.some((a) => a.type === "link" && a.label === "Pod settings")).toBe(false);
+    expect(actions.some((a) => a.type === "link" && a.label === "Manage vendors")).toBe(false);
+    expect(actions.some((a) => a.type === "link" && a.label === "Account")).toBe(true);
+    expect(actions.some((a) => a.type === "link" && a.label === "Dashboard")).toBe(true);
+    expect(actions.some((a) => a.type === "link" && a.label === "Public page")).toBe(true);
   });
 
   it("includes customer orders for customer mode", () => {

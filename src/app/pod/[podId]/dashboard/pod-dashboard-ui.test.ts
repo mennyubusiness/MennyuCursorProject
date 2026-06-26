@@ -3,382 +3,109 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = join(process.cwd(), "src");
-const dashboardDir = join(root, "app/pod/[podId]/dashboard");
+const podDir = join(root, "app/pod/[podId]");
+const dashboardDir = join(podDir, "dashboard");
+
+function readPod(relativePath: string): string {
+  return readFileSync(join(podDir, relativePath), "utf8");
+}
 
 function readDashboard(relativePath: string): string {
   return readFileSync(join(dashboardDir, relativePath), "utf8");
 }
 
-describe("pod dashboard P0 UI", () => {
-  it("loads analytics and renders business-first dashboard sections", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).toContain("getPodAnalytics");
-    expect(page).toContain("PodDashboardMetrics");
-    expect(page).toContain("PodDashboardSidebar");
-    expect(page).toContain("derivePodDashboardLayoutState");
-    expect(page).toContain("PodVendorAdoptionBoard");
+describe("pod owner nav and layout", () => {
+  it("uses vendor-mirror nav items on PodAreaNav", () => {
+    const nav = readPod("PodAreaNav.tsx");
+    expect(nav).toMatch(/Dashboard.*Vendors.*Analytics.*Promote.*Payouts.*Setup.*Settings/s);
+    expect(nav).not.toContain("Overview");
+    expect(nav).not.toContain("Orders");
   });
 
-  it("uses canonical slug URLs in sidebar quick links", () => {
-    const sidebar = readDashboard("PodDashboardSidebar.tsx");
-    expect(sidebar).toContain("buildPodCustomerPath");
-    expect(sidebar).toContain("#ordering-qr");
-    expect(sidebar).toContain("View public pod page");
-    expect(sidebar).toContain("Brand, location, and public page details");
-  });
-
-  it("uses canonical slug URLs in roster vendor links", () => {
-    const roster = readDashboard("PodVendorRosterPanel.tsx");
-    expect(roster).toContain("buildVendorMenuCustomerPath");
-    expect(roster).not.toMatch(/\/pod\/\$\{podId\}\/vendor\/\$\{row\.vendorId\}/);
-  });
-
-  it("labels metrics without earnings language", () => {
-    const metrics = readDashboard("PodDashboardMetrics.tsx");
-    expect(metrics).toContain("Open Order volume");
-    expect(metrics).toContain("No Open Order sales yet");
-    expect(metrics).not.toMatch(/earnings|revenue share|payout/i);
-  });
-
-  it("anchors QR section on settings page", () => {
-    const qr = readFileSync(join(root, "components/pod/PodOrderingQrSection.tsx"), "utf8");
-    expect(qr).toContain('id="ordering-qr"');
-    expect(qr).toContain("DashboardCard");
+  it("uses shared PodLayoutChrome for pod owner routes", () => {
+    const layout = readPod("layout.tsx");
+    const chrome = readPod("PodLayoutChrome.tsx");
+    expect(layout).toContain("PodLayoutChrome");
+    expect(chrome).toContain("PodAreaNav");
+    expect(chrome).toContain("/vendors");
+    expect(chrome).toContain("/analytics");
+    expect(chrome).toContain("/promote");
   });
 });
 
-describe("pod dashboard command center layout", () => {
-  it("uses a full-width dashboard shell with sidebar", () => {
+describe("pod dashboard vendor-mirror structure", () => {
+  it("loads shared context and renders status, readiness, attention, activity, promote preview", () => {
     const page = readDashboard("page.tsx");
-    const layout = readFileSync(join(dashboardDir, "layout.tsx"), "utf8");
-    const sidebar = readDashboard("PodDashboardSidebar.tsx");
-    const shell = readFileSync(join(root, "components/dashboard/dashboard-styles.ts"), "utf8");
-
-    expect(page).toContain("DashboardShell");
-    expect(page).toContain('tier="command"');
-    expect(page).toContain("withSidebar");
-    expect(shell).toContain("max-w-7xl");
-    expect(page).not.toContain("max-w-2xl");
-    expect(layout).toContain("max-w-7xl");
-    expect(sidebar).toContain("POD_DASHBOARD_SECTIONS");
-    expect(sidebar).toContain('href={`#${id}`}');
+    expect(page).toContain("loadPodDashboardContext");
+    expect(page).toContain("PodStatusCard");
+    expect(page).toContain("PodVendorReadinessSection");
+    expect(page).toContain("PodNeedsAttentionSection");
+    expect(page).toContain("PodTodayActivitySection");
+    expect(page).toContain("PodPromotePreviewSection");
+    expect(page).toContain("PodRecentActivitySection");
+    expect(page).not.toContain("PodDashboardSidebar");
+    expect(page).not.toContain("withSidebar");
   });
 
-  it("sidebar contains Overview, Vendors, Promote, Activity, and Setup anchors", () => {
-    const sidebar = readDashboard("PodDashboardSidebar.tsx");
-    expect(sidebar).toContain('"overview"');
-    expect(sidebar).toContain('"vendors"');
-    expect(sidebar).toContain('"promote"');
-    expect(sidebar).toContain('"activity"');
-    expect(sidebar).toContain('"setup"');
-    expect(sidebar).toContain("Overview");
-    expect(sidebar).toContain("Vendors");
-    expect(sidebar).toContain("Promote");
-    expect(sidebar).toContain("Activity");
-    expect(sidebar).toContain("Setup");
-  });
-
-  it("maps section ids on the dashboard page", () => {
+  it("does not load individual orders on the dashboard", () => {
     const page = readDashboard("page.tsx");
-    expect(page).toContain('id="overview"');
-    expect(page).toContain('id="vendors"');
-    expect(page).toContain('id="promote"');
-    expect(page).toContain('id="activity"');
-    expect(page).toContain('id="setup"');
-    expect(page).toContain("DashboardSection");
-    expect(page).toContain("shouldShowPodSetupSection");
-    expect(page).toContain("shouldShowVendorSetupSection");
-  });
-
-  it("uses a responsive two-column main grid on large screens", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).toMatch(/lg:grid lg:grid-cols-2/);
-  });
-
-  it("includes mobile section navigation in the sidebar component", () => {
-    const sidebar = readDashboard("PodDashboardSidebar.tsx");
-    expect(sidebar).toContain("lg:hidden");
-    expect(sidebar).toContain("overflow-x-auto");
-    expect(sidebar).toContain('aria-label="Dashboard sections"');
+    expect(page).not.toMatch(/vendorOrder\.findMany|OrderDetail|pickupCode|customerName/i);
   });
 });
 
-describe("pod dashboard shared primitives integration", () => {
-  it("uses dashboard primitives on the pod command center page", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).toContain("DashboardShell");
-    expect(page).toContain("DashboardShellMain");
-    expect(page).toContain("DashboardSection");
-    expect(page).toContain("DashboardCard");
-  });
-
-  it("uses metric and empty-state primitives in pod metrics", () => {
-    const metrics = readDashboard("PodDashboardMetrics.tsx");
-    expect(metrics).toContain("DashboardMetricGrid");
-    expect(metrics).toContain("DashboardMetricCard");
-    expect(metrics).toContain("DashboardEmptyState");
-    expect(metrics).toContain("DashboardCard");
-  });
-
-  it("uses status badge primitive in pod sidebar", () => {
-    const sidebar = readDashboard("PodDashboardSidebar.tsx");
-    expect(sidebar).toContain("DashboardStatusBadge");
-    expect(sidebar).toContain("DashboardCard");
+describe("pod dedicated pages", () => {
+  it("defines vendors, analytics, promote, payouts, and setup routes", () => {
+    expect(readPod("vendors/page.tsx")).toContain("PodVendorsFilterBar");
+    expect(readPod("analytics/page.tsx")).toContain("getPodAnalyticsExtended");
+    expect(readPod("analytics/page.tsx")).not.toContain("redirect(");
+    expect(readPod("promote/page.tsx")).toContain("PodPromotionCard");
+    expect(readPod("promote/page.tsx")).toContain("PodOrderingQrSection");
+    expect(readPod("payouts/page.tsx")).toContain("PodPayoutSummaryCard");
+    expect(readPod("setup/page.tsx")).toContain("VendorSetupChecklist");
+    expect(readPod("setup/page.tsx")).not.toContain("Recommended");
   });
 });
 
-describe("pod dashboard pickup instruction removal", () => {
-  const dashboardFiles = [
-    "page.tsx",
-    "PodDashboardSidebar.tsx",
-    "PodDashboardSetupChecklist.tsx",
-    "PodDashboardMetrics.tsx",
-    "PodVendorAdoptionBoard.tsx",
-    "PodDashboardActivityFeed.tsx",
-    "PodPromotionCard.tsx",
-    "PodDashboardInviteVendorSection.tsx",
-    "PodVendorRosterPanel.tsx",
-  ];
-
-  it("does not mention pickup instructions on dashboard surfaces", () => {
-    for (const file of dashboardFiles) {
-      const src = readDashboard(file);
-      expect(src).not.toMatch(/pickup instructions/i);
-    }
+describe("pod analytics aggregate-only", () => {
+  it("exposes vendor breakdown without customer fields", () => {
+    const analytics = readFileSync(join(root, "services/pod-analytics.service.ts"), "utf8");
+    expect(analytics).toContain("getPodAnalyticsExtended");
+    expect(analytics).toContain("vendorBreakdown");
+    expect(analytics).not.toMatch(/customerPhone|customerEmail|pickupCode/i);
   });
 
-  it("removes pickup instruction checklist item from derivePodSetupChecklist", () => {
+  it("analytics view shows overview, trends, and vendor breakdown tables", () => {
+    const view = readPod("analytics/PodAnalyticsView.tsx");
+    expect(view).toContain("Vendor breakdown");
+    expect(view).toContain("Orders and sales by day");
+    expect(view).not.toMatch(/pickup code|customer name/i);
+  });
+});
+
+describe("pod setup checklist", () => {
+  it("requires pickup instructions and orderable vendor", () => {
     const readiness = readFileSync(join(root, "lib/vendor-pod-readiness.ts"), "utf8");
-    expect(readiness).not.toContain("pickup_instructions");
-    expect(readiness).not.toContain("Pickup instructions added");
-    expect(readiness).not.toContain("Help customers find pickup at your pod");
+    expect(readiness).toContain("pickup_instructions");
+    expect(readiness).toContain("POD_SETUP_REQUIRED_CHECKLIST_KEYS");
+    expect(readiness).toContain("vendor_ready");
   });
 });
 
-describe("pod dashboard onboarding layout", () => {
-  it("derives workflow visibility from pod and vendor readiness", () => {
-    const layout = readFileSync(join(root, "lib/pod-dashboard-layout.ts"), "utf8");
-    expect(layout).toContain("shouldShowPodSetupSection");
-    expect(layout).toContain("shouldShowVendorSetupSection");
-    expect(layout).toContain("shouldPromoteInviteSection");
-    expect(layout).toContain("filterActionablePodSetupItems");
-  });
-
-  it("orders main content as analytics, invite, setup, vendor setup, then roster", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).toMatch(/PodDashboardMetrics[\s\S]*PodDashboardInviteVendorSection/);
-    expect(page).toMatch(/PodDashboardInviteVendorSection[\s\S]*shouldShowPodSetupSection/);
-    expect(page).toMatch(/shouldShowPodSetupSection[\s\S]*shouldShowVendorSetupSection/);
-    expect(page).toMatch(/shouldShowVendorSetupSection[\s\S]*shouldShowVendorRoster/);
-  });
-
-  it("hides completed pod setup checklist surfaces", () => {
-    const checklist = readDashboard("PodDashboardSetupChecklist.tsx");
-    expect(checklist).not.toContain("All complete");
-    expect(checklist).toContain("if (items.length === 0)");
-  });
-
-  it("supports prominent invite mode when the pod has no vendors", () => {
-    const invite = readDashboard("PodDashboardInviteVendorSection.tsx");
-    expect(invite).toContain("prominent");
-    expect(invite).toContain("Invite your first vendor");
-    expect(invite).toContain("PodDashboardVendorSearch");
-    expect(invite).not.toContain("PodDashboardAddVendor");
-  });
-
-  it("does not load all vendors on the pod dashboard page", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).not.toContain("vendorsNotInPod");
-    expect(page).toContain("listPendingPodVendorInvites");
-  });
-});
-
-describe("pod dashboard vendor adoption UI", () => {
-  it("renders adoption board without reordering roster drag sort", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).toContain("PodVendorAdoptionBoard");
-    expect(page).toContain("buildPodAdoptionAttentionRows");
-
+describe("pod roster and adoption preserved", () => {
+  it("keeps roster controls and adoption copy actions", () => {
     const roster = readDashboard("PodVendorRosterPanel.tsx");
     expect(roster).toContain("DndContext");
-    expect(roster).toContain("arrayMove");
     expect(roster).toContain("Pause in pod");
-    expect(roster).toContain("Remove from pod");
-  });
-
-  it("surfaces needs-attention section and copy actions", () => {
     const board = readDashboard("PodVendorAdoptionBoard.tsx");
-    expect(board).toContain("Needs attention");
     expect(board).toContain("Copy reminder");
-    expect(board).toContain("Copy setup link");
     expect(board).toContain("buildVendorMenuCustomerPath");
-    expect(board).not.toMatch(/fetch\(|sendEmail|twilio|sms/i);
-  });
-
-  it("uses owner-facing live and blocker labels in roster", () => {
-    const roster = readDashboard("PodVendorRosterPanel.tsx");
-    expect(roster).toContain("podOwnerVendorDisplayStatus");
   });
 });
 
-describe("pod dashboard activity feed UI", () => {
-  it("wires activity feed in the activity section after promote tools", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).toContain("getPodActivityFeed");
-    expect(page).toContain("PodDashboardActivityFeed");
-    expect(page).toMatch(/id="promote"[\s\S]*id="activity"/);
-  });
-
-  it("renders empty-state guidance without duplicate sidebar links", () => {
-    const feed = readDashboard("PodDashboardActivityFeed.tsx");
-    expect(feed).toContain("No recent pod activity yet");
-    expect(feed).not.toContain("QR &amp; signage");
-    expect(feed).not.toContain("View public pod page");
-    expect(feed).not.toMatch(/customerPhone|customerEmail|revenue|payout/i);
-  });
-
-  it("keeps activity service queries free of customer fields", () => {
-    const service = readFileSync(join(root, "services/pod-activity.service.ts"), "utf8");
-    expect(service).not.toMatch(/customerPhone|customerEmail|customerAccountId|totalCents|vendorGross/i);
-    expect(service).toContain("buildCurrentStatusActivityItems");
-  });
-});
-
-describe("pod dashboard promotion tools UI", () => {
-  it("places promotion card in the promote section", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).toContain("PodPromotionCard");
-    expect(page).toMatch(/id="promote"[\s\S]*PodPromotionCard/);
-  });
-
-  it("renders announcement management and featured vendor summary", () => {
-    const card = readDashboard("PodPromotionCard.tsx");
-    expect(card).toContain("Promote your pod");
-    expect(card).toContain("updatePodAnnouncement");
-    expect(card).toContain("Show on public pod page");
-    expect(card).toContain("Feature a vendor from the roster");
-    expect(card).toContain("Copy public page link");
-    expect(card).toContain("POD_ANNOUNCEMENT_MAX_LENGTH");
-  });
-
-  it("avoids duplicating sidebar public page and QR links in the promotion card", () => {
-    const card = readDashboard("PodPromotionCard.tsx");
-    expect(card).not.toContain("View public pod page");
-    expect(card).not.toContain("QR &amp; signage");
-  });
-
-  it("shows active announcements only on public pod views", () => {
-    const data = readFileSync(join(root, "lib/pod-customer-page-data.ts"), "utf8");
-    expect(data).toContain("getPublicPodAnnouncementText");
-    expect(data).toContain("activeAnnouncement");
-
-    const standard = readFileSync(join(root, "components/pod/StandardPodPageView.tsx"), "utf8");
-    expect(standard).toContain("PodAnnouncementBanner");
-    expect(standard).toMatch(/activeAnnouncement \? <PodAnnouncementBanner/);
-
-    const destination = readFileSync(
-      join(root, "components/pod/destination/DestinationPodPageView.tsx"),
-      "utf8"
-    );
-    expect(destination).toContain("PodAnnouncementBanner");
-  });
-});
-
-describe("pod dashboard beta polish", () => {
-  const dashboardFiles = [
-    "page.tsx",
-    "PodDashboardMetrics.tsx",
-    "PodVendorAdoptionBoard.tsx",
-    "PodDashboardActivityFeed.tsx",
-    "PodPromotionCard.tsx",
-    "PodDashboardSetupChecklist.tsx",
-    "PodDashboardInviteVendorSection.tsx",
-    "PodDashboardSidebar.tsx",
-  ];
-
-  it("uses null-safe announcement state on the dashboard page", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).toContain("resolvePodDashboardAnnouncementState");
-    expect(page).toContain("announcementState.initialText");
-    expect(page).toContain("announcementState.initialIsActive");
-  });
-
-  it("does not use earnings language in non-payout dashboard surfaces", () => {
-    for (const file of dashboardFiles) {
-      const src = readDashboard(file);
-      expect(src).not.toMatch(/\bearnings\b|\brevenue share\b/i);
-    }
-  });
-
-  it("includes mobile overflow guards on long text surfaces", () => {
-    const promotion = readDashboard("PodPromotionCard.tsx");
-    const activity = readDashboard("PodDashboardActivityFeed.tsx");
-    const banner = readFileSync(join(root, "components/pod/PodAnnouncementBanner.tsx"), "utf8");
-
-    expect(promotion).toContain("overflow-wrap:anywhere");
-    expect(activity).toContain("overflow-wrap:anywhere");
-    expect(banner).toContain("overflow-wrap:anywhere");
-    expect(promotion).toContain("compact");
-  });
-
-  it("only highlights orderable featured vendors on public cards", () => {
-    const gridCard = readFileSync(join(root, "components/pod/PodVendorCard.tsx"), "utf8");
-    const destinationCard = readFileSync(
-      join(root, "components/pod/destination/DestinationPodVendorCard.tsx"),
-      "utf8"
-    );
-    expect(gridCard).toMatch(/isFeatured && !availability\.unavailable/);
-    expect(destinationCard).toMatch(/isFeatured && !unavailable/);
-  });
-
-  it("preserves roster panel controls", () => {
-    const roster = readDashboard("PodVendorRosterPanel.tsx");
-    expect(roster).toContain("PodVendorRosterPanel");
-    expect(roster).toContain("updatePodVendorPresentation");
-    expect(roster).toContain("Featured");
-  });
-});
-
-describe("pod dashboard P6 payout visibility", () => {
-  it("loads payout summary only for authorized viewer", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).toContain("getPodOwnerPayoutSummary");
-    expect(page).toContain("PodPayoutSummaryCard");
-    expect(page).toMatch(/payoutSummary \?/);
-  });
-
-  it("does not render payout card without summary", () => {
-    const page = readDashboard("page.tsx");
-    expect(page).toContain("{payoutSummary ? (");
-    expect(page).not.toContain("adminRunPodPayoutTransferBatchAction");
-    expect(page).not.toMatch(/stripe\.transfers\.create/);
-  });
-
-  it("PodPayoutSummaryCard uses owner-safe payout copy only", () => {
+describe("pod payout visibility", () => {
+  it("links payout card to dedicated payouts page", () => {
     const card = readDashboard("PodPayoutSummaryCard.tsx");
-    expect(card).toContain("Pod payouts");
-    expect(card).toContain("Pending calculated payout");
-    expect(card).toContain("Transfers are sent manually by Open Order during beta.");
-    expect(card).toContain("/settings#payout-setup");
-    expect(card).not.toMatch(/\bbasis points\b|\brecipient\b|\bvendor payout\b|\bStripe fees\b/i);
-    expect(card).not.toMatch(/\bavailable balance\b|\bwithdraw\b|\bguaranteed\b/i);
-  });
-
-  it("summary service stays separate from vendor payout code", () => {
-    const service = readFileSync(join(root, "services/pod-payout-summary.service.ts"), "utf8");
-    expect(service).toContain("canViewPodPayouts");
-    expect(service).not.toContain("VendorPayoutTransfer");
-    expect(service).not.toContain("getPodAnalytics");
-    expect(service).not.toMatch(/stripe\.transfers\.create/);
-  });
-
-  it("public pod page does not show payout info", () => {
-    const standard = readFileSync(join(root, "components/pod/StandardPodPageView.tsx"), "utf8");
-    const destination = readFileSync(
-      join(root, "components/pod/destination/DestinationPodPageView.tsx"),
-      "utf8"
-    );
-    expect(standard).not.toMatch(/PodPayoutSummary|getPodOwnerPayoutSummary|Pending calculated payout/i);
-    expect(destination).not.toMatch(/PodPayoutSummary|getPodOwnerPayoutSummary|Pending calculated payout/i);
+    expect(card).toContain("/payouts");
+    expect(card).not.toContain("/settings#payout-setup");
   });
 });

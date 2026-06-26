@@ -485,58 +485,111 @@ export type PodSetupChecklistInput = {
     description: string | null;
     imageUrl: string | null;
     address: string | null;
+    slug: string;
+    pickupInstructions: string | null;
   };
   vendorStatuses: Array<{ canAcceptOrders: boolean; status: VendorPodReadinessStatus }>;
+  podPayoutsEnabled?: boolean;
+  payoutSetupReady?: boolean;
 };
+
+/** Pod self-serve setup checklist keys required before setup is considered complete. */
+export const POD_SETUP_REQUIRED_CHECKLIST_KEYS = [
+  "pod_profile",
+  "location",
+  "pod_active",
+  "pickup_instructions",
+  "vendor_ready",
+  "qr_signage",
+] as const;
 
 export function derivePodSetupChecklist(input: PodSetupChecklistInput): ReadinessChecklistItem[] {
   const { podId, pod, vendorStatuses } = input;
   const profileComplete = Boolean(
     pod.name?.trim() && (pod.description?.trim() || pod.address?.trim()) && pod.imageUrl?.trim()
   );
+  const locationComplete = Boolean(pod.address?.trim());
+  const pickupComplete = Boolean(pod.pickupInstructions?.trim());
   const hasOrderableVendor = vendorStatuses.some((v) => v.canAcceptOrders);
   const hasReadyVendor = vendorStatuses.some(
     (v) => v.canAcceptOrders || v.status === "ready" || v.status === "active"
   );
+  const qrComplete = Boolean(pod.slug?.trim());
 
-  return [
+  const items: ReadinessChecklistItem[] = [
     {
       key: "pod_profile",
       label: "Pod profile complete",
       complete: profileComplete,
       owner: "pod_owner",
-      description: "Name, hero image, and description or address on the public pod page.",
+      description: "Name, hero image, and description on the public pod page.",
       actionHref: `/pod/${podId}/settings`,
-      actionLabel: "Edit pod settings",
+      actionLabel: "Edit pod profile",
     },
     {
-      key: "order_link",
-      label: "Public order link ready",
-      complete: true,
+      key: "location",
+      label: "Location set",
+      complete: locationComplete,
       owner: "pod_owner",
-      description: "Share your pod page or QR code with customers.",
+      description: "Add the address customers see on your public pod page.",
       actionHref: `/pod/${podId}/settings`,
-      actionLabel: "View QR & link",
-    },
-    {
-      key: "vendor_ready",
-      label: "At least one vendor ready or active",
-      complete: hasReadyVendor,
-      owner: "pod_owner",
-      description: hasOrderableVendor
-        ? "A vendor can accept orders in this pod."
-        : "Invite vendors and help them finish setup.",
-      actionHref: `/pod/${podId}/dashboard`,
-      actionLabel: "Manage vendors",
+      actionLabel: "Edit location",
     },
     {
       key: "pod_active",
-      label: "Pod activation",
+      label: "Public page active",
       complete: pod.isActive,
       owner: "open_order",
       description: pod.isActive
         ? "This pod is active for customer ordering."
         : "Open Order activates pods for public ordering.",
     },
+    {
+      key: "pickup_instructions",
+      label: "Pickup instructions set",
+      complete: pickupComplete,
+      owner: "pod_owner",
+      description: "Tell customers where and how to pick up orders.",
+      actionHref: `/pod/${podId}/settings`,
+      actionLabel: "Set pickup instructions",
+    },
+    {
+      key: "vendor_ready",
+      label: "At least one orderable vendor",
+      complete: hasOrderableVendor,
+      owner: "pod_owner",
+      description: hasOrderableVendor
+        ? "A vendor can accept orders in this pod."
+        : "Invite vendors and help them finish setup.",
+      actionHref: `/pod/${podId}/vendors`,
+      actionLabel: "Manage vendors",
+    },
+    {
+      key: "qr_signage",
+      label: "QR and signage available",
+      complete: qrComplete,
+      owner: "pod_owner",
+      description: "Download QR code and signage for your public pod page.",
+      actionHref: `/pod/${podId}/promote`,
+      actionLabel: "View QR & signage",
+    },
   ];
+
+  if (input.podPayoutsEnabled) {
+    items.push({
+      key: "payout_setup",
+      label: "Payout account set up",
+      complete: Boolean(input.payoutSetupReady),
+      owner: "pod_owner",
+      description: "Connect the payout account for your pod share.",
+      actionHref: `/pod/${podId}/payouts`,
+      actionLabel: "Set up payouts",
+    });
+  }
+
+  if (!hasReadyVendor && !hasOrderableVendor) {
+    // Keep legacy key out of required list; vendor_ready covers orderable state.
+  }
+
+  return items;
 }
