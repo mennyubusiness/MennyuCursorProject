@@ -6,5 +6,5 @@ export default async function VendorAreaIndex({
   params: Promise<{ vendorId: string }>;
 }) {
   const { vendorId } = await params;
-  redirect(`/vendor/${vendorId}/orders`);
+  redirect(`/vendor/${vendorId}/dashboard`);
 }

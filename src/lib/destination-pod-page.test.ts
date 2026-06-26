@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { FULL_BLEED_VIEWPORT_CLASS } from "@/lib/full-bleed-layout";
 import { buildDestinationPodNavItems } from "./pod-page-nav";
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -82,9 +83,9 @@ describe("DestinationPodMarquee", () => {
   });
 
   it("spans full viewport width with overflow clipped on the bleed wrapper", () => {
-    expect(marqueeSrc).toMatch(/w-screen/);
-    expect(marqueeSrc).toMatch(/overflow-x-clip/);
-    expect(marqueeSrc).toMatch(/-translate-x-1\/2/);
+    expect(marqueeSrc).toMatch(/FULL_BLEED_VIEWPORT_CLASS/);
+    expect(FULL_BLEED_VIEWPORT_CLASS).toMatch(/w-screen/);
+    expect(FULL_BLEED_VIEWPORT_CLASS).toMatch(/-translate-x-1\/2/);
   });
 
   it("loops seamlessly with two identical rows and -50% animation track", () => {

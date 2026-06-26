@@ -31,11 +31,12 @@ export async function startVendorStripeConnectOnboarding(
 
     const origin = await getPublicSiteOrigin();
     const accountId = await createVendorConnectedAccount(vendorId);
-    const returnUrl = `${origin}/vendor/${encodeURIComponent(vendorId)}/settings?stripe_connect=return`;
-    const refreshUrl = `${origin}/vendor/${encodeURIComponent(vendorId)}/settings?stripe_connect=refresh`;
+    const returnUrl = `${origin}/vendor/${encodeURIComponent(vendorId)}/payouts?stripe_connect=return`;
+    const refreshUrl = `${origin}/vendor/${encodeURIComponent(vendorId)}/payouts?stripe_connect=refresh`;
     const url = await createVendorOnboardingLink(accountId, returnUrl, refreshUrl);
 
-    revalidatePath(`/vendor/${vendorId}/settings`);
+    revalidatePath(`/vendor/${vendorId}/payouts`);
+    revalidatePath(`/vendor/${vendorId}/dashboard`);
     return { ok: true, url };
   } catch (e) {
     if (e instanceof StripeConnectNotConfiguredError) {
@@ -57,7 +58,8 @@ export async function syncVendorStripeConnectStatusAction(
       return { ok: false, error: "You don’t have permission." };
     }
     await retrieveAndSyncVendorConnectedAccount(vendorId);
-    revalidatePath(`/vendor/${vendorId}/settings`);
+    revalidatePath(`/vendor/${vendorId}/payouts`);
+    revalidatePath(`/vendor/${vendorId}/dashboard`);
     return { ok: true };
   } catch (e) {
     if (e instanceof StripeConnectNotConfiguredError) {

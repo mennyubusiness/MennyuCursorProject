@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { DashboardStatusBadge } from "@/components/dashboard";
-import { vendorSettingsSectionHref } from "@/lib/vendor-settings-sections";
 
 type Props = {
   vendorId: string;
@@ -21,22 +20,22 @@ export function VendorOrdersSystemStatusStrip({
 }: Props) {
   return (
     <nav aria-label="System status" className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
-      <Link href={vendorSettingsSectionHref(vendorId, "pos-menu")} className={linkClass}>
+      <Link href={`/vendor/${vendorId}/setup`} className={linkClass}>
         <span className="text-oo-stone-gray">POS</span>
         <DashboardStatusBadge tone={posConnected ? "success" : "neutral"}>
           {posConnected ? "Connected" : "Not connected"}
         </DashboardStatusBadge>
       </Link>
-      <Link href={vendorSettingsSectionHref(vendorId, "payouts")} className={linkClass}>
+      <Link href={`/vendor/${vendorId}/payouts`} className={linkClass}>
         <span className="text-oo-stone-gray">Payments</span>
         <DashboardStatusBadge tone={paymentsReady ? "success" : "warning"}>
           {paymentsReady ? "Ready" : "Needs setup"}
         </DashboardStatusBadge>
       </Link>
-      <Link href={vendorSettingsSectionHref(vendorId, "ordering")} className={linkClass}>
+      <Link href={`/vendor/${vendorId}/hours`} className={linkClass}>
         <span className="text-oo-stone-gray">Orders</span>
         <DashboardStatusBadge tone={ordersPaused ? "warning" : "success"}>
-          {ordersPaused ? "Paused" : "Ready for orders"}
+          {ordersPaused ? "Paused" : "Accepting orders"}
         </DashboardStatusBadge>
       </Link>
     </nav>

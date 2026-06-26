@@ -9,7 +9,6 @@ import {
 import { DeliverectMenuHealthPanel } from "@/components/deliverect/DeliverectMenuHealthPanel";
 import { MennyuLocationIdField } from "@/components/vendor/MennyuLocationIdField";
 import { VendorPosConnectionPanel } from "@/components/vendor/VendorPosConnectionPanel";
-import { VendorSetupChecklist } from "@/components/vendor/VendorSetupChecklist";
 import { VendorPauseToggle } from "../dashboard/VendorPauseToggle";
 import { VendorPodRequests } from "../dashboard/VendorPodRequests";
 import { VendorRecentPodRequests } from "../dashboard/VendorRecentPodRequests";
@@ -125,12 +124,21 @@ export function VendorSettingsSectionPanels(props: VendorSettingsSectionPanelsPr
         <div className="space-y-6" data-settings-section="overview">
           <div>
             <h3 className="text-xl font-semibold text-oo-charcoal">Overview</h3>
-            <p className="mt-1 text-sm text-oo-stone-gray">Setup status and next steps</p>
+            <p className="mt-1 text-sm text-oo-stone-gray">
+              Account settings live here. Day-to-day operations use Dashboard, Orders, Menu, and Hours.
+            </p>
           </div>
           <PrimaryNextAction items={props.checklist} />
-          <VendorSetupChecklist items={props.checklist} title="Setup checklist" />
+          <div className="flex flex-wrap gap-3 text-sm">
+            <Link href={`/vendor/${vendorId}/setup`} className="font-medium text-oo-charcoal underline">
+              Open setup checklist
+            </Link>
+            <Link href={`/vendor/${vendorId}/dashboard`} className="font-medium text-oo-charcoal underline">
+              Go to dashboard
+            </Link>
+          </div>
           <div>
-            <h4 className="text-sm font-semibold text-oo-charcoal">Quick links</h4>
+            <h4 className="text-sm font-semibold text-oo-charcoal">Settings sections</h4>
             <div className="mt-3">
               <OverviewSectionCards vendorId={vendorId} badges={props.badges} />
             </div>
@@ -158,7 +166,14 @@ export function VendorSettingsSectionPanels(props: VendorSettingsSectionPanelsPr
 
     case "payouts":
       return (
-        <div data-settings-section="payouts">
+        <div className="space-y-4" data-settings-section="payouts">
+          <p className="text-sm text-oo-stone-gray">
+            Payout setup also lives on the{" "}
+            <Link href={`/vendor/${vendorId}/payouts`} className="font-medium text-oo-charcoal underline">
+              Payouts
+            </Link>{" "}
+            page in the main vendor nav.
+          </p>
           <VendorStripePayoutCard
             vendorId={vendorId}
             stripeConnectConfigured={props.stripeConnectConfigured}
@@ -230,18 +245,21 @@ export function VendorSettingsSectionPanels(props: VendorSettingsSectionPanelsPr
       return (
         <div className="space-y-4" data-settings-section="ordering">
           <p className="text-sm text-oo-stone-gray">
-            This controls whether customers can place new orders through Open Order. In-progress orders are not
-            affected.
+            Pause and resume orders from the{" "}
+            <Link href={`/vendor/${vendorId}/hours`} className="font-medium text-oo-charcoal underline">
+              Hours
+            </Link>{" "}
+            page. This settings section is kept for compatibility only.
           </p>
           <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
             <VendorPauseToggle vendorId={vendorId} initialPaused={props.ordersPaused} embedded />
           </div>
           <div className="flex flex-wrap gap-4 text-sm">
+            <Link href={`/vendor/${vendorId}/hours`} className="font-medium text-oo-charcoal underline">
+              Open Hours
+            </Link>
             <Link href={`/vendor/${vendorId}/orders`} className="font-medium text-oo-charcoal underline">
               Go to Orders
-            </Link>
-            <Link href={`/vendor/${vendorId}/kitchen`} className="font-medium text-oo-charcoal underline">
-              Open Kitchen Mode
             </Link>
           </div>
         </div>

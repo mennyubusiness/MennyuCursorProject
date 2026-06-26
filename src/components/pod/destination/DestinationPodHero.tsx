@@ -1,6 +1,8 @@
 import Image from "next/image";
 
 import { DestinationPodMarquee } from "@/components/pod/destination/DestinationPodMarquee";
+import { FULL_BLEED_VIEWPORT_CLASS } from "@/lib/full-bleed-layout";
+import { cn } from "@/lib/cn";
 import { isHttpsImageUrl } from "@/lib/remote-image-url";
 
 type DestinationPodHeroProps = {
@@ -23,7 +25,13 @@ export function DestinationPodHero({
 
   return (
     <>
-      <header id="pod-hero" className="relative isolate overflow-hidden border-b border-oo-light-stone">
+      <header
+        id="pod-hero"
+        className={cn(
+          FULL_BLEED_VIEWPORT_CLASS,
+          "isolate w-full overflow-hidden border-b border-oo-light-stone"
+        )}
+      >
         <div className="absolute inset-0 z-0" aria-hidden>
           {hasImage ? (
             <Image

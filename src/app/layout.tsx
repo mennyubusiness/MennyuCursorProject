@@ -12,6 +12,7 @@ import { resolveHeaderNavContext } from "@/lib/auth/header-nav-context";
 import { getActiveOrderByCustomerPhone } from "@/services/order.service";
 import { cn } from "@/lib/cn";
 import { OpenOrderLogo } from "@/components/brand/OpenOrderLogo";
+import { isCustomerPodSlugPath } from "@/lib/customer-public-url";
 import { getPublicSiteOriginFromEnv } from "@/lib/public-site-url";
 import { CustomerQuickCartShell } from "@/components/cart/CustomerQuickCartShell";
 import { isQuickCartEnabledForPath } from "@/lib/quick-cart-enabled";
@@ -43,6 +44,7 @@ export default async function RootLayout({
   const isAdmin = pathname.startsWith("/admin");
   const isPodMarketplace = /^\/pod\/[^/]+$/.test(pathname);
   const isVendorMenuPage = /^\/pod\/[^/]+\/vendor\/[^/]+$/.test(pathname);
+  const isCustomerPodSurface = isCustomerPodSlugPath(pathname);
   const isFullBleed =
     pathname === "/" ||
     pathname === "/explore" ||
@@ -54,7 +56,8 @@ export default async function RootLayout({
     pathname === "/privacy" ||
     pathname === "/terms" ||
     isPodMarketplace ||
-    isVendorMenuPage;
+    isVendorMenuPage ||
+    isCustomerPodSurface;
   const hideFooter =
     pathname === "/login" || pathname === "/register" || isAdmin;
   const session = await auth();

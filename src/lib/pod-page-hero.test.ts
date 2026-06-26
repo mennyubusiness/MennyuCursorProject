@@ -7,7 +7,7 @@ const dir = dirname(fileURLToPath(import.meta.url));
 const heroSrc = readFileSync(join(dir, "../components/pod/PodPageHero.tsx"), "utf8");
 const heroActionsSrc = readFileSync(join(dir, "../components/pod/PodPageHeroActions.tsx"), "utf8");
 const navSrc = readFileSync(join(dir, "../components/pod/PodPageStickyNav.tsx"), "utf8");
-const pageSrc = readFileSync(join(dir, "../app/pod/[podId]/page.tsx"), "utf8");
+const pageSrc = readFileSync(join(dir, "../lib/pod-customer-page-render.tsx"), "utf8");
 const standardPageSrc = readFileSync(join(dir, "../components/pod/StandardPodPageView.tsx"), "utf8");
 
 describe("PodPageHero banner contrast", () => {
@@ -15,6 +15,7 @@ describe("PodPageHero banner contrast", () => {
     expect(heroSrc).toMatch(/absolute inset-0 z-0/);
     expect(heroSrc).toMatch(/absolute inset-0 z-10 bg-black\/45/);
     expect(heroSrc).toMatch(/relative z-20/);
+    expect(heroSrc).toMatch(/FULL_BLEED_VIEWPORT_CLASS/);
   });
 
   it("does not use a visible hero content card wrapper", () => {

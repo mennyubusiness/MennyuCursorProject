@@ -4,26 +4,26 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
+  { href: "dashboard", label: "Dashboard" },
   { href: "orders", label: "Orders" },
-  { href: "kitchen", label: "Kitchen" },
-  { href: "issues", label: "Issues" },
   { href: "menu", label: "Menu" },
-  { href: "analytics", label: "Analytics" },
+  { href: "hours", label: "Hours" },
+  { href: "payouts", label: "Payouts" },
   { href: "settings", label: "Settings" },
 ] as const;
 
 function navLinkIsActive(pathname: string, base: string, href: string): boolean {
   const path = `${base}/${href}`;
-  if (href === "orders") {
+  if (href === "dashboard") {
     return pathname === path || pathname === base;
   }
-  if (href === "kitchen") {
+  if (href === "orders") {
     return pathname === path || pathname.startsWith(`${path}/`);
   }
   if (href === "menu") {
-    return pathname === path;
+    return pathname === path || pathname.startsWith(`${path}/`);
   }
-  return pathname === path;
+  return pathname === path || pathname.startsWith(`${path}/`);
 }
 
 export function VendorAreaNav({ vendorId, wide = false }: { vendorId: string; wide?: boolean }) {
@@ -50,6 +50,19 @@ export function VendorAreaNav({ vendorId, wide = false }: { vendorId: string; wi
               </Link>
             );
           })}
+        </div>
+        <div className="ml-auto hidden gap-1 sm:flex">
+          <Link href={`${base}/kitchen`} className="oo-dash-nav-link">
+            Kitchen
+          </Link>
+          <Link href={`${base}/issues`} className="oo-dash-nav-link">
+            Issues
+          </Link>
+          {!pathname.includes("/setup") ? (
+            <Link href={`${base}/setup`} className="oo-dash-nav-link">
+              Setup
+            </Link>
+          ) : null}
         </div>
       </div>
     </nav>

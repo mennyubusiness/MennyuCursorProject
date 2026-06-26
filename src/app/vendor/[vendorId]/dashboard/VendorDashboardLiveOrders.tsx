@@ -90,6 +90,7 @@ export function VendorDashboardLiveOrders({
   initialVendorOrders,
   initialNowMs,
   isDeliverectLive = false,
+  activeGroupsOnly = false,
 }: {
   vendorId: string;
   vendorDeliverectChannelLinkId?: string | null;
@@ -98,6 +99,8 @@ export function VendorDashboardLiveOrders({
   initialNowMs: number;
   /** Pass from server (e.g. isRoutingRetryAvailable()) so POS vs Open Order mode is correct. */
   isDeliverectLive?: boolean;
+  /** When true, only render new/preparing/ready groups (dashboard preview). */
+  activeGroupsOnly?: boolean;
 }) {
   const { vendorOrders, nowMs, onStatusSuccess } = useVendorOrdersPoll({
     vendorId,
@@ -133,7 +136,9 @@ export function VendorDashboardLiveOrders({
 
   const grouped = groupVendorOrdersForBoard(vendorOrders);
 
-  const order: GroupKey[] = ["new", "preparing", "ready", "completed", "cancelled_failed"];
+  const order: GroupKey[] = activeGroupsOnly
+    ? ["new", "preparing", "ready"]
+    : ["new", "preparing", "ready", "completed", "cancelled_failed"];
 
   const highlightNow = Date.now();
   const newOrderIdsForSound = grouped.new?.map((vo) => vo.id) ?? [];
@@ -154,14 +159,16 @@ export function VendorDashboardLiveOrders({
   return (
     <>
       <NewOrderSoundAlert newOrderIds={newOrderIdsForSound} />
-      <div className="mb-10">
-        <VendorOrdersSummaryStrip
-          needsAttention={needsActionCount}
-          preparing={preparingOnlyCount}
-          ready={readyCount}
-          completedToday={completedTodayCount}
-        />
-      </div>
+      {!activeGroupsOnly ? (
+        <div className="mb-10">
+          <VendorOrdersSummaryStrip
+            needsAttention={needsActionCount}
+            preparing={preparingOnlyCount}
+            ready={readyCount}
+            completedToday={completedTodayCount}
+          />
+        </div>
+      ) : null}
       {vendorOrders.length === 0 ? (
         <DashboardEmptyState
           title="No active orders right now."

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MenuImportPublishPanel } from "@/components/menu-import/MenuImportPublishPanel";
 import { liveMenuSourceCopy, formatLiveMenuStatusLine } from "@/lib/vendor-menu-page.helpers";
+import { VENDOR_POS_MENU_MANAGED_COPY } from "@/lib/vendor-operational-copy";
 import type { VendorMenuPageData } from "@/lib/vendor-menu-page-data.server";
 import { VendorMenuHeaderActions } from "./VendorMenuHeaderActions";
 import { VendorMenuItemBrowser } from "./VendorMenuItemBrowser";
@@ -23,8 +24,13 @@ export function VendorMenuPageView({ data }: { data: VendorMenuPageData }) {
         <div className="min-w-0">
           <h2 className="text-2xl font-semibold text-oo-charcoal">Menu</h2>
           <p className="mt-2 max-w-2xl text-sm text-oo-stone-gray">
-            Review what customers see, publish new imports, and check menu availability.
+            Manage what customers can order. Search items and control availability.
           </p>
+          {data.posConnected ? (
+            <p className="mt-3 rounded-lg bg-oo-cream/80 px-3 py-2 text-sm text-oo-stone-gray">
+              {VENDOR_POS_MENU_MANAGED_COPY}
+            </p>
+          ) : null}
         </div>
         <VendorMenuHeaderActions
           vendorId={vendorId}

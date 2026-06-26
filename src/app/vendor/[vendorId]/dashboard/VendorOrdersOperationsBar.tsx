@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { vendorSettingsSectionHref } from "@/lib/vendor-settings-sections";
+import { VENDOR_POS_MANAGED_COPY } from "@/lib/vendor-operational-copy";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -14,13 +13,16 @@ export function VendorOrdersOperationsBar({
   initialPaused,
   posOpen,
   layout = "default",
+  posManaged = false,
 }: {
   vendorId: string;
   initialPaused: boolean;
   /** When false, store is closed (from POS). When undefined, not yet connected. */
   posOpen?: boolean;
-  /** `compact`: borderless strip for Orders hub. */
+  /** `compact`: borderless strip for dashboard surfaces. */
   layout?: "default" | "compact";
+  /** When true, Open Order pause/resume may be limited because POS controls intake. */
+  posManaged?: boolean;
 }) {
   const router = useRouter();
   const [paused, setPaused] = useState(initialPaused);
@@ -28,8 +30,8 @@ export function VendorOrdersOperationsBar({
   const [error, setError] = useState<string | null>(null);
 
   const storeLabel =
-    posOpen === undefined ? "POS not connected" : posOpen ? "Store open (POS)" : "Store closed (POS)";
-  const orderIntakeLabel = paused ? "Open Order intake paused" : "Open Order intake active";
+    posOpen === undefined ? "Store hours not connected" : posOpen ? "Store open" : "Store closed";
+  const orderIntakeLabel = paused ? "Paused on Open Order" : "Accepting orders on Open Order";
 
   async function handleToggle() {
     setError(null);
@@ -69,31 +71,29 @@ export function VendorOrdersOperationsBar({
               : "Customers can order from your published menu on Open Order."}
           </p>
         )}
-        {layout === "compact" && (
+        {layout === "compact" && !posManaged && (
           <p className="text-xs text-oo-stone-gray">
-            Pause or resume from here, or use{" "}
-            <Link
-              href={vendorSettingsSectionHref(vendorId, "ordering")}
-              className="underline hover:text-oo-charcoal"
-            >
-              Settings
-            </Link>
-            .
+            Pause stops new Open Order orders. In-progress orders still show below.
           </p>
         )}
+        {posManaged ? (
+          <p className="text-xs text-oo-stone-gray">{VENDOR_POS_MANAGED_COPY}</p>
+        ) : null}
       </div>
-      <button
-        type="button"
-        onClick={() => void handleToggle()}
-        disabled={loading}
-        className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-          paused
-            ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
-            : "bg-brand text-white hover:bg-brand-hover"
-        }`}
-      >
-        {loading ? "…" : paused ? "Resume Open Order intake" : "Pause Open Order intake"}
-      </button>
+      {!posManaged ? (
+        <button
+          type="button"
+          onClick={() => void handleToggle()}
+          disabled={loading}
+          className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+            paused
+              ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
+              : "bg-brand text-white hover:bg-brand-hover"
+          }`}
+        >
+          {loading ? "…" : paused ? "Resume orders" : "Pause orders"}
+        </button>
+      ) : null}
     </div>
   );
 

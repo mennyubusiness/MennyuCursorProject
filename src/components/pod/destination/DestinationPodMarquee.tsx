@@ -23,15 +23,13 @@ function MarqueeRow({ items, ariaHidden = false }: { items: string[]; ariaHidden
   );
 }
 
-/** Break out of constrained page width to span the full viewport. */
-const fullBleedClass =
-  "relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 overflow-x-clip";
+import { FULL_BLEED_VIEWPORT_CLASS } from "@/lib/full-bleed-layout";
 
 export function DestinationPodMarquee({ items }: DestinationPodMarqueeProps) {
   if (items.length === 0) return null;
 
   return (
-    <div className={fullBleedClass}>
+    <div className={FULL_BLEED_VIEWPORT_CLASS}>
       <div
         className="relative z-20 w-full border-t border-white/10 bg-oo-charcoal py-3"
         aria-label="Pod vendors"

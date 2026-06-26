@@ -219,7 +219,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
         stripeSummary.stripeConnectConfigured === false
           ? "Stripe Connect is not configured on this server."
           : "Stripe Connect account with charges and payouts enabled.",
-      actionHref: audience === "vendor" ? `${settingsBase}?section=payouts` : undefined,
+      actionHref: audience === "vendor" ? `/vendor/${vendorId}/payouts` : undefined,
       actionLabel: audience === "vendor" ? "Set up payouts" : undefined,
     },
     {
@@ -231,7 +231,10 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
         posState === "connected"
           ? "Kitchen routing is connected through Deliverect."
           : "Connect Deliverect so orders can route to the kitchen POS.",
-      actionHref: audience === "vendor" ? `${settingsBase}?section=pos-menu` : undefined,
+      actionHref:
+        audience === "vendor"
+          ? `/vendor/${vendorId}/setup`
+          : undefined,
       actionLabel: audience === "vendor" ? "Connect POS" : undefined,
     },
     {

@@ -19,9 +19,13 @@ export function VendorLayoutChrome({
   const isSettings = pathname?.includes(`/vendor/${vendorId}/settings`);
   const isWideWorkspace =
     isSettings ||
+    pathname?.includes(`/vendor/${vendorId}/dashboard`) ||
     pathname?.includes(`/vendor/${vendorId}/orders`) ||
     pathname?.includes(`/vendor/${vendorId}/menu`) ||
-    pathname?.includes(`/vendor/${vendorId}/menu-imports`);
+    pathname?.includes(`/vendor/${vendorId}/menu-imports`) ||
+    pathname?.includes(`/vendor/${vendorId}/hours`) ||
+    pathname?.includes(`/vendor/${vendorId}/payouts`) ||
+    pathname?.includes(`/vendor/${vendorId}/setup`);
 
   if (isKitchen) {
     return <div className="min-h-dvh bg-oo-cream">{children}</div>;
@@ -51,7 +55,7 @@ export function VendorLayoutChrome({
 export function VendorKitchenExitLink({ vendorId }: { vendorId: string }) {
   return (
     <Link
-      href={`/vendor/${vendorId}/orders`}
+      href={`/vendor/${vendorId}/dashboard`}
       className="rounded-xl border border-oo-light-stone bg-oo-warm-white px-4 py-2.5 text-sm font-semibold text-oo-charcoal shadow-sm transition hover:bg-oo-cream"
     >
       Exit Kitchen Mode

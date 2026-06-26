@@ -5,6 +5,7 @@ import { isHttpsImageUrl } from "@/lib/remote-image-url";
 import type { PodOrderingStatus } from "@/lib/pod-page-status";
 import { podOrderingStatusBadgeClass } from "@/lib/pod-page-status";
 import { cn } from "@/lib/cn";
+import { FULL_BLEED_VIEWPORT_CLASS } from "@/lib/full-bleed-layout";
 
 type PodPageHeroProps = {
   podId: string;
@@ -42,7 +43,13 @@ export function PodPageHero({
   const location = address?.trim();
 
   return (
-    <header id="pod-hero" className="relative isolate overflow-hidden border-b border-oo-light-stone">
+    <header
+      id="pod-hero"
+      className={cn(
+        FULL_BLEED_VIEWPORT_CLASS,
+        "isolate w-full overflow-hidden border-b border-oo-light-stone"
+      )}
+    >
       {/* Layer 0: banner image or fallback fill */}
       <div className="absolute inset-0 z-0" aria-hidden>
         {hasImage ? (
