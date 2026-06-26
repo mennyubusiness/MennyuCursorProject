@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const QUICK_LINKS = [
   { href: "menu", label: "Manage menu availability", description: "See what customers can order" },
-  { href: "hours", label: "Edit hours", description: "Pause, resume, and store hours" },
+  { href: "hours", label: "Edit hours", description: "Customer ordering hours and Deliverect sync" },
   { href: "orders", label: "View order history", description: "Active board and past orders" },
   { href: "payouts", label: "View payouts", description: "Stripe status and transfers" },
   { href: "setup", label: "Complete setup", description: "Readiness checklist" },

@@ -28,6 +28,8 @@ import {
 } from "@/lib/vendor-orders-board";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { getVendorOrdersBoardData, serializeVendorOrdersForBoard } from "@/lib/vendor-orders-board-data";
+import { summarizeVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
+import { resolveVendorHoursTimezone } from "@/lib/vendor-customer-ordering-hours";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 
 function startOfToday(): Date {
@@ -61,6 +63,9 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       stripeConnectedAccountId: true,
       stripeChargesEnabled: true,
       stripePayoutsEnabled: true,
+      syncCustomerOrderingHoursFromDeliverect: true,
+      customerOrderingHours: true,
+      deliverectSyncedCustomerOrderingHours: true,
     },
   });
   if (!vendorRecord) return null;
@@ -73,7 +78,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
         where: { vendorId },
         select: {
           isActive: true,
-          pod: { select: { id: true, name: true, slug: true, isActive: true } },
+          pod: { select: { id: true, name: true, slug: true, isActive: true, pickupTimezone: true } },
         },
       }),
       hasUnmatchedChannelRegistrationForVendorById(vendorId),
@@ -146,10 +151,22 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     readiness.checklist.filter((item) => item.complete).map((item) => item.key)
   );
 
+  const hoursTimezone = resolveVendorHoursTimezone(currentPod?.pod.pickupTimezone);
+  const hoursSummary = summarizeVendorCustomerOrderingHours({
+    vendor: {
+      syncCustomerOrderingHoursFromDeliverect:
+        vendorRecord.syncCustomerOrderingHoursFromDeliverect ?? false,
+      customerOrderingHours: vendorRecord.customerOrderingHours,
+      deliverectSyncedCustomerOrderingHours: vendorRecord.deliverectSyncedCustomerOrderingHours,
+    },
+    posConnected,
+    timeZone: hoursTimezone,
+  });
+
   const availability = getVendorAvailability({
     isActive: vendorRecord.isActive,
     mennyuOrdersPaused: vendorRecord.mennyuOrdersPaused ?? false,
-    posOpen: undefined,
+    posOpen: hoursSummary.posOpen,
   });
 
   const intakeLabel = vendorIntakeStatusLabel({
@@ -241,6 +258,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     initialNowMs,
     isDeliverectLive: isRoutingRetryAvailable(),
     lastMenuSyncAt: vendorRecord.deliverectAutoMapLastAt?.toISOString() ?? null,
+    hoursSummary,
   };
 });
 

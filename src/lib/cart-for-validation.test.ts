@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { defaultVendorCustomerOrderingWeek } from "./vendor-customer-ordering-hours";
 import { buildCartForValidationFromDisplayCart } from "./cart-for-validation";
 
 describe("buildCartForValidationFromDisplayCart posOpen", () => {
-  it("does not pass posOpen until Vendor stores open/closed state", () => {
+  it("leaves posOpen undefined when no customer ordering hours are configured", () => {
     const built = buildCartForValidationFromDisplayCart({
       podId: "pod_1",
       items: [
@@ -20,11 +21,38 @@ describe("buildCartForValidationFromDisplayCart posOpen", () => {
           vendor: {
             isActive: true,
             mennyuOrdersPaused: false,
-            posOpen: false,
           },
         },
       ],
     });
     expect(built.items[0]?.vendor.posOpen).toBeUndefined();
+  });
+
+  it("derives posOpen from custom customer ordering hours", () => {
+    const built = buildCartForValidationFromDisplayCart({
+      podId: "pod_1",
+      pod: { pickupTimezone: "America/Chicago" },
+      items: [
+        {
+          id: "line_1",
+          menuItemId: "mi_1",
+          vendorId: "v_1",
+          quantity: 1,
+          priceCents: 500,
+          menuItem: {
+            priceCents: 500,
+            isAvailable: true,
+            name: "Burger",
+          },
+          vendor: {
+            isActive: true,
+            mennyuOrdersPaused: false,
+            syncCustomerOrderingHoursFromDeliverect: false,
+            customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+          },
+        },
+      ],
+    });
+    expect(typeof built.items[0]?.vendor.posOpen).toBe("boolean");
   });
 });

@@ -17,6 +17,8 @@ import {
   MODIFIER_VALIDATION_MENU_ITEM_INCLUDE,
 } from "@/services/modifier-validation";
 import { getVendorAvailability } from "@/lib/vendor-availability";
+import { resolveVendorPosOpen, type VendorHoursSourceFields } from "@/lib/vendor-customer-ordering-hours";
+import { resolveVendorHoursTimezone } from "@/lib/vendor-customer-ordering-hours";
 import {
   getVendorOrderabilityInPod,
   cartLineOrderabilityCode,
@@ -120,15 +122,17 @@ export async function validateCartForOrder(cart: {
       isActive?: boolean;
       mennyuOrdersPaused?: boolean;
       posOpen?: boolean;
-      /** When set, enforce Deliverect `subItems` depth limits (same as outbound validation). */
       deliverectChannelLinkId?: string | null;
+      syncCustomerOrderingHoursFromDeliverect?: boolean;
+      customerOrderingHours?: unknown;
+      deliverectSyncedCustomerOrderingHours?: unknown;
     };
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
   }>;
 }): Promise<CartValidationResult> {
   const pod = await prisma.pod.findUnique({
     where: { id: cart.podId },
-    select: { isActive: true },
+    select: { isActive: true, pickupTimezone: true },
   });
   if (!pod?.isActive) {
     return {
@@ -137,6 +141,8 @@ export async function validateCartForOrder(cart: {
       message: "This pod is not currently accepting orders.",
     };
   }
+
+  const hoursTimezone = resolveVendorHoursTimezone(pod.pickupTimezone);
 
   const vendorIds = [...new Set(cart.items.map((i) => i.vendorId))];
   const operationalByVendor = new Map<string, Set<string>>();
@@ -159,7 +165,14 @@ export async function validateCartForOrder(cart: {
     if (!item.menuItem.isAvailable) {
       return { valid: false, code: "ITEM_UNAVAILABLE", message: `${item.menuItem.name} is no longer available.`, cartItemId: item.id, menuItemId: item.menuItemId, menuItemName: item.menuItem.name };
     }
-    const vendorAvailability = getVendorAvailability(item.vendor);
+    const hoursFields: VendorHoursSourceFields = {
+      syncCustomerOrderingHoursFromDeliverect: item.vendor.syncCustomerOrderingHoursFromDeliverect ?? false,
+      customerOrderingHours: item.vendor.customerOrderingHours ?? null,
+      deliverectSyncedCustomerOrderingHours: item.vendor.deliverectSyncedCustomerOrderingHours ?? null,
+    };
+    const posOpen =
+      item.vendor.posOpen ?? resolveVendorPosOpen(hoursFields, hoursTimezone);
+    const vendorAvailability = getVendorAvailability({ ...item.vendor, posOpen });
     if (!vendorAvailability.orderable) {
       const { code, message } =
         vendorAvailability.status === "inactive"
@@ -181,7 +194,7 @@ export async function validateCartForOrder(cart: {
       podActive: true,
       podVendorExists: Boolean(vendorInPod),
       podVendorActive: vendorInPod?.isActive ?? false,
-      vendor: item.vendor,
+      vendor: { ...item.vendor, posOpen },
     });
     if (!podOrderability.orderable) {
       const code = cartLineOrderabilityCode(podOrderability);

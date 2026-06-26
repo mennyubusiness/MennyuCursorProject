@@ -19,6 +19,9 @@ type VendorStoreStatusCardProps = {
   posManaged: boolean;
   initialPaused: boolean;
   storefrontHref: string | null;
+  todayHoursLabel: string;
+  nextOpeningLabel: string | null;
+  hoursSourceLabel: string;
 };
 
 export function VendorStoreStatusCard({
@@ -32,6 +35,9 @@ export function VendorStoreStatusCard({
   posManaged,
   initialPaused,
   storefrontHref,
+  todayHoursLabel,
+  nextOpeningLabel,
+  hoursSourceLabel,
 }: VendorStoreStatusCardProps) {
   const tone: DashboardStatusTone = vendorIntakeStatusTone(intakeLabel);
 
@@ -64,7 +70,7 @@ export function VendorStoreStatusCard({
             href={`/vendor/${vendorId}/hours`}
             className="inline-flex items-center justify-center rounded-xl border border-oo-light-stone bg-oo-cream px-4 py-2.5 text-sm font-semibold text-oo-charcoal transition hover:bg-oo-warm-white"
           >
-            Edit hours & pause
+            Edit hours
           </Link>
         </div>
       </div>
@@ -72,9 +78,11 @@ export function VendorStoreStatusCard({
       <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
           <dt className="text-xs font-medium text-oo-stone-gray">Today</dt>
-          <dd className="mt-1 text-sm font-medium text-oo-charcoal">
-            Hours are shown on the Hours page. Pause or resume intake below when needed.
-          </dd>
+          <dd className="mt-1 text-sm font-medium text-oo-charcoal">{todayHoursLabel}</dd>
+          {nextOpeningLabel ? (
+            <dd className="mt-1 text-xs text-oo-stone-gray">{nextOpeningLabel}</dd>
+          ) : null}
+          <dd className="mt-1 text-xs text-oo-stone-gray">{hoursSourceLabel}</dd>
         </div>
         <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
           <dt className="text-xs font-medium text-oo-stone-gray">POS</dt>

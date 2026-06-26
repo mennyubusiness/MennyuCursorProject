@@ -58,6 +58,9 @@ export default async function VendorDashboardPage({
           posManaged={ctx.posManaged}
           initialPaused={ctx.vendorRecord.mennyuOrdersPaused ?? false}
           storefrontHref={ctx.storefrontHref}
+          todayHoursLabel={ctx.hoursSummary.todayLabel}
+          nextOpeningLabel={ctx.hoursSummary.nextOpeningLabel}
+          hoursSourceLabel={ctx.hoursSummary.sourceLabel}
         />
 
         <VendorDashboardActiveOrdersSection

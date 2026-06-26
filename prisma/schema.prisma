@@ -443,6 +443,13 @@ model Vendor {
   deliverectBusyDelayMinutes Int?
   /// When true, Deliverect menu webhook imports may auto-publish when eligibility rules pass (see menu-auto-publish.service).
   autoPublishMenus        Boolean                @default(false)
+  /// When true, customer ordering hours come from Deliverect/POS (deliverectSyncedCustomerOrderingHours).
+  syncCustomerOrderingHoursFromDeliverect Boolean @default(false)
+  /// Vendor-defined customer-facing ordering hours (JSON array of day rows). Used when sync is off.
+  customerOrderingHours   Json?
+  /// Last known hours snapshot from Deliverect/POS (same JSON shape as customerOrderingHours).
+  deliverectSyncedCustomerOrderingHours Json?
+  deliverectSyncedCustomerOrderingHoursAt DateTime?
   /// Legacy: shared secret for Bearer/automation and magic-link cookie bootstrap. Prefer User session + VendorMembership.
   vendorDashboardToken    String?
   /// Business / kitchen contact (may match User email for sole operators).

@@ -43,8 +43,15 @@ describe("vendor operational copy", () => {
 });
 
 describe("vendor section pages", () => {
-  it("defines dedicated hours, payouts, and setup pages", () => {
-    expect(readVendor("hours/page.tsx")).toContain("VendorOrdersOperationsBar");
+  it("defines dedicated hours page focused on customer ordering hours", () => {
+    const hours = readVendor("hours/page.tsx");
+    expect(hours).toContain("VendorCustomerOrderingHoursForm");
+    expect(hours).toContain("Choose how Open Order should determine when customers can place orders.");
+    expect(hours).not.toContain("VendorStoreStatusCard");
+    expect(hours).not.toContain("VendorOrdersOperationsBar");
+  });
+
+  it("defines dedicated payouts and setup pages", () => {
     expect(readVendor("payouts/page.tsx")).toContain("VendorStripePayoutCard");
     expect(readVendor("payouts/page.tsx")).toContain("VendorPayoutTransferHistory");
     expect(readVendor("setup/page.tsx")).toContain("VendorSetupChecklist");

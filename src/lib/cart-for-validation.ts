@@ -1,16 +1,10 @@
 import type { CartForValidation } from "@/services/order.service";
-
-/**
- * POS open/closed is not wired for customer cart/checkout validation yet: Vendor has no
- * persisted posOpen field, and Deliverect busy-mode uses mennyuOrdersPaused instead.
- * VENDOR_CLOSED in order.service applies only when vendor.posOpen === false is supplied.
- * Do not show customer copy implying POS-hours blocking until that field is sourced.
- */
-const POS_OPEN_FOR_VALIDATION: boolean | undefined = undefined;
+import { resolveVendorPosOpen, resolveVendorHoursTimezone, type VendorHoursSourceFields } from "@/lib/vendor-customer-ordering-hours";
 
 /** Display-cart row shape used by /cart SSR and revalidation (CART_DISPLAY_SESSION_CART_INCLUDE). */
 export type DisplayCartRowForValidation = {
   podId: string;
+  pod?: { pickupTimezone?: string | null };
   items: Array<{
     id: string;
     menuItemId: string;
@@ -31,6 +25,9 @@ export type DisplayCartRowForValidation = {
       mennyuOrdersPaused?: boolean | null;
       posOpen?: boolean;
       deliverectChannelLinkId?: string | null;
+      syncCustomerOrderingHoursFromDeliverect?: boolean;
+      customerOrderingHours?: unknown;
+      deliverectSyncedCustomerOrderingHours?: unknown;
     };
     selections?: Array<{
       modifierOptionId: string;
@@ -40,9 +37,21 @@ export type DisplayCartRowForValidation = {
   }>;
 };
 
+function vendorHoursFields(
+  vendor: DisplayCartRowForValidation["items"][number]["vendor"]
+): VendorHoursSourceFields {
+  return {
+    syncCustomerOrderingHoursFromDeliverect: vendor.syncCustomerOrderingHoursFromDeliverect ?? false,
+    customerOrderingHours: vendor.customerOrderingHours ?? null,
+    deliverectSyncedCustomerOrderingHours: vendor.deliverectSyncedCustomerOrderingHours ?? null,
+  };
+}
+
 export function buildCartForValidationFromDisplayCart(
   cart: DisplayCartRowForValidation
 ): CartForValidation {
+  const timeZone = resolveVendorHoursTimezone(cart.pod?.pickupTimezone);
+
   return {
     podId: cart.podId,
     items: cart.items.map((i) => ({
@@ -63,7 +72,7 @@ export function buildCartForValidationFromDisplayCart(
       vendor: {
         isActive: i.vendor.isActive,
         mennyuOrdersPaused: i.vendor.mennyuOrdersPaused ?? undefined,
-        posOpen: POS_OPEN_FOR_VALIDATION,
+        posOpen: resolveVendorPosOpen(vendorHoursFields(i.vendor), timeZone),
         deliverectChannelLinkId: i.vendor.deliverectChannelLinkId ?? null,
       },
       selections: i.selections?.map((s) => ({
