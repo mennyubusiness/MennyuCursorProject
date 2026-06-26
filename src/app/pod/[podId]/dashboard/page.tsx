@@ -36,11 +36,11 @@ export default async function PodDashboardPage({
         {!ctx.setupComplete ? (
           <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 px-4 py-3 text-sm text-oo-charcoal">
             <Link href={`/pod/${podId}/setup`} className="font-semibold underline">
-              Setup incomplete
+              Readiness needs attention
             </Link>
             <span className="text-oo-stone-gray">
               {" "}
-              — finish required steps so customers can order from your pod.
+              — finish required checks so customers can order from your pod.
             </span>
           </div>
         ) : null}

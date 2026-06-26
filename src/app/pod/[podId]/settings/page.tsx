@@ -9,6 +9,8 @@ import {
 } from "@/components/dashboard";
 import { prisma } from "@/lib/db";
 import { parsePodAmenities, parsePodCustomAmenities } from "@/lib/pod-amenities";
+import { arePodOwnerPayoutsConfigured } from "@/lib/pod-owner-payout-visibility";
+import { loadPodPayoutRecipientContext } from "@/services/pod-payout-connect.service";
 import { PodBrandProfileForm } from "./PodBrandProfileForm";
 
 export default async function PodSettingsPage({
@@ -39,6 +41,11 @@ export default async function PodSettingsPage({
     },
   });
   if (!pod) notFound();
+
+  const payoutContext = await loadPodPayoutRecipientContext(podId);
+  const showPayouts = arePodOwnerPayoutsConfigured({
+    podPayoutsEnabled: payoutContext?.podPayoutsEnabled ?? false,
+  });
 
   const amenities = parsePodAmenities(pod.amenities);
   const customAmenities = parsePodCustomAmenities(pod.customAmenities);
@@ -94,12 +101,19 @@ export default async function PodSettingsPage({
           QR codes, signage, and announcements live on the{" "}
           <Link href={`/pod/${podId}/promote`} className="font-medium text-oo-charcoal underline">
             Promote
-          </Link>{" "}
-          page. Pod share payouts are on the{" "}
-          <Link href={`/pod/${podId}/payouts`} className="font-medium text-oo-charcoal underline">
-            Payouts
-          </Link>{" "}
-          page.
+          </Link>
+          {showPayouts ? (
+            <>
+              {" "}
+              page. Pod share payouts are on the{" "}
+              <Link href={`/pod/${podId}/payouts`} className="font-medium text-oo-charcoal underline">
+                Payouts
+              </Link>{" "}
+              page.
+            </>
+          ) : (
+            <> page.</>
+          )}
         </p>
       </div>
     </DashboardShell>

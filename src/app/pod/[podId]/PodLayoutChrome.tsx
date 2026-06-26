@@ -8,10 +8,12 @@ import { PodAreaNav } from "./PodAreaNav";
 export function PodLayoutChrome({
   podId,
   podName,
+  showPayouts = false,
   children,
 }: {
   podId: string;
   podName: string;
+  showPayouts?: boolean;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -37,7 +39,7 @@ export function PodLayoutChrome({
         <div className={headerWidth}>
           <h1 className="oo-dash-titlebar-heading">{podName}</h1>
         </div>
-        <PodAreaNav podId={podId} wide={isWideWorkspace} />
+        <PodAreaNav podId={podId} wide={isWideWorkspace} showPayouts={showPayouts} />
       </header>
       <main className={mainWidth}>{children}</main>
     </div>

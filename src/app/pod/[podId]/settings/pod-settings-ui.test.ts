@@ -35,14 +35,15 @@ describe("pod settings workspace layout", () => {
     expect(page).toContain("Pod profile, location, branding");
   });
 
-  it("focuses settings on profile and links promote/payouts elsewhere", () => {
+  it("links promote elsewhere and only mentions payouts when configured", () => {
     const page = readSettings("page.tsx");
     expect(page).toContain('id="profile"');
     expect(page).toContain("PodBrandProfileForm");
     expect(page).not.toContain("PodOrderingQrSection");
     expect(page).not.toContain("PodPayoutSetupCard");
     expect(page).toContain("/promote");
-    expect(page).toContain("/payouts");
+    expect(page).toContain("showPayouts");
+    expect(page).toContain("arePodOwnerPayoutsConfigured");
   });
 });
 
@@ -52,6 +53,7 @@ describe("pod settings payout account copy", () => {
     const view = readPod("payouts/PodPayoutsView.tsx");
     expect(payouts).toContain("loadPodDashboardContext");
     expect(payouts).toContain("PodPayoutsView");
+    expect(payouts).toContain("redirect(`/pod/${podId}/dashboard`)");
     expect(view).toContain("PodPayoutSetupCard");
   });
 

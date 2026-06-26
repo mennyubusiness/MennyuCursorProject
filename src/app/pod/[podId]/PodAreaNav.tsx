@@ -9,7 +9,7 @@ const NAV_LINKS = [
   { href: "analytics", label: "Analytics" },
   { href: "promote", label: "Promote" },
   { href: "payouts", label: "Payouts" },
-  { href: "setup", label: "Setup" },
+  { href: "setup", label: "Readiness" },
   { href: "settings", label: "Settings" },
 ] as const;
 
@@ -21,17 +21,27 @@ function navLinkIsActive(pathname: string, base: string, href: string): boolean 
   return pathname === path || pathname.startsWith(`${path}/`);
 }
 
-export function PodAreaNav({ podId, wide = false }: { podId: string; wide?: boolean }) {
+export function PodAreaNav({
+  podId,
+  wide = false,
+  showPayouts = false,
+}: {
+  podId: string;
+  wide?: boolean;
+  showPayouts?: boolean;
+}) {
   const pathname = usePathname();
   const base = `/pod/${podId}`;
   const widthClass = wide
     ? "mx-auto flex max-w-7xl flex-wrap gap-1 px-4 py-2"
     : "mx-auto flex max-w-2xl flex-wrap gap-1 px-4 py-2";
 
+  const links = NAV_LINKS.filter((link) => link.href !== "payouts" || showPayouts);
+
   return (
     <nav className="oo-dash-nav" aria-label="Pod area">
       <div className={widthClass}>
-        {NAV_LINKS.map(({ href, label }) => {
+        {links.map(({ href, label }) => {
           const path = `${base}/${href}`;
           const isActive = navLinkIsActive(pathname ?? "", base, href);
           return (

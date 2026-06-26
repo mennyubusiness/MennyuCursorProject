@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canAccessPodDashboardLayout } from "@/lib/permissions";
+import { loadPodPayoutRecipientContext } from "@/services/pod-payout-connect.service";
+import { arePodOwnerPayoutsConfigured } from "@/lib/pod-owner-payout-visibility";
 import { PodLayoutChrome } from "./PodLayoutChrome";
 
 export default async function PodAreaLayout({
@@ -32,8 +34,13 @@ export default async function PodAreaLayout({
   });
   if (!pod) notFound();
 
+  const payoutContext = await loadPodPayoutRecipientContext(podId);
+  const showPayouts = arePodOwnerPayoutsConfigured({
+    podPayoutsEnabled: payoutContext?.podPayoutsEnabled ?? false,
+  });
+
   return (
-    <PodLayoutChrome podId={pod.id} podName={pod.name}>
+    <PodLayoutChrome podId={pod.id} podName={pod.name} showPayouts={showPayouts}>
       {children}
     </PodLayoutChrome>
   );

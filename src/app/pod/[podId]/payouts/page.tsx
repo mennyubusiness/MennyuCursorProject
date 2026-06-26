@@ -5,8 +5,10 @@ import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { env } from "@/lib/env";
 import { derivePodPayoutConnectStatus } from "@/lib/pod-payout-connect-status";
 import { loadPodDashboardContext } from "@/lib/pod-dashboard-data.server";
+import { arePodOwnerPayoutsConfigured } from "@/lib/pod-owner-payout-visibility";
 import {
   isUserDesignatedPodPayoutRecipient,
+  loadPodPayoutRecipientContext,
   syncPodPayoutConnectedAccountStatus,
 } from "@/services/pod-payout-connect.service";
 import { prisma } from "@/lib/db";
@@ -26,12 +28,23 @@ export default async function PodPayoutsPage({
 
   const connect = sp.pod_payout_connect;
   if (connect === "return" || connect === "refresh") {
-    if (userId && (await isUserDesignatedPodPayoutRecipient(userId, podId))) {
+    const payoutContext = await loadPodPayoutRecipientContext(podId);
+    const payoutsConfigured = arePodOwnerPayoutsConfigured({
+      podPayoutsEnabled: payoutContext?.podPayoutsEnabled ?? false,
+    });
+    if (
+      payoutsConfigured &&
+      userId &&
+      (await isUserDesignatedPodPayoutRecipient(userId, podId))
+    ) {
       try {
         await syncPodPayoutConnectedAccountStatus(userId);
       } catch (e) {
         console.error("[pod payouts] pod payout Connect sync failed", e);
       }
+    }
+    if (!payoutsConfigured) {
+      redirect(`/pod/${podId}/dashboard`);
     }
     if (connect === "refresh") {
       redirect(`/pod/${podId}/payouts?payout_notice=link_expired`);
@@ -41,6 +54,14 @@ export default async function PodPayoutsPage({
 
   const ctx = await loadPodDashboardContext(podId);
   if (!ctx) notFound();
+
+  if (
+    !arePodOwnerPayoutsConfigured({
+      podPayoutsEnabled: ctx.payoutContext?.podPayoutsEnabled ?? false,
+    })
+  ) {
+    redirect(`/pod/${podId}/dashboard`);
+  }
 
   const recipientUser =
     userId && ctx.payoutSummary

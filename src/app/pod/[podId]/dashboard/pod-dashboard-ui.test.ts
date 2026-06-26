@@ -15,9 +15,16 @@ function readDashboard(relativePath: string): string {
 }
 
 describe("pod owner nav and layout", () => {
-  it("uses vendor-mirror nav items on PodAreaNav", () => {
+  it("defines pod nav items and hides payouts unless configured", () => {
     const nav = readPod("PodAreaNav.tsx");
-    expect(nav).toMatch(/Dashboard.*Vendors.*Analytics.*Promote.*Payouts.*Setup.*Settings/s);
+    const layout = readPod("layout.tsx");
+    const chrome = readPod("PodLayoutChrome.tsx");
+    expect(nav).toMatch(/Dashboard.*Vendors.*Analytics.*Promote.*Payouts.*Readiness.*Settings/s);
+    expect(nav).toContain("showPayouts");
+    expect(nav).toContain('link.href !== "payouts" || showPayouts');
+    expect(layout).toContain("arePodOwnerPayoutsConfigured");
+    expect(layout).toContain("showPayouts={showPayouts}");
+    expect(chrome).toContain("showPayouts");
     expect(nav).not.toContain("Overview");
     expect(nav).not.toContain("Orders");
   });
@@ -74,8 +81,9 @@ describe("pod dedicated pages", () => {
     expect(readPod("promote/page.tsx")).toContain("PodPromotionCard");
     expect(readPod("promote/page.tsx")).not.toContain("featuredVendors");
     expect(readPod("payouts/page.tsx")).toContain("PodPayoutsView");
-    expect(readPod("setup/page.tsx")).toContain("VendorSetupChecklist");
-    expect(readPod("setup/page.tsx")).not.toContain("Recommended");
+    expect(readPod("setup/page.tsx")).toContain("PodReadinessVendorSection");
+    expect(readPod("setup/page.tsx")).not.toContain("POD_ALL_READY_COPY");
+    expect(readPod("setup/page.tsx")).not.toContain("VendorSetupChecklist");
   });
 });
 
@@ -147,12 +155,34 @@ describe("pod analytics aggregate-only", () => {
 });
 
 describe("pod setup checklist", () => {
-  it("requires orderable vendor but not pickup instructions", () => {
+  it("requires orderable vendor but not pickup instructions or QR signage", () => {
     const readiness = readFileSync(join(root, "lib/vendor-pod-readiness.ts"), "utf8");
     expect(readiness).toContain("vendor_ready");
+    expect(readiness).toMatch(
+      /POD_SETUP_REQUIRED_CHECKLIST_KEYS = \[\s*"pod_profile",\s*"location",\s*"pod_active",\s*"vendor_ready",\s*\]/
+    );
+    expect(readiness).toMatch(/POD_SETUP_OPTIONAL_CHECKLIST_KEYS = \["qr_signage"/);
     expect(readiness).not.toContain('"pickup_instructions"');
     const attention = readFileSync(join(root, "lib/pod-dashboard-attention.ts"), "utf8");
     expect(attention).not.toMatch(/pickup instructions/i);
+    expect(attention).toContain("View readiness");
+  });
+});
+
+describe("pod readiness page", () => {
+  it("structures readiness overview with summary, pod checks, and vendor rows", () => {
+    const page = readPod("setup/page.tsx");
+    const summary = readPod("setup/PodReadinessSummarySection.tsx");
+    const vendors = readPod("setup/PodReadinessVendorSection.tsx");
+    const readinessLib = readFileSync(join(root, "lib/pod-readiness-page.ts"), "utf8");
+    expect(page).toContain('title="Readiness"');
+    expect(page).toContain("PodReadinessSummarySection");
+    expect(page).toContain("PodReadinessPromotionSection");
+    expect(summary).toContain("Readiness summary");
+    expect(vendors).toContain("deriveVendorMissingLines");
+    expect(vendors).toContain("Invite vendors");
+    expect(vendors).not.toMatch(/Set hours|Connect Stripe|Edit menu/i);
+    expect(readinessLib).toContain("Vendor needs to set customer ordering hours.");
   });
 });
 
@@ -168,6 +198,16 @@ describe("pod roster and adoption preserved", () => {
 });
 
 describe("pod payout visibility", () => {
+  it("redirects unconfigured payouts route and gates analytics revenue share", () => {
+    const payoutsPage = readPod("payouts/page.tsx");
+    const analyticsPage = readPod("analytics/page.tsx");
+    const analyticsView = readPod("analytics/PodAnalyticsView.tsx");
+    expect(payoutsPage).toContain("arePodOwnerPayoutsConfigured");
+    expect(payoutsPage).toContain("redirect(`/pod/${podId}/dashboard`)");
+    expect(analyticsPage).toContain("showPodRevenueShare");
+    expect(analyticsView).toContain("showPodRevenueShare");
+  });
+
   it("uses focused payouts page sections", () => {
     const page = readPod("payouts/page.tsx");
     const view = readPod("payouts/PodPayoutsView.tsx");

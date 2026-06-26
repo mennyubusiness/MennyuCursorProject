@@ -259,7 +259,10 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
     pendingInviteCount: pendingEmailInvites.length,
     pendingRequestCount: pendingForUi.length,
     adoptionAttentionRows,
-    incompleteSetupItems: podSetupChecklist.filter((item) => !item.complete && item.owner === "pod_owner"),
+    incompleteSetupItems: podSetupChecklist.filter(
+      (item) =>
+        !item.complete && item.owner === "pod_owner" && item.key !== "payout_setup"
+    ),
   });
 
   return {

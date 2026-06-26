@@ -18,10 +18,12 @@ export function PodAnalyticsView({
   podId,
   range,
   analytics,
+  showPodRevenueShare = false,
 }: {
   podId: string;
   range: PodAnalyticsRange;
   analytics: NonNullable<Awaited<ReturnType<typeof getPodAnalyticsExtended>>>;
+  showPodRevenueShare?: boolean;
 }) {
   return (
     <div className="space-y-8">
@@ -46,11 +48,13 @@ export function PodAnalyticsView({
         <DashboardMetricGrid>
           <DashboardMetricCard label="Total orders" value={analytics.ordersInRange} />
           <DashboardMetricCard label="Total sales" value={formatMoney(analytics.salesInRangeCents)} />
-          <DashboardMetricCard
-            label="Pod revenue share"
-            value={formatMoney(analytics.podRevenueShareInRangeCents)}
-            helper="From eligible pod sales"
-          />
+          {showPodRevenueShare ? (
+            <DashboardMetricCard
+              label="Pod revenue share"
+              value={formatMoney(analytics.podRevenueShareInRangeCents)}
+              helper="From eligible pod sales"
+            />
+          ) : null}
           <DashboardMetricCard
             label="Average order value"
             value={

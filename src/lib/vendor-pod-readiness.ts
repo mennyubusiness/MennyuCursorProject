@@ -493,14 +493,16 @@ export type PodSetupChecklistInput = {
   payoutSetupReady?: boolean;
 };
 
-/** Pod self-serve setup checklist keys required before setup is considered complete. */
+/** Pod self-serve checklist keys required before the pod is ready for customers. */
 export const POD_SETUP_REQUIRED_CHECKLIST_KEYS = [
   "pod_profile",
   "location",
   "pod_active",
   "vendor_ready",
-  "qr_signage",
 ] as const;
+
+/** Optional pod owner tools — not required for customer ordering. */
+export const POD_SETUP_OPTIONAL_CHECKLIST_KEYS = ["qr_signage", "payout_setup"] as const;
 
 export function derivePodSetupChecklist(input: PodSetupChecklistInput): ReadinessChecklistItem[] {
   const { podId, pod, vendorStatuses } = input;
@@ -558,9 +560,9 @@ export function derivePodSetupChecklist(input: PodSetupChecklistInput): Readines
       label: "QR and signage available",
       complete: qrComplete,
       owner: "pod_owner",
-      description: "Download QR code and signage for your public pod page.",
+      description: "Share your public pod page with a QR code or link.",
       actionHref: `/pod/${podId}/promote`,
-      actionLabel: "View QR & signage",
+      actionLabel: "Open Promote",
     },
   ];
 
