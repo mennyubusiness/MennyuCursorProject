@@ -65,7 +65,13 @@ describe("vendor section pages", () => {
   it("defines dedicated payouts and setup pages", () => {
     expect(readVendor("payouts/page.tsx")).toContain("VendorStripePayoutCard");
     expect(readVendor("payouts/page.tsx")).toContain("VendorPayoutTransferHistory");
-    expect(readVendor("setup/page.tsx")).toContain("VendorSetupChecklist");
+    const setup = readVendor("setup/page.tsx");
+    expect(setup).toContain("VendorSetupChecklist");
+    expect(setup).toContain("VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS");
+    expect(setup).not.toMatch(/REQUIRED_KEYS = new Set\(\["profile", "stripe", "pos", "menu", "pod_invite"\]\)/);
+    expect(setup).not.toContain("Recommended");
+    expect(setup).not.toContain("Try Kitchen mode for busy shifts");
+    expect(setup).not.toContain("Pickup instructions on pod page");
   });
 
   it("keeps orders page focused on the workbench", () => {

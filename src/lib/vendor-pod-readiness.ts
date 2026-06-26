@@ -108,6 +108,7 @@ export type VendorPodReadinessResult = {
     stripe: boolean;
     pos: boolean;
     menu: boolean;
+    hours: boolean;
   };
   canAcceptOrders: boolean;
 };
@@ -153,6 +154,16 @@ export function isVendorMenuReady(menu: VendorMenuReadinessSummary): boolean {
 export function isVendorCustomerOrderingHoursReady(customerOrderingHours: unknown): boolean {
   return hasValidVendorCustomerOrderingHours(customerOrderingHours);
 }
+
+/** Vendor self-serve setup checklist keys required before setup is considered complete. */
+export const VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS = [
+  "profile",
+  "stripe",
+  "pos",
+  "menu",
+  "hours",
+  "pod_invite",
+] as const;
 
 export function vendorPodReadinessStatusLabel(status: VendorPodReadinessStatus): string {
   switch (status) {
@@ -266,12 +277,15 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
   if (audience === "vendor") {
     const inviteComplete =
       (input.pendingPodInviteCount ?? 0) === 0 && Boolean(input.hasPodMembership);
+    const hoursComplete = isVendorCustomerOrderingHoursReady(input.customerOrderingHours);
     items.push({
       key: "hours",
-      label: "Set customer ordering hours",
-      complete: isVendorCustomerOrderingHoursReady(input.customerOrderingHours),
+      label: "Customer ordering hours",
+      complete: hoursComplete,
       owner: "vendor",
-      description: "Tell customers when they can place orders through Open Order.",
+      description: hoursComplete
+        ? "Customer ordering hours set."
+        : "Set customer ordering hours before accepting orders.",
       actionHref: `/vendor/${vendorId}/hours`,
       actionLabel: "Set hours",
     });

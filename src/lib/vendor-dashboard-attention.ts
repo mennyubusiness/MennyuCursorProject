@@ -1,4 +1,7 @@
-import type { ReadinessBlockingReason } from "@/lib/vendor-pod-readiness";
+import {
+  VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS,
+  type ReadinessBlockingReason,
+} from "@/lib/vendor-pod-readiness";
 import type { VendorHoursStatusSummary } from "@/lib/vendor-customer-ordering-hours";
 import { VENDOR_NO_POD_COPY } from "@/lib/vendor-operational-copy";
 import type { VendorPosUiState } from "@/lib/vendor-pos-ui-state";
@@ -116,6 +119,5 @@ export function deriveVendorAttentionItems(input: {
 }
 
 export function isVendorSetupComplete(checklistCompleteKeys: string[]): boolean {
-  const required = ["profile", "stripe", "pos", "menu", "hours", "pod_invite"];
-  return required.every((key) => checklistCompleteKeys.includes(key));
+  return VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS.every((key) => checklistCompleteKeys.includes(key));
 }

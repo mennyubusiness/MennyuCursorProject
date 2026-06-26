@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   derivePodSetupChecklist,
   deriveVendorPodReadiness,
+  isVendorCustomerOrderingHoursReady,
   isVendorMenuReady,
   isVendorPosReady,
   isVendorProfileComplete,
   isVendorStripePayoutReady,
+  VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS,
 } from "./vendor-pod-readiness";
+import { defaultVendorCustomerOrderingWeek } from "./vendor-customer-ordering-hours";
 
 const baseVendor = {
   isActive: true,
@@ -41,6 +44,8 @@ const basePos = {
   hasUnmatchedChannelRegistration: false,
 };
 
+const baseCustomerOrderingHours = defaultVendorCustomerOrderingWeek();
+
 function readiness(overrides?: Partial<Parameters<typeof deriveVendorPodReadiness>[0]>) {
   return deriveVendorPodReadiness({
     podId: "pod_1",
@@ -51,6 +56,7 @@ function readiness(overrides?: Partial<Parameters<typeof deriveVendorPodReadines
     menuSummary: baseMenu,
     posSummary: basePos,
     stripeSummary: baseStripe,
+    customerOrderingHours: baseCustomerOrderingHours,
     ...overrides,
   });
 }
@@ -78,6 +84,14 @@ describe("vendor setup sub-helpers", () => {
   it("detects menu availability", () => {
     expect(isVendorMenuReady(baseMenu)).toBe(true);
     expect(isVendorMenuReady({ ...baseMenu, hasAvailableOperationalItems: false })).toBe(false);
+  });
+
+  it("detects customer ordering hours readiness from manual hours only", () => {
+    expect(isVendorCustomerOrderingHoursReady(baseCustomerOrderingHours)).toBe(true);
+    expect(isVendorCustomerOrderingHoursReady(null)).toBe(false);
+    expect(isVendorCustomerOrderingHoursReady(undefined)).toBe(false);
+    const allClosed = defaultVendorCustomerOrderingWeek().map((row) => ({ ...row, isOpen: false }));
+    expect(isVendorCustomerOrderingHoursReady(allClosed)).toBe(false);
   });
 });
 
@@ -133,6 +147,31 @@ describe("deriveVendorPodReadiness status priority", () => {
     expect(result.status).toBe("needs_menu");
   });
 
+  it("flags missing customer ordering hours", () => {
+    const result = deriveVendorPodReadiness(
+      {
+        podId: "pod_1",
+        vendorId: "vendor_1",
+        pod: { isActive: true },
+        podVendor: { isActive: true },
+        vendor: baseVendor,
+        menuSummary: baseMenu,
+        posSummary: basePos,
+        stripeSummary: baseStripe,
+        customerOrderingHours: null,
+      },
+      { audience: "vendor" }
+    );
+    expect(result.status).toBe("needs_hours");
+    expect(result.setupSummary.hours).toBe(false);
+    const hoursItem = result.checklist.find((item) => item.key === "hours");
+    expect(hoursItem?.complete).toBe(false);
+    expect(hoursItem?.label).toBe("Customer ordering hours");
+    expect(hoursItem?.description).toBe("Set customer ordering hours before accepting orders.");
+    expect(hoursItem?.actionHref).toBe("/vendor/vendor_1/hours");
+    expect(hoursItem?.actionLabel).toBe("Set hours");
+  });
+
   it("returns active when setup complete and orderable", () => {
     const result = readiness();
     expect(result.status).toBe("active");
@@ -141,6 +180,10 @@ describe("deriveVendorPodReadiness status priority", () => {
 });
 
 describe("deriveVendorPodReadiness vendor checklist", () => {
+  it("includes hours in vendor setup required keys", () => {
+    expect(VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS).toContain("hours");
+  });
+
   it("includes vendor-owned action links", () => {
     const result = deriveVendorPodReadiness(
       {
@@ -154,13 +197,18 @@ describe("deriveVendorPodReadiness vendor checklist", () => {
         stripeSummary: { ...baseStripe, stripePayoutsEnabled: false },
         pendingPodInviteCount: 1,
         hasPodMembership: false,
+        customerOrderingHours: baseCustomerOrderingHours,
       },
       { audience: "vendor" }
     );
 
+    const hours = result.checklist.find((item) => item.key === "hours");
+    expect(hours?.complete).toBe(true);
+    expect(hours?.description).toBe("Customer ordering hours set.");
+
     const stripe = result.checklist.find((item) => item.key === "stripe");
     expect(stripe?.complete).toBe(false);
-    expect(stripe?.actionHref).toContain("section=payouts");
+    expect(stripe?.actionHref).toBe("/vendor/vendor_1/payouts");
 
     const invite = result.checklist.find((item) => item.key === "pod_invite");
     expect(invite?.complete).toBe(false);

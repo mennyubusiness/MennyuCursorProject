@@ -5,50 +5,9 @@ import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { VendorSetupChecklist } from "@/components/vendor/VendorSetupChecklist";
 import { loadVendorDashboardContext } from "@/lib/vendor-dashboard-data.server";
 import { VENDOR_ALL_READY_COPY } from "@/lib/vendor-operational-copy";
-import type { ReadinessChecklistItem } from "@/lib/vendor-pod-readiness";
+import { VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS } from "@/lib/vendor-pod-readiness";
 
-const REQUIRED_KEYS = new Set(["profile", "stripe", "pos", "menu", "pod_invite"]);
-
-function buildRecommendedItems(input: {
-  vendorId: string;
-  hasLogo: boolean;
-  currentPod: { id: string; name: string } | null;
-}): ReadinessChecklistItem[] {
-  const items: ReadinessChecklistItem[] = [
-    {
-      key: "logo",
-      label: "Logo uploaded",
-      complete: input.hasLogo,
-      owner: "vendor",
-      description: "Customers see your logo on the pod menu.",
-      actionHref: `/vendor/${input.vendorId}/settings?section=profile`,
-      actionLabel: "Edit business profile",
-    },
-    {
-      key: "kitchen",
-      label: "Try Kitchen mode for busy shifts",
-      complete: true,
-      owner: "vendor",
-      description: "A simplified full-screen order board for the line.",
-      actionHref: `/vendor/${input.vendorId}/kitchen`,
-      actionLabel: "Open Kitchen mode",
-    },
-  ];
-
-  if (input.currentPod) {
-    items.splice(1, 0, {
-      key: "pickup",
-      label: "Pickup instructions on pod page",
-      complete: false,
-      owner: "pod_owner",
-      description: `Ask your pod (${input.currentPod.name}) to add pickup directions customers see at checkout.`,
-      actionHref: `/pod/${input.currentPod.id}/settings`,
-      actionLabel: "View pod settings",
-    });
-  }
-
-  return items;
-}
+const REQUIRED_KEYS = new Set<string>(VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS);
 
 export default async function VendorSetupPage({
   params,
@@ -60,11 +19,6 @@ export default async function VendorSetupPage({
   if (!ctx) notFound();
 
   const required = ctx.readiness.checklist.filter((item) => REQUIRED_KEYS.has(item.key));
-  const recommended = buildRecommendedItems({
-    vendorId,
-    hasLogo: Boolean(ctx.vendorRecord.imageUrl?.trim()),
-    currentPod: ctx.currentPod,
-  }).filter((item) => !item.complete || item.key === "kitchen");
 
   return (
     <DashboardShell tier="command" className="px-0 pb-0 pt-0">
@@ -97,11 +51,6 @@ export default async function VendorSetupPage({
         ) : null}
 
         <VendorSetupChecklist items={required} title="Required to accept orders" />
-        <VendorSetupChecklist
-          items={recommended}
-          title="Recommended"
-          emptyCompleteCopy="Everything is ready for orders."
-        />
       </div>
     </DashboardShell>
   );
