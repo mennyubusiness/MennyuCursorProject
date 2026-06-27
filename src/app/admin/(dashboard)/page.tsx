@@ -30,6 +30,10 @@ const QUICK_LINK_GROUPS = [
   {
     title: "Operations",
     links: [
+      { label: "System health", href: "/admin/health", hint: "Operational health dashboard" },
+      { label: "Incidents", href: "/admin/incidents", hint: "Triage queue" },
+      { label: "Notifications", href: "/admin/notifications", hint: "SMS log visibility" },
+      { label: "Webhooks", href: "/admin/webhooks", hint: "Stripe & Deliverect health" },
       {
         label: "Vendor transfers",
         href: "/admin/payout-transfers",

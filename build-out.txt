@@ -1,0 +1,27 @@
+﻿   Γû▓ Next.js 15.5.15
+   - Environments: .env
+
+   Creating an optimized production build ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -18,6 +18,10 @@ const MARKETPLACE: NavItem[] = [
 ];
 
 const OPERATIONS: NavItem[] = [
+  { href: "/admin/health", label: "System health" },
+  { href: "/admin/incidents", label: "Incidents" },
+  { href: "/admin/notifications", label: "Notifications" },
+  { href: "/admin/webhooks", label: "Webhooks" },
   { href: "/admin/payout-transfers", label: "Vendor Transfers" },
   { href: "/admin/deliverect-webhook-incidents", label: "POS sync" },
   { href: "/admin/deliverect-connections", label: "Deliverect connections" },
