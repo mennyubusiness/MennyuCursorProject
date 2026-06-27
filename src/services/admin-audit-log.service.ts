@@ -43,3 +43,37 @@ export async function listAdminAuditLogsForUser(userId: string, limit = 25) {
     },
   });
 }
+
+export async function listAdminAuditLogsForVendor(vendorId: string, limit = 30) {
+  return prisma.adminAuditLog.findMany({
+    where: {
+      OR: [
+        { targetType: "vendor", targetId: vendorId },
+        { targetType: "vendorPodMembership", targetId: { endsWith: `:${vendorId}` } },
+        { targetType: "slug", targetId: vendorId },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: {
+      adminUser: { select: { id: true, email: true, name: true } },
+    },
+  });
+}
+
+export async function listAdminAuditLogsForPod(podId: string, limit = 30) {
+  return prisma.adminAuditLog.findMany({
+    where: {
+      OR: [
+        { targetType: "pod", targetId: podId },
+        { targetType: "vendorPodMembership", targetId: { startsWith: `${podId}:` } },
+        { targetType: "slug", targetId: podId },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: {
+      adminUser: { select: { id: true, email: true, name: true } },
+    },
+  });
+}

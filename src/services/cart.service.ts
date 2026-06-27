@@ -454,11 +454,12 @@ export async function addCartItem(
     }),
     prisma.pod.findUnique({
       where: { id: cart.podId },
-      select: { isActive: true },
+      select: { isActive: true, mennyuOrdersPaused: true },
     }),
   ]);
   const podOrderability = getVendorOrderabilityInPod({
     podActive: pod?.isActive ?? false,
+    podOrdersPaused: pod?.mennyuOrdersPaused ?? false,
     podVendorExists: Boolean(vendorInPod),
     podVendorActive: vendorInPod?.isActive ?? false,
     vendor: vendorForOrderability,

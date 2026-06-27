@@ -3,6 +3,7 @@ import { getVendorAvailability } from "@/lib/vendor-availability";
 
 export type VendorOrderabilityBlockReason =
   | "pod_inactive"
+  | "pod_orders_paused"
   | "pod_vendor_missing"
   | "pod_vendor_paused"
   | "vendor_inactive"
@@ -18,6 +19,7 @@ export type VendorOrderabilityInPodResult = {
 
 export type VendorOrderabilityInPodInput = {
   podActive: boolean;
+  podOrdersPaused?: boolean;
   podVendorExists: boolean;
   podVendorActive: boolean;
   vendor: VendorAvailabilityInput;
@@ -36,6 +38,14 @@ export function getVendorOrderabilityInPod(
       reason: "pod_inactive",
       code: "POD_INACTIVE",
       message: "This pod is not currently accepting orders.",
+    };
+  }
+  if (input.podOrdersPaused) {
+    return {
+      orderable: false,
+      reason: "pod_orders_paused",
+      code: "POD_ORDERS_PAUSED",
+      message: "This pod is paused and not accepting orders right now.",
     };
   }
   if (!input.podVendorExists) {
@@ -93,6 +103,9 @@ export function cartLineOrderabilityMessage(result: VendorOrderabilityInPodResul
   if (result.orderable) return "";
   if (result.reason === "pod_inactive") {
     return "This pod is not currently accepting orders.";
+  }
+  if (result.reason === "pod_orders_paused") {
+    return "This pod is paused and not accepting orders right now.";
   }
   if (result.reason === "pod_vendor_missing" || result.reason === "pod_vendor_paused") {
     return "This vendor is no longer accepting orders at this pod.";

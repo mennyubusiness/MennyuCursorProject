@@ -7,6 +7,7 @@ import { getOrCreateCartForVendorMenuAction } from "@/actions/cart.actions";
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { prisma } from "@/lib/db";
 import { looksLikePodOrVendorId, resolvePodBySlugOrId, resolveVendorInPodBySlugOrId } from "@/lib/pod-route-resolve";
+import { findSlugRedirectByOldSlug } from "@/lib/slug-admin.server";
 import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
 import { vendorAvailabilityWithCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
 import { loadCustomerVendorMenuSections } from "@/services/vendor-customer-menu.service";
@@ -14,10 +15,19 @@ import { loadCustomerVendorMenuSections } from "@/services/vendor-customer-menu.
 const DEBUG_VENDOR_MENU_PAGE = process.env.NODE_ENV === "development";
 
 export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: string) {
+  const podSlugRedirect = await findSlugRedirectByOldSlug(podRef);
+  if (podSlugRedirect?.entityType === "pod") {
+    redirect(buildVendorMenuCustomerPath(podSlugRedirect.newSlug, vendorRef));
+  }
+
+  const vendorSlugRedirect = await findSlugRedirectByOldSlug(vendorRef);
+  const resolvedVendorRef =
+    vendorSlugRedirect?.entityType === "vendor" ? vendorSlugRedirect.newSlug : vendorRef;
+
   const pod = await resolvePodBySlugOrId(podRef);
   if (!pod?.isActive) notFound();
 
-  const resolved = await resolveVendorInPodBySlugOrId(pod.id, vendorRef);
+  const resolved = await resolveVendorInPodBySlugOrId(pod.id, resolvedVendorRef);
   if (!resolved) notFound();
 
   const { vendor, podVendor: pv } = resolved;
@@ -25,7 +35,8 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
 
   if (
     (looksLikePodOrVendorId(podRef) && podRef !== pod.slug) ||
-    (looksLikePodOrVendorId(vendorRef) && vendorRef !== vendor.slug)
+    (looksLikePodOrVendorId(vendorRef) && vendorRef !== vendor.slug) ||
+    (vendorSlugRedirect && vendorRef !== vendor.slug)
   ) {
     redirect(buildVendorMenuCustomerPath(pod.slug, vendor.slug));
   }
@@ -44,6 +55,7 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
       name: true,
       slug: true,
       isActive: true,
+      mennyuOrdersPaused: true,
       accentColor: true,
       pickupTimezone: true,
     },
@@ -74,6 +86,7 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
 
   const orderability = getVendorOrderabilityInPod({
     podActive: podRow.isActive,
+    podOrdersPaused: podRow.mennyuOrdersPaused,
     podVendorExists: Boolean(pv),
     podVendorActive: pv?.isActive ?? false,
     vendor: vendorForOrderability,

@@ -63,6 +63,8 @@ model Pod {
   /// Pickup-only sales tax rate in basis points (e.g. 825 = 8.25%). Applied to food subtotal by Mennyu at checkout — not vendor-entered per order. Null/omit = no automatic tax.
   pickupSalesTaxBps  Int?
   isActive           Boolean                @default(true)
+  /// When true, pod remains public but customer ordering is paused for all vendors.
+  mennyuOrdersPaused Boolean                @default(false)
   onboardingStatus   AccountOnboardingStatus @default(ready_for_next_step)
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
@@ -298,6 +300,7 @@ model User {
   podVendorInvitesCreated              PodVendorInvite[] @relation("PodVendorInviteCreatedBy")
   podVendorInvitesAccepted             PodVendorInvite[] @relation("PodVendorInviteAcceptedBy")
   adminAuditLogs                       AdminAuditLog[]   @relation("AdminAuditLogActor")
+  slugRedirectsCreated                 SlugRedirect[]    @relation("SlugRedirectCreatedBy")
   /// When set, credentials login and active JWT sessions are blocked.
   disabledAt                           DateTime?
 }
@@ -336,6 +339,23 @@ model AdminAuditLog {
   @@index([adminUserId, createdAt])
   @@index([createdAt])
   @@index([actionType])
+}
+
+/// Redirect from a retired public slug to the current slug (pod or vendor root slug).
+model SlugRedirect {
+  id                   String   @id @default(cuid())
+  oldSlug              String   @unique
+  newSlug              String
+  entityType           String
+  entityId             String
+  createdByAdminUserId String?
+  reason               String?
+  createdAt            DateTime @default(now())
+
+  createdByAdmin User? @relation("SlugRedirectCreatedBy", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([newSlug])
 }
 
 /// Phone-verified diner identity (checkout / order history). Separate from email-based User registration.

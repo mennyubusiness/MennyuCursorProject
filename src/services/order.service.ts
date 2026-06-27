@@ -132,13 +132,20 @@ export async function validateCartForOrder(cart: {
 }): Promise<CartValidationResult> {
   const pod = await prisma.pod.findUnique({
     where: { id: cart.podId },
-    select: { isActive: true, pickupTimezone: true },
+    select: { isActive: true, mennyuOrdersPaused: true, pickupTimezone: true },
   });
   if (!pod?.isActive) {
     return {
       valid: false,
       code: "POD_INACTIVE",
       message: "This pod is not currently accepting orders.",
+    };
+  }
+  if (pod.mennyuOrdersPaused) {
+    return {
+      valid: false,
+      code: "POD_ORDERS_PAUSED",
+      message: "This pod is paused and not accepting orders right now.",
     };
   }
 
@@ -191,7 +198,8 @@ export async function validateCartForOrder(cart: {
       select: { isActive: true },
     });
     const podOrderability = getVendorOrderabilityInPod({
-      podActive: true,
+      podActive: pod.isActive,
+      podOrdersPaused: pod.mennyuOrdersPaused,
       podVendorExists: Boolean(vendorInPod),
       podVendorActive: vendorInPod?.isActive ?? false,
       vendor: { ...item.vendor, posOpen },
@@ -372,12 +380,19 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
 
   const pod = await prisma.pod.findUnique({
     where: { id: cart.podId },
-    select: { isActive: true, pickupTimezone: true },
+    select: { isActive: true, mennyuOrdersPaused: true, pickupTimezone: true },
   });
   if (!pod?.isActive) {
     errors.push({
       code: "POD_INACTIVE",
       message: "This pod is not currently accepting orders.",
+    });
+    return { valid: false, errors };
+  }
+  if (pod.mennyuOrdersPaused) {
+    errors.push({
+      code: "POD_ORDERS_PAUSED",
+      message: "This pod is paused and not accepting orders right now.",
     });
     return { valid: false, errors };
   }
@@ -474,7 +489,8 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
     }
     if (podVendorActive.get(item.vendorId) !== true) {
       const podOrderability = getVendorOrderabilityInPod({
-        podActive: true,
+        podActive: pod.isActive,
+        podOrdersPaused: pod.mennyuOrdersPaused,
         podVendorExists: podVendorActive.has(item.vendorId),
         podVendorActive: podVendorActive.get(item.vendorId) === true,
         vendor: { ...item.vendor, posOpen },

@@ -102,7 +102,7 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
       where: { id: podId },
       include: {
         vendors: {
-          where: { isActive: true },
+          where: { isActive: true, vendor: { isActive: true } },
           include: {
             vendor: {
               select: {
@@ -129,7 +129,14 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
   const vendorRows = pod.vendors.map(toGridRow);
   const amenities = parsePodAmenities(pod.amenities);
   const customAmenities = parsePodCustomAmenities(pod.customAmenities);
-  const orderingStatus = getPodOrderingStatus(vendorRows.map((r) => r.availability));
+  const orderingStatus = pod.mennyuOrdersPaused
+    ? {
+        label: "Pod ordering paused",
+        tone: "closed" as const,
+        openVendorCount: 0,
+        totalVendorCount: vendorRows.length,
+      }
+    : getPodOrderingStatus(vendorRows.map((r) => r.availability));
 
   const hasLocationSection = Boolean(pod.address?.trim());
   const hasContactSection = Boolean(
