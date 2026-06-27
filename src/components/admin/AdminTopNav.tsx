@@ -8,38 +8,74 @@ import { cn } from "@/lib/cn";
 type NavItem = { href: string; label: string };
 
 const ORDERS: NavItem[] = [
-  { href: "/admin/orders", label: "All orders" },
-  { href: "/admin/exceptions", label: "Issues" },
+  { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/exceptions", label: "Issues & refunds" },
+  { href: "/admin/payout-transfers", label: "Vendor transfers" },
 ];
 
 const MARKETPLACE: NavItem[] = [
-  { href: "/admin/vendors", label: "Vendors" },
   { href: "/admin/pods", label: "Pods" },
+  { href: "/admin/vendors", label: "Vendors" },
 ];
 
 const OPERATIONS: NavItem[] = [
-  { href: "/admin/health", label: "System health" },
   { href: "/admin/incidents", label: "Incidents" },
   { href: "/admin/notifications", label: "Notifications" },
   { href: "/admin/webhooks", label: "Webhooks" },
-  { href: "/admin/payout-transfers", label: "Vendor Transfers" },
+  { href: "/admin/menu-imports", label: "Menu imports" },
   { href: "/admin/deliverect-webhook-incidents", label: "POS sync" },
   { href: "/admin/deliverect-connections", label: "Deliverect connections" },
 ];
 
-const SETTINGS: NavItem[] = [
-  { href: "/admin/users", label: "Users" },
-  { href: "/admin/pricing", label: "Pricing" },
-  { href: "/admin/analytics", label: "Analytics" },
+const SETTINGS: NavItem[] = [{ href: "/admin/pricing", label: "Pricing" }];
+
+/** Route prefixes that activate each dropdown (includes nested admin pages). */
+const ORDERS_PREFIXES = ["/admin/orders", "/admin/exceptions", "/admin/payout-transfers"];
+const MARKETPLACE_PREFIXES = ["/admin/pods", "/admin/vendors"];
+const OPERATIONS_PREFIXES = [
+  "/admin/incidents",
+  "/admin/notifications",
+  "/admin/webhooks",
+  "/admin/menu-imports",
+  "/admin/deliverect-webhook-incidents",
+  "/admin/deliverect-connections",
+  "/admin/deliverect-channel-registrations",
 ];
+const SETTINGS_PREFIXES = ["/admin/pricing"];
 
 function pathMatches(href: string, pathname: string) {
   if (href === "/admin") return pathname === "/admin";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function pathMatchesAny(prefixes: string[], pathname: string) {
+  return prefixes.some((p) => pathMatches(p, pathname));
+}
+
 function groupActive(items: NavItem[], pathname: string) {
   return items.some((i) => pathMatches(i.href, pathname));
+}
+
+function NavTopLink({
+  href,
+  label,
+  pathname,
+  active,
+}: {
+  href: string;
+  label: string;
+  pathname: string;
+  active?: boolean;
+}) {
+  const isActive = active ?? pathMatches(href, pathname);
+  return (
+    <Link
+      href={href}
+      className={cn("oo-dash-titlebar-link shrink-0", isActive && "is-active")}
+    >
+      {label}
+    </Link>
+  );
 }
 
 function NavDropdown({
@@ -49,6 +85,7 @@ function NavDropdown({
   pathname,
   openId,
   setOpenId,
+  activePrefixes,
 }: {
   id: string;
   label: string;
@@ -56,6 +93,7 @@ function NavDropdown({
   pathname: string;
   openId: string | null;
   setOpenId: (v: string | null) => void;
+  activePrefixes?: string[];
 }) {
   const open = openId === id;
   const ref = useRef<HTMLDivElement>(null);
@@ -71,10 +109,12 @@ function NavDropdown({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open, close]);
 
-  const active = groupActive(items, pathname);
+  const active =
+    (activePrefixes ? pathMatchesAny(activePrefixes, pathname) : false) ||
+    groupActive(items, pathname);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative shrink-0">
       <button
         type="button"
         className={cn("oo-dash-titlebar-link", active && "is-group-active")}
@@ -118,16 +158,16 @@ export function AdminTopNav() {
   const pathname = usePathname() ?? "";
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const dashboardActive = pathname === "/admin";
+  const healthActive = pathMatches("/admin/health", pathname);
+  const usersActive = pathMatches("/admin/users", pathname);
+  const analyticsActive = pathMatches("/admin/analytics", pathname);
 
   return (
-    <nav className="flex flex-wrap items-center gap-x-1 gap-y-2" aria-label="Admin">
-      <Link
-        href="/admin"
-        className={cn("oo-dash-titlebar-link", dashboardActive && "is-active")}
-      >
-        Dashboard
-      </Link>
+    <nav
+      className="-mx-1 flex max-w-full flex-wrap items-center gap-x-0.5 gap-y-2 overflow-x-auto px-1"
+      aria-label="Admin"
+    >
+      <NavTopLink href="/admin" label="Dashboard" pathname={pathname} />
 
       <NavDropdown
         id="orders"
@@ -136,6 +176,7 @@ export function AdminTopNav() {
         pathname={pathname}
         openId={openId}
         setOpenId={setOpenId}
+        activePrefixes={ORDERS_PREFIXES}
       />
       <NavDropdown
         id="marketplace"
@@ -144,6 +185,7 @@ export function AdminTopNav() {
         pathname={pathname}
         openId={openId}
         setOpenId={setOpenId}
+        activePrefixes={MARKETPLACE_PREFIXES}
       />
       <NavDropdown
         id="operations"
@@ -152,7 +194,28 @@ export function AdminTopNav() {
         pathname={pathname}
         openId={openId}
         setOpenId={setOpenId}
+        activePrefixes={OPERATIONS_PREFIXES}
       />
+
+      <NavTopLink
+        href="/admin/users"
+        label="Users"
+        pathname={pathname}
+        active={usersActive}
+      />
+      <NavTopLink
+        href="/admin/health"
+        label="Health"
+        pathname={pathname}
+        active={healthActive}
+      />
+      <NavTopLink
+        href="/admin/analytics"
+        label="Analytics"
+        pathname={pathname}
+        active={analyticsActive}
+      />
+
       <NavDropdown
         id="settings"
         label="Settings"
@@ -160,6 +223,7 @@ export function AdminTopNav() {
         pathname={pathname}
         openId={openId}
         setOpenId={setOpenId}
+        activePrefixes={SETTINGS_PREFIXES}
       />
     </nav>
   );
