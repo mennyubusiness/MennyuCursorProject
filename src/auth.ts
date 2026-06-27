@@ -56,9 +56,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             passwordHash: true,
             isPlatformAdmin: true,
             passwordChangedAt: true,
+            disabledAt: true,
           },
         });
         if (!user?.passwordHash) return null;
+        if (user.disabledAt) return null;
         const ok = await verifyPassword(passwordRaw, user.passwordHash);
         if (!ok) return null;
         return {

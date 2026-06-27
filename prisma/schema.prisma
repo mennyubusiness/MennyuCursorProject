@@ -297,6 +297,9 @@ model User {
   podPayoutStripeLastSyncedAt          DateTime?
   podVendorInvitesCreated              PodVendorInvite[] @relation("PodVendorInviteCreatedBy")
   podVendorInvitesAccepted             PodVendorInvite[] @relation("PodVendorInviteAcceptedBy")
+  adminAuditLogs                       AdminAuditLog[]   @relation("AdminAuditLogActor")
+  /// When set, credentials login and active JWT sessions are blocked.
+  disabledAt                           DateTime?
 }
 
 /// Single-use email password reset token (raw token never stored).
@@ -312,6 +315,27 @@ model PasswordResetToken {
 
   @@index([userId, createdAt])
   @@index([expiresAt])
+}
+
+/// Immutable record of admin support/recovery actions (Sprint 1 account access tooling).
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  adminUserId String?
+  actionType  String
+  targetType  String
+  targetId    String
+  oldValue    String?
+  newValue    String?
+  reason      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  adminUser User? @relation("AdminAuditLogActor", fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([targetType, targetId, createdAt])
+  @@index([adminUserId, createdAt])
+  @@index([createdAt])
+  @@index([actionType])
 }
 
 /// Phone-verified diner identity (checkout / order history). Separate from email-based User registration.

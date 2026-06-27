@@ -24,6 +24,7 @@ const OPERATIONS: NavItem[] = [
 ];
 
 const SETTINGS: NavItem[] = [
+  { href: "/admin/users", label: "Users" },
   { href: "/admin/pricing", label: "Pricing" },
   { href: "/admin/analytics", label: "Analytics" },
 ];
