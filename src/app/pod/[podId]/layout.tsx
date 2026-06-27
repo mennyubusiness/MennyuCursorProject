@@ -2,6 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
+import {
+  getPodDashboardEmailVerificationRedirect,
+  shouldSkipEmailVerificationGate,
+} from "@/lib/auth/email-verification-access.server";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canAccessPodDashboardLayout } from "@/lib/permissions";
 import { loadPodPayoutRecipientContext } from "@/services/pod-payout-connect.service";
@@ -33,6 +37,18 @@ export default async function PodAreaLayout({
     select: { id: true, name: true },
   });
   if (!pod) notFound();
+
+  if (!(await shouldSkipEmailVerificationGate())) {
+    const session = await auth();
+    if (session?.user?.id) {
+      const emailRedirect = await getPodDashboardEmailVerificationRedirect({
+        userId: session.user.id,
+        podId,
+        emailVerified: Boolean(session.user.isEmailVerified),
+      });
+      if (emailRedirect) redirect(emailRedirect);
+    }
+  }
 
   const payoutContext = await loadPodPayoutRecipientContext(podId);
   const showPayouts = arePodOwnerPayoutsConfigured({

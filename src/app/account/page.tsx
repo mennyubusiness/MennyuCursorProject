@@ -7,6 +7,9 @@ import { resolveAccountPrimaryNavMode } from "@/lib/account-primary-nav-mode";
 import { ACCOUNT_SIGN_IN_PATH } from "@/lib/auth/account-paths";
 import { getOrdersForSignedInUser } from "@/services/customer-account-orders.service";
 
+import { loadUserEmailVerificationState } from "@/lib/auth/email-verification-access.server";
+
+import { AccountEmailVerificationCard } from "./AccountEmailVerificationCard";
 import { AccountHubHeader } from "./AccountHubHeader";
 import { AccountPhoneSection } from "./AccountPhoneSection";
 import { AccountProfileCard } from "./AccountProfileCard";
@@ -28,11 +31,17 @@ export default async function AccountPage() {
 
   const showPhoneLinkHint = Boolean(ctx.checkoutPhone?.canLink);
   const primaryMode = resolveAccountPrimaryNavMode(ctx);
+  const emailState = await loadUserEmailVerificationState(session.user.id);
 
   return (
     <div className="space-y-6">
       <AccountHubHeader ctx={ctx} primaryMode={primaryMode} />
       <AccountProfileCard email={session.user.email} name={ctx.emailAccount?.name ?? null} />
+      <AccountEmailVerificationCard
+        email={session.user.email}
+        emailVerified={Boolean(emailState?.emailVerified)}
+        emailVerifiedAt={emailState?.emailVerified?.toISOString() ?? null}
+      />
       {primaryMode === "customer" && (
         <>
           <AccountPhoneSection checkoutPhone={ctx.checkoutPhone} />

@@ -1,6 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import {
+  getVendorDashboardEmailVerificationRedirect,
+  shouldSkipEmailVerificationGate,
+} from "@/lib/auth/email-verification-access.server";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canAccessVendorDashboard, isVendorDashboardDevOpen } from "@/lib/vendor-dashboard-auth";
 import { VendorLayoutChrome } from "./VendorLayoutChrome";
@@ -31,6 +35,18 @@ export default async function VendorAreaLayout({
         redirect(`/vendor/${vendorId}/settings?access=needs_session`);
       }
       redirect(buildLoginHrefWithReturn(`/vendor/${vendorId}`));
+    }
+  }
+
+  if (!(await shouldSkipEmailVerificationGate())) {
+    const session = await auth();
+    if (session?.user?.id) {
+      const emailRedirect = await getVendorDashboardEmailVerificationRedirect({
+        userId: session.user.id,
+        vendorId,
+        emailVerified: Boolean(session.user.isEmailVerified),
+      });
+      if (emailRedirect) redirect(emailRedirect);
     }
   }
 

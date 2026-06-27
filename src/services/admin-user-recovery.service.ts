@@ -155,7 +155,7 @@ export async function adminMarkEmailVerified(input: {
 
   await createAdminAuditLog({
     adminUserId: input.adminUserId,
-    actionType: ADMIN_AUDIT_ACTION.USER_EMAIL_MARKED_VERIFIED,
+    actionType: ADMIN_AUDIT_ACTION.EMAIL_VERIFIED_BY_ADMIN,
     targetType: ADMIN_AUDIT_TARGET.user,
     targetId: user.id,
     reason: reasonCheck.reason,
@@ -164,6 +164,54 @@ export async function adminMarkEmailVerified(input: {
   });
 
   revalidatePath(`/admin/users/${user.id}`);
+  return { ok: true };
+}
+
+export async function adminSendEmailVerification(input: {
+  userId: string;
+  adminUserId: string | null;
+  reason: string;
+  requestOrigin?: string;
+}): Promise<ActionResult> {
+  const reasonCheck = requireAdminReason(input.reason);
+  if (!reasonCheck.ok) return reasonCheck;
+
+  const user = await loadTargetUser(input.userId);
+  if (!user) return { ok: false, error: "User not found." };
+  if (user.disabledAt) return { ok: false, error: "Disabled users cannot receive verification emails." };
+
+  const { sendEmailVerificationEmail } = await import("@/services/email-verification.service");
+  const result = await sendEmailVerificationEmail({
+    userId: user.id,
+    requestOrigin: input.requestOrigin,
+    initiator: "admin",
+    adminUserId: input.adminUserId,
+    adminReason: reasonCheck.reason,
+  });
+
+  if (!result.ok) return result;
+
+  revalidatePath(`/admin/users/${user.id}`);
+  return { ok: true };
+}
+
+export async function adminRevokeEmailVerificationTokens(input: {
+  userId: string;
+  adminUserId: string | null;
+  reason: string;
+}): Promise<ActionResult> {
+  const reasonCheck = requireAdminReason(input.reason);
+  if (!reasonCheck.ok) return reasonCheck;
+
+  const { revokeEmailVerificationTokens } = await import("@/services/email-verification.service");
+  const result = await revokeEmailVerificationTokens({
+    userId: input.userId,
+    adminUserId: input.adminUserId,
+    reason: reasonCheck.reason,
+  });
+  if (!result.ok) return result;
+
+  revalidatePath(`/admin/users/${input.userId}`);
   return { ok: true };
 }
 

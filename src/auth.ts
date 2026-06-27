@@ -12,6 +12,11 @@ import {
   passwordChangedAtToJwtMs,
 } from "@/lib/auth/password-session-version";
 import { loadUserPasswordChangedAtMs } from "@/lib/auth/password-session-version.server";
+import { loadUserEmailVerifiedMs } from "@/lib/auth/email-verification-session.server";
+import {
+  emailVerifiedToJwtMs,
+  isJwtEmailVerified,
+} from "@/lib/auth/email-verification-session";
 
 function authSecret(): string {
   const s = process.env.AUTH_SECRET?.trim();
@@ -56,6 +61,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             passwordHash: true,
             isPlatformAdmin: true,
             passwordChangedAt: true,
+            emailVerified: true,
             disabledAt: true,
           },
         });
@@ -69,6 +75,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           isPlatformAdmin: user.isPlatformAdmin,
           passwordChangedAt: user.passwordChangedAt,
+          emailVerified: user.emailVerified,
         };
       },
     }),
@@ -86,6 +93,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.sub = user.id;
         token.isPlatformAdmin = Boolean(user.isPlatformAdmin);
         token.passwordChangedAtMs = passwordChangedAtToJwtMs(user.passwordChangedAt);
+        token.emailVerifiedMs = emailVerifiedToJwtMs(user.emailVerified);
         token.sessionInvalidated = false;
         return token;
       }
@@ -101,6 +109,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return { ...token, sessionInvalidated: true };
       }
 
+      const emailVerifiedMs = await loadUserEmailVerifiedMs(token.sub);
+      token.emailVerifiedMs = emailVerifiedMs;
+
       token.sessionInvalidated = false;
       return token;
     },
@@ -111,6 +122,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user && token.sub) {
         session.user.id = token.sub;
         session.user.isPlatformAdmin = Boolean(token.isPlatformAdmin);
+        session.user.isEmailVerified = isJwtEmailVerified(
+          typeof token.emailVerifiedMs === "number" ? token.emailVerifiedMs : null
+        );
       }
       return session;
     },

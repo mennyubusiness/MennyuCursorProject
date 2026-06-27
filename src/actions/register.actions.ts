@@ -55,13 +55,19 @@ export async function registerWithEmailPassword(input: {
   const passwordHash = await hashPassword(password);
   const name = input.name?.trim() || null;
 
-  await prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       email,
       passwordHash,
       name,
       needsAccountRoleSelection: true,
     },
+    select: { id: true },
+  });
+
+  const { sendEmailVerificationEmail } = await import("@/services/email-verification.service");
+  await sendEmailVerificationEmail({ userId: user.id, initiator: "signup" }).catch(() => {
+    /* signup succeeds even if email provider is unavailable */
   });
 
   return { ok: true };

@@ -264,6 +264,8 @@ model User {
   id            String   @id @default(cuid())
   email         String   @unique
   emailVerified DateTime?
+  /// Last time a verification email was successfully queued/sent.
+  emailVerificationLastSentAt DateTime?
   passwordHash  String?
   name          String?
   image         String?
@@ -285,6 +287,7 @@ model User {
   groupOrderParticipants   GroupOrderParticipant[]
   customerAccount          CustomerAccount?
   passwordResetTokens      PasswordResetToken[]
+  emailVerificationTokens  EmailVerificationToken[]
   /// Solo carts owned by this customer account (not group-order host carts).
   customerCarts            Cart[]                 @relation("CustomerAccountCart")
   podPayoutSettingsAsRecipient   PodPayoutSettings[]   @relation("PodPayoutRecipient")
@@ -317,6 +320,25 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+/// Single-use email verification token (raw token never stored).
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  email     String
+  expiresAt DateTime
+  usedAt    DateTime?
+  sentAt    DateTime?
+  metadata  Json?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([email])
   @@index([expiresAt])
 }
 

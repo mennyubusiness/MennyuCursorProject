@@ -26,6 +26,8 @@ import {
   adminInvalidateUserSessions,
   adminMarkEmailVerified,
   adminMarkPhoneVerified,
+  adminRevokeEmailVerificationTokens,
+  adminSendEmailVerification,
   adminSendPasswordReset,
 } from "@/services/admin-user-recovery.service";
 
@@ -85,6 +87,23 @@ export async function adminSendPasswordResetAction(userId: string, reason: strin
   return withAdmin(async ({ adminUserId }) => {
     const result = await adminSendPasswordReset({ userId, adminUserId, reason });
     return result.ok ? { ok: true, message: "Password reset email sent if the account supports password login." } : result;
+  });
+}
+
+export async function adminSendEmailVerificationAction(userId: string, reason: string): Promise<ActionResult> {
+  return withAdmin(async ({ adminUserId }) => {
+    const result = await adminSendEmailVerification({ userId, adminUserId, reason });
+    return result.ok ? { ok: true, message: "Verification email sent." } : result;
+  });
+}
+
+export async function adminRevokeEmailVerificationTokensAction(
+  userId: string,
+  reason: string
+): Promise<ActionResult> {
+  return withAdmin(async ({ adminUserId }) => {
+    const result = await adminRevokeEmailVerificationTokens({ userId, adminUserId, reason });
+    return result.ok ? { ok: true, message: "Outstanding verification tokens revoked." } : result;
   });
 }
 

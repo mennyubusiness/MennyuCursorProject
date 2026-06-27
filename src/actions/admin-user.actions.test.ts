@@ -18,6 +18,8 @@ vi.mock("@/services/admin-user-recovery.service", () => ({
   adminMarkPhoneVerified: vi.fn(),
   adminInvalidateUserSessions: vi.fn(),
   adminSendPasswordReset: vi.fn(),
+  adminSendEmailVerification: vi.fn(),
+  adminRevokeEmailVerificationTokens: vi.fn(),
 }));
 
 vi.mock("@/services/admin-role-repair.service", () => ({
@@ -42,7 +44,7 @@ vi.mock("@/services/admin-audit-log.service", () => ({
   createAdminAuditLog: (...args: unknown[]) => mockCreateAuditLog(...args),
 }));
 
-import { adminDisableUserAction } from "@/actions/admin-user.actions";
+import { adminDisableUserAction, adminSendEmailVerificationAction } from "@/actions/admin-user.actions";
 
 const usersPage = readFileSync(
   join(process.cwd(), "src/app/admin/(dashboard)/users/page.tsx"),
@@ -110,5 +112,25 @@ describe("admin users UI wiring", () => {
     expect(detailClient).toContain("attachmentWarning");
     expect(detailClient).toContain("Attach vendor to pod from invite");
     expect(detailClient).toContain("Audit log");
+    expect(detailClient).toContain("adminSendEmailVerificationAction");
+    expect(detailClient).toContain("adminRevokeEmailVerificationTokensAction");
+    expect(detailClient).toContain("emailVerificationLastSentAt");
+  });
+
+  it("admin dashboard layout gates unverified platform admin sessions", () => {
+    expect(usersLayout).toContain("getPlatformAdminEmailVerificationRedirect");
+  });
+});
+
+describe("admin email verification actions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("rejects non-admin send verification callers", async () => {
+    mockRequireAdmin.mockResolvedValue({ ok: false, error: "Unauthorized." });
+
+    const result = await adminSendEmailVerificationAction("user_1", "support");
+    expect(result).toEqual({ ok: false, error: "Unauthorized." });
   });
 });

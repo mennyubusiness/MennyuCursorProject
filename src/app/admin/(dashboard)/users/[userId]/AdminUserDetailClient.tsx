@@ -20,7 +20,9 @@ import {
   adminRemoveVendorAccessAction,
   adminRepairInviteAttachmentAction,
   adminResendInviteAction,
+  adminRevokeEmailVerificationTokensAction,
   adminRevokeInviteAction,
+  adminSendEmailVerificationAction,
   adminSendPasswordResetAction,
   adminTransferPodOwnershipAction,
   adminTransferVendorOwnershipAction,
@@ -205,6 +207,20 @@ export function AdminUserDetailClient({ detail, vendorOptions, podOptions }: Pro
           label="Email verified"
           value={detail.user.emailVerified ? "Yes" : "No"}
         />
+        {detail.user.emailVerifiedAt ? (
+          <InfoRow
+            label="Email verified at"
+            value={new Date(detail.user.emailVerifiedAt).toLocaleString()}
+          />
+        ) : null}
+        <InfoRow
+          label="Last verification email"
+          value={
+            detail.user.emailVerificationLastSentAt
+              ? new Date(detail.user.emailVerificationLastSentAt).toLocaleString()
+              : "Never sent"
+          }
+        />
         <InfoRow
           label="Phone verified"
           value={detail.user.phoneVerified ? "Yes" : "No"}
@@ -259,6 +275,26 @@ export function AdminUserDetailClient({ detail, vendorOptions, podOptions }: Pro
             onSubmit={(reason) => run(() => adminDisableUserAction(userId, reason))}
           />
         )}
+        <ReasonActionForm
+          label="Send verification email"
+          description="Sends the standard email verification link. Rate limited like the user-facing resend flow."
+          confirmLabel="Send verification email"
+          disabled={detail.user.emailVerified || isDisabled}
+          disabledReason={
+            isDisabled
+              ? "Disabled users cannot receive verification emails."
+              : "Email is already verified."
+          }
+          onSubmit={(reason) => run(() => adminSendEmailVerificationAction(userId, reason))}
+        />
+        <ReasonActionForm
+          label="Revoke verification tokens"
+          description="Invalidates outstanding unused verification links for this user."
+          confirmLabel="Revoke tokens"
+          disabled={detail.user.emailVerified}
+          disabledReason="No outstanding verification flow needed when email is verified."
+          onSubmit={(reason) => run(() => adminRevokeEmailVerificationTokensAction(userId, reason))}
+        />
         <ReasonActionForm
           label="Mark email verified"
           description="Admin override for email verification only. Does not bypass payment or compliance checks."

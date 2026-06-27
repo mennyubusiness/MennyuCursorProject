@@ -32,6 +32,7 @@ export type AdminUserDetailView = {
     updatedAt: string;
     emailVerified: boolean;
     emailVerifiedAt: string | null;
+    emailVerificationLastSentAt: string | null;
     phoneVerified: boolean;
     phoneVerifiedAt: string | null;
     disabledAt: string | null;
@@ -191,6 +192,7 @@ export async function loadAdminUserDetail(userId: string): Promise<AdminUserDeta
       updatedAt: user.updatedAt.toISOString(),
       emailVerified: Boolean(user.emailVerified),
       emailVerifiedAt: user.emailVerified?.toISOString() ?? null,
+      emailVerificationLastSentAt: user.emailVerificationLastSentAt?.toISOString() ?? null,
       phoneVerified: Boolean(user.customerAccount?.phoneVerifiedAt),
       phoneVerifiedAt: user.customerAccount?.phoneVerifiedAt?.toISOString() ?? null,
       disabledAt: user.disabledAt?.toISOString() ?? null,
