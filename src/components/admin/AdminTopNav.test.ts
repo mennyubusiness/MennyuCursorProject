@@ -24,21 +24,22 @@ describe("AdminTopNav structure", () => {
   });
 
   it("keeps Settings limited to configuration routes", () => {
-    expect(nav).toContain('href="/admin/pricing"');
-    expect(nav).not.toMatch(/SETTINGS.*\/admin\/users/s);
-    expect(nav).not.toMatch(/SETTINGS.*\/admin\/analytics/s);
+    const settingsBlock = nav.slice(nav.indexOf("const SETTINGS:"), nav.indexOf("/** Route prefixes"));
+    expect(settingsBlock).toMatch(/href: "\/admin\/pricing"/);
+    expect(settingsBlock).not.toMatch(/\/admin\/users/);
+    expect(settingsBlock).not.toMatch(/\/admin\/analytics/);
   });
 
   it("orders dropdown links only to existing routes", () => {
-    expect(nav).toContain('href="/admin/orders"');
-    expect(nav).toContain('href="/admin/exceptions"');
-    expect(nav).toContain('href="/admin/payout-transfers"');
+    expect(nav).toMatch(/href: "\/admin\/orders"/);
+    expect(nav).toMatch(/href: "\/admin\/exceptions"/);
+    expect(nav).toMatch(/href: "\/admin\/payout-transfers"/);
   });
 
   it("operations dropdown includes sprint 3 triage routes", () => {
-    expect(nav).toContain('href="/admin/incidents"');
-    expect(nav).toContain('href="/admin/notifications"');
-    expect(nav).toContain('href="/admin/webhooks"');
+    expect(nav).toMatch(/href: "\/admin\/incidents"/);
+    expect(nav).toMatch(/href: "\/admin\/notifications"/);
+    expect(nav).toMatch(/href: "\/admin\/webhooks"/);
   });
 
   it("does not link health routes under operations dropdown", () => {
@@ -49,12 +50,24 @@ describe("AdminTopNav structure", () => {
 
 describe("AdminTopNav active styling", () => {
   it("uses shared pill active state without orange underline", () => {
-    expect(styles).toContain(".oo-dash-titlebar-link.is-active,\n  .oo-dash-titlebar-link.is-group-active");
+    expect(styles).toMatch(/\.oo-dash-titlebar-link\.is-active,\s+\.oo-dash-titlebar-link\.is-group-active/);
     expect(styles).toContain("box-shadow: none");
-    expect(styles).not.toMatch(/is-active[\s\S]*box-shadow: inset 0 -2px 0 0 var\(--oo-brand\)/);
+    expect(styles).not.toMatch(/box-shadow: inset 0 -2px 0 0 var\(--oo-brand\)/);
   });
 
   it("dropdown menus stay above page content", () => {
-    expect(styles).toMatch(/oo-dash-titlebar-menu[\s\S]*z-50/);
+    expect(styles).toMatch(/oo-dash-titlebar-menu[\s\S]*z-\[60\]/);
+    expect(styles).toMatch(/oo-dash-titlebar[\s\S]*overflow-visible/);
+  });
+
+  it("does not clip dropdowns with horizontal scroll overflow on nav", () => {
+    expect(nav).not.toContain("overflow-x-auto");
+    expect(nav).toContain("overflow-visible");
+  });
+
+  it("opens dropdowns on click without hover-only handlers", () => {
+    expect(nav).toContain("onClick={toggle}");
+    expect(nav).not.toContain("onMouseEnter");
+    expect(nav).not.toContain("onMouseLeave");
   });
 });

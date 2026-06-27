@@ -148,7 +148,7 @@
   }
 
   .oo-dash-titlebar {
-    @apply border-b border-oo-light-stone;
+    @apply relative z-40 overflow-visible border-b border-oo-light-stone;
     background-color: var(--oo-charcoal);
     color: var(--oo-cream);
   }
@@ -194,7 +194,7 @@
   }
 
   .oo-dash-titlebar-menu {
-    @apply absolute left-0 top-full z-50 mt-1 min-w-[200px] rounded-lg border border-oo-light-stone bg-oo-warm-white py-1 shadow-lg;
+    @apply absolute left-0 top-full z-[60] mt-1 min-w-[200px] rounded-lg border border-oo-light-stone bg-oo-warm-white py-1 shadow-lg;
   }
 
   .oo-dash-titlebar-menu-link {

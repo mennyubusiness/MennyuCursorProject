@@ -10,7 +10,7 @@ export default function AdminLayout({
   return (
     <div className="oo-dash">
       <header className="oo-dash-titlebar">
-        <PageShell className="py-3">
+        <PageShell className="overflow-visible py-3">
           <AdminTopNav />
         </PageShell>
       </header>

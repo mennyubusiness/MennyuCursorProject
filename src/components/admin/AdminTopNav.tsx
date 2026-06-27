@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 
 type NavItem = { href: string; label: string };
@@ -97,21 +97,36 @@ function NavDropdown({
 }) {
   const open = openId === id;
   const ref = useRef<HTMLDivElement>(null);
+  const menuId = useId();
 
   const close = useCallback(() => setOpenId(null), [setOpenId]);
 
   useEffect(() => {
     if (!open) return;
-    function onDoc(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) close();
+
+    function onPointerDown(e: PointerEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        close();
+      }
     }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") close();
+    }
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open, close]);
 
   const active =
     (activePrefixes ? pathMatchesAny(activePrefixes, pathname) : false) ||
     groupActive(items, pathname);
+
+  const toggle = () => setOpenId(open ? null : id);
 
   return (
     <div ref={ref} className="relative shrink-0">
@@ -120,19 +135,20 @@ function NavDropdown({
         className={cn("oo-dash-titlebar-link", active && "is-group-active")}
         aria-expanded={open}
         aria-haspopup="menu"
-        onClick={() => setOpenId(open ? null : id)}
-        onMouseEnter={() => setOpenId(id)}
+        aria-controls={menuId}
+        onClick={toggle}
       >
         {label}
         <span className="oo-dash-titlebar-caret" aria-hidden>
           ▾
         </span>
       </button>
-      {open && (
+      {open ? (
         <div
+          id={menuId}
           className="oo-dash-titlebar-menu"
           role="menu"
-          onMouseLeave={() => setOpenId(null)}
+          aria-label={`${label} menu`}
         >
           {items.map((item) => {
             const itemActive = pathMatches(item.href, pathname);
@@ -149,7 +165,7 @@ function NavDropdown({
             );
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -164,7 +180,7 @@ export function AdminTopNav() {
 
   return (
     <nav
-      className="-mx-1 flex max-w-full flex-wrap items-center gap-x-0.5 gap-y-2 overflow-x-auto px-1"
+      className="flex flex-wrap items-center gap-x-0.5 gap-y-2 overflow-visible"
       aria-label="Admin"
     >
       <NavTopLink href="/admin" label="Dashboard" pathname={pathname} />
