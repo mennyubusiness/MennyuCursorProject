@@ -1,4 +1,5 @@
 /** Client-side pod hints for Quick Cart (browsing = route only; assigned = cookie). */
+import type { CurrentPagePod } from "@/lib/current-page-pod";
 import { CURRENT_POD_COOKIE } from "@/lib/session";
 import { BROWSE_POD_ID_SESSION_KEY } from "@/lib/customer-browse-pod";
 import { isCustomerPodSlugPath } from "@/lib/customer-public-url";
@@ -35,9 +36,28 @@ export function getAssignedPodIdFromCookie(): string | null {
   return fromCookie ? decodeCookieValue(fromCookie) : null;
 }
 
-/** Browsing pod for Quick Cart API (`browsePodId` query) — route wins; never stale cookie alone. */
-export function getBrowsingPodIdFromClient(): string | null {
-  return getRoutePodIdFromClient();
+/** Browsing pod for Quick Cart API (`browsePodId` query) — page pod wins, then route/session hints. */
+export function resolveQuickCartBrowsePod(pagePod: CurrentPagePod | null | undefined): {
+  id: string | null;
+  name: string | null;
+  slug: string | null;
+} {
+  if (pagePod?.id?.trim()) {
+    return {
+      id: pagePod.id,
+      name: pagePod.name?.trim() || null,
+      slug: pagePod.slug?.trim() || null,
+    };
+  }
+  const routeId = getRoutePodIdFromClient();
+  if (routeId) {
+    return { id: routeId, name: null, slug: null };
+  }
+  return { id: null, name: null, slug: null };
+}
+
+export function getBrowsingPodIdFromClient(pagePod?: CurrentPagePod | null): string | null {
+  return resolveQuickCartBrowsePod(pagePod).id;
 }
 
 /**

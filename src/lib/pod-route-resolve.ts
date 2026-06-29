@@ -15,13 +15,13 @@ export async function resolvePodBySlugOrId(ref: string) {
   if (looksLikePodOrVendorId(key)) {
     return prisma.pod.findFirst({
       where: { OR: [{ id: key }, { slug: key }] },
-      select: { id: true, slug: true, isActive: true },
+      select: { id: true, slug: true, name: true, isActive: true },
     });
   }
 
   return prisma.pod.findUnique({
     where: { slug: key },
-    select: { id: true, slug: true, isActive: true },
+    select: { id: true, slug: true, name: true, isActive: true },
   });
 }
 

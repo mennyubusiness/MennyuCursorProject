@@ -176,6 +176,7 @@ describe("QuickCartDrawer source", () => {
     expect(groupSrc).toContain("Join with code");
     expect(groupSrc).toMatch(/Ordering with friends/);
     expect(groupSrc).not.toMatch(/for this pod/);
+    expect(groupSrc).not.toMatch(/href="\/group-order\/join"/);
   });
 
   it("does not expose joinToken in quick cart components", () => {

@@ -72,6 +72,12 @@ describe("Quick Cart group start wiring", () => {
     expect(groupSrc).toContain("Join with code");
   });
 
+  it("opens join-code modal instead of navigating to bare join route", () => {
+    expect(groupSrc).toContain("JoinGroupOrderByCodeModal");
+    expect(groupSrc).toContain('type="button"');
+    expect(groupSrc).not.toMatch(/href="\/group-order\/join"/);
+  });
+
   it("uses host group controls instead of participant join card", () => {
     expect(groupSrc).toContain("QuickCartHostGroupControls");
     expect(groupSrc).toContain('role === "host"');

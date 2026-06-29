@@ -1,4 +1,4 @@
-import { CustomerBrowsePodScope } from "@/components/pod/CustomerBrowsePodScope";
+import { CurrentPagePodSync } from "@/components/pod/CurrentPagePodProvider";
 import { resolvePodBySlugOrId } from "@/lib/pod-route-resolve";
 import { notFound } from "next/navigation";
 
@@ -15,7 +15,9 @@ export default async function PodSlugLayout({
 
   return (
     <>
-      <CustomerBrowsePodScope podId={pod.id} />
+      <CurrentPagePodSync
+        currentPagePod={{ id: pod.id, slug: pod.slug, name: pod.name }}
+      />
       {children}
     </>
   );

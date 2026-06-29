@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { QuickCartProvider } from "@/components/cart/QuickCartContext";
 import { QuickCartDrawer } from "@/components/cart/QuickCartDrawer";
+import { CurrentPagePodProvider } from "@/components/pod/CurrentPagePodProvider";
 
 export function CustomerQuickCartShell({
   enabled,
@@ -14,9 +15,11 @@ export function CustomerQuickCartShell({
   children: ReactNode;
 }) {
   return (
-    <QuickCartProvider enabled={enabled} hasServerSession={hasServerSession}>
-      {children}
-      <QuickCartDrawer />
-    </QuickCartProvider>
+    <CurrentPagePodProvider>
+      <QuickCartProvider enabled={enabled} hasServerSession={hasServerSession}>
+        {children}
+        <QuickCartDrawer />
+      </QuickCartProvider>
+    </CurrentPagePodProvider>
   );
 }

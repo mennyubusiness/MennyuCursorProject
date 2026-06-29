@@ -120,4 +120,13 @@ describe("JoinGroupOrderByCodeModal wiring", () => {
     expect(heroActionsSrc).toMatch(/PodPageJoinWithCodeButton/);
     expect(heroActionsSrc).not.toMatch(/group-order\/join\?podId=/);
   });
+
+  it("Quick Cart join button opens modal instead of bare join route", () => {
+    const quickCartGroupSrc = readFileSync(
+      join(process.cwd(), "src/components/cart/QuickCartGroupSection.tsx"),
+      "utf8"
+    );
+    expect(quickCartGroupSrc).toMatch(/JoinGroupOrderByCodeModal/);
+    expect(quickCartGroupSrc).not.toMatch(/href="\/group-order\/join"/);
+  });
 });

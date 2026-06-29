@@ -3,7 +3,32 @@ import {
   getBrowsingPodIdFromClient,
   resolveBrowsingPodId,
   resolveCurrentPodId,
+  resolveQuickCartBrowsePod,
 } from "./quick-cart-pod";
+
+describe("resolveQuickCartBrowsePod", () => {
+  it("prefers server-resolved page pod over client route hints", () => {
+    expect(
+      resolveQuickCartBrowsePod({
+        id: "pod_page",
+        slug: "riverside",
+        name: "Riverside Pod",
+      })
+    ).toEqual({
+      id: "pod_page",
+      slug: "riverside",
+      name: "Riverside Pod",
+    });
+  });
+
+  it("returns null browse pod when page pod is absent", () => {
+    expect(resolveQuickCartBrowsePod(null)).toEqual({
+      id: null,
+      name: null,
+      slug: null,
+    });
+  });
+});
 
 describe("resolveBrowsingPodId", () => {
   it("uses route pod only", () => {

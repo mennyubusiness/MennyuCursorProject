@@ -30,8 +30,8 @@ import {
   type CartSnapshotMeta,
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
-import { getBrowsingPodIdFromClient } from "@/lib/quick-cart-pod";
-import { buildCartPodContextForDisplay, quickCartHasActiveGroupOrder, resolveQuickCartSnapshotAfterUpdate } from "@/lib/quick-cart-display";
+import { getBrowsingPodIdFromClient, resolveQuickCartBrowsePod } from "@/lib/quick-cart-pod";
+import { buildCartPodContextForDisplay, buildBrowsingPodOnlyContext, quickCartHasActiveGroupOrder, resolveQuickCartSnapshotAfterUpdate } from "@/lib/quick-cart-display";
 import { normalizeAuthoritativeCartSnapshot, normalizeQuickCartApiCart } from "@/lib/cart-group-metadata";
 import { isQuickCartEnabledForPath } from "@/lib/quick-cart-enabled";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -40,6 +40,7 @@ import {
   isActiveCartRecoveryDisplayable,
   shouldShowActiveRecovery,
 } from "@/lib/quick-cart-active-recovery";
+import { useCurrentPagePod } from "@/components/pod/CurrentPagePodProvider";
 
 const NEUTRAL_POD_CONTEXT: CartPodContext = {
   cartScope: "neutral",
@@ -88,6 +89,7 @@ export function QuickCartProvider({
   hasServerSession?: boolean;
 }) {
   const pathname = usePathname();
+  const currentPagePod = useCurrentPagePod();
   const routeQuickCartEnabled = isQuickCartEnabledForPath(pathname);
   const [isOpen, setIsOpen] = useState(false);
   const [cart, setCart] = useState<Cart | null>(null);
@@ -115,18 +117,42 @@ export function QuickCartProvider({
   const hasActiveGroupOrder = quickCartHasActiveGroupOrder(cart);
   const enabled = routeQuickCartEnabled || hasActiveGroupOrder;
 
+  const resolveBrowsePod = useCallback(
+    () => resolveQuickCartBrowsePod(currentPagePod),
+    [currentPagePod]
+  );
+
+  const mergePayloadBrowsingPod = useCallback(
+    (payload: QuickCartApiResponse): QuickCartApiResponse => {
+      const pageBrowse = resolveBrowsePod();
+      if (!pageBrowse.id) return payload;
+      return {
+        ...payload,
+        browsingPodId: payload.browsingPodId ?? pageBrowse.id,
+        browsingPodName: payload.browsingPodName ?? pageBrowse.name,
+        browsingPodSlug: payload.browsingPodSlug ?? pageBrowse.slug,
+        scope:
+          payload.scope === "neutral" && !payload.cart && !payload.requiresClearToSwitchPod
+            ? "browsing_pod"
+            : payload.scope,
+      };
+    },
+    [resolveBrowsePod]
+  );
+
   const applyPayload = useCallback((payload: QuickCartApiResponse) => {
-    if (!shouldAcceptApiCartPayload(payload, lastAcceptedMetaRef.current)) {
+    const mergedPayload = mergePayloadBrowsingPod(payload);
+    if (!shouldAcceptApiCartPayload(mergedPayload, lastAcceptedMetaRef.current)) {
       setLoading(false);
       return;
     }
     const normalizedCart =
-      payload.cart != null
-        ? normalizeQuickCartApiCart(payload.cart, payload.scope)
+      mergedPayload.cart != null
+        ? normalizeQuickCartApiCart(mergedPayload.cart, mergedPayload.scope)
         : null;
     const displayCart = resolveQuickCartSnapshotAfterUpdate(normalizedCart);
-    const recovery = isActiveCartRecoveryDisplayable(payload.activeCartRecovery)
-      ? payload.activeCartRecovery
+    const recovery = isActiveCartRecoveryDisplayable(mergedPayload.activeCartRecovery)
+      ? mergedPayload.activeCartRecovery
       : null;
     const normalizedRecovery = recovery ?? null;
     rememberAcceptedCartSnapshot(displayCart);
@@ -135,25 +161,25 @@ export function QuickCartProvider({
     setPodContext(
       buildCartPodContextForDisplay({
         cart: displayCart,
-        browsingPodId: payload.browsingPodId,
-        browsingPodName: payload.browsingPodName,
-        browsingPodSlug: payload.browsingPodSlug,
-        assignedPodId: payload.assignedPodId,
-        assignedPodName: payload.assignedPodName,
-        assignedPodSlug: payload.assignedPodSlug,
-        requiresClearToSwitchPod: payload.requiresClearToSwitchPod,
+        browsingPodId: mergedPayload.browsingPodId,
+        browsingPodName: mergedPayload.browsingPodName,
+        browsingPodSlug: mergedPayload.browsingPodSlug,
+        assignedPodId: mergedPayload.assignedPodId,
+        assignedPodName: mergedPayload.assignedPodName,
+        assignedPodSlug: mergedPayload.assignedPodSlug,
+        requiresClearToSwitchPod: mergedPayload.requiresClearToSwitchPod,
       })
     );
     setActiveCartRecovery(normalizedRecovery);
     setShowActiveRecovery(
       shouldShowActiveRecovery(
         normalizedRecovery,
-        payload.scope,
-        payload.requiresClearToSwitchPod
+        mergedPayload.scope,
+        mergedPayload.requiresClearToSwitchPod
       )
     );
     setLoading(false);
-  }, []);
+  }, [mergePayloadBrowsingPod]);
 
   const applyCartSnapshot = useCallback((next: Cart | null, detail?: CartUpdatedDetail) => {
     snapshotGenerationRef.current += 1;
@@ -175,17 +201,23 @@ export function QuickCartProvider({
     cartRef.current = displayCart;
     setCart(displayCart);
     if (!displayCart) {
-      setPodContext(NEUTRAL_POD_CONTEXT);
+      const pageBrowse = resolveBrowsePod();
+      setPodContext(
+        pageBrowse.id
+          ? buildBrowsingPodOnlyContext(pageBrowse)
+          : NEUTRAL_POD_CONTEXT
+      );
       setActiveCartRecovery(null);
       setShowActiveRecovery(false);
       setIsOpen(false);
     } else {
+      const pageBrowse = resolveBrowsePod();
       setPodContext(
         buildCartPodContextForDisplay({
           cart: displayCart,
-          browsingPodId: getBrowsingPodIdFromClient(),
-          browsingPodName: displayCart.podName ?? null,
-          browsingPodSlug: displayCart.podSlug ?? null,
+          browsingPodId: pageBrowse.id ?? getBrowsingPodIdFromClient(currentPagePod),
+          browsingPodName: pageBrowse.name ?? displayCart.podName ?? null,
+          browsingPodSlug: pageBrowse.slug ?? displayCart.podSlug ?? null,
           assignedPodId:
             displayCart.cartScope === "assigned_pod" || displayCart.cartScope === "group_order"
               ? displayCart.podId
@@ -197,11 +229,12 @@ export function QuickCartProvider({
       );
     }
     setLoading(false);
-  }, []);
+  }, [currentPagePod, resolveBrowsePod]);
 
   const refreshCart = useCallback(async () => {
     if (!enabled && !quickCartHasActiveGroupOrder(cartRef.current)) return;
-    const browsePodId = getBrowsingPodIdFromClient();
+    const browsePod = resolveBrowsePod();
+    const browsePodId = browsePod.id;
     const generationAtStart = snapshotGenerationRef.current;
     const podAtStart = browsePodId;
     setLoading(true);
@@ -217,14 +250,16 @@ export function QuickCartProvider({
           generationAtStart,
           currentGeneration: snapshotGenerationRef.current,
           podAtStart,
-          currentPodId: getBrowsingPodIdFromClient(),
+          currentPodId: resolveBrowsePod().id,
         })
       ) {
         return;
       }
       if (!res.ok) {
         setCart(null);
-        setPodContext(NEUTRAL_POD_CONTEXT);
+        setPodContext(
+          browsePod.id ? buildBrowsingPodOnlyContext(browsePod) : NEUTRAL_POD_CONTEXT
+        );
         setActiveCartRecovery(null);
         setShowActiveRecovery(false);
         return;
@@ -235,7 +270,7 @@ export function QuickCartProvider({
           generationAtStart,
           currentGeneration: snapshotGenerationRef.current,
           podAtStart,
-          currentPodId: getBrowsingPodIdFromClient(),
+          currentPodId: resolveBrowsePod().id,
         })
       ) {
         return;
@@ -247,11 +282,13 @@ export function QuickCartProvider({
           generationAtStart,
           currentGeneration: snapshotGenerationRef.current,
           podAtStart,
-          currentPodId: getBrowsingPodIdFromClient(),
+          currentPodId: resolveBrowsePod().id,
         })
       ) {
         setCart(null);
-        setPodContext(NEUTRAL_POD_CONTEXT);
+        setPodContext(
+          browsePod.id ? buildBrowsingPodOnlyContext(browsePod) : NEUTRAL_POD_CONTEXT
+        );
         setActiveCartRecovery(null);
         setShowActiveRecovery(false);
       }
@@ -261,13 +298,13 @@ export function QuickCartProvider({
           generationAtStart,
           currentGeneration: snapshotGenerationRef.current,
           podAtStart,
-          currentPodId: getBrowsingPodIdFromClient(),
+          currentPodId: resolveBrowsePod().id,
         })
       ) {
         setLoading(false);
       }
     }
-  }, [enabled, applyPayload]);
+  }, [enabled, applyPayload, resolveBrowsePod]);
 
   const openCart = useCallback(() => {
     if (!enabled) return;
@@ -285,26 +322,36 @@ export function QuickCartProvider({
     snapshotGenerationRef.current += 1;
     lastAcceptedMetaRef.current = null;
     setCart(null);
-    setPodContext(NEUTRAL_POD_CONTEXT);
+    const pageBrowse = resolveBrowsePod();
+    setPodContext(
+      pageBrowse.id ? buildBrowsingPodOnlyContext(pageBrowse) : NEUTRAL_POD_CONTEXT
+    );
     setActiveCartRecovery(null);
     setShowActiveRecovery(false);
     void refreshCart();
-  }, [hasServerSession, refreshCart]);
+  }, [hasServerSession, refreshCart, resolveBrowsePod]);
 
   useEffect(() => {
     if (!routeQuickCartEnabled && !quickCartHasActiveGroupOrder(cartRef.current)) return;
-    const browsePodId = getBrowsingPodIdFromClient();
+    const browsePod = resolveBrowsePod();
+    const browsePodId = browsePod.id;
     const prevPod = activeBrowsePodRef.current;
     if (prevPod && browsePodId && prevPod !== browsePodId) {
       snapshotGenerationRef.current += 1;
       setCart(null);
-      setPodContext(NEUTRAL_POD_CONTEXT);
+      setPodContext(buildBrowsingPodOnlyContext(browsePod));
       setActiveCartRecovery(null);
       setShowActiveRecovery(false);
+    } else if (browsePodId && !prevPod) {
+      setPodContext((prev) =>
+        prev.browsingPodId
+          ? prev
+          : buildBrowsingPodOnlyContext(browsePod)
+      );
     }
     activeBrowsePodRef.current = browsePodId;
     void refreshCart();
-  }, [routeQuickCartEnabled, pathname, refreshCart]);
+  }, [routeQuickCartEnabled, pathname, refreshCart, currentPagePod, resolveBrowsePod]);
 
   useEffect(() => {
     const onCartUpdated = (event: Event) => {
@@ -314,7 +361,7 @@ export function QuickCartProvider({
           !shouldQuickCartApplyCartSnapshot(
             detail,
             cartRef.current,
-            getBrowsingPodIdFromClient()
+            getBrowsingPodIdFromClient(currentPagePod)
           )
         ) {
           return;
@@ -337,7 +384,7 @@ export function QuickCartProvider({
       const local = cartRef.current;
       const ctx = {
         cartId: local?.id ?? detail?.cartId ?? "",
-        podId: detail?.podId ?? local?.podId ?? getBrowsingPodIdFromClient() ?? "",
+        podId: detail?.podId ?? local?.podId ?? getBrowsingPodIdFromClient(currentPagePod) ?? "",
       };
       if (!detail?.podId || !cartClearAppliesToContext(detail, ctx)) return;
       applyCartSnapshot(null);
@@ -348,7 +395,7 @@ export function QuickCartProvider({
       window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated);
       window.removeEventListener(CART_CLEARED_EVENT, onCartCleared);
     };
-  }, [applyCartSnapshot, refreshCart]);
+  }, [applyCartSnapshot, refreshCart, currentPagePod]);
 
   const getCartSnapshot = useCallback(() => cartRef.current, []);
 

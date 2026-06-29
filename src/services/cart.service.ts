@@ -1273,7 +1273,6 @@ export async function getQuickCartPayload(
         });
       }
     }
-    return neutral;
   }
 
   const sessionRows = await prisma.cart.findMany({

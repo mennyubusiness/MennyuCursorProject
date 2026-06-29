@@ -134,4 +134,10 @@ describe("empty group cart wiring", () => {
     expect(cartServiceSrc).toMatch(/resolveHostActiveGroupCartId/);
     expect(cartServiceSrc).toMatch(/shouldShowFullCartInQuickCartDrawer/);
   });
+
+  it("does not return neutral for signed-in users before browse pod handling", () => {
+    expect(cartServiceSrc).not.toMatch(
+      /if \(signedInUserId\)[\s\S]{0,800}return neutral;\s*\}\s*\n\s*const sessionRows/s
+    );
+  });
 });

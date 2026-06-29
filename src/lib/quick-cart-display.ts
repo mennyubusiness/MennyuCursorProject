@@ -72,6 +72,36 @@ export function buildCartPodContextForDisplay(params: {
   return getCartPodContext(params);
 }
 
+/** Page browse context without an assigned cart row (keeps Start group order available). */
+export function buildBrowsingPodOnlyContext(browse: {
+  id: string | null;
+  name?: string | null;
+  slug?: string | null;
+}): CartPodContext {
+  if (!browse.id?.trim()) {
+    return getCartPodContext({
+      cart: null,
+      browsingPodId: null,
+      browsingPodName: null,
+      browsingPodSlug: null,
+      assignedPodId: null,
+      assignedPodName: null,
+      assignedPodSlug: null,
+      requiresClearToSwitchPod: false,
+    });
+  }
+  return getCartPodContext({
+    cart: null,
+    browsingPodId: browse.id,
+    browsingPodName: browse.name ?? null,
+    browsingPodSlug: browse.slug ?? null,
+    assignedPodId: null,
+    assignedPodName: null,
+    assignedPodSlug: null,
+    requiresClearToSwitchPod: false,
+  });
+}
+
 export function quickCartSubtitle(ctx: CartPodContext): string {
   const podLabel = ctx.cartPodName ?? ctx.browsingPodName;
 
