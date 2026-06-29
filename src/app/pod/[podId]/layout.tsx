@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { AdminModeBanner } from "@/components/admin/AdminModeBanner";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import {
@@ -7,6 +8,7 @@ import {
   shouldSkipEmailVerificationGate,
 } from "@/lib/auth/email-verification-access.server";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
+import { shouldShowAdminModeBanner } from "@/lib/admin-mode-context";
 import { canAccessPodDashboardLayout } from "@/lib/permissions";
 import { loadPodPayoutRecipientContext } from "@/services/pod-payout-connect.service";
 import { arePodOwnerPayoutsConfigured } from "@/lib/pod-owner-payout-visibility";
@@ -55,9 +57,14 @@ export default async function PodAreaLayout({
     podPayoutsEnabled: payoutContext?.podPayoutsEnabled ?? false,
   });
 
+  const showAdminBanner = await shouldShowAdminModeBanner("operational");
+
   return (
-    <PodLayoutChrome podId={pod.id} podName={pod.name} showPayouts={showPayouts}>
-      {children}
-    </PodLayoutChrome>
+    <>
+      {showAdminBanner ? <AdminModeBanner sticky /> : null}
+      <PodLayoutChrome podId={pod.id} podName={pod.name} showPayouts={showPayouts}>
+        {children}
+      </PodLayoutChrome>
+    </>
   );
 }

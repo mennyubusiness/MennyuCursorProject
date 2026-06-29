@@ -1,11 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { AdminModeBanner } from "@/components/admin/AdminModeBanner";
 import { prisma } from "@/lib/db";
 import {
   getVendorDashboardEmailVerificationRedirect,
   shouldSkipEmailVerificationGate,
 } from "@/lib/auth/email-verification-access.server";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
+import { shouldShowAdminModeBanner } from "@/lib/admin-mode-context";
 import { canAccessVendorDashboard, isVendorDashboardDevOpen } from "@/lib/vendor-dashboard-auth";
 import { VendorLayoutChrome } from "./VendorLayoutChrome";
 
@@ -50,9 +52,14 @@ export default async function VendorAreaLayout({
     }
   }
 
+  const showAdminBanner = await shouldShowAdminModeBanner("operational");
+
   return (
-    <VendorLayoutChrome vendorId={vendor.id} vendorName={vendor.name}>
-      {children}
-    </VendorLayoutChrome>
+    <>
+      {showAdminBanner ? <AdminModeBanner sticky /> : null}
+      <VendorLayoutChrome vendorId={vendor.id} vendorName={vendor.name}>
+        {children}
+      </VendorLayoutChrome>
+    </>
   );
 }

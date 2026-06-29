@@ -8,6 +8,14 @@ import {
   AdminReasonActionForm,
   AdminSection,
 } from "@/components/admin/AdminReasonActionForm";
+import {
+  ADMIN_NAV_LABELS,
+  buildOrderAdminPath,
+  buildPodAdminPath,
+  buildPodDashboardPath,
+  buildUserAdminPath,
+  buildVendorDashboardPath,
+} from "@/lib/admin-entity-nav-links";
 import type { AdminVendorDetailView } from "@/services/admin-vendor-detail.service";
 import {
   adminAttachVendorToPodFromVendorAction,
@@ -172,10 +180,13 @@ export function AdminVendorRescueClient({
           <ul className="space-y-1 text-sm">
             {detail.owners.map((o) => (
               <li key={o.userId}>
-                <Link href={`/admin/users/${o.userId}`} className="underline">
-                  {o.email}
+                <Link href={buildUserAdminPath(o.userId)} className="underline">
+                  {ADMIN_NAV_LABELS.openUserAdmin}
                 </Link>
-                <span className="text-oo-stone-gray"> · {o.role}</span>
+                <span className="text-oo-stone-gray">
+                  {" "}
+                  · {o.email} · {o.role}
+                </span>
               </li>
             ))}
           </ul>
@@ -189,10 +200,19 @@ export function AdminVendorRescueClient({
           <ul className="space-y-2 text-sm">
             {detail.pods.map((p) => (
               <li key={p.podId} className="rounded border border-oo-light-stone px-2 py-2">
-                <Link href={`/admin/pods/${p.podId}`} className="font-medium underline">
-                  {p.podName}
-                </Link>
-                <p className="text-xs text-oo-stone-gray">
+                <p className="font-medium text-oo-charcoal">{p.podName}</p>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  <Link href={buildPodAdminPath(p.podId)} className="underline">
+                    {ADMIN_NAV_LABELS.openPodAdmin}
+                  </Link>
+                  <Link href={buildPodDashboardPath(p.podId)} className="underline">
+                    {ADMIN_NAV_LABELS.openPodDashboard}
+                  </Link>
+                  <a href={p.publicPath} target="_blank" rel="noopener noreferrer" className="underline">
+                    {ADMIN_NAV_LABELS.openPublicPage}
+                  </a>
+                </div>
+                <p className="mt-1 text-xs text-oo-stone-gray">
                   {p.publicPath} · {p.podVendorActive ? "Active in pod" : "Paused in pod"}
                 </p>
                 <AdminReasonActionForm
@@ -257,6 +277,12 @@ export function AdminVendorRescueClient({
         <AdminInfoRow label="Payouts enabled" value={detail.vendor.stripePayoutsEnabled ? "Yes" : "No"} />
       </AdminSection>
 
+      <AdminSection title="Vendor dashboard">
+        <Link href={buildVendorDashboardPath(vendorId)} className="text-sm font-medium underline">
+          {ADMIN_NAV_LABELS.openVendorDashboard}
+        </Link>
+      </AdminSection>
+
       <AdminSection title="Recent orders">
         {detail.recentOrders.length === 0 ? (
           <p className="text-sm text-oo-stone-gray">No recent orders.</p>
@@ -264,12 +290,12 @@ export function AdminVendorRescueClient({
           <ul className="space-y-1 text-sm">
             {detail.recentOrders.map((o) => (
               <li key={o.id}>
-                <Link href={`/admin/orders/${o.id}`} className="underline">
-                  {o.id.slice(0, 8)}…
+                <Link href={buildOrderAdminPath(o.id)} className="underline">
+                  {ADMIN_NAV_LABELS.openOrderAdmin}
                 </Link>
                 <span className="text-oo-stone-gray">
                   {" "}
-                  · {o.routingStatus}/{o.fulfillmentStatus} · ${(o.totalCents / 100).toFixed(2)} · {new Date(o.createdAt).toLocaleDateString()}
+                  · {o.id.slice(0, 8)}… · {o.routingStatus}/{o.fulfillmentStatus} · ${(o.totalCents / 100).toFixed(2)} · {new Date(o.createdAt).toLocaleDateString()}
                 </span>
               </li>
             ))}

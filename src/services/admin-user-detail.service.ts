@@ -46,13 +46,16 @@ export type AdminUserDetailView = {
   vendors: Array<{
     vendorId: string;
     vendorName: string;
+    vendorSlug: string;
     role: string;
     podName: string | null;
     podId: string | null;
+    podSlug: string | null;
   }>;
   pods: Array<{
     podId: string;
     podName: string;
+    podSlug: string;
     role: string;
   }>;
   customer: {
@@ -113,14 +116,18 @@ export async function loadAdminUserDetail(userId: string): Promise<AdminUserDeta
             select: {
               id: true,
               name: true,
-              pods: { include: { pod: { select: { id: true, name: true } } }, take: 1 },
+              slug: true,
+              pods: {
+                include: { pod: { select: { id: true, name: true, slug: true } } },
+                take: 1,
+              },
             },
           },
         },
         orderBy: { createdAt: "asc" },
       },
       podMemberships: {
-        include: { pod: { select: { id: true, name: true } } },
+        include: { pod: { select: { id: true, name: true, slug: true } } },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -206,13 +213,16 @@ export async function loadAdminUserDetail(userId: string): Promise<AdminUserDeta
     vendors: user.vendorMemberships.map((m) => ({
       vendorId: m.vendor.id,
       vendorName: m.vendor.name,
+      vendorSlug: m.vendor.slug,
       role: m.role,
       podId: m.vendor.pods[0]?.pod.id ?? null,
       podName: m.vendor.pods[0]?.pod.name ?? null,
+      podSlug: m.vendor.pods[0]?.pod.slug ?? null,
     })),
     pods: user.podMemberships.map((m) => ({
       podId: m.pod.id,
       podName: m.pod.name,
+      podSlug: m.pod.slug,
       role: m.role,
     })),
     customer: {

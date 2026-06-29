@@ -11,6 +11,7 @@ import {
   type VendorCustomerOrderingDayHours,
   type VendorCustomerOrderingWeek,
 } from "@/lib/vendor-customer-ordering-hours";
+import { HoursTimeSelect } from "@/components/vendor/HoursTimeSelect";
 
 const SUCCESS_COPY = "Hours updated.";
 const ERROR_COPY = "We couldn't update your hours. Please try again.";
@@ -97,24 +98,20 @@ export function VendorCustomerOrderingHoursForm({ vendorId, initialCustomHours }
 
                   {row.isOpen ? (
                     <div className="flex flex-wrap items-center gap-2">
-                      <label className="text-xs text-oo-stone-gray">
+                      <label className="flex items-center gap-2 text-xs text-oo-stone-gray">
                         Open
-                        <input
-                          type="time"
-                          required
+                        <HoursTimeSelect
+                          aria-label={`${VENDOR_WEEKDAY_LABELS[day]} opening time`}
                           value={row.openTime}
-                          onChange={(e) => updateDay(day, { openTime: e.target.value })}
-                          className="ml-2 rounded-md border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm text-oo-charcoal"
+                          onChange={(openTime) => updateDay(day, { openTime })}
                         />
                       </label>
-                      <label className="text-xs text-oo-stone-gray">
+                      <label className="flex items-center gap-2 text-xs text-oo-stone-gray">
                         Close
-                        <input
-                          type="time"
-                          required
+                        <HoursTimeSelect
+                          aria-label={`${VENDOR_WEEKDAY_LABELS[day]} closing time`}
                           value={row.closeTime}
-                          onChange={(e) => updateDay(day, { closeTime: e.target.value })}
-                          className="ml-2 rounded-md border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm text-oo-charcoal"
+                          onChange={(closeTime) => updateDay(day, { closeTime })}
                         />
                       </label>
                     </div>

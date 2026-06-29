@@ -3,6 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import {
+  ADMIN_NAV_LABELS,
+  buildOrderAdminPath,
+  buildPodAdminPath,
+  buildPodDashboardPath,
+  buildVendorAdminPath,
+  buildVendorDashboardPath,
+} from "@/lib/admin-entity-nav-links";
+import { buildPodCustomerPath, buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { AdminUserDetailView } from "@/services/admin-user-detail.service";
 import {
   adminAddPodAccessAction,
@@ -328,10 +337,31 @@ export function AdminUserDetailClient({ detail, vendorOptions, podOptions }: Pro
           <ul className="space-y-2 text-sm">
             {detail.vendors.map((v) => (
               <li key={v.vendorId} className="rounded-lg border border-oo-light-stone px-3 py-2">
-                <Link href={`/admin/vendors/${v.vendorId}`} className="font-medium underline">
-                  {v.vendorName}
-                </Link>
-                <p className="text-xs text-oo-stone-gray">
+                <p className="font-medium text-oo-charcoal">{v.vendorName}</p>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  <Link href={buildVendorAdminPath(v.vendorId)} className="underline">
+                    {ADMIN_NAV_LABELS.openVendorAdmin}
+                  </Link>
+                  <Link href={buildVendorDashboardPath(v.vendorId)} className="underline">
+                    {ADMIN_NAV_LABELS.openVendorDashboard}
+                  </Link>
+                  {v.podSlug && v.vendorSlug ? (
+                    <a
+                      href={buildVendorMenuCustomerPath(v.podSlug, v.vendorSlug)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      {ADMIN_NAV_LABELS.openPublicPage}
+                    </a>
+                  ) : null}
+                  {v.podId && v.podName ? (
+                    <Link href={buildPodAdminPath(v.podId)} className="underline">
+                      {ADMIN_NAV_LABELS.openPodAdmin}
+                    </Link>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs text-oo-stone-gray">
                   Role: {v.role}
                   {v.podName ? ` · Pod: ${v.podName}` : " · Not attached to a pod"}
                 </p>
@@ -421,10 +451,19 @@ export function AdminUserDetailClient({ detail, vendorOptions, podOptions }: Pro
           <ul className="space-y-2 text-sm">
             {detail.pods.map((p) => (
               <li key={p.podId} className="rounded-lg border border-oo-light-stone px-3 py-2">
-                <Link href={`/admin/pods/${p.podId}`} className="font-medium underline">
-                  {p.podName}
-                </Link>
-                <p className="text-xs text-oo-stone-gray">Role: {p.role}</p>
+                <p className="font-medium text-oo-charcoal">{p.podName}</p>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  <Link href={buildPodAdminPath(p.podId)} className="underline">
+                    {ADMIN_NAV_LABELS.openPodAdmin}
+                  </Link>
+                  <Link href={buildPodDashboardPath(p.podId)} className="underline">
+                    {ADMIN_NAV_LABELS.openPodDashboard}
+                  </Link>
+                  <a href={buildPodCustomerPath(p.podSlug)} target="_blank" rel="noopener noreferrer" className="underline">
+                    {ADMIN_NAV_LABELS.openPublicPage}
+                  </a>
+                </div>
+                <p className="mt-1 text-xs text-oo-stone-gray">Role: {p.role}</p>
                 <div className="mt-2 space-y-2">
                   {p.role !== "owner" ? (
                     <ReasonActionForm
@@ -572,12 +611,12 @@ export function AdminUserDetailClient({ detail, vendorOptions, podOptions }: Pro
           <ul className="space-y-1 text-sm">
             {detail.recentOrders.map((o) => (
               <li key={o.id}>
-                <Link href={`/admin/orders/${o.id}`} className="underline">
-                  {o.id.slice(0, 8)}…
+                <Link href={buildOrderAdminPath(o.id)} className="underline">
+                  {ADMIN_NAV_LABELS.openOrderAdmin}
                 </Link>
                 <span className="text-oo-stone-gray">
                   {" "}
-                  · {o.status} · ${(o.totalCents / 100).toFixed(2)} · {o.podName} ·{" "}
+                  · {o.id.slice(0, 8)}… · {o.status} · ${(o.totalCents / 100).toFixed(2)} · {o.podName} ·{" "}
                   {new Date(o.createdAt).toLocaleDateString()}
                 </span>
               </li>

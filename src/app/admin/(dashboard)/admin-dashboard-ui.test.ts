@@ -96,6 +96,12 @@ describe("admin home preserved behavior", () => {
     expect(layout).toContain("isAdminDashboardLayoutAuthorized");
     expect(layout).toContain("/admin/access-denied");
   });
+
+  it("shows admin mode banner in admin shell layout", () => {
+    const layout = readFileSync(join(root, "app/admin/layout.tsx"), "utf8");
+    expect(layout).toContain("AdminModeBanner");
+    expect(layout).toContain("shouldShowAdminModeBanner");
+  });
 });
 
 describe("admin home copy guardrails", () => {

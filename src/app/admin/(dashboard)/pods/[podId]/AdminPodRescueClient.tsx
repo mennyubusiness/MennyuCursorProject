@@ -8,6 +8,15 @@ import {
   AdminReasonActionForm,
   AdminSection,
 } from "@/components/admin/AdminReasonActionForm";
+import {
+  ADMIN_NAV_LABELS,
+  buildOrderAdminPath,
+  buildPodDashboardPath,
+  buildUserAdminPath,
+  buildVendorAdminPath,
+  buildVendorDashboardPath,
+} from "@/lib/admin-entity-nav-links";
+import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { AdminPodDetailView } from "@/services/admin-pod-detail.service";
 import {
   adminAddPodOwnerFromPodAction,
@@ -194,9 +203,10 @@ export function AdminPodRescueClient({
           <ul className="space-y-2 text-sm">
             {detail.owners.map((o) => (
               <li key={o.userId} className="rounded border border-oo-light-stone px-2 py-2">
-                <Link href={`/admin/users/${o.userId}`} className="underline">
-                  {o.email}
+                <Link href={buildUserAdminPath(o.userId)} className="underline">
+                  {ADMIN_NAV_LABELS.openUserAdmin}
                 </Link>
+                <span className="text-oo-stone-gray"> · {o.email}</span>
                 <AdminReasonActionForm
                   label="Remove pod owner access"
                   description="Removes this user's pod membership. Cannot remove the only owner."
@@ -238,10 +248,24 @@ export function AdminPodRescueClient({
           <ul className="space-y-2 text-sm">
             {detail.vendors.map((v) => (
               <li key={v.vendorId} className="rounded border border-oo-light-stone px-2 py-2">
-                <Link href={`/admin/vendors/${v.vendorId}`} className="font-medium underline">
-                  {v.vendorName}
-                </Link>
-                <p className="text-xs text-oo-stone-gray">{v.orderabilityLabel}</p>
+                <p className="font-medium text-oo-charcoal">{v.vendorName}</p>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  <Link href={buildVendorAdminPath(v.vendorId)} className="underline">
+                    {ADMIN_NAV_LABELS.openVendorAdmin}
+                  </Link>
+                  <Link href={buildVendorDashboardPath(v.vendorId)} className="underline">
+                    {ADMIN_NAV_LABELS.openVendorDashboard}
+                  </Link>
+                  <a
+                    href={buildVendorMenuCustomerPath(detail.pod.slug, v.vendorSlug)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    {ADMIN_NAV_LABELS.openPublicPage}
+                  </a>
+                </div>
+                <p className="mt-1 text-xs text-oo-stone-gray">{v.orderabilityLabel}</p>
                 {v.podVendorActive ? (
                   <AdminReasonActionForm
                     label="Pause vendor in pod"
@@ -306,6 +330,12 @@ export function AdminPodRescueClient({
         </p>
       </AdminSection>
 
+      <AdminSection title="Pod dashboard">
+        <Link href={buildPodDashboardPath(podId)} className="text-sm font-medium underline">
+          {ADMIN_NAV_LABELS.openPodDashboard}
+        </Link>
+      </AdminSection>
+
       <AdminSection title="Recent orders">
         {detail.recentOrders.length === 0 ? (
           <p className="text-sm text-oo-stone-gray">No recent orders.</p>
@@ -313,12 +343,12 @@ export function AdminPodRescueClient({
           <ul className="space-y-1 text-sm">
             {detail.recentOrders.map((o) => (
               <li key={o.id}>
-                <Link href={`/admin/orders/${o.id}`} className="underline">
-                  {o.id.slice(0, 8)}…
+                <Link href={buildOrderAdminPath(o.id)} className="underline">
+                  {ADMIN_NAV_LABELS.openOrderAdmin}
                 </Link>
                 <span className="text-oo-stone-gray">
                   {" "}
-                  · {o.status} · ${(o.totalCents / 100).toFixed(2)}
+                  · {o.id.slice(0, 8)}… · {o.status} · ${(o.totalCents / 100).toFixed(2)}
                 </span>
               </li>
             ))}
