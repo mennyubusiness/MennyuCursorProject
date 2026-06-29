@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { AuthShell } from "@/components/auth/auth-shell";
+import { VerifyEmailGateLayout } from "@/components/auth/verify-email-gate-layout";
 import { ACCOUNT_SIGN_IN_PATH } from "@/lib/auth/account-paths";
 import { isUserEmailVerified, loadUserEmailVerificationState } from "@/lib/auth/email-verification-access.server";
 import { VerifyEmailRequiredClient } from "./VerifyEmailRequiredClient";
@@ -17,8 +17,8 @@ export default async function VerifyEmailRequiredPage() {
   }
 
   return (
-    <AuthShell>
+    <VerifyEmailGateLayout>
       <VerifyEmailRequiredClient email={session.user.email} />
-    </AuthShell>
+    </VerifyEmailGateLayout>
   );
 }
