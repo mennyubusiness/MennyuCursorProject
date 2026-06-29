@@ -1,6 +1,5 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
 import { auth } from "@/auth";
 import { assertCustomerOrderAccess } from "@/lib/customer-order-access";
 import { userCanAccessOrder } from "@/lib/user-order-access";
@@ -13,7 +12,6 @@ import { getOrderWithUnifiedStatus } from "@/services/order-status.service";
 import { getOrdersForSignedInUser } from "@/services/customer-account-orders.service";
 import { reorderFromOrder } from "@/services/reorder.service";
 import { reconcilePaymentFromRedirect } from "@/services/payment.service";
-import { clearCheckoutSourceCartForOrder } from "@/services/cart.service";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 
 export async function getOrderStatusAction(orderId: string) {
@@ -48,16 +46,6 @@ export async function pollOrderAfterPaymentAction(orderId: string) {
   const reconcileResult = await reconcilePaymentFromRedirect(orderId);
   const order = await getOrderWithUnifiedStatus(orderId);
   return { reconcileResult, order };
-}
-
-/**
- * @deprecated Use POST /api/orders/[orderId]/post-checkout-sync from the order page client.
- * Server Actions must not be invoked during Server Component render when cookies are mutated.
- */
-export async function clearCartAfterOrderSuccessAction(orderId: string) {
-  await clearCheckoutSourceCartForOrder(orderId);
-  const cookieStore = await cookies();
-  cookieStore.delete("mennyu_checkout");
 }
 
 export type OrdersForSignedInUserResult =

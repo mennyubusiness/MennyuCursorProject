@@ -25,6 +25,13 @@ export type AssertCartSessionAccessOptions = {
 
 const ACCESS_DENIED = "Cart not found or access denied";
 
+export const GROUP_ORDER_TERMINAL_CHECKOUT_MESSAGE =
+  "This group order is closed. Start a new order or clear your cart to continue.";
+
+function isTerminalGroupSessionStatus(status: string): boolean {
+  return status === "ended" || status === "expired";
+}
+
 type SoloCartAccessRow = {
   id: string;
   sessionId: string;
@@ -95,7 +102,21 @@ export async function assertCartSessionAccess(
   });
 
   if (groupSession) {
-    if (groupSession.status === "ended" || groupSession.status === "expired") {
+    if (isTerminalGroupSessionStatus(groupSession.status)) {
+      if (mode === "checkout") {
+        return {
+          ok: false,
+          status: 403,
+          error: GROUP_ORDER_TERMINAL_CHECKOUT_MESSAGE,
+        };
+      }
+      if (mode === "mutate" && groupSession.status === "expired") {
+        return {
+          ok: false,
+          status: 403,
+          error: "This group order is closed.",
+        };
+      }
       return assertSoloCartAccess(cart, currentSessionId, options.authUserId);
     }
 

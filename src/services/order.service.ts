@@ -907,12 +907,22 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
     throw new OrderValidationError(code, access.error);
   }
 
-  const groupSession = access.isGroupOrder
-    ? await prisma.groupOrderSession.findUnique({
-        where: { cartId: input.cartId },
-        select: { id: true, status: true },
-      })
-    : null;
+  const attachedGroupSession = await prisma.groupOrderSession.findUnique({
+    where: { cartId: input.cartId },
+    select: { id: true, status: true },
+  });
+
+  if (
+    attachedGroupSession &&
+    (attachedGroupSession.status === "ended" || attachedGroupSession.status === "expired")
+  ) {
+    throw new OrderValidationError(
+      "GROUP_ORDER_CLOSED",
+      "This group order is closed. Start a new order or clear your cart to continue."
+    );
+  }
+
+  const groupSession = access.isGroupOrder ? attachedGroupSession : null;
 
   if (groupSession) {
     const fingerprint = input.groupCheckoutFingerprint?.trim();

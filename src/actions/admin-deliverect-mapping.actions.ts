@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireAdminActionContext } from "@/lib/admin-action-context";
 import { prisma } from "@/lib/db";
 
 function mappingPath(vendorId: string) {
@@ -12,6 +13,9 @@ export async function setMenuItemDeliverectProductId(
   vendorId: string,
   deliverectProductId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const adminCtx = await requireAdminActionContext();
+  if (!adminCtx.ok) return adminCtx;
+
   const item = await prisma.menuItem.findFirst({
     where: { id: menuItemId, vendorId },
     select: { id: true },
@@ -31,6 +35,9 @@ export async function setModifierOptionDeliverectModifierId(
   vendorId: string,
   deliverectModifierId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const adminCtx = await requireAdminActionContext();
+  if (!adminCtx.ok) return adminCtx;
+
   const opt = await prisma.modifierOption.findFirst({
     where: { id: modifierOptionId, modifierGroup: { vendorId } },
     select: { id: true },

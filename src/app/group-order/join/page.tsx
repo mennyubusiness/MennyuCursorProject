@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { readGroupOrderParticipantMarkersFromRequest } from "@/lib/group-participant-order-access";
+import { isGroupJoinCodeLookupRateLimited } from "@/lib/group-order-join-rate-limit";
+import { getClientIpFromHeaders } from "@/lib/rate-limit-http";
 import {
   GROUP_ORDER_JOIN_COPY,
   resolveGroupOrderJoinState,
@@ -43,6 +45,18 @@ export default async function GroupOrderJoinPage({
   const cookieStore = await cookies();
   const markers = readGroupOrderParticipantMarkersFromRequest(cookieStore);
   const authSession = await auth();
+
+  if (code?.trim()) {
+    const headersList = await headers();
+    const ip = getClientIpFromHeaders(headersList);
+    if (isGroupJoinCodeLookupRateLimited(ip)) {
+      return (
+        <JoinStateShell title={GROUP_ORDER_JOIN_COPY.notFoundTitle}>
+          <p>{GROUP_ORDER_JOIN_COPY.notFoundBody}</p>
+        </JoinStateShell>
+      );
+    }
+  }
 
   const state = await resolveGroupOrderJoinState({
     sessionId,

@@ -12,8 +12,8 @@ import type { GroupOrderParticipantMarkers } from "@/lib/group-order-participant
 import {
   expireGroupOrderSessionIfStale,
   expireStaleGroupOrderSessions,
-  normalizeGroupOrderJoinCode,
 } from "@/lib/group-order-session-lifecycle";
+import { parseGroupOrderJoinCodeDigits } from "@/lib/group-order-join-code";
 
 export type GroupOrderJoinState =
   | { kind: "not_found" }
@@ -60,7 +60,8 @@ export async function resolveGroupOrderJoinState(args: {
       include: { pod: { select: { name: true, slug: true } } },
     });
   } else if (args.joinCode?.trim()) {
-    const code = normalizeGroupOrderJoinCode(args.joinCode);
+    const code = parseGroupOrderJoinCodeDigits(args.joinCode);
+    if (!code) return { kind: "not_found" };
     session = await prisma.groupOrderSession.findFirst({
       where: { joinCode: code },
       include: { pod: { select: { name: true, slug: true } } },

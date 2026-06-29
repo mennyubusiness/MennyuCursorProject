@@ -10,6 +10,7 @@ vi.mock("react", async () => {
 vi.mock("@/auth", () => ({ auth: vi.fn().mockResolvedValue(null) }));
 vi.mock("next/headers", () => ({
   cookies: vi.fn().mockResolvedValue({ get: () => undefined }),
+  headers: vi.fn().mockResolvedValue(new Headers()),
 }));
 vi.mock("@/lib/group-order-participant-cookie", () => ({
   readGroupOrderParticipantMarkers: vi.fn().mockReturnValue({
@@ -26,6 +27,9 @@ vi.mock("@/lib/group-order-join-state", () => ({
 vi.mock("@/services/cart.service", () => ({}));
 vi.mock("@/services/group-order.service", () => ({}));
 vi.mock("@/lib/group-order-cart-page", () => ({}));
+vi.mock("@/lib/group-order-join-rate-limit", () => ({
+  isGroupJoinCodeLookupRateLimited: vi.fn().mockReturnValue(false),
+}));
 vi.mock("@/lib/rate-limit", () => ({
   RATE_LIMITS: {},
   RATE_LIMIT_ERROR_MESSAGE: "Too many requests.",
@@ -38,6 +42,7 @@ vi.mock("@/lib/rate-limit-http", () => ({
 
 import { validateGroupOrderJoinCodeAction } from "@/actions/group-order.actions";
 import { resolveGroupOrderJoinState } from "@/lib/group-order-join-state";
+import { isGroupJoinCodeLookupRateLimited } from "@/lib/group-order-join-rate-limit";
 
 describe("validateGroupOrderJoinCodeAction", () => {
   beforeEach(() => {
@@ -73,6 +78,16 @@ describe("validateGroupOrderJoinCodeAction", () => {
     });
     const result = await validateGroupOrderJoinCodeAction("123456");
     expect(result).toEqual({ ok: true, joinPath: "/group-order/join?code=123456" });
+  });
+
+  it("returns generic not-found copy when lookup is rate limited", async () => {
+    vi.mocked(isGroupJoinCodeLookupRateLimited).mockReturnValue(true);
+    const result = await validateGroupOrderJoinCodeAction("123456");
+    expect(result).toEqual({
+      ok: false,
+      error: "We couldn't find that group order. Check the code and try again.",
+    });
+    expect(resolveGroupOrderJoinState).not.toHaveBeenCalled();
   });
 });
 

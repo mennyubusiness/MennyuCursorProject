@@ -165,5 +165,67 @@ describe("assertCartSessionAccess", () => {
       });
       expect(r.ok).toBe(true);
     });
+
+    it("blocks host checkout when group session is expired", async () => {
+      mockGroupOrderSessionFindUnique.mockResolvedValue({
+        hostUserId: HOST_USER,
+        status: "expired",
+      });
+
+      const r = await assertCartSessionAccess(CART_ID, null, {
+        authUserId: HOST_USER,
+        mode: "checkout",
+      });
+
+      expect(r.ok).toBe(false);
+      if (!r.ok) {
+        expect(r.status).toBe(403);
+        expect(r.error).toContain("closed");
+      }
+    });
+
+    it("blocks host checkout when group session is ended", async () => {
+      mockGroupOrderSessionFindUnique.mockResolvedValue({
+        hostUserId: HOST_USER,
+        status: "ended",
+      });
+
+      const r = await assertCartSessionAccess(CART_ID, null, {
+        authUserId: HOST_USER,
+        mode: "checkout",
+      });
+
+      expect(r.ok).toBe(false);
+    });
+
+    it("blocks non-host checkout on active group cart", async () => {
+      const r = await assertCartSessionAccess(CART_ID, SESSION_A, {
+        authUserId: CUSTOMER_USER,
+        mode: "checkout",
+      });
+
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toContain("host");
+    });
+
+    it("blocks mutate access on expired group cart even for host owner", async () => {
+      mockCartFindUnique.mockResolvedValue({
+        id: CART_ID,
+        sessionId: SESSION_A,
+        podId: "pod_1",
+        userId: HOST_USER,
+      });
+      mockGroupOrderSessionFindUnique.mockResolvedValue({
+        hostUserId: HOST_USER,
+        status: "expired",
+      });
+
+      const r = await assertCartSessionAccess(CART_ID, SESSION_A, {
+        authUserId: HOST_USER,
+        mode: "mutate",
+      });
+
+      expect(r.ok).toBe(false);
+    });
   });
 });

@@ -40,6 +40,7 @@ import {
   resolveGroupOrderJoinState,
 } from "@/lib/group-order-join-state";
 import { buildGroupOrderJoinPath } from "@/lib/group-order-invite-url";
+import { isGroupJoinCodeLookupRateLimited } from "@/lib/group-order-join-rate-limit";
 import type { Cart } from "@/domain/types";
 
 export type ValidateGroupOrderJoinCodeResult =
@@ -265,6 +266,12 @@ export async function validateGroupOrderJoinCodeAction(
   }
   if (digits.length !== 6) {
     return { ok: false, error: "Code must be exactly 6 digits." };
+  }
+
+  const headersList = await headers();
+  const ip = getClientIpFromHeaders(headersList);
+  if (isGroupJoinCodeLookupRateLimited(ip)) {
+    return { ok: false, error: GROUP_ORDER_JOIN_COPY.notFoundBody };
   }
 
   const cookieStore = await cookies();

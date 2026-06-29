@@ -8,8 +8,8 @@ import { prisma } from "@/lib/db";
 import {
   expireGroupOrderSessionIfStale,
   expireStaleGroupOrderSessions,
-  normalizeGroupOrderJoinCode,
 } from "@/lib/group-order-session-lifecycle";
+import { parseGroupOrderJoinCodeDigits } from "@/lib/group-order-join-code";
 import { CartValidationError } from "@/services/cart-validation-error";
 import { normalizePhoneToE164US } from "@/lib/phone-e164";
 import { computeGroupCheckoutFingerprint } from "@/services/group-order-checkout-fingerprint.service";
@@ -247,7 +247,8 @@ export async function findSessionByCartId(cartId: string) {
 
 export async function findActiveSessionByJoinCode(joinCode: string) {
   await expireStaleGroupOrderSessions();
-  const code = normalizeGroupOrderJoinCode(joinCode);
+  const code = parseGroupOrderJoinCodeDigits(joinCode);
+  if (!code) return null;
   return prisma.groupOrderSession.findFirst({
     where: {
       joinCode: code,
@@ -281,7 +282,8 @@ export async function findSessionByIdForJoinOrTracking(sessionId: string) {
 
 export async function findSessionByJoinCodeForJoinOrTracking(joinCode: string) {
   await expireStaleGroupOrderSessions();
-  const code = normalizeGroupOrderJoinCode(joinCode);
+  const code = parseGroupOrderJoinCodeDigits(joinCode);
+  if (!code) return null;
   const session = await prisma.groupOrderSession.findFirst({
     where: { joinCode: code },
     include: { pod: { select: { id: true, name: true } } },
@@ -719,7 +721,10 @@ export async function enforceGroupOrderCartMutation(
   if (gos.status === "submitted") {
     throw new CartValidationError("This group order is closed.", "GROUP_ORDER_CLOSED");
   }
-  if (gos.status === "ended" || gos.status === "expired") {
+  if (gos.status === "expired") {
+    throw new CartValidationError("This group order is closed.", "GROUP_ORDER_CLOSED");
+  }
+  if (gos.status === "ended") {
     if (actor) {
       throw new CartValidationError("This group order is closed.", "GROUP_ORDER_CLOSED");
     }

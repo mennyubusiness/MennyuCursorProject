@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireAdminActionContext } from "@/lib/admin-action-context";
 import { prisma } from "@/lib/db";
 
 function clampBps(n: number): number {
@@ -31,6 +32,9 @@ export type PricingConfigFormInput = {
 export async function updateActivePricingConfig(
   input: PricingConfigFormInput
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const adminCtx = await requireAdminActionContext();
+  if (!adminCtx.ok) return adminCtx;
+
   const customerServiceFeeBps = percentToBps(input.customerServiceFeePercent);
   const vendorProcessingFeeBps = percentToBps(input.vendorProcessingFeePercent);
   const customerServiceFeeFlatCents = clampNonNegInt(input.customerServiceFeeFlatCents);

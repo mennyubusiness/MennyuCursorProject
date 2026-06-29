@@ -387,6 +387,14 @@ describe("enforceGroupOrderCartMutation", () => {
       enforceGroupOrderCartMutation("cart_1", actor, { kind: "add" })
     ).rejects.toMatchObject({ code: "GROUP_ORDER_CLOSED" });
   });
+
+  it("blocks solo-path mutations on expired sessions", async () => {
+    mockFindUniqueSession.mockResolvedValue({ status: "expired" });
+    const { enforceGroupOrderCartMutation } = await import("./group-order.service");
+    await expect(
+      enforceGroupOrderCartMutation("cart_1", null, { kind: "add" })
+    ).rejects.toMatchObject({ code: "GROUP_ORDER_CLOSED" });
+  });
 });
 
 describe("findExistingParticipantForJoin", () => {

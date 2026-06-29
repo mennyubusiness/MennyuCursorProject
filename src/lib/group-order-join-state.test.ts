@@ -60,6 +60,16 @@ describe("resolveGroupOrderJoinState", () => {
     expect(mockExpireBatch).toHaveBeenCalled();
   });
 
+  it("returns not_found for incomplete join codes without lookup", async () => {
+    const { resolveGroupOrderJoinState } = await import("./group-order-join-state");
+    const state = await resolveGroupOrderJoinState({
+      joinCode: "123",
+      markers: { participantId: null, legacyJoinToken: null },
+    });
+    expect(state.kind).toBe("not_found");
+    expect(mockFindFirst).not.toHaveBeenCalled();
+  });
+
   it("active session without cookie → can_join", async () => {
     mockFindFirst.mockResolvedValue(freshSession("active", { cartId: "cart_1" }));
     mockFindUnique.mockResolvedValue(freshSession("active"));
