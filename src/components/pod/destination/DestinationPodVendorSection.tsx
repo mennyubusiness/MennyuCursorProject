@@ -80,7 +80,7 @@ export function DestinationPodVendorSection({
                 </div>
               )}
               <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-2 xl:grid-cols-3">
-                {rows.map(({ vendor, isFeatured, availability }) => {
+                {rows.map(({ vendor, isFeatured, availability, hoursDisplay }) => {
                   const isHighlighted = highlightVendorId === vendor.id;
                   return (
                     <li
@@ -97,6 +97,7 @@ export function DestinationPodVendorSection({
                         vendor={vendor}
                         isFeatured={isFeatured}
                         availability={availability}
+                        hoursDisplay={hoursDisplay}
                       />
                     </li>
                   );

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { VendorLogo } from "@/components/images/VendorLogo";
 import { FavoriteVendorButton } from "@/components/retention/FavoriteVendorButton";
 import { PageShell } from "@/components/layout/page-shell";
+import { VendorHoursDisclosure } from "@/components/vendor/VendorHoursDisclosure";
+import type { VendorHoursDisplayModel } from "@/lib/vendor-hours-display";
 import type { VendorAvailabilityStatus } from "@/lib/vendor-availability";
 import { cn } from "@/lib/cn";
 
@@ -42,6 +44,7 @@ type VendorMenuHeroProps = {
   cuisineCategory: string | null;
   availabilityStatus: VendorAvailabilityStatus;
   bannerLine: string | null;
+  hoursDisplay: VendorHoursDisplayModel;
 };
 
 export function VendorMenuHero({
@@ -57,6 +60,7 @@ export function VendorMenuHero({
   cuisineCategory,
   availabilityStatus,
   bannerLine,
+  hoursDisplay,
 }: VendorMenuHeroProps) {
   const trimmedPodName = podName?.trim();
   const backLabel = trimmedPodName ? `Back to ${trimmedPodName}` : "Back to pod";
@@ -107,6 +111,10 @@ export function VendorMenuHero({
                 <li className="text-oo-stone-gray">{cuisineCategory.trim()}</li>
               ) : null}
             </ul>
+
+            <div className="mt-3 max-w-md">
+              <VendorHoursDisclosure display={hoursDisplay} />
+            </div>
 
             {vendorDescription?.trim() && (
               <p className="mt-2 line-clamp-2 max-w-2xl text-sm leading-relaxed text-oo-stone-gray">

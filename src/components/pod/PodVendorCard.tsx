@@ -8,6 +8,8 @@ import { vendorInitials } from "@/lib/vendor-initials";
 import { cn } from "@/lib/cn";
 
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
+import { VendorHoursDisclosure } from "@/components/vendor/VendorHoursDisclosure";
+import type { VendorHoursDisplayModel } from "@/lib/vendor-hours-display";
 
 export type PodVendorCardVendor = {
   id: string;
@@ -30,6 +32,7 @@ type PodVendorCardProps = {
   vendor: PodVendorCardVendor;
   isFeatured: boolean;
   availability: AvailabilityLabel;
+  hoursDisplay?: VendorHoursDisplayModel;
 };
 
 function VendorCardMedia({
@@ -79,15 +82,21 @@ function VendorCardMedia({
 }
 
 /** Vendor cards for pod marketplace grids and horizontal strips. */
-export function PodVendorCard({ podSlug, variant, vendor, isFeatured, availability }: PodVendorCardProps) {
+export function PodVendorCard({
+  podSlug,
+  variant,
+  vendor,
+  isFeatured,
+  availability,
+  hoursDisplay,
+}: PodVendorCardProps) {
   const href = buildVendorMenuCustomerPath(podSlug, vendor.slug);
   const grid = variant === "grid";
   const cuisine = vendor.cuisineCategory?.trim();
   const ctaLabel = availability.unavailable ? "View menu" : "Order now";
 
   return (
-    <Link
-      href={href}
+    <div
       className={cn(
         "group flex h-full flex-col overflow-hidden rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm transition duration-200",
         "hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md motion-reduce:hover:translate-y-0",
@@ -95,8 +104,12 @@ export function PodVendorCard({ podSlug, variant, vendor, isFeatured, availabili
         grid ? "w-full" : "w-[min(10.5rem,40vw)] shrink-0",
         availability.unavailable && "opacity-95"
       )}
-      aria-label={`${vendor.name}${cuisine ? `, ${cuisine}` : ""} — ${availability.statusLabel}. ${ctaLabel}.`}
     >
+      <Link
+        href={href}
+        className="flex min-h-0 flex-1 flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+        aria-label={`${vendor.name}${cuisine ? `, ${cuisine}` : ""} — ${availability.statusLabel}. ${ctaLabel}.`}
+      >
       <VendorCardMedia
         imageUrl={vendor.imageUrl}
         vendorName={vendor.name}
@@ -159,6 +172,13 @@ export function PodVendorCard({ podSlug, variant, vendor, isFeatured, availabili
           {ctaLabel} →
         </span>
       </div>
-    </Link>
+      </Link>
+
+      {grid && hoursDisplay ? (
+        <div className="border-t border-oo-light-stone/70 px-3.5 pb-3.5 pt-2 sm:px-4 sm:pb-4">
+          <VendorHoursDisclosure display={hoursDisplay} compact />
+        </div>
+      ) : null}
+    </div>
   );
 }

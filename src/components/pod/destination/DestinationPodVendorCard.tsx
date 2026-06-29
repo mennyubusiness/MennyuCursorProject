@@ -8,6 +8,8 @@ import { vendorInitials } from "@/lib/vendor-initials";
 import { cn } from "@/lib/cn";
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { PodVendorCardVendor } from "@/components/pod/PodVendorCard";
+import { VendorHoursDisclosure } from "@/components/vendor/VendorHoursDisclosure";
+import type { VendorHoursDisplayModel } from "@/lib/vendor-hours-display";
 
 type AvailabilityLabel = {
   unavailable: boolean;
@@ -20,6 +22,7 @@ type DestinationPodVendorCardProps = {
   vendor: PodVendorCardVendor;
   isFeatured: boolean;
   availability: AvailabilityLabel;
+  hoursDisplay: VendorHoursDisplayModel;
 };
 
 function VendorMedia({
@@ -75,6 +78,7 @@ export function DestinationPodVendorCard({
   vendor,
   isFeatured,
   availability,
+  hoursDisplay,
 }: DestinationPodVendorCardProps) {
   const href = buildVendorMenuCustomerPath(podSlug, vendor.slug);
   const cuisine = vendor.cuisineCategory?.trim();
@@ -82,17 +86,19 @@ export function DestinationPodVendorCard({
   const unavailable = availability.unavailable;
 
   return (
-    <Link
-      href={href}
+    <div
       className={cn(
         "group flex h-full min-h-[44px] flex-col overflow-hidden rounded-2xl border border-oo-light-stone bg-oo-warm-white shadow-sm transition duration-200",
         "hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md motion-reduce:hover:translate-y-0",
         isFeatured && !unavailable && "ring-1 ring-brand/25",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-oo-cream",
         unavailable && "hover:border-oo-light-stone"
       )}
-      aria-label={`${vendor.name}${cuisine ? `, ${cuisine}` : ""}${unavailable ? ` — ${availability.statusLabel}` : ""}. View menu.`}
     >
+      <Link
+        href={href}
+        className="flex min-h-0 flex-1 flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-oo-cream"
+        aria-label={`${vendor.name}${cuisine ? `, ${cuisine}` : ""}${unavailable ? ` — ${availability.statusLabel}` : ""}. View menu.`}
+      >
       <VendorMedia imageUrl={vendor.imageUrl} vendorName={vendor.name} muted={unavailable} />
       <div className="flex flex-1 flex-col p-4 sm:p-5">
         <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
@@ -121,6 +127,11 @@ export function DestinationPodVendorCard({
           </p>
         )}
       </div>
-    </Link>
+      </Link>
+
+      <div className="border-t border-oo-light-stone/70 px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
+        <VendorHoursDisclosure display={hoursDisplay} compact />
+      </div>
+    </div>
   );
 }

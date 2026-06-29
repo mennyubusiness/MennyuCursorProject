@@ -10,12 +10,28 @@ import { getPublicPodAnnouncementText } from "@/lib/pod-announcement";
 import { buildPodPageNavItems } from "@/lib/pod-page-nav";
 import { getPodOrderingStatus } from "@/lib/pod-page-status";
 import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
+import {
+  resolveVendorHoursTimezone,
+  vendorAvailabilityWithCustomerOrderingHours,
+} from "@/lib/vendor-customer-ordering-hours";
+import { buildVendorHoursDisplay, type VendorHoursDisplayModel } from "@/lib/vendor-hours-display";
 
 function availabilityForVendor(v: {
   isActive: boolean;
   mennyuOrdersPaused: boolean;
-}): PodVendorGridRow["availability"] {
-  const status = getVendorAvailabilityStatus(v);
+  customerOrderingHours: unknown;
+  deliverectChannelLinkId: string | null;
+}, podTimezone: string | null): PodVendorGridRow["availability"] {
+  const status = getVendorAvailabilityStatus(
+    vendorAvailabilityWithCustomerOrderingHours(
+      {
+        ...v,
+        syncCustomerOrderingHoursFromDeliverect: false,
+        deliverectSyncedCustomerOrderingHours: null,
+      },
+      podTimezone
+    )
+  );
   const unavailable = status !== "open";
   const isPosClosed = status === "closed";
   const isMennyuNotAccepting = status === "mennyu_paused";
@@ -35,19 +51,30 @@ function availabilityForVendor(v: {
   };
 }
 
-function toGridRow(pv: {
-  isFeatured: boolean;
-  vendor: {
-    id: string;
-    slug: string;
-    name: string;
-    description: string | null;
-    imageUrl: string | null;
-    cuisineCategory: string | null;
-    isActive: boolean;
-    mennyuOrdersPaused: boolean;
-  };
-}): PodVendorGridRow {
+function toGridRow(
+  pv: {
+    isFeatured: boolean;
+    vendor: {
+      id: string;
+      slug: string;
+      name: string;
+      description: string | null;
+      imageUrl: string | null;
+      cuisineCategory: string | null;
+      isActive: boolean;
+      mennyuOrdersPaused: boolean;
+      customerOrderingHours: unknown;
+      deliverectChannelLinkId: string | null;
+    };
+  },
+  podTimezone: string | null
+): PodVendorGridRow {
+  const hoursTimezone = resolveVendorHoursTimezone(podTimezone);
+  const hoursDisplay: VendorHoursDisplayModel = buildVendorHoursDisplay({
+    customerOrderingHours: pv.vendor.customerOrderingHours,
+    timeZone: hoursTimezone,
+  });
+
   return {
     vendor: {
       id: pv.vendor.id,
@@ -58,7 +85,8 @@ function toGridRow(pv: {
       cuisineCategory: pv.vendor.cuisineCategory,
     },
     isFeatured: pv.isFeatured,
-    availability: availabilityForVendor(pv.vendor),
+    availability: availabilityForVendor(pv.vendor, podTimezone),
+    hoursDisplay,
   };
 }
 
@@ -114,6 +142,8 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
                 mennyuOrdersPaused: true,
                 imageUrl: true,
                 cuisineCategory: true,
+                customerOrderingHours: true,
+                deliverectChannelLinkId: true,
               },
             },
           },
@@ -126,7 +156,7 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
 
   if (!pod || !pod.isActive) return null;
 
-  const vendorRows = pod.vendors.map(toGridRow);
+  const vendorRows = pod.vendors.map((pv) => toGridRow(pv, pod.pickupTimezone));
   const amenities = parsePodAmenities(pod.amenities);
   const customAmenities = parsePodCustomAmenities(pod.customAmenities);
   const orderingStatus = pod.mennyuOrdersPaused

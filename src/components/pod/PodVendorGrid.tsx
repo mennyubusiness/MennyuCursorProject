@@ -1,5 +1,6 @@
 import { PodVendorCard } from "@/components/pod/PodVendorCard";
 import type { PodVendorCardVendor } from "@/components/pod/PodVendorCard";
+import type { VendorHoursDisplayModel } from "@/lib/vendor-hours-display";
 
 export type PodVendorGridRow = {
   vendor: PodVendorCardVendor;
@@ -9,6 +10,7 @@ export type PodVendorGridRow = {
     statusLabel: string;
     showBrowseHint: boolean;
   };
+  hoursDisplay: VendorHoursDisplayModel;
 };
 
 type PodVendorGridProps = {
@@ -31,7 +33,7 @@ export function PodVendorGrid({
         "grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4"
       }
     >
-      {rows.map(({ vendor, isFeatured, availability }) => {
+      {rows.map(({ vendor, isFeatured, availability, hoursDisplay }) => {
         const isHighlighted = highlightVendorId === vendor.id;
         return (
           <li
@@ -49,6 +51,7 @@ export function PodVendorGrid({
               vendor={vendor}
               isFeatured={isFeatured}
               availability={availability}
+              hoursDisplay={hoursDisplay}
             />
           </li>
         );

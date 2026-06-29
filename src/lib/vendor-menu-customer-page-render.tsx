@@ -9,7 +9,11 @@ import { prisma } from "@/lib/db";
 import { looksLikePodOrVendorId, resolvePodBySlugOrId, resolveVendorInPodBySlugOrId } from "@/lib/pod-route-resolve";
 import { findSlugRedirectByOldSlug } from "@/lib/slug-admin.server";
 import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
-import { vendorAvailabilityWithCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
+import {
+  resolveVendorHoursTimezone,
+  vendorAvailabilityWithCustomerOrderingHours,
+} from "@/lib/vendor-customer-ordering-hours";
+import { buildVendorHoursDisplay } from "@/lib/vendor-hours-display";
 import { loadCustomerVendorMenuSections } from "@/services/vendor-customer-menu.service";
 
 const DEBUG_VENDOR_MENU_PAGE = process.env.NODE_ENV === "development";
@@ -101,6 +105,11 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
         : ("inactive" as const)
     : ("open" as const);
 
+  const hoursDisplay = buildVendorHoursDisplay({
+    customerOrderingHours: vendor.customerOrderingHours,
+    timeZone: resolveVendorHoursTimezone(podRow.pickupTimezone),
+  });
+
   return (
     <div className="w-full min-h-0">
       <RecentVendorViewTracker
@@ -124,6 +133,7 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
         cuisineCategory={vendor.cuisineCategory}
         availabilityStatus={availabilityStatus}
         bannerLine={bannerLine}
+        hoursDisplay={hoursDisplay}
       />
 
       {sections.length === 0 ? (
