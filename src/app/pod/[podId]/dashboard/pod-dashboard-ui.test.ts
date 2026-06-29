@@ -101,7 +101,10 @@ describe("pod promote page", () => {
     expect(share).toContain("QR code is not available yet");
     expect(qrActions).toContain("Copy link");
     expect(qrActions).toContain("Download QR");
+    expect(qrActions).toContain("Download QR sign");
     expect(qrActions).toContain("View public page");
+    expect(share).toContain("Print this sign and place it at your pod");
+    expect(share).toContain("generatePodQrSignSvg");
     expect(announcement).toContain('title="Announcement"');
     expect(announcement).toContain("Post a short update customers will see on your public pod page");
     expect(announcement).toContain("Save announcement");

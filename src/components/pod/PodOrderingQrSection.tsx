@@ -4,6 +4,11 @@ import { DashboardCard } from "@/components/dashboard";
 import { DASHBOARD_SECTION_SCROLL_CLASS } from "@/components/dashboard/dashboard-styles";
 import { buildPodCustomerPath } from "@/lib/customer-public-url";
 import { buildPodOrderingAbsoluteUrl } from "@/lib/pod-ordering-url";
+import {
+  buildPodQrSignDownloadFileName,
+  generatePodQrSignSvg,
+  podQrSignSvgToDataUrl,
+} from "@/lib/pod-qr-sign";
 import { cn } from "@/lib/cn";
 
 import { PodQrActions } from "./PodQrActions";
@@ -31,6 +36,7 @@ export async function PodOrderingQrSection({
   const safeSlug = slug.replace(/[^a-zA-Z0-9-_]+/g, "-").slice(0, 48) || "pod";
 
   let qrDataUrl = "";
+  let signSvgDataUrl = "";
   if (slug && origin) {
     const qrTargetUrl = buildPodOrderingAbsoluteUrl(origin, slug);
     try {
@@ -40,8 +46,15 @@ export async function PodOrderingQrSection({
         errorCorrectionLevel: "M",
         color: { dark: "#1c1917ff", light: "#ffffffff" },
       });
+      const signSvg = await generatePodQrSignSvg({
+        podName,
+        podSlug: slug,
+        publicPodUrl: qrTargetUrl,
+      });
+      signSvgDataUrl = podQrSignSvgToDataUrl(signSvg);
     } catch {
       qrDataUrl = "";
+      signSvgDataUrl = "";
     }
   }
 
@@ -76,11 +89,16 @@ export async function PodOrderingQrSection({
                   />
                 </div>
                 <div className="min-w-0 flex-1 space-y-3">
+                  <p className="text-sm text-oo-stone-gray">
+                    Print this sign and place it at your pod so customers can scan to order.
+                  </p>
                   <PodQrActions
                     publicPageUrl={publicPageUrl}
                     publicPageHref={publicPageHref}
                     qrDataUrl={qrDataUrl}
                     downloadFileName={`open-order-pod-${safeSlug}-qr.png`}
+                    signSvgDataUrl={signSvgDataUrl || undefined}
+                    signDownloadFileName={buildPodQrSignDownloadFileName(slug)}
                   />
                 </div>
               </div>

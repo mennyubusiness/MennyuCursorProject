@@ -1,5 +1,5 @@
 import type { CustomerVendorMenuCategorySection } from "@/services/vendor-customer-menu.service";
-import type { PublishEligibility } from "@/services/menu-publish-from-canonical.service";
+import type { PublishEligibility } from "@/lib/menu-import-publish-eligibility";
 
 export type LiveMenuSummary = {
   categoryCount: number;
@@ -139,16 +139,16 @@ export function buildVendorMenuPublishGate(input: VendorMenuPublishGateInput): V
   const disabledReasons: string[] = [];
 
   if (!input.hasLatestImport) {
-    disabledReasons.push("No unpublished menu import waiting to publish.");
+    disabledReasons.push("No menu changes are waiting to publish.");
   }
   if (!input.canManage) {
     disabledReasons.push("You do not have permission to publish menu changes.");
   }
   if (!input.posConnected) {
-    disabledReasons.push("POS is not connected — connect Deliverect before publishing.");
+    disabledReasons.push("Connect your POS before publishing menu changes.");
   }
-  if (!input.publishEligibility.canPublish) {
-    disabledReasons.push(...input.publishEligibility.reasons);
+  if (!input.publishEligibility.canPublish && input.publishEligibility.showPublishWarning) {
+    disabledReasons.push(...input.publishEligibility.blockers);
   }
 
   const unique = [...new Set(disabledReasons)];

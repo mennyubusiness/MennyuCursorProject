@@ -22,6 +22,12 @@ import {
 import { orderModifierGroupsForPublish } from "@/domain/menu-import/modifier-group-publish-order";
 import { onMenuImportPublishedToLive } from "@/services/menu-deliverect-post-publish.service";
 import { runMenuParityAudit, type MenuParityAuditResult } from "@/services/menu-parity.service";
+export {
+  evaluateMenuImportPublishEligibility,
+  noPendingMenuPublishEligibility,
+  type MenuImportPublishDisplayState,
+  type PublishEligibility,
+} from "@/lib/menu-import-publish-eligibility";
 
 export class MenuPublishValidationError extends Error {
   constructor(
@@ -31,50 +37,6 @@ export class MenuPublishValidationError extends Error {
     super(message);
     this.name = "MenuPublishValidationError";
   }
-}
-
-export type PublishEligibility = {
-  canPublish: boolean;
-  reasons: string[];
-};
-
-/** Read-only checks for admin UI (mirrors service gates). */
-export function evaluateMenuImportPublishEligibility(input: {
-  status: MenuImportJobStatus;
-  draftVersionId: string | null;
-  draftVersion: { state: MenuVersionState; canonicalSnapshot: unknown } | null;
-  issues: Array<{ severity: MenuImportIssueSeverity; waived: boolean }>;
-}): PublishEligibility {
-  const reasons: string[] = [];
-
-  if (!input.draftVersionId || !input.draftVersion) {
-    reasons.push("No draft MenuVersion linked to this job.");
-  } else if (input.draftVersion.state !== MenuVersionState.draft) {
-    reasons.push(`Draft version is not in draft state (current: ${input.draftVersion.state}).`);
-  }
-
-  const parsed = input.draftVersion
-    ? mennyuCanonicalMenuSchema.safeParse(input.draftVersion.canonicalSnapshot)
-    : null;
-  if (input.draftVersion && !parsed?.success) {
-    reasons.push("Canonical snapshot does not parse (fix import or draft data).");
-  }
-  if (parsed?.success && parsed.data.products.length === 0) {
-    reasons.push("Canonical menu has no products to publish.");
-  }
-
-  if (input.status !== MenuImportJobStatus.awaiting_review) {
-    reasons.push(`Job status must be awaiting_review (current: ${input.status}).`);
-  }
-
-  const blocking = input.issues.filter(
-    (i) => i.severity === MenuImportIssueSeverity.blocking && !i.waived
-  ).length;
-  if (blocking > 0) {
-    reasons.push(`${blocking} blocking issue(s) must be resolved or waived before publish.`);
-  }
-
-  return { canPublish: reasons.length === 0, reasons };
 }
 
 const menuImportPublishInclude = {

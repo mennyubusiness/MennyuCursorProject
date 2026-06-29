@@ -149,8 +149,7 @@ export default async function VendorMenuImportJobPage({
         vendorName={job.vendor.name}
         isLatestActionableJob={false}
         newerActionableJob={null}
-        publishBlocked={!publishEligibility.canPublish}
-        publishReasons={publishEligibility.reasons}
+        publishEligibility={publishEligibility}
         failedErrorCode={job.status === "failed" ? job.errorCode : null}
       />
 

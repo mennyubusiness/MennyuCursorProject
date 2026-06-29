@@ -9,6 +9,8 @@ type PodQrActionsProps = {
   publicPageHref: string;
   qrDataUrl: string;
   downloadFileName: string;
+  signSvgDataUrl?: string;
+  signDownloadFileName?: string;
 };
 
 export function PodQrActions({
@@ -16,6 +18,8 @@ export function PodQrActions({
   publicPageHref,
   qrDataUrl,
   downloadFileName,
+  signSvgDataUrl,
+  signDownloadFileName,
 }: PodQrActionsProps) {
   const [copied, setCopied] = useState(false);
 
@@ -45,6 +49,15 @@ export function PodQrActions({
       >
         Download QR
       </a>
+      {signSvgDataUrl && signDownloadFileName ? (
+        <a
+          href={signSvgDataUrl}
+          download={signDownloadFileName}
+          className={buttonClassName({ variant: "outline", size: "sm" })}
+        >
+          Download QR sign
+        </a>
+      ) : null}
       <Link
         href={publicPageHref}
         target="_blank"

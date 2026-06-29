@@ -132,11 +132,18 @@ export function VendorMenuPageView({ data }: { data: VendorMenuPageData }) {
                   : ""}
               </p>
               <p className="text-oo-stone-gray">
-                {data.publishGate.canPublish
-                  ? "Ready to publish after you review changes."
-                  : "Not ready to publish yet."}
+                {data.publishEligibility.displayState === "live"
+                  ? data.publishEligibility.infoMessage ?? "Menu is live."
+                  : data.publishGate.canPublish
+                    ? "Ready to publish after you review changes."
+                    : data.publishEligibility.displayState === "processing"
+                      ? data.publishEligibility.infoMessage ?? "Menu changes are still being processed."
+                      : data.publishEligibility.showPublishWarning
+                        ? "Finish required before publishing."
+                        : data.publishEligibility.infoMessage ?? "No menu changes are waiting to publish."}
               </p>
-              {!data.publishGate.canPublish && data.publishGate.disabledReasons.length > 0 ? (
+              {data.publishGate.canPublish ? null : data.publishEligibility.showPublishWarning &&
+                data.publishGate.disabledReasons.length > 0 ? (
                 <ul className="list-disc space-y-1 pl-5 text-xs text-amber-950">
                   {data.publishGate.disabledReasons.map((reason) => (
                     <li key={reason}>{reason}</li>

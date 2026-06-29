@@ -1,6 +1,6 @@
 import "server-only";
 
-import { MenuImportIssueSeverity } from "@prisma/client";
+import { MenuImportIssueSeverity, MenuVersionState } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
@@ -17,7 +17,7 @@ import {
   type VendorMenuDisplayItem,
 } from "@/lib/vendor-menu-page.helpers";
 import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
-import { evaluateMenuImportPublishEligibility } from "@/services/menu-publish-from-canonical.service";
+import { evaluateMenuImportPublishEligibility, noPendingMenuPublishEligibility } from "@/lib/menu-import-publish-eligibility";
 import { loadCustomerVendorMenuSections } from "@/services/vendor-customer-menu.service";
 
 export type VendorMenuPageData = {
@@ -30,6 +30,7 @@ export type VendorMenuPageData = {
   publishedMenuVersionId: string | null;
   displayItems: VendorMenuDisplayItem[];
   latestImport: LatestImportSummary | null;
+  publishEligibility: ReturnType<typeof evaluateMenuImportPublishEligibility>;
   publishGate: ReturnType<typeof buildVendorMenuPublishGate>;
   publishEligibilityReasons: string[];
   canManage: boolean;
@@ -116,7 +117,7 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
   const displayItems = flattenMenuSectionsForDisplay(sections, mappingWarningItemIds);
 
   let latestImport: LatestImportSummary | null = null;
-  let publishEligibility = { canPublish: false, reasons: ["No unpublished menu import waiting to publish."] };
+  let publishEligibility = noPendingMenuPublishEligibility();
 
   if (latestJob) {
     const issueCounts = countMenuImportIssues(latestJob.issues);
@@ -143,6 +144,15 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
         severity: i.severity as MenuImportIssueSeverity,
         waived: i.waived,
       })),
+    });
+  } else if (hasPublishedMenuVersion) {
+    publishEligibility = evaluateMenuImportPublishEligibility({
+      status: "succeeded",
+      draftVersionId: publishedVersion?.id ?? null,
+      draftVersion: publishedVersion
+        ? { state: MenuVersionState.published, canonicalSnapshot: publishedVersion.canonicalSnapshot }
+        : null,
+      issues: [],
     });
   }
 
@@ -177,8 +187,9 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
     publishedMenuVersionId: publishedVersion?.id ?? null,
     displayItems,
     latestImport,
+    publishEligibility,
     publishGate,
-    publishEligibilityReasons: publishEligibility.reasons,
+    publishEligibilityReasons: publishEligibility.blockers,
     canManage,
     canAdminPull: isPlatformAdmin,
     posConnected,
