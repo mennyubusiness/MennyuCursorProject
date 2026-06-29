@@ -297,6 +297,8 @@ export interface CheckoutInput {
   mennyuSessionId?: string | null;
   /** Verified phone-first customer account from checkout OTP session. */
   customerAccountId?: string | null;
+  /** Participant cookie markers — blocks group participants from checkout even when host is signed in. */
+  groupOrderParticipantMarkers?: import("@/lib/group-order-participant-cookie").GroupOrderParticipantMarkers | null;
 }
 
 // ---- Deliverect (integration) ----

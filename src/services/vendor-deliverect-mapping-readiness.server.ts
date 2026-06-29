@@ -2,7 +2,6 @@ import "server-only";
 
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { isDeliverectRoutingMode } from "@/lib/vendor-order-routing-mode";
-import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
 
 /** Deliverect-mode vendors only; manual-mode vendors are omitted (treated as mapping-ready). */
 export async function loadVendorDeliverectMappingReadyMap(
@@ -11,6 +10,11 @@ export async function loadVendorDeliverectMappingReadyMap(
 ): Promise<Map<string, boolean>> {
   const map = new Map<string, boolean>();
   const deliverectIds = vendorIds.filter((id) => isDeliverectRoutingMode(routingModes.get(id)));
+  if (deliverectIds.length === 0) return map;
+
+  const { evaluateDeliverectMenuIntegrityForVendor } = await import(
+    "@/services/deliverect-menu-integrity.service"
+  );
 
   await Promise.all(
     deliverectIds.map(async (vendorId) => {

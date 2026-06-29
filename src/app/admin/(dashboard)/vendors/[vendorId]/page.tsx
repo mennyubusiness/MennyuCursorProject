@@ -17,7 +17,7 @@ export default async function AdminVendorDetailPage({
   const [detail, podOptions, readinessBundles] = await Promise.all([
     loadAdminVendorDetail(id),
     prisma.pod.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: 500 }),
-    loadVendorReadinessBundles([id]),
+    loadVendorReadinessBundles([id], { includeDeliverectMappingIntegrity: true }),
   ]);
   if (!detail) notFound();
   const posSummary = readinessBundles.get(id)?.posSummary ?? null;

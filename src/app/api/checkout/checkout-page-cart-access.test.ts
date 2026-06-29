@@ -25,5 +25,7 @@ describe("checkout SSR and API cart access alignment", () => {
   it("checkout API uses assertCartSessionAccess before createOrderFromCart", () => {
     expect(checkoutApiSrc).toMatch(/assertCartSessionAccess/);
     expect(checkoutApiSrc).toMatch(/mennyuSessionId:\s*sessionId/);
+    expect(checkoutApiSrc).toMatch(/participantMarkers/);
+    expect(checkoutApiSrc).toMatch(/groupOrderParticipantMarkers/);
   });
 });

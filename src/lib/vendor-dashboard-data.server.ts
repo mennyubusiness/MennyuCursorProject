@@ -37,7 +37,6 @@ import {
   vendorRoutingStatusFieldLabel,
   vendorRoutingStatusLabel,
 } from "@/lib/vendor-order-routing-mode";
-import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 
 function startOfToday(): Date {
@@ -123,9 +122,15 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
 
   let deliverectMappingReady = true;
   if (isDeliverectRoutingMode(vendorRecord.orderRoutingMode)) {
+    const { loadVendorDeliverectMappingReadyMap } = await import(
+      "@/services/vendor-deliverect-mapping-readiness.server"
+    );
+    const routingModes = new Map<string, typeof vendorRecord.orderRoutingMode>([
+      [vendorId, vendorRecord.orderRoutingMode],
+    ]);
     try {
-      const integrity = await evaluateDeliverectMenuIntegrityForVendor(vendorId);
-      deliverectMappingReady = integrity.deliverectReady;
+      const mappingReady = await loadVendorDeliverectMappingReadyMap([vendorId], routingModes);
+      deliverectMappingReady = mappingReady.get(vendorId) ?? false;
     } catch {
       deliverectMappingReady = false;
     }

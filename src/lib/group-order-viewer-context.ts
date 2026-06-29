@@ -8,6 +8,7 @@ import {
   findSessionByCartId,
   type ResolvedGroupCartActor,
 } from "@/services/group-order.service";
+import { canAccessPaymentStep } from "@/lib/group-order-checkout-permission";
 
 export type GroupOrderViewerRole = "host" | "participant" | "unknown" | "solo";
 
@@ -31,11 +32,26 @@ export function canViewerCheckoutOnCartPage(args: {
   goStateView: "host" | "participant" | "unknown" | undefined;
   viewerCtx: GroupOrderViewerContext | null;
 }): boolean {
-  // Inactive group state (solo cart, terminal session, or no session) — always eligible for checkout UI.
-  if (!args.goStateActive) {
-    return true;
+  const actorRole: GroupOrderViewerRole = !args.goStateActive
+    ? "solo"
+    : args.goStateView === "host"
+      ? "host"
+      : args.goStateView === "participant"
+        ? "participant"
+        : "unknown";
+
+  if (
+    !canAccessPaymentStep({
+      isGroupOrder: args.goStateActive,
+      actorRole,
+      goStateView: args.goStateView,
+      groupSessionActive: args.goStateActive,
+    })
+  ) {
+    return false;
   }
-  if (args.goStateView !== "host") return false;
+
+  if (!args.goStateActive) return true;
   return Boolean(args.viewerCtx?.canCheckout);
 }
 

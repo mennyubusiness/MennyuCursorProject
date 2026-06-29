@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import type { VendorOrderForBoardClient } from "@/lib/vendor-orders-board-data";
 import {
@@ -13,13 +14,17 @@ import {
 import { getVendorOrderEffectiveDisplayState } from "@/lib/vendor-order-effective-state";
 import { getPickupCode } from "@/lib/pickup-code";
 import { useVendorOrdersPoll } from "@/hooks/useVendorOrdersPoll";
-import { NewOrderSoundAlert } from "../dashboard/NewOrderSoundAlert";
 import { VendorKitchenExitLink } from "../VendorLayoutChrome";
 import { VendorKitchenPauseToggle } from "./VendorKitchenPauseToggle";
 import {
   VendorKitchenOrderCard,
   buildKitchenOperatingMode,
 } from "./VendorKitchenOrderCard";
+
+const NewOrderSoundAlert = dynamic(
+  () => import("../dashboard/NewOrderSoundAlert").then((m) => m.NewOrderSoundAlert),
+  { ssr: false }
+);
 
 export function VendorKitchenBoard({
   vendorId,

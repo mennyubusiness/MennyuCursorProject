@@ -148,6 +148,20 @@ export async function getGroupOrderStateForCartPage(
   const submittedOrderId =
     s.status === "submitted" ? await findOrderIdForGroupOrderSession(s.id) : null;
 
+  const boundParticipant = await resolveGroupParticipantForSession(s.id, markers);
+  if (boundParticipant?.role === "participant" && !boundParticipant.leftAt) {
+    return {
+      active: true,
+      view: "participant",
+      status: s.status,
+      podId: s.podId,
+      viewerDisplayName: boundParticipant.displayName,
+      isHost: false,
+      participantId: boundParticipant.id,
+      submittedOrderId,
+    };
+  }
+
   const isHost = Boolean(hostId && s.hostUserId === hostId);
   if (isHost) {
     if (s.status === "ended" || s.status === "expired") {
@@ -170,7 +184,7 @@ export async function getGroupOrderStateForCartPage(
     };
   }
 
-  const participant = await resolveGroupParticipantForSession(s.id, markers);
+  const participant = boundParticipant;
   if (participant?.role === "participant") {
     return {
       active: true,

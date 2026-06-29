@@ -75,6 +75,7 @@ describe("createOrderFromCart checkout auth", () => {
     expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(CART_ID, SESSION_CURRENT, {
       authUserId: ACCOUNT_USER,
       mode: "checkout",
+      participantMarkers: null,
     });
     expect(OrderValidationError).toBeDefined();
   });
@@ -98,6 +99,7 @@ describe("createOrderFromCart checkout auth", () => {
     expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(CART_ID, SESSION_CURRENT, {
       authUserId: null,
       mode: "checkout",
+      participantMarkers: null,
     });
   });
 
@@ -124,6 +126,7 @@ describe("createOrderFromCart checkout auth", () => {
     expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(CART_ID, SESSION_CURRENT, {
       authUserId: "user_host",
       mode: "checkout",
+      participantMarkers: null,
     });
   });
 
@@ -151,6 +154,7 @@ describe("createOrderFromCart checkout auth", () => {
     expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(CART_ID, SESSION_CURRENT, {
       authUserId: ACCOUNT_USER,
       mode: "checkout",
+      participantMarkers: null,
     });
   });
 });

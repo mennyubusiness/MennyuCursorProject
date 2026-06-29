@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
+import { readGroupOrderParticipantMarkersFromCookieHeader } from "@/lib/group-participant-order-access";
 import { buildCustomerSessionCookieHeader } from "@/lib/customer-session";
 import { createCustomerOrderAccessToken } from "@/lib/customer-order-access-token";
 import {
@@ -81,9 +82,13 @@ export async function POST(request: NextRequest) {
 
   const sessionId = getSessionIdFromRequest(request);
   const authSession = await auth();
+  const participantMarkers = readGroupOrderParticipantMarkersFromCookieHeader(
+    request.headers.get("cookie")
+  );
   const access = await assertCartSessionAccess(cartId, sessionId, {
     authUserId: authSession?.user?.id ?? null,
     mode: "checkout",
+    participantMarkers,
   });
   if (!access.ok) {
     const code =
@@ -149,6 +154,7 @@ export async function POST(request: NextRequest) {
       authUserId: authSession?.user?.id ?? null,
       mennyuSessionId: sessionId,
       customerAccountId: phoneVerification.customerAccountId,
+      groupOrderParticipantMarkers: participantMarkers,
     });
   } catch (err) {
     if (err instanceof OrderValidationError) {

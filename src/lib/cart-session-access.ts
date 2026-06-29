@@ -7,6 +7,8 @@ import {
   GROUP_ORDER_JOIN_TOKEN_COOKIE,
   GROUP_ORDER_PARTICIPANT_ID_COOKIE,
 } from "@/lib/group-order-cookies";
+import type { GroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
+import { resolveGroupParticipantForSession } from "@/lib/group-participant-order-access";
 import {
   resolveActorForGroupCart,
   resolveGroupCartActorForRead,
@@ -21,6 +23,7 @@ export type AssertCartSessionAccessOptions = {
   groupOrderActor?: ResolvedGroupCartActor | null;
   authUserId?: string | null;
   mode?: "read" | "mutate" | "checkout";
+  participantMarkers?: GroupOrderParticipantMarkers | null;
 };
 
 const ACCESS_DENIED = "Cart not found or access denied";
@@ -98,7 +101,7 @@ export async function assertCartSessionAccess(
 
   const groupSession = await prisma.groupOrderSession.findUnique({
     where: { cartId },
-    select: { hostUserId: true, status: true },
+    select: { id: true, hostUserId: true, status: true },
   });
 
   if (groupSession) {
@@ -121,6 +124,24 @@ export async function assertCartSessionAccess(
     }
 
     if (mode === "checkout") {
+      const markers = options.participantMarkers ?? { participantId: null, legacyJoinToken: null };
+      const boundParticipant = await resolveGroupParticipantForSession(groupSession.id, markers);
+      if (boundParticipant?.role === "participant" && !boundParticipant.leftAt) {
+        return {
+          ok: false,
+          status: 403,
+          error: "Only the host can check out for this group order.",
+        };
+      }
+
+      if (options.groupOrderActor?.role === "participant") {
+        return {
+          ok: false,
+          status: 403,
+          error: "Only the host can check out for this group order.",
+        };
+      }
+
       const uid = options.authUserId?.trim();
       if (!uid || uid !== groupSession.hostUserId) {
         return {

@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
+import { groupParticipantCheckoutRedirectPath } from "@/lib/group-order-checkout-permission";
+import { readGroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
 import { getMennyuSessionIdForRequest } from "@/lib/session-request";
 import { prisma } from "@/lib/db";
 import { prepareGroupOrderCheckoutForHost } from "@/services/group-order.service";
@@ -32,18 +35,23 @@ export default async function CheckoutPage({
   const { cartId } = await searchParams;
   if (!cartId) redirect("/cart");
 
-  const [sessionId, authSession] = await Promise.all([
+  const [sessionId, authSession, cookieStore] = await Promise.all([
     getMennyuSessionIdForRequest(),
     auth(),
+    cookies(),
   ]);
+  const participantMarkers = readGroupOrderParticipantMarkers(cookieStore);
 
   const access = await assertCartSessionAccess(cartId, sessionId ?? null, {
     authUserId: authSession?.user?.id ?? null,
     mode: "checkout",
+    participantMarkers,
   });
   if (!access.ok) {
-    const errorCode = access.error.includes("host") ? "group_checkout_host_only" : "cart_access_denied";
-    redirect(`/cart?error=${encodeURIComponent(errorCode)}`);
+    if (access.error.includes("host")) {
+      redirect(groupParticipantCheckoutRedirectPath(cartId));
+    }
+    redirect(`/cart?error=${encodeURIComponent("cart_access_denied")}`);
   }
 
   const groupSessionMeta = access.isGroupOrder

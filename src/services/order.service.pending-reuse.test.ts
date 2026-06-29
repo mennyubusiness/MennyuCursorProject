@@ -402,6 +402,7 @@ describe("createOrderFromCart pending_payment reuse", () => {
     expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(CART_ID, SESSION_ID, {
       authUserId: null,
       mode: "checkout",
+      participantMarkers: null,
     });
   });
 
@@ -427,6 +428,7 @@ describe("createOrderFromCart pending_payment reuse", () => {
     expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(CART_ID, "sess_new", {
       authUserId: ACCOUNT_USER,
       mode: "checkout",
+      participantMarkers: null,
     });
   });
 
@@ -453,6 +455,7 @@ describe("createOrderFromCart pending_payment reuse", () => {
     expect(mockAssertCartSessionAccess).toHaveBeenCalledWith(CART_ID, SESSION_ID, {
       authUserId: HOST_USER,
       mode: "checkout",
+      participantMarkers: null,
     });
   });
 });

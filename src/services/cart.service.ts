@@ -441,7 +441,7 @@ export async function addCartItem(
       where: { id: cart.podId },
       select: { isActive: true, mennyuOrdersPaused: true },
     }),
-    loadVendorReadinessBundles([menuItemInitial.vendorId]),
+    loadVendorReadinessBundles([menuItemInitial.vendorId], { includeDeliverectMappingIntegrity: true }),
   ]);
   const readinessBundle = readinessBundles.get(menuItemInitial.vendorId);
   const podOrderability = getVendorOrderabilityInPod({

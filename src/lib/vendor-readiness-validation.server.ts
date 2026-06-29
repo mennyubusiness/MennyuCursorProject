@@ -12,7 +12,6 @@ import type {
   VendorReadinessVendorFields,
   VendorStripeReadinessSummary,
 } from "@/lib/vendor-readiness-states";
-import { loadVendorDeliverectMappingReadyMap } from "@/services/vendor-deliverect-mapping-readiness.server";
 
 const vendorReadinessSelect = {
   id: true,
@@ -41,8 +40,17 @@ export type VendorReadinessBundle = {
   posSummary: VendorPosReadinessSummary;
 };
 
+export type LoadVendorReadinessBundlesOptions = {
+  /**
+   * When true, runs Deliverect menu integrity for deliverect-routing vendors.
+   * Keep false for public pod/menu surfaces; enable for checkout/cart/admin validation.
+   */
+  includeDeliverectMappingIntegrity?: boolean;
+};
+
 export async function loadVendorReadinessBundles(
-  vendorIds: string[]
+  vendorIds: string[],
+  options: LoadVendorReadinessBundlesOptions = {}
 ): Promise<Map<string, VendorReadinessBundle>> {
   const uniqueIds = [...new Set(vendorIds.filter(Boolean))];
   const result = new Map<string, VendorReadinessBundle>();
@@ -56,11 +64,22 @@ export async function loadVendorReadinessBundles(
   const routingModes = new Map<string, VendorOrderRoutingMode>(
     vendors.map((vendor) => [vendor.id, vendor.orderRoutingMode])
   );
-  const mappingReadyByVendor = await loadVendorDeliverectMappingReadyMap(uniqueIds, routingModes);
+
+  let mappingReadyByVendor = new Map<string, boolean>();
+  if (options.includeDeliverectMappingIntegrity) {
+    const { loadVendorDeliverectMappingReadyMap } = await import(
+      "@/services/vendor-deliverect-mapping-readiness.server"
+    );
+    mappingReadyByVendor = await loadVendorDeliverectMappingReadyMap(uniqueIds, routingModes);
+  }
 
   const stripeConnectConfigured = Boolean(env.STRIPE_SECRET_KEY);
 
   for (const vendor of vendors) {
+    const deliverectMappingReady = options.includeDeliverectMappingIntegrity
+      ? (mappingReadyByVendor.get(vendor.id) ?? true)
+      : undefined;
+
     result.set(vendor.id, {
       vendor: {
         isActive: vendor.isActive,
@@ -90,7 +109,7 @@ export async function loadVendorReadinessBundles(
         pendingDeliverectConnectionKey: vendor.pendingDeliverectConnectionKey,
         hasUnmatchedChannelRegistration: false,
         orderRoutingMode: vendor.orderRoutingMode,
-        deliverectMappingReady: mappingReadyByVendor.get(vendor.id) ?? true,
+        deliverectMappingReady,
       },
     });
   }

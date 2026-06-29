@@ -161,7 +161,7 @@ export async function validateCartForOrder(cart: {
       }
       return map;
     })(),
-    loadVendorReadinessBundles(vendorIds),
+    loadVendorReadinessBundles(vendorIds, { includeDeliverectMappingIntegrity: true }),
     prisma.podVendor.findMany({
       where: { podId: cart.podId, vendorId: { in: vendorIds } },
       select: { vendorId: true, isActive: true },
@@ -899,6 +899,7 @@ export async function createOrderFromCart(input: CheckoutInput): Promise<CreateO
   const access = await assertCartSessionAccess(input.cartId, input.mennyuSessionId ?? null, {
     authUserId: input.authUserId ?? input.groupOrderHostUserId ?? null,
     mode: "checkout",
+    participantMarkers: input.groupOrderParticipantMarkers ?? null,
   });
   if (!access.ok) {
     const code =

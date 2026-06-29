@@ -70,6 +70,37 @@ describe("group-order-cart-page (server render helpers)", () => {
     }
   });
 
+  it("prefers participant markers over host auth on shared devices", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user_host", name: "Host" } });
+    mockFindSessionByCartId.mockResolvedValue({
+      id: "gos_1",
+      joinCode: "123456",
+      status: "locked_checkout",
+      podId: "pod_1",
+      hostUserId: "user_host",
+      participants: [
+        { id: "p_host", displayName: "Host", role: "host", leftAt: null },
+        { id: "p_guest", displayName: "Alex", role: "participant", leftAt: null },
+      ],
+    });
+    mockResolveGroupParticipantForSession.mockResolvedValue({
+      id: "p_guest",
+      role: "participant",
+      displayName: "Alex",
+      leftAt: null,
+    });
+    const { getGroupOrderStateForCartPage } = await import("./group-order-cart-page");
+    const state = await getGroupOrderStateForCartPage("cart_1", {
+      participantMarkers: { participantId: "p_guest", legacyJoinToken: null },
+    });
+    expect(state.active).toBe(true);
+    if (state.active) {
+      expect(state.view).toBe("participant");
+      expect(state.isHost).toBe(false);
+      expect(state.status).toBe("locked_checkout");
+    }
+  });
+
   it("returns inactive state for guest solo cart with ended group session on same cart row", async () => {
     mockFindSessionByCartId.mockResolvedValue({
       id: "gos_ended",

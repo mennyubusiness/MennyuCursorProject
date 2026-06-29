@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import {
   getVendorOrderBoardGroupKey,
   groupVendorOrdersForBoard,
@@ -20,8 +21,12 @@ import {
 } from "@/lib/vendor-urgency";
 import { getPickupCode } from "@/lib/pickup-code";
 import { VendorOrderCard } from "./VendorOrderCard";
-import { NewOrderSoundAlert } from "./NewOrderSoundAlert";
 import { VendorOrdersSummaryStrip } from "./VendorOrdersSummaryStrip";
+
+const NewOrderSoundAlert = dynamic(
+  () => import("./NewOrderSoundAlert").then((m) => m.NewOrderSoundAlert),
+  { ssr: false }
+);
 
 type GroupKey = VendorOrdersBoardGroup;
 

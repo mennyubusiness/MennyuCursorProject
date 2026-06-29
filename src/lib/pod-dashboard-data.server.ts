@@ -17,7 +17,6 @@ import {
 } from "@/lib/pod-vendor-adoption";
 import { derivePodSetupChecklist, deriveVendorPodReadinessForRoster } from "@/lib/vendor-pod-readiness";
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
-import { loadVendorDeliverectMappingReadyMap } from "@/services/vendor-deliverect-mapping-readiness.server";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { getPodAnalytics } from "@/services/pod-analytics.service";
@@ -115,6 +114,9 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
   const unmatchedByVendor = new Map(unmatchedFlags.map((row) => [row.vendorId, row.hasUnmatched]));
   const routingModes = new Map<string, VendorOrderRoutingMode>(
     pod.vendors.map((pv) => [pv.vendor.id, pv.vendor.orderRoutingMode])
+  );
+  const { loadVendorDeliverectMappingReadyMap } = await import(
+    "@/services/vendor-deliverect-mapping-readiness.server"
   );
   const mappingReadyByVendor = await loadVendorDeliverectMappingReadyMap(vendorIdsInPod, routingModes);
   const stripeConnectConfigured = Boolean(env.STRIPE_SECRET_KEY);

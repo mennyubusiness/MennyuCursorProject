@@ -1,4 +1,5 @@
 import { formatMobileBottomActionSummary } from "@/lib/mobile-customer-ui";
+import { groupParticipantWaitingCopy } from "@/lib/group-order-checkout-permission";
 
 export type CartCheckoutCtaInput = {
   viewerCanCheckout: boolean;
@@ -59,8 +60,6 @@ export function resolveCartCheckoutCtaState(input: CartCheckoutCtaInput): CartCh
       : blockedLabel,
     showTrackOrder: input.groupSubmitted,
     showParticipantMessage: input.showParticipantTotalsOnly,
-    participantMessage: input.sessionLockedCheckout
-      ? "The host is checking out. New changes are paused."
-      : "The host will check out when everyone is ready.",
+    participantMessage: groupParticipantWaitingCopy(input.sessionLockedCheckout),
   };
 }

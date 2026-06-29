@@ -6,6 +6,7 @@ import { buttonClassName } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { buildPodCustomerPath } from "@/lib/customer-public-url";
 import { resolveCartCheckoutCtaState } from "@/lib/cart-checkout-cta-state";
+import { groupParticipantWaitingCopy } from "@/lib/group-order-checkout-permission";
 import type { Cart } from "@/domain/types";
 
 export const CART_CHECKOUT_PRIMARY_LABEL = "Proceed to checkout";
@@ -98,9 +99,7 @@ export function CartPageSummaryCheckoutActions(props: CartPageCheckoutActionProp
     return (
       <div className="mt-6 border-t border-oo-light-stone pt-6">
         <p className="text-sm text-oo-stone-gray">
-          {sessionLockedCheckout
-            ? "The host is checking out. New changes are paused."
-            : "The host will check out when everyone is ready."}
+          {groupParticipantWaitingCopy(sessionLockedCheckout)}
         </p>
         <Link
           href={buildPodCustomerPath(podSlug)}
