@@ -2,11 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   isDeliverectRoutingMode,
   isManualDashboardRoutingMode,
+  isVendorDeliverectLiveForUi,
   isVendorDeliverectPosConnected,
+  isVendorPosManagedForUi,
+  isVendorPosMenuManagedForUi,
   isVendorRoutingOperationalReady,
   normalizeVendorOrderRoutingMode,
+  vendorKitchenStatusLine,
+  vendorKitchenStatusWarning,
+  vendorMenuSyncLabelForRouting,
   vendorOrderRoutingModeAdminLabel,
   vendorOrderRoutingModeShortLabel,
+  vendorRoutingStatusFieldLabel,
+  vendorRoutingStatusLabel,
 } from "./vendor-order-routing-mode";
 
 describe("normalizeVendorOrderRoutingMode", () => {
@@ -74,6 +82,38 @@ describe("isVendorRoutingOperationalReady", () => {
         deliverectMappingReady: false,
       })
     ).toBe(false);
+  });
+});
+
+describe("vendor-facing routing UI helpers", () => {
+  it("shows dashboard/tablet label instead of POS when manual_dashboard", () => {
+    expect(vendorRoutingStatusLabel("manual_dashboard", "connected")).toContain("Dashboard");
+    expect(vendorRoutingStatusFieldLabel("manual_dashboard")).toBe("Order routing");
+    expect(isVendorPosManagedForUi("manual_dashboard", "connected")).toBe(false);
+    expect(isVendorDeliverectLiveForUi("manual_dashboard", true)).toBe(false);
+    expect(isVendorPosMenuManagedForUi("manual_dashboard", true)).toBe(false);
+    expect(vendorKitchenStatusLine("manual_dashboard", "connected")).toContain("Open Order");
+    expect(vendorKitchenStatusWarning("manual_dashboard", "not_connected")).toBeNull();
+  });
+
+  it("uses POS labels and managed flags when deliverect", () => {
+    expect(vendorRoutingStatusLabel("deliverect", "connected")).toBe("POS connected");
+    expect(vendorRoutingStatusFieldLabel("deliverect")).toBe("POS");
+    expect(isVendorPosManagedForUi("deliverect", "connected")).toBe(true);
+    expect(isVendorDeliverectLiveForUi("deliverect", true)).toBe(true);
+    expect(isVendorPosMenuManagedForUi("deliverect", true)).toBe(true);
+    expect(vendorMenuSyncLabelForRouting({
+      orderRoutingMode: "deliverect",
+      posConnected: true,
+      menuReady: true,
+      hasOperationalItems: true,
+    })).toBe("Menu synced from POS");
+    expect(vendorMenuSyncLabelForRouting({
+      orderRoutingMode: "manual_dashboard",
+      posConnected: true,
+      menuReady: true,
+      hasOperationalItems: true,
+    })).toBe("Menu ready");
   });
 });
 

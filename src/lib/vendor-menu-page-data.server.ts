@@ -16,6 +16,7 @@ import {
   type LatestImportSummary,
   type VendorMenuDisplayItem,
 } from "@/lib/vendor-menu-page.helpers";
+import { isDeliverectRoutingMode, isVendorPosMenuManagedForUi } from "@/lib/vendor-order-routing-mode";
 import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
 import { evaluateMenuImportPublishEligibility, noPendingMenuPublishEligibility } from "@/lib/menu-import-publish-eligibility";
 import { loadCustomerVendorMenuSections } from "@/services/vendor-customer-menu.service";
@@ -57,6 +58,7 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
       autoPublishMenus: true,
       deliverectChannelLinkId: true,
       posConnectionStatus: true,
+      orderRoutingMode: true,
     },
   });
   if (!vendor) return null;
@@ -156,14 +158,16 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
     });
   }
 
-  const posConnected = Boolean(
+  const posPhysicallyConnected = Boolean(
     vendor.deliverectChannelLinkId?.trim() && vendor.posConnectionStatus === "connected"
   );
+  const posConnected = isVendorPosMenuManagedForUi(vendor.orderRoutingMode, posPhysicallyConnected);
 
   const publishGate = buildVendorMenuPublishGate({
     hasLatestImport: Boolean(latestImport),
     publishEligibility,
-    posConnected,
+    posConnected:
+      isDeliverectRoutingMode(vendor.orderRoutingMode) ? posPhysicallyConnected : true,
     canManage,
   });
 

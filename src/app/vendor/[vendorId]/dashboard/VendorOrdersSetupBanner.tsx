@@ -1,12 +1,16 @@
+import type { VendorOrderRoutingMode } from "@prisma/client";
 import Link from "next/link";
+
+import { vendorSetupIncompleteBannerCopy } from "@/lib/vendor-order-routing-mode";
 
 type Props = {
   vendorId: string;
   show: boolean;
+  orderRoutingMode: VendorOrderRoutingMode;
 };
 
-/** Compact nudge when POS or payments are not fully configured. */
-export function VendorOrdersSetupBanner({ vendorId, show }: Props) {
+/** Compact nudge when routing or payments are not fully configured. */
+export function VendorOrdersSetupBanner({ vendorId, show, orderRoutingMode }: Props) {
   if (!show) return null;
 
   return (
@@ -17,10 +21,7 @@ export function VendorOrdersSetupBanner({ vendorId, show }: Props) {
       >
         Setup incomplete
       </Link>
-      <span className="text-oo-stone-gray">
-        {" "}
-        — finish POS connection and payments on the Setup page when you are ready.
-      </span>
+      <span className="text-oo-stone-gray"> {vendorSetupIncompleteBannerCopy(orderRoutingMode)}</span>
     </div>
   );
 }

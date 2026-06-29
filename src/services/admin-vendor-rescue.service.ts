@@ -24,6 +24,8 @@ function revalidateVendorPaths(vendorId: string) {
   revalidatePath("/admin/vendors");
   revalidatePath(`/vendor/${vendorId}/dashboard`);
   revalidatePath(`/vendor/${vendorId}/setup`);
+  revalidatePath(`/vendor/${vendorId}/orders`);
+  revalidatePath(`/vendor/${vendorId}/kitchen`);
   revalidatePath(`/vendor/${vendorId}/menu`);
   revalidatePath("/explore");
 }

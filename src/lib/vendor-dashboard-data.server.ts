@@ -11,9 +11,7 @@ import {
 } from "@/lib/vendor-dashboard-attention";
 import {
   vendorIntakeStatusLabel,
-  vendorMenuSyncLabel,
   vendorPaymentsReadinessLabel,
-  vendorPosConnectionLabel,
 } from "@/lib/vendor-operational-copy";
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
@@ -31,7 +29,14 @@ import { getVendorOrdersBoardData, serializeVendorOrdersForBoard } from "@/lib/v
 import { summarizeVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
 import { resolveVendorHoursTimezone } from "@/lib/vendor-customer-ordering-hours";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
-import { isDeliverectRoutingMode } from "@/lib/vendor-order-routing-mode";
+import {
+  isDeliverectRoutingMode,
+  isVendorDeliverectLiveForUi,
+  isVendorPosManagedForUi,
+  vendorMenuSyncLabelForRouting,
+  vendorRoutingStatusFieldLabel,
+  vendorRoutingStatusLabel,
+} from "@/lib/vendor-order-routing-mode";
 import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 
@@ -272,14 +277,16 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     menuReady,
     menuSummary,
     intakeLabel,
-    posConnectionLabel: vendorPosConnectionLabel(posState),
-    menuSyncLabel: vendorMenuSyncLabel({
+    posConnectionLabel: vendorRoutingStatusLabel(vendorRecord.orderRoutingMode, posState),
+    routingStatusFieldLabel: vendorRoutingStatusFieldLabel(vendorRecord.orderRoutingMode),
+    menuSyncLabel: vendorMenuSyncLabelForRouting({
+      orderRoutingMode: vendorRecord.orderRoutingMode,
       posConnected,
       menuReady,
       hasOperationalItems: menuSummary.hasOperationalItems,
     }),
     paymentsLabel: vendorPaymentsReadinessLabel(paymentsReady),
-    posManaged: posConnected,
+    posManaged: isVendorPosManagedForUi(vendorRecord.orderRoutingMode, posState),
     currentPod: currentPod
       ? { id: currentPod.pod.id, name: currentPod.pod.name, slug: currentPod.pod.slug }
       : null,
@@ -289,7 +296,10 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     todayStats,
     initialVendorOrdersForClient,
     initialNowMs,
-    isDeliverectLive: isRoutingRetryAvailable(),
+    isDeliverectLive: isVendorDeliverectLiveForUi(
+      vendorRecord.orderRoutingMode,
+      isRoutingRetryAvailable()
+    ),
     lastMenuSyncAt: vendorRecord.deliverectAutoMapLastAt?.toISOString() ?? null,
     hoursSummary,
   };

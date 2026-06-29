@@ -17,6 +17,7 @@ export const getVendorOrdersBoardData = cache(async (vendorId: string) => {
       deliverectChannelLinkId: true,
       deliverectLocationId: true,
       posConnectionStatus: true,
+      orderRoutingMode: true,
       pendingDeliverectConnectionKey: true,
       deliverectAutoMapLastOutcome: true,
       deliverectAutoMapLastAt: true,

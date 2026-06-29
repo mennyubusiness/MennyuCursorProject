@@ -45,6 +45,7 @@ export default async function VendorDashboardPage({
           intakeLabel={ctx.intakeLabel}
           podName={ctx.currentPod?.name ?? null}
           posConnectionLabel={ctx.posConnectionLabel}
+          routingStatusFieldLabel={ctx.routingStatusFieldLabel}
           menuSyncLabel={ctx.menuSyncLabel}
           paymentsLabel={ctx.paymentsLabel}
           storefrontHref={ctx.storefrontHref}

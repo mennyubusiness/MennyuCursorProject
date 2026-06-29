@@ -8,6 +8,10 @@ import { VendorOrderRoutingSection } from "@/components/vendor/VendorOrderRoutin
 import { buildVendorOperationalSetupItems } from "@/lib/vendor-dashboard-attention";
 import { loadVendorDashboardContext } from "@/lib/vendor-dashboard-data.server";
 import { VENDOR_ALL_READY_COPY } from "@/lib/vendor-operational-copy";
+import {
+  vendorSetupOperationalLockedDescription,
+  vendorSetupPageIncompleteDescription,
+} from "@/lib/vendor-order-routing-mode";
 import { VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS } from "@/lib/vendor-pod-readiness";
 
 export default async function VendorSetupPage({
@@ -40,7 +44,7 @@ export default async function VendorSetupPage({
         description={
           ctx.setupComplete
             ? "Readiness checklist — everything required before customers can order."
-            : "Complete public profile steps to appear on your pod page, then finish payment and POS setup to accept orders."
+            : vendorSetupPageIncompleteDescription(ctx.vendorRecord.orderRoutingMode)
         }
         actions={
           ctx.setupComplete ? (
@@ -67,10 +71,7 @@ export default async function VendorSetupPage({
           />
         )}
 
-        <VendorOrderRoutingSection
-          orderRoutingMode={ctx.vendorRecord.orderRoutingMode}
-          posSummary={ctx.readinessPosSummary}
-        />
+        <VendorOrderRoutingSection orderRoutingMode={ctx.vendorRecord.orderRoutingMode} />
 
         <VendorSetupChecklist items={appearance} title="Required to appear on pod page" />
 
@@ -80,8 +81,7 @@ export default async function VendorSetupPage({
           <section className="rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/40 px-4 py-4 text-sm text-oo-stone-gray">
             <h3 className="font-semibold text-oo-charcoal">Required to accept orders</h3>
             <p className="mt-2">
-              Finish the public profile requirements above first. Payment, POS, and ordering controls unlock after your
-              vendor is visible on the pod page.
+              {vendorSetupOperationalLockedDescription(ctx.vendorRecord.orderRoutingMode)}
             </p>
           </section>
         )}

@@ -75,12 +75,6 @@ export function AdminVendorOrderRoutingSection({
         </p>
       ) : null}
 
-      {!deliverectMode ? (
-        <p className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-          {VENDOR_ROUTING_MODE_COPY.manualDashboard.serviceReminder}
-        </p>
-      ) : null}
-
       {mode !== orderRoutingMode ? (
         <div className="mt-4">
           <AdminReasonActionForm

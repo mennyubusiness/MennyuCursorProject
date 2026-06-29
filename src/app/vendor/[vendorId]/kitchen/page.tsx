@@ -1,5 +1,10 @@
 import { notFound } from "next/navigation";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
+import {
+  isVendorDeliverectLiveForUi,
+  vendorKitchenStatusLine,
+  vendorKitchenStatusWarning,
+} from "@/lib/vendor-order-routing-mode";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import {
@@ -19,7 +24,10 @@ export default async function VendorKitchenPage({
 
   const { vendor } = data;
   const initialNowMs = Date.now();
-  const isDeliverectLive = isRoutingRetryAvailable();
+  const isDeliverectLive = isVendorDeliverectLiveForUi(
+    vendor.orderRoutingMode,
+    isRoutingRetryAvailable()
+  );
   const hasUnmatchedChannelRegistration = await hasUnmatchedChannelRegistrationForVendorById(
     vendorId
   );
@@ -32,19 +40,8 @@ export default async function VendorKitchenPage({
     hasUnmatchedChannelRegistrationForVendor: hasUnmatchedChannelRegistration,
   });
 
-  const posStatusLine =
-    posUi === "connected"
-      ? "POS connected — status may sync from kitchen system"
-      : posUi === "needs_attention"
-        ? "POS needs attention — confirm orders in Open Order if needed"
-        : "Manual mode — use buttons below to update order status";
-
-  const posWarning =
-    posUi === "needs_attention"
-      ? "POS connection needs attention. Orders may not sync automatically until this is resolved."
-      : posUi === "not_connected"
-        ? "POS not connected — kitchen actions update Open Order directly."
-        : null;
+  const posStatusLine = vendorKitchenStatusLine(vendor.orderRoutingMode, posUi);
+  const posWarning = vendorKitchenStatusWarning(vendor.orderRoutingMode, posUi);
 
   const initialVendorOrders = serializeVendorOrdersForBoard(
     data.vendorOrders,
