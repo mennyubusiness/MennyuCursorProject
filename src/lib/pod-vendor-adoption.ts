@@ -3,10 +3,18 @@ import type { VendorPodReadinessStatus } from "@/lib/vendor-pod-readiness";
 /** Simple owner-facing status label derived from existing readiness state. */
 export function podOwnerVendorDisplayStatus(
   status: VendorPodReadinessStatus,
-  canAcceptOrders: boolean
+  canAcceptOrders: boolean,
+  setupSummary?: { publicProfile?: boolean; profile?: boolean; menu?: boolean; hours?: boolean }
 ): string {
   if (canAcceptOrders) {
     return "Live";
+  }
+
+  const publicReady = setupSummary?.publicProfile ?? (
+    setupSummary?.profile && setupSummary?.menu && (setupSummary?.hours ?? true)
+  );
+  if (publicReady === false) {
+    return "Hidden";
   }
 
   switch (status) {

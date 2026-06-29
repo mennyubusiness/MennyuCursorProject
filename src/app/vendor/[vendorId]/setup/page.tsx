@@ -5,9 +5,10 @@ import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { VendorSetupChecklist } from "@/components/vendor/VendorSetupChecklist";
 import { loadVendorDashboardContext } from "@/lib/vendor-dashboard-data.server";
 import { VENDOR_ALL_READY_COPY } from "@/lib/vendor-operational-copy";
-import { VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS } from "@/lib/vendor-pod-readiness";
-
-const REQUIRED_KEYS = new Set<string>(VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS);
+import {
+  VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS,
+  VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS,
+} from "@/lib/vendor-pod-readiness";
 
 export default async function VendorSetupPage({
   params,
@@ -18,7 +19,12 @@ export default async function VendorSetupPage({
   const ctx = await loadVendorDashboardContext(vendorId);
   if (!ctx) notFound();
 
-  const required = ctx.readiness.checklist.filter((item) => REQUIRED_KEYS.has(item.key));
+  const appearance = ctx.readiness.checklist.filter((item) =>
+    (VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS as readonly string[]).includes(item.key)
+  );
+  const acceptingOrders = ctx.readiness.checklist.filter((item) =>
+    (VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS as readonly string[]).includes(item.key)
+  );
 
   return (
     <DashboardShell tier="command" className="px-0 pb-0 pt-0">
@@ -28,7 +34,7 @@ export default async function VendorSetupPage({
         description={
           ctx.setupComplete
             ? "Readiness checklist — everything required before customers can order."
-            : "Complete these steps before accepting orders."
+            : "Complete public profile steps to appear on your pod page, then finish payment and POS setup to accept orders."
         }
         actions={
           ctx.setupComplete ? (
@@ -50,7 +56,8 @@ export default async function VendorSetupPage({
           </div>
         ) : null}
 
-        <VendorSetupChecklist items={required} title="Required to accept orders" />
+        <VendorSetupChecklist items={appearance} title="Required to appear on pod page" />
+        <VendorSetupChecklist items={acceptingOrders} title="Required to accept orders" />
       </div>
     </DashboardShell>
   );

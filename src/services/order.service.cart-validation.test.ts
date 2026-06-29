@@ -41,6 +41,12 @@ vi.mock("@/services/cart-deliverect-variant-resolution", () => ({
   variantSelectionsPriceCentsForLeafCartLine: (...args: unknown[]) => mockVariantCharge(...args),
 }));
 
+const mockLoadVendorReadinessBundles = vi.fn();
+
+vi.mock("@/lib/vendor-readiness-validation.server", () => ({
+  loadVendorReadinessBundles: (...args: unknown[]) => mockLoadVendorReadinessBundles(...args),
+}));
+
 import type { CartForValidation } from "./order.service";
 import { defaultVendorCustomerOrderingWeek } from "@/lib/vendor-customer-ordering-hours";
 
@@ -75,6 +81,7 @@ function baseCart(items: CartForValidation["items"]): CartForValidation {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockLoadVendorReadinessBundles.mockResolvedValue(new Map());
   mockPodFindUnique.mockResolvedValue({ isActive: true, pickupTimezone: "America/Chicago" });
   mockPodVendorFindUnique.mockResolvedValue({ isActive: true });
   mockPodVendorFindMany.mockResolvedValue([{ vendorId: "v_1", isActive: true }]);
@@ -200,23 +207,54 @@ describe("validateCartForOrder", () => {
     expect(open.valid).toBe(true);
   });
 
-  it("rejects vendor when manual customer ordering hours are missing", async () => {
-    mockPodFindUnique.mockResolvedValue({ isActive: true, pickupTimezone: "America/Chicago" });
+  it("rejects vendor when customer ordering hours are missing from public profile", async () => {
+    mockLoadVendorReadinessBundles.mockResolvedValue(
+      new Map([
+        [
+          "v_1",
+          {
+            vendor: {
+              isActive: true,
+              mennyuOrdersPaused: false,
+              name: "Kitchen",
+              slug: "kitchen",
+              description: "Food",
+              imageUrl: "https://example.com/b.jpg",
+              cuisineCategory: "Tacos",
+              customerOrderingHours: null,
+            },
+            menuSummary: { hasOperationalItems: true, hasAvailableOperationalItems: true },
+            stripeSummary: {
+              stripeConnectedAccountId: "acct",
+              stripeChargesEnabled: true,
+              stripePayoutsEnabled: true,
+              stripeConnectConfigured: true,
+            },
+            posSummary: {
+              deliverectChannelLinkId: "link",
+              posConnectionStatus: "connected",
+              deliverectAutoMapLastOutcome: null,
+              pendingDeliverectConnectionKey: null,
+              hasUnmatchedChannelRegistration: false,
+            },
+          },
+        ],
+      ])
+    );
     const result = await validateCartForOrder(
       baseCart([
         baseLine({
           vendor: {
             isActive: true,
             mennyuOrdersPaused: false,
-            syncCustomerOrderingHoursFromDeliverect: true,
-            deliverectSyncedCustomerOrderingHours: defaultVendorCustomerOrderingWeek(),
             customerOrderingHours: null,
+            posOpen: false,
           },
         }),
       ])
     );
     expect(result.valid).toBe(false);
-    if (!result.valid) expect(result.code).toBe("VENDOR_CLOSED");
+    if (!result.valid) expect(result.code).toBe("VENDOR_NOT_PUBLIC_READY");
   });
 
   it("rejects inactive pod", async () => {
@@ -227,7 +265,7 @@ describe("validateCartForOrder", () => {
   });
 
   it("rejects vendor paused in pod", async () => {
-    mockPodVendorFindUnique.mockResolvedValue({ isActive: false });
+    mockPodVendorFindMany.mockResolvedValue([{ vendorId: "v_1", isActive: false }]);
     const result = await validateCartForOrder(baseCart([baseLine()]));
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.code).toBe("VENDOR_PAUSED_IN_POD");

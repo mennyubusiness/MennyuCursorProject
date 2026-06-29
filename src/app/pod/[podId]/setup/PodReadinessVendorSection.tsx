@@ -8,6 +8,15 @@ import {
   vendorReadinessBadge,
   vendorReadinessPrimaryAction,
 } from "@/lib/pod-readiness-page";
+import { getVendorPodOwnerDisplayStateFromSetup } from "@/lib/vendor-readiness-states";
+
+function rowDisplayState(row: PodRosterVendorRow) {
+  return getVendorPodOwnerDisplayStateFromSetup({
+    podVendorActive: row.podVendorActive,
+    canAcceptOrders: row.readiness.canAcceptOrders,
+    setupSummary: row.readiness.setupSummary,
+  });
+}
 
 export function PodReadinessVendorSection({
   podId,
@@ -46,9 +55,12 @@ export function PodReadinessVendorSection({
             const badge = vendorReadinessBadge(row);
             const missingLines = deriveVendorMissingLines(row);
             const action = vendorReadinessPrimaryAction({ podId, podSlug, row });
-            const visibilityLabel = row.podVendorActive
-              ? "Visible on pod page"
-              : "Not visible on pod page";
+            const visibilityLabel =
+              rowDisplayState(row) === "live"
+                ? "Live — accepting orders"
+                : rowDisplayState(row) === "hidden"
+                  ? "Hidden — public profile incomplete"
+                  : "Visible — not accepting orders";
             const orderabilityLabel = row.readiness.canAcceptOrders
               ? "Orderable"
               : "Not orderable";

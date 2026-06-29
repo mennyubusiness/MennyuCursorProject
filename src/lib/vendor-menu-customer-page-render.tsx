@@ -10,6 +10,11 @@ import { looksLikePodOrVendorId, resolvePodBySlugOrId, resolveVendorInPodBySlugO
 import { findSlugRedirectByOldSlug } from "@/lib/slug-admin.server";
 import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
 import {
+  getVendorPublicVisibilityState,
+  getVendorOrderabilityState,
+} from "@/lib/vendor-readiness-states";
+import { loadVendorReadinessBundles } from "@/lib/vendor-readiness-validation.server";
+import {
   resolveVendorHoursTimezone,
   vendorAvailabilityWithCustomerOrderingHours,
 } from "@/lib/vendor-customer-ordering-hours";
@@ -35,7 +40,24 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
   if (!resolved) notFound();
 
   const { vendor, podVendor: pv } = resolved;
-  if (!vendor.isActive) notFound();
+  if (!vendor.isActive || !pv?.isActive) notFound();
+
+  const readinessBundles = await loadVendorReadinessBundles([vendor.id]);
+  const readinessBundle = readinessBundles.get(vendor.id);
+  if (!readinessBundle) notFound();
+
+  const readinessEvaluation = {
+    vendor: readinessBundle.vendor,
+    menuSummary: readinessBundle.menuSummary,
+    stripeSummary: readinessBundle.stripeSummary,
+    posSummary: readinessBundle.posSummary,
+    pod: { isActive: true, mennyuOrdersPaused: false },
+    podVendor: { exists: true, isActive: pv.isActive },
+  };
+
+  if (getVendorPublicVisibilityState(readinessEvaluation) === "hidden") {
+    notFound();
+  }
 
   if (
     (looksLikePodOrVendorId(podRef) && podRef !== pod.slug) ||
@@ -87,6 +109,11 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
     vendor,
     podRow.pickupTimezone
   );
+  const evaluationWithAvailability = {
+    ...readinessEvaluation,
+    pod: { isActive: podRow.isActive, mennyuOrdersPaused: podRow.mennyuOrdersPaused },
+    vendorAvailability: vendorForOrderability,
+  };
 
   const orderability = getVendorOrderabilityInPod({
     podActive: podRow.isActive,
@@ -94,13 +121,20 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
     podVendorExists: Boolean(pv),
     podVendorActive: pv?.isActive ?? false,
     vendor: vendorForOrderability,
+    readiness: {
+      vendor: readinessBundle.vendor,
+      menuSummary: readinessBundle.menuSummary,
+      stripeSummary: readinessBundle.stripeSummary,
+      posSummary: readinessBundle.posSummary,
+    },
   });
+  const orderState = getVendorOrderabilityState(evaluationWithAvailability);
   const orderingDisabled = !orderability.orderable;
-  const bannerLine = orderingDisabled ? orderability.message ?? null : null;
+  const bannerLine = orderingDisabled ? orderState.customerBannerLine : null;
   const availabilityStatus = orderingDisabled
-    ? orderability.reason === "vendor_closed"
+    ? orderState.customerStatusLabel === "Closed right now"
       ? ("closed" as const)
-      : orderability.reason === "vendor_paused" || orderability.reason === "pod_vendor_paused"
+      : orderState.customerStatusLabel === "Not accepting orders right now"
         ? ("mennyu_paused" as const)
         : ("inactive" as const)
     : ("open" as const);

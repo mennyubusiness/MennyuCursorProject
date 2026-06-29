@@ -15,6 +15,7 @@ import {
   cartLineOrderabilityCode,
   cartLineOrderabilityMessage,
 } from "@/lib/vendor-orderability-in-pod";
+import { loadVendorReadinessBundles } from "@/lib/vendor-readiness-validation.server";
 import { selectCartForSessionAndPod } from "@/lib/cart-selection";
 import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
 import { getOperationalMenuItemIdsForVendor } from "@/services/menu-active-scope.service";
@@ -422,22 +423,6 @@ export async function addCartItem(
       menuItemName: menuItemInitial.name,
     });
   }
-  const vendorAvailability = getVendorAvailability(vendorForOrderability);
-  if (!vendorAvailability.orderable) {
-    const message =
-      vendorAvailability.status === "inactive"
-        ? "This vendor is no longer active."
-        : vendorAvailability.status === "closed"
-          ? "This vendor is currently closed."
-          : "This vendor is paused right now.";
-    const code =
-      vendorAvailability.status === "inactive"
-        ? "VENDOR_INACTIVE"
-        : vendorAvailability.status === "closed"
-          ? "VENDOR_CLOSED"
-          : "VENDOR_PAUSED_MENNYU";
-    throw new CartValidationError(message, code);
-  }
 
   if (groupOrderActor && cart.podId !== groupOrderActor.podId) {
     throw new CartValidationError(
@@ -445,7 +430,7 @@ export async function addCartItem(
       "GROUP_ORDER_POD_MISMATCH"
     );
   }
-  const [vendorInPod, pod] = await Promise.all([
+  const [vendorInPod, pod, readinessBundles] = await Promise.all([
     prisma.podVendor.findUnique({
       where: {
         podId_vendorId: { podId: cart.podId, vendorId: menuItemInitial.vendorId },
@@ -456,13 +441,23 @@ export async function addCartItem(
       where: { id: cart.podId },
       select: { isActive: true, mennyuOrdersPaused: true },
     }),
+    loadVendorReadinessBundles([menuItemInitial.vendorId]),
   ]);
+  const readinessBundle = readinessBundles.get(menuItemInitial.vendorId);
   const podOrderability = getVendorOrderabilityInPod({
     podActive: pod?.isActive ?? false,
     podOrdersPaused: pod?.mennyuOrdersPaused ?? false,
     podVendorExists: Boolean(vendorInPod),
     podVendorActive: vendorInPod?.isActive ?? false,
     vendor: vendorForOrderability,
+    readiness: readinessBundle
+      ? {
+          vendor: readinessBundle.vendor,
+          menuSummary: readinessBundle.menuSummary,
+          stripeSummary: readinessBundle.stripeSummary,
+          posSummary: readinessBundle.posSummary,
+        }
+      : undefined,
   });
   if (!podOrderability.orderable) {
     throw new CartValidationError(

@@ -5,8 +5,14 @@
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { PosConnectionStatus } from "@prisma/client";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
-import { isVendorOrderableInPod } from "@/lib/vendor-orderability-in-pod";
 import { hasValidVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
+import {
+  getVendorOrderabilityState,
+  getVendorPublicProfileMissingItems,
+  isVendorPublicProfileFieldsComplete,
+  isVendorPublicProfileReady,
+  type VendorReadinessEvaluationInput,
+} from "@/lib/vendor-readiness-states";
 
 export type ReadinessOwner = "pod_owner" | "vendor" | "open_order";
 
@@ -23,42 +29,17 @@ export type VendorPodReadinessStatus =
   | "ready"
   | "active";
 
-export type VendorMenuReadinessSummary = {
-  /** Published MenuVersion exists (informational; legacy menus may still operate). */
-  hasPublishedMenuVersion: boolean;
-  /** At least one operational menu item id (published snapshot or legacy fallback). */
-  hasOperationalItems: boolean;
-  /** At least one operational item with isAvailable true. */
-  hasAvailableOperationalItems: boolean;
-};
+export type VendorMenuReadinessSummary = import("@/lib/vendor-readiness-states").VendorMenuReadinessSummary;
+export type VendorStripeReadinessSummary = import("@/lib/vendor-readiness-states").VendorStripeReadinessSummary;
+export type VendorPosReadinessSummary = import("@/lib/vendor-readiness-states").VendorPosReadinessSummary;
+export type VendorReadinessVendorFields = import("@/lib/vendor-readiness-states").VendorReadinessVendorFields;
 
-export type VendorStripeReadinessSummary = {
-  stripeConnectedAccountId: string | null;
-  stripeChargesEnabled: boolean;
-  stripePayoutsEnabled: boolean;
-  /** When false, Stripe Connect is not configured on this server — readiness cannot be completed here. */
-  stripeConnectConfigured?: boolean;
-};
-
-export type VendorPosReadinessSummary = {
-  deliverectChannelLinkId: string | null;
-  posConnectionStatus: PosConnectionStatus;
-  deliverectAutoMapLastOutcome: string | null;
-  pendingDeliverectConnectionKey: string | null;
-  hasUnmatchedChannelRegistration: boolean;
-};
-
-export type VendorReadinessVendorFields = {
-  isActive: boolean;
-  mennyuOrdersPaused: boolean;
-  name: string;
-  slug: string;
-  description: string | null;
-  imageUrl: string | null;
-  cuisineCategory: string | null;
-  contactEmail: string | null;
-  contactPhone: string | null;
-};
+export {
+  isVendorPublicProfileReady,
+  isVendorPublicProfileFieldsComplete,
+  getVendorPublicProfileMissingItems,
+  getVendorPodOwnerDisplaySummary,
+} from "@/lib/vendor-readiness-states";
 
 export type ReadinessChecklistItem = {
   key: string;
@@ -105,6 +86,7 @@ export type VendorPodReadinessResult = {
   checklist: ReadinessChecklistItem[];
   setupSummary: {
     profile: boolean;
+    publicProfile: boolean;
     stripe: boolean;
     pos: boolean;
     menu: boolean;
@@ -113,11 +95,24 @@ export type VendorPodReadinessResult = {
   canAcceptOrders: boolean;
 };
 
-/** Profile fields required before a vendor is considered presentation-ready. */
+/** Profile presentation fields (name, description, banner, cuisine) — excludes menu and hours. */
 export function isVendorProfileComplete(
-  vendor: Pick<VendorReadinessVendorFields, "name" | "description" | "imageUrl">
+  vendor: Pick<VendorReadinessVendorFields, "name" | "description" | "imageUrl" | "cuisineCategory">
 ): boolean {
-  return Boolean(vendor.name?.trim() && vendor.description?.trim() && vendor.imageUrl?.trim());
+  return isVendorPublicProfileFieldsComplete(vendor);
+}
+
+function toReadinessEvaluationInput(input: VendorPodReadinessInput): VendorReadinessEvaluationInput {
+  return {
+    vendor: { ...input.vendor, customerOrderingHours: input.customerOrderingHours },
+    menuSummary: input.menuSummary,
+    stripeSummary: input.stripeSummary,
+    posSummary: input.posSummary,
+    pod: input.pod,
+    podVendor: input.podVendor
+      ? { exists: true, isActive: input.podVendor.isActive }
+      : { exists: false, isActive: false },
+  };
 }
 
 /** Mirrors vendor-payout-transfer.service isVendorConnectPayoutReady (charges + payouts + account id). */
@@ -155,14 +150,21 @@ export function isVendorCustomerOrderingHoursReady(customerOrderingHours: unknow
   return hasValidVendorCustomerOrderingHours(customerOrderingHours);
 }
 
-/** Vendor self-serve setup checklist keys required before setup is considered complete. */
-export const VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS = [
-  "profile",
+/** Checklist keys required before a vendor appears on the public pod page. */
+export const VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS = ["profile", "cuisine", "menu", "hours"] as const;
+
+/** Checklist keys required before a vendor can accept orders. */
+export const VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS = [
   "stripe",
   "pos",
-  "menu",
-  "hours",
+  "menu_available",
   "pod_invite",
+] as const;
+
+/** Vendor self-serve setup checklist keys required before setup is considered complete. */
+export const VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS = [
+  ...VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS,
+  ...VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS,
 ] as const;
 
 export function vendorPodReadinessStatusLabel(status: VendorPodReadinessStatus): string {
@@ -227,9 +229,30 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
       label: "Complete vendor profile",
       complete: profileComplete,
       owner: "vendor",
-      description: "Name, description, and logo on the pod menu.",
+      description: "Name, description, banner photo, and cuisine on the pod menu.",
       actionHref: profileHref,
       actionLabel: profileAction,
+    },
+    {
+      key: "cuisine",
+      label: "Set cuisine category",
+      complete: Boolean(vendor.cuisineCategory?.trim()),
+      owner: "vendor",
+      description: "Helps customers understand what you serve.",
+      actionHref: audience === "vendor" ? `${settingsBase}?section=profile` : profileHref,
+      actionLabel: audience === "vendor" ? "Edit profile" : profileAction,
+    },
+    {
+      key: "menu",
+      label: "Publish menu",
+      complete: menuSummary.hasOperationalItems,
+      owner: "vendor",
+      description: menuSummary.hasOperationalItems
+        ? "Menu items are available on your public page."
+        : "Publish or import a menu before appearing on the pod page.",
+      actionHref:
+        audience === "vendor" ? `/vendor/${vendorId}/menu` : podOwnerVendorHref(podId, podSlug, vendor.slug),
+      actionLabel: audience === "vendor" ? "Review menu" : "View menu page",
     },
     {
       key: "stripe",
@@ -259,7 +282,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
       actionLabel: audience === "vendor" ? "Connect POS" : undefined,
     },
     {
-      key: "menu",
+      key: "menu_available",
       label: "Confirm menu availability",
       complete: menuComplete,
       owner: "vendor",
@@ -285,7 +308,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
       owner: "vendor",
       description: hoursComplete
         ? "Customer ordering hours set."
-        : "Set customer ordering hours before accepting orders.",
+        : "Set customer ordering hours before appearing on your pod page.",
       actionHref: `/vendor/${vendorId}/hours`,
       actionLabel: "Set hours",
     });
@@ -335,18 +358,33 @@ function blockingFromChecklist(
 
 function derivePrimaryStatus(
   input: VendorPodReadinessInput,
-  setup: { profile: boolean; stripe: boolean; pos: boolean; menu: boolean; hours: boolean },
+  setup: {
+    profile: boolean;
+    publicProfile: boolean;
+    stripe: boolean;
+    pos: boolean;
+    menu: boolean;
+    hours: boolean;
+  },
   canAcceptOrders: boolean
 ): VendorPodReadinessStatus {
   if (!input.pod.isActive) return "pod_inactive";
   if (!input.vendor.isActive) return "inactive_by_open_order";
   if (input.vendor.mennyuOrdersPaused) return "paused_by_vendor";
   if (!input.podVendor?.isActive) return "paused_in_pod";
-  if (!setup.profile) return "needs_profile";
+
+  const publicMissing = getVendorPublicProfileMissingItems(toReadinessEvaluationInput(input));
+  if (
+    publicMissing.some((key) => key === "name" || key === "description" || key === "banner" || key === "cuisine")
+  ) {
+    return "needs_profile";
+  }
+  if (publicMissing.includes("menu")) return "needs_menu";
+  if (publicMissing.includes("hours")) return "needs_hours";
+
   if (!setup.stripe) return "needs_payment";
   if (!setup.pos) return "needs_pos";
   if (!setup.menu) return "needs_menu";
-  if (!setup.hours) return "needs_hours";
   return canAcceptOrders ? "active" : "ready";
 }
 
@@ -380,23 +418,18 @@ export function deriveVendorPodReadiness(
   opts?: { audience?: "pod_owner" | "vendor" }
 ): VendorPodReadinessResult {
   const audience = opts?.audience ?? "pod_owner";
+  const evaluation = toReadinessEvaluationInput(input);
   const setupSummary = {
     profile: isVendorProfileComplete(input.vendor),
+    publicProfile: isVendorPublicProfileReady(evaluation),
     stripe: isVendorStripePayoutReady(input.stripeSummary),
     pos: isVendorPosReady(input.posSummary),
     menu: isVendorMenuReady(input.menuSummary),
     hours: isVendorCustomerOrderingHoursReady(input.customerOrderingHours),
   };
 
-  const canAcceptOrders = isVendorOrderableInPod({
-    podActive: input.pod.isActive,
-    podVendorExists: Boolean(input.podVendor),
-    podVendorActive: input.podVendor?.isActive ?? false,
-    vendor: {
-      isActive: input.vendor.isActive,
-      mennyuOrdersPaused: input.vendor.mennyuOrdersPaused,
-    },
-  });
+  const orderabilityState = getVendorOrderabilityState(evaluation);
+  const canAcceptOrders = orderabilityState.orderable;
 
   const status = derivePrimaryStatus(input, setupSummary, canAcceptOrders);
   const checklist = buildSetupChecklist(input, audience);

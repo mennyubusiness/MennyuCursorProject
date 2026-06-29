@@ -8,9 +8,11 @@ export type PodRosterReadinessSnapshot = {
   canAcceptOrders: boolean;
   setupSummary: {
     profile: boolean;
+    publicProfile?: boolean;
     stripe: boolean;
     pos: boolean;
     menu: boolean;
+    hours?: boolean;
   };
   primaryBlocker: {
     code: string;

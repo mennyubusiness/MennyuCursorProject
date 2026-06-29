@@ -5,54 +5,28 @@ import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import type { PodContactInfo } from "@/components/pod/PodPageContactSection";
 import type { PodVendorGridRow } from "@/components/pod/PodVendorGrid";
 import { prisma } from "@/lib/db";
+import { env } from "@/lib/env";
 import { parsePodAmenities, parsePodCustomAmenities, type PodAmenityId } from "@/lib/pod-amenities";
 import { getPublicPodAnnouncementText } from "@/lib/pod-announcement";
 import { buildPodPageNavItems } from "@/lib/pod-page-nav";
 import { getPodOrderingStatus } from "@/lib/pod-page-status";
-import { getVendorAvailabilityStatus } from "@/lib/vendor-availability";
 import {
   resolveVendorHoursTimezone,
   vendorAvailabilityWithCustomerOrderingHours,
 } from "@/lib/vendor-customer-ordering-hours";
 import { buildVendorHoursDisplay, type VendorHoursDisplayModel } from "@/lib/vendor-hours-display";
-
-function availabilityForVendor(v: {
-  isActive: boolean;
-  mennyuOrdersPaused: boolean;
-  customerOrderingHours: unknown;
-  deliverectChannelLinkId: string | null;
-}, podTimezone: string | null): PodVendorGridRow["availability"] {
-  const status = getVendorAvailabilityStatus(
-    vendorAvailabilityWithCustomerOrderingHours(
-      {
-        ...v,
-        syncCustomerOrderingHoursFromDeliverect: false,
-        deliverectSyncedCustomerOrderingHours: null,
-      },
-      podTimezone
-    )
-  );
-  const unavailable = status !== "open";
-  const isPosClosed = status === "closed";
-  const isMennyuNotAccepting = status === "mennyu_paused";
-  const isInactive = status === "inactive";
-  const statusLabel = isPosClosed
-    ? "Closed"
-    : isMennyuNotAccepting
-      ? "Not accepting orders"
-      : isInactive
-        ? "Unavailable"
-        : "Open for orders";
-
-  return {
-    unavailable,
-    statusLabel,
-    showBrowseHint: isMennyuNotAccepting || isPosClosed,
-  };
-}
+import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
+import {
+  getVendorCustomerPodCardAvailability,
+  getVendorPublicVisibilityState,
+  type VendorMenuReadinessSummary,
+  type VendorPosReadinessSummary,
+  type VendorStripeReadinessSummary,
+} from "@/lib/vendor-readiness-states";
 
 function toGridRow(
   pv: {
+    isActive: boolean;
     isFeatured: boolean;
     vendor: {
       id: string;
@@ -65,11 +39,52 @@ function toGridRow(
       mennyuOrdersPaused: boolean;
       customerOrderingHours: unknown;
       deliverectChannelLinkId: string | null;
+      posConnectionStatus: VendorPosReadinessSummary["posConnectionStatus"];
+      deliverectAutoMapLastOutcome: string | null;
+      pendingDeliverectConnectionKey: string | null;
+      stripeConnectedAccountId: string | null;
+      stripeChargesEnabled: boolean;
+      stripePayoutsEnabled: boolean;
     };
   },
-  podTimezone: string | null
-): PodVendorGridRow {
-  const hoursTimezone = resolveVendorHoursTimezone(podTimezone);
+  pod: { isActive: boolean; mennyuOrdersPaused: boolean; pickupTimezone: string | null },
+  menuSummary: VendorMenuReadinessSummary,
+  stripeSummary: VendorStripeReadinessSummary,
+  posSummary: VendorPosReadinessSummary
+): PodVendorGridRow | null {
+  const hoursTimezone = resolveVendorHoursTimezone(pod.pickupTimezone);
+  const vendorAvailability = vendorAvailabilityWithCustomerOrderingHours(
+    {
+      ...pv.vendor,
+      syncCustomerOrderingHoursFromDeliverect: false,
+      deliverectSyncedCustomerOrderingHours: null,
+    },
+    pod.pickupTimezone
+  );
+
+  const evaluation = {
+    vendor: {
+      isActive: pv.vendor.isActive,
+      mennyuOrdersPaused: pv.vendor.mennyuOrdersPaused,
+      name: pv.vendor.name,
+      slug: pv.vendor.slug,
+      description: pv.vendor.description,
+      imageUrl: pv.vendor.imageUrl,
+      cuisineCategory: pv.vendor.cuisineCategory,
+      customerOrderingHours: pv.vendor.customerOrderingHours,
+    },
+    menuSummary,
+    stripeSummary,
+    posSummary,
+    pod: { isActive: pod.isActive, mennyuOrdersPaused: pod.mennyuOrdersPaused },
+    podVendor: { exists: true, isActive: pv.isActive },
+    vendorAvailability,
+  };
+
+  if (getVendorPublicVisibilityState(evaluation) === "hidden") {
+    return null;
+  }
+
   const hoursDisplay: VendorHoursDisplayModel = buildVendorHoursDisplay({
     customerOrderingHours: pv.vendor.customerOrderingHours,
     timeZone: hoursTimezone,
@@ -85,7 +100,7 @@ function toGridRow(
       cuisineCategory: pv.vendor.cuisineCategory,
     },
     isFeatured: pv.isFeatured,
-    availability: availabilityForVendor(pv.vendor, podTimezone),
+    availability: getVendorCustomerPodCardAvailability(evaluation),
     hoursDisplay,
   };
 }
@@ -144,6 +159,12 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
                 cuisineCategory: true,
                 customerOrderingHours: true,
                 deliverectChannelLinkId: true,
+                posConnectionStatus: true,
+                deliverectAutoMapLastOutcome: true,
+                pendingDeliverectConnectionKey: true,
+                stripeConnectedAccountId: true,
+                stripeChargesEnabled: true,
+                stripePayoutsEnabled: true,
               },
             },
           },
@@ -156,7 +177,37 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
 
   if (!pod || !pod.isActive) return null;
 
-  const vendorRows = pod.vendors.map((pv) => toGridRow(pv, pod.pickupTimezone));
+  const vendorIds = pod.vendors.map((pv) => pv.vendor.id);
+  const menuSummaries = await loadVendorMenuReadinessSummaries(vendorIds);
+  const stripeConnectConfigured = Boolean(env.STRIPE_SECRET_KEY);
+
+  const vendorRows = pod.vendors
+    .map((pv) => {
+      const menuSummary = menuSummaries.get(pv.vendor.id) ?? {
+        hasPublishedMenuVersion: false,
+        hasOperationalItems: false,
+        hasAvailableOperationalItems: false,
+      };
+      return toGridRow(
+        pv,
+        { isActive: pod.isActive, mennyuOrdersPaused: pod.mennyuOrdersPaused, pickupTimezone: pod.pickupTimezone },
+        menuSummary,
+        {
+          stripeConnectedAccountId: pv.vendor.stripeConnectedAccountId,
+          stripeChargesEnabled: pv.vendor.stripeChargesEnabled ?? false,
+          stripePayoutsEnabled: pv.vendor.stripePayoutsEnabled ?? false,
+          stripeConnectConfigured,
+        },
+        {
+          deliverectChannelLinkId: pv.vendor.deliverectChannelLinkId,
+          posConnectionStatus: pv.vendor.posConnectionStatus,
+          deliverectAutoMapLastOutcome: pv.vendor.deliverectAutoMapLastOutcome,
+          pendingDeliverectConnectionKey: pv.vendor.pendingDeliverectConnectionKey,
+          hasUnmatchedChannelRegistration: false,
+        }
+      );
+    })
+    .filter((row): row is PodVendorGridRow => row != null);
   const amenities = parsePodAmenities(pod.amenities);
   const customAmenities = parsePodCustomAmenities(pod.customAmenities);
   const orderingStatus = pod.mennyuOrdersPaused

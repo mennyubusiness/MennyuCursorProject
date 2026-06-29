@@ -24,6 +24,7 @@ import {
   cartLineOrderabilityCode,
   cartLineOrderabilityMessage,
 } from "@/lib/vendor-orderability-in-pod";
+import { loadVendorReadinessBundles } from "@/lib/vendor-readiness-validation.server";
 import {
   getOperationalMenuItemIdsForVendor,
   getOperationalModifierOptionIdsForVendor,
@@ -152,10 +153,21 @@ export async function validateCartForOrder(cart: {
   const hoursTimezone = resolveVendorHoursTimezone(pod.pickupTimezone);
 
   const vendorIds = [...new Set(cart.items.map((i) => i.vendorId))];
-  const operationalByVendor = new Map<string, Set<string>>();
-  for (const vid of vendorIds) {
-    operationalByVendor.set(vid, await getOperationalMenuItemIdsForVendor(vid));
-  }
+  const [operationalByVendor, readinessBundles, podVendors] = await Promise.all([
+    (async () => {
+      const map = new Map<string, Set<string>>();
+      for (const vid of vendorIds) {
+        map.set(vid, await getOperationalMenuItemIdsForVendor(vid));
+      }
+      return map;
+    })(),
+    loadVendorReadinessBundles(vendorIds),
+    prisma.podVendor.findMany({
+      where: { podId: cart.podId, vendorId: { in: vendorIds } },
+      select: { vendorId: true, isActive: true },
+    }),
+  ]);
+  const podVendorActive = new Map(podVendors.map((row) => [row.vendorId, row.isActive]));
 
   for (const item of cart.items) {
     const operational = operationalByVendor.get(item.vendorId)?.has(item.menuItemId) ?? false;
@@ -179,30 +191,21 @@ export async function validateCartForOrder(cart: {
     };
     const posOpen =
       item.vendor.posOpen ?? resolveVendorPosOpen(hoursFields, hoursTimezone);
-    const vendorAvailability = getVendorAvailability({ ...item.vendor, posOpen });
-    if (!vendorAvailability.orderable) {
-      const { code, message } =
-        vendorAvailability.status === "inactive"
-          ? { code: "VENDOR_INACTIVE" as const, message: "A vendor in your cart is no longer active." }
-          : vendorAvailability.status === "closed"
-            ? { code: "VENDOR_CLOSED" as const, message: "A vendor in your cart is currently closed." }
-            : {
-                code: "VENDOR_PAUSED_MENNYU" as const,
-                message:
-                  "A vendor in your cart is not accepting orders through Open Order right now. Please remove their items or try again later.",
-              };
-      return { valid: false, code, message };
-    }
-    const vendorInPod = await prisma.podVendor.findUnique({
-      where: { podId_vendorId: { podId: cart.podId, vendorId: item.vendorId } },
-      select: { isActive: true },
-    });
+    const readinessBundle = readinessBundles.get(item.vendorId);
     const podOrderability = getVendorOrderabilityInPod({
       podActive: pod.isActive,
       podOrdersPaused: pod.mennyuOrdersPaused,
-      podVendorExists: Boolean(vendorInPod),
-      podVendorActive: vendorInPod?.isActive ?? false,
+      podVendorExists: podVendorActive.has(item.vendorId),
+      podVendorActive: podVendorActive.get(item.vendorId) === true,
       vendor: { ...item.vendor, posOpen },
+      readiness: readinessBundle
+        ? {
+            vendor: readinessBundle.vendor,
+            menuSummary: readinessBundle.menuSummary,
+            stripeSummary: readinessBundle.stripeSummary,
+            posSummary: readinessBundle.posSummary,
+          }
+        : undefined,
     });
     if (!podOrderability.orderable) {
       const code = cartLineOrderabilityCode(podOrderability);

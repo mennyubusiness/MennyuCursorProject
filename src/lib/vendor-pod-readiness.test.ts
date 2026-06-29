@@ -62,9 +62,10 @@ function readiness(overrides?: Partial<Parameters<typeof deriveVendorPodReadines
 }
 
 describe("vendor setup sub-helpers", () => {
-  it("detects incomplete profile", () => {
+  it("detects incomplete profile without cuisine", () => {
     expect(isVendorProfileComplete(baseVendor)).toBe(true);
     expect(isVendorProfileComplete({ ...baseVendor, imageUrl: null })).toBe(false);
+    expect(isVendorProfileComplete({ ...baseVendor, cuisineCategory: null })).toBe(false);
   });
 
   it("detects stripe payout readiness", () => {
@@ -117,15 +118,15 @@ describe("deriveVendorPodReadiness status priority", () => {
     expect(result.status).toBe("paused_in_pod");
   });
 
-  it("flags missing profile before payment", () => {
+  it("flags missing profile before payment when cuisine is missing", () => {
     const result = readiness({
-      vendor: { ...baseVendor, description: null },
+      vendor: { ...baseVendor, cuisineCategory: null },
       stripeSummary: { ...baseStripe, stripeConnectedAccountId: null, stripeChargesEnabled: false, stripePayoutsEnabled: false },
     });
     expect(result.status).toBe("needs_profile");
   });
 
-  it("flags missing stripe after profile complete", () => {
+  it("flags missing stripe after public profile complete", () => {
     const result = readiness({
       stripeSummary: { ...baseStripe, stripeConnectedAccountId: null, stripeChargesEnabled: false, stripePayoutsEnabled: false },
     });
@@ -167,7 +168,7 @@ describe("deriveVendorPodReadiness status priority", () => {
     const hoursItem = result.checklist.find((item) => item.key === "hours");
     expect(hoursItem?.complete).toBe(false);
     expect(hoursItem?.label).toBe("Customer ordering hours");
-    expect(hoursItem?.description).toBe("Set customer ordering hours before accepting orders.");
+    expect(hoursItem?.description).toBe("Set customer ordering hours before appearing on your pod page.");
     expect(hoursItem?.actionHref).toBe("/vendor/vendor_1/hours");
     expect(hoursItem?.actionLabel).toBe("Set hours");
   });
@@ -228,6 +229,7 @@ describe("deriveVendorPodReadiness pod owner view", () => {
         menuSummary: baseMenu,
         posSummary: basePos,
         stripeSummary: { ...baseStripe, stripePayoutsEnabled: false },
+        customerOrderingHours: baseCustomerOrderingHours,
       },
       { audience: "pod_owner" }
     );
