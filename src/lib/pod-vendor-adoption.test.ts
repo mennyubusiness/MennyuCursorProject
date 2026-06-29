@@ -17,7 +17,7 @@ describe("podOwnerVendorDisplayStatus", () => {
   it("maps setup blockers to owner-facing labels", () => {
     expect(podOwnerVendorDisplayStatus("needs_payment", false)).toBe("Needs Stripe");
     expect(podOwnerVendorDisplayStatus("needs_menu", false)).toBe("Needs menu");
-    expect(podOwnerVendorDisplayStatus("needs_pos", false)).toBe("Needs POS connection");
+    expect(podOwnerVendorDisplayStatus("needs_pos", false)).toBe("Needs Deliverect setup");
     expect(podOwnerVendorDisplayStatus("needs_profile", false)).toBe("Needs profile");
   });
 

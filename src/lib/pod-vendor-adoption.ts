@@ -25,7 +25,7 @@ export function podOwnerVendorDisplayStatus(
     case "needs_hours":
       return "Missing customer ordering hours";
     case "needs_pos":
-      return "Needs POS connection";
+      return "Needs Deliverect setup";
     case "needs_profile":
       return "Needs profile";
     case "paused_in_pod":

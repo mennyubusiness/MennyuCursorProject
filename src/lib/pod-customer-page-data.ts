@@ -5,7 +5,6 @@ import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import type { PodContactInfo } from "@/components/pod/PodPageContactSection";
 import type { PodVendorGridRow } from "@/components/pod/PodVendorGrid";
 import { prisma } from "@/lib/db";
-import { env } from "@/lib/env";
 import { parsePodAmenities, parsePodCustomAmenities, type PodAmenityId } from "@/lib/pod-amenities";
 import { getPublicPodAnnouncementText } from "@/lib/pod-announcement";
 import { buildPodPageNavItems } from "@/lib/pod-page-nav";
@@ -15,7 +14,7 @@ import {
   vendorAvailabilityWithCustomerOrderingHours,
 } from "@/lib/vendor-customer-ordering-hours";
 import { buildVendorHoursDisplay, type VendorHoursDisplayModel } from "@/lib/vendor-hours-display";
-import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
+import { loadVendorReadinessBundles } from "@/lib/vendor-readiness-validation.server";
 import {
   getVendorCustomerPodCardAvailability,
   getVendorPublicVisibilityState,
@@ -38,13 +37,6 @@ function toGridRow(
       isActive: boolean;
       mennyuOrdersPaused: boolean;
       customerOrderingHours: unknown;
-      deliverectChannelLinkId: string | null;
-      posConnectionStatus: VendorPosReadinessSummary["posConnectionStatus"];
-      deliverectAutoMapLastOutcome: string | null;
-      pendingDeliverectConnectionKey: string | null;
-      stripeConnectedAccountId: string | null;
-      stripeChargesEnabled: boolean;
-      stripePayoutsEnabled: boolean;
     };
   },
   pod: { isActive: boolean; mennyuOrdersPaused: boolean; pickupTimezone: string | null },
@@ -158,13 +150,6 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
                 imageUrl: true,
                 cuisineCategory: true,
                 customerOrderingHours: true,
-                deliverectChannelLinkId: true,
-                posConnectionStatus: true,
-                deliverectAutoMapLastOutcome: true,
-                pendingDeliverectConnectionKey: true,
-                stripeConnectedAccountId: true,
-                stripeChargesEnabled: true,
-                stripePayoutsEnabled: true,
               },
             },
           },
@@ -178,33 +163,18 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
   if (!pod || !pod.isActive) return null;
 
   const vendorIds = pod.vendors.map((pv) => pv.vendor.id);
-  const menuSummaries = await loadVendorMenuReadinessSummaries(vendorIds);
-  const stripeConnectConfigured = Boolean(env.STRIPE_SECRET_KEY);
+  const readinessBundles = await loadVendorReadinessBundles(vendorIds);
 
   const vendorRows = pod.vendors
     .map((pv) => {
-      const menuSummary = menuSummaries.get(pv.vendor.id) ?? {
-        hasPublishedMenuVersion: false,
-        hasOperationalItems: false,
-        hasAvailableOperationalItems: false,
-      };
+      const bundle = readinessBundles.get(pv.vendor.id);
+      if (!bundle) return null;
       return toGridRow(
         pv,
         { isActive: pod.isActive, mennyuOrdersPaused: pod.mennyuOrdersPaused, pickupTimezone: pod.pickupTimezone },
-        menuSummary,
-        {
-          stripeConnectedAccountId: pv.vendor.stripeConnectedAccountId,
-          stripeChargesEnabled: pv.vendor.stripeChargesEnabled ?? false,
-          stripePayoutsEnabled: pv.vendor.stripePayoutsEnabled ?? false,
-          stripeConnectConfigured,
-        },
-        {
-          deliverectChannelLinkId: pv.vendor.deliverectChannelLinkId,
-          posConnectionStatus: pv.vendor.posConnectionStatus,
-          deliverectAutoMapLastOutcome: pv.vendor.deliverectAutoMapLastOutcome,
-          pendingDeliverectConnectionKey: pv.vendor.pendingDeliverectConnectionKey,
-          hasUnmatchedChannelRegistration: false,
-        }
+        bundle.menuSummary,
+        bundle.stripeSummary,
+        bundle.posSummary
       );
     })
     .filter((row): row is PodVendorGridRow => row != null);

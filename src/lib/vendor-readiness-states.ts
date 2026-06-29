@@ -7,8 +7,11 @@ import { getVendorAvailability, type VendorAvailabilityInput } from "@/lib/vendo
 import {
   hasValidVendorCustomerOrderingHours,
 } from "@/lib/vendor-customer-ordering-hours";
-import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
-import type { PosConnectionStatus } from "@prisma/client";
+import {
+  isVendorRoutingOperationalReady,
+  type VendorRoutingReadinessInput,
+} from "@/lib/vendor-order-routing-mode";
+import type { VendorOrderRoutingMode } from "@prisma/client";
 
 export type VendorMenuReadinessSummary = {
   hasPublishedMenuVersion?: boolean;
@@ -23,11 +26,7 @@ export type VendorStripeReadinessSummary = {
   stripeConnectConfigured?: boolean;
 };
 
-export type VendorPosReadinessSummary = {
-  deliverectChannelLinkId: string | null;
-  posConnectionStatus: PosConnectionStatus;
-  deliverectAutoMapLastOutcome: string | null;
-  pendingDeliverectConnectionKey: string | null;
+export type VendorPosReadinessSummary = VendorRoutingReadinessInput & {
   hasUnmatchedChannelRegistration: boolean;
 };
 
@@ -53,15 +52,12 @@ function isVendorStripePayoutReady(stripe: VendorStripeReadinessSummary): boolea
 }
 
 function isVendorPosReady(pos: VendorPosReadinessSummary): boolean {
-  return (
-    deriveVendorPosUiState({
-      deliverectChannelLinkId: pos.deliverectChannelLinkId,
-      posConnectionStatus: pos.posConnectionStatus,
-      deliverectAutoMapLastOutcome: pos.deliverectAutoMapLastOutcome,
-      pendingDeliverectConnectionKey: pos.pendingDeliverectConnectionKey,
-      hasUnmatchedChannelRegistrationForVendor: pos.hasUnmatchedChannelRegistration,
-    }) === "connected"
-  );
+  return isVendorRoutingOperationalReady(pos);
+}
+
+function isVendorDeliverectMappingReady(pos: VendorPosReadinessSummary): boolean {
+  if (pos.orderRoutingMode !== "deliverect") return true;
+  return pos.deliverectMappingReady !== false;
 }
 
 function isVendorMenuReady(menu: VendorMenuReadinessSummary): boolean {
@@ -94,6 +90,7 @@ export const VENDOR_PUBLIC_PROFILE_MISSING_LABELS: Record<VendorPublicProfileMis
 export type VendorOperationalMissingKey =
   | "stripe"
   | "pos"
+  | "deliverect_mapping"
   | "pod_membership"
   | "pod_vendor_inactive"
   | "vendor_inactive"
@@ -174,6 +171,7 @@ export function getVendorOperationalMissingItems(
   if (podVendor && !podVendor.isActive) missing.push("pod_vendor_inactive");
   if (!isVendorStripePayoutReady(stripeSummary)) missing.push("stripe");
   if (!isVendorPosReady(posSummary)) missing.push("pos");
+  if (!isVendorDeliverectMappingReady(posSummary)) missing.push("deliverect_mapping");
   if (!isVendorMenuReady(menuSummary)) missing.push("menu_unavailable");
 
   const availability = getVendorAvailability(
@@ -254,7 +252,7 @@ export function getVendorPodOwnerMissingLinesFromSetup(input: {
     lines.push("Visible, not accepting orders: vendor needs payment setup.");
   }
   if (!input.setupSummary.pos) {
-    lines.push("Visible, not accepting orders: POS not connected.");
+    lines.push("Visible, not accepting orders: order routing setup incomplete.");
   }
   if (!input.setupSummary.menu) {
     lines.push("Visible, not accepting orders: menu has no available items.");
@@ -358,7 +356,10 @@ export function getVendorPodOwnerMissingLines(input: VendorReadinessEvaluationIn
     lines.push("Visible, not accepting orders: vendor needs payment setup.");
   }
   if (operational.includes("pos")) {
-    lines.push("Visible, not accepting orders: POS not connected.");
+    lines.push("Visible, not accepting orders: order routing setup incomplete.");
+  }
+  if (operational.includes("deliverect_mapping")) {
+    lines.push("Visible, not accepting orders: Deliverect mappings incomplete.");
   }
   if (operational.includes("menu_unavailable")) {
     lines.push("Visible, not accepting orders: menu has no available items.");

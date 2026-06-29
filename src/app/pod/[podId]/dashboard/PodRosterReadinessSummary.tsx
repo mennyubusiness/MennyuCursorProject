@@ -1,3 +1,8 @@
+import type { VendorOrderRoutingMode } from "@prisma/client";
+import {
+  isDeliverectRoutingMode,
+  vendorOrderRoutingModeShortLabel,
+} from "@/lib/vendor-order-routing-mode";
 import type { ReadinessOwner, VendorPodReadinessStatus } from "@/lib/vendor-pod-readiness";
 import { podOwnerVendorDisplayStatus } from "@/lib/pod-vendor-adoption";
 
@@ -6,6 +11,7 @@ export type PodRosterReadinessSnapshot = {
   label: string;
   description: string;
   canAcceptOrders: boolean;
+  orderRoutingMode?: VendorOrderRoutingMode;
   setupSummary: {
     profile: boolean;
     publicProfile?: boolean;
@@ -42,15 +48,36 @@ function ownerHint(owner: ReadinessOwner): string {
   return "Your action";
 }
 
-export function PodRosterReadinessSummary({ readiness }: { readiness: PodRosterReadinessSnapshot }) {
+export function PodRosterReadinessSummary({
+  readiness,
+  orderRoutingMode,
+}: {
+  readiness: PodRosterReadinessSnapshot;
+  orderRoutingMode?: VendorOrderRoutingMode;
+}) {
+  const mode = orderRoutingMode ?? readiness.orderRoutingMode;
+  const routingLabel = mode ? vendorOrderRoutingModeShortLabel(mode) : null;
+  const routingIncomplete =
+    mode && isDeliverectRoutingMode(mode) && !readiness.canAcceptOrders && readiness.setupSummary.pos === false;
+
   return (
     <div className="mt-2 space-y-2">
       <div className="flex flex-wrap gap-1">
         <SetupFlag label="Profile" complete={readiness.setupSummary.profile} />
         <SetupFlag label="Stripe" complete={readiness.setupSummary.stripe} />
-        <SetupFlag label="POS" complete={readiness.setupSummary.pos} />
+        {mode && isDeliverectRoutingMode(mode) ? (
+          <SetupFlag label="Deliverect" complete={readiness.setupSummary.pos} />
+        ) : (
+          <SetupFlag label="Dashboard" complete={true} />
+        )}
         <SetupFlag label="Menu" complete={readiness.setupSummary.menu} />
       </div>
+      {routingLabel ? (
+        <p className="text-[11px] text-oo-stone-gray">
+          Routing: <span className="font-medium text-oo-charcoal">{routingLabel}</span>
+          {routingIncomplete ? " · setup incomplete" : null}
+        </p>
+      ) : null}
       <p className="text-xs text-oo-stone-gray">
         <span className="font-medium text-oo-charcoal">
           {podOwnerVendorDisplayStatus(readiness.status, readiness.canAcceptOrders)}

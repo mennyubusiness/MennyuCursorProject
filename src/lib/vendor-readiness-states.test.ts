@@ -37,6 +37,8 @@ const basePos = {
   deliverectAutoMapLastOutcome: null,
   pendingDeliverectConnectionKey: null,
   hasUnmatchedChannelRegistration: false,
+  orderRoutingMode: "manual_dashboard" as const,
+  deliverectMappingReady: true,
 };
 
 function evaluation(overrides?: Partial<Parameters<typeof getVendorOrderabilityState>[0]>) {
@@ -114,14 +116,33 @@ describe("orderability", () => {
     expect(state.customerBannerLine).not.toMatch(/stripe/i);
   });
 
-  it("is visible but not orderable when deliverect is missing", () => {
+  it("is visible but not orderable when deliverect routing is missing setup", () => {
     const input = evaluation({
-      posSummary: { ...basePos, deliverectChannelLinkId: null, posConnectionStatus: "not_connected" },
+      posSummary: {
+        ...basePos,
+        orderRoutingMode: "deliverect",
+        deliverectChannelLinkId: null,
+        posConnectionStatus: "not_connected",
+        deliverectMappingReady: false,
+      },
     });
     const state = getVendorOrderabilityState(input);
     expect(state.visibility).toBe("visible");
     expect(state.orderable).toBe(false);
     expect(state.customerBannerLine).not.toMatch(/deliverect|pos/i);
+  });
+
+  it("is orderable in manual dashboard mode without Deliverect", () => {
+    const input = evaluation({
+      posSummary: {
+        ...basePos,
+        orderRoutingMode: "manual_dashboard",
+        deliverectChannelLinkId: null,
+        posConnectionStatus: "not_connected",
+      },
+    });
+    const state = getVendorOrderabilityState(input);
+    expect(state.orderable).toBe(true);
   });
 
   it("is orderable when public profile and operational readiness are complete and open", () => {

@@ -20,6 +20,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { updatePodVendorPresentation } from "@/actions/pod-settings.actions";
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
+import type { VendorOrderRoutingMode } from "@prisma/client";
 import { podOwnerVendorDisplayStatus } from "@/lib/pod-vendor-adoption";
 import { VendorLogo } from "@/components/images/VendorLogo";
 import { PodRosterReadinessSummary, type PodRosterReadinessSnapshot } from "./PodRosterReadinessSummary";
@@ -37,6 +38,7 @@ export type PodRosterVendorRow = {
   vendorGloballyActive: boolean;
   /** Vendor-controlled global pause across Open Order. */
   mennyuOrdersPaused: boolean;
+  orderRoutingMode: VendorOrderRoutingMode;
   readiness: PodRosterReadinessSnapshot;
 };
 
@@ -123,7 +125,7 @@ function SortableRosterRow({
         <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
           <span className={badges.className}>{badges.label}</span>
         </div>
-        <PodRosterReadinessSummary readiness={row.readiness} />
+        <PodRosterReadinessSummary readiness={row.readiness} orderRoutingMode={row.orderRoutingMode} />
       </div>
       <div className="flex w-full shrink-0 flex-wrap items-stretch gap-2 sm:w-auto sm:flex-nowrap sm:items-center sm:justify-end">
         <label className="flex cursor-pointer items-center gap-2 text-sm text-oo-charcoal">

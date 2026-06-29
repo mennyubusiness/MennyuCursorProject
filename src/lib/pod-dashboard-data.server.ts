@@ -17,6 +17,8 @@ import {
 } from "@/lib/pod-vendor-adoption";
 import { derivePodSetupChecklist, deriveVendorPodReadinessForRoster } from "@/lib/vendor-pod-readiness";
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
+import { loadVendorDeliverectMappingReadyMap } from "@/services/vendor-deliverect-mapping-readiness.server";
+import type { VendorOrderRoutingMode } from "@prisma/client";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { getPodAnalytics } from "@/services/pod-analytics.service";
 import { getPodActivityFeed } from "@/services/pod-activity.service";
@@ -62,6 +64,7 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
               posConnectionStatus: true,
               pendingDeliverectConnectionKey: true,
               deliverectAutoMapLastOutcome: true,
+              orderRoutingMode: true,
               customerOrderingHours: true,
             },
           },
@@ -110,6 +113,10 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
   if (!analytics) return null;
 
   const unmatchedByVendor = new Map(unmatchedFlags.map((row) => [row.vendorId, row.hasUnmatched]));
+  const routingModes = new Map<string, VendorOrderRoutingMode>(
+    pod.vendors.map((pv) => [pv.vendor.id, pv.vendor.orderRoutingMode])
+  );
+  const mappingReadyByVendor = await loadVendorDeliverectMappingReadyMap(vendorIdsInPod, routingModes);
   const stripeConnectConfigured = Boolean(env.STRIPE_SECRET_KEY);
 
   const rosterRows: PodRosterVendorRow[] = pod.vendors.map((pv) => {
@@ -142,6 +149,8 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
         deliverectAutoMapLastOutcome: vendor.deliverectAutoMapLastOutcome,
         pendingDeliverectConnectionKey: vendor.pendingDeliverectConnectionKey,
         hasUnmatchedChannelRegistration: unmatchedByVendor.get(vendor.id) ?? false,
+        orderRoutingMode: vendor.orderRoutingMode,
+        deliverectMappingReady: mappingReadyByVendor.get(vendor.id) ?? true,
       },
       stripeSummary: {
         stripeConnectedAccountId: vendor.stripeConnectedAccountId,
@@ -162,11 +171,13 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
       podVendorActive: pv.isActive,
       vendorGloballyActive: vendor.isActive,
       mennyuOrdersPaused: vendor.mennyuOrdersPaused ?? false,
+      orderRoutingMode: vendor.orderRoutingMode,
       readiness: {
         status: readiness.status,
         label: readiness.label,
         description: readiness.description,
         canAcceptOrders: readiness.canAcceptOrders,
+        orderRoutingMode: vendor.orderRoutingMode,
         setupSummary: readiness.setupSummary,
         primaryBlocker: readiness.blockingReasons[0]
           ? {

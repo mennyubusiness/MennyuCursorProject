@@ -3,10 +3,15 @@
  * Does not replace customer orderability gates (see vendor-orderability-in-pod.ts).
  */
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
-import type { PosConnectionStatus } from "@prisma/client";
+import type { PosConnectionStatus, VendorOrderRoutingMode } from "@prisma/client";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { hasValidVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
 import { VENDOR_HOURS_PUBLIC_COPY } from "@/lib/vendor-operational-copy";
+import {
+  isDeliverectRoutingMode,
+  isVendorRoutingOperationalReady,
+  VENDOR_ROUTING_MODE_COPY,
+} from "@/lib/vendor-order-routing-mode";
 import {
   getVendorOrderabilityState,
   getVendorPublicProfileMissingItems,
@@ -126,17 +131,9 @@ export function isVendorStripePayoutReady(stripe: VendorStripeReadinessSummary):
   );
 }
 
-/** POS routing is ready when Deliverect channel link is attached (same as connected UI state). */
+/** Routing setup is ready when manual dashboard mode is selected or Deliverect setup is complete. */
 export function isVendorPosReady(pos: VendorPosReadinessSummary): boolean {
-  return (
-    deriveVendorPosUiState({
-      deliverectChannelLinkId: pos.deliverectChannelLinkId,
-      posConnectionStatus: pos.posConnectionStatus,
-      deliverectAutoMapLastOutcome: pos.deliverectAutoMapLastOutcome,
-      pendingDeliverectConnectionKey: pos.pendingDeliverectConnectionKey,
-      hasUnmatchedChannelRegistrationForVendor: pos.hasUnmatchedChannelRegistration,
-    }) === "connected"
-  );
+  return isVendorRoutingOperationalReady(pos);
 }
 
 /**
@@ -175,7 +172,10 @@ export const VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS = [
   ...VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS,
 ] as const;
 
-export function vendorPodReadinessStatusLabel(status: VendorPodReadinessStatus): string {
+export function vendorPodReadinessStatusLabel(
+  status: VendorPodReadinessStatus,
+  orderRoutingMode?: VendorOrderRoutingMode | null
+): string {
   switch (status) {
     case "pod_inactive":
       return "Pod inactive";
@@ -190,7 +190,9 @@ export function vendorPodReadinessStatusLabel(status: VendorPodReadinessStatus):
     case "needs_payment":
       return "Waiting on Stripe payouts";
     case "needs_pos":
-      return "Waiting on POS/menu connection";
+      return isDeliverectRoutingMode(orderRoutingMode)
+        ? "Waiting on Deliverect setup"
+        : "Waiting on order routing setup";
     case "needs_menu":
       return "Menu unavailable";
     case "needs_hours":
@@ -217,6 +219,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
   const stripeComplete = isVendorStripePayoutReady(stripeSummary);
   const posComplete = isVendorPosReady(posSummary);
   const menuComplete = isVendorMenuReady(menuSummary);
+  const deliverectMode = isDeliverectRoutingMode(posSummary.orderRoutingMode);
   const posState = deriveVendorPosUiState({
     deliverectChannelLinkId: posSummary.deliverectChannelLinkId,
     posConnectionStatus: posSummary.posConnectionStatus,
@@ -320,18 +323,28 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
     },
     {
       key: "pos",
-      label: "Connect or confirm POS/menu",
+      label: deliverectMode ? "Connect Deliverect POS" : "Order routing: Open Order dashboard",
       complete: posComplete,
-      owner: "vendor",
-      description:
-        posState === "connected"
-          ? "Kitchen routing is connected through Deliverect."
-          : "Connect Deliverect so orders can route to the kitchen POS.",
+      owner: deliverectMode ? "vendor" : "open_order",
+      description: deliverectMode
+        ? posComplete
+          ? "Deliverect is connected and mappings are ready for routing."
+          : posState === "connected"
+            ? "Deliverect is connected but product/modifier mappings still need attention."
+            : "Connect Deliverect so orders can route to the kitchen POS."
+        : VENDOR_ROUTING_MODE_COPY.manualDashboard.vendorHelper,
       actionHref:
         audience === "vendor"
-          ? `/vendor/${vendorId}/setup`
+          ? deliverectMode
+            ? `/vendor/${vendorId}/connect-pos`
+            : `/vendor/${vendorId}/kitchen`
           : undefined,
-      actionLabel: audience === "vendor" ? "Connect POS" : undefined,
+      actionLabel:
+        audience === "vendor"
+          ? deliverectMode
+            ? "Connect POS"
+            : "Open Kitchen Mode"
+          : undefined,
     },
     {
       key: "menu_available",
@@ -534,7 +547,7 @@ export function deriveVendorPodReadiness(
     blockingReasons.push(...blockingFromChecklist(checklist, [...code]));
   }
 
-  const label = vendorPodReadinessStatusLabel(status);
+  const label = vendorPodReadinessStatusLabel(status, input.posSummary.orderRoutingMode);
   const primaryBlocker = blockingReasons[0] ?? null;
 
   return {

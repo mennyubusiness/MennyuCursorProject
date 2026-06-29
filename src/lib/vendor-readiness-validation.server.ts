@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { VendorOrderRoutingMode } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
@@ -11,6 +12,7 @@ import type {
   VendorReadinessVendorFields,
   VendorStripeReadinessSummary,
 } from "@/lib/vendor-readiness-states";
+import { loadVendorDeliverectMappingReadyMap } from "@/services/vendor-deliverect-mapping-readiness.server";
 
 const vendorReadinessSelect = {
   id: true,
@@ -29,6 +31,7 @@ const vendorReadinessSelect = {
   posConnectionStatus: true,
   deliverectAutoMapLastOutcome: true,
   pendingDeliverectConnectionKey: true,
+  orderRoutingMode: true,
 } as const;
 
 export type VendorReadinessBundle = {
@@ -49,6 +52,11 @@ export async function loadVendorReadinessBundles(
     prisma.vendor.findMany({ where: { id: { in: uniqueIds } }, select: vendorReadinessSelect }),
     loadVendorMenuReadinessSummaries(uniqueIds),
   ]);
+
+  const routingModes = new Map<string, VendorOrderRoutingMode>(
+    vendors.map((vendor) => [vendor.id, vendor.orderRoutingMode])
+  );
+  const mappingReadyByVendor = await loadVendorDeliverectMappingReadyMap(uniqueIds, routingModes);
 
   const stripeConnectConfigured = Boolean(env.STRIPE_SECRET_KEY);
 
@@ -81,6 +89,8 @@ export async function loadVendorReadinessBundles(
         deliverectAutoMapLastOutcome: vendor.deliverectAutoMapLastOutcome,
         pendingDeliverectConnectionKey: vendor.pendingDeliverectConnectionKey,
         hasUnmatchedChannelRegistration: false,
+        orderRoutingMode: vendor.orderRoutingMode,
+        deliverectMappingReady: mappingReadyByVendor.get(vendor.id) ?? true,
       },
     });
   }

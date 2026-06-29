@@ -46,17 +46,34 @@ export async function submitVendorOrder(
     where: { id: vendorOrderId },
     select: {
       deliverectChannelLinkId: true,
-      vendor: { select: { deliverectChannelLinkId: true, deliverectBusyDelayMinutes: true } },
+      vendor: {
+        select: {
+          orderRoutingMode: true,
+          deliverectChannelLinkId: true,
+          deliverectBusyDelayMinutes: true,
+        },
+      },
     },
   });
   if (!voHead) {
     return { success: false, error: "Vendor order not found" };
   }
+  const routingMode = voHead.vendor.orderRoutingMode ?? "manual_dashboard";
   const channelLinkId =
     voHead.vendor.deliverectChannelLinkId ?? voHead.deliverectChannelLinkId;
   const provider: "deliverect" | "manual" =
-    channelLinkId != null && String(channelLinkId).trim() !== "" ? "deliverect" : "manual";
+    routingMode === "deliverect" ? "deliverect" : "manual";
   const busyDelay = voHead.vendor.deliverectBusyDelayMinutes ?? 0;
+
+  if (provider === "deliverect") {
+    if (channelLinkId == null || String(channelLinkId).trim() === "") {
+      return {
+        success: false,
+        error: "Deliverect routing is configured but channel link is missing.",
+        code: "DELIVERECT_NOT_CONFIGURED",
+      };
+    }
+  }
 
   if (provider === "manual") {
     const vo = await prisma.vendorOrder.findUnique({

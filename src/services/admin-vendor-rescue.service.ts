@@ -1,8 +1,9 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { MenuImportJobStatus } from "@prisma/client";
+import { MenuImportJobStatus, type VendorOrderRoutingMode } from "@prisma/client";
 import { ADMIN_AUDIT_ACTION, ADMIN_AUDIT_TARGET, requireAdminReason } from "@/lib/admin-audit-log";
+import { VENDOR_ORDER_ROUTING_MODES } from "@/lib/vendor-order-routing-mode";
 import { buildVendorMenuCustomerPath, buildPodCustomerPath } from "@/lib/customer-public-url";
 import { prisma } from "@/lib/db";
 import {
@@ -22,6 +23,7 @@ function revalidateVendorPaths(vendorId: string) {
   revalidatePath(`/admin/vendors/${vendorId}`);
   revalidatePath("/admin/vendors");
   revalidatePath(`/vendor/${vendorId}/dashboard`);
+  revalidatePath(`/vendor/${vendorId}/setup`);
   revalidatePath(`/vendor/${vendorId}/menu`);
   revalidatePath("/explore");
 }
@@ -348,6 +350,48 @@ export async function adminLogVendorReadinessRecheck(input: {
   });
 
   return { ok: true, message: "Readiness rechecked (computed on load)." };
+}
+
+export async function adminUpdateVendorOrderRoutingMode(input: {
+  vendorId: string;
+  orderRoutingMode: VendorOrderRoutingMode;
+  adminUserId: string | null;
+  reason: string;
+}): Promise<ActionResult> {
+  const reasonCheck = requireAdminReason(input.reason);
+  if (!reasonCheck.ok) return reasonCheck;
+
+  if (!VENDOR_ORDER_ROUTING_MODES.includes(input.orderRoutingMode)) {
+    return { ok: false, error: "Invalid order routing mode." };
+  }
+
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: input.vendorId },
+    select: { id: true, orderRoutingMode: true },
+  });
+  if (!vendor) return { ok: false, error: "Vendor not found." };
+
+  if (vendor.orderRoutingMode === input.orderRoutingMode) {
+    return { ok: true, message: "Order routing mode unchanged." };
+  }
+
+  await prisma.vendor.update({
+    where: { id: input.vendorId },
+    data: { orderRoutingMode: input.orderRoutingMode },
+  });
+
+  await createAdminAuditLog({
+    adminUserId: input.adminUserId,
+    actionType: ADMIN_AUDIT_ACTION.VENDOR_ORDER_ROUTING_MODE_UPDATED,
+    targetType: ADMIN_AUDIT_TARGET.vendor,
+    targetId: input.vendorId,
+    reason: reasonCheck.reason,
+    oldValue: vendor.orderRoutingMode,
+    newValue: input.orderRoutingMode,
+  });
+
+  revalidateVendorPaths(input.vendorId);
+  return { ok: true, message: "Order routing mode updated." };
 }
 
 export async function adminRefreshVendorMenu(input: {

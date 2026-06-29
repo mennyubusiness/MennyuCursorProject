@@ -177,7 +177,6 @@ describe("pod readiness page", () => {
     const page = readPod("setup/page.tsx");
     const summary = readPod("setup/PodReadinessSummarySection.tsx");
     const vendors = readPod("setup/PodReadinessVendorSection.tsx");
-    const readinessLib = readFileSync(join(root, "lib/pod-readiness-page.ts"), "utf8");
     expect(page).toContain('title="Readiness"');
     expect(page).toContain("PodReadinessSummarySection");
     expect(page).not.toContain("PodReadinessPromotionSection");
@@ -185,7 +184,8 @@ describe("pod readiness page", () => {
     expect(vendors).toContain("deriveVendorMissingLines");
     expect(vendors).toContain("Invite vendors");
     expect(vendors).not.toMatch(/Set hours|Connect Stripe|Edit menu/i);
-    expect(readinessLib).toContain("Vendor needs to set customer ordering hours.");
+    const readinessStatesLib = readFileSync(join(root, "lib/vendor-readiness-states.ts"), "utf8");
+    expect(readinessStatesLib).toContain("Hidden: customer ordering hours missing.");
   });
 });
 

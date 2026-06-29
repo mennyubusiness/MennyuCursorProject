@@ -56,6 +56,8 @@ export function deriveVendorAttentionItems(input: {
   publicProfileReady: boolean;
   canAcceptOrders: boolean;
   posState: VendorPosUiState;
+  /** When false (manual dashboard routing), skip Deliverect/POS connection warnings. */
+  deliverectRoutingMode?: boolean;
   hasPodMembership: boolean;
   pendingPodInviteCount: number;
   failedOrdersToday: number;
@@ -117,20 +119,22 @@ export function deriveVendorAttentionItems(input: {
       items.push(checklistItemToAttention(item));
     }
 
-    if (input.posState === "needs_attention" && !items.some((item) => item.id === "pos")) {
-      items.push({
-        id: "pos_attention",
-        title: "POS needs attention",
-        description: "Your POS connection needs a fix before orders can route reliably.",
-        severity: "warning",
-      });
-    } else if (input.posState === "not_connected" && !items.some((item) => item.id === "pos")) {
-      items.push({
-        id: "pos_disconnected",
-        title: "POS not connected",
-        description: "Connect your POS so kitchen orders can sync automatically.",
-        severity: "info",
-      });
+    if (input.deliverectRoutingMode !== false) {
+      if (input.posState === "needs_attention" && !items.some((item) => item.id === "pos")) {
+        items.push({
+          id: "pos_attention",
+          title: "POS needs attention",
+          description: "Your POS connection needs a fix before orders can route reliably.",
+          severity: "warning",
+        });
+      } else if (input.posState === "not_connected" && !items.some((item) => item.id === "pos")) {
+        items.push({
+          id: "pos_disconnected",
+          title: "POS not connected",
+          description: "Connect your POS so kitchen orders can sync automatically.",
+          severity: "info",
+        });
+      }
     }
 
     if (input.vendorPaused) {

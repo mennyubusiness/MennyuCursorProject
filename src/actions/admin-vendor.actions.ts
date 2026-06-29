@@ -14,6 +14,7 @@ import {
   adminShowVendor,
   adminUnpauseVendorOrdering,
   adminUpdateVendorPublicProfile,
+  adminUpdateVendorOrderRoutingMode,
 } from "@/services/admin-vendor-rescue.service";
 
 type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -115,4 +116,17 @@ export async function adminRefreshVendorMenuAction(vendorId: string, reason: str
 
 export async function adminRecheckVendorReadinessAction(vendorId: string, reason: string) {
   return withAdmin(({ adminUserId }) => adminLogVendorReadinessRecheck({ vendorId, adminUserId, reason }));
+}
+
+export async function adminUpdateVendorOrderRoutingModeAction(input: {
+  vendorId: string;
+  orderRoutingMode: "manual_dashboard" | "deliverect";
+  reason: string;
+}) {
+  return withAdmin(({ adminUserId }) =>
+    adminUpdateVendorOrderRoutingMode({ ...input, adminUserId }).then((r) => {
+      if (r.ok) revalidatePath(`/admin/vendors/${input.vendorId}`);
+      return r;
+    })
+  );
 }

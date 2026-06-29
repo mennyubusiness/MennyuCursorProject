@@ -31,6 +31,9 @@ import { getVendorOrdersBoardData, serializeVendorOrdersForBoard } from "@/lib/v
 import { summarizeVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
 import { resolveVendorHoursTimezone } from "@/lib/vendor-customer-ordering-hours";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
+import { isDeliverectRoutingMode } from "@/lib/vendor-order-routing-mode";
+import { evaluateDeliverectMenuIntegrityForVendor } from "@/services/deliverect-menu-integrity.service";
+import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 
 function startOfToday(): Date {
   const d = new Date();
@@ -57,6 +60,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       deliverectChannelLinkId: true,
       deliverectLocationId: true,
       posConnectionStatus: true,
+      orderRoutingMode: true,
       pendingDeliverectConnectionKey: true,
       deliverectAutoMapLastOutcome: true,
       deliverectAutoMapLastAt: true,
@@ -112,6 +116,26 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
   });
   const menuReady = isVendorMenuReady(menuSummary);
 
+  let deliverectMappingReady = true;
+  if (isDeliverectRoutingMode(vendorRecord.orderRoutingMode)) {
+    try {
+      const integrity = await evaluateDeliverectMenuIntegrityForVendor(vendorId);
+      deliverectMappingReady = integrity.deliverectReady;
+    } catch {
+      deliverectMappingReady = false;
+    }
+  }
+
+  const readinessPosSummary: VendorPosReadinessSummary = {
+    deliverectChannelLinkId: vendorRecord.deliverectChannelLinkId,
+    posConnectionStatus: vendorRecord.posConnectionStatus,
+    deliverectAutoMapLastOutcome: vendorRecord.deliverectAutoMapLastOutcome,
+    pendingDeliverectConnectionKey: vendorRecord.pendingDeliverectConnectionKey,
+    hasUnmatchedChannelRegistration,
+    orderRoutingMode: vendorRecord.orderRoutingMode,
+    deliverectMappingReady,
+  };
+
   const readiness = deriveVendorPodReadiness(
     {
       podId: currentPod?.pod.id ?? vendorId,
@@ -130,13 +154,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
         contactPhone: vendorRecord.contactPhone,
       },
       menuSummary,
-      posSummary: {
-        deliverectChannelLinkId: vendorRecord.deliverectChannelLinkId,
-        posConnectionStatus: vendorRecord.posConnectionStatus,
-        deliverectAutoMapLastOutcome: vendorRecord.deliverectAutoMapLastOutcome,
-        pendingDeliverectConnectionKey: vendorRecord.pendingDeliverectConnectionKey,
-        hasUnmatchedChannelRegistration,
-      },
+      posSummary: readinessPosSummary,
       stripeSummary: {
         stripeConnectedAccountId: vendorRecord.stripeConnectedAccountId,
         stripeChargesEnabled: vendorRecord.stripeChargesEnabled ?? false,
@@ -188,6 +206,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     publicProfileReady: readiness.setupSummary.publicProfile,
     canAcceptOrders: readiness.canAcceptOrders,
     posState,
+    deliverectRoutingMode: isDeliverectRoutingMode(vendorRecord.orderRoutingMode),
     hasPodMembership: Boolean(currentPod),
     pendingPodInviteCount: pendingInvites,
     failedOrdersToday: todayStats.failedOrCancelled,
@@ -245,6 +264,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     vendor: boardData.vendor,
     vendorRecord,
     readiness,
+    readinessPosSummary,
     setupComplete,
     posState,
     posConnected,

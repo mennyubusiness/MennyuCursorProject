@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { VendorSetupChecklist } from "@/components/vendor/VendorSetupChecklist";
 import { VendorSetupStatusBanners } from "@/components/vendor/VendorSetupStatusBanners";
+import { VendorOrderRoutingSection } from "@/components/vendor/VendorOrderRoutingSection";
 import { buildVendorOperationalSetupItems } from "@/lib/vendor-dashboard-attention";
 import { loadVendorDashboardContext } from "@/lib/vendor-dashboard-data.server";
 import { VENDOR_ALL_READY_COPY } from "@/lib/vendor-operational-copy";
@@ -65,6 +66,11 @@ export default async function VendorSetupPage({
             canAcceptOrders={ctx.readiness.canAcceptOrders}
           />
         )}
+
+        <VendorOrderRoutingSection
+          orderRoutingMode={ctx.vendorRecord.orderRoutingMode}
+          posSummary={ctx.readinessPosSummary}
+        />
 
         <VendorSetupChecklist items={appearance} title="Required to appear on pod page" />
 

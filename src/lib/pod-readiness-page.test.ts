@@ -19,6 +19,7 @@ function rosterRow(overrides: Partial<PodRosterVendorRow> = {}): PodRosterVendor
     podVendorActive: true,
     vendorGloballyActive: true,
     mennyuOrdersPaused: false,
+    orderRoutingMode: "manual_dashboard",
     readiness: {
       status: "needs_hours",
       label: "Needs hours",
@@ -73,7 +74,7 @@ describe("derivePodReadinessPageSummary", () => {
 describe("deriveVendorMissingLines", () => {
   it("uses vendor-owned copy without edit actions", () => {
     const lines = deriveVendorMissingLines(rosterRow());
-    expect(lines).toContain("Vendor needs to set customer ordering hours.");
+    expect(lines).toContain("Hidden: customer ordering hours missing.");
   });
 
   it("shows pod visibility state", () => {
@@ -83,11 +84,22 @@ describe("deriveVendorMissingLines", () => {
 });
 
 describe("vendorReadinessBadge", () => {
-  it("labels ready vendors", () => {
+  it("labels live vendors", () => {
     expect(
       vendorReadinessBadge(
-        rosterRow({ readiness: { ...rosterRow().readiness, canAcceptOrders: true, status: "active" } })
+        rosterRow({
+          readiness: {
+            ...rosterRow().readiness,
+            canAcceptOrders: true,
+            status: "active",
+            setupSummary: {
+              ...rosterRow().readiness.setupSummary,
+              hours: true,
+              publicProfile: true,
+            },
+          },
+        })
       ).label
-    ).toBe("Ready");
+    ).toBe("Live");
   });
 });

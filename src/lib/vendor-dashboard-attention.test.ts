@@ -98,6 +98,27 @@ describe("deriveVendorAttentionItems", () => {
     expect(items.some((item) => item.id === "vendor_hidden")).toBe(false);
     expect(items.some((item) => item.id === "stripe")).toBe(true);
   });
+
+  it("does not show Deliverect POS warnings in manual dashboard routing mode", () => {
+    const items = deriveVendorAttentionItems({
+      ...base,
+      canAcceptOrders: false,
+      deliverectRoutingMode: false,
+      posState: "not_connected",
+      checklist: [
+        ...completePublicChecklist,
+        {
+          key: "stripe",
+          label: "Connect Stripe payouts",
+          complete: false,
+          owner: "vendor",
+        },
+      ],
+    });
+
+    expect(items.some((item) => item.id === "pos_disconnected")).toBe(false);
+    expect(items.some((item) => item.id === "pos_attention")).toBe(false);
+  });
 });
 
 describe("isVendorSetupComplete", () => {

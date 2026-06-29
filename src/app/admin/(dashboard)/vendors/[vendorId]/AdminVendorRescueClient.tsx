@@ -17,6 +17,9 @@ import {
   buildVendorDashboardPath,
 } from "@/lib/admin-entity-nav-links";
 import type { AdminVendorDetailView } from "@/services/admin-vendor-detail.service";
+import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
+import type { VendorOrderRoutingMode } from "@prisma/client";
+import { AdminVendorOrderRoutingSection } from "./AdminVendorOrderRoutingSection";
 import {
   adminAttachVendorToPodFromVendorAction,
   adminDetachVendorFromPodFromVendorAction,
@@ -35,9 +38,11 @@ type Option = { id: string; name: string };
 export function AdminVendorRescueClient({
   detail,
   podOptions,
+  posSummary,
 }: {
   detail: AdminVendorDetailView;
   podOptions: Option[];
+  posSummary: VendorPosReadinessSummary | null;
 }) {
   const router = useRouter();
   const vendorId = detail.vendor.id;
@@ -251,6 +256,14 @@ export function AdminVendorRescueClient({
           </button>
         </form>
       </AdminSection>
+
+      {posSummary ? (
+        <AdminVendorOrderRoutingSection
+          vendorId={vendorId}
+          orderRoutingMode={detail.vendor.orderRoutingMode as VendorOrderRoutingMode}
+          posSummary={posSummary}
+        />
+      ) : null}
 
       <AdminSection title="Menu / POS status">
         <AdminInfoRow label="POS status" value={detail.vendor.posConnectionStatus} />

@@ -42,6 +42,8 @@ const basePos = {
   deliverectAutoMapLastOutcome: null,
   pendingDeliverectConnectionKey: null,
   hasUnmatchedChannelRegistration: false,
+  orderRoutingMode: "manual_dashboard" as const,
+  deliverectMappingReady: true,
 };
 
 const baseCustomerOrderingHours = defaultVendorCustomerOrderingWeek();
@@ -75,11 +77,27 @@ describe("vendor setup sub-helpers", () => {
     ).toBe(false);
   });
 
-  it("detects POS connected state", () => {
+  it("detects POS connected state for Deliverect routing mode", () => {
     expect(isVendorPosReady(basePos)).toBe(true);
     expect(
-      isVendorPosReady({ ...basePos, deliverectChannelLinkId: null, posConnectionStatus: "not_connected" })
+      isVendorPosReady({
+        ...basePos,
+        orderRoutingMode: "deliverect",
+        deliverectChannelLinkId: null,
+        posConnectionStatus: "not_connected",
+      })
     ).toBe(false);
+  });
+
+  it("treats manual dashboard routing as POS-ready without Deliverect", () => {
+    expect(
+      isVendorPosReady({
+        ...basePos,
+        orderRoutingMode: "manual_dashboard",
+        deliverectChannelLinkId: null,
+        posConnectionStatus: "not_connected",
+      })
+    ).toBe(true);
   });
 
   it("detects menu availability", () => {
@@ -134,11 +152,30 @@ describe("deriveVendorPodReadiness status priority", () => {
     expect(result.blockingReasons[0]?.owner).toBe("vendor");
   });
 
-  it("flags missing POS", () => {
+  it("flags missing Deliverect setup in deliverect routing mode", () => {
     const result = readiness({
-      posSummary: { ...basePos, deliverectChannelLinkId: null, posConnectionStatus: "not_connected" },
+      posSummary: {
+        ...basePos,
+        orderRoutingMode: "deliverect",
+        deliverectMappingReady: false,
+        deliverectChannelLinkId: null,
+        posConnectionStatus: "not_connected",
+      },
     });
     expect(result.status).toBe("needs_pos");
+  });
+
+  it("does not block manual dashboard vendors without Deliverect", () => {
+    const result = readiness({
+      posSummary: {
+        ...basePos,
+        orderRoutingMode: "manual_dashboard",
+        deliverectChannelLinkId: null,
+        posConnectionStatus: "not_connected",
+      },
+    });
+    expect(result.status).not.toBe("needs_pos");
+    expect(result.canAcceptOrders).toBe(true);
   });
 
   it("flags missing menu", () => {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { loadVendorReadinessBundles } from "@/lib/vendor-readiness-validation.server";
 import { loadAdminVendorDetail } from "@/services/admin-vendor-detail.service";
 import { AdminVendorRescueClient } from "./AdminVendorRescueClient";
 
@@ -13,11 +14,13 @@ export default async function AdminVendorDetailPage({
   const id = vendorId?.trim();
   if (!id) notFound();
 
-  const [detail, podOptions] = await Promise.all([
+  const [detail, podOptions, readinessBundles] = await Promise.all([
     loadAdminVendorDetail(id),
     prisma.pod.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: 500 }),
+    loadVendorReadinessBundles([id]),
   ]);
   if (!detail) notFound();
+  const posSummary = readinessBundles.get(id)?.posSummary ?? null;
 
   return (
     <div className="space-y-8">
@@ -34,7 +37,7 @@ export default async function AdminVendorDetailPage({
         <p className="mt-1 font-mono text-sm text-oo-stone-gray">{detail.vendor.slug}</p>
       </header>
 
-      <AdminVendorRescueClient detail={detail} podOptions={podOptions} />
+      <AdminVendorRescueClient detail={detail} podOptions={podOptions} posSummary={posSummary} />
 
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Tools</h2>

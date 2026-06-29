@@ -38,11 +38,13 @@ const baseContext = {
 function routingHead(opts?: {
   voChannelLink?: string | null;
   vendorChannelLink?: string | null;
+  orderRoutingMode?: "manual_dashboard" | "deliverect";
   busyDelay?: number;
 }) {
   return {
     deliverectChannelLinkId: opts?.voChannelLink ?? null,
     vendor: {
+      orderRoutingMode: opts?.orderRoutingMode ?? "deliverect",
       deliverectChannelLinkId:
         opts?.vendorChannelLink === undefined ? "ch_deliverect_test" : opts.vendorChannelLink,
       deliverectBusyDelayMinutes: opts?.busyDelay ?? 0,
@@ -68,9 +70,11 @@ describe("submitVendorOrder", () => {
     expect(mockApplyStatus).not.toHaveBeenCalled();
   });
 
-  it("uses manual path for unlinked vendor and records confirmed routing history", async () => {
+  it("uses manual path when routing mode is manual_dashboard", async () => {
     mockFindUnique
-      .mockResolvedValueOnce(routingHead({ vendorChannelLink: null }))
+      .mockResolvedValueOnce(
+        routingHead({ orderRoutingMode: "manual_dashboard", vendorChannelLink: "ch_deliverect_test" })
+      )
       .mockResolvedValueOnce({
         orderId: ORDER_ID,
         fulfillmentStatus: "pending",
@@ -94,6 +98,22 @@ describe("submitVendorOrder", () => {
       },
       "manual"
     );
+  });
+
+  it("fails deliverect routing when mode is deliverect but channel link is missing", async () => {
+    mockFindUnique.mockResolvedValueOnce(
+      routingHead({ orderRoutingMode: "deliverect", vendorChannelLink: null })
+    );
+
+    const result = await submitVendorOrder(VO_ID, baseContext);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Deliverect routing is configured but channel link is missing.",
+      code: "DELIVERECT_NOT_CONFIGURED",
+    });
+    expect(mockSubmitDeliverect).not.toHaveBeenCalled();
+    expect(mockApplyStatus).not.toHaveBeenCalled();
   });
 
   it("routes Deliverect-linked vendor through Deliverect submit path", async () => {
