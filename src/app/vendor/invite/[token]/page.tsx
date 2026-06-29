@@ -35,7 +35,7 @@ export default async function VendorInvitePage({
 
     if (acceptResult.ok) {
       redirect(
-        `/vendor/${acceptResult.vendorId}/settings?section=pod-membership&access=pod_connected`
+        `/vendor/${acceptResult.vendorId}/setup?access=pod_connected`
       );
     }
 

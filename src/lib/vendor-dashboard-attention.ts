@@ -182,7 +182,7 @@ export function buildVendorOperationalSetupItems(input: {
       description: input.vendorPaused
         ? "New orders are paused in vendor settings."
         : "New orders are not paused.",
-      actionHref: `/vendor/${input.vendorId}/settings?section=account`,
+      actionHref: `/vendor/${input.vendorId}/hours`,
       actionLabel: "Open settings",
     },
     {

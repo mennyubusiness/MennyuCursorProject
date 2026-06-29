@@ -31,6 +31,7 @@ async function revalidateVendorCustomerSurfaces(vendorId: string) {
 export type VendorBrandProfileInput = {
   name: string;
   description: string;
+  cuisineCategory: string;
   imageUrl: string;
   accentColor: string;
 };
@@ -68,6 +69,11 @@ export async function updateVendorBrandProfile(
     };
   }
 
+  const cuisineCategory = input.cuisineCategory?.trim() ?? "";
+  if (cuisineCategory.length > 120) {
+    return { ok: false, error: "Cuisine/category must be at most 120 characters." };
+  }
+
   const vid = vendorId.trim();
   const previous = await prisma.vendor.findUnique({
     where: { id: vid },
@@ -79,6 +85,7 @@ export async function updateVendorBrandProfile(
     data: {
       name: nameResult.value,
       description,
+      cuisineCategory: cuisineCategory || null,
       imageUrl: logoUrl,
       accentColor,
     },

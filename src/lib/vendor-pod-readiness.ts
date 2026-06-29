@@ -227,7 +227,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
 
   const settingsBase = `/vendor/${vendorId}/settings`;
   const profileHref =
-    audience === "vendor" ? `${settingsBase}?section=profile` : podOwnerVendorHref(podId, podSlug, vendor.slug);
+    audience === "vendor" ? settingsBase : podOwnerVendorHref(podId, podSlug, vendor.slug);
   const profileAction =
     audience === "vendor" ? "Edit profile" : "View vendor page";
 
@@ -240,7 +240,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
             complete: Boolean(vendor.name?.trim()),
             owner: "vendor",
             description: "Shown on your public pod menu.",
-            actionHref: `${settingsBase}?section=profile`,
+            actionHref: settingsBase,
             actionLabel: "Edit profile",
           },
           {
@@ -249,7 +249,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
             complete: Boolean(vendor.description?.trim()),
             owner: "vendor",
             description: "Helps customers understand what you serve.",
-            actionHref: `${settingsBase}?section=profile`,
+            actionHref: settingsBase,
             actionLabel: "Edit profile",
           },
           {
@@ -258,7 +258,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
             complete: Boolean(vendor.imageUrl?.trim()),
             owner: "vendor",
             description: "Displayed at the top of your public menu page.",
-            actionHref: `${settingsBase}?section=profile`,
+            actionHref: settingsBase,
             actionLabel: "Edit profile",
           },
           {
@@ -267,7 +267,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
             complete: Boolean(vendor.cuisineCategory?.trim()),
             owner: "vendor",
             description: "Helps customers find you on the pod page.",
-            actionHref: `${settingsBase}?section=profile`,
+            actionHref: settingsBase,
             actionLabel: "Edit profile",
           },
         ]

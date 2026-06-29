@@ -10,7 +10,7 @@ const NAV_LINKS = [
   { href: "hours", label: "Hours" },
   { href: "payouts", label: "Payouts" },
   { href: "setup", label: "Setup" },
-  { href: "settings", label: "Settings" },
+  { href: "settings", label: "Vendor Profile" },
 ] as const;
 
 function navLinkIsActive(pathname: string, base: string, href: string): boolean {

@@ -9,6 +9,7 @@ type DestinationPodGroupOrderPromptGateProps = {
   podId: string;
   hasVendors: boolean;
   isQrEntry: boolean;
+  hasExplicitJoinIntent: boolean;
   orderingStatus: PodOrderingStatus;
 };
 
@@ -16,6 +17,7 @@ export async function DestinationPodGroupOrderPromptGate({
   podId,
   hasVendors,
   isQrEntry,
+  hasExplicitJoinIntent,
   orderingStatus,
 }: DestinationPodGroupOrderPromptGateProps) {
   const [session, ctaState] = await Promise.all([auth(), getPodPageGroupOrderCtaState(podId)]);
@@ -23,6 +25,7 @@ export async function DestinationPodGroupOrderPromptGate({
   const eligible = shouldOfferDestinationGroupOrderPrompt({
     hasVendors,
     isQrEntry,
+    hasExplicitJoinIntent,
     ctaStateKind: ctaState.kind,
     orderingTone: orderingStatus.tone,
   });

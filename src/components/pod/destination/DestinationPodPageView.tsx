@@ -13,6 +13,7 @@ import { buildDestinationPodNavItems } from "@/lib/pod-page-nav";
 
 type DestinationPodPageViewProps = PodCustomerPageData & {
   isQrEntry: boolean;
+  hasExplicitJoinIntent: boolean;
   highlightVendor: string | null;
 };
 
@@ -26,6 +27,7 @@ export function DestinationPodPageView({
   hasVisitSection,
   contactDetails,
   isQrEntry,
+  hasExplicitJoinIntent,
   highlightVendor,
 }: DestinationPodPageViewProps) {
   const podId = pod.id;
@@ -62,6 +64,7 @@ export function DestinationPodPageView({
         podId={podId}
         hasVendors={hasVendors}
         isQrEntry={isQrEntry}
+        hasExplicitJoinIntent={hasExplicitJoinIntent}
         orderingStatus={orderingStatus}
       />
 

@@ -178,13 +178,13 @@ export function buildVendorSetupSettingsPath(
   switch (code) {
     case "profile":
     case "needs_profile":
-      return `${settingsBase}?section=profile`;
+      return settingsBase;
     case "stripe":
     case "needs_payment":
-      return `${settingsBase}?section=payouts`;
+      return `/vendor/${vendorId}/payouts`;
     case "pos":
     case "needs_pos":
-      return `${settingsBase}?section=pos-menu`;
+      return `/vendor/${vendorId}/connect-pos`;
     case "menu":
     case "needs_menu":
       return `/vendor/${vendorId}/menu`;

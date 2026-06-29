@@ -6,7 +6,7 @@ const QUICK_LINKS = [
   { href: "orders", label: "View order history", description: "Active board and past orders" },
   { href: "payouts", label: "View payouts", description: "Stripe status and transfers" },
   { href: "setup", label: "Complete setup", description: "Readiness checklist" },
-  { href: "settings?section=profile", label: "Update business profile", description: "Name, logo, and contact" },
+  { href: "settings", label: "Vendor profile", description: "Public name, logo, and description" },
 ] as const;
 
 export function VendorQuickLinksSection({ vendorId }: { vendorId: string }) {

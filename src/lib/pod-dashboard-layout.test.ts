@@ -74,7 +74,7 @@ describe("derivePodDashboardLayoutState", () => {
           displayStatus: "Needs Stripe",
           status: "needs_payment",
           primaryBlockerCode: "stripe",
-          setupPath: "/vendor/v1/settings?section=payouts",
+          setupPath: "/vendor/v1/payouts",
           reminderText: "Hi",
         },
       ],

@@ -86,7 +86,7 @@ describe("buildVendorAdoptionReminderMessage", () => {
 describe("buildVendorSetupSettingsPath", () => {
   it("returns vendor settings paths for setup blockers", () => {
     expect(buildVendorSetupSettingsPath("vendor_1", "needs_payment", "stripe")).toBe(
-      "/vendor/vendor_1/settings?section=payouts"
+      "/vendor/vendor_1/payouts"
     );
     expect(buildVendorSetupSettingsPath("vendor_1", "needs_menu", "menu")).toBe("/vendor/vendor_1/menu");
   });

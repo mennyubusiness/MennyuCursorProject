@@ -17,21 +17,21 @@ describe("destinationGroupPromptStorageKey", () => {
 });
 
 describe("shouldOfferDestinationGroupOrderPrompt", () => {
-  it("offers the prompt when vendors exist and user can start a group order", () => {
+  it("offers the prompt on QR entry when vendors exist and user can start a group order", () => {
     expect(
       shouldOfferDestinationGroupOrderPrompt({
         hasVendors: true,
-        isQrEntry: false,
+        isQrEntry: true,
         ctaStateKind: "start",
         orderingTone: "open",
       })
     ).toBe(true);
   });
 
-  it("does not offer the prompt without vendors", () => {
+  it("does not offer the prompt on regular (non-QR) entry", () => {
     expect(
       shouldOfferDestinationGroupOrderPrompt({
-        hasVendors: false,
+        hasVendors: true,
         isQrEntry: false,
         ctaStateKind: "start",
         orderingTone: "open",
@@ -39,10 +39,10 @@ describe("shouldOfferDestinationGroupOrderPrompt", () => {
     ).toBe(false);
   });
 
-  it("does not offer the prompt on QR entry", () => {
+  it("does not offer the prompt without vendors", () => {
     expect(
       shouldOfferDestinationGroupOrderPrompt({
-        hasVendors: true,
+        hasVendors: false,
         isQrEntry: true,
         ctaStateKind: "start",
         orderingTone: "open",
@@ -54,7 +54,7 @@ describe("shouldOfferDestinationGroupOrderPrompt", () => {
     expect(
       shouldOfferDestinationGroupOrderPrompt({
         hasVendors: true,
-        isQrEntry: false,
+        isQrEntry: true,
         ctaStateKind: "host_active",
         orderingTone: "open",
       })
@@ -62,7 +62,7 @@ describe("shouldOfferDestinationGroupOrderPrompt", () => {
     expect(
       shouldOfferDestinationGroupOrderPrompt({
         hasVendors: true,
-        isQrEntry: false,
+        isQrEntry: true,
         ctaStateKind: "participant_active",
         orderingTone: "open",
       })
@@ -70,7 +70,7 @@ describe("shouldOfferDestinationGroupOrderPrompt", () => {
     expect(
       shouldOfferDestinationGroupOrderPrompt({
         hasVendors: true,
-        isQrEntry: false,
+        isQrEntry: true,
         ctaStateKind: "locked_checkout",
         orderingTone: "open",
       })
@@ -81,9 +81,21 @@ describe("shouldOfferDestinationGroupOrderPrompt", () => {
     expect(
       shouldOfferDestinationGroupOrderPrompt({
         hasVendors: true,
-        isQrEntry: false,
+        isQrEntry: true,
         ctaStateKind: "start",
         orderingTone: "empty",
+      })
+    ).toBe(false);
+  });
+
+  it("does not offer the prompt when join intent is explicit in the URL", () => {
+    expect(
+      shouldOfferDestinationGroupOrderPrompt({
+        hasVendors: true,
+        isQrEntry: true,
+        ctaStateKind: "start",
+        orderingTone: "open",
+        hasExplicitJoinIntent: true,
       })
     ).toBe(false);
   });

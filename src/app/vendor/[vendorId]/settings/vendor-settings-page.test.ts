@@ -3,93 +3,58 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import {
+  resolveLegacyVendorSettingsRedirect,
+  resolveVendorSettingsSection,
+  vendorSettingsSectionHref,
+} from "@/lib/vendor-settings-sections";
+
 const dir = dirname(fileURLToPath(import.meta.url));
-
 const pageSrc = readFileSync(join(dir, "page.tsx"), "utf8");
-const shellSrc = readFileSync(join(dir, "VendorSettingsShell.tsx"), "utf8");
-const panelsSrc = readFileSync(join(dir, "VendorSettingsSectionPanels.tsx"), "utf8");
-const sectionsSrc = readFileSync(join(dir, "../../../../lib/vendor-settings-sections.ts"), "utf8");
+const formSrc = readFileSync(join(dir, "VendorBrandProfileForm.tsx"), "utf8");
+const navSrc = readFileSync(join(dir, "../VendorAreaNav.tsx"), "utf8");
 
-describe("vendor settings section routing", () => {
-  it("resolves section from search params with overview default", () => {
-    expect(pageSrc).toMatch(/resolveVendorSettingsSection\(sp\.section\)/);
-    expect(sectionsSrc).toMatch(/return "overview"/);
+describe("vendor profile page routing", () => {
+  it("defaults unknown sections to profile", () => {
+    expect(resolveVendorSettingsSection(undefined)).toBe("profile");
+    expect(resolveVendorSettingsSection("overview")).toBe("overview");
   });
 
-  it("redirects Stripe connect return to payouts section", () => {
-    expect(pageSrc).toMatch(/settingsRedirectPath\(vendorId, "payouts"\)/);
-  });
-});
-
-describe("vendor settings workspace layout", () => {
-  it("uses full-width shell on settings route", () => {
-    const chrome = readFileSync(join(dir, "../VendorLayoutChrome.tsx"), "utf8");
-    expect(chrome).toMatch(/max-w-7xl/);
-    expect(chrome).toContain("wide={isWideWorkspace}");
+  it("maps legacy section URLs to dedicated workspace pages", () => {
+    expect(resolveLegacyVendorSettingsRedirect("v1", "payouts")).toBe("/vendor/v1/payouts");
+    expect(resolveLegacyVendorSettingsRedirect("v1", "pos-menu")).toBe("/vendor/v1/connect-pos");
+    expect(resolveLegacyVendorSettingsRedirect("v1", "pod-membership", { access: "pod_connected" })).toBe(
+      "/vendor/v1/setup?access=pod_connected"
+    );
+    expect(resolveLegacyVendorSettingsRedirect("v1", "hours")).toBe(null);
+    expect(resolveLegacyVendorSettingsRedirect("v1", "profile")).toBe(null);
   });
 
-  it("aligns VendorAreaNav to wide workspace routes", () => {
-    const nav = readFileSync(join(dir, "../VendorAreaNav.tsx"), "utf8");
-    expect(nav).toContain("max-w-7xl");
-    expect(nav).toContain("wide");
-  });
-
-  it("renders sidebar section navigation", () => {
-    expect(shellSrc).toMatch(/VENDOR_SETTINGS_SECTIONS/);
-    expect(shellSrc).toMatch(/aria-label="Settings sections"/);
-    expect(shellSrc).toMatch(/vendor-settings-section-mobile/);
+  it("uses a single settings route for vendor profile", () => {
+    expect(vendorSettingsSectionHref("v1", "profile")).toBe("/vendor/v1/settings");
   });
 });
 
-describe("vendor settings section content", () => {
-  it("overview shows next action or calm empty state, not all forms", () => {
-    const overviewBlock = panelsSrc.match(/case "overview":[\s\S]*?case "profile":/)?.[0] ?? "";
-    expect(overviewBlock).toMatch(/data-settings-section="overview"/);
-    expect(overviewBlock).toMatch(/OverviewSectionCards/);
-    expect(overviewBlock).not.toMatch(/VendorBrandProfileForm/);
-    expect(overviewBlock).not.toMatch(/VendorStripePayoutCard/);
+describe("vendor profile page content", () => {
+  it("renders a focused public profile page without setup warnings", () => {
+    expect(pageSrc).toMatch(/title="Vendor Profile"/);
+    expect(pageSrc).toMatch(/Manage the public details customers see for this vendor\./);
+    expect(pageSrc).toMatch(/title="Public profile"/);
+    expect(pageSrc).toMatch(/VendorBrandProfileForm/);
+    expect(pageSrc).not.toMatch(/VendorSettingsShell/);
+    expect(pageSrc).not.toMatch(/VendorSettingsSectionPanels/);
+    expect(pageSrc).not.toMatch(/deriveVendorPodReadiness/);
+    expect(pageSrc).not.toMatch(/PrimaryNextAction/);
+    expect(pageSrc).not.toMatch(/Setup summary/);
   });
 
-  it("profile section renders brand form only", () => {
-    expect(panelsSrc).toMatch(/data-settings-section="profile"/);
-    expect(panelsSrc).toMatch(/VendorBrandProfileForm/);
+  it("redirects Stripe connect callbacks to the payouts page", () => {
+    expect(pageSrc).toMatch(/redirect\(`\/vendor\/\$\{vendorId\}\/payouts\?/);
   });
 
-  it("payouts section renders Stripe card", () => {
-    expect(panelsSrc).toMatch(/data-settings-section="payouts"/);
-    expect(panelsSrc).toMatch(/VendorStripePayoutCard/);
-  });
-
-  it("pos-menu section consolidates Deliverect and menu controls", () => {
-    expect(panelsSrc).toMatch(/data-settings-section="pos-menu"/);
-    expect(panelsSrc).toMatch(/VendorPosConnectionPanel/);
-    expect(panelsSrc).toMatch(/MennyuLocationIdField/);
-    expect(panelsSrc).toMatch(/VendorAutoPublishToggle/);
-    expect(panelsSrc).toMatch(/DeliverectMenuHealthPanel/);
-  });
-
-  it("ordering section redirects to hours without pause toggle", () => {
-    expect(panelsSrc).toMatch(/data-settings-section="ordering"/);
-    expect(panelsSrc).toMatch(/Open Hours/);
-    expect(panelsSrc).not.toMatch(/VendorPauseToggle/);
-  });
-
-  it("pod membership section renders invitations and activity", () => {
-    expect(panelsSrc).toMatch(/data-settings-section="pod-membership"/);
-    expect(panelsSrc).toMatch(/VendorPodRequests/);
-    expect(panelsSrc).toMatch(/VendorRecentPodRequests/);
-  });
-
-  it("account section renders dashboard access card", () => {
-    expect(panelsSrc).toMatch(/data-settings-section="account"/);
-    expect(panelsSrc).toMatch(/VendorDashboardAccessCard/);
-  });
-});
-
-describe("vendor settings preserved actions", () => {
-  it("keeps existing form and action components wired through panels", () => {
-    expect(panelsSrc).toMatch(/VendorBrandProfileForm/);
-    expect(panelsSrc).toMatch(/VendorStripePayoutCard/);
-    expect(panelsSrc).toMatch(/VendorAutoPublishToggle/);
+  it("labels nav and save actions as vendor profile", () => {
+    expect(navSrc).toMatch(/Vendor Profile/);
+    expect(formSrc).toMatch(/Save profile/);
+    expect(formSrc).toMatch(/Cuisine\/category/);
   });
 });

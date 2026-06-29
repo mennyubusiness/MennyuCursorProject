@@ -1,67 +1,46 @@
 import { describe, expect, it } from "vitest";
+
 import {
-  VENDOR_SETTINGS_SECTIONS,
-  buildVendorSettingsSectionBadges,
+  resolveLegacyVendorSettingsRedirect,
   resolveVendorSettingsSection,
   vendorSettingsSectionHref,
 } from "./vendor-settings-sections";
 
 describe("resolveVendorSettingsSection", () => {
-  it("defaults to overview when section is missing", () => {
-    expect(resolveVendorSettingsSection(undefined)).toBe("overview");
-    expect(resolveVendorSettingsSection(null)).toBe("overview");
-    expect(resolveVendorSettingsSection("")).toBe("overview");
+  it("defaults to profile", () => {
+    expect(resolveVendorSettingsSection(undefined)).toBe("profile");
+    expect(resolveVendorSettingsSection("")).toBe("profile");
+    expect(resolveVendorSettingsSection("unknown")).toBe("profile");
   });
 
-  it("falls back to overview for invalid section", () => {
-    expect(resolveVendorSettingsSection("not-a-section")).toBe("overview");
-    expect(resolveVendorSettingsSection("payout")).toBe("overview");
-  });
-
-  it("accepts valid section ids including legacy ordering", () => {
-    expect(resolveVendorSettingsSection("profile")).toBe("profile");
-    expect(resolveVendorSettingsSection("pos-menu")).toBe("pos-menu");
+  it("accepts known legacy section ids", () => {
+    expect(resolveVendorSettingsSection("payouts")).toBe("payouts");
     expect(resolveVendorSettingsSection("pod-membership")).toBe("pod-membership");
-    expect(resolveVendorSettingsSection("ordering")).toBe("ordering");
   });
 });
 
 describe("vendorSettingsSectionHref", () => {
-  it("omits query param for overview", () => {
-    expect(vendorSettingsSectionHref("v1", "overview")).toBe("/vendor/v1/settings");
-  });
-
-  it("adds section query param for other sections", () => {
-    expect(vendorSettingsSectionHref("v1", "payouts")).toBe("/vendor/v1/settings?section=payouts");
-    expect(vendorSettingsSectionHref("v1", "pos-menu")).toBe("/vendor/v1/settings?section=pos-menu");
+  it("points to the vendor profile route", () => {
+    expect(vendorSettingsSectionHref("v1")).toBe("/vendor/v1/settings");
+    expect(vendorSettingsSectionHref("v1", "payouts")).toBe("/vendor/v1/settings");
   });
 });
 
-describe("VENDOR_SETTINGS_SECTIONS", () => {
-  it("includes expected sidebar sections without ordering controls", () => {
-    expect(VENDOR_SETTINGS_SECTIONS.map((s) => s.label)).toEqual([
-      "Overview",
-      "Business profile",
-      "Payouts",
-      "POS & menu",
-      "Pod membership",
-      "Account",
-    ]);
+describe("resolveLegacyVendorSettingsRedirect", () => {
+  it("redirects legacy settings sections to dedicated pages", () => {
+    expect(resolveLegacyVendorSettingsRedirect("v1", "payouts")).toBe("/vendor/v1/payouts");
+    expect(resolveLegacyVendorSettingsRedirect("v1", "payouts", { payout_notice: "link_expired" })).toBe(
+      "/vendor/v1/payouts?payout_notice=link_expired"
+    );
+    expect(resolveLegacyVendorSettingsRedirect("v1", "pos-menu")).toBe("/vendor/v1/connect-pos");
+    expect(resolveLegacyVendorSettingsRedirect("v1", "pod-membership")).toBe("/vendor/v1/setup");
+    expect(resolveLegacyVendorSettingsRedirect("v1", "ordering")).toBe("/vendor/v1/hours");
+    expect(resolveLegacyVendorSettingsRedirect("v1", "account")).toBe("/vendor/v1/dashboard");
   });
-});
 
-describe("buildVendorSettingsSectionBadges", () => {
-  it("reflects setup and pod state", () => {
-    const badges = buildVendorSettingsSectionBadges({
-      setupSummary: { profile: true, stripe: false, pos: true, menu: false },
-      pendingPodInviteCount: 2,
-      hasPodMembership: false,
-    });
-
-    expect(badges.profile).toBe("Complete");
-    expect(badges.payouts).toBe("Needs setup");
-    expect(badges["pos-menu"]).toBe("Needs menu");
-    expect(badges["pod-membership"]).toBe("Invite pending");
-    expect(badges.ordering).toBeUndefined();
+  it("keeps profile/overview on the settings route", () => {
+    expect(resolveLegacyVendorSettingsRedirect("v1", "profile")).toBe(null);
+    expect(resolveLegacyVendorSettingsRedirect("v1", "overview")).toBe(null);
+    expect(resolveLegacyVendorSettingsRedirect("v1", undefined)).toBe(null);
   });
 });

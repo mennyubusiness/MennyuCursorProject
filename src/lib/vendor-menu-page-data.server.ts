@@ -169,7 +169,7 @@ export async function loadVendorMenuPageData(vendorId: string): Promise<VendorMe
 
   const healthDetailHref = latestImport
     ? `/vendor/${vendorId}/menu-imports/${latestImport.jobId}`
-    : `/vendor/${vendorId}/settings?section=pos-menu`;
+    : `/vendor/${vendorId}/connect-pos`;
   const healthDetailLabel = latestImport ? "Review import details" : "Open POS & menu settings";
 
   const storefrontHref =

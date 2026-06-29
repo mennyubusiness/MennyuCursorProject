@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { DestinationPodPageView } from "@/components/pod/destination/DestinationPodPageView";
 import { StandardPodPageView } from "@/components/pod/StandardPodPageView";
 import { POD_QR_ENTRY_VALUE } from "@/lib/pod-ordering-url";
+import { hasExplicitGroupJoinIntentFromSearchParams } from "@/lib/destination-pod-group-prompt";
 import { loadPodCustomerPageData } from "@/lib/pod-customer-page-data";
 import { resolvePodPageTemplate } from "@/lib/pod-page-variant";
 import { looksLikePodOrVendorId, resolvePodBySlugOrId } from "@/lib/pod-route-resolve";
@@ -52,6 +53,7 @@ export async function renderPodCustomerPage(
   const entryRaw = searchParams.entry;
   const entry = Array.isArray(entryRaw) ? entryRaw[0] : entryRaw;
   const isQrEntry = entry === POD_QR_ENTRY_VALUE;
+  const hasExplicitJoinIntent = hasExplicitGroupJoinIntentFromSearchParams(searchParams);
   const highlightVendorRaw = searchParams.highlightVendor;
   const highlightVendor =
     (Array.isArray(highlightVendorRaw) ? highlightVendorRaw[0] : highlightVendorRaw)?.trim() ?? null;
@@ -64,6 +66,7 @@ export async function renderPodCustomerPage(
   const viewProps = {
     ...data,
     isQrEntry,
+    hasExplicitJoinIntent,
     highlightVendor,
   };
 

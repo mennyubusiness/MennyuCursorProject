@@ -206,14 +206,14 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     if (item.id === "pod_invite") {
       return {
         ...item,
-        actionHref: `/vendor/${vendorId}/settings?section=pod-membership`,
+        actionHref: `/vendor/${vendorId}/setup`,
         actionLabel: "View invitations",
       };
     }
     if (item.id === "no_pod") {
       return {
         ...item,
-        actionHref: `/vendor/${vendorId}/settings?section=pod-membership`,
+        actionHref: `/vendor/${vendorId}/setup`,
         actionLabel: "Pod membership",
       };
     }
@@ -226,7 +226,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     if (item.id === "not_paused") {
       return {
         ...item,
-        actionHref: `/vendor/${vendorId}/settings?section=account`,
+        actionHref: `/vendor/${vendorId}/hours`,
         actionLabel: "Open settings",
       };
     }

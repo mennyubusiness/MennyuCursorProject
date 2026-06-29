@@ -56,7 +56,7 @@ describe("vendor area nav width", () => {
   it("includes setup in primary nav", () => {
     const nav = readVendor("VendorAreaNav.tsx");
     expect(nav).toContain('"setup"');
-    expect(nav).toMatch(/dashboard.*Orders.*Menu.*Hours.*Payouts.*Setup.*Settings/s);
+    expect(nav).toMatch(/dashboard.*Orders.*Menu.*Hours.*Payouts.*Setup.*Vendor Profile/s);
   });
 
   it("enables wide chrome for dashboard, orders, menu, hours, payouts, setup, and settings", () => {

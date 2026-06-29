@@ -7,6 +7,20 @@ export function destinationGroupPromptStorageKey(podId: string): string {
   return `${DESTINATION_GROUP_PROMPT_STORAGE_PREFIX}${podId}`;
 }
 
+const GROUP_JOIN_SEARCH_PARAM_KEYS = ["code", "join", "joinCode", "groupJoin"] as const;
+
+/** True when the pod URL carries an explicit join-code or join intent query param. */
+export function hasExplicitGroupJoinIntentFromSearchParams(
+  searchParams: Record<string, string | string[] | undefined>
+): boolean {
+  for (const key of GROUP_JOIN_SEARCH_PARAM_KEYS) {
+    const raw = searchParams[key];
+    const value = (Array.isArray(raw) ? raw[0] : raw)?.trim();
+    if (value) return true;
+  }
+  return false;
+}
+
 export function isDestinationGroupPromptDismissed(
   podId: string,
   storage: Pick<Storage, "getItem"> | null | undefined = typeof sessionStorage !== "undefined"
@@ -43,9 +57,12 @@ export function shouldOfferDestinationGroupOrderPrompt(input: {
   isQrEntry: boolean;
   ctaStateKind: PodPageGroupOrderCtaState["kind"];
   orderingTone: PodOrderingStatusTone;
+  /** When true, skip the generic prompt so an explicit join flow can take over. */
+  hasExplicitJoinIntent?: boolean;
 }): boolean {
   if (!input.hasVendors) return false;
-  if (input.isQrEntry) return false;
+  if (!input.isQrEntry) return false;
+  if (input.hasExplicitJoinIntent) return false;
   if (input.ctaStateKind !== "start") return false;
   if (input.orderingTone === "empty") return false;
   return true;

@@ -196,7 +196,7 @@ export async function createVendorProfile(input: {
     const accept = await acceptPodVendorInviteForUser({ token: inviteToken, userId });
     if (accept.ok) {
       podConnected = true;
-      redirectPath = `/vendor/${accept.vendorId}/settings?section=pod-membership&access=pod_connected`;
+      redirectPath = `/vendor/${accept.vendorId}/setup?access=pod_connected`;
     }
   }
 

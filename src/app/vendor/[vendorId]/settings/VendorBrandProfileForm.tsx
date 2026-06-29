@@ -13,17 +13,20 @@ export function VendorBrandProfileForm({
   initialDescription,
   initialImageUrl,
   initialAccentColor,
+  initialCuisineCategory,
 }: {
   vendorId: string;
   initialName: string;
   initialDescription: string | null;
   initialImageUrl: string | null;
   initialAccentColor: string | null;
+  initialCuisineCategory?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription ?? "");
+  const [cuisineCategory, setCuisineCategory] = useState(initialCuisineCategory ?? "");
   const [imageUrl, setImageUrl] = useState(initialImageUrl ?? "");
   const [useAccent, setUseAccent] = useState(Boolean(initialAccentColor));
   const [accentHex, setAccentHex] = useState(initialAccentColor ?? DEFAULT_PICKER_FALLBACK);
@@ -40,6 +43,7 @@ export function VendorBrandProfileForm({
       const res = await updateVendorBrandProfile(vendorId, {
         name,
         description,
+        cuisineCategory,
         imageUrl,
         accentColor: useAccent ? accentHex : "",
       });
@@ -56,7 +60,7 @@ export function VendorBrandProfileForm({
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
         <label htmlFor="brand-name" className="block text-sm font-medium text-oo-charcoal">
-          Business name
+          Vendor name
         </label>
         <input
           id="brand-name"
@@ -65,6 +69,21 @@ export function VendorBrandProfileForm({
           onChange={(e) => setName(e.target.value)}
           maxLength={200}
           required
+          className="mt-1 w-full rounded-md border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm text-oo-charcoal shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="brand-cuisine" className="block text-sm font-medium text-oo-charcoal">
+          Cuisine/category
+        </label>
+        <p className="mt-0.5 text-xs text-oo-stone-gray">Helps customers find you on the pod page.</p>
+        <input
+          id="brand-cuisine"
+          type="text"
+          value={cuisineCategory}
+          onChange={(e) => setCuisineCategory(e.target.value)}
+          maxLength={120}
           className="mt-1 w-full rounded-md border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm text-oo-charcoal shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
         />
       </div>
@@ -88,7 +107,7 @@ export function VendorBrandProfileForm({
       <BrandLogoUploadField
         scope="vendor"
         entityId={vendorId}
-        label="Business logo"
+        label="Logo / banner photo"
         value={imageUrl}
         onChange={setImageUrl}
       />
@@ -136,7 +155,7 @@ export function VendorBrandProfileForm({
           disabled={pending}
           className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
         >
-          {pending ? "Saving…" : "Save brand"}
+          {pending ? "Saving…" : "Save profile"}
         </button>
         {message && (
           <span className={`text-sm ${message.error ? "text-red-600" : "text-emerald-800"}`} role="status">
