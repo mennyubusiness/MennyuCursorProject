@@ -3,12 +3,11 @@ import { notFound } from "next/navigation";
 
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { VendorSetupChecklist } from "@/components/vendor/VendorSetupChecklist";
+import { VendorSetupStatusBanners } from "@/components/vendor/VendorSetupStatusBanners";
+import { buildVendorOperationalSetupItems } from "@/lib/vendor-dashboard-attention";
 import { loadVendorDashboardContext } from "@/lib/vendor-dashboard-data.server";
 import { VENDOR_ALL_READY_COPY } from "@/lib/vendor-operational-copy";
-import {
-  VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS,
-  VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS,
-} from "@/lib/vendor-pod-readiness";
+import { VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS } from "@/lib/vendor-pod-readiness";
 
 export default async function VendorSetupPage({
   params,
@@ -19,12 +18,18 @@ export default async function VendorSetupPage({
   const ctx = await loadVendorDashboardContext(vendorId);
   if (!ctx) notFound();
 
+  const publicProfileReady = ctx.readiness.setupSummary.publicProfile;
   const appearance = ctx.readiness.checklist.filter((item) =>
     (VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS as readonly string[]).includes(item.key)
   );
-  const acceptingOrders = ctx.readiness.checklist.filter((item) =>
-    (VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS as readonly string[]).includes(item.key)
-  );
+  const acceptingOrders = publicProfileReady
+    ? buildVendorOperationalSetupItems({
+        checklist: ctx.readiness.checklist,
+        vendorPaused: Boolean(ctx.vendorRecord.mennyuOrdersPaused),
+        currentlyOpen: Boolean(ctx.hoursSummary.posOpen) && !ctx.vendorRecord.mennyuOrdersPaused,
+        vendorId,
+      })
+    : [];
 
   return (
     <DashboardShell tier="command" className="px-0 pb-0 pt-0">
@@ -54,10 +59,26 @@ export default async function VendorSetupPage({
             <p className="font-medium">{VENDOR_ALL_READY_COPY}</p>
             <p className="mt-1">Use the dashboard for day-to-day operations. Return here if something changes.</p>
           </div>
-        ) : null}
+        ) : (
+          <VendorSetupStatusBanners
+            publicProfileReady={publicProfileReady}
+            canAcceptOrders={ctx.readiness.canAcceptOrders}
+          />
+        )}
 
         <VendorSetupChecklist items={appearance} title="Required to appear on pod page" />
-        <VendorSetupChecklist items={acceptingOrders} title="Required to accept orders" />
+
+        {publicProfileReady ? (
+          <VendorSetupChecklist items={acceptingOrders} title="Required to accept orders" />
+        ) : (
+          <section className="rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/40 px-4 py-4 text-sm text-oo-stone-gray">
+            <h3 className="font-semibold text-oo-charcoal">Required to accept orders</h3>
+            <p className="mt-2">
+              Finish the public profile requirements above first. Payment, POS, and ordering controls unlock after your
+              vendor is visible on the pod page.
+            </p>
+          </section>
+        )}
       </div>
     </DashboardShell>
   );

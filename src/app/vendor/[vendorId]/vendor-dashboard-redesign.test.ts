@@ -67,8 +67,10 @@ describe("vendor section pages", () => {
     expect(readVendor("payouts/page.tsx")).toContain("VendorPayoutTransferHistory");
     const setup = readVendor("setup/page.tsx");
     expect(setup).toContain("VendorSetupChecklist");
-    expect(setup).toContain("VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS");
-    expect(setup).not.toMatch(/REQUIRED_KEYS = new Set\(\["profile", "stripe", "pos", "menu", "pod_invite"\]\)/);
+    expect(setup).toContain("VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS");
+    expect(setup).toContain("VendorSetupStatusBanners");
+    expect(setup).toContain("Required to appear on pod page");
+    expect(setup).toContain("Required to accept orders");
     expect(setup).not.toContain("Recommended");
     expect(setup).not.toContain("Try Kitchen mode for busy shifts");
     expect(setup).not.toContain("Pickup instructions on pod page");

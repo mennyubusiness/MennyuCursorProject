@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AdminVendorContextNav } from "@/components/admin/AdminEntityContextNav";
 import { prisma } from "@/lib/db";
 import { loadAdminVendorDetail } from "@/services/admin-vendor-detail.service";
 import { AdminVendorRescueClient } from "./AdminVendorRescueClient";
@@ -34,15 +33,6 @@ export default async function AdminVendorDetailPage({
         <h1 className="text-2xl font-semibold tracking-tight text-oo-charcoal">{detail.vendor.name}</h1>
         <p className="mt-1 font-mono text-sm text-oo-stone-gray">{detail.vendor.slug}</p>
       </header>
-
-      <AdminVendorContextNav
-        vendorId={id}
-        vendorName={detail.vendor.name}
-        publicPathPreview={detail.vendor.publicPathPreview}
-        pods={detail.pods}
-        owners={detail.owners}
-        recentOrders={detail.recentOrders}
-      />
 
       <AdminVendorRescueClient detail={detail} podOptions={podOptions} />
 

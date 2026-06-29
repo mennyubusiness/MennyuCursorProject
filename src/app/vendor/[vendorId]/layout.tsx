@@ -7,7 +7,7 @@ import {
   shouldSkipEmailVerificationGate,
 } from "@/lib/auth/email-verification-access.server";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
-import { shouldShowAdminModeBanner } from "@/lib/admin-mode-context";
+import { shouldShowAdminModeBannerForVendor } from "@/lib/admin-mode-context";
 import { canAccessVendorDashboard, isVendorDashboardDevOpen } from "@/lib/vendor-dashboard-auth";
 import { VendorLayoutChrome } from "./VendorLayoutChrome";
 
@@ -52,7 +52,7 @@ export default async function VendorAreaLayout({
     }
   }
 
-  const showAdminBanner = await shouldShowAdminModeBanner("operational");
+  const showAdminBanner = await shouldShowAdminModeBannerForVendor(vendorId);
 
   return (
     <>

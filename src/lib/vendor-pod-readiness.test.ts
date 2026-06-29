@@ -168,7 +168,9 @@ describe("deriveVendorPodReadiness status priority", () => {
     const hoursItem = result.checklist.find((item) => item.key === "hours");
     expect(hoursItem?.complete).toBe(false);
     expect(hoursItem?.label).toBe("Customer ordering hours");
-    expect(hoursItem?.description).toBe("Set customer ordering hours before appearing on your pod page.");
+    expect(hoursItem?.description).toBe(
+      "Set customer ordering hours before this vendor can appear on the pod page."
+    );
     expect(hoursItem?.actionHref).toBe("/vendor/vendor_1/hours");
     expect(hoursItem?.actionLabel).toBe("Set hours");
   });

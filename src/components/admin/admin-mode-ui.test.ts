@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  isPodElevatedDashboardPath,
+  isVendorElevatedDashboardPath,
+} from "@/lib/admin-mode-banner-paths";
 
 const root = join(process.cwd(), "src");
 
@@ -21,64 +25,75 @@ describe("admin mode banner", () => {
     expect(marquee).toContain("sr-only");
   });
 
-  it("wires banner into admin layout with server auth check", () => {
+  it("does not render banner in admin layout", () => {
     const layout = readSrc("app/admin/layout.tsx");
-    expect(layout).toContain("shouldShowAdminModeBanner");
-    expect(layout).toContain('<AdminModeBanner />');
-    expect(layout).toContain('"admin"');
+    expect(layout).not.toContain("AdminModeBanner");
+    expect(layout).not.toContain("shouldShowAdminModeBanner");
   });
 
-  it("wires sticky banner into vendor and pod operational layouts", () => {
+  it("wires sticky banner into vendor and pod operational layouts with path checks", () => {
     const vendorLayout = readSrc("app/vendor/[vendorId]/layout.tsx");
     const podLayout = readSrc("app/pod/[podId]/layout.tsx");
 
-    expect(vendorLayout).toContain('shouldShowAdminModeBanner("operational")');
+    expect(vendorLayout).toContain("shouldShowAdminModeBannerForVendor");
     expect(vendorLayout).toContain("<AdminModeBanner sticky />");
-    expect(podLayout).toContain('shouldShowAdminModeBanner("operational")');
+    expect(podLayout).toContain("shouldShowAdminModeBannerForPod");
     expect(podLayout).toContain("<AdminModeBanner sticky />");
   });
 
-  it("uses elevated admin detection for operational scope", () => {
+  it("uses elevated admin detection separate from admin shell", () => {
     const ctx = readSrc("lib/admin-mode-context.ts");
-    expect(ctx).toContain('scope === "admin"');
+    expect(ctx).toContain("isElevatedAdminAccess");
     expect(ctx).toContain("isPlatformAdmin");
     expect(ctx).toContain("isAdminAllowed");
+    expect(ctx).not.toContain('scope === "admin"');
+  });
+
+  it("limits pod banner to operator dashboard routes", () => {
+    const podId = "pod-123";
+    expect(isPodElevatedDashboardPath(`/pod/${podId}/dashboard`, podId)).toBe(true);
+    expect(isPodElevatedDashboardPath(`/pod/${podId}/settings`, podId)).toBe(true);
+    expect(isPodElevatedDashboardPath(`/pod/${podId}/vendor/vendor-1`, podId)).toBe(false);
+    expect(isPodElevatedDashboardPath(`/p/my-pod`, podId)).toBe(false);
+  });
+
+  it("limits vendor banner to vendor operator routes", () => {
+    const vendorId = "vendor-456";
+    expect(isVendorElevatedDashboardPath(`/vendor/${vendorId}/dashboard`, vendorId)).toBe(true);
+    expect(isVendorElevatedDashboardPath(`/vendor/${vendorId}/kitchen`, vendorId)).toBe(true);
+    expect(isVendorElevatedDashboardPath(`/p/my-pod/v/my-vendor`, vendorId)).toBe(false);
   });
 });
 
-describe("admin entity context navigation", () => {
-  it("vendor admin detail includes related navigation links", () => {
-    const page = readFileSync(
-      join(root, "app/admin/(dashboard)/vendors/[vendorId]/page.tsx"),
-      "utf8"
-    );
-    const nav = readSrc("components/admin/AdminEntityContextNav.tsx");
-    expect(page).toContain("AdminVendorContextNav");
-    expect(nav).toContain("ADMIN_NAV_LABELS.openVendorDashboard");
-    expect(nav).toContain("buildUserAdminPath");
-  });
-
-  it("pod admin detail includes related navigation links", () => {
+describe("admin pod detail navigation", () => {
+  it("does not render standalone related navigation on pod admin detail", () => {
     const page = readFileSync(
       join(root, "app/admin/(dashboard)/pods/[podId]/page.tsx"),
       "utf8"
     );
-    const nav = readSrc("components/admin/AdminEntityContextNav.tsx");
-    expect(page).toContain("AdminPodContextNav");
-    expect(nav).toContain("ADMIN_NAV_LABELS.openPodDashboard");
-    expect(nav).toContain("buildVendorAdminPath");
+    expect(page).not.toContain("AdminPodContextNav");
+    expect(page).not.toContain("AdminEntityContextNav");
   });
 
-  it("user admin detail includes vendor and pod navigation links", () => {
-    const page = readFileSync(
+  it("places pod dashboard link in overview section", () => {
+    const rescue = readSrc("app/admin/(dashboard)/pods/[podId]/AdminPodRescueClient.tsx");
+    expect(rescue).toContain('title="Overview"');
+    expect(rescue).toContain("buildPodDashboardPath(podId)");
+    expect(rescue).toContain("ADMIN_NAV_LABELS.openPodDashboard");
+    expect(rescue).not.toContain('title="Pod dashboard"');
+  });
+
+  it("does not render standalone related navigation on vendor or user admin detail", () => {
+    const vendorPage = readFileSync(
+      join(root, "app/admin/(dashboard)/vendors/[vendorId]/page.tsx"),
+      "utf8"
+    );
+    const userPage = readFileSync(
       join(root, "app/admin/(dashboard)/users/[userId]/page.tsx"),
       "utf8"
     );
-    expect(page).toContain("AdminUserContextNav");
-    const nav = readSrc("components/admin/AdminEntityContextNav.tsx");
-    expect(nav).toContain("ADMIN_NAV_LABELS.openVendorAdmin");
-    expect(nav).toContain("ADMIN_NAV_LABELS.openPodDashboard");
-    expect(nav).toContain("ADMIN_NAV_LABELS.openPublicPage");
+    expect(vendorPage).not.toContain("AdminVendorContextNav");
+    expect(userPage).not.toContain("AdminUserContextNav");
   });
 
   it("uses consistent admin nav labels", () => {
@@ -86,5 +101,6 @@ describe("admin entity context navigation", () => {
     expect(labels).toContain('openUserAdmin: "Open user admin"');
     expect(labels).toContain('openVendorAdmin: "Open vendor admin"');
     expect(labels).toContain('openPodAdmin: "Open pod admin"');
+    expect(labels).toContain('openPodDashboard: "Open pod dashboard"');
   });
 });

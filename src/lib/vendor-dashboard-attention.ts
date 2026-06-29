@@ -1,13 +1,24 @@
 import {
+  VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS,
+  VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS,
+  type ReadinessChecklistItem,
   VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS,
-  type ReadinessBlockingReason,
 } from "@/lib/vendor-pod-readiness";
-import type { VendorHoursStatusSummary } from "@/lib/vendor-customer-ordering-hours";
-import { VENDOR_NO_POD_COPY } from "@/lib/vendor-operational-copy";
+import {
+  VENDOR_HIDDEN_FROM_POD_BODY,
+  VENDOR_HIDDEN_FROM_POD_TITLE,
+  VENDOR_HOURS_PUBLIC_COPY,
+  VENDOR_NO_POD_COPY,
+  VENDOR_ORDERING_CLOSED_BODY,
+  VENDOR_ORDERING_CLOSED_TITLE,
+} from "@/lib/vendor-operational-copy";
 import type { VendorPosUiState } from "@/lib/vendor-pos-ui-state";
+
+export type VendorAttentionItemKind = "summary" | "item";
 
 export type VendorAttentionItem = {
   id: string;
+  kind?: VendorAttentionItemKind;
   title: string;
   description: string;
   actionHref?: string;
@@ -15,86 +26,128 @@ export type VendorAttentionItem = {
   severity: "warning" | "info";
 };
 
+const PUBLIC_CHECKLIST_KEYS = new Set<string>(VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS);
+const OPERATIONAL_CHECKLIST_KEYS = new Set<string>(VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS);
+
+function checklistItemToAttention(item: ReadinessChecklistItem): VendorAttentionItem {
+  if (item.key === "hours") {
+    return {
+      id: "hours",
+      title: "Customer ordering hours",
+      description: VENDOR_HOURS_PUBLIC_COPY,
+      actionHref: item.actionHref,
+      actionLabel: item.actionLabel ?? "Set hours",
+      severity: "warning",
+    };
+  }
+
+  return {
+    id: item.key,
+    title: item.label,
+    description: item.description ?? item.label,
+    actionHref: item.actionHref,
+    actionLabel: item.actionLabel,
+    severity: "warning",
+  };
+}
+
 export function deriveVendorAttentionItems(input: {
-  blockingReasons: ReadinessBlockingReason[];
+  checklist: ReadinessChecklistItem[];
+  publicProfileReady: boolean;
+  canAcceptOrders: boolean;
   posState: VendorPosUiState;
-  paymentsReady: boolean;
-  menuSynced: boolean;
   hasPodMembership: boolean;
   pendingPodInviteCount: number;
   failedOrdersToday: number;
-  intakeLabel: string;
-  hoursSummary?: Pick<VendorHoursStatusSummary, "needsHoursAttention" | "sourceLabel">;
+  vendorPaused: boolean;
+  currentlyOpen: boolean;
 }): VendorAttentionItem[] {
   const items: VendorAttentionItem[] = [];
+  const incompletePublic = input.checklist.filter(
+    (item) => PUBLIC_CHECKLIST_KEYS.has(item.key) && !item.complete
+  );
+  const incompleteOperational = input.checklist.filter(
+    (item) => OPERATIONAL_CHECKLIST_KEYS.has(item.key) && !item.complete
+  );
 
-  if (!input.hasPodMembership && input.pendingPodInviteCount === 0) {
+  if (!input.publicProfileReady) {
     items.push({
-      id: "no_pod",
-      title: "No pod assignment",
-      description: VENDOR_NO_POD_COPY,
-      actionHref: undefined,
-      actionLabel: undefined,
+      id: "vendor_hidden",
+      kind: "summary",
+      title: VENDOR_HIDDEN_FROM_POD_TITLE,
+      description: VENDOR_HIDDEN_FROM_POD_BODY,
       severity: "warning",
     });
+
+    for (const item of incompletePublic) {
+      items.push(checklistItemToAttention(item));
+    }
+
+    if (!input.hasPodMembership && input.pendingPodInviteCount === 0) {
+      items.push({
+        id: "no_pod",
+        title: "No pod assignment",
+        description: VENDOR_NO_POD_COPY,
+        severity: "warning",
+      });
+    }
+
+    if (input.pendingPodInviteCount > 0) {
+      items.push({
+        id: "pod_invite",
+        title: "Pod membership pending",
+        description: `You have ${input.pendingPodInviteCount} pod invitation${input.pendingPodInviteCount === 1 ? "" : "s"} waiting for a response.`,
+        severity: "info",
+      });
+    }
+
+    return items;
   }
 
-  if (input.pendingPodInviteCount > 0) {
+  if (!input.canAcceptOrders) {
     items.push({
-      id: "pod_invite",
-      title: "Pod membership pending",
-      description: `You have ${input.pendingPodInviteCount} pod invitation${input.pendingPodInviteCount === 1 ? "" : "s"} waiting for a response.`,
-      actionHref: undefined,
-      actionLabel: undefined,
-      severity: "info",
-    });
-  }
-
-  if (!input.paymentsReady) {
-    items.push({
-      id: "stripe",
-      title: "Payment setup incomplete",
-      description: "Finish payment setup before accepting orders.",
+      id: "ordering_closed",
+      kind: "summary",
+      title: VENDOR_ORDERING_CLOSED_TITLE,
+      description: VENDOR_ORDERING_CLOSED_BODY,
       severity: "warning",
     });
-  }
 
-  if (input.posState === "needs_attention") {
-    items.push({
-      id: "pos_attention",
-      title: "POS needs attention",
-      description: "Your POS connection needs a fix before orders can route reliably.",
-      severity: "warning",
-    });
-  } else if (input.posState === "not_connected") {
-    items.push({
-      id: "pos_disconnected",
-      title: "POS not connected",
-      description: "Connect your POS so kitchen orders can sync automatically.",
-      severity: "info",
-    });
-  }
+    for (const item of incompleteOperational) {
+      items.push(checklistItemToAttention(item));
+    }
 
-  if (!input.menuSynced) {
-    items.push({
-      id: "menu_sync",
-      title: "Menu sync needs attention",
-      description: "Customers need at least one available menu item before they can order.",
-      severity: "warning",
-    });
-  }
+    if (input.posState === "needs_attention" && !items.some((item) => item.id === "pos")) {
+      items.push({
+        id: "pos_attention",
+        title: "POS needs attention",
+        description: "Your POS connection needs a fix before orders can route reliably.",
+        severity: "warning",
+      });
+    } else if (input.posState === "not_connected" && !items.some((item) => item.id === "pos")) {
+      items.push({
+        id: "pos_disconnected",
+        title: "POS not connected",
+        description: "Connect your POS so kitchen orders can sync automatically.",
+        severity: "info",
+      });
+    }
 
-  for (const reason of input.blockingReasons) {
-    if (reason.code === "vendor_paused") continue;
-    if (items.some((item) => item.id === reason.code)) continue;
-    items.push({
-      id: reason.code,
-      title: reason.label,
-      description: reason.description,
-      actionHref: reason.actionHref,
-      actionLabel: reason.actionLabel,
-      severity: "warning",
-    });
+    if (input.vendorPaused) {
+      items.push({
+        id: "not_paused",
+        title: "Orders paused",
+        description: "Unpause new orders in vendor settings to accept orders again.",
+        severity: "warning",
+      });
+    } else if (!input.currentlyOpen) {
+      items.push({
+        id: "currently_closed",
+        title: "Outside customer ordering hours",
+        description: "Customers can browse your menu, but ordering opens during your set hours.",
+        severity: "info",
+      });
+    }
   }
 
   if (input.failedOrdersToday > 0) {
@@ -106,18 +159,44 @@ export function deriveVendorAttentionItems(input: {
     });
   }
 
-  if (input.hoursSummary?.needsHoursAttention) {
-    items.push({
-      id: "hours_setup",
-      title: "Customer ordering hours not set",
-      description: "Set customer ordering hours before accepting orders.",
-      severity: "warning",
-    });
-  }
-
   return items;
 }
 
 export function isVendorSetupComplete(checklistCompleteKeys: string[]): boolean {
   return VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS.every((key) => checklistCompleteKeys.includes(key));
+}
+
+export function buildVendorOperationalSetupItems(input: {
+  checklist: ReadinessChecklistItem[];
+  vendorPaused: boolean;
+  currentlyOpen: boolean;
+  vendorId: string;
+}): ReadinessChecklistItem[] {
+  const base = input.checklist.filter((item) => OPERATIONAL_CHECKLIST_KEYS.has(item.key));
+  const extras: ReadinessChecklistItem[] = [
+    {
+      key: "not_paused",
+      label: "Not paused",
+      complete: !input.vendorPaused,
+      owner: "vendor",
+      description: input.vendorPaused
+        ? "New orders are paused in vendor settings."
+        : "New orders are not paused.",
+      actionHref: `/vendor/${input.vendorId}/settings?section=account`,
+      actionLabel: "Open settings",
+    },
+    {
+      key: "currently_open",
+      label: "Currently open",
+      complete: input.currentlyOpen,
+      owner: "vendor",
+      description: input.currentlyOpen
+        ? "You are inside customer ordering hours."
+        : "Outside customer ordering hours right now.",
+      actionHref: `/vendor/${input.vendorId}/hours`,
+      actionLabel: "Set hours",
+    },
+  ];
+
+  return [...base, ...extras];
 }

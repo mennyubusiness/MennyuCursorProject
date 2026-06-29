@@ -6,6 +6,7 @@ import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { PosConnectionStatus } from "@prisma/client";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { hasValidVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
+import { VENDOR_HOURS_PUBLIC_COPY } from "@/lib/vendor-operational-copy";
 import {
   getVendorOrderabilityState,
   getVendorPublicProfileMissingItems,
@@ -150,8 +151,15 @@ export function isVendorCustomerOrderingHoursReady(customerOrderingHours: unknow
   return hasValidVendorCustomerOrderingHours(customerOrderingHours);
 }
 
-/** Checklist keys required before a vendor appears on the public pod page. */
-export const VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS = ["profile", "cuisine", "menu", "hours"] as const;
+/** Public profile fields required before a vendor appears on the public pod page. */
+export const VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS = [
+  "name",
+  "description",
+  "banner",
+  "cuisine",
+  "menu",
+  "hours",
+] as const;
 
 /** Checklist keys required before a vendor can accept orders. */
 export const VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS = [
@@ -223,25 +231,69 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
   const profileAction =
     audience === "vendor" ? "Edit profile" : "View vendor page";
 
+  const publicProfileItems: ReadinessChecklistItem[] =
+    audience === "vendor"
+      ? [
+          {
+            key: "name",
+            label: "Vendor name",
+            complete: Boolean(vendor.name?.trim()),
+            owner: "vendor",
+            description: "Shown on your public pod menu.",
+            actionHref: `${settingsBase}?section=profile`,
+            actionLabel: "Edit profile",
+          },
+          {
+            key: "description",
+            label: "Description",
+            complete: Boolean(vendor.description?.trim()),
+            owner: "vendor",
+            description: "Helps customers understand what you serve.",
+            actionHref: `${settingsBase}?section=profile`,
+            actionLabel: "Edit profile",
+          },
+          {
+            key: "banner",
+            label: "Banner photo",
+            complete: Boolean(vendor.imageUrl?.trim()),
+            owner: "vendor",
+            description: "Displayed at the top of your public menu page.",
+            actionHref: `${settingsBase}?section=profile`,
+            actionLabel: "Edit profile",
+          },
+          {
+            key: "cuisine",
+            label: "Cuisine/category",
+            complete: Boolean(vendor.cuisineCategory?.trim()),
+            owner: "vendor",
+            description: "Helps customers find you on the pod page.",
+            actionHref: `${settingsBase}?section=profile`,
+            actionLabel: "Edit profile",
+          },
+        ]
+      : [
+          {
+            key: "profile",
+            label: "Complete vendor profile",
+            complete: profileComplete,
+            owner: "vendor",
+            description: "Name, description, banner photo, and cuisine on the pod menu.",
+            actionHref: profileHref,
+            actionLabel: profileAction,
+          },
+          {
+            key: "cuisine",
+            label: "Set cuisine category",
+            complete: Boolean(vendor.cuisineCategory?.trim()),
+            owner: "vendor",
+            description: "Helps customers understand what you serve.",
+            actionHref: profileHref,
+            actionLabel: profileAction,
+          },
+        ];
+
   const items: ReadinessChecklistItem[] = [
-    {
-      key: "profile",
-      label: "Complete vendor profile",
-      complete: profileComplete,
-      owner: "vendor",
-      description: "Name, description, banner photo, and cuisine on the pod menu.",
-      actionHref: profileHref,
-      actionLabel: profileAction,
-    },
-    {
-      key: "cuisine",
-      label: "Set cuisine category",
-      complete: Boolean(vendor.cuisineCategory?.trim()),
-      owner: "vendor",
-      description: "Helps customers understand what you serve.",
-      actionHref: audience === "vendor" ? `${settingsBase}?section=profile` : profileHref,
-      actionLabel: audience === "vendor" ? "Edit profile" : profileAction,
-    },
+    ...publicProfileItems,
     {
       key: "menu",
       label: "Publish menu",
@@ -308,7 +360,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
       owner: "vendor",
       description: hoursComplete
         ? "Customer ordering hours set."
-        : "Set customer ordering hours before appearing on your pod page.",
+        : VENDOR_HOURS_PUBLIC_COPY,
       actionHref: `/vendor/${vendorId}/hours`,
       actionLabel: "Set hours",
     });
@@ -465,17 +517,21 @@ export function deriveVendorPodReadiness(
       actionLabel: "Show in pod",
     });
   } else if (status.startsWith("needs_")) {
+    const profileBlockerKeys =
+      audience === "vendor"
+        ? (["name", "description", "banner", "cuisine"] as const)
+        : (["profile", "cuisine"] as const);
     const code =
       status === "needs_profile"
-        ? "profile"
+        ? profileBlockerKeys
         : status === "needs_payment"
-          ? "stripe"
+          ? (["stripe"] as const)
           : status === "needs_pos"
-            ? "pos"
+            ? (["pos"] as const)
             : status === "needs_hours"
-              ? "hours"
-              : "menu";
-    blockingReasons.push(...blockingFromChecklist(checklist, [code]));
+              ? (["hours"] as const)
+              : (["menu"] as const);
+    blockingReasons.push(...blockingFromChecklist(checklist, [...code]));
   }
 
   const label = vendorPodReadinessStatusLabel(status);

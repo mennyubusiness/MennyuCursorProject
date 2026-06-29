@@ -80,3 +80,11 @@ export const VENDOR_STRIPE_COPY = "Your payments are processed through Stripe.";
 export const VENDOR_ALL_READY_COPY = "Everything is ready for orders.";
 export const VENDOR_NO_POD_COPY = "This vendor is not assigned to a pod yet.";
 export const VENDOR_NO_ACTIVE_ORDERS_COPY = "No active orders right now.";
+export const VENDOR_HIDDEN_FROM_POD_TITLE = "Vendor hidden from pod page";
+export const VENDOR_HIDDEN_FROM_POD_BODY =
+  "This vendor will appear on the public pod page after the required public setup items are complete.";
+export const VENDOR_ORDERING_CLOSED_TITLE = "Ordering is closed";
+export const VENDOR_ORDERING_CLOSED_BODY =
+  "This vendor cannot accept orders until the required ordering setup is complete.";
+export const VENDOR_HOURS_PUBLIC_COPY =
+  "Set customer ordering hours before this vendor can appear on the pod page.";

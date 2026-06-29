@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AdminUserContextNav } from "@/components/admin/AdminEntityContextNav";
 import { prisma } from "@/lib/db";
 import { loadAdminUserDetail } from "@/services/admin-user-detail.service";
 import { AdminUserDetailClient } from "./AdminUserDetailClient";
@@ -39,8 +38,6 @@ export default async function AdminUserDetailPage({
         <p className="text-sm text-oo-stone-gray">{detail.user.email}</p>
         <p className="text-xs text-oo-stone-gray">User ID: {detail.user.id}</p>
       </div>
-
-      <AdminUserContextNav vendors={detail.vendors} pods={detail.pods} />
 
       <AdminUserDetailClient
         detail={detail}

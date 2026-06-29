@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AdminPodContextNav } from "@/components/admin/AdminEntityContextNav";
 import { prisma } from "@/lib/db";
 import { loadAdminPodDetail } from "@/services/admin-pod-detail.service";
 import {
@@ -73,16 +72,6 @@ export default async function AdminPodDetailPage({
         <h1 className="text-2xl font-semibold tracking-tight text-oo-charcoal">{detail.pod.name}</h1>
         <p className="mt-1 font-mono text-sm text-oo-stone-gray">{detail.pod.slug}</p>
       </header>
-
-      <AdminPodContextNav
-        podId={id}
-        podName={detail.pod.name}
-        podSlug={detail.pod.slug}
-        publicPath={detail.pod.publicPath}
-        owners={detail.owners}
-        vendors={detail.vendors}
-        recentOrders={detail.recentOrders}
-      />
 
       <AdminPodRescueClient detail={detail} vendorOptions={vendorOptions} />
 

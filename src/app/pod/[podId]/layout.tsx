@@ -8,7 +8,7 @@ import {
   shouldSkipEmailVerificationGate,
 } from "@/lib/auth/email-verification-access.server";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
-import { shouldShowAdminModeBanner } from "@/lib/admin-mode-context";
+import { shouldShowAdminModeBannerForPod } from "@/lib/admin-mode-context";
 import { canAccessPodDashboardLayout } from "@/lib/permissions";
 import { loadPodPayoutRecipientContext } from "@/services/pod-payout-connect.service";
 import { arePodOwnerPayoutsConfigured } from "@/lib/pod-owner-payout-visibility";
@@ -57,7 +57,7 @@ export default async function PodAreaLayout({
     podPayoutsEnabled: payoutContext?.podPayoutsEnabled ?? false,
   });
 
-  const showAdminBanner = await shouldShowAdminModeBanner("operational");
+  const showAdminBanner = await shouldShowAdminModeBannerForPod(podId);
 
   return (
     <>

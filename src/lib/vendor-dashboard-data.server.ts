@@ -184,23 +184,23 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
   const activeCounts = countActiveBoardGroups(grouped);
 
   const attentionItems = deriveVendorAttentionItems({
-    blockingReasons: readiness.blockingReasons,
+    checklist: readiness.checklist,
+    publicProfileReady: readiness.setupSummary.publicProfile,
+    canAcceptOrders: readiness.canAcceptOrders,
     posState,
-    paymentsReady,
-    menuSynced: menuReady,
     hasPodMembership: Boolean(currentPod),
     pendingPodInviteCount: pendingInvites,
     failedOrdersToday: todayStats.failedOrCancelled,
-    intakeLabel,
-    hoursSummary,
+    vendorPaused: Boolean(vendorRecord.mennyuOrdersPaused),
+    currentlyOpen: availability.status === "open",
   }).map((item) => {
     if (item.id === "stripe" && !item.actionHref) {
       return { ...item, actionHref: `/vendor/${vendorId}/payouts`, actionLabel: "Finish setup" };
     }
-    if (item.id === "pos_disconnected" || item.id === "pos_attention") {
+    if (item.id === "pos_disconnected" || item.id === "pos_attention" || item.id === "pos") {
       return { ...item, actionHref: `/vendor/${vendorId}/setup`, actionLabel: "Open setup" };
     }
-    if (item.id === "menu_sync") {
+    if (item.id === "menu_sync" || item.id === "menu" || item.id === "menu_available") {
       return { ...item, actionHref: `/vendor/${vendorId}/menu`, actionLabel: "Review menu" };
     }
     if (item.id === "pod_invite") {
@@ -221,6 +221,16 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       return { ...item, actionHref: `/vendor/${vendorId}/orders`, actionLabel: "View orders" };
     }
     if (item.id === "hours_setup" || item.id === "hours") {
+      return { ...item, actionHref: `/vendor/${vendorId}/hours`, actionLabel: "Set hours" };
+    }
+    if (item.id === "not_paused") {
+      return {
+        ...item,
+        actionHref: `/vendor/${vendorId}/settings?section=account`,
+        actionLabel: "Open settings",
+      };
+    }
+    if (item.id === "currently_closed") {
       return { ...item, actionHref: `/vendor/${vendorId}/hours`, actionLabel: "Set hours" };
     }
     return item;

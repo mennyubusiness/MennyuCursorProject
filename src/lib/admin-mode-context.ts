@@ -1,27 +1,21 @@
 import "server-only";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { auth } from "@/auth";
 import {
   ADMIN_COOKIE_NAME,
   isAdminAllowed,
-  isAdminDashboardLayoutAuthorized,
 } from "@/lib/admin-auth";
+import {
+  isPodElevatedDashboardPath,
+  isVendorElevatedDashboardPath,
+} from "@/lib/admin-mode-banner-paths";
 import { env } from "@/lib/env";
 
-export type AdminModeBannerScope = "admin" | "operational";
+export { isPodElevatedDashboardPath, isVendorElevatedDashboardPath } from "@/lib/admin-mode-banner-paths";
 
-/**
- * Whether to show the yellow admin mode marquee.
- * - `admin`: /admin/* layouts (authorized admin session or bridge).
- * - `operational`: vendor/pod dashboards when acting with elevated admin access,
- *   not for normal vendor/pod owners without platform admin or secret bridge.
- */
-export async function shouldShowAdminModeBanner(scope: AdminModeBannerScope): Promise<boolean> {
-  if (scope === "admin") {
-    return isAdminDashboardLayoutAuthorized();
-  }
-
+/** Platform admin or admin-secret bridge — not normal pod/vendor owners. */
+export async function isElevatedAdminAccess(): Promise<boolean> {
   const session = await auth();
   if (session?.user?.isPlatformAdmin) return true;
 
@@ -35,4 +29,31 @@ export async function shouldShowAdminModeBanner(scope: AdminModeBannerScope): Pr
   }
 
   return isAdminAllowed(cookieValue, null);
+}
+
+async function currentPathname(): Promise<string> {
+  const headersList = await headers();
+  return headersList.get("x-pathname") ?? "";
+}
+
+/**
+ * Yellow admin marquee on pod operator pages when an admin uses elevated access.
+ * Never shown on /admin/* or public customer routes.
+ */
+export async function shouldShowAdminModeBannerForPod(podId: string): Promise<boolean> {
+  const pathname = await currentPathname();
+  if (pathname.startsWith("/admin")) return false;
+  if (!(await isElevatedAdminAccess())) return false;
+  return isPodElevatedDashboardPath(pathname, podId);
+}
+
+/**
+ * Yellow admin marquee on vendor operator pages when an admin uses elevated access.
+ * Never shown on /admin/* or public customer routes.
+ */
+export async function shouldShowAdminModeBannerForVendor(vendorId: string): Promise<boolean> {
+  const pathname = await currentPathname();
+  if (pathname.startsWith("/admin")) return false;
+  if (!(await isElevatedAdminAccess())) return false;
+  return isVendorElevatedDashboardPath(pathname, vendorId);
 }

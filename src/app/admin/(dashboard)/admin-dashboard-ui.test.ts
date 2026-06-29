@@ -97,10 +97,10 @@ describe("admin home preserved behavior", () => {
     expect(layout).toContain("/admin/access-denied");
   });
 
-  it("shows admin mode banner in admin shell layout", () => {
+  it("does not show admin mode banner in admin shell layout", () => {
     const layout = readFileSync(join(root, "app/admin/layout.tsx"), "utf8");
-    expect(layout).toContain("AdminModeBanner");
-    expect(layout).toContain("shouldShowAdminModeBanner");
+    expect(layout).not.toContain("AdminModeBanner");
+    expect(layout).not.toContain("shouldShowAdminModeBanner");
   });
 });
 

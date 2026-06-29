@@ -63,11 +63,23 @@ export function AdminPodRescueClient({
     <div className="grid gap-4 lg:grid-cols-2">
       <AdminSection title="Overview">
         <AdminInfoRow label="ID" value={detail.pod.id} />
-        <AdminInfoRow label="Public URL" value={detail.pod.publicPath} />
+        <AdminInfoRow
+          label="Public URL"
+          value={
+            <Link href={detail.pod.publicPath} target="_blank" rel="noopener noreferrer" className="underline">
+              {detail.pod.publicPath}
+            </Link>
+          }
+        />
         <AdminInfoRow label="Public visibility" value={detail.pod.isActive ? "Visible" : "Hidden"} />
         <AdminInfoRow label="Ordering" value={detail.pod.mennyuOrdersPaused ? "Paused" : "Open"} />
         <AdminInfoRow label="Readiness" value={detail.readinessLabel} />
         <AdminInfoRow label="Created" value={new Date(detail.pod.createdAt).toLocaleString()} />
+        <p>
+          <Link href={buildPodDashboardPath(podId)} className="text-sm font-medium underline">
+            {ADMIN_NAV_LABELS.openPodDashboard}
+          </Link>
+        </p>
       </AdminSection>
 
       <AdminSection title="Ordering controls">
@@ -328,12 +340,6 @@ export function AdminPodRescueClient({
         <p className="text-xs text-oo-stone-gray">
           Use <Link href="/admin/users" className="underline">Users</Link> admin tools for invite repair.
         </p>
-      </AdminSection>
-
-      <AdminSection title="Pod dashboard">
-        <Link href={buildPodDashboardPath(podId)} className="text-sm font-medium underline">
-          {ADMIN_NAV_LABELS.openPodDashboard}
-        </Link>
       </AdminSection>
 
       <AdminSection title="Recent orders">
