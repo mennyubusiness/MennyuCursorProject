@@ -6,6 +6,7 @@ import {
 } from "./cart-page-checkout-actions";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -42,6 +43,8 @@ import { buildCartValidationVendorGroups } from "@/lib/cart-validation-vendor-gr
 
 type CartPageMutationContextValue = {
   cart: Cart;
+  getCartSnapshot: () => Cart;
+  applyLocalCartSnapshot: (cart: Cart) => void;
   liveValidation: CartPageValidationSnapshot;
   cartId: string;
   podId: string;
@@ -67,6 +70,12 @@ function useCartPageMutation(): CartPageMutationContextValue {
   return ctx;
 }
 
+/** Cart line mutations on /cart (optimistic qty/remove). */
+export function useCartPageOptimisticMutations() {
+  const { getCartSnapshot, applyLocalCartSnapshot } = useCartPageMutation();
+  return { getCartSnapshot, applyLocalCartSnapshot };
+}
+
 /** Applies cart-page mutation snapshots locally so /cart UI stays in sync without router.refresh(). */
 export function CartPageMutationProvider({
   cartId,
@@ -86,6 +95,8 @@ export function CartPageMutationProvider({
   children: ReactNode;
 }) {
   const [cart, setCart] = useState(initialCart);
+  const cartRef = useRef(initialCart);
+  cartRef.current = cart;
   const [serverValidation, setServerValidation] = useState(initialValidation);
   const [isRevalidating, setIsRevalidating] = useState(false);
   const [isSyncingCart, setIsSyncingCart] = useState(
@@ -104,6 +115,7 @@ export function CartPageMutationProvider({
 
   useEffect(() => {
     setCart(initialCart);
+    cartRef.current = initialCart;
     setServerValidation(initialValidation);
     skipRevalidateForFingerprintRef.current = cartMutationFingerprint(initialCart.items);
     lastAcceptedSnapshotMetaRef.current = buildCartSnapshotMeta({
@@ -111,6 +123,22 @@ export function CartPageMutationProvider({
       clientSequence: lastAcceptedSnapshotMetaRef.current?.clientSequence ?? 0,
     });
   }, [initialCart, initialValidation]);
+
+  const applyLocalCartSnapshot = useCallback((next: Cart) => {
+    cartRef.current = next;
+    setCart(next);
+    skipRevalidateForFingerprintRef.current = cartMutationFingerprint(next.items);
+    lastAcceptedSnapshotMetaRef.current = mergeAcceptedCartSnapshotMeta(
+      lastAcceptedSnapshotMetaRef.current,
+      {
+        cart: next,
+        clientSequence: (lastAcceptedSnapshotMetaRef.current?.clientSequence ?? 0) + 1,
+        source: "cart-page",
+      }
+    );
+  }, []);
+
+  const getCartSnapshot = useCallback(() => cartRef.current, []);
 
   useEffect(() => {
     const onUpdate = (event: Event) => {
@@ -122,6 +150,7 @@ export function CartPageMutationProvider({
         lastAcceptedSnapshotMetaRef.current,
         detail
       );
+      cartRef.current = detail.cart;
       setCart(detail.cart);
       skipRevalidateForFingerprintRef.current = cartMutationFingerprint(detail.cart.items);
     };
@@ -151,6 +180,7 @@ export function CartPageMutationProvider({
           return;
         }
         setCart(fresh);
+        cartRef.current = fresh;
         skipRevalidateForFingerprintRef.current = cartMutationFingerprint(fresh.items);
         lastAcceptedSnapshotMetaRef.current = mergeAcceptedCartSnapshotMeta(
           lastAcceptedSnapshotMetaRef.current,
@@ -234,6 +264,8 @@ export function CartPageMutationProvider({
     const itemById = (cartItemId: string) => cart.items.find((i) => i.id === cartItemId);
     return {
       cart,
+      getCartSnapshot,
+      applyLocalCartSnapshot,
       liveValidation,
       cartId,
       podId,
@@ -252,7 +284,7 @@ export function CartPageMutationProvider({
       isRevalidating,
       isSyncingCart,
     };
-  }, [cart, liveValidation, cartId, podId, podSlug, errorByCartItemId, checkoutState, isRevalidating, isSyncingCart, allowCheckout]);
+  }, [cart, getCartSnapshot, applyLocalCartSnapshot, liveValidation, cartId, podId, podSlug, errorByCartItemId, checkoutState, isRevalidating, isSyncingCart, allowCheckout]);
 
   return (
     <CartPageMutationContext.Provider value={value}>{children}</CartPageMutationContext.Provider>

@@ -23,8 +23,6 @@ export function QuickCartDrawer() {
     activeCartRecovery,
     showActiveRecovery,
     loading,
-    applyCartSnapshot,
-    refreshCart,
     hasServerSession,
     clearActiveSoloCart,
     clearAndSwitchSoloCart,
@@ -152,10 +150,6 @@ export function QuickCartDrawer() {
                           podId={cart.podId}
                           cartItemId={line.id}
                           quantity={line.quantity}
-                          onUpdated={async (next) => {
-                            if (next) applyCartSnapshot(next);
-                            else await refreshCart();
-                          }}
                         />
                       </li>
                     ))}

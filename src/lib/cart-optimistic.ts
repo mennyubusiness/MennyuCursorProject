@@ -78,6 +78,50 @@ export function optimisticSimpleAdd(
   return rebuildCartFromItems(cart, [...cart.items, tempLine]);
 }
 
+function findCartLine(cart: Cart, cartItemId: string): CartItem | undefined {
+  return cart.items.find((line) => line.id === cartItemId);
+}
+
+/** Set absolute quantity on a line; removes the line when quantity <= 0. */
+export function optimisticUpdateCartItemQuantity(
+  cart: Cart,
+  cartItemId: string,
+  quantity: number
+): Cart | null {
+  const line = findCartLine(cart, cartItemId);
+  if (!line) return null;
+  if (quantity <= 0) {
+    return rebuildCartFromItems(
+      cart,
+      cart.items.filter((item) => item.id !== cartItemId)
+    );
+  }
+  const items = cart.items.map((item) =>
+    item.id === cartItemId ? { ...item, quantity } : item
+  );
+  return rebuildCartFromItems(cart, items);
+}
+
+export function optimisticIncrementCartItem(cart: Cart, cartItemId: string): Cart | null {
+  const line = findCartLine(cart, cartItemId);
+  if (!line) return null;
+  return optimisticUpdateCartItemQuantity(cart, cartItemId, line.quantity + 1);
+}
+
+export function optimisticDecrementCartItem(cart: Cart, cartItemId: string): Cart | null {
+  const line = findCartLine(cart, cartItemId);
+  if (!line) return null;
+  return optimisticUpdateCartItemQuantity(cart, cartItemId, line.quantity - 1);
+}
+
+export function optimisticRemoveCartItem(cart: Cart, cartItemId: string): Cart | null {
+  if (!findCartLine(cart, cartItemId)) return null;
+  return rebuildCartFromItems(
+    cart,
+    cart.items.filter((item) => item.id !== cartItemId)
+  );
+}
+
 /** Pending modifier add — temporary line until server returns authoritative cart. */
 export function optimisticPendingModifierLine(
   cart: Cart,

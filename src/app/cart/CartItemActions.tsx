@@ -1,19 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { updateCartItemAction, removeFromCartAction } from "@/actions/cart.actions";
-import { dispatchCartUpdated } from "@/lib/cart-client-sync";
-import { applyCartMutationClientResult } from "@/lib/cart-mutation-client-result";
-import { enqueueCartMutation } from "@/lib/cart-mutation-queue";
-import type { Cart } from "@/domain/types";
+import { useCallback, useState } from "react";
+import { updateCartItemAction } from "@/actions/cart.actions";
 import { ModifierModal } from "@/components/ModifierModal";
 import type { ModifierConfigForUI } from "@/lib/modifier-config";
-import { CartPageLiveQuantity } from "./CartPageMutationSync";
-
-function publishCartPageMutation(cart: Cart | null | undefined): void {
-  if (!cart) return;
-  dispatchCartUpdated({ cart, source: "cart-page" });
-}
+import { rebuildCartFromItems } from "@/lib/cart-totals";
+import { runOptimisticCartMutation } from "@/lib/cart-optimistic-mutations";
+import {
+  optimisticDecrementCartItemMutation,
+  optimisticIncrementCartItemMutation,
+  optimisticRemoveCartItemMutation,
+} from "@/lib/cart-optimistic-line-mutations";
+import { CartPageLiveQuantity, useCartPageOptimisticMutations } from "./CartPageMutationSync";
 
 /**
  * Cart item quantity, special instructions, remove, and (for configurable items) modifier edit.
@@ -45,13 +43,32 @@ export function CartItemActions({
   interactionDisabled?: boolean;
   interactionDisabledReason?: string | null;
 }) {
-  const [loading, setLoading] = useState(false);
+  const { getCartSnapshot, applyLocalCartSnapshot } = useCartPageOptimisticMutations();
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editInstructions, setEditInstructions] = useState(specialInstructions ?? "");
   const [modifierModalOpen, setModifierModalOpen] = useState(false);
 
   const hasModifiers = modifierConfig && modifierConfig.groups.length > 0;
+
+  const getCurrentCart = useCallback(() => getCartSnapshot(), [getCartSnapshot]);
+  const applyLocal = useCallback(
+    (cart: import("@/domain/types").Cart) => {
+      applyLocalCartSnapshot(cart);
+    },
+    [applyLocalCartSnapshot]
+  );
+
+  const mutationBase = {
+    cartId,
+    podId,
+    cartItemId,
+    source: "cart-page" as const,
+    getCurrentCart,
+    applyLocal,
+    setError,
+    specialInstructions: specialInstructions ?? null,
+  };
 
   if (interactionDisabled) {
     return (
@@ -64,65 +81,35 @@ export function CartItemActions({
     );
   }
 
-  async function updateQuantity(q: number) {
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await enqueueCartMutation(cartId, () =>
-        updateCartItemAction(cartId, cartItemId, q, specialInstructions ?? null, undefined, podId)
-      );
-      applyCartMutationClientResult({
-        result: result ?? undefined,
-        applyCart: publishCartPageMutation,
-        setError,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Update failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function saveInstructions() {
-    setError(null);
-    setLoading(true);
-    try {
-      const value = editInstructions.trim() || null;
-      const result = await enqueueCartMutation(cartId, () =>
-        updateCartItemAction(cartId, cartItemId, quantity, value, undefined, podId)
-      );
-      if (
-        applyCartMutationClientResult({
-          result: result ?? undefined,
-          applyCart: publishCartPageMutation,
-          setError,
-        })
-      ) {
-        setEditing(false);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Update failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function remove() {
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await enqueueCartMutation(cartId, () =>
-        removeFromCartAction(cartId, cartItemId, podId)
-      );
-      applyCartMutationClientResult({
-        result,
-        applyCart: publishCartPageMutation,
-        setError,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Remove failed");
-    } finally {
-      setLoading(false);
+    const value = editInstructions.trim() || null;
+    const result = await runOptimisticCartMutation({
+      ...mutationBase,
+      applyOptimistic: (cart) => {
+        const line = cart.items.find((item) => item.id === cartItemId);
+        if (!line) return null;
+        const items = cart.items.map((item) =>
+          item.id === cartItemId ? { ...item, specialInstructions: value } : item
+        );
+        return rebuildCartFromItems(cart, items);
+      },
+      runServer: async () => {
+        const result = await updateCartItemAction(
+          cartId,
+          cartItemId,
+          quantity,
+          value,
+          undefined,
+          podId
+        );
+        if (!result) {
+          return { success: false, error: "We couldn't update your cart. Please try again." };
+        }
+        return result;
+      },
+    });
+    if (result.success) {
+      setEditing(false);
     }
   }
 
@@ -131,8 +118,8 @@ export function CartItemActions({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => updateQuantity(Math.max(0, quantity - 1))}
-          disabled={loading || quantity <= 1}
+          onClick={() => void optimisticDecrementCartItemMutation(mutationBase)}
+          disabled={quantity <= 1}
           className="flex h-11 w-11 items-center justify-center rounded-lg border border-oo-light-stone text-lg font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50 sm:h-8 sm:w-8 sm:text-base"
           aria-label="Decrease quantity"
         >
@@ -143,9 +130,8 @@ export function CartItemActions({
         </span>
         <button
           type="button"
-          onClick={() => updateQuantity(quantity + 1)}
-          disabled={loading}
-          className="flex h-11 w-11 items-center justify-center rounded-lg border border-oo-light-stone text-lg font-medium text-oo-charcoal hover:bg-oo-cream disabled:opacity-50 sm:h-8 sm:w-8 sm:text-base"
+          onClick={() => void optimisticIncrementCartItemMutation(mutationBase)}
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-oo-light-stone text-lg font-medium text-oo-charcoal hover:bg-oo-cream sm:h-8 sm:w-8 sm:text-base"
           aria-label="Increase quantity"
         >
           +
@@ -162,7 +148,6 @@ export function CartItemActions({
                 setEditing(true);
               }
             }}
-            disabled={loading}
             className="ml-1 inline-flex min-h-11 items-center px-3 text-sm font-semibold text-oo-charcoal hover:underline sm:min-h-0 sm:px-2"
           >
             Edit
@@ -170,8 +155,7 @@ export function CartItemActions({
         )}
         <button
           type="button"
-          onClick={remove}
-          disabled={loading}
+          onClick={() => void optimisticRemoveCartItemMutation(mutationBase)}
           className="inline-flex min-h-11 items-center px-3 text-sm font-semibold text-red-700 hover:underline sm:min-h-0 sm:px-2"
         >
           Remove
@@ -210,9 +194,8 @@ export function CartItemActions({
           <div className="mt-2 flex gap-2">
             <button
               type="button"
-              onClick={saveInstructions}
-              disabled={loading}
-              className="rounded border border-stone-900 bg-stone-900 px-2 py-1 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+              onClick={() => void saveInstructions()}
+              className="rounded border border-stone-900 bg-stone-900 px-2 py-1 text-sm font-medium text-white hover:bg-stone-800"
             >
               Save
             </button>
@@ -222,7 +205,6 @@ export function CartItemActions({
                 setEditing(false);
                 setEditInstructions(specialInstructions ?? "");
               }}
-              disabled={loading}
               className="rounded border border-stone-300 px-2 py-1 text-sm hover:bg-stone-100"
             >
               Cancel

@@ -24,6 +24,7 @@ import {
   shouldAcceptApiCartPayload,
   shouldAcceptCartSnapshot,
   rememberAcceptedCartSnapshot,
+  enrichCartUpdatedDetail,
   resolveInitialVendorMenuCart,
   type CartClearedDetail,
   type CartSnapshotMeta,
@@ -70,6 +71,7 @@ type QuickCartContextValue = {
   refreshCart: () => Promise<void>;
   setCart: (cart: Cart | null) => void;
   applyCartSnapshot: (cart: Cart | null) => void;
+  getCartSnapshot: () => Cart | null;
   clearActiveSoloCart: () => Promise<void>;
   clearAndSwitchSoloCart: () => Promise<void>;
 };
@@ -128,6 +130,7 @@ export function QuickCartProvider({
       : null;
     const normalizedRecovery = recovery ?? null;
     rememberAcceptedCartSnapshot(displayCart);
+    cartRef.current = displayCart;
     setCart(displayCart);
     setPodContext(
       buildCartPodContextForDisplay({
@@ -159,11 +162,17 @@ export function QuickCartProvider({
         lastAcceptedMetaRef.current,
         detail
       );
+    } else if (next) {
+      lastAcceptedMetaRef.current = mergeAcceptedCartSnapshotMeta(
+        lastAcceptedMetaRef.current,
+        enrichCartUpdatedDetail({ cart: next, source: "quick-cart" })
+      );
     }
     const normalized =
       next != null ? normalizeAuthoritativeCartSnapshot(next, detail?.source) : null;
     const displayCart = resolveQuickCartSnapshotAfterUpdate(normalized);
     rememberAcceptedCartSnapshot(displayCart);
+    cartRef.current = displayCart;
     setCart(displayCart);
     if (!displayCart) {
       setPodContext(NEUTRAL_POD_CONTEXT);
@@ -341,6 +350,8 @@ export function QuickCartProvider({
     };
   }, [applyCartSnapshot, refreshCart]);
 
+  const getCartSnapshot = useCallback(() => cartRef.current, []);
+
   const clearActiveSoloCart = useCallback(async () => {
     const recovery = activeCartRecoveryRef.current;
     if (!recovery || recovery.kind !== "solo_cart") {
@@ -419,6 +430,7 @@ export function QuickCartProvider({
       refreshCart,
       setCart,
       applyCartSnapshot,
+      getCartSnapshot,
       clearActiveSoloCart,
       clearAndSwitchSoloCart,
     }),
@@ -437,6 +449,7 @@ export function QuickCartProvider({
       itemCount,
       refreshCart,
       applyCartSnapshot,
+      getCartSnapshot,
       clearActiveSoloCart,
       clearAndSwitchSoloCart,
     ]

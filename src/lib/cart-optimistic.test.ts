@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { optimisticSimpleAdd } from "@/lib/cart-optimistic";
+import { optimisticSimpleAdd, optimisticIncrementCartItem, optimisticRemoveCartItem } from "@/lib/cart-optimistic";
 import type { Cart } from "@/domain/types";
 
 const baseCart: Cart = {
@@ -62,5 +62,12 @@ describe("optimisticSimpleAdd", () => {
     expect(next?.items).toHaveLength(2);
     expect(next?.items[1]?.id.startsWith("optimistic:")).toBe(true);
     expect(next?.subtotalCents).toBe(800);
+  });
+});
+
+describe("optimistic line quantity helpers", () => {
+  it("returns null when line id is unknown", () => {
+    expect(optimisticIncrementCartItem(baseCart, "missing")).toBeNull();
+    expect(optimisticRemoveCartItem(baseCart, "missing")).toBeNull();
   });
 });

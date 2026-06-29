@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { updateCartItemAction } from "@/actions/cart.actions";
+import { useMemo } from "react";
 import type { ModifierConfigForUI } from "./modifier-config";
 import { useVendorMenuCart } from "@/components/vendor-menu/VendorMenuCartContext";
 import type { Cart, CartItem } from "@/domain/types";
 import { shortCartLineLabel } from "@/lib/cart-line-identity";
-import { enqueueCartMutation } from "@/lib/cart-mutation-queue";
+import {
+  optimisticDecrementCartItemMutation,
+  optimisticIncrementCartItemMutation,
+} from "@/lib/cart-optimistic-line-mutations";
 import {
   useMenuItemAddAction,
   type MenuItemAddAction,
@@ -34,31 +36,32 @@ function CartLineQtyControls({
   compact?: boolean;
   overlay?: boolean;
 }) {
-  const [loading, setLoading] = useState(false);
-  const { cart: snapshot, applyServerCart } = useVendorMenuCart();
+  const { cart, applyLocalCartUpdate, getCartSnapshot } = useVendorMenuCart();
+  const liveLine = cart.items.find((item) => item.id === line.id) ?? line;
+  const quantity = liveLine.quantity;
 
-  async function setQty(next: number) {
+  const mutationBase = {
+    cartId,
+    podId,
+    cartItemId: line.id,
+    source: "vendor-menu" as const,
+    getCurrentCart: getCartSnapshot,
+    applyLocal: applyLocalCartUpdate,
+  };
+
+  async function decrement() {
     if (orderingDisabled) return;
-    setLoading(true);
-    const before = snapshot;
-    try {
-      const result = await enqueueCartMutation(cartId, () =>
-        updateCartItemAction(cartId, line.id, next, undefined, undefined, podId)
-      );
-      if (result?.success) {
-        applyServerCart(result.cart);
-        onUpdated(result.cart);
-      } else if (result && !result.success) {
-        if (result.cart) {
-          applyServerCart(result.cart);
-        } else {
-          applyServerCart(before);
-        }
-      }
-    } catch {
-      applyServerCart(before);
-    } finally {
-      setLoading(false);
+    const result = await optimisticDecrementCartItemMutation(mutationBase);
+    if (result.success) {
+      onUpdated(result.cart);
+    }
+  }
+
+  async function increment() {
+    if (orderingDisabled) return;
+    const result = await optimisticIncrementCartItemMutation(mutationBase);
+    if (result.success) {
+      onUpdated(result.cart);
     }
   }
 
@@ -84,23 +87,23 @@ function CartLineQtyControls({
     <div className={shell} onClick={overlay ? stopOverlayBubble : undefined}>
       <button
         type="button"
-        disabled={orderingDisabled || loading}
+        disabled={orderingDisabled}
         onClick={(event) => {
           if (overlay) stopOverlayBubble(event);
-          void setQty(line.quantity - 1);
+          void decrement();
         }}
         className={btnClass}
         aria-label="Decrease quantity"
       >
         −
       </button>
-      <span className={qtyClass}>{line.quantity}</span>
+      <span className={qtyClass}>{quantity}</span>
       <button
         type="button"
-        disabled={orderingDisabled || loading}
+        disabled={orderingDisabled}
         onClick={(event) => {
           if (overlay) stopOverlayBubble(event);
-          void setQty(line.quantity + 1);
+          void increment();
         }}
         className={btnClass}
         aria-label="Increase quantity"

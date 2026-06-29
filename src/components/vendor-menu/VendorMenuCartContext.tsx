@@ -28,9 +28,9 @@ import {
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
 import {
-  enqueueCartMutation,
-  markCartSnapshotCommitted,
-} from "@/lib/cart-mutation-queue";
+  runOptimisticCartMutation,
+} from "@/lib/cart-optimistic-mutations";
+import { enqueueCartMutation, markCartSnapshotCommitted } from "@/lib/cart-mutation-queue";
 import { normalizeAuthoritativeCartSnapshot } from "@/lib/cart-group-metadata";
 import {
   optimisticPendingModifierLine,
@@ -63,6 +63,7 @@ type VendorMenuCartContextValue = {
   cartMutationError: CartMutationError | null;
   clearCartMutationError: () => void;
   applyServerCart: (cart: Cart) => void;
+  applyLocalCartUpdate: (cart: Cart) => void;
   runSimpleAddToCart: (
     params: OptimisticSimpleAddParams & {
       add: () => Promise<
@@ -75,6 +76,7 @@ type VendorMenuCartContextValue = {
     | { success: false; error: string; code?: string }
   >;
   applyServerCartFromMutation: (cart: Cart) => void;
+  getCartSnapshot: () => Cart;
   runModifierAddInBackground: (params: {
     optimistic: ModifierAddOptimisticParams;
     add: () => Promise<
@@ -226,7 +228,23 @@ export function VendorMenuCartProvider({
     publishCart(next);
   }, [publishCart]);
 
+  const applyLocalCartUpdate = useCallback((next: Cart) => {
+    const normalized = normalizeAuthoritativeCartSnapshot(
+      ensureCartSnapshotScalars(next, {
+        id: cartRef.current.id,
+        podId: cartRef.current.podId,
+        sessionId: cartRef.current.sessionId,
+      }),
+      "vendor-menu"
+    );
+    cartRef.current = normalized;
+    setCart(normalized);
+    rememberAcceptedCartSnapshot(normalized);
+  }, []);
+
   const applyServerCartFromMutation = applyServerCart;
+
+  const getCartSnapshot = useCallback(() => cartRef.current, []);
 
   const clearCartMutationError = useCallback(() => {
     setCartMutationError(null);
@@ -298,41 +316,23 @@ export function VendorMenuCartProvider({
         | { success: false; error: string; code?: string }
       >;
     }) => {
-      const cartId = cartRef.current.id;
-      return enqueueCartMutation(cartId, async () => {
-        const snapshot = cartRef.current;
-        const optimisticRaw = optimisticSimpleAdd(snapshot, optimisticParams);
-        const optimisticCart = optimisticRaw
-          ? normalizeAuthoritativeCartSnapshot(
-              ensureCartSnapshotScalars(optimisticRaw, {
-                id: snapshot.id,
-                podId: snapshot.podId,
-                sessionId: snapshot.sessionId,
-              }),
-              "vendor-menu"
-            )
-          : null;
-        if (optimisticCart) {
-          cartRef.current = optimisticCart;
-          setCart(optimisticCart);
-          dispatchCartUpdated({ cart: optimisticCart, source: "vendor-menu" });
-        }
-
-        const result = await add();
-        if (result.success) {
-          setCartMutationError(null);
-          publishCart(result.cart);
-          return result;
-        }
-
-        cartRef.current = snapshot;
-        setCart(snapshot);
-        dispatchCartUpdated({ cart: snapshot, source: "vendor-menu" });
-        reportCartMutationError({ message: result.error, code: result.code });
-        return result;
+      return runOptimisticCartMutation({
+        cartId: cartRef.current.id,
+        source: "vendor-menu",
+        getCurrentCart: () => cartRef.current,
+        applyOptimistic: (snapshot) => optimisticSimpleAdd(snapshot, optimisticParams),
+        runServer: add,
+        applyLocal: applyLocalCartUpdate,
+        setError: (message) => {
+          if (message) {
+            reportCartMutationError({ message });
+          } else {
+            setCartMutationError(null);
+          }
+        },
       });
     },
-    [publishCart, reportCartMutationError]
+    [applyLocalCartUpdate, reportCartMutationError]
   );
 
   const value = useMemo(
@@ -344,8 +344,10 @@ export function VendorMenuCartProvider({
       cartMutationError,
       clearCartMutationError,
       applyServerCart,
+      applyLocalCartUpdate,
       runSimpleAddToCart,
       applyServerCartFromMutation,
+      getCartSnapshot,
       runModifierAddInBackground,
     }),
     [
@@ -355,8 +357,10 @@ export function VendorMenuCartProvider({
       cartMutationError,
       clearCartMutationError,
       applyServerCart,
+      applyLocalCartUpdate,
       runSimpleAddToCart,
       applyServerCartFromMutation,
+      getCartSnapshot,
       runModifierAddInBackground,
     ]
   );
