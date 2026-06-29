@@ -20,8 +20,13 @@ describe("Quick Cart open state", () => {
     expect(applyPayloadBlock).not.toMatch(/setIsOpen\(false\)/);
   });
 
-  it("still closes on intentional clear snapshot and clear actions", () => {
-    expect(contextSrc).toMatch(/applyCartSnapshot[\s\S]*?if \(!displayCart\)[\s\S]*?setIsOpen\(false\)/);
+  it("only closes on explicit null snapshot and intentional clear actions", () => {
+    const applyCartSnapshotBlock = contextSrc.slice(
+      contextSrc.indexOf("const applyCartSnapshot = useCallback"),
+      contextSrc.indexOf("const refreshCart = useCallback")
+    );
+    expect(applyCartSnapshotBlock).toMatch(/if \(next === null\)[\s\S]*?setIsOpen\(false\)/);
+    expect(applyCartSnapshotBlock).not.toMatch(/if \(!displayCart\)[\s\S]*?setIsOpen\(false\)/);
     expect(contextSrc).toMatch(/clearActiveSoloCart[\s\S]*setIsOpen\(false\)/);
     expect(contextSrc).toMatch(/clearAndSwitchSoloCart[\s\S]*setIsOpen\(false\)/);
   });

@@ -23,11 +23,12 @@ export function cartSnapshotLineCount(cart: Cart | null | undefined): number {
   return cart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0;
 }
 
-/** Solo empty carts should not keep Quick Cart / header badge state after clear or last-line removal. */
+/** Keep empty cart rows for Quick Cart drawer; only drop absent carts. */
 export function resolveQuickCartSnapshotAfterUpdate(cart: Cart | null): Cart | null {
   if (!cart) return null;
   if (cartSnapshotLineCount(cart) > 0) return cart;
   if (quickCartHasActiveGroupOrder(cart)) return cart;
+  if (cart.id?.trim()) return cart;
   return null;
 }
 

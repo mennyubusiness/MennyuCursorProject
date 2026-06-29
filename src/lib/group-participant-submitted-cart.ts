@@ -10,6 +10,10 @@ import {
   resolveGroupParticipantForSession,
 } from "@/lib/group-participant-order-access";
 import { resolveActiveGroupParticipantBinding } from "@/lib/group-order-participant-resolve";
+import {
+  isCheckoutInProgressOrderStatus,
+  isTerminalOrderStatus,
+} from "@/lib/order-terminal-status";
 import { CART_DISPLAY_SESSION_CART_INCLUDE } from "@/services/cart.service";
 
 export type SubmittedParticipantCartResolution =
@@ -53,12 +57,40 @@ async function findParticipantRowForSubmittedLookup(markers: GroupOrderParticipa
   });
 }
 
-/** Participant cookie + submitted session → order id when available. */
+async function findLinkedOrderStatusForGroupSession(
+  groupOrderSessionId: string
+): Promise<{ orderId: string; status: string } | null> {
+  const orderId = await findOrderIdForGroupOrderSession(groupOrderSessionId);
+  if (!orderId) return null;
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, status: true },
+  });
+  if (!order) return null;
+  return { orderId: order.id, status: order.status };
+}
+
+/** True when a submitted group session still has a live (non-terminal) order handoff. */
+export async function isParticipantGroupOrderHandoffActive(
+  groupOrderSessionId: string
+): Promise<boolean> {
+  const linked = await findLinkedOrderStatusForGroupSession(groupOrderSessionId);
+  if (!linked) return true;
+  if (isCheckoutInProgressOrderStatus(linked.status)) return true;
+  return !isTerminalOrderStatus(linked.status);
+}
+
+/** Participant cookie + submitted session → order id when handoff is still active. */
 export async function resolveSubmittedGroupOrderForParticipantCart(
   markers: GroupOrderParticipantMarkers
 ): Promise<SubmittedParticipantCartResolution> {
   const row = await findParticipantRowForSubmittedLookup(markers);
   if (!row || row.groupOrderSession.status !== "submitted") {
+    return { kind: "none" };
+  }
+
+  const handoffActive = await isParticipantGroupOrderHandoffActive(row.groupOrderSession.id);
+  if (!handoffActive) {
     return { kind: "none" };
   }
 
@@ -73,21 +105,31 @@ export async function resolveSubmittedGroupOrderForParticipantCart(
   };
 }
 
+/**
+ * Order status redirect target for /cart — only during active handoff and only when
+ * the loaded cart is the submitted group cart (or no cart is loaded yet).
+ */
+export async function resolveParticipantSubmittedOrderRedirect(args: {
+  participantMarkers: GroupOrderParticipantMarkers;
+  activeCart: { id: string } | null | undefined;
+}): Promise<string | null> {
+  const resolution = await resolveSubmittedGroupOrderForParticipantCart(args.participantMarkers);
+  if (resolution.kind !== "submitted" || !resolution.orderId) {
+    return null;
+  }
+  if (args.activeCart && args.activeCart.id !== resolution.cartId) {
+    return null;
+  }
+  return resolution.orderId;
+}
+
 export async function loadParticipantGroupCartRowForCartPage(
   markers: GroupOrderParticipantMarkers
 ) {
   const binding = await resolveActiveGroupParticipantBinding(markers);
-  if (binding) {
-    return prisma.cart.findUnique({
-      where: { id: binding.cartId },
-      include: CART_DISPLAY_SESSION_CART_INCLUDE,
-    });
-  }
-
-  const resolved = await resolveSubmittedGroupOrderForParticipantCart(markers);
-  if (resolved.kind !== "submitted") return null;
+  if (!binding) return null;
   return prisma.cart.findUnique({
-    where: { id: resolved.cartId },
+    where: { id: binding.cartId },
     include: CART_DISPLAY_SESSION_CART_INCLUDE,
   });
 }
@@ -117,6 +159,15 @@ export async function getGroupOrderSubmissionStatusForParticipantCart(args: {
   }
 
   if (session.status !== "submitted") {
+    return {
+      ok: true,
+      sessionStatus: session.status,
+      submittedOrderId: null,
+    };
+  }
+
+  const handoffActive = await isParticipantGroupOrderHandoffActive(session.id);
+  if (!handoffActive) {
     return {
       ok: true,
       sessionStatus: session.status,

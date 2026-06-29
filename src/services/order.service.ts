@@ -1294,13 +1294,12 @@ export {
   getRecentCompletedOrdersForPhone,
 } from "@/services/customer-account-orders.service";
 
-/** Terminal Order.status values: no further updates expected; order is not "active". */
-const TERMINAL_ORDER_STATUSES = ["completed", "partially_completed", "cancelled", "failed"] as const;
-
-/**
- * Parent orders still in checkout (unpaid). Must not block /cart or show as a "live" placed order.
- */
-const CHECKOUT_IN_PROGRESS_STATUSES = ["pending_payment"] as const;
+import {
+  isCheckoutInProgressOrderStatus,
+  isTerminalOrderStatus,
+  TERMINAL_ORDER_STATUSES,
+  CHECKOUT_IN_PROGRESS_ORDER_STATUSES,
+} from "@/lib/order-terminal-status";
 
 /**
  * Returns the customer's most recent active order (placed + paid or in fulfillment), if any.
@@ -1316,7 +1315,7 @@ export async function getActiveOrderByCustomerPhone(
   const order = await prisma.order.findFirst({
     where: {
       customerPhone: normalized,
-      status: { notIn: [...TERMINAL_ORDER_STATUSES, ...CHECKOUT_IN_PROGRESS_STATUSES] },
+      status: { notIn: [...TERMINAL_ORDER_STATUSES, ...CHECKOUT_IN_PROGRESS_ORDER_STATUSES] },
     },
     orderBy: { createdAt: "desc" },
     select: { id: true },

@@ -9,7 +9,6 @@ import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import {
   discardStaleCheckoutCartsForSession,
   getOrCreateCart,
-  loadActiveDisplayCartForSession,
 } from "@/services/cart.service";
 import { getActiveOrderByCustomerPhone, validateCartItemsForDisplay, getCartValidationMessage } from "@/services/order.service";
 import type { Cart } from "@/domain/types";
@@ -43,11 +42,13 @@ import {
 import { readGroupOrderParticipantMarkers } from "@/lib/group-order-participant-cookie";
 import {
   getGroupOrderStateForCartPage,
-  loadActiveGroupCartForCartPage,
   startGroupOrderForCartPage,
   unlockGroupCheckoutForCartPage,
 } from "@/lib/group-order-cart-page";
-import { resolveSubmittedGroupOrderForParticipantCart } from "@/lib/group-participant-submitted-cart";
+import {
+  resolveActiveCartForCartPage,
+  resolveParticipantCartPageRedirect,
+} from "@/lib/guest-active-cart-resolution";
 import { resolveGroupCartEmptyState } from "@/lib/group-order-cart-empty-state";
 import { GroupOrderCartPanel } from "./GroupOrderCartPanel";
 import { GroupOrderHostEmptyCartCard } from "./GroupOrderHostEmptyCartCard";
@@ -118,15 +119,6 @@ export default async function CartPage({
   const participantMarkers = readGroupOrderParticipantMarkers(cookieStore);
   const authSession = await auth();
 
-  const submittedParticipantResolution =
-    await resolveSubmittedGroupOrderForParticipantCart(participantMarkers);
-  if (
-    submittedParticipantResolution.kind === "submitted" &&
-    submittedParticipantResolution.orderId
-  ) {
-    redirect(`/order/${submittedParticipantResolution.orderId}`);
-  }
-
   const startGroupOrder = params.startGroupOrder === "1";
   const podIdRaw = params.podId;
   const podIdFromQuery =
@@ -151,20 +143,19 @@ export default async function CartPage({
   const preferredPodId = startGroupOrder && targetPodForGroup ? targetPodForGroup : currentPodId;
   const perfT0 = cartPagePerfNow();
   let cart =
-    (await loadActiveGroupCartForCartPage({
-      hostUserId: authSession?.user?.id ?? null,
-      participantMarkers,
+    (await resolveActiveCartForCartPage({
+      sessionId,
       preferredPodId,
+      participantMarkers,
+      hostUserId: authSession?.user?.id ?? null,
     })) ?? undefined;
-  if (!cart) {
-    cart =
-      (await loadActiveDisplayCartForSession(
-        sessionId,
-        preferredPodId,
-        participantMarkers,
-        authSession?.user?.id ?? null
-      )) ??
-      undefined;
+
+  const participantRedirect = await resolveParticipantCartPageRedirect({
+    participantMarkers,
+    activeCart: cart ?? null,
+  });
+  if (participantRedirect.redirect) {
+    redirect(`/order/${participantRedirect.orderId}`);
   }
   if (params.groupUnlock === "1" && cart?.id && authSession?.user?.id) {
     await unlockGroupCheckoutForCartPage(cart.id, authSession.user.id);

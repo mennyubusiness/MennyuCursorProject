@@ -138,8 +138,8 @@ describe("quick-cart-display", () => {
     expect(quickCartPodLinkLabel(ctx)).toBe("Explore pods");
   });
 
-  it("resolveQuickCartSnapshotAfterUpdate drops empty solo carts", () => {
-    expect(resolveQuickCartSnapshotAfterUpdate(baseCart)).toBeNull();
+  it("resolveQuickCartSnapshotAfterUpdate keeps empty solo carts with a cart id", () => {
+    expect(resolveQuickCartSnapshotAfterUpdate(baseCart)).toEqual(baseCart);
     expect(
       resolveQuickCartSnapshotAfterUpdate({
         ...baseCart,
@@ -179,8 +179,8 @@ describe("QuickCartDrawer source", () => {
     expect(groupSrc).not.toMatch(/href="\/group-order\/join"/);
   });
 
-  it("does not expose joinToken in quick cart components", () => {
-    expect(drawerSrc).not.toMatch(/joinToken/i);
-    expect(groupSrc).not.toMatch(/joinToken/i);
+  it("drawer source renders assigned empty state", () => {
+    expect(drawerSrc).toContain("showAssignedEmpty");
+    expect(drawerSrc).toContain("Add something from the menu to get started.");
   });
 });

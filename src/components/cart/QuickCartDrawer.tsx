@@ -64,6 +64,16 @@ export function QuickCartDrawer() {
     !showActiveRecovery &&
     !hasActiveGroupOrder &&
     !showHostGroupEmpty;
+  const showAssignedEmpty =
+    Boolean(
+      cart &&
+      !hasItems &&
+      podContext.cartScope === "assigned_pod" &&
+      !showActiveRecovery &&
+      !hasActiveGroupOrder &&
+      !showHostGroupEmpty &&
+      !showParticipantGroupEmpty
+    );
   const suppressNeutralGroupPromo =
     showActiveRecovery && shouldSuppressNeutralGroupPromo(activeCartRecovery);
 
@@ -121,6 +131,13 @@ export function QuickCartDrawer() {
               <p className="font-semibold text-oo-charcoal">Your cart is empty</p>
               <p className="mt-2 text-sm text-oo-stone-gray">{quickCartEmptyTitle(podContext)}</p>
             </div>
+          ) : showAssignedEmpty ? (
+            <div className="oo-empty-state px-6 py-10">
+              <p className="font-semibold text-oo-charcoal">Your cart is empty.</p>
+              <p className="mt-2 text-sm text-oo-stone-gray">
+                Add something from the menu to get started.
+              </p>
+            </div>
           ) : cart && hasItems ? (
             <ul className="space-y-5">
               {cart.groups.map((group) => (
@@ -174,22 +191,24 @@ export function QuickCartDrawer() {
         </div>
 
         <footer className="border-t border-oo-light-stone bg-oo-warm-white px-4 py-4 sm:px-5">
-          {hasItems && cart && (
+          {cart && (hasItems || showAssignedEmpty) && (
             <>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-oo-stone-gray">{isParticipant ? "Your subtotal" : "Subtotal"}</span>
                 <span className="text-base font-bold tabular-nums text-oo-charcoal">
-                  ${(cart.subtotalCents / 100).toFixed(2)}
+                  ${((hasItems ? cart.subtotalCents : 0) / 100).toFixed(2)}
                 </span>
               </div>
-              <p className="mt-1 text-[11px] text-oo-stone-gray">
-                {itemCount} item{itemCount === 1 ? "" : "s"}
-                {isParticipant
-                  ? " · host checks out for the group"
-                  : canCheckout
-                    ? " · tax & fees at checkout"
-                    : ""}
-              </p>
+              {hasItems ? (
+                <p className="mt-1 text-[11px] text-oo-stone-gray">
+                  {itemCount} item{itemCount === 1 ? "" : "s"}
+                  {isParticipant
+                    ? " · host checks out for the group"
+                    : canCheckout
+                      ? " · tax & fees at checkout"
+                      : ""}
+                </p>
+              ) : null}
             </>
           )}
           {((cart && hasItems) || showGroupOrderFooter) && cart && (

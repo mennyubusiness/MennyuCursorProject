@@ -109,8 +109,9 @@ export function QuickCartProvider({
   activeCartRecoveryRef.current = activeCartRecovery;
 
   const itemCount = useMemo(() => {
-    const fromCart = cart?.items.reduce((n, i) => n + i.quantity, 0) ?? 0;
-    if (fromCart > 0) return fromCart;
+    if (cart) {
+      return cart.items.reduce((n, i) => n + i.quantity, 0);
+    }
     return activeCartRecovery?.itemCount ?? 0;
   }, [cart, activeCartRecovery]);
 
@@ -194,8 +195,25 @@ export function QuickCartProvider({
         enrichCartUpdatedDetail({ cart: next, source: "quick-cart" })
       );
     }
-    const normalized =
-      next != null ? normalizeAuthoritativeCartSnapshot(next, detail?.source) : null;
+
+    if (next === null) {
+      rememberAcceptedCartSnapshot(null);
+      cartRef.current = null;
+      setCart(null);
+      const pageBrowse = resolveBrowsePod();
+      setPodContext(
+        pageBrowse.id
+          ? buildBrowsingPodOnlyContext(pageBrowse)
+          : NEUTRAL_POD_CONTEXT
+      );
+      setActiveCartRecovery(null);
+      setShowActiveRecovery(false);
+      setIsOpen(false);
+      setLoading(false);
+      return;
+    }
+
+    const normalized = normalizeAuthoritativeCartSnapshot(next, detail?.source);
     const displayCart = resolveQuickCartSnapshotAfterUpdate(normalized);
     rememberAcceptedCartSnapshot(displayCart);
     cartRef.current = displayCart;
@@ -209,7 +227,6 @@ export function QuickCartProvider({
       );
       setActiveCartRecovery(null);
       setShowActiveRecovery(false);
-      setIsOpen(false);
     } else {
       const pageBrowse = resolveBrowsePod();
       setPodContext(

@@ -9,6 +9,7 @@ import {
   findOrderIdForGroupOrderSession,
   resolveGroupParticipantForSession,
 } from "@/lib/group-participant-order-access";
+import { isParticipantGroupOrderHandoffActive } from "@/lib/group-participant-submitted-cart";
 import { expireGroupOrderSessionIfStale } from "@/lib/group-order-session-lifecycle";
 import {
   isTerminalGroupOrderSessionStatus,
@@ -141,6 +142,13 @@ export async function getGroupOrderStateForCartPage(
     if (expired === "expired") {
       s = await findSessionByCartId(cartId);
       if (!s) return { active: false };
+    }
+  }
+
+  if (s.status === "submitted") {
+    const handoffActive = await isParticipantGroupOrderHandoffActive(s.id);
+    if (!handoffActive) {
+      return { active: false };
     }
   }
 
