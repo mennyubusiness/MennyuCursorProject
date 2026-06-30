@@ -10,6 +10,8 @@ import {
   openOrderProductDeliverectId,
 } from "@/lib/open-order-menu-ids";
 import { isOpenOrderMenuSource } from "@/lib/vendor-menu-source";
+import { normalizeVendorLogoUrl } from "@/lib/vendor-brand";
+import { deleteSupabasePublicObjectIfInBucket } from "@/lib/supabase/storage-cleanup";
 import {
   OpenOrderMenuPublishError,
   publishOpenOrderMenuFromBuilder,
@@ -74,6 +76,77 @@ async function revalidateMenuBuilderSurfaces(vendorId: string) {
 function parsePriceToCents(raw: string): number | null {
   const parsed = parseMenuPriceToCents(raw);
   return parsed.ok ? parsed.cents : null;
+}
+
+export async function reorderOpenOrderMenuCategories(
+  vendorId: string,
+  orderedCategoryIds: string[]
+): Promise<ActionResult> {
+  const authz = await authorizeOpenOrderMenuBuilder(vendorId);
+  if (!authz.ok) return authz;
+
+  if (orderedCategoryIds.length === 0) return { ok: true };
+
+  const existing = await prisma.vendorMenuCategory.findMany({
+    where: { vendorId },
+    select: { id: true },
+  });
+  if (existing.length !== orderedCategoryIds.length) {
+    return { ok: false, error: "Category list is out of date. Refresh and try again." };
+  }
+  const idSet = new Set(existing.map((row) => row.id));
+  if (!orderedCategoryIds.every((id) => idSet.has(id))) {
+    return { ok: false, error: "Invalid category order." };
+  }
+
+  await prisma.$transaction(
+    orderedCategoryIds.map((id, sortOrder) =>
+      prisma.vendorMenuCategory.update({ where: { id }, data: { sortOrder } })
+    )
+  );
+  await revalidateCustomerMenuSurfaces(vendorId);
+  return { ok: true };
+}
+
+export async function reorderOpenOrderMenuItemsInCategory(
+  vendorId: string,
+  categoryId: string,
+  orderedItemIds: string[]
+): Promise<ActionResult> {
+  const authz = await authorizeOpenOrderMenuBuilder(vendorId);
+  if (!authz.ok) return authz;
+
+  const category = await prisma.vendorMenuCategory.findFirst({
+    where: { id: categoryId, vendorId },
+    select: { id: true },
+  });
+  if (!category) return { ok: false, error: "Category not found." };
+
+  const catDeliverectId = openOrderCategoryDeliverectId(categoryId);
+  const existing = await prisma.menuItem.findMany({
+    where: {
+      vendorId,
+      deliverectProductId: { startsWith: "oo:prod:" },
+      deliverectCategoryId: catDeliverectId,
+    },
+    select: { id: true },
+  });
+
+  if (existing.length !== orderedItemIds.length) {
+    return { ok: false, error: "Item list is out of date. Refresh and try again." };
+  }
+  const idSet = new Set(existing.map((row) => row.id));
+  if (!orderedItemIds.every((id) => idSet.has(id))) {
+    return { ok: false, error: "Invalid item order." };
+  }
+
+  await prisma.$transaction(
+    orderedItemIds.map((id, sortOrder) =>
+      prisma.menuItem.update({ where: { id }, data: { sortOrder } })
+    )
+  );
+  await revalidateCustomerMenuSurfaces(vendorId);
+  return { ok: true };
 }
 
 export async function createOpenOrderMenuCategory(
@@ -239,6 +312,7 @@ export async function updateOpenOrderMenuItem(
     categoryId?: string;
     isAvailable?: boolean;
     sortOrder?: number;
+    imageUrl?: string | null;
   }
 ): Promise<ActionResult> {
   const authz = await authorizeOpenOrderMenuBuilder(vendorId);
@@ -250,7 +324,7 @@ export async function updateOpenOrderMenuItem(
       vendorId,
       deliverectProductId: { startsWith: "oo:prod:" },
     },
-    select: { id: true },
+    select: { id: true, imageUrl: true },
   });
   if (!existing) return { ok: false, error: "Item not found." };
 
@@ -261,6 +335,7 @@ export async function updateOpenOrderMenuItem(
     deliverectCategoryId?: string;
     isAvailable?: boolean;
     sortOrder?: number;
+    imageUrl?: string | null;
   } = {};
 
   if (input.name !== undefined) {
@@ -296,8 +371,26 @@ export async function updateOpenOrderMenuItem(
     }
     data.sortOrder = input.sortOrder;
   }
+  if (input.imageUrl !== undefined) {
+    if (input.imageUrl == null || input.imageUrl.trim() === "") {
+      data.imageUrl = null;
+    } else {
+      const normalized = normalizeVendorLogoUrl(input.imageUrl);
+      if (!normalized) {
+        return { ok: false, error: "Image must be a direct https:// link." };
+      }
+      data.imageUrl = normalized;
+    }
+  }
 
   await prisma.menuItem.update({ where: { id: itemId }, data });
+  if (
+    input.imageUrl !== undefined &&
+    existing.imageUrl &&
+    existing.imageUrl !== data.imageUrl
+  ) {
+    void deleteSupabasePublicObjectIfInBucket(existing.imageUrl);
+  }
   await revalidateCustomerMenuSurfaces(vendorId);
   return { ok: true };
 }

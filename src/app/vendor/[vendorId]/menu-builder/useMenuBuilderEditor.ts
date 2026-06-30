@@ -15,6 +15,8 @@ import {
   deleteOpenOrderMenuCategory,
   deleteOpenOrderMenuItem,
   publishOpenOrderMenuAction,
+  reorderOpenOrderMenuCategories,
+  reorderOpenOrderMenuItemsInCategory,
   updateOpenOrderMenuCategory,
   updateOpenOrderMenuItem,
 } from "@/actions/vendor-menu-builder.actions";
@@ -104,6 +106,25 @@ function itemCountForCategory(items: MenuBuilderItem[], categoryId: string): num
   return items.filter((item) => item.categoryId === categoryId && !item.isDeleting).length;
 }
 
+function sortByOrder<T extends { sortOrder: number }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function swapSortOrder<T extends { id: string; sortOrder: number }>(
+  rows: T[],
+  id: string,
+  direction: "up" | "down"
+): T[] | null {
+  const sorted = sortByOrder(rows);
+  const index = sorted.findIndex((row) => row.id === id);
+  if (index < 0) return null;
+  const swapIndex = direction === "up" ? index - 1 : index + 1;
+  if (swapIndex < 0 || swapIndex >= sorted.length) return null;
+  const next = [...sorted];
+  [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+  return next.map((row, sortOrder) => ({ ...row, sortOrder }));
+}
+
 export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
   const [categories, setCategories] = useState<MenuBuilderCategory[]>(data.categories);
   const [items, setItems] = useState<MenuBuilderItem[]>(data.items);
@@ -128,10 +149,12 @@ export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
 
   const categoriesWithCounts = useMemo(
     () =>
-      categories.map((cat) => ({
-        ...cat,
-        itemCount: itemCountForCategory(items, cat.id),
-      })),
+      sortByOrder(
+        categories.map((cat) => ({
+          ...cat,
+          itemCount: itemCountForCategory(items, cat.id),
+        }))
+      ),
     [categories, items]
   );
 
@@ -423,6 +446,7 @@ export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
         isAvailable: true,
         sortOrder: items.length,
         categoryId: input.categoryId,
+        imageUrl: null,
         updatedAt: new Date().toISOString(),
         isTemp: true,
         modifierGroups: [],
@@ -710,6 +734,80 @@ export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
     [data.vendorId, items, runSave]
   );
 
+  const updateItemImage = useCallback(
+    (itemId: string, imageUrl: string | null) => {
+      const previous = items.find((i) => i.id === itemId);
+      if (!previous) return;
+      if ((previous.imageUrl ?? null) === imageUrl) return;
+
+      void runSave(
+        `item-image:${itemId}`,
+        () => {
+          setItems((prev) =>
+            prev.map((i) => (i.id === itemId ? { ...i, imageUrl } : i))
+          );
+        },
+        () => {
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === itemId ? { ...i, imageUrl: previous.imageUrl ?? null } : i
+            )
+          );
+        },
+        () => updateOpenOrderMenuItem(data.vendorId, itemId, { imageUrl })
+      );
+    },
+    [data.vendorId, items, runSave]
+  );
+
+  const moveCategory = useCallback(
+    (categoryId: string, direction: "up" | "down") => {
+      const reordered = swapSortOrder(categories, categoryId, direction);
+      if (!reordered) return;
+      const previous = categories;
+
+      void runSave(
+        "category-reorder",
+        () => setCategories(reordered),
+        () => setCategories(previous),
+        () => reorderOpenOrderMenuCategories(data.vendorId, reordered.map((c) => c.id))
+      );
+    },
+    [categories, data.vendorId, runSave]
+  );
+
+  const moveItemInCategory = useCallback(
+    (categoryId: string, itemId: string, direction: "up" | "down") => {
+      const inCategory = items.filter((i) => i.categoryId === categoryId && !i.isDeleting);
+      const reordered = swapSortOrder(inCategory, itemId, direction);
+      if (!reordered) return;
+      const reorderedIds = new Set(reordered.map((i) => i.id));
+      const sortById = new Map(reordered.map((i) => [i.id, i.sortOrder]));
+      const previous = items;
+
+      void runSave(
+        `item-reorder:${categoryId}`,
+        () => {
+          setItems((prev) =>
+            prev.map((item) =>
+              reorderedIds.has(item.id)
+                ? { ...item, sortOrder: sortById.get(item.id) ?? item.sortOrder }
+                : item
+            )
+          );
+        },
+        () => setItems(previous),
+        () =>
+          reorderOpenOrderMenuItemsInCategory(
+            data.vendorId,
+            categoryId,
+            reordered.map((i) => i.id)
+          )
+      );
+    },
+    [data.vendorId, items, runSave]
+  );
+
   const publishMenu = useCallback(async () => {
     setPublishError(null);
     setPublishMessage(null);
@@ -757,6 +855,9 @@ export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
     updateItemName,
     updateItemPrice,
     updateItemAvailable,
+    updateItemImage,
+    moveCategory,
+    moveItemInCategory,
     addModifierGroup,
     updateModifierGroupFields,
     removeModifierGroup,

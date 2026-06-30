@@ -29,6 +29,7 @@ export type VendorMenuBuilderPageData = {
     isAvailable: boolean;
     sortOrder: number;
     categoryId: string | null;
+    imageUrl: string | null;
     updatedAt: string;
     modifierGroups: VendorMenuBuilderModifierGroup[];
   }>;
@@ -64,6 +65,7 @@ export async function loadVendorMenuBuilderPageData(
         priceCents: true,
         isAvailable: true,
         sortOrder: true,
+        imageUrl: true,
         deliverectCategoryId: true,
         updatedAt: true,
       },
@@ -113,6 +115,7 @@ export async function loadVendorMenuBuilderPageData(
       priceCents: item.priceCents,
       isAvailable: item.isAvailable,
       sortOrder: item.sortOrder,
+      imageUrl: item.imageUrl,
       categoryId: item.deliverectCategoryId?.replace(/^oo:cat:/, "") ?? null,
       updatedAt: item.updatedAt.toISOString(),
       modifierGroups: modifierGroupsByItemId.get(item.id) ?? [],

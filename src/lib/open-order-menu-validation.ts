@@ -25,6 +25,7 @@ export type OpenOrderMenuItemRow = {
   deliverectCategoryId: string | null;
   deliverectProductId: string | null;
   updatedAt: Date;
+  imageUrl?: string | null;
   modifierGroups?: OpenOrderModifierGroupValidationRow[];
 };
 

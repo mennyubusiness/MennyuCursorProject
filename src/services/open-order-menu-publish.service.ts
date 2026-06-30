@@ -63,6 +63,7 @@ async function loadBuilderRows(vendorId: string) {
         sortOrder: true,
         deliverectCategoryId: true,
         deliverectProductId: true,
+        imageUrl: true,
         updatedAt: true,
       },
     }),
@@ -139,7 +140,7 @@ export function buildOpenOrderCanonicalMenu(
       priceCents: item.priceCents,
       isAvailable: item.isAvailable,
       sortOrder: item.sortOrder ?? index,
-      imageUrl: null,
+      imageUrl: item.imageUrl?.trim() || null,
       basketMaxQuantity: null,
       modifierGroupDeliverectIds,
     };

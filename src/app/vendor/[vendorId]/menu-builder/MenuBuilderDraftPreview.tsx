@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { formatCentsToCurrency } from "@/lib/menu-price";
+import { MenuItemImage } from "@/components/images/MenuItemImage";
 import { isModifierGroupEffectivelyRequired } from "@/lib/open-order-modifier-validation";
 import type { MenuBuilderCategory, MenuBuilderItem } from "./useMenuBuilderEditor";
 
@@ -97,24 +98,34 @@ function DraftPreviewItem({ item }: { item: MenuBuilderItem }) {
 
   return (
     <li className="rounded-xl border border-oo-light-stone bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h4 className="text-base font-semibold text-oo-charcoal">{item.name}</h4>
-          {item.description ? (
-            <p className="mt-1 text-sm text-oo-stone-gray">{item.description}</p>
-          ) : null}
-        </div>
-        <div className="text-right">
-          <p className="text-base font-bold tabular-nums text-oo-charcoal">
-            {formatCentsToCurrency(item.priceCents)}
-          </p>
-          {!item.isAvailable ? (
-            <span className="mt-1 inline-block rounded-md bg-oo-charcoal/80 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-oo-warm-white">
-              Sold out
-            </span>
-          ) : (
-            <span className="mt-1 inline-block text-xs text-emerald-700">Available</span>
-          )}
+      <div className="flex flex-wrap items-start gap-3">
+        <MenuItemImage
+          imageUrl={item.imageUrl}
+          itemName={item.name}
+          className="h-16 w-16 shrink-0"
+          sizes="64px"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h4 className="text-base font-semibold text-oo-charcoal">{item.name}</h4>
+              {item.description ? (
+                <p className="mt-1 text-sm text-oo-stone-gray">{item.description}</p>
+              ) : null}
+            </div>
+            <div className="text-right">
+              <p className="text-base font-bold tabular-nums text-oo-charcoal">
+                {formatCentsToCurrency(item.priceCents)}
+              </p>
+              {!item.isAvailable ? (
+                <span className="mt-1 inline-block rounded-md bg-oo-charcoal/80 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-oo-warm-white">
+                  Sold out
+                </span>
+              ) : (
+                <span className="mt-1 inline-block text-xs text-emerald-700">Available</span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
