@@ -40,7 +40,7 @@ export async function requireVendorMenuSourceContext(vendorId: string): Promise<
 /** Redirect manual/open_order vendors away from Deliverect menu tooling. */
 export function gateDeliverectMenuRoutes(vendor: Pick<VendorMenuSourceFields, "menuSource">, vendorId: string) {
   if (isOpenOrderMenuSource(vendor)) {
-    redirect(`/vendor/${vendorId}/menu-builder`);
+    redirect(`/vendor/${vendorId}/menu-builder?inactive_menu_source=deliverect`);
   }
 }
 
@@ -50,7 +50,7 @@ export function gateOpenOrderMenuBuilderRoutes(
   vendorId: string
 ) {
   if (isDeliverectMenuSource(vendor)) {
-    redirect(`/vendor/${vendorId}/menu`);
+    redirect(`/vendor/${vendorId}/menu?inactive_menu_source=open_order`);
   }
 }
 

@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import type { VendorMenuSource } from "@prisma/client";
 import { VendorAreaNav } from "./VendorAreaNav";
+import { VendorInactiveMenuSourceNotice } from "./VendorInactiveMenuSourceNotice";
 
 export function VendorLayoutChrome({
   vendorId,
@@ -50,7 +51,12 @@ export function VendorLayoutChrome({
         </div>
         <VendorAreaNav vendorId={vendorId} menuSource={menuSource} wide={isWideWorkspace} />
       </header>
-      <main className={mainWidth}>{children}</main>
+      <main className={mainWidth}>
+        <Suspense fallback={null}>
+          <VendorInactiveMenuSourceNotice />
+        </Suspense>
+        {children}
+      </main>
     </div>
   );
 }

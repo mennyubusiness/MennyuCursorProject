@@ -58,7 +58,8 @@ model Pod {
   announcementUpdatedAt  DateTime?
   latitude           Float?
   longitude          Float?
-  /// IANA timezone for scheduled pickup (e.g. America/Chicago). Falls back to DEFAULT_PICKUP_TIMEZONE env when null.
+  /// IANA timezone for scheduled pickup and vendor business hours (e.g. America/Los_Angeles).
+  /// Falls back to DEFAULT_PICKUP_TIMEZONE env, then America/Los_Angeles when null.
   pickupTimezone     String?
   /// Pickup-only sales tax rate in basis points (e.g. 825 = 8.25%). Applied to food subtotal by Mennyu at checkout — not vendor-entered per order. Null/omit = no automatic tax.
   pickupSalesTaxBps  Int?

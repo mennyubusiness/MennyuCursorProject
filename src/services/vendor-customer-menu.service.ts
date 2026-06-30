@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import {
   getOperationalMenuItemIdsForVendor,
 } from "@/services/menu-active-scope.service";
+import { menuItemDeliverectIdMatchesMenuSource } from "@/lib/vendor-menu-source";
 import {
   loadCachedCustomerVendorMenuDisplay,
   loadCustomerVendorMenuAvailabilityOverlay,
@@ -70,7 +71,7 @@ function devLogVendorMenuLoad(label: string, vendorId: string, ms: number, extra
 }
 
 async function loadFallbackMenuDisplay(vendorId: string): Promise<CachedCustomerVendorMenuDisplay> {
-  const [rows, operationalIds] = await Promise.all([
+  const [rows, operationalIds, vendor] = await Promise.all([
     prisma.menuItem.findMany({
       where: {
         vendorId,
@@ -80,12 +81,18 @@ async function loadFallbackMenuDisplay(vendorId: string): Promise<CachedCustomer
       include: CUSTOMER_VENDOR_MENU_ITEM_INCLUDE,
     }),
     getOperationalMenuItemIdsForVendor(vendorId),
+    prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { menuSource: true },
+    }),
   ]);
 
   const activeRows = rows.filter(
     (r) =>
       operationalIds.has(r.id) &&
-      !r.deliverectVariantParentPlu?.trim()
+      !r.deliverectVariantParentPlu?.trim() &&
+      (!vendor ||
+        menuItemDeliverectIdMatchesMenuSource(r.deliverectProductId, vendor.menuSource))
   );
 
   const variantChildCountByParentPlu: Record<string, number> = {};

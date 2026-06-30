@@ -1,17 +1,34 @@
 /**
  * Vendor customer-facing ordering hours — manual Open Order weekly schedule.
  * Deliverect sync is retained in the schema/backend but disabled in vendor-facing product flows.
+ *
+ * Wall-clock evaluation delegates to {@link ./business-time.ts}.
  */
 
-export const VENDOR_WEEKDAYS = [
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-  "sunday",
-] as const;
+import {
+  BUSINESS_WEEKDAYS,
+  businessTimeToMinutes,
+  evaluateBusinessHours,
+  formatBusinessLocalLabel,
+  getBusinessLocalClock,
+  getMinutesInTimezone,
+  getWeekdayInTimezone,
+  isOpenAtTime as isOpenAtBusinessTime,
+  isWithinBusinessHours,
+  resolveBusinessTimezone,
+  resolveVendorHoursTimezone,
+} from "@/lib/business-time";
+
+export {
+  evaluateBusinessHours,
+  formatBusinessLocalLabel,
+  getBusinessLocalClock,
+  resolveBusinessTimezone,
+  resolveVendorHoursTimezone,
+};
+export type { BusinessHoursEvaluation } from "@/lib/business-time";
+
+export const VENDOR_WEEKDAYS = BUSINESS_WEEKDAYS;
 
 export type VendorWeekday = (typeof VENDOR_WEEKDAYS)[number];
 
@@ -88,8 +105,8 @@ export function validateVendorCustomerOrderingWeek(week: VendorCustomerOrderingW
     if (!TIME_RE.test(row.openTime) || !TIME_RE.test(row.closeTime)) {
       return "Open and close times must use HH:MM format.";
     }
-    const openMin = timeToMinutes(row.openTime);
-    const closeMin = timeToMinutes(row.closeTime);
+    const openMin = businessTimeToMinutes(row.openTime);
+    const closeMin = businessTimeToMinutes(row.closeTime);
     if (closeMin <= openMin) {
       return `${VENDOR_WEEKDAY_LABELS[row.day]}: closing time must be after opening time.`;
     }
@@ -115,11 +132,6 @@ function parseActiveVendorCustomerOrderingWeek(raw: unknown): VendorCustomerOrde
   return week;
 }
 
-function timeToMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map((v) => Number(v));
-  return h * 60 + m;
-}
-
 function formatMinutes12h(minutes: number): string {
   const h24 = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -130,36 +142,17 @@ function formatMinutes12h(minutes: number): string {
 
 export function formatDayHoursLabel(row: VendorCustomerOrderingDayHours): string {
   if (!row.isOpen) return "Closed";
-  return `${formatMinutes12h(timeToMinutes(row.openTime))} – ${formatMinutes12h(timeToMinutes(row.closeTime))}`;
+  return `${formatMinutes12h(businessTimeToMinutes(row.openTime))} – ${formatMinutes12h(businessTimeToMinutes(row.closeTime))}`;
 }
 
-export function getWeekdayInTimezone(now: Date, timeZone: string): VendorWeekday {
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long" }).format(now).toLowerCase();
-  return weekday as VendorWeekday;
-}
-
-export function getMinutesInTimezone(now: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(now);
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
-  return hour * 60 + minute;
-}
+export { getWeekdayInTimezone, getMinutesInTimezone };
 
 export function isOpenAtTime(
   week: VendorCustomerOrderingWeek,
   weekday: VendorWeekday,
   minutes: number
 ): boolean {
-  const row = week.find((d) => d.day === weekday);
-  if (!row?.isOpen) return false;
-  const openMin = timeToMinutes(row.openTime);
-  const closeMin = timeToMinutes(row.closeTime);
-  return minutes >= openMin && minutes < closeMin;
+  return isOpenAtBusinessTime(week, weekday, minutes);
 }
 
 /**
@@ -174,13 +167,13 @@ export function isVendorWithinCustomerOrderingHours(input: {
   syncFromDeliverect?: boolean;
   syncedHours?: VendorCustomerOrderingWeek | null;
 }): boolean {
-  const week = input.customHours;
-  if (!week) return false;
-
-  const now = input.now ?? new Date();
-  const weekday = getWeekdayInTimezone(now, input.timeZone);
-  const minutes = getMinutesInTimezone(now, input.timeZone);
-  return isOpenAtTime(week, weekday, minutes);
+  if (!input.customHours) return false;
+  const timeZone = resolveVendorHoursTimezone(input.timeZone);
+  return isWithinBusinessHours({
+    week: input.customHours,
+    timeZone,
+    now: input.now,
+  });
 }
 
 export function resolveVendorPosOpen(
@@ -189,9 +182,10 @@ export function resolveVendorPosOpen(
   now?: Date
 ): boolean {
   const customHours = parseActiveVendorCustomerOrderingWeek(vendor.customerOrderingHours);
-  return isVendorWithinCustomerOrderingHours({
-    customHours,
-    timeZone,
+  const resolvedZone = resolveVendorHoursTimezone(timeZone);
+  return isWithinBusinessHours({
+    week: customHours,
+    timeZone: resolvedZone,
     now,
   });
 }
@@ -206,11 +200,12 @@ export function vendorAvailabilityWithCustomerOrderingHours(
   podTimezone: string | null | undefined,
   now?: Date
 ) {
+  const timeZone = resolveVendorHoursTimezone(podTimezone);
   return {
     isActive: vendor.isActive,
     mennyuOrdersPaused: vendor.mennyuOrdersPaused,
     deliverectChannelLinkId: vendor.deliverectChannelLinkId,
-    posOpen: resolveVendorPosOpen(vendor, resolveVendorHoursTimezone(podTimezone), now),
+    posOpen: resolveVendorPosOpen(vendor, timeZone, now),
   };
 }
 
@@ -229,6 +224,7 @@ export function summarizeVendorCustomerOrderingHours(input: {
   now?: Date;
 }): VendorHoursStatusSummary {
   const now = input.now ?? new Date();
+  const timeZone = resolveVendorHoursTimezone(input.timeZone);
   const customHours = parseActiveVendorCustomerOrderingWeek(input.vendor.customerOrderingHours);
 
   if (!customHours) {
@@ -242,33 +238,28 @@ export function summarizeVendorCustomerOrderingHours(input: {
     };
   }
 
-  const posOpen = isVendorWithinCustomerOrderingHours({
-    customHours,
-    timeZone: input.timeZone,
-    now,
-  });
-
-  const weekday = getWeekdayInTimezone(now, input.timeZone);
+  const evaluation = evaluateBusinessHours({ week: customHours, timeZone, now });
+  const weekday = evaluation.clock.weekday;
   const todayRow = customHours.find((d) => d.day === weekday);
-  const minutes = getMinutesInTimezone(now, input.timeZone);
+  const minutes = evaluation.clock.minutesSinceMidnight;
   const openNow = isOpenAtTime(customHours, weekday, minutes);
 
   let todayLabel = "Closed today";
   if (todayRow?.isOpen) {
     todayLabel = openNow
-      ? `Open until ${formatMinutes12h(timeToMinutes(todayRow.closeTime))}`
+      ? `Open until ${formatMinutes12h(businessTimeToMinutes(todayRow.closeTime))}`
       : `Closed · hours ${formatDayHoursLabel(todayRow)}`;
   } else if (todayRow) {
     todayLabel = "Closed today";
   }
 
-  const nextOpeningLabel = findNextOpeningLabel(customHours, input.timeZone, now);
+  const nextOpeningLabel = findNextOpeningLabel(customHours, timeZone, now);
 
   return {
     sourceLabel: "Customer ordering hours",
     todayLabel,
     nextOpeningLabel,
-    posOpen,
+    posOpen: evaluation.isOpen,
     needsHoursAttention: false,
     syncFailed: false,
   };
@@ -285,7 +276,7 @@ function findNextOpeningLabel(week: VendorCustomerOrderingWeek, timeZone: string
     const row = week.find((d) => d.day === day);
     if (!row?.isOpen) continue;
 
-    const openMin = timeToMinutes(row.openTime);
+    const openMin = businessTimeToMinutes(row.openTime);
     if (offset === 0 && startMinutes < openMin) {
       return `Opens today at ${formatMinutes12h(openMin)}`;
     }
@@ -298,12 +289,6 @@ function findNextOpeningLabel(week: VendorCustomerOrderingWeek, timeZone: string
   return null;
 }
 
-export function resolveVendorHoursTimezone(podTimezone: string | null | undefined): string {
-  const trimmed = podTimezone?.trim();
-  if (trimmed) return trimmed;
-  return process.env.DEFAULT_PICKUP_TIMEZONE?.trim() || "America/Chicago";
-}
-
 export function serializeVendorCustomerOrderingWeek(week: VendorCustomerOrderingWeek): VendorCustomerOrderingWeek {
   return VENDOR_WEEKDAYS.map((day) => {
     const row = week.find((d) => d.day === day);
@@ -314,4 +299,15 @@ export function serializeVendorCustomerOrderingWeek(week: VendorCustomerOrdering
       closeTime: row?.closeTime ?? "17:00",
     };
   });
+}
+
+/** Admin/debug: full hours evaluation for a vendor row. */
+export function evaluateVendorCustomerOrderingHoursDebug(input: {
+  customerOrderingHours: unknown;
+  podPickupTimezone?: string | null;
+  now?: Date;
+}) {
+  const week = parseActiveVendorCustomerOrderingWeek(input.customerOrderingHours);
+  const timeZone = resolveVendorHoursTimezone(input.podPickupTimezone);
+  return evaluateBusinessHours({ week, timeZone, now: input.now });
 }

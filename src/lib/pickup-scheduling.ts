@@ -7,12 +7,13 @@ import "server-only";
 export const PICKUP_MIN_LEAD_MINUTES = 30;
 export const PICKUP_MAX_DAYS_AHEAD = 14;
 
+import { resolveBusinessTimezone } from "@/lib/business-time";
+
 export function resolvePickupTimezone(pod: { pickupTimezone: string | null }): string {
-  const fromPod = pod.pickupTimezone?.trim();
-  if (fromPod) return fromPod;
-  const fromEnv = process.env.DEFAULT_PICKUP_TIMEZONE?.trim();
-  if (fromEnv) return fromEnv;
-  return "America/New_York";
+  return resolveBusinessTimezone({
+    podPickupTimezone: pod.pickupTimezone,
+    envDefaultTimezone: process.env.DEFAULT_PICKUP_TIMEZONE,
+  });
 }
 
 function readWallClockUTC(tMs: number, timeZone: string) {

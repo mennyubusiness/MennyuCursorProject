@@ -7,6 +7,8 @@ import { VENDOR_ORDER_ROUTING_MODES } from "@/lib/vendor-order-routing-mode";
 import { menuSourceForOrderRoutingMode } from "@/lib/vendor-menu-source";
 import { buildVendorMenuCustomerPath, buildPodCustomerPath } from "@/lib/customer-public-url";
 import { prisma } from "@/lib/db";
+import { revalidateCustomerVendorMenuCacheForVendor } from "@/services/vendor-customer-menu-cache.service";
+import { revalidateOperationalMenuCacheForVendor } from "@/services/menu-active-scope.service";
 import {
   createSlugRedirect,
   listSlugRedirectsForEntity,
@@ -29,7 +31,38 @@ function revalidateVendorPaths(vendorId: string) {
   revalidatePath(`/vendor/${vendorId}/kitchen`);
   revalidatePath(`/vendor/${vendorId}/menu`);
   revalidatePath(`/vendor/${vendorId}/menu-builder`);
+  revalidatePath(`/vendor/${vendorId}/menu-imports`);
+  revalidatePath(`/vendor/${vendorId}/connect-pos`);
   revalidatePath("/explore");
+}
+
+async function revalidateVendorOrderingSurfaces(vendorId: string) {
+  revalidateVendorPaths(vendorId);
+  revalidateOperationalMenuCacheForVendor(vendorId);
+  revalidateCustomerVendorMenuCacheForVendor(vendorId);
+
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: { slug: true },
+  });
+  if (!vendor) return;
+
+  const memberships = await prisma.podVendor.findMany({
+    where: { vendorId },
+    select: { podId: true, pod: { select: { slug: true } } },
+  });
+
+  for (const membership of memberships) {
+    revalidatePath(`/pod/${membership.podId}`);
+    revalidatePath(`/pod/${membership.podId}/dashboard`);
+    if (membership.pod.slug) {
+      revalidatePath(buildPodCustomerPath(membership.pod.slug));
+      if (vendor.slug) {
+        revalidatePath(buildVendorMenuCustomerPath(membership.pod.slug, vendor.slug));
+      }
+    }
+    revalidatePath(`/pod/${membership.podId}/vendor/${vendorId}`);
+  }
 }
 
 export async function adminPauseVendorOrdering(input: {
@@ -375,11 +408,13 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
   });
   if (!vendor) return { ok: false, error: "Vendor not found." };
 
-  if (vendor.orderRoutingMode === input.orderRoutingMode) {
+  const nextMenuSource = menuSourceForOrderRoutingMode(input.orderRoutingMode);
+  const routingUnchanged = vendor.orderRoutingMode === input.orderRoutingMode;
+  const menuSourceUnchanged = vendor.menuSource === nextMenuSource;
+
+  if (routingUnchanged && menuSourceUnchanged) {
     return { ok: true, message: "Order routing mode unchanged." };
   }
-
-  const nextMenuSource = menuSourceForOrderRoutingMode(input.orderRoutingMode);
 
   await prisma.vendor.update({
     where: { id: input.vendorId },
@@ -399,7 +434,7 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
     newValue: `${input.orderRoutingMode} / menu:${nextMenuSource}`,
   });
 
-  revalidateVendorPaths(input.vendorId);
+  await revalidateVendorOrderingSurfaces(input.vendorId);
   return { ok: true, message: "Order routing mode updated." };
 }
 

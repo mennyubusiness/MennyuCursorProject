@@ -16,6 +16,7 @@ import {
   buildUserAdminPath,
   buildVendorDashboardPath,
 } from "@/lib/admin-entity-nav-links";
+import type { BusinessHoursEvaluation } from "@/lib/business-time";
 import type { AdminVendorDetailView } from "@/services/admin-vendor-detail.service";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 import type { VendorOrderRoutingMode } from "@prisma/client";
@@ -48,10 +49,14 @@ export function AdminVendorRescueClient({
   detail,
   podOptions,
   posSummary,
+  hoursDebug,
+  hoursDebugPodName,
 }: {
   detail: AdminVendorDetailView;
   podOptions: Option[];
   posSummary: VendorPosReadinessSummary | null;
+  hoursDebug?: BusinessHoursEvaluation | null;
+  hoursDebugPodName?: string | null;
 }) {
   const router = useRouter();
   const vendorId = detail.vendor.id;
@@ -115,6 +120,34 @@ export function AdminVendorRescueClient({
         <AdminInfoRow label="Onboarding" value={detail.vendor.onboardingStatus} />
         <AdminInfoRow label="Created" value={new Date(detail.vendor.createdAt).toLocaleString()} />
       </AdminSection>
+
+      {hoursDebug ? (
+        <AdminSection title="Business hours debug">
+          <p className="mb-3 text-xs text-oo-stone-gray">
+            Admin-only snapshot of canonical hours evaluation
+            {hoursDebugPodName ? ` (pod: ${hoursDebugPodName})` : ""}.
+          </p>
+          <AdminInfoRow label="Timezone used" value={hoursDebug.timeZone} />
+          <AdminInfoRow label="Server UTC now" value={hoursDebug.serverUtcIso} />
+          <AdminInfoRow label="Business-local now" value={hoursDebug.businessLocalLabel} />
+          <AdminInfoRow label="Business day" value={hoursDebug.clock.weekday} />
+          <AdminInfoRow
+            label="Minutes since midnight"
+            value={String(hoursDebug.clock.minutesSinceMidnight)}
+          />
+          <AdminInfoRow
+            label="Matched hours row"
+            value={
+              hoursDebug.matchedDay
+                ? `${hoursDebug.matchedDay.day} ${hoursDebug.matchedDay.openTime}–${hoursDebug.matchedDay.closeTime} (open=${hoursDebug.matchedDay.isOpen})`
+                : "—"
+            }
+          />
+          <AdminInfoRow label="Computed status" value={hoursDebug.isOpen ? "Open" : "Closed"} />
+          <AdminInfoRow label="Reason code" value={hoursDebug.reasonCode} />
+          <AdminInfoRow label="Reason detail" value={hoursDebug.reasonDetail} />
+        </AdminSection>
+      ) : null}
 
       <AdminSection title="Ordering controls">
         {detail.vendor.mennyuOrdersPaused ? (

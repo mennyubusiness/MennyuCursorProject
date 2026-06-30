@@ -15,6 +15,7 @@ import {
 import { computeCustomerMenuBrowseExcludedProductIds } from "@/domain/menu-import/customer-menu-browse";
 import { variantChildCountByParentPluFromProducts } from "@/lib/deliverect-variant-child-count";
 import { computeOperationalProductPools } from "@/services/menu-active-scope.service";
+import { loadActiveMenuVersionIdForVendor } from "@/lib/vendor-active-menu-version.server";
 import {
   CUSTOMER_VENDOR_MENU_ITEM_INCLUDE,
   type CustomerVendorMenuCategorySection,
@@ -166,7 +167,11 @@ async function buildPublishedMenuDisplay(
   menuVersionId: string
 ): Promise<CachedCustomerVendorMenuDisplay | null> {
   const published = await prisma.menuVersion.findFirst({
-    where: { id: menuVersionId, vendorId, state: MenuVersionState.published },
+    where: {
+      id: menuVersionId,
+      vendorId,
+      state: { in: [MenuVersionState.published, MenuVersionState.archived] },
+    },
     select: { id: true, canonicalSnapshot: true },
   });
   if (!published?.canonicalSnapshot) return null;
@@ -243,12 +248,7 @@ function cachedPublishedMenuDisplay(vendorId: string, menuVersionId: string) {
 }
 
 export async function loadPublishedMenuVersionId(vendorId: string): Promise<string | null> {
-  const published = await prisma.menuVersion.findFirst({
-    where: { vendorId, state: MenuVersionState.published },
-    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-    select: { id: true },
-  });
-  return published?.id ?? null;
+  return loadActiveMenuVersionIdForVendor(vendorId);
 }
 
 export async function loadCachedCustomerVendorMenuDisplay(

@@ -14,6 +14,8 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { revalidateTag } from "next/cache";
 import { requestCache } from "@/lib/request-cache";
+import { loadActiveMenuVersionForVendor } from "@/lib/vendor-active-menu-version.server";
+import { menuItemDeliverectIdMatchesMenuSource } from "@/lib/vendor-menu-source";
 import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
@@ -137,24 +139,19 @@ type PublishedMenuMeta = {
   menuVersionId: string | null;
 };
 
-async function loadPublishedMenuMeta(vendorId: string): Promise<PublishedMenuMeta> {
-  const published = await prisma.menuVersion.findFirst({
-    where: { vendorId, state: MenuVersionState.published },
-    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-    select: { id: true, canonicalSnapshot: true },
-  });
-  if (!published?.canonicalSnapshot) {
+async function loadActiveMenuMeta(vendorId: string): Promise<PublishedMenuMeta> {
+  const active = await loadActiveMenuVersionForVendor(vendorId);
+  if (!active) {
     return { menu: null, menuVersionId: null };
   }
-  const parsed = mennyuCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
   return {
-    menu: parsed.success ? parsed.data : null,
-    menuVersionId: published.id,
+    menu: active.menu,
+    menuVersionId: active.id,
   };
 }
 
 async function computeOperationalMenuItemIdsUncached(vendorId: string): Promise<string[]> {
-  const { menu, menuVersionId } = await loadPublishedMenuMeta(vendorId);
+  const { menu, menuVersionId } = await loadActiveMenuMeta(vendorId);
   if (!menu) {
     const set = await fallbackWinnersNoPublishedMenu(vendorId);
     return [...set];
@@ -184,7 +181,7 @@ function cachedOperationalMenuItemIdsForPublishedMenu(
 }
 
 async function resolveOperationalMenuItemIds(vendorId: string): Promise<Set<string>> {
-  const { menuVersionId } = await loadPublishedMenuMeta(vendorId);
+  const { menuVersionId } = await loadActiveMenuMeta(vendorId);
   if (!menuVersionId) {
     return fallbackWinnersNoPublishedMenu(vendorId);
   }
@@ -200,8 +197,13 @@ export const getOperationalMenuItemIdsForVendor = requestCache(
   async (vendorId: string): Promise<Set<string>> => resolveOperationalMenuItemIds(vendorId)
 );
 
-/** When no published snapshot exists, use latest row per deliverectProductId (legacy). */
+/** When no active-source snapshot exists, use latest row per deliverectProductId (legacy). */
 async function fallbackWinnersNoPublishedMenu(vendorId: string): Promise<Set<string>> {
+  const menuSource = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: { menuSource: true },
+  });
+
   const rows = await prisma.menuItem.findMany({
     where: { vendorId, deliverectProductId: { not: null } },
     select: { id: true, deliverectProductId: true, deliverectPlu: true, updatedAt: true },
@@ -209,6 +211,12 @@ async function fallbackWinnersNoPublishedMenu(vendorId: string): Promise<Set<str
   const byPid = new Map<string, MenuItemPickRow[]>();
   for (const r of rows) {
     if (!r.deliverectProductId) continue;
+    if (
+      menuSource &&
+      !menuItemDeliverectIdMatchesMenuSource(r.deliverectProductId, menuSource.menuSource)
+    ) {
+      continue;
+    }
     const list = byPid.get(r.deliverectProductId) ?? [];
     list.push(r);
     byPid.set(r.deliverectProductId, list);
@@ -234,7 +242,7 @@ export async function isMenuItemIdOperational(vendorId: string, menuItemId: stri
 }
 
 async function computeOperationalModifierOptionIdsUncached(vendorId: string): Promise<string[]> {
-  const { menu } = await loadPublishedMenuMeta(vendorId);
+  const { menu } = await loadActiveMenuMeta(vendorId);
   if (!menu) {
     const opts = await prisma.modifierOption.findMany({
       where: { modifierGroup: { vendorId } },
@@ -291,7 +299,7 @@ function cachedOperationalModifierOptionIdsForPublishedMenu(
 }
 
 async function resolveOperationalModifierOptionIds(vendorId: string): Promise<Set<string>> {
-  const { menuVersionId } = await loadPublishedMenuMeta(vendorId);
+  const { menuVersionId } = await loadActiveMenuMeta(vendorId);
   if (!menuVersionId) {
     const ids = await computeOperationalModifierOptionIdsUncached(vendorId);
     return new Set(ids);

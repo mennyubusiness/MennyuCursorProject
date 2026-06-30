@@ -1,7 +1,7 @@
 import "server-only";
 
-import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { loadActiveMenuVersionForVendor } from "@/lib/vendor-active-menu-version.server";
 import { getOperationalMenuItemIdsForVendor } from "@/services/menu-active-scope.service";
 import type { VendorMenuReadinessSummary } from "@/lib/vendor-pod-readiness";
 
@@ -16,12 +16,13 @@ export async function loadVendorMenuReadinessSummaries(
   const result = new Map<string, VendorMenuReadinessSummary>();
   if (uniqueIds.length === 0) return result;
 
-  const publishedByVendor = await prisma.menuVersion.groupBy({
-    by: ["vendorId"],
-    where: { vendorId: { in: uniqueIds }, state: MenuVersionState.published },
-    _count: { _all: true },
-  });
-  const hasPublished = new Map(publishedByVendor.map((row) => [row.vendorId, row._count._all > 0]));
+  const publishedByVendor = await Promise.all(
+    uniqueIds.map(async (vendorId) => {
+      const active = await loadActiveMenuVersionForVendor(vendorId);
+      return [vendorId, Boolean(active?.menu)] as const;
+    })
+  );
+  const hasPublished = new Map(publishedByVendor);
 
   const operationalSets = await Promise.all(uniqueIds.map((id) => getOperationalMenuItemIdsForVendor(id)));
   const allOperationalIds = new Set<string>();

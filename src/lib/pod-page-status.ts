@@ -11,6 +11,10 @@ type VendorAvailabilityInput = {
   unavailable: boolean;
 };
 
+/**
+ * Pod-level ordering ticker from visible vendor cards.
+ * `unavailable` means not orderable (hours, pause, setup, etc.) — hidden vendors are excluded upstream.
+ */
 export function getPodOrderingStatus(vendors: VendorAvailabilityInput[]): PodOrderingStatus {
   const totalVendorCount = vendors.length;
   if (totalVendorCount === 0) {
