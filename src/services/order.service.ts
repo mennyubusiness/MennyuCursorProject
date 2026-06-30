@@ -37,6 +37,13 @@ import {
   maxSubItemsChainVariantStepsForProductShape,
 } from "@/lib/deliverect-subitem-nesting";
 import {
+  DELIVERECT_ITEM_KITCHEN_MAPPING_MESSAGE,
+  DELIVERECT_MODIFIER_NOT_ORDERABLE_MESSAGE,
+  validateDeliverectModifierKitchenMapping,
+  validateDeliverectProductKitchenMapping,
+  vendorUsesDeliverectSubItemsNestingRules,
+} from "@/lib/cart-menu-source-validation";
+import {
   shellBasePriceCentsForMenuItem,
   variantSelectionsPriceCentsForLeafCartLine,
 } from "@/services/cart-deliverect-variant-resolution";
@@ -123,6 +130,7 @@ export async function validateCartForOrder(cart: {
       isActive?: boolean;
       mennyuOrdersPaused?: boolean;
       posOpen?: boolean;
+      menuSource?: import("@prisma/client").VendorMenuSource;
       deliverectChannelLinkId?: string | null;
       syncCustomerOrderingHoursFromDeliverect?: boolean;
       customerOrderingHours?: unknown;
@@ -249,6 +257,19 @@ export async function validateCartForOrder(cart: {
   const nestingFailure = await validateDeliverectSubItemsNestingForOrder(cart.items);
   if (nestingFailure) return nestingFailure;
 
+  const mappingErrors = await collectDeliverectKitchenMappingErrors(cart.items);
+  if (mappingErrors.length > 0) {
+    const first = mappingErrors[0]!;
+    return {
+      valid: false,
+      code: first.code,
+      message: first.message,
+      cartItemId: first.cartItemId,
+      menuItemId: first.menuItemId,
+      menuItemName: first.menuItemName,
+    };
+  }
+
   return { valid: true };
 }
 
@@ -259,7 +280,10 @@ type CartLineForDeliverectNestingCheck = {
     name: string;
     deliverectVariantParentPlu?: string | null;
   };
-  vendor?: { deliverectChannelLinkId?: string | null };
+  vendor?: {
+    menuSource?: import("@prisma/client").VendorMenuSource;
+    deliverectChannelLinkId?: string | null;
+  };
   selections?: Array<{ modifierOptionId: string; quantity: number }>;
 };
 
@@ -290,7 +314,9 @@ export async function collectDeliverectSubItemsNestingErrors(
   const optGroupById = new Map(optsWithGroup.map((o) => [o.id, o]));
 
   for (const item of items) {
-    if (!item.vendor?.deliverectChannelLinkId?.trim()) continue;
+    if (!vendorUsesDeliverectSubItemsNestingRules({ menuSource: item.vendor?.menuSource ?? "open_order" })) {
+      continue;
+    }
     const sels = item.selections ?? [];
     if (sels.length === 0) continue;
     const subItemsChainVariantSteps = countSubItemsChainVariantSelections({
@@ -313,6 +339,73 @@ export async function collectDeliverectSubItemsNestingErrors(
       errors.push({
         code: "DELIVERECT_SUBITEMS_NESTING_LIMIT",
         message: deliverectSubItemsChainLimitMessage(item.menuItem.name, max),
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      });
+    }
+  }
+
+  return errors;
+}
+
+type CartLineForKitchenMappingCheck = {
+  id: string;
+  menuItemId: string;
+  menuItem: { name: string; deliverectPlu?: string | null };
+  vendor: { menuSource?: import("@prisma/client").VendorMenuSource };
+  selections?: Array<{ modifierOptionId: string; quantity: number }>;
+};
+
+/** Deliverect POS PLU mapping — skipped for open_order menu vendors. */
+export async function collectDeliverectKitchenMappingErrors(
+  items: CartLineForKitchenMappingCheck[]
+): Promise<CartItemValidationError[]> {
+  const errors: CartItemValidationError[] = [];
+  const optionIds = [
+    ...new Set(
+      items.flatMap((item) => (item.selections ?? []).map((s) => s.modifierOptionId))
+    ),
+  ];
+  const optionsById = new Map<string, { deliverectModifierPlu: string | null }>();
+  if (optionIds.length > 0) {
+    const rows = await prisma.modifierOption.findMany({
+      where: { id: { in: optionIds } },
+      select: { id: true, deliverectModifierPlu: true },
+    });
+    for (const row of rows) {
+      optionsById.set(row.id, { deliverectModifierPlu: row.deliverectModifierPlu });
+    }
+  }
+
+  for (const item of items) {
+    const vendor = { menuSource: item.vendor.menuSource ?? "open_order" };
+    const productMapping = validateDeliverectProductKitchenMapping({
+      vendor,
+      deliverectPlu: item.menuItem.deliverectPlu,
+    });
+    if (!productMapping.ok) {
+      errors.push({
+        code: productMapping.code,
+        message: DELIVERECT_ITEM_KITCHEN_MAPPING_MESSAGE,
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      });
+      continue;
+    }
+
+    const selectedOptions = (item.selections ?? [])
+      .map((s) => optionsById.get(s.modifierOptionId))
+      .filter((o): o is { deliverectModifierPlu: string | null } => o != null);
+    const modifierMapping = validateDeliverectModifierKitchenMapping({
+      vendor,
+      options: selectedOptions,
+    });
+    if (!modifierMapping.ok) {
+      errors.push({
+        code: modifierMapping.code,
+        message: DELIVERECT_MODIFIER_NOT_ORDERABLE_MESSAGE,
         cartItemId: item.id,
         menuItemId: item.menuItemId,
         menuItemName: item.menuItem.name,
@@ -366,7 +459,16 @@ export type CartForValidation = {
       deliverectPlu?: string | null;
       deliverectVariantParentPlu?: string | null;
     };
-    vendor: { isActive?: boolean; mennyuOrdersPaused?: boolean; posOpen?: boolean; deliverectChannelLinkId?: string | null; syncCustomerOrderingHoursFromDeliverect?: boolean; customerOrderingHours?: unknown; deliverectSyncedCustomerOrderingHours?: unknown };
+    vendor: {
+      isActive?: boolean;
+      mennyuOrdersPaused?: boolean;
+      posOpen?: boolean;
+      menuSource?: import("@prisma/client").VendorMenuSource;
+      deliverectChannelLinkId?: string | null;
+      syncCustomerOrderingHoursFromDeliverect?: boolean;
+      customerOrderingHours?: unknown;
+      deliverectSyncedCustomerOrderingHours?: unknown;
+    };
     selections?: Array<{ modifierOptionId: string; quantity: number; modifierOption?: { priceCents: number } }>;
   }>;
 };
@@ -570,6 +672,7 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
   }
 
   errors.push(...(await collectDeliverectSubItemsNestingErrors(cart.items)));
+  errors.push(...(await collectDeliverectKitchenMappingErrors(cart.items)));
 
   return { valid: errors.length === 0, errors };
 }
@@ -596,6 +699,10 @@ export function getCartValidationMessage(code: string): string {
     INVALID_NESTED_MODIFIER: "A nested modifier selection needs to be updated.",
     BASKET_LIMIT_EXCEEDED: "Quantity exceeds the maximum allowed for an item.",
     MODIFIER_OPTION_NOT_IN_CURRENT_MENU: "A modifier selection is not on the vendor's current menu.",
+    DELIVERECT_PLU_MISSING:
+      "This item is not available for online ordering until the kitchen menu mapping is fixed. Please choose something else.",
+    DELIVERECT_MODIFIER_PLU_MISSING:
+      "A customization for this item is not available for online ordering. Try different options or contact the restaurant.",
     DELIVERECT_SUBITEMS_NESTING_LIMIT:
       "An item exceeds Deliverect’s limit for nested menu levels on online orders (top-level variant groups only — not add-ons). Update the cart or contact the restaurant.",
     GROUP_ORDER_LOCKED: "This cart is locked while the host checks out.",

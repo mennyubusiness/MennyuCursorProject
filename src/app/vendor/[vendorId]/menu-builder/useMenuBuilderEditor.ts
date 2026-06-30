@@ -23,7 +23,8 @@ import { parseMenuPriceToCents } from "@/lib/menu-price";
 import {
   validateOpenOrderMenuBuilderState,
   type OpenOrderMenuValidationResult,
-} from "@/lib/open-order-menu-validation";import type {
+} from "@/lib/open-order-menu-validation";
+import type {
   VendorMenuBuilderModifierGroup,
   VendorMenuBuilderPageData,
 } from "@/lib/vendor-menu-builder-data.server";
@@ -106,7 +107,10 @@ function itemCountForCategory(items: MenuBuilderItem[], categoryId: string): num
 export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
   const [categories, setCategories] = useState<MenuBuilderCategory[]>(data.categories);
   const [items, setItems] = useState<MenuBuilderItem[]>(data.items);
-  const [hasPublishedMenuVersion, setHasPublishedMenuVersion] = useState(data.hasPublishedMenuVersion);
+  const [hasPublishedOpenOrderMenu, setHasPublishedOpenOrderMenu] = useState(
+    data.hasPublishedOpenOrderMenu
+  );
+  const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(data.hasUnpublishedChanges);
   const [publishedAtIso, setPublishedAtIso] = useState(data.publishedAtIso);
   const [lastUpdatedIso, setLastUpdatedIso] = useState(data.lastUpdatedIso);
 
@@ -171,6 +175,7 @@ export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
         if (result.ok) {
           setEntitySaveState(entityKey, "saved");
           setLastUpdatedIso(new Date().toISOString());
+          setHasUnpublishedChanges(true);
         } else {
           rollback();
           setEntitySaveState(entityKey, "error", result.error ?? "Could not save. Try again.");
@@ -713,7 +718,8 @@ export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
       const result = await publishOpenOrderMenuAction(data.vendorId);
       if (result.ok) {
         setPublishMessage(result.message ?? "Menu published to your storefront.");
-        setHasPublishedMenuVersion(true);
+        setHasPublishedOpenOrderMenu(true);
+        setHasUnpublishedChanges(false);
         setPublishedAtIso(new Date().toISOString());
       } else {
         setPublishError(result.error ?? "Could not publish menu.");
@@ -734,7 +740,8 @@ export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
     categories: categoriesWithCounts,
     items,
     validation,
-    hasPublishedMenuVersion,
+    hasPublishedOpenOrderMenu,
+    hasUnpublishedChanges,
     publishedAtIso,
     lastUpdatedIso,
     globalStatus,

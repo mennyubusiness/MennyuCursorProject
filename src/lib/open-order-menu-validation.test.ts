@@ -53,13 +53,13 @@ describe("open-order-menu-validation", () => {
     expect(result.issues.some((i) => i.code === "INVALID_ITEM_PRICE")).toBe(true);
   });
 
-  it("rejects required group without enough available options in menu validation", () => {
+  it("rejects required group without available options", () => {
     const result = validateOpenOrderMenuBuilderState({
       categories: [{ id: "cat1", name: "Mains", sortOrder: 0, isVisible: true }],
       items: [
         {
           id: "item1",
-          name: "Bowl",
+          name: "Chicken Burrito",
           description: null,
           priceCents: 1200,
           isAvailable: true,
@@ -69,7 +69,7 @@ describe("open-order-menu-validation", () => {
           updatedAt: new Date(),
           modifierGroups: [
             {
-              name: "Protein",
+              name: "Choose your protein",
               required: true,
               minSelections: 1,
               maxSelections: 1,
@@ -81,6 +81,30 @@ describe("open-order-menu-validation", () => {
       ],
     });
     expect(result.ready).toBe(false);
-    expect(result.issues.some((i) => i.code === "INVALID_MODIFIER_GROUP")).toBe(true);
+    expect(result.issues.some((i) => i.message.includes("required modifier group"))).toBe(true);
+  });
+
+  it("flags empty visible categories", () => {
+    const result = validateOpenOrderMenuBuilderState({
+      categories: [
+        { id: "cat1", name: "Mains", sortOrder: 0, isVisible: true },
+        { id: "cat2", name: "Sides", sortOrder: 1, isVisible: true },
+      ],
+      items: [
+        {
+          id: "item1",
+          name: "Burger",
+          description: null,
+          priceCents: 1200,
+          isAvailable: true,
+          sortOrder: 0,
+          deliverectCategoryId: "oo:cat:cat1",
+          deliverectProductId: "oo:prod:item1",
+          updatedAt: new Date(),
+        },
+      ],
+    });
+    expect(result.ready).toBe(false);
+    expect(result.issues.some((i) => i.message.includes("Sides"))).toBe(true);
   });
 });

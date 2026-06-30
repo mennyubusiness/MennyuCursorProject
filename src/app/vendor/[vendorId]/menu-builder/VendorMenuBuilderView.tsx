@@ -1,23 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { VendorMenuBuilderPageData } from "@/lib/vendor-menu-builder-data.server";
 import { formatCentsToCurrency } from "@/lib/menu-price";
+import { MenuBuilderDraftPreview } from "./MenuBuilderDraftPreview";
 import { MenuBuilderItemModifiers } from "./MenuBuilderItemModifiers";
+import { MenuBuilderPublishStatus } from "./MenuBuilderPublishStatus";
 import { MenuBuilderSaveStatus } from "./MenuBuilderSaveStatus";
 import { MenuPriceInput } from "./MenuPriceInput";
 import { useMenuBuilderEditor } from "./useMenuBuilderEditor";
 
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(iso)
-  );
-}
-
 export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageData }) {
   const editor = useMenuBuilderEditor(data);
+  const [draftPreviewOpen, setDraftPreviewOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newItem, setNewItem] = useState({
     name: "",
@@ -37,9 +32,6 @@ export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageDat
     return map;
   }, [editor.items]);
 
-  const statusReady = editor.validation.ready && editor.hasPublishedMenuVersion;
-  const needsPublish = editor.validation.ready && !editor.hasPublishedMenuVersion;
-
   return (
     <div className="space-y-8">
       <header className="border-b border-oo-light-stone pb-6">
@@ -47,87 +39,35 @@ export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageDat
           <div>
             <h2 className="text-2xl font-semibold text-oo-charcoal">Menu Builder</h2>
             <p className="mt-2 max-w-2xl text-sm text-oo-stone-gray">
-              Create categories and items for your Open Order storefront. Publish when you are ready
-              for customers to order.
+              Edit your draft menu here. Customers order from the published version until you
+              publish changes.
             </p>
           </div>
           <MenuBuilderSaveStatus status={editor.globalStatus} />
         </div>
       </header>
 
-      {editor.publishError ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-          {editor.publishError}
-        </div>
-      ) : null}
-      {editor.publishMessage ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          {editor.publishMessage}
-        </div>
-      ) : null}
+      <MenuBuilderPublishStatus
+        validation={editor.validation}
+        hasPublishedOpenOrderMenu={editor.hasPublishedOpenOrderMenu}
+        hasUnpublishedChanges={editor.hasUnpublishedChanges}
+        publishedAtIso={editor.publishedAtIso}
+        lastUpdatedIso={editor.lastUpdatedIso}
+        publishPending={editor.publishPending}
+        publishError={editor.publishError}
+        publishMessage={editor.publishMessage}
+        storefrontHref={data.storefrontHref}
+        onPublish={() => void editor.publishMenu()}
+        onPreviewDraft={() => setDraftPreviewOpen(true)}
+      />
 
-      <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-oo-charcoal">Menu status</h3>
-            <p className="mt-1 text-sm text-oo-stone-gray">
-              {statusReady
-                ? "Ready — menu is published and valid."
-                : needsPublish
-                  ? "Valid draft — publish to make it live for customers."
-                  : "Needs attention — fix blockers below."}
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={editor.publishPending || !editor.validation.ready}
-            onClick={() => void editor.publishMenu()}
-            className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-hover disabled:opacity-50"
-          >
-            {editor.publishPending ? "Publishing…" : "Publish menu"}
-          </button>
-        </div>
-        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <dt className="text-xs text-oo-stone-gray">Categories</dt>
-            <dd className="mt-0.5 font-medium text-oo-charcoal">
-              {editor.validation.visibleCategoryCount}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-oo-stone-gray">Items</dt>
-            <dd className="mt-0.5 font-medium text-oo-charcoal">
-              {editor.validation.visibleItemCount}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-oo-stone-gray">Last updated</dt>
-            <dd className="mt-0.5 font-medium text-oo-charcoal">
-              {formatDate(editor.lastUpdatedIso)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-oo-stone-gray">Last published</dt>
-            <dd className="mt-0.5 font-medium text-oo-charcoal">
-              {formatDate(editor.publishedAtIso)}
-            </dd>
-          </div>
-        </dl>
-        {data.storefrontHref ? (
-          <Link
-            href={data.storefrontHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-block text-sm font-medium text-oo-charcoal underline"
-          >
-            Preview customer menu
-          </Link>
-        ) : (
-          <p className="mt-3 text-sm text-oo-stone-gray">
-            Join a pod to get a public menu preview link.
-          </p>
-        )}
-      </section>
+      <MenuBuilderDraftPreview
+        open={draftPreviewOpen}
+        onClose={() => setDraftPreviewOpen(false)}
+        categories={editor.categories}
+        items={editor.items}
+        vendorName={data.vendorName}
+      />
 
       {!editor.validation.ready ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">

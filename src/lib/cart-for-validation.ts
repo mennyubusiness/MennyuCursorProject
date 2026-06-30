@@ -24,6 +24,7 @@ export type DisplayCartRowForValidation = {
       isActive?: boolean;
       mennyuOrdersPaused?: boolean | null;
       posOpen?: boolean;
+      menuSource?: import("@prisma/client").VendorMenuSource;
       deliverectChannelLinkId?: string | null;
       syncCustomerOrderingHoursFromDeliverect?: boolean;
       customerOrderingHours?: unknown;
@@ -73,6 +74,7 @@ export function buildCartForValidationFromDisplayCart(
         isActive: i.vendor.isActive,
         mennyuOrdersPaused: i.vendor.mennyuOrdersPaused ?? undefined,
         posOpen: resolveVendorPosOpen(vendorHoursFields(i.vendor), timeZone),
+        menuSource: i.vendor.menuSource,
         deliverectChannelLinkId: i.vendor.deliverectChannelLinkId ?? null,
       },
       selections: i.selections?.map((s) => ({

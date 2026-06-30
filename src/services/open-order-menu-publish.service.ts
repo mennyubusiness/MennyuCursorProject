@@ -246,4 +246,59 @@ export async function loadOpenOrderMenuBuilderValidation(vendorId: string) {
   return validateOpenOrderMenuBuilderState({ categories, items });
 }
 
+export type OpenOrderMenuPublishState = {
+  draftFingerprint: string;
+  publishedFingerprint: string | null;
+  hasPublishedOpenOrderMenu: boolean;
+  hasUnpublishedChanges: boolean;
+  publishedAtIso: string | null;
+};
+
+export async function findPublishedOpenOrderMenuVersion(vendorId: string) {
+  const versions = await prisma.menuVersion.findMany({
+    where: { vendorId, state: MenuVersionState.published },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      publishedAt: true,
+      canonicalSnapshotSha256: true,
+      canonicalSnapshot: true,
+    },
+  });
+
+  for (const version of versions) {
+    const snapshot = version.canonicalSnapshot;
+    if (
+      snapshot &&
+      typeof snapshot === "object" &&
+      "deliverect" in snapshot &&
+      (snapshot as { deliverect?: { sourcePayloadKind?: string } }).deliverect
+        ?.sourcePayloadKind === "open_order_builder_v1"
+    ) {
+      return version;
+    }
+  }
+
+  return null;
+}
+
+export async function loadOpenOrderMenuPublishState(
+  vendorId: string
+): Promise<OpenOrderMenuPublishState> {
+  const { categories, items, modifierGroupsByItemId } = await loadBuilderRows(vendorId);
+  const menu = buildOpenOrderCanonicalMenu(vendorId, categories, items, modifierGroupsByItemId);
+  const draftFingerprint = payloadFingerprint(menu);
+  const published = await findPublishedOpenOrderMenuVersion(vendorId);
+  const publishedFingerprint = published?.canonicalSnapshotSha256 ?? null;
+
+  return {
+    draftFingerprint,
+    publishedFingerprint,
+    hasPublishedOpenOrderMenu: Boolean(published),
+    hasUnpublishedChanges:
+      !publishedFingerprint || draftFingerprint !== publishedFingerprint,
+    publishedAtIso: published?.publishedAt?.toISOString() ?? null,
+  };
+}
+
 export { MenuPublishValidationError };

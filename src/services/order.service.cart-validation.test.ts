@@ -14,6 +14,7 @@ const mockShellBase = vi.fn();
 const mockVariantCharge = vi.fn();
 const mockMenuItemFindUnique = vi.fn();
 const mockMenuItemFindMany = vi.fn();
+const mockModifierOptionFindMany = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -27,6 +28,9 @@ vi.mock("@/lib/db", () => ({
     menuItem: {
       findUnique: (...args: unknown[]) => mockMenuItemFindUnique(...args),
       findMany: (...args: unknown[]) => mockMenuItemFindMany(...args),
+    },
+    modifierOption: {
+      findMany: (...args: unknown[]) => mockModifierOptionFindMany(...args),
     },
   },
 }));
@@ -89,6 +93,7 @@ beforeEach(() => {
   mockOperationalModOpts.mockResolvedValue(new Set(["opt_1"]));
   mockShellBase.mockResolvedValue(500);
   mockVariantCharge.mockResolvedValue(0);
+  mockModifierOptionFindMany.mockResolvedValue([]);
   mockMenuItemFindUnique.mockResolvedValue({
     id: "mi_1",
     vendorId: "v_1",
@@ -326,5 +331,180 @@ describe("validateCartItemsForDisplay multi-vendor", () => {
     const result = await validateCartItemsForDisplay(baseCart([baseLine()]));
     expect(result.valid).toBe(false);
     expect(result.errors[0]?.code).toBe("VENDOR_PAUSED_IN_POD");
+  });
+});
+
+describe("deliverect kitchen mapping validation by menu source", () => {
+  it("allows open_order items without deliverectPlu at checkout", async () => {
+    const result = await validateCartForOrder(
+      baseCart([
+        baseLine({
+          vendor: {
+            isActive: true,
+            mennyuOrdersPaused: false,
+            customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+            posOpen: true,
+            menuSource: "open_order",
+            deliverectChannelLinkId: "legacy-link",
+          },
+          menuItem: {
+            priceCents: 500,
+            isAvailable: true,
+            name: "Burrito",
+            deliverectPlu: null,
+          },
+        }),
+      ])
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it("rejects deliverect items missing deliverectPlu at checkout", async () => {
+    const result = await validateCartForOrder(
+      baseCart([
+        baseLine({
+          vendor: {
+            isActive: true,
+            mennyuOrdersPaused: false,
+            customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+            posOpen: true,
+            menuSource: "deliverect",
+            deliverectChannelLinkId: "link_1",
+          },
+          menuItem: {
+            priceCents: 500,
+            isAvailable: true,
+            name: "Burger",
+            deliverectPlu: null,
+          },
+        }),
+      ])
+    );
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe("DELIVERECT_PLU_MISSING");
+  });
+
+  it("allows open_order modifier selections without deliverectModifierPlu on display validation", async () => {
+    mockModifierOptionFindMany.mockResolvedValue([
+      { id: "opt_1", deliverectModifierPlu: null },
+    ]);
+    mockMenuItemFindMany.mockResolvedValue([
+      {
+        id: "mi_1",
+        vendorId: "v_1",
+        name: "Burrito",
+        isAvailable: true,
+        basketMaxQuantity: null,
+        modifierGroups: [
+          {
+            required: false,
+            minSelections: 0,
+            maxSelections: 1,
+            modifierGroup: {
+              id: "mg_1",
+              name: "Protein",
+              isAvailable: true,
+              parentModifierOptionId: null,
+              deliverectMultiMax: 1,
+              options: [
+                {
+                  id: "opt_1",
+                  name: "Chicken",
+                  isAvailable: true,
+                  priceCents: 0,
+                  nestedModifierGroups: [],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    const result = await validateCartItemsForDisplay(
+      baseCart([
+        baseLine({
+          vendor: {
+            isActive: true,
+            mennyuOrdersPaused: false,
+            customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+            posOpen: true,
+            menuSource: "open_order",
+          },
+          selections: [{ modifierOptionId: "opt_1", quantity: 1, modifierOption: { priceCents: 0 } }],
+        }),
+      ])
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it("rejects deliverect modifier selections missing deliverectModifierPlu on display validation", async () => {
+    mockModifierOptionFindMany.mockResolvedValue([
+      {
+        id: "opt_1",
+        deliverectModifierPlu: null,
+        modifierGroup: {
+          id: "mg_1",
+          sortOrder: 0,
+          deliverectIsVariantGroup: false,
+          parentModifierOptionId: null,
+        },
+      },
+    ]);
+    mockMenuItemFindMany.mockResolvedValue([
+      {
+        id: "mi_1",
+        vendorId: "v_1",
+        name: "Burger",
+        isAvailable: true,
+        basketMaxQuantity: null,
+        modifierGroups: [
+          {
+            required: false,
+            minSelections: 0,
+            maxSelections: 1,
+            modifierGroup: {
+              id: "mg_1",
+              name: "Add-on",
+              isAvailable: true,
+              parentModifierOptionId: null,
+              deliverectMultiMax: 1,
+              options: [
+                {
+                  id: "opt_1",
+                  name: "Cheese",
+                  isAvailable: true,
+                  priceCents: 0,
+                  nestedModifierGroups: [],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    const result = await validateCartItemsForDisplay(
+      baseCart([
+        baseLine({
+          vendor: {
+            isActive: true,
+            mennyuOrdersPaused: false,
+            customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+            posOpen: true,
+            menuSource: "deliverect",
+          },
+          menuItem: {
+            priceCents: 500,
+            isAvailable: true,
+            name: "Burger",
+            deliverectPlu: "PLU-1",
+          },
+          selections: [{ modifierOptionId: "opt_1", quantity: 1, modifierOption: { priceCents: 0 } }],
+        }),
+      ])
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.code === "DELIVERECT_MODIFIER_PLU_MISSING")).toBe(true);
   });
 });

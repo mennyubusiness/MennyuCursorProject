@@ -1,9 +1,8 @@
 import "server-only";
 
-import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
-import { loadOpenOrderMenuBuilderValidation } from "@/services/open-order-menu-publish.service";
+import { loadOpenOrderMenuBuilderValidation, loadOpenOrderMenuPublishState } from "@/services/open-order-menu-publish.service";
 import { requireVendorMenuSourceContext } from "@/lib/vendor-menu-route-guard.server";
 import type { OpenOrderBuilderModifierGroupRow } from "@/lib/open-order-menu-builder-modifiers.server";
 import { loadOpenOrderBuilderModifierGroupsByItemId } from "@/lib/open-order-menu-builder-modifiers.server";
@@ -34,7 +33,8 @@ export type VendorMenuBuilderPageData = {
     modifierGroups: VendorMenuBuilderModifierGroup[];
   }>;
   validation: Awaited<ReturnType<typeof loadOpenOrderMenuBuilderValidation>>;
-  hasPublishedMenuVersion: boolean;
+  hasPublishedOpenOrderMenu: boolean;
+  hasUnpublishedChanges: boolean;
   publishedAtIso: string | null;
   lastUpdatedIso: string | null;
   storefrontHref: string | null;
@@ -45,7 +45,7 @@ export async function loadVendorMenuBuilderPageData(
 ): Promise<VendorMenuBuilderPageData | null> {
   const vendor = await requireVendorMenuSourceContext(vendorId);
 
-  const [categories, items, validation, publishedVersion, podLink] = await Promise.all([
+  const [categories, items, validation, publishState, podLink] = await Promise.all([
     prisma.vendorMenuCategory.findMany({
       where: { vendorId },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -69,11 +69,7 @@ export async function loadVendorMenuBuilderPageData(
       },
     }),
     loadOpenOrderMenuBuilderValidation(vendorId),
-    prisma.menuVersion.findFirst({
-      where: { vendorId, state: MenuVersionState.published },
-      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-      select: { publishedAt: true },
-    }),
+    loadOpenOrderMenuPublishState(vendorId),
     prisma.podVendor.findFirst({
       where: { vendorId, isActive: true, pod: { isActive: true } },
       select: { pod: { select: { slug: true } } },
@@ -122,8 +118,9 @@ export async function loadVendorMenuBuilderPageData(
       modifierGroups: modifierGroupsByItemId.get(item.id) ?? [],
     })),
     validation,
-    hasPublishedMenuVersion: Boolean(publishedVersion),
-    publishedAtIso: publishedVersion?.publishedAt?.toISOString() ?? null,
+    hasPublishedOpenOrderMenu: publishState.hasPublishedOpenOrderMenu,
+    hasUnpublishedChanges: publishState.hasUnpublishedChanges,
+    publishedAtIso: publishState.publishedAtIso,
     lastUpdatedIso: lastUpdated?.toISOString() ?? null,
     storefrontHref,
   };

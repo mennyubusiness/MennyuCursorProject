@@ -53,6 +53,12 @@ import { attachQuickCartDisplay, shouldShowFullCartInQuickCartDrawer } from "@/l
 import { isCartRowAssigned } from "@/lib/cart-pod-context";
 import { assertSessionAllowsAddToCart } from "@/lib/cart-pod-guard";
 import {
+  DELIVERECT_ITEM_KITCHEN_MAPPING_MESSAGE,
+  DELIVERECT_MODIFIER_NOT_ORDERABLE_MESSAGE,
+  validateDeliverectModifierKitchenMapping,
+  validateDeliverectProductKitchenMapping,
+} from "@/lib/cart-menu-source-validation";
+import {
   ensureCartOwnedByUser,
   findActiveAccountSoloCartId,
 } from "@/lib/account-cart-ownership";
@@ -517,30 +523,34 @@ export async function addCartItem(
     }
   }
 
-  /** Narrow gate: Deliverect-routed vendors cannot take lines that would fail {@link validateForSubmission}. */
-  const deliverectRouted = Boolean(menuItemResolved.vendor.deliverectChannelLinkId?.trim());
-  if (deliverectRouted) {
-    if (!menuItemResolved.deliverectPlu?.trim()) {
+  /** Deliverect menu vendors cannot take lines that would fail outbound POS mapping. */
+  const productMapping = validateDeliverectProductKitchenMapping({
+    vendor: menuItemResolved.vendor,
+    deliverectPlu: menuItemResolved.deliverectPlu,
+  });
+  if (!productMapping.ok) {
+    throw new CartValidationError(
+      DELIVERECT_ITEM_KITCHEN_MAPPING_MESSAGE,
+      productMapping.code,
+      { menuItemId: menuItemResolved.id, menuItemName: menuItemResolved.name }
+    );
+  }
+  if (selectionsForLeaf.length > 0) {
+    const optIds = [...new Set(selectionsForLeaf.map((s) => s.modifierOptionId))];
+    const optsWithPlu = await prisma.modifierOption.findMany({
+      where: { id: { in: optIds } },
+      select: { id: true, deliverectModifierPlu: true },
+    });
+    const modifierMapping = validateDeliverectModifierKitchenMapping({
+      vendor: menuItemResolved.vendor,
+      options: optsWithPlu,
+    });
+    if (!modifierMapping.ok) {
       throw new CartValidationError(
-        "This item is not available for online ordering until the kitchen menu mapping is fixed. Please choose something else.",
-        "DELIVERECT_PLU_MISSING",
+        DELIVERECT_MODIFIER_NOT_ORDERABLE_MESSAGE,
+        modifierMapping.code,
         { menuItemId: menuItemResolved.id, menuItemName: menuItemResolved.name }
       );
-    }
-    if (selectionsForLeaf.length > 0) {
-      const optIds = [...new Set(selectionsForLeaf.map((s) => s.modifierOptionId))];
-      const optsWithPlu = await prisma.modifierOption.findMany({
-        where: { id: { in: optIds } },
-        select: { id: true, deliverectModifierPlu: true },
-      });
-      const badPlu = optsWithPlu.some((o) => !o.deliverectModifierPlu?.trim());
-      if (badPlu) {
-        throw new CartValidationError(
-          "A customization for this item is not available for online ordering. Try different options or contact the restaurant.",
-          "DELIVERECT_MODIFIER_PLU_MISSING",
-          { menuItemId: menuItemResolved.id, menuItemName: menuItemResolved.name }
-        );
-      }
     }
   }
 

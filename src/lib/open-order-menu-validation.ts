@@ -88,8 +88,23 @@ export function validateOpenOrderMenuBuilderState(input: {
   if (visibleItems.length === 0) {
     issues.push({
       code: "NO_VISIBLE_ITEM",
-      message: "Add at least one item in a visible category.",
+      message: "Add at least one menu item.",
     });
+  }
+
+  for (const cat of visibleCategories) {
+    const catItems = visibleItems.filter((item) => {
+      const catId = item.deliverectCategoryId
+        ? parseOpenOrderCategoryId(item.deliverectCategoryId)
+        : null;
+      return catId === cat.id;
+    });
+    if (catItems.length === 0) {
+      issues.push({
+        code: "EMPTY_VISIBLE_CATEGORY",
+        message: `"${cat.name}" category has no visible items.`,
+      });
+    }
   }
 
   for (const cat of input.categories) {
@@ -119,7 +134,7 @@ export function validateOpenOrderMenuBuilderState(input: {
     if (!isValidPriceCents(item.priceCents)) {
       issues.push({
         code: "INVALID_ITEM_PRICE",
-        message: `Item "${item.name}" needs a valid price.`,
+        message: `"${item.name}" is missing a valid price.`,
       });
     }
 

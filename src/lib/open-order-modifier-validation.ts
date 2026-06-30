@@ -88,7 +88,12 @@ export function validateOpenOrderModifierGroupRow(
     minSelections: group.minSelections,
     maxSelections: group.maxSelections,
   });
-  if (!boundsCheck.ok) return boundsCheck.error;
+  if (!boundsCheck.ok) {
+    if (boundsCheck.error.includes("Max selections cannot be less than min")) {
+      return `"${group.name}" has max selections lower than min selections.`;
+    }
+    return boundsCheck.error;
+  }
 
   if (!group.name.trim()) {
     return `Modifier group for "${ctx.itemName}" needs a name.`;
@@ -111,6 +116,9 @@ export function validateOpenOrderModifierGroupRow(
   if (required && group.isAvailable) {
     const availableCount = group.options.filter((o) => o.isAvailable).length;
     if (availableCount < boundsCheck.bounds.minSelections) {
+      if (availableCount === 0) {
+        return `"${ctx.itemName}" has a required modifier group with no available options (${group.name}).`;
+      }
       return `Required group "${group.name}" on "${ctx.itemName}" needs at least ${boundsCheck.bounds.minSelections} available option(s).`;
     }
   }
