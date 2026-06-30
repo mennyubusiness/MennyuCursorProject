@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  createOpenOrderModifierGroup,
+  createOpenOrderModifierOption,
+  deleteOpenOrderModifierGroup,
+  deleteOpenOrderModifierOption,
+  updateOpenOrderModifierGroup,
+  updateOpenOrderModifierOption,
+} from "@/actions/vendor-menu-builder-modifier.actions";
 import {
   createOpenOrderMenuCategory,
   createOpenOrderMenuItem,
@@ -15,8 +23,11 @@ import { parseMenuPriceToCents } from "@/lib/menu-price";
 import {
   validateOpenOrderMenuBuilderState,
   type OpenOrderMenuValidationResult,
-} from "@/lib/open-order-menu-validation";
-import type { VendorMenuBuilderPageData } from "@/lib/vendor-menu-builder-data.server";
+} from "@/lib/open-order-menu-validation";import type {
+  VendorMenuBuilderModifierGroup,
+  VendorMenuBuilderPageData,
+} from "@/lib/vendor-menu-builder-data.server";
+import { toModifierValidationRow } from "@/lib/open-order-modifier-validation";
 import type { MenuBuilderGlobalSaveStatus } from "./MenuBuilderSaveStatus";
 
 export type MenuBuilderCategory = VendorMenuBuilderPageData["categories"][number] & {
@@ -31,7 +42,16 @@ export type MenuBuilderItem = VendorMenuBuilderPageData["items"][number] & {
 
 type EntitySaveStatus = "idle" | "saving" | "saved" | "error";
 
-type ActionResult = { ok: boolean; error?: string; message?: string; categoryId?: string; itemId?: string };
+type ActionResult = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  categoryId?: string;
+  itemId?: string;
+  groupId?: string;
+  linkId?: string;
+  optionId?: string;
+};
 
 function tempId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -62,8 +82,21 @@ function toValidationRows(
           : null,
         deliverectProductId: openOrderProductDeliverectId(item.id),
         updatedAt: new Date(item.updatedAt),
+        modifierGroups: (item.modifierGroups ?? []).map(toModifierValidationRow),
       })),
   });
+}
+
+function updateItemModifierGroups(
+  setItems: Dispatch<SetStateAction<MenuBuilderItem[]>>,
+  itemId: string,
+  updater: (groups: VendorMenuBuilderModifierGroup[]) => VendorMenuBuilderModifierGroup[]
+) {
+  setItems((prev) =>
+    prev.map((item) =>
+      item.id === itemId ? { ...item, modifierGroups: updater(item.modifierGroups ?? []) } : item
+    )
+  );
 }
 
 function itemCountForCategory(items: MenuBuilderItem[], categoryId: string): number {
@@ -387,6 +420,7 @@ export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
         categoryId: input.categoryId,
         updatedAt: new Date().toISOString(),
         isTemp: true,
+        modifierGroups: [],
       };
 
       const result = await runSave(
@@ -444,6 +478,233 @@ export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
     [data.vendorId, items, runSave]
   );
 
+  const addModifierGroup = useCallback(
+    async (itemId: string) => {
+      const tempGroupId = tempId("temp-modgrp");
+      const tempLinkId = tempId("temp-modlink");
+      const optimisticGroup: VendorMenuBuilderModifierGroup = {
+        id: tempGroupId,
+        linkId: tempLinkId,
+        name: "New modifier group",
+        required: false,
+        minSelections: 0,
+        maxSelections: 1,
+        isAvailable: true,
+        sortOrder: (items.find((i) => i.id === itemId)?.modifierGroups?.length ?? 0),
+        options: [],
+        isTemp: true,
+      } as VendorMenuBuilderModifierGroup & { isTemp?: boolean };
+
+      const result = await runSave(
+        `modgrp-create:${itemId}`,
+        () => updateItemModifierGroups(setItems, itemId, (groups) => [...groups, optimisticGroup]),
+        () => updateItemModifierGroups(setItems, itemId, (groups) => groups.filter((g) => g.id !== tempGroupId)),
+        () => createOpenOrderModifierGroup(data.vendorId, itemId, { name: "New modifier group" })
+      );
+
+      if (result.ok && result.groupId && result.linkId) {
+        updateItemModifierGroups(setItems, itemId, (groups) =>
+          groups.map((g) =>
+            g.id === tempGroupId
+              ? { ...g, id: result.groupId!, linkId: result.linkId!, isTemp: false }
+              : g
+          )
+        );
+      }
+    },
+    [data.vendorId, items, runSave]
+  );
+
+  const updateModifierGroupFields = useCallback(
+    (
+      itemId: string,
+      groupId: string,
+      input: {
+        name?: string;
+        required?: boolean;
+        minSelections?: number;
+        maxSelections?: number;
+        isAvailable?: boolean;
+      }
+    ) => {
+      const item = items.find((i) => i.id === itemId);
+      const previous = item?.modifierGroups?.find((g) => g.id === groupId);
+      if (!previous) return;
+
+      void runSave(
+        `modgrp:${groupId}`,
+        () =>
+          updateItemModifierGroups(setItems, itemId, (groups) =>
+            groups.map((g) => (g.id === groupId ? { ...g, ...input } : g))
+          ),
+        () =>
+          updateItemModifierGroups(setItems, itemId, (groups) =>
+            groups.map((g) => (g.id === groupId ? previous : g))
+          ),
+        () => updateOpenOrderModifierGroup(data.vendorId, itemId, groupId, input)
+      );
+    },
+    [data.vendorId, items, runSave]
+  );
+
+  const removeModifierGroup = useCallback(
+    (itemId: string, groupId: string) => {
+      const previous = items.find((i) => i.id === itemId)?.modifierGroups?.find((g) => g.id === groupId);
+      if (!previous) return;
+
+      void runSave(
+        `modgrp-delete:${groupId}`,
+        () =>
+          updateItemModifierGroups(setItems, itemId, (groups) => groups.filter((g) => g.id !== groupId)),
+        () => updateItemModifierGroups(setItems, itemId, (groups) => [...groups, previous]),
+        () => deleteOpenOrderModifierGroup(data.vendorId, itemId, groupId)
+      );
+    },
+    [data.vendorId, items, runSave]
+  );
+
+  const addModifierOption = useCallback(
+    async (itemId: string, groupId: string, name: string, price: string) => {
+      const tempOptionId = tempId("temp-modopt");
+      const optimisticOption = {
+        id: tempOptionId,
+        name: name.trim() || "New option",
+        priceCents: 0,
+        isAvailable: true,
+        sortOrder: 0,
+        isTemp: true,
+      };
+
+      const result = await runSave(
+        `modopt-create:${groupId}`,
+        () =>
+          updateItemModifierGroups(setItems, itemId, (groups) =>
+            groups.map((g) =>
+              g.id === groupId
+                ? { ...g, options: [...g.options, optimisticOption] }
+                : g
+            )
+          ),
+        () =>
+          updateItemModifierGroups(setItems, itemId, (groups) =>
+            groups.map((g) =>
+              g.id === groupId
+                ? { ...g, options: g.options.filter((o) => o.id !== tempOptionId) }
+                : g
+            )
+          ),
+        () =>
+          createOpenOrderModifierOption(data.vendorId, itemId, groupId, {
+            name: name.trim() || "New option",
+            price,
+          })
+      );
+
+      if (result.ok && result.optionId) {
+        updateItemModifierGroups(setItems, itemId, (groups) =>
+          groups.map((g) =>
+            g.id === groupId
+              ? {
+                  ...g,
+                  options: g.options.map((o) =>
+                    o.id === tempOptionId ? { ...o, id: result.optionId!, isTemp: false } : o
+                  ),
+                }
+              : g
+          )
+        );
+      }
+    },
+    [data.vendorId, runSave]
+  );
+
+  const updateModifierOptionFields = useCallback(
+    (
+      itemId: string,
+      groupId: string,
+      optionId: string,
+      input: { name?: string; price?: string; isAvailable?: boolean }
+    ) => {
+      const previous = items
+        .find((i) => i.id === itemId)
+        ?.modifierGroups?.find((g) => g.id === groupId)
+        ?.options.find((o) => o.id === optionId);
+      if (!previous) return;
+
+      const optimisticPatch = {
+        ...input,
+        ...(input.price !== undefined
+          ? {
+              priceCents: (() => {
+                const parsed = parseMenuPriceToCents(input.price);
+                return parsed.ok ? parsed.cents : previous.priceCents;
+              })(),
+            }
+          : {}),
+      };
+
+      void runSave(
+        `modopt:${optionId}`,
+        () =>
+          updateItemModifierGroups(setItems, itemId, (groups) =>
+            groups.map((g) =>
+              g.id === groupId
+                ? {
+                    ...g,
+                    options: g.options.map((o) =>
+                      o.id === optionId ? { ...o, ...optimisticPatch } : o
+                    ),
+                  }
+                : g
+            )
+          ),
+        () =>
+          updateItemModifierGroups(setItems, itemId, (groups) =>
+            groups.map((g) =>
+              g.id === groupId
+                ? {
+                    ...g,
+                    options: g.options.map((o) => (o.id === optionId ? previous : o)),
+                  }
+                : g
+            )
+          ),
+        () => updateOpenOrderModifierOption(data.vendorId, itemId, groupId, optionId, input)
+      );
+    },
+    [data.vendorId, items, runSave]
+  );
+
+  const removeModifierOption = useCallback(
+    (itemId: string, groupId: string, optionId: string) => {
+      const previous = items
+        .find((i) => i.id === itemId)
+        ?.modifierGroups?.find((g) => g.id === groupId)
+        ?.options.find((o) => o.id === optionId);
+      if (!previous) return;
+
+      void runSave(
+        `modopt-delete:${optionId}`,
+        () =>
+          updateItemModifierGroups(setItems, itemId, (groups) =>
+            groups.map((g) =>
+              g.id === groupId
+                ? { ...g, options: g.options.filter((o) => o.id !== optionId) }
+                : g
+            )
+          ),
+        () =>
+          updateItemModifierGroups(setItems, itemId, (groups) =>
+            groups.map((g) =>
+              g.id === groupId ? { ...g, options: [...g.options, previous] } : g
+            )
+          ),
+        () => deleteOpenOrderModifierOption(data.vendorId, itemId, groupId, optionId)
+      );
+    },
+    [data.vendorId, items, runSave]
+  );
+
   const publishMenu = useCallback(async () => {
     setPublishError(null);
     setPublishMessage(null);
@@ -489,6 +750,12 @@ export function useMenuBuilderEditor(data: VendorMenuBuilderPageData) {
     updateItemName,
     updateItemPrice,
     updateItemAvailable,
+    addModifierGroup,
+    updateModifierGroupFields,
+    removeModifierGroup,
+    addModifierOption,
+    updateModifierOptionFields,
+    removeModifierOption,
     publishMenu,
     getEntityStatus,
     getEntityError,

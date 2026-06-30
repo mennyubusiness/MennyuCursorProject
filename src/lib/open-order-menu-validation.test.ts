@@ -52,4 +52,35 @@ describe("open-order-menu-validation", () => {
     expect(result.ready).toBe(false);
     expect(result.issues.some((i) => i.code === "INVALID_ITEM_PRICE")).toBe(true);
   });
+
+  it("rejects required group without enough available options in menu validation", () => {
+    const result = validateOpenOrderMenuBuilderState({
+      categories: [{ id: "cat1", name: "Mains", sortOrder: 0, isVisible: true }],
+      items: [
+        {
+          id: "item1",
+          name: "Bowl",
+          description: null,
+          priceCents: 1200,
+          isAvailable: true,
+          sortOrder: 0,
+          deliverectCategoryId: "oo:cat:cat1",
+          deliverectProductId: "oo:prod:item1",
+          updatedAt: new Date(),
+          modifierGroups: [
+            {
+              name: "Protein",
+              required: true,
+              minSelections: 1,
+              maxSelections: 1,
+              isAvailable: true,
+              options: [{ name: "Chicken", priceCents: 0, isAvailable: false }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(result.ready).toBe(false);
+    expect(result.issues.some((i) => i.code === "INVALID_MODIFIER_GROUP")).toBe(true);
+  });
 });

@@ -5,7 +5,11 @@ import { prisma } from "@/lib/db";
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { loadOpenOrderMenuBuilderValidation } from "@/services/open-order-menu-publish.service";
 import { requireVendorMenuSourceContext } from "@/lib/vendor-menu-route-guard.server";
-import { isOpenOrderProductDeliverectId } from "@/lib/open-order-menu-ids";
+import type { OpenOrderBuilderModifierGroupRow } from "@/lib/open-order-menu-builder-modifiers.server";
+import { loadOpenOrderBuilderModifierGroupsByItemId } from "@/lib/open-order-menu-builder-modifiers.server";
+
+export type VendorMenuBuilderModifierOption = OpenOrderBuilderModifierGroupRow["options"][number];
+export type VendorMenuBuilderModifierGroup = OpenOrderBuilderModifierGroupRow;
 
 export type VendorMenuBuilderPageData = {
   vendorId: string;
@@ -27,6 +31,7 @@ export type VendorMenuBuilderPageData = {
     sortOrder: number;
     categoryId: string | null;
     updatedAt: string;
+    modifierGroups: VendorMenuBuilderModifierGroup[];
   }>;
   validation: Awaited<ReturnType<typeof loadOpenOrderMenuBuilderValidation>>;
   hasPublishedMenuVersion: boolean;
@@ -89,6 +94,9 @@ export async function loadVendorMenuBuilderPageData(
     null
   );
 
+  const itemIds = items.map((item) => item.id);
+  const modifierGroupsByItemId = await loadOpenOrderBuilderModifierGroupsByItemId(vendorId, itemIds);
+
   const podSlug = podLink?.pod.slug;
   const storefrontHref = podSlug
     ? buildVendorMenuCustomerPath(podSlug, vendor.slug)
@@ -111,6 +119,7 @@ export async function loadVendorMenuBuilderPageData(
       sortOrder: item.sortOrder,
       categoryId: item.deliverectCategoryId?.replace(/^oo:cat:/, "") ?? null,
       updatedAt: item.updatedAt.toISOString(),
+      modifierGroups: modifierGroupsByItemId.get(item.id) ?? [],
     })),
     validation,
     hasPublishedMenuVersion: Boolean(publishedVersion),
@@ -121,5 +130,5 @@ export async function loadVendorMenuBuilderPageData(
 }
 
 export function isOpenOrderBuilderMenuItem(deliverectProductId: string | null): boolean {
-  return isOpenOrderProductDeliverectId(deliverectProductId);
+  return deliverectProductId?.startsWith("oo:prod:") ?? false;
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { VendorMenuBuilderPageData } from "@/lib/vendor-menu-builder-data.server";
 import { formatCentsToCurrency } from "@/lib/menu-price";
+import { MenuBuilderItemModifiers } from "./MenuBuilderItemModifiers";
 import { MenuBuilderSaveStatus } from "./MenuBuilderSaveStatus";
 import { MenuPriceInput } from "./MenuPriceInput";
 import { useMenuBuilderEditor } from "./useMenuBuilderEditor";
@@ -295,21 +296,24 @@ export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageDat
               ) : (
                 <ul className="mt-3 divide-y divide-oo-light-stone">
                   {catItems.map((item) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      nameStatus={editor.getEntityStatus(`item-name:${item.id}`)}
-                      nameError={editor.getEntityError(`item-name:${item.id}`)}
-                      priceStatus={editor.getEntityStatus(`item-price:${item.id}`)}
-                      priceError={editor.getEntityError(`item-price:${item.id}`)}
-                      onNameCommit={(name) => editor.updateItemName(item.id, name)}
-                      onPriceCommit={(raw) => editor.updateItemPrice(item.id, raw)}
-                      onAvailableChange={(isAvailable) =>
-                        editor.updateItemAvailable(item.id, isAvailable)
-                      }
-                      onDelete={() => editor.removeItem(item.id)}
-                      deleteStatus={editor.getEntityStatus(`item-delete:${item.id}`)}
-                    />
+                    <li key={item.id} className="py-3">
+                      <ItemRow
+                        item={item}
+                        vendorId={data.vendorId}
+                        editor={editor}
+                        nameStatus={editor.getEntityStatus(`item-name:${item.id}`)}
+                        nameError={editor.getEntityError(`item-name:${item.id}`)}
+                        priceStatus={editor.getEntityStatus(`item-price:${item.id}`)}
+                        priceError={editor.getEntityError(`item-price:${item.id}`)}
+                        onNameCommit={(name) => editor.updateItemName(item.id, name)}
+                        onPriceCommit={(raw) => editor.updateItemPrice(item.id, raw)}
+                        onAvailableChange={(isAvailable) =>
+                          editor.updateItemAvailable(item.id, isAvailable)
+                        }
+                        onDelete={() => editor.removeItem(item.id)}
+                        deleteStatus={editor.getEntityStatus(`item-delete:${item.id}`)}
+                      />
+                    </li>
                   ))}
                 </ul>
               )}
@@ -387,7 +391,9 @@ function CategoryRow({
 }
 
 function ItemRow({
+  vendorId,
   item,
+  editor,
   nameStatus,
   nameError,
   priceStatus,
@@ -398,13 +404,16 @@ function ItemRow({
   onDelete,
   deleteStatus,
 }: {
+  vendorId: string;
   item: {
     id: string;
     name: string;
     priceCents: number;
     isAvailable: boolean;
     isTemp?: boolean;
+    modifierGroups: import("@/lib/vendor-menu-builder-data.server").VendorMenuBuilderModifierGroup[];
   };
+  editor: ReturnType<typeof useMenuBuilderEditor>;
   nameStatus: ReturnType<ReturnType<typeof useMenuBuilderEditor>["getEntityStatus"]>;
   nameError: string | null;
   priceStatus: ReturnType<ReturnType<typeof useMenuBuilderEditor>["getEntityStatus"]>;
@@ -422,7 +431,8 @@ function ItemRow({
   }, [item.name]);
 
   return (
-    <li className="grid gap-2 py-3 sm:grid-cols-2 lg:grid-cols-4">
+    <>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
       <div className="space-y-1">
         <input
           type="text"
@@ -465,6 +475,15 @@ function ItemRow({
           {deleteStatus === "saving" ? "Deleting…" : "Delete"}
         </button>
       </div>
-    </li>
+      </div>
+      <MenuBuilderItemModifiers
+        vendorId={vendorId}
+        itemId={item.id}
+        itemName={item.name}
+        groups={item.modifierGroups ?? []}
+        editor={editor}
+        disabled={item.isTemp}
+      />
+    </>
   );
 }

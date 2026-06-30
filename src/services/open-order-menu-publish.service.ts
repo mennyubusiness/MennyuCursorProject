@@ -11,8 +11,15 @@ import {
 } from "@/lib/menu-publish-transaction";
 import {
   openOrderCategoryDeliverectId,
+  openOrderModifierGroupDeliverectId,
   openOrderProductDeliverectId,
 } from "@/lib/open-order-menu-ids";
+import {
+  buildCanonicalModifierGroupDefinitions,
+  loadOpenOrderBuilderModifierGroupsByItemId,
+  toModifierValidationRowFromBuilderGroup as toModifierValidationRow,
+  type OpenOrderBuilderModifierGroupRow,
+} from "@/lib/open-order-menu-builder-modifiers.server";
 import {
   validateOpenOrderMenuBuilderState,
   type OpenOrderMenuItemRow,
@@ -35,7 +42,7 @@ export class OpenOrderMenuPublishError extends Error {
 }
 
 async function loadBuilderRows(vendorId: string) {
-  const [categories, items] = await Promise.all([
+  const [categories, rawItems] = await Promise.all([
     prisma.vendorMenuCategory.findMany({
       where: { vendorId },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -60,13 +67,25 @@ async function loadBuilderRows(vendorId: string) {
       },
     }),
   ]);
-  return { categories, items };
+
+  const modifierGroupsByItemId = await loadOpenOrderBuilderModifierGroupsByItemId(
+    vendorId,
+    rawItems.map((item) => item.id)
+  );
+
+  const items: OpenOrderMenuItemRow[] = rawItems.map((item) => ({
+    ...item,
+    modifierGroups: (modifierGroupsByItemId.get(item.id) ?? []).map(toModifierValidationRow),
+  }));
+
+  return { categories, items, modifierGroupsByItemId };
 }
 
 export function buildOpenOrderCanonicalMenu(
   vendorId: string,
   categories: Array<{ id: string; name: string; sortOrder: number; isVisible: boolean }>,
-  items: OpenOrderMenuItemRow[]
+  items: OpenOrderMenuItemRow[],
+  modifierGroupsByItemId: Map<string, OpenOrderBuilderModifierGroupRow[]>
 ): MennyuCanonicalMenu {
   const visibleCategories = categories
     .filter((c) => c.isVisible && c.name.trim())
@@ -100,20 +119,31 @@ export function buildOpenOrderCanonicalMenu(
     };
   });
 
-  const products = productsInCategories.map((item, index) => ({
-    deliverectId: openOrderProductDeliverectId(item.id),
-    plu: null,
-    deliverectVariantParentPlu: null,
-    deliverectVariantParentName: null,
-    name: item.name.trim(),
-    description: item.description?.trim() || null,
-    priceCents: item.priceCents,
-    isAvailable: item.isAvailable,
-    sortOrder: item.sortOrder ?? index,
-    imageUrl: null,
-    basketMaxQuantity: null,
-    modifierGroupDeliverectIds: [] as string[],
-  }));
+  const allModifierGroups = [...modifierGroupsByItemId.values()].flat();
+  const modifierGroupDefinitions = buildCanonicalModifierGroupDefinitions(allModifierGroups);
+  const modifierGroupDeliverectIdSet = new Set(modifierGroupDefinitions.map((g) => g.deliverectId));
+
+  const products = productsInCategories.map((item, index) => {
+    const itemGroups = modifierGroupsByItemId.get(item.id) ?? [];
+    const modifierGroupDeliverectIds = itemGroups
+      .map((g) => openOrderModifierGroupDeliverectId(g.id))
+      .filter((id) => modifierGroupDeliverectIdSet.has(id));
+
+    return {
+      deliverectId: openOrderProductDeliverectId(item.id),
+      plu: null,
+      deliverectVariantParentPlu: null,
+      deliverectVariantParentName: null,
+      name: item.name.trim(),
+      description: item.description?.trim() || null,
+      priceCents: item.priceCents,
+      isAvailable: item.isAvailable,
+      sortOrder: item.sortOrder ?? index,
+      imageUrl: null,
+      basketMaxQuantity: null,
+      modifierGroupDeliverectIds,
+    };
+  });
 
   const menu: MennyuCanonicalMenu = {
     schemaVersion: 1,
@@ -122,7 +152,7 @@ export function buildOpenOrderCanonicalMenu(
       sourcePayloadKind: "open_order_builder_v1",
     },
     categories: canonicalCategories,
-    modifierGroupDefinitions: [],
+    modifierGroupDefinitions,
     products,
   };
 
@@ -138,7 +168,7 @@ export async function publishOpenOrderMenuFromBuilder(input: {
   publishedBy: string | null;
 }): Promise<{ menuVersionId: string }> {
   const vendorId = input.vendorId.trim();
-  const { categories, items } = await loadBuilderRows(vendorId);
+  const { categories, items, modifierGroupsByItemId } = await loadBuilderRows(vendorId);
 
   const validation = validateOpenOrderMenuBuilderState({ categories, items });
   if (!validation.ready) {
@@ -148,7 +178,7 @@ export async function publishOpenOrderMenuFromBuilder(input: {
     );
   }
 
-  const menu = buildOpenOrderCanonicalMenu(vendorId, categories, items);
+  const menu = buildOpenOrderCanonicalMenu(vendorId, categories, items, modifierGroupsByItemId);
   if (menu.products.length === 0) {
     throw new OpenOrderMenuPublishError("EMPTY_MENU", "Cannot publish an empty menu.");
   }
@@ -161,6 +191,7 @@ export async function publishOpenOrderMenuFromBuilder(input: {
     vendorId,
     categoryCount: menu.categories.length,
     productCount: menu.products.length,
+    modifierGroupCount: menu.modifierGroupDefinitions.length,
   });
 
   const result = await prisma.$transaction(

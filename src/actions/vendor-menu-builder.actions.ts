@@ -19,7 +19,9 @@ import { revalidateOperationalMenuCacheForVendor } from "@/services/menu-active-
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
-async function authorizeOpenOrderMenuBuilder(vendorId: string): Promise<ActionResult | { ok: true }> {
+export type { ActionResult };
+
+export async function authorizeOpenOrderMenuBuilder(vendorId: string): Promise<ActionResult | { ok: true }> {
   const authz = await authorizeVendorSettingsWrite(vendorId);
   if (!authz.ok) return authz;
 
@@ -34,7 +36,7 @@ async function authorizeOpenOrderMenuBuilder(vendorId: string): Promise<ActionRe
   return { ok: true };
 }
 
-async function revalidateCustomerMenuSurfaces(vendorId: string) {
+export async function revalidateCustomerMenuSurfaces(vendorId: string) {
   const id = vendorId.trim();
   revalidateOperationalMenuCacheForVendor(id);
   revalidateCustomerVendorMenuCacheForVendor(id);

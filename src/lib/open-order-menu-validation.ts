@@ -3,6 +3,10 @@ import {
   isOpenOrderProductDeliverectId,
   parseOpenOrderCategoryId,
 } from "@/lib/open-order-menu-ids";
+import {
+  validateOpenOrderModifierGroupRow,
+  type OpenOrderModifierGroupValidationRow,
+} from "@/lib/open-order-modifier-validation";
 
 export type OpenOrderMenuCategoryRow = {
   id: string;
@@ -21,6 +25,7 @@ export type OpenOrderMenuItemRow = {
   deliverectCategoryId: string | null;
   deliverectProductId: string | null;
   updatedAt: Date;
+  modifierGroups?: OpenOrderModifierGroupValidationRow[];
 };
 
 export type OpenOrderMenuValidationIssue = {
@@ -117,6 +122,17 @@ export function validateOpenOrderMenuBuilderState(input: {
         message: `Item "${item.name}" needs a valid price.`,
       });
     }
+
+    for (const group of item.modifierGroups ?? []) {
+      const groupIssue = validateOpenOrderModifierGroupRow(group, { itemName: item.name });
+      if (groupIssue) {
+        issues.push({
+          code: "INVALID_MODIFIER_GROUP",
+          message: groupIssue,
+        });
+      }
+    }
+
     if (
       item.deliverectCategoryId == null ||
       !isOpenOrderCategoryDeliverectId(item.deliverectCategoryId)
