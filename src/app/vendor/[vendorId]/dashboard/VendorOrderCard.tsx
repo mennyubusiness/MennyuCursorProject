@@ -19,10 +19,12 @@ import {
   getVendorOrderNextAction,
 } from "@/lib/vendor-order-next-action";
 import type { VendorOrderStatusAuthority } from "@/domain/status-authority";
+import type { VendorOrderRoutingMode } from "@prisma/client";
 import {
   isDeliverectAuthoritativeVendorOrder,
   VENDOR_DELIVERECT_CONTROLLED_NOTICE,
 } from "@/lib/deliverect-vendor-order-authority";
+import { isManualDashboardRoutingMode } from "@/lib/vendor-order-routing-mode";
 
 type VendorOrderForCard = {
   id: string;
@@ -93,6 +95,7 @@ export function VendorOrderCard({
   isDeliverectLive = false,
   deliverectRoutingDegraded = false,
   vendorDeliverectChannelLinkId = null,
+  orderRoutingMode = "manual_dashboard",
 }: {
   vendorId: string;
   vendorOrder: VendorOrderForCard;
@@ -118,6 +121,7 @@ export function VendorOrderCard({
   /** Live Deliverect VO stuck in pending/pending past the healthy wait — show manual confirm + degraded copy. */
   deliverectRoutingDegraded?: boolean;
   vendorDeliverectChannelLinkId?: string | null;
+  orderRoutingMode?: VendorOrderRoutingMode;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -133,14 +137,19 @@ export function VendorOrderCard({
       vendorOrder.deliverectChannelLinkId ?? vendorDeliverectChannelLinkId,
     vendor: { deliverectChannelLinkId: vendorDeliverectChannelLinkId },
   };
-  const deliverectAuthoritative = isDeliverectAuthoritativeVendorOrder(authorityVo);
+  const manualDashboard = isManualDashboardRoutingMode(orderRoutingMode);
+  const deliverectAuthoritative = isDeliverectAuthoritativeVendorOrder(
+    authorityVo,
+    orderRoutingMode
+  );
 
   const nextAction = deliverectAuthoritative
     ? null
     : getVendorOrderNextAction(
         vendorOrder.routingStatus,
         vendorOrder.fulfillmentStatus,
-        isDeliverectLive
+        isDeliverectLive,
+        { isManualDashboard: manualDashboard }
       );
   const showManualConfirmFallback =
     deliverectRoutingDegraded === true &&
@@ -156,11 +165,14 @@ export function VendorOrderCard({
       );
   const isTerminal = ["completed", "cancelled"].includes(vendorOrder.fulfillmentStatus);
   const recovered = isVendorOrderManuallyRecovered(vendorOrder, vendorOrder.statusHistory);
-  const canDeny = canVendorRejectVendorOrder({
-    ...authorityVo,
-    fulfillmentStatus: vendorOrder.fulfillmentStatus,
-    statusHistory: vendorOrder.statusHistory,
-  });
+  const canDeny = canVendorRejectVendorOrder(
+    {
+      ...authorityVo,
+      fulfillmentStatus: vendorOrder.fulfillmentStatus,
+      statusHistory: vendorOrder.statusHistory,
+    },
+    orderRoutingMode
+  );
   const isCancelledOrFailed =
     vendorOrder.fulfillmentStatus === "cancelled" ||
     (vendorOrder.routingStatus === "failed" && !recovered);

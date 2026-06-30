@@ -17,6 +17,7 @@ export function VendorDashboardActiveOrdersSection({
   initialVendorOrders,
   initialNowMs,
   isDeliverectLive,
+  orderRoutingMode,
   posManaged,
   activeCounts,
 }: {
@@ -25,6 +26,7 @@ export function VendorDashboardActiveOrdersSection({
   initialVendorOrders: Parameters<typeof VendorDashboardLiveOrders>[0]["initialVendorOrders"];
   initialNowMs: number;
   isDeliverectLive: boolean;
+  orderRoutingMode: import("@prisma/client").VendorOrderRoutingMode;
   posManaged: boolean;
   activeCounts: ActiveCounts;
 }) {
@@ -80,6 +82,7 @@ export function VendorDashboardActiveOrdersSection({
           initialVendorOrders={initialVendorOrders}
           initialNowMs={initialNowMs}
           isDeliverectLive={isDeliverectLive}
+          orderRoutingMode={orderRoutingMode}
           activeGroupsOnly
         />
       )}

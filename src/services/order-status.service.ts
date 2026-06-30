@@ -24,6 +24,10 @@ import {
 import type { ParentOrderStatus, VendorOrderFulfillmentStatus, VendorOrderRoutingStatus } from "@/domain/types";
 import { shouldApplyStatusUpdate } from "@/domain/status-authority";
 import { validateTransition, targetToUpdate, type VendorOrderTargetState } from "@/domain/vendor-order-transition";
+import {
+  isVendorDashboardTransitionNoOp,
+  resolveVendorDashboardTransitionPatch,
+} from "@/lib/vendor-manual-fulfillment";
 import type {
   DeliverectWebhookApplyResult,
   DeliverectWebhookLastApplyRecord,
@@ -686,14 +690,19 @@ export async function applyVendorOrderTransition(
       lastStatusSource: true,
       deliverectChannelLinkId: true,
       statusHistory: { select: { source: true } },
-      vendor: { select: { deliverectChannelLinkId: true } },
+      vendor: {
+        select: { deliverectChannelLinkId: true, orderRoutingMode: true },
+      },
     },
   });
   if (!vo) {
     return { success: false, error: "Vendor order not found", code: "NOT_FOUND" };
   }
 
-  if (legacySourceToStatusSource(source) === "vendor_dashboard") {
+  const orderRoutingMode = vo.vendor.orderRoutingMode;
+  const isManualDashboard = orderRoutingMode === "manual_dashboard";
+
+  if (legacySourceToStatusSource(source) === "vendor_dashboard" && !isManualDashboard) {
     const prec = shouldApplyStatusUpdate(
       {
         statusAuthority: vo.statusAuthority,
@@ -716,33 +725,70 @@ export async function applyVendorOrderTransition(
   }
 
   const receiptConfirmed = isVendorReceiptConfirmed(vo, vo.statusHistory);
-  const err = validateTransition(
-    vo.routingStatus as VendorOrderRoutingStatus,
-    vo.fulfillmentStatus as VendorOrderFulfillmentStatus,
-    targetState,
-    source,
-    receiptConfirmed
-  );
-  if (err) {
-    return { success: false, error: err, code: "INVALID_TRANSITION" };
-  }
+  const currentRouting = vo.routingStatus as VendorOrderRoutingStatus;
+  const currentFulfillment = vo.fulfillmentStatus as VendorOrderFulfillmentStatus;
+  const prismaSource = legacySourceToStatusSource(source);
 
-  const update = targetToUpdate(targetState);
-  if (Object.keys(update).length === 0) {
-    return { success: false, error: "No update for target state", code: "INVALID_STATE" };
+  let update: {
+    routingStatus?: VendorOrderRoutingStatus;
+    fulfillmentStatus?: VendorOrderFulfillmentStatus;
+  };
+
+  if (prismaSource === "vendor_dashboard") {
+    const resolved = resolveVendorDashboardTransitionPatch(
+      currentRouting,
+      currentFulfillment,
+      targetState,
+      {
+        receiptConfirmed,
+        allowSkipAhead: isManualDashboard,
+      }
+    );
+    if (resolved.error) {
+      return { success: false, error: resolved.error, code: "INVALID_TRANSITION" };
+    }
+    update = resolved.patch;
+  } else {
+    const err = validateTransition(
+      currentRouting,
+      currentFulfillment,
+      targetState,
+      source,
+      receiptConfirmed
+    );
+    if (err) {
+      return { success: false, error: err, code: "INVALID_TRANSITION" };
+    }
+    update = targetToUpdate(targetState);
+    if (Object.keys(update).length === 0) {
+      return { success: false, error: "No update for target state", code: "INVALID_STATE" };
+    }
   }
 
   const nextRouting = (update.routingStatus ?? vo.routingStatus) as VendorRoutingStatus;
   const nextFulfillment = (update.fulfillmentStatus ?? vo.fulfillmentStatus) as VendorFulfillmentStatus;
 
+  if (isVendorDashboardTransitionNoOp(currentRouting, currentFulfillment, update)) {
+    const order = await prisma.order.findUnique({
+      where: { id: vo.orderId },
+      select: { status: true },
+    });
+    return {
+      success: true,
+      vendorOrderId,
+      orderId: vo.orderId,
+      routingStatus: currentRouting,
+      fulfillmentStatus: currentFulfillment,
+      parentStatus: (order?.status ?? "pending") as ParentOrderStatus,
+    };
+  }
+
   const patch: {
     routingStatus?: VendorRoutingStatus;
     fulfillmentStatus?: VendorFulfillmentStatus;
   } = {};
-  if (update.routingStatus !== undefined) patch.routingStatus = update.routingStatus;
-  if (update.fulfillmentStatus !== undefined) patch.fulfillmentStatus = update.fulfillmentStatus;
-
-  const prismaSource = legacySourceToStatusSource(source);
+  if (update.routingStatus !== undefined) patch.routingStatus = update.routingStatus as VendorRoutingStatus;
+  if (update.fulfillmentStatus !== undefined) patch.fulfillmentStatus = update.fulfillmentStatus as VendorFulfillmentStatus;
 
   const parentStatus = await applyVendorOrderStatusWithMeta(
     {

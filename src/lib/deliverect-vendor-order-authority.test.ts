@@ -24,9 +24,14 @@ const manualVo = {
 };
 
 describe("deliverect-vendor-order-authority", () => {
-  it("treats channel-linked orders as Deliverect-authoritative", () => {
-    expect(isDeliverectAuthoritativeVendorOrder(deliverectVo)).toBe(true);
-    expect(canVendorDashboardMutateVendorOrder(deliverectVo)).toBe(false);
+  it("treats channel-linked orders as Deliverect-authoritative in deliverect routing mode", () => {
+    expect(isDeliverectAuthoritativeVendorOrder(deliverectVo, "deliverect")).toBe(true);
+    expect(canVendorDashboardMutateVendorOrder(deliverectVo, "deliverect")).toBe(false);
+  });
+
+  it("treats manual_dashboard vendors as Open Order–authoritative even with channel link", () => {
+    expect(isDeliverectAuthoritativeVendorOrder(deliverectVo, "manual_dashboard")).toBe(false);
+    expect(canVendorDashboardMutateVendorOrder(deliverectVo, "manual_dashboard")).toBe(true);
   });
 
   it("treats manual vendors without channel link as Open Order–authoritative", () => {
@@ -44,12 +49,13 @@ describe("deliverect-vendor-order-authority", () => {
     expect(canVendorDashboardMutateVendorOrder(recovered)).toBe(true);
   });
 
-  it("channel-linked sent/pending infers vendor_manual but remains Deliverect-authoritative", () => {
+  it("channel-linked sent/pending infers vendor_manual but remains Deliverect-authoritative in deliverect mode", () => {
     const sent = {
       ...deliverectVo,
       statusAuthority: null,
       routingStatus: "sent",
     };
+    expect(isDeliverectAuthoritativeVendorOrder(sent, "deliverect")).toBe(true);
     expect(isDeliverectAuthoritativeVendorOrder(sent)).toBe(true);
   });
 });

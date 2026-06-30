@@ -84,6 +84,7 @@ export async function POST(
         select: {
           vendorDashboardToken: true,
           deliverectChannelLinkId: true,
+          orderRoutingMode: true,
         },
       },
     },
@@ -114,7 +115,7 @@ export async function POST(
     manuallyRecoveredAt: vo.manuallyRecoveredAt,
   };
 
-  if (!canVendorDashboardMutateVendorOrder(authorityVo)) {
+  if (!canVendorDashboardMutateVendorOrder(authorityVo, vo.vendor.orderRoutingMode)) {
     const isDeliverectLive = isRoutingRetryAvailable();
     const routingDegraded = isDeliverectVendorOrderRoutingDegraded(
       vo,

@@ -50,9 +50,10 @@ export function canCustomerCancelWholeOrder(order: Parameters<typeof canCustomer
  * and fulfillment is still pending or accepted.
  */
 export function canVendorRejectVendorOrder(
-  vo: VendorOrderForCancelEligibility
+  vo: VendorOrderForCancelEligibility,
+  orderRoutingMode?: import("@prisma/client").VendorOrderRoutingMode | string | null
 ): boolean {
-  if (!canVendorDashboardMutateVendorOrder(vo)) return false;
+  if (!canVendorDashboardMutateVendorOrder(vo, orderRoutingMode)) return false;
   if (vo.fulfillmentStatus === "cancelled") return false;
   if (vo.fulfillmentStatus === "completed") return false;
   if (!PRE_PREPARATION_FULFILLMENT.has(vo.fulfillmentStatus)) return false;

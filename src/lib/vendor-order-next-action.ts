@@ -13,13 +13,19 @@ export function formatVendorCustomerPhone(phone: string | null): string | null {
 export function getVendorOrderNextAction(
   routingStatus: string,
   fulfillmentStatus: string,
-  isDeliverectLive: boolean
+  isDeliverectLive: boolean,
+  options?: { isManualDashboard?: boolean }
 ): { targetState: string; label: string } | null {
+  const isManualDashboard = options?.isManualDashboard === true;
+
   if (fulfillmentStatus === "pending") {
     if (routingStatus === "sent" || routingStatus === "confirmed") {
       return { targetState: "accepted", label: "Accept order" };
     }
     if (routingStatus === "pending" && !isDeliverectLive) {
+      if (isManualDashboard) {
+        return { targetState: "accepted", label: "Accept order" };
+      }
       return { targetState: "confirmed", label: "Confirm order" };
     }
   }
@@ -30,7 +36,7 @@ export function getVendorOrderNextAction(
     return { targetState: "ready", label: "Mark ready" };
   }
   if (fulfillmentStatus === "ready") {
-    return { targetState: "completed", label: "Mark completed" };
+    return { targetState: "completed", label: "Complete pickup" };
   }
   return null;
 }
@@ -39,16 +45,17 @@ export function getVendorOrderNextAction(
 export function getVendorOrderKitchenActionLabel(
   routingStatus: string,
   fulfillmentStatus: string,
-  isDeliverectLive: boolean
+  isDeliverectLive: boolean,
+  options?: { isManualDashboard?: boolean }
 ): { targetState: string; label: string } | null {
-  const action = getVendorOrderNextAction(routingStatus, fulfillmentStatus, isDeliverectLive);
+  const action = getVendorOrderNextAction(routingStatus, fulfillmentStatus, isDeliverectLive, options);
   if (!action) return null;
   const kitchenLabels: Record<string, string> = {
     confirmed: "Confirm",
-    accepted: "Accept",
+    accepted: "Accept order",
     preparing: "Start preparing",
     ready: "Mark ready",
-    completed: "Picked up",
+    completed: "Complete pickup",
   };
   return {
     targetState: action.targetState,

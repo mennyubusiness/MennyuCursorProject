@@ -32,6 +32,7 @@ export function VendorKitchenBoard({
   initialVendorOrders,
   initialNowMs,
   isDeliverectLive,
+  orderRoutingMode,
   vendorDeliverectChannelLinkId,
   ordersPaused,
   posStatusLine,
@@ -42,6 +43,7 @@ export function VendorKitchenBoard({
   initialVendorOrders: VendorOrderForBoardClient[];
   initialNowMs: number;
   isDeliverectLive: boolean;
+  orderRoutingMode: import("@prisma/client").VendorOrderRoutingMode;
   vendorDeliverectChannelLinkId: string | null;
   ordersPaused: boolean;
   posStatusLine: string;
@@ -153,6 +155,7 @@ export function VendorKitchenBoard({
                             vendorId={vendorId}
                             vendorOrder={vo}
                             pickupCode={getPickupCode(vo.order.id)}
+                            orderRoutingMode={orderRoutingMode}
                             operatingMode={buildKitchenOperatingMode(
                               vo,
                               vendorDeliverectChannelLinkId,

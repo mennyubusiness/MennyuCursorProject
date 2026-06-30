@@ -56,6 +56,7 @@ export default async function VendorKitchenPage({
       initialVendorOrders={initialVendorOrders}
       initialNowMs={initialNowMs}
       isDeliverectLive={isDeliverectLive}
+      orderRoutingMode={vendor.orderRoutingMode}
       vendorDeliverectChannelLinkId={vendor.deliverectChannelLinkId}
       ordersPaused={vendor.mennyuOrdersPaused ?? false}
       posStatusLine={posStatusLine}

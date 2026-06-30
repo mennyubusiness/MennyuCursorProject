@@ -30,6 +30,7 @@ export default async function VendorOrdersPage({
           initialVendorOrders={ctx.initialVendorOrdersForClient}
           initialNowMs={ctx.initialNowMs}
           isDeliverectLive={ctx.isDeliverectLive}
+          orderRoutingMode={ctx.vendorRecord.orderRoutingMode}
           posManaged={ctx.posManaged}
           initialPaused={ctx.vendorRecord.mennyuOrdersPaused ?? false}
         />

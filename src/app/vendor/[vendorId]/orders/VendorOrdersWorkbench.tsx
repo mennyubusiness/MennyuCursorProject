@@ -20,6 +20,7 @@ export function VendorOrdersWorkbench({
   initialVendorOrders,
   initialNowMs,
   isDeliverectLive,
+  orderRoutingMode,
   posManaged,
   initialPaused,
 }: {
@@ -29,6 +30,7 @@ export function VendorOrdersWorkbench({
   initialVendorOrders: WorkbenchOrder[];
   initialNowMs: number;
   isDeliverectLive: boolean;
+  orderRoutingMode: import("@prisma/client").VendorOrderRoutingMode;
   posManaged: boolean;
   initialPaused: boolean;
 }) {
@@ -92,6 +94,7 @@ export function VendorOrdersWorkbench({
             initialVendorOrders={initialVendorOrders}
             initialNowMs={initialNowMs}
             isDeliverectLive={isDeliverectLive}
+            orderRoutingMode={orderRoutingMode}
             activeGroupsOnly
           />
         </DashboardSection>

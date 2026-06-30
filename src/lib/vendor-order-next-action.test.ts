@@ -25,6 +25,15 @@ describe("getVendorOrderNextAction", () => {
     expect(getVendorOrderNextAction("failed", "pending", true)).toBeNull();
   });
 
+  it("offers accept for manual dashboard when routing is still pending", () => {
+    expect(
+      getVendorOrderNextAction("pending", "pending", false, { isManualDashboard: true })
+    ).toEqual({
+      targetState: "accepted",
+      label: "Accept order",
+    });
+  });
+
   it("offers kitchen progression for manual vendor after acceptance", () => {
     expect(getVendorOrderNextAction("confirmed", "accepted", false)).toEqual({
       targetState: "preparing",
@@ -36,11 +45,17 @@ describe("getVendorOrderNextAction", () => {
     });
     expect(getVendorOrderNextAction("confirmed", "ready", false)).toEqual({
       targetState: "completed",
-      label: "Mark completed",
+      label: "Complete pickup",
     });
   });
 
-  it("offers kitchen-friendly preparing label", () => {
+  it("offers kitchen-friendly labels including complete pickup", () => {
+    expect(
+      getVendorOrderKitchenActionLabel("confirmed", "ready", false, { isManualDashboard: true })
+    ).toEqual({
+      targetState: "completed",
+      label: "Complete pickup",
+    });
     expect(getVendorOrderKitchenActionLabel("confirmed", "accepted", true)).toEqual({
       targetState: "preparing",
       label: "Start preparing",

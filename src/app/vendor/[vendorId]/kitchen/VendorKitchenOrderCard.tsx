@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import type { VendorOrderRoutingMode } from "@prisma/client";
 import type { VendorOrderStatusAuthority } from "@/domain/status-authority";
 import { canVendorRejectVendorOrder } from "@/lib/cancel-eligibility";
 import {
@@ -9,6 +10,8 @@ import {
   VENDOR_DELIVERECT_CONTROLLED_NOTICE,
 } from "@/lib/deliverect-vendor-order-authority";
 import { isVendorOrderManuallyRecovered } from "@/lib/vendor-order-effective-state";
+import { isManualDashboardRoutingMode } from "@/lib/vendor-order-routing-mode";
+import { getVendorKitchenSkipAheadActions } from "@/lib/vendor-manual-fulfillment";
 import {
   formatVendorCustomerPhone,
   getVendorOrderKitchenActionLabel,
@@ -64,6 +67,7 @@ export function VendorKitchenOrderCard({
   operatingMode,
   nowMs,
   isDeliverectLive,
+  orderRoutingMode,
   deliverectRoutingDegraded = false,
   vendorDeliverectChannelLinkId = null,
   needsAttention = false,
@@ -75,6 +79,7 @@ export function VendorKitchenOrderCard({
   operatingMode: VendorOrderOperatingMode;
   nowMs: number;
   isDeliverectLive: boolean;
+  orderRoutingMode: VendorOrderRoutingMode;
   deliverectRoutingDegraded?: boolean;
   vendorDeliverectChannelLinkId?: string | null;
   needsAttention?: boolean;
@@ -85,6 +90,9 @@ export function VendorKitchenOrderCard({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+
+  const manualDashboard = isManualDashboardRoutingMode(orderRoutingMode);
 
   const authorityVo = {
     routingStatus: vendorOrder.routingStatus,
@@ -97,14 +105,25 @@ export function VendorKitchenOrderCard({
     vendor: { deliverectChannelLinkId: vendorDeliverectChannelLinkId },
   };
 
-  const deliverectAuthoritative = isDeliverectAuthoritativeVendorOrder(authorityVo);
+  const deliverectAuthoritative = isDeliverectAuthoritativeVendorOrder(
+    authorityVo,
+    orderRoutingMode
+  );
   const nextAction = deliverectAuthoritative
     ? null
     : getVendorOrderKitchenActionLabel(
         vendorOrder.routingStatus,
         vendorOrder.fulfillmentStatus,
-        isDeliverectLive
+        isDeliverectLive,
+        { isManualDashboard: manualDashboard }
       );
+  const skipAheadActions = manualDashboard
+    ? getVendorKitchenSkipAheadActions(
+        vendorOrder.routingStatus,
+        vendorOrder.fulfillmentStatus,
+        nextAction?.targetState
+      )
+    : [];
   const showManualConfirmFallback =
     deliverectRoutingDegraded === true &&
     vendorOrder.routingStatus === "pending" &&
@@ -113,11 +132,14 @@ export function VendorKitchenOrderCard({
     ? null
     : getOperatingModeActionHint(operatingMode, authorityVo, isDeliverectLive, deliverectRoutingDegraded);
   const recovered = isVendorOrderManuallyRecovered(vendorOrder, vendorOrder.statusHistory);
-  const canDeny = canVendorRejectVendorOrder({
-    ...authorityVo,
-    fulfillmentStatus: vendorOrder.fulfillmentStatus,
-    statusHistory: vendorOrder.statusHistory,
-  });
+  const canDeny = canVendorRejectVendorOrder(
+    {
+      ...authorityVo,
+      fulfillmentStatus: vendorOrder.fulfillmentStatus,
+      statusHistory: vendorOrder.statusHistory,
+    },
+    orderRoutingMode
+  );
   const urgency = getVendorOrderUrgency(new Date(vendorOrder.order.createdAt), nowMs);
   const totalItems = vendorOrder.lineItems.reduce((sum, l) => sum + l.quantity, 0);
   const customerPhone = formatVendorCustomerPhone(vendorOrder.order.customerPhone);
@@ -240,7 +262,7 @@ export function VendorKitchenOrderCard({
         </div>
       )}
 
-      {(nextAction || canDeny || showManualConfirmFallback) && (
+      {(nextAction || canDeny || showManualConfirmFallback || skipAheadActions.length > 0) && (
         <div className="mt-4 space-y-2 border-t border-oo-light-stone pt-4">
           {actionHint && <p className="text-sm text-oo-stone-gray">{actionHint}</p>}
           <div className="flex flex-wrap gap-2">
@@ -250,7 +272,7 @@ export function VendorKitchenOrderCard({
                 onClick={() => void handleStatusChange(nextAction.targetState)}
                 disabled={loading}
                 className={
-                  isMennyuControlsPrimary(operatingMode, authorityVo)
+                  isMennyuControlsPrimary(operatingMode, authorityVo) || manualDashboard
                     ? "min-h-[48px] flex-1 rounded-xl bg-brand px-5 py-3 text-base font-bold text-white shadow-sm transition hover:bg-brand-hover disabled:opacity-50"
                     : "min-h-[48px] flex-1 rounded-xl border border-oo-light-stone bg-oo-warm-white px-5 py-3 text-base font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
                 }
@@ -279,6 +301,33 @@ export function VendorKitchenOrderCard({
               </button>
             )}
           </div>
+          {skipAheadActions.length > 0 && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setMoreActionsOpen((open) => !open)}
+                disabled={loading}
+                className="min-h-[40px] rounded-lg px-2 text-sm font-semibold text-oo-stone-gray underline-offset-2 hover:text-oo-charcoal hover:underline disabled:opacity-50"
+              >
+                {moreActionsOpen ? "Hide more actions" : "More actions"}
+              </button>
+              {moreActionsOpen && (
+                <div className="flex flex-wrap gap-2">
+                  {skipAheadActions.map((action) => (
+                    <button
+                      key={action.targetState}
+                      type="button"
+                      onClick={() => void handleStatusChange(action.targetState)}
+                      disabled={loading}
+                      className="min-h-[44px] rounded-xl border border-oo-light-stone bg-oo-cream/80 px-4 py-2.5 text-sm font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

@@ -1,11 +1,14 @@
 /**
  * Deliverect vs Open Order authority for vendor-order kitchen status.
  * Channel-linked orders are POS-managed unless admin manual recovery took control.
+ * Vendor orderRoutingMode is the primary gate: manual_dashboard vendors always manage fulfillment in Open Order.
  */
 import {
   getEffectiveAuthority,
   type VendorOrderAuthoritySnapshot,
 } from "@/domain/status-authority";
+import type { VendorOrderRoutingMode } from "@prisma/client";
+import { isDeliverectRoutingMode } from "@/lib/vendor-order-routing-mode";
 
 export const VENDOR_DELIVERECT_CONTROLLED_MESSAGE =
   "This order is controlled by Deliverect/POS. Status updates must come from the POS.";
@@ -22,10 +25,13 @@ export function hasDeliverectChannelLink(
 
 /**
  * Kitchen status should come from Deliverect/POS webhooks, not the vendor dashboard.
+ * Manual dashboard vendors are never POS-authoritative regardless of channel link.
  */
 export function isDeliverectAuthoritativeVendorOrder(
-  vo: VendorOrderAuthoritySnapshot
+  vo: VendorOrderAuthoritySnapshot,
+  orderRoutingMode?: VendorOrderRoutingMode | string | null
 ): boolean {
+  if (orderRoutingMode === "manual_dashboard") return false;
   if (vo.manuallyRecoveredAt != null) return false;
   if (getEffectiveAuthority(vo) === "admin_override") return false;
   return hasDeliverectChannelLink(vo);
@@ -33,13 +39,19 @@ export function isDeliverectAuthoritativeVendorOrder(
 
 /** Open Order (or admin recovery) may drive status from the vendor dashboard. */
 export function isOpenOrderAuthoritativeVendorOrder(
-  vo: VendorOrderAuthoritySnapshot
+  vo: VendorOrderAuthoritySnapshot,
+  orderRoutingMode?: VendorOrderRoutingMode | string | null
 ): boolean {
-  return !isDeliverectAuthoritativeVendorOrder(vo);
+  return !isDeliverectAuthoritativeVendorOrder(vo, orderRoutingMode);
 }
 
 export function canVendorDashboardMutateVendorOrder(
-  vo: VendorOrderAuthoritySnapshot
+  vo: VendorOrderAuthoritySnapshot,
+  orderRoutingMode?: VendorOrderRoutingMode | string | null
 ): boolean {
+  if (orderRoutingMode === "manual_dashboard") return true;
+  if (isDeliverectRoutingMode(orderRoutingMode)) {
+    return isOpenOrderAuthoritativeVendorOrder(vo, orderRoutingMode);
+  }
   return isOpenOrderAuthoritativeVendorOrder(vo);
 }

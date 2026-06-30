@@ -100,6 +100,7 @@ export function VendorDashboardLiveOrders({
   initialVendorOrders,
   initialNowMs,
   isDeliverectLive = false,
+  orderRoutingMode = "manual_dashboard",
   activeGroupsOnly = false,
 }: {
   vendorId: string;
@@ -109,6 +110,7 @@ export function VendorDashboardLiveOrders({
   initialNowMs: number;
   /** Pass from server (e.g. isRoutingRetryAvailable()) so POS vs Open Order mode is correct. */
   isDeliverectLive?: boolean;
+  orderRoutingMode?: import("@prisma/client").VendorOrderRoutingMode;
   /** When true, only render new/preparing/ready groups (dashboard preview). */
   activeGroupsOnly?: boolean;
 }) {
@@ -241,6 +243,7 @@ export function VendorDashboardLiveOrders({
                     key={vo.id}
                     vendorId={vendorId}
                     vendorDeliverectChannelLinkId={vendorDeliverectChannelLinkId}
+                    orderRoutingMode={orderRoutingMode}
                     isDeliverectLive={isDeliverectLive}
                     deliverectRoutingDegraded={vo.deliverectRoutingDegraded === true}
                     onStatusSuccess={onStatusSuccess}
