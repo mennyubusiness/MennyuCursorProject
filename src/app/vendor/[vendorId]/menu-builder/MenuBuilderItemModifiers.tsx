@@ -8,6 +8,18 @@ import type { useMenuBuilderEditor } from "./useMenuBuilderEditor";
 
 type Editor = ReturnType<typeof useMenuBuilderEditor>;
 
+function modifierSummary(groups: VendorMenuBuilderModifierGroup[]) {
+  if (groups.length === 0) {
+    return "None";
+  }
+  const requiredCount = groups.filter((group) => group.required).length;
+  const groupLabel = `${groups.length} group${groups.length === 1 ? "" : "s"}`;
+  if (requiredCount > 0) {
+    return `${groupLabel} · ${requiredCount} required`;
+  }
+  return groupLabel;
+}
+
 export function MenuBuilderItemModifiers({
   vendorId: _vendorId,
   itemId,
@@ -15,6 +27,11 @@ export function MenuBuilderItemModifiers({
   groups,
   editor,
   disabled,
+  expanded,
+  onExpandedChange,
+  hasValidationError,
+  validationIssueCount,
+  onAddGroup,
 }: {
   vendorId: string;
   itemName: string;
@@ -22,42 +39,63 @@ export function MenuBuilderItemModifiers({
   groups: VendorMenuBuilderModifierGroup[];
   editor: Editor;
   disabled?: boolean;
+  expanded: boolean;
+  onExpandedChange: (open: boolean) => void;
+  hasValidationError: boolean;
+  validationIssueCount: number;
+  onAddGroup?: () => void;
 }) {
-  const [open, setOpen] = useState(groups.length > 0);
   const [newOptionName, setNewOptionName] = useState<Record<string, string>>({});
   const [newOptionPrice, setNewOptionPrice] = useState<Record<string, string>>({});
+  const createPending = editor.getEntityStatus(`modgrp-create:${itemId}`) === "saving";
 
-  useEffect(() => {
-    if (groups.length > 0) setOpen(true);
-  }, [groups.length]);
+  const handleAddGroup = () => {
+    onAddGroup?.();
+    onExpandedChange(true);
+    void editor.addModifierGroup(itemId);
+  };
 
   return (
-    <div className="mt-3 rounded-lg border border-dashed border-oo-light-stone bg-oo-cream/40 p-3">
+    <div className="mt-4 rounded-lg border border-dashed border-oo-light-stone bg-oo-cream/40 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="text-left text-sm font-medium text-oo-charcoal hover:underline"
-        >
-          Modifiers{groups.length > 0 ? ` (${groups.length})` : ""}
-        </button>
-        <button
-          type="button"
-          disabled={disabled || editor.getEntityStatus(`modgrp-create:${itemId}`) === "saving"}
-          onClick={() => void editor.addModifierGroup(itemId)}
-          className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
-        >
-          {editor.getEntityStatus(`modgrp-create:${itemId}`) === "saving"
-            ? "Adding…"
-            : "Add modifier group"}
-        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-oo-charcoal">
+            Modifiers &amp; options · {modifierSummary(groups)}
+            {hasValidationError ? (
+              <span className="ml-2 text-xs font-semibold text-red-700">
+                · {validationIssueCount} issue{validationIssueCount === 1 ? "" : "s"}
+              </span>
+            ) : null}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {groups.length === 0 ? (
+            <button
+              type="button"
+              disabled={disabled || createPending}
+              onClick={handleAddGroup}
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+            >
+              {createPending ? "Adding…" : "Add"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onExpandedChange(!expanded)}
+            className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+            aria-expanded={expanded}
+          >
+            {expanded ? "Collapse" : "Expand"}
+          </button>
+        </div>
       </div>
 
       {editor.getEntityError(`modgrp-create:${itemId}`) ? (
         <p className="mt-2 text-xs text-red-700">{editor.getEntityError(`modgrp-create:${itemId}`)}</p>
       ) : null}
 
-      {open ? (
+      {expanded ? (
         <div className="mt-3 space-y-4">
           {groups.length === 0 ? (
             <p className="text-xs text-oo-stone-gray">
@@ -95,6 +133,16 @@ export function MenuBuilderItemModifiers({
               />
             ))
           )}
+          {groups.length > 0 ? (
+            <button
+              type="button"
+              disabled={disabled || createPending}
+              onClick={handleAddGroup}
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+            >
+              {createPending ? "Adding…" : "Add modifier group"}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

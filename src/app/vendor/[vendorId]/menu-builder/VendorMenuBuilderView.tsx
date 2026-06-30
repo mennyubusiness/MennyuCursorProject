@@ -1,20 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { VendorMenuBuilderPageData } from "@/lib/vendor-menu-builder-data.server";
 import { MenuBuilderDraftPreview } from "./MenuBuilderDraftPreview";
-import { MenuBuilderItemModifiers } from "./MenuBuilderItemModifiers";
-import { MenuBuilderItemPhoto } from "./MenuBuilderItemPhoto";
 import { MenuBuilderPublishStatus } from "./MenuBuilderPublishStatus";
-import { MenuBuilderReorderButtons } from "./MenuBuilderReorderButtons";
 import { MenuBuilderSaveStatus } from "./MenuBuilderSaveStatus";
-import { MenuPriceInput } from "./MenuPriceInput";
+import { MenuBuilderSortableCategoryList } from "./MenuBuilderSortableCategoryList";
+import { MenuBuilderSortableItemList } from "./MenuBuilderSortableItemList";
 import { useMenuBuilderEditor } from "./useMenuBuilderEditor";
 
 export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageData }) {
   const editor = useMenuBuilderEditor(data);
   const [draftPreviewOpen, setDraftPreviewOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [modifierExpandedByItemId, setModifierExpandedByItemId] = useState<
+    Record<string, boolean | undefined>
+  >({});
   const [newItem, setNewItem] = useState({
     name: "",
     description: "",
@@ -39,6 +40,24 @@ export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageDat
     return map;
   }, [editor.items]);
 
+  const modifierValidationByItemId = useMemo(() => {
+    const map: Record<string, { hasError: boolean; issueCount: number }> = {};
+    for (const item of editor.items) {
+      const issues = editor.validation.issues.filter(
+        (issue) =>
+          issue.code === "INVALID_MODIFIER_GROUP" && issue.message.includes(`"${item.name}"`)
+      );
+      if (issues.length > 0) {
+        map[item.id] = { hasError: true, issueCount: issues.length };
+      }
+    }
+    return map;
+  }, [editor.items, editor.validation.issues]);
+
+  const handleModifierExpandedChange = useCallback((itemId: string, expanded: boolean) => {
+    setModifierExpandedByItemId((prev) => ({ ...prev, [itemId]: expanded }));
+  }, []);
+
   const scrollToMenuBuilderTarget = (message: string) => {
     for (const item of editor.items) {
       if (message.includes(`"${item.name}"`)) {
@@ -46,6 +65,14 @@ export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageDat
           behavior: "smooth",
           block: "center",
         });
+        if (
+          editor.validation.issues.some(
+            (issue) =>
+              issue.code === "INVALID_MODIFIER_GROUP" && issue.message === message
+          )
+        ) {
+          handleModifierExpandedChange(item.id, true);
+        }
         return;
       }
     }
@@ -122,7 +149,7 @@ export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageDat
       <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
         <h3 className="text-base font-semibold text-oo-charcoal">Categories</h3>
         <p className="mt-1 text-sm text-oo-stone-gray">
-          Drag order with the arrows. Hidden categories stay in your draft but won&apos;t show to
+          Drag categories to reorder. Hidden categories stay in your draft but won&apos;t show to
           customers until visible and published.
         </p>
         <form
@@ -155,28 +182,7 @@ export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageDat
         ) : null}
 
         <ul className="mt-4 divide-y divide-oo-light-stone">
-          {editor.categories.length === 0 ? (
-            <li className="py-3 text-sm text-oo-stone-gray">No categories yet.</li>
-          ) : (
-            editor.categories.map((cat, catIndex) => (
-              <CategoryRow
-                key={cat.id}
-                cat={cat}
-                catIndex={catIndex}
-                catCount={editor.categories.length}
-                status={editor.getEntityStatus(`cat-name:${cat.id}`)}
-                nameError={editor.getEntityError(`cat-name:${cat.id}`)}
-                reorderStatus={editor.getEntityStatus("category-reorder")}
-                onNameCommit={(name) => editor.updateCategoryName(cat.id, name)}
-                onVisibleChange={(isVisible) => editor.updateCategoryVisible(cat.id, isVisible)}
-                onDelete={() => editor.removeCategory(cat.id)}
-                onMoveUp={() => editor.moveCategory(cat.id, "up")}
-                onMoveDown={() => editor.moveCategory(cat.id, "down")}
-                deleteDisabled={cat.itemCount > 0}
-                deleteStatus={editor.getEntityStatus(`cat-delete:${cat.id}`)}
-              />
-            ))
-          )}
+          <MenuBuilderSortableCategoryList categories={editor.categories} editor={editor} />
         </ul>
       </section>
 
@@ -266,6 +272,9 @@ export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageDat
 
       <section className="space-y-6">
         <h3 className="text-base font-semibold text-oo-charcoal">Items by category</h3>
+        <p className="text-sm text-oo-stone-gray">
+          Drag items within each category to reorder. Use the handle on the left of each row.
+        </p>
         {editor.categories.map((cat) => {
           const catItems = itemsByCategory.get(cat.id) ?? [];
           return (
@@ -287,279 +296,20 @@ export function VendorMenuBuilderView({ data }: { data: VendorMenuBuilderPageDat
               {catItems.length === 0 ? (
                 <p className="mt-3 text-sm text-oo-stone-gray">No items in this category.</p>
               ) : (
-                <ul className="mt-3 space-y-4">
-                  {catItems.map((item, itemIndex) => (
-                    <li
-                      key={item.id}
-                      id={`menu-builder-item-${item.id}`}
-                      className="scroll-mt-24 rounded-xl border border-oo-light-stone bg-white p-4 shadow-sm"
-                    >
-                      <ItemRow
-                        item={item}
-                        vendorId={data.vendorId}
-                        editor={editor}
-                        itemIndex={itemIndex}
-                        itemCount={catItems.length}
-                        nameStatus={editor.getEntityStatus(`item-name:${item.id}`)}
-                        nameError={editor.getEntityError(`item-name:${item.id}`)}
-                        priceStatus={editor.getEntityStatus(`item-price:${item.id}`)}
-                        priceError={editor.getEntityError(`item-price:${item.id}`)}
-                        imageStatus={editor.getEntityStatus(`item-image:${item.id}`)}
-                        imageError={editor.getEntityError(`item-image:${item.id}`)}
-                        reorderStatus={editor.getEntityStatus(`item-reorder:${cat.id}`)}
-                        onNameCommit={(name) => editor.updateItemName(item.id, name)}
-                        onPriceCommit={(raw) => editor.updateItemPrice(item.id, raw)}
-                        onAvailableChange={(isAvailable) =>
-                          editor.updateItemAvailable(item.id, isAvailable)
-                        }
-                        onImageChange={(url) => editor.updateItemImage(item.id, url)}
-                        onMoveUp={() => editor.moveItemInCategory(cat.id, item.id, "up")}
-                        onMoveDown={() => editor.moveItemInCategory(cat.id, item.id, "down")}
-                        onDelete={() => editor.removeItem(item.id)}
-                        deleteStatus={editor.getEntityStatus(`item-delete:${item.id}`)}
-                      />
-                    </li>
-                  ))}
-                </ul>
+                <MenuBuilderSortableItemList
+                  categoryId={cat.id}
+                  items={catItems}
+                  vendorId={data.vendorId}
+                  editor={editor}
+                  modifierExpanded={modifierExpandedByItemId}
+                  onModifierExpandedChange={handleModifierExpandedChange}
+                  modifierValidationByItemId={modifierValidationByItemId}
+                />
               )}
             </div>
           );
         })}
       </section>
     </div>
-  );
-}
-
-function CategoryRow({
-  cat,
-  catIndex,
-  catCount,
-  status,
-  nameError,
-  reorderStatus,
-  onNameCommit,
-  onVisibleChange,
-  onDelete,
-  onMoveUp,
-  onMoveDown,
-  deleteDisabled,
-  deleteStatus,
-}: {
-  cat: { id: string; name: string; isVisible: boolean; itemCount: number; isTemp?: boolean };
-  catIndex: number;
-  catCount: number;
-  status: ReturnType<ReturnType<typeof useMenuBuilderEditor>["getEntityStatus"]>;
-  nameError: string | null;
-  reorderStatus: ReturnType<ReturnType<typeof useMenuBuilderEditor>["getEntityStatus"]>;
-  onNameCommit: (name: string) => void;
-  onVisibleChange: (isVisible: boolean) => void;
-  onDelete: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  deleteDisabled: boolean;
-  deleteStatus: ReturnType<ReturnType<typeof useMenuBuilderEditor>["getEntityStatus"]>;
-}) {
-  const [name, setName] = useState(cat.name);
-
-  useEffect(() => {
-    setName(cat.name);
-  }, [cat.name]);
-
-  return (
-    <li
-      id={`menu-builder-category-${cat.id}`}
-      className="scroll-mt-24 flex flex-wrap items-center gap-3 py-3"
-    >
-      <MenuBuilderReorderButtons
-        label={cat.name}
-        onMoveUp={onMoveUp}
-        onMoveDown={onMoveDown}
-        canMoveUp={catIndex > 0}
-        canMoveDown={catIndex < catCount - 1}
-        disabled={cat.isTemp || reorderStatus === "saving"}
-      />
-      <div className="min-w-[10rem] flex-1 space-y-1">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => {
-            const trimmed = name.trim();
-            if (trimmed !== cat.name) onNameCommit(trimmed);
-          }}
-          className={`w-full rounded-lg border px-3 py-2 text-sm ${
-            nameError ? "border-red-300" : "border-oo-light-stone"
-          }`}
-        />
-        {nameError ? <p className="text-xs text-red-700">{nameError}</p> : null}
-        {status === "saving" ? <p className="text-xs text-oo-stone-gray">Saving…</p> : null}
-      </div>
-      <label className="flex items-center gap-2 text-sm text-oo-stone-gray">
-        <input
-          type="checkbox"
-          checked={cat.isVisible}
-          onChange={(e) => onVisibleChange(e.target.checked)}
-        />
-        Visible
-      </label>
-      <span className="text-xs text-oo-stone-gray">{cat.itemCount} items</span>
-      <button
-        type="button"
-        disabled={deleteDisabled || deleteStatus === "saving" || cat.isTemp}
-        title={deleteDisabled ? "Remove items first" : "Delete category"}
-        onClick={onDelete}
-        className="text-sm text-red-700 hover:underline disabled:opacity-40"
-      >
-        {deleteStatus === "saving" ? "Deleting…" : "Delete"}
-      </button>
-    </li>
-  );
-}
-
-function ItemRow({
-  vendorId,
-  item,
-  editor,
-  itemIndex,
-  itemCount,
-  nameStatus,
-  nameError,
-  priceStatus,
-  priceError,
-  imageStatus,
-  imageError,
-  reorderStatus,
-  onNameCommit,
-  onPriceCommit,
-  onAvailableChange,
-  onImageChange,
-  onMoveUp,
-  onMoveDown,
-  onDelete,
-  deleteStatus,
-}: {
-  vendorId: string;
-  item: {
-    id: string;
-    name: string;
-    priceCents: number;
-    isAvailable: boolean;
-    imageUrl: string | null;
-    isTemp?: boolean;
-    modifierGroups: import("@/lib/vendor-menu-builder-data.server").VendorMenuBuilderModifierGroup[];
-  };
-  editor: ReturnType<typeof useMenuBuilderEditor>;
-  itemIndex: number;
-  itemCount: number;
-  nameStatus: ReturnType<ReturnType<typeof useMenuBuilderEditor>["getEntityStatus"]>;
-  nameError: string | null;
-  priceStatus: ReturnType<ReturnType<typeof useMenuBuilderEditor>["getEntityStatus"]>;
-  priceError: string | null;
-  imageStatus: ReturnType<ReturnType<typeof useMenuBuilderEditor>["getEntityStatus"]>;
-  imageError: string | null;
-  reorderStatus: ReturnType<ReturnType<typeof useMenuBuilderEditor>["getEntityStatus"]>;
-  onNameCommit: (name: string) => void;
-  onPriceCommit: (raw: string) => void;
-  onAvailableChange: (isAvailable: boolean) => void;
-  onImageChange: (url: string | null) => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  onDelete: () => void;
-  deleteStatus: ReturnType<ReturnType<typeof useMenuBuilderEditor>["getEntityStatus"]>;
-}) {
-  const [name, setName] = useState(item.name);
-
-  useEffect(() => {
-    setName(item.name);
-  }, [item.name]);
-
-  return (
-    <>
-      <div className="flex flex-wrap gap-4">
-        <MenuBuilderReorderButtons
-          label={item.name}
-          onMoveUp={onMoveUp}
-          onMoveDown={onMoveDown}
-          canMoveUp={itemIndex > 0}
-          canMoveDown={itemIndex < itemCount - 1}
-          disabled={item.isTemp || reorderStatus === "saving"}
-        />
-        <MenuBuilderItemPhoto
-          vendorId={vendorId}
-          itemId={item.id}
-          itemName={item.name}
-          imageUrl={item.imageUrl}
-          disabled={item.isTemp}
-          onImageChange={onImageChange}
-          status={imageStatus}
-          error={imageError}
-        />
-        <div className="min-w-0 flex-1 space-y-3">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-oo-stone-gray">Item name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={() => {
-                  const trimmed = name.trim();
-                  if (trimmed !== item.name) onNameCommit(trimmed);
-                }}
-                className={`w-full rounded-lg border px-3 py-2 text-sm ${
-                  nameError ? "border-red-300" : "border-oo-light-stone"
-                }`}
-              />
-              {nameError ? <p className="text-xs text-red-700">{nameError}</p> : null}
-              {nameStatus === "saving" ? (
-                <p className="text-xs text-oo-stone-gray">Saving…</p>
-              ) : null}
-            </div>
-            <div>
-              <MenuPriceInput
-                cents={item.priceCents}
-                compact
-                onCommit={onPriceCommit}
-                error={priceError}
-                status={priceStatus}
-              />
-            </div>
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={item.isAvailable}
-                  onChange={(e) => onAvailableChange(e.target.checked)}
-                />
-                {item.isAvailable ? "Available" : "Sold out"}
-              </label>
-              <button
-                type="button"
-                disabled={deleteStatus === "saving" || item.isTemp}
-                onClick={onDelete}
-                className="text-sm text-red-700 hover:underline disabled:opacity-40"
-              >
-                {deleteStatus === "saving" ? "Deleting…" : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="mt-4 rounded-lg border border-oo-light-stone bg-oo-cream/40 p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
-          Modifiers & options
-        </p>
-        <div className="mt-2">
-      <MenuBuilderItemModifiers
-        vendorId={vendorId}
-        itemId={item.id}
-        itemName={item.name}
-        groups={item.modifierGroups ?? []}
-        editor={editor}
-        disabled={item.isTemp}
-      />
-        </div>
-      </div>
-    </>
   );
 }
