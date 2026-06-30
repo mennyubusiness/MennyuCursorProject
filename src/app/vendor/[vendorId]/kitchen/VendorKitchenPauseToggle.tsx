@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { VENDOR_POS_INTAKE_MANAGED_COPY } from "@/lib/vendor-operational-copy";
@@ -12,6 +12,7 @@ export function VendorKitchenPauseToggle({
   initialPaused,
   variant = "kitchen",
   posManaged = false,
+  onPausedChange,
 }: {
   vendorId: string;
   initialPaused: boolean;
@@ -19,16 +20,22 @@ export function VendorKitchenPauseToggle({
   variant?: Variant;
   /** When true, intake cannot be toggled in Open Order (POS-controlled). */
   posManaged?: boolean;
+  onPausedChange?: (paused: boolean) => void;
 }) {
   const router = useRouter();
   const [paused, setPaused] = useState(initialPaused);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setPaused(initialPaused);
+  }, [initialPaused]);
+
   const pauseLabel = variant === "orders" ? "Pause order intake" : "Pause intake";
   const resumeLabel = variant === "orders" ? "Resume order intake" : "Resume intake";
 
   async function handleToggle() {
+    if (loading) return;
     setError(null);
     setLoading(true);
     try {
@@ -42,7 +49,9 @@ export function VendorKitchenPauseToggle({
         setError(data.error ?? "Request failed");
         return;
       }
-      setPaused(Boolean(data.paused));
+      const nextPaused = Boolean(data.paused);
+      setPaused(nextPaused);
+      onPausedChange?.(nextPaused);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error");
@@ -68,7 +77,7 @@ export function VendorKitchenPauseToggle({
             ? "bg-amber-100 text-amber-950 hover:bg-amber-200"
             : "border border-oo-light-stone bg-oo-warm-white text-oo-charcoal hover:bg-oo-cream"
         }`
-      : `rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${
+      : `inline-flex min-h-[48px] items-center justify-center rounded-xl px-5 py-2.5 text-sm font-bold transition disabled:opacity-50 ${
           paused
             ? "bg-amber-100 text-amber-950 hover:bg-amber-200"
             : "border border-oo-light-stone bg-oo-warm-white text-oo-charcoal hover:bg-oo-cream"

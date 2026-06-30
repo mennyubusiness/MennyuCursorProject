@@ -20,6 +20,7 @@ export function useVendorOrdersPoll<T extends VendorOrderPollRow>(params: {
   fetchError: string | null;
   refresh: () => Promise<void>;
   isPolling: boolean;
+  lastFetchedAtMs: number | null;
 } {
   const { vendorId, initialOrders, initialNowMs, enabled = true } = params;
   const [vendorOrders, setVendorOrders] = useState<T[]>(initialOrders);
@@ -27,6 +28,7 @@ export function useVendorOrdersPoll<T extends VendorOrderPollRow>(params: {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(true);
   const [isPolling, setIsPolling] = useState(false);
+  const [lastFetchedAtMs, setLastFetchedAtMs] = useState<number | null>(initialNowMs);
 
   const onStatusSuccess = useCallback(
     (vendorOrderId: string, update: { routingStatus: string; fulfillmentStatus: string }) => {
@@ -53,6 +55,7 @@ export function useVendorOrdersPoll<T extends VendorOrderPollRow>(params: {
       const data = await res.json();
       setVendorOrders((data.vendorOrders ?? []) as T[]);
       setFetchError(null);
+      setLastFetchedAtMs(Date.now());
     } catch {
       setFetchError("Could not refresh orders. Check your connection.");
     } finally {
@@ -86,6 +89,7 @@ export function useVendorOrdersPoll<T extends VendorOrderPollRow>(params: {
         const data = await res.json();
         setVendorOrders((data.vendorOrders ?? []) as T[]);
         setFetchError(null);
+        setLastFetchedAtMs(Date.now());
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
           setFetchError("Could not refresh orders.");
@@ -120,5 +124,6 @@ export function useVendorOrdersPoll<T extends VendorOrderPollRow>(params: {
     fetchError,
     refresh,
     isPolling,
+    lastFetchedAtMs,
   };
 }

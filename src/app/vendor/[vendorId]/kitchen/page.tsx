@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import {
   isVendorDeliverectLiveForUi,
-  vendorKitchenStatusLine,
   vendorKitchenStatusWarning,
 } from "@/lib/vendor-order-routing-mode";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
@@ -40,7 +39,6 @@ export default async function VendorKitchenPage({
     hasUnmatchedChannelRegistrationForVendor: hasUnmatchedChannelRegistration,
   });
 
-  const posStatusLine = vendorKitchenStatusLine(vendor.orderRoutingMode, posUi);
   const posWarning = vendorKitchenStatusWarning(vendor.orderRoutingMode, posUi);
 
   const initialVendorOrders = serializeVendorOrdersForBoard(
@@ -59,7 +57,6 @@ export default async function VendorKitchenPage({
       orderRoutingMode={vendor.orderRoutingMode}
       vendorDeliverectChannelLinkId={vendor.deliverectChannelLinkId}
       ordersPaused={vendor.mennyuOrdersPaused ?? false}
-      posStatusLine={posStatusLine}
       posWarning={posWarning}
     />
   );

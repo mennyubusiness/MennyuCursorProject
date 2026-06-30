@@ -4,10 +4,8 @@ import { notFound } from "next/navigation";
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { VendorSetupChecklist } from "@/components/vendor/VendorSetupChecklist";
 import { VendorSetupStatusBanners } from "@/components/vendor/VendorSetupStatusBanners";
-import { VendorOrderRoutingSection } from "@/components/vendor/VendorOrderRoutingSection";
 import { buildVendorOperationalSetupItems } from "@/lib/vendor-dashboard-attention";
 import { loadVendorDashboardContext } from "@/lib/vendor-dashboard-data.server";
-import { VENDOR_ALL_READY_COPY } from "@/lib/vendor-operational-copy";
 import {
   vendorSetupOperationalLockedDescription,
   vendorSetupPageIncompleteDescription,
@@ -59,19 +57,12 @@ export default async function VendorSetupPage({
       />
 
       <div className="mt-8 space-y-8">
-        {ctx.setupComplete ? (
-          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-950">
-            <p className="font-medium">{VENDOR_ALL_READY_COPY}</p>
-            <p className="mt-1">Use the dashboard for day-to-day operations. Return here if something changes.</p>
-          </div>
-        ) : (
+        {!ctx.setupComplete ? (
           <VendorSetupStatusBanners
             publicProfileReady={publicProfileReady}
             canAcceptOrders={ctx.readiness.canAcceptOrders}
           />
-        )}
-
-        <VendorOrderRoutingSection orderRoutingMode={ctx.vendorRecord.orderRoutingMode} />
+        ) : null}
 
         <VendorSetupChecklist items={appearance} title="Required to appear on pod page" />
 
