@@ -3,7 +3,7 @@
  * Does not replace customer orderability gates (see vendor-orderability-in-pod.ts).
  */
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
-import type { PosConnectionStatus, VendorOrderRoutingMode } from "@prisma/client";
+import type { PosConnectionStatus, VendorMenuSource, VendorOrderRoutingMode } from "@prisma/client";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { hasValidVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
 import { VENDOR_HOURS_PUBLIC_COPY } from "@/lib/vendor-operational-copy";
@@ -12,6 +12,7 @@ import {
   isVendorRoutingOperationalReady,
   VENDOR_ROUTING_MODE_COPY,
 } from "@/lib/vendor-order-routing-mode";
+import { isOpenOrderMenuSource, vendorMenuSourceVendorPath } from "@/lib/vendor-menu-source";
 import {
   getVendorOrderabilityState,
   getVendorPublicProfileMissingItems,
@@ -76,6 +77,7 @@ export type VendorPodReadinessInput = {
   menuSummary: VendorMenuReadinessSummary;
   posSummary: VendorPosReadinessSummary;
   stripeSummary: VendorStripeReadinessSummary;
+  menuSource?: VendorMenuSource;
   /** Vendor self-serve checklist: pending pod invites. */
   pendingPodInviteCount?: number;
   /** Vendor has accepted membership in any pod (for invite checklist). */
@@ -220,6 +222,13 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
   const posComplete = isVendorPosReady(posSummary);
   const menuComplete = isVendorMenuReady(menuSummary);
   const deliverectMode = isDeliverectRoutingMode(posSummary.orderRoutingMode);
+  const openOrderMenu = isOpenOrderMenuSource({
+    menuSource: input.menuSource ?? posSummary.menuSource ?? "open_order",
+  });
+  const menuVendorPath = vendorMenuSourceVendorPath(
+    vendorId,
+    openOrderMenu ? "open_order" : "deliverect"
+  );
   const posState = deriveVendorPosUiState({
     deliverectChannelLinkId: posSummary.deliverectChannelLinkId,
     posConnectionStatus: posSummary.posConnectionStatus,
@@ -299,15 +308,17 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
     ...publicProfileItems,
     {
       key: "menu",
-      label: "Publish menu",
+      label: openOrderMenu ? "Build menu" : "Publish menu",
       complete: menuSummary.hasOperationalItems,
       owner: "vendor",
       description: menuSummary.hasOperationalItems
         ? "Menu items are available on your public page."
-        : "Publish or import a menu before appearing on the pod page.",
+        : openOrderMenu
+          ? "Add categories and items in Menu Builder, then publish."
+          : "Publish or import a menu before appearing on the pod page.",
       actionHref:
-        audience === "vendor" ? `/vendor/${vendorId}/menu` : podOwnerVendorHref(podId, podSlug, vendor.slug),
-      actionLabel: audience === "vendor" ? "Review menu" : "View menu page",
+        audience === "vendor" ? menuVendorPath : podOwnerVendorHref(podId, podSlug, vendor.slug),
+      actionLabel: audience === "vendor" ? (openOrderMenu ? "Open Menu Builder" : "Review menu") : "View menu page",
     },
     {
       key: "stripe",
@@ -348,17 +359,19 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
     },
     {
       key: "menu_available",
-      label: "Confirm menu availability",
+      label: openOrderMenu ? "Publish Open Order menu" : "Confirm menu availability",
       complete: menuComplete,
       owner: "vendor",
       description: menuSummary.hasOperationalItems
         ? menuComplete
           ? "At least one menu item is available to order."
           : "Menu items exist but none are available right now."
-        : "Publish or import a menu with at least one available item.",
+        : openOrderMenu
+          ? "Publish your Menu Builder menu with at least one available item."
+          : "Publish or import a menu with at least one available item.",
       actionHref:
-        audience === "vendor" ? `/vendor/${vendorId}/menu` : podOwnerVendorHref(podId, podSlug, vendor.slug),
-      actionLabel: audience === "vendor" ? "Review menu" : "View menu page",
+        audience === "vendor" ? menuVendorPath : podOwnerVendorHref(podId, podSlug, vendor.slug),
+      actionLabel: audience === "vendor" ? (openOrderMenu ? "Open Menu Builder" : "Review menu") : "View menu page",
     },
   ];
 

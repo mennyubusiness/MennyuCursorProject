@@ -20,6 +20,7 @@ import {
   VendorKitchenOrderCard,
   buildKitchenOperatingMode,
 } from "./VendorKitchenOrderCard";
+import { VendorKitchenTestSoundButton } from "./VendorKitchenTestSoundButton";
 
 const NewOrderSoundAlert = dynamic(
   () => import("../dashboard/NewOrderSoundAlert").then((m) => m.NewOrderSoundAlert),
@@ -89,6 +90,7 @@ export function VendorKitchenBoard({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <VendorKitchenTestSoundButton />
             <VendorKitchenPauseToggle vendorId={vendorId} initialPaused={ordersPaused} />
             <VendorKitchenExitLink vendorId={vendorId} />
           </div>

@@ -7,7 +7,11 @@ export const deliverectMenuImportMetaSchema = z.object({
   channelLinkId: z.string().min(1).optional(),
   locationId: z.string().min(1).optional(),
   menuId: z.string().min(1).optional(),
-  sourcePayloadKind: z.enum(["deliverect_menu_api_v1", "deliverect_menu_webhook_v1"]),
+  sourcePayloadKind: z.enum([
+    "deliverect_menu_api_v1",
+    "deliverect_menu_webhook_v1",
+    "open_order_builder_v1",
+  ]),
 });
 
 export const mennyuCanonicalModifierOptionSchema = z.object({

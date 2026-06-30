@@ -141,7 +141,7 @@ export function deriveVendorAttentionItems(input: {
       items.push({
         id: "not_paused",
         title: "Orders paused",
-        description: "Unpause new orders in vendor settings to accept orders again.",
+        description: "Unpause new orders from Kitchen mode or Orders to accept orders again.",
         severity: "warning",
       });
     } else if (!input.currentlyOpen) {
@@ -184,10 +184,10 @@ export function buildVendorOperationalSetupItems(input: {
       complete: !input.vendorPaused,
       owner: "vendor",
       description: input.vendorPaused
-        ? "New orders are paused in vendor settings."
+        ? "New orders are paused — unpause from Kitchen mode or Orders."
         : "New orders are not paused.",
-      actionHref: `/vendor/${input.vendorId}/hours`,
-      actionLabel: "Open settings",
+      actionHref: `/vendor/${input.vendorId}/kitchen`,
+      actionLabel: "Open kitchen",
     },
     {
       key: "currently_open",

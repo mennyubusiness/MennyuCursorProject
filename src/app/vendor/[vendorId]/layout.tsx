@@ -22,7 +22,7 @@ export default async function VendorAreaLayout({
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { id: true, name: true, vendorDashboardToken: true },
+    select: { id: true, name: true, menuSource: true, vendorDashboardToken: true },
   });
   if (!vendor) notFound();
 
@@ -57,7 +57,7 @@ export default async function VendorAreaLayout({
   return (
     <>
       {showAdminBanner ? <AdminModeBanner sticky /> : null}
-      <VendorLayoutChrome vendorId={vendor.id} vendorName={vendor.name}>
+      <VendorLayoutChrome vendorId={vendor.id} vendorName={vendor.name} menuSource={vendor.menuSource}>
         {children}
       </VendorLayoutChrome>
     </>

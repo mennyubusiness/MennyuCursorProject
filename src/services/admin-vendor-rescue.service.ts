@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { MenuImportJobStatus, type VendorOrderRoutingMode } from "@prisma/client";
 import { ADMIN_AUDIT_ACTION, ADMIN_AUDIT_TARGET, requireAdminReason } from "@/lib/admin-audit-log";
 import { VENDOR_ORDER_ROUTING_MODES } from "@/lib/vendor-order-routing-mode";
+import { menuSourceForOrderRoutingMode } from "@/lib/vendor-menu-source";
 import { buildVendorMenuCustomerPath, buildPodCustomerPath } from "@/lib/customer-public-url";
 import { prisma } from "@/lib/db";
 import {
@@ -27,6 +28,7 @@ function revalidateVendorPaths(vendorId: string) {
   revalidatePath(`/vendor/${vendorId}/orders`);
   revalidatePath(`/vendor/${vendorId}/kitchen`);
   revalidatePath(`/vendor/${vendorId}/menu`);
+  revalidatePath(`/vendor/${vendorId}/menu-builder`);
   revalidatePath("/explore");
 }
 
@@ -369,7 +371,7 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: input.vendorId },
-    select: { id: true, orderRoutingMode: true },
+    select: { id: true, orderRoutingMode: true, menuSource: true },
   });
   if (!vendor) return { ok: false, error: "Vendor not found." };
 
@@ -377,9 +379,14 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
     return { ok: true, message: "Order routing mode unchanged." };
   }
 
+  const nextMenuSource = menuSourceForOrderRoutingMode(input.orderRoutingMode);
+
   await prisma.vendor.update({
     where: { id: input.vendorId },
-    data: { orderRoutingMode: input.orderRoutingMode },
+    data: {
+      orderRoutingMode: input.orderRoutingMode,
+      menuSource: nextMenuSource,
+    },
   });
 
   await createAdminAuditLog({
@@ -388,8 +395,8 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
     targetType: ADMIN_AUDIT_TARGET.vendor,
     targetId: input.vendorId,
     reason: reasonCheck.reason,
-    oldValue: vendor.orderRoutingMode,
-    newValue: input.orderRoutingMode,
+    oldValue: `${vendor.orderRoutingMode} / menu:${vendor.menuSource}`,
+    newValue: `${input.orderRoutingMode} / menu:${nextMenuSource}`,
   });
 
   revalidateVendorPaths(input.vendorId);

@@ -11,6 +11,7 @@ import {
   isDeliverectVendorOrderRoutingDegraded,
   shouldOmitVendorOrderFromDeliverectDashboard,
 } from "@/lib/vendor-deliverect-dashboard-visibility";
+import { touchVendorDashboardLastSeen } from "@/lib/vendor-dashboard-presence.server";
 
 export async function GET(
   request: Request,
@@ -23,7 +24,14 @@ export async function GET(
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { id: true, name: true, slug: true, deliverectChannelLinkId: true, vendorDashboardToken: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      deliverectChannelLinkId: true,
+      orderRoutingMode: true,
+      vendorDashboardToken: true,
+    },
   });
   if (!vendor) {
     return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
@@ -37,6 +45,8 @@ export async function GET(
   if (!access.ok) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  void touchVendorDashboardLastSeen(vendorId);
 
   const vendorOrders = await prisma.vendorOrder.findMany({
     where: {
@@ -90,9 +100,9 @@ export async function GET(
   });
 
   const now = Date.now();
-  const isDeliverectLive = isRoutingRetryAvailable();
+  const isDeliverectEnvLive = isRoutingRetryAvailable();
   const visibleVendorOrders = vendorOrders.filter(
-    (vo) => !shouldOmitVendorOrderFromDeliverectDashboard(vo, vendor, isDeliverectLive, now)
+    (vo) => !shouldOmitVendorOrderFromDeliverectDashboard(vo, vendor, isDeliverectEnvLive, now)
   );
 
   const multiVendorOrderIds = [
@@ -179,7 +189,7 @@ export async function GET(
       deliverectRoutingDegraded: isDeliverectVendorOrderRoutingDegraded(
         vo,
         vendor,
-        isDeliverectLive,
+        isDeliverectEnvLive,
         now
       ),
     };

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { DashboardStatusBadge, type DashboardStatusTone } from "@/components/dashboard";
 import { vendorIntakeStatusTone, type VendorIntakeStatusLabel } from "@/lib/vendor-operational-copy";
+import { VendorKitchenPauseToggle } from "../kitchen/VendorKitchenPauseToggle";
 
 type VendorStoreStatusCardProps = {
   vendorId: string;
@@ -16,6 +17,8 @@ type VendorStoreStatusCardProps = {
   todayHoursLabel: string;
   nextOpeningLabel: string | null;
   hoursSourceLabel: string;
+  ordersPaused: boolean;
+  posManaged: boolean;
 };
 
 export function VendorStoreStatusCard({
@@ -31,6 +34,8 @@ export function VendorStoreStatusCard({
   todayHoursLabel,
   nextOpeningLabel,
   hoursSourceLabel,
+  ordersPaused,
+  posManaged,
 }: VendorStoreStatusCardProps) {
   const tone: DashboardStatusTone = vendorIntakeStatusTone(intakeLabel);
 
@@ -48,7 +53,13 @@ export function VendorStoreStatusCard({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap items-end gap-3">
+          <VendorKitchenPauseToggle
+            vendorId={vendorId}
+            initialPaused={ordersPaused}
+            variant="orders"
+            posManaged={posManaged}
+          />
           {storefrontHref ? (
             <Link
               href={storefrontHref}

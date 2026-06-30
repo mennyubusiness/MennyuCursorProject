@@ -18,6 +18,7 @@ async function revalidateVendorCustomerSurfaces(vendorId: string) {
   revalidatePath(`/vendor/${id}`);
   revalidatePath(`/vendor/${id}/settings`);
   revalidatePath(`/vendor/${id}/menu`);
+  revalidatePath(`/vendor/${id}/menu-builder`);
   const pods = await prisma.podVendor.findMany({
     where: { vendorId: id },
     select: { podId: true },

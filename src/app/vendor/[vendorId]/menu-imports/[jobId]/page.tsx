@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  gateDeliverectMenuRoutes,
+  requireVendorMenuSourceContext,
+} from "@/lib/vendor-menu-route-guard.server";
+import {
   fetchAdminMenuImportJobDetail,
   fetchLatestPublishedMenuVersionForVendor,
   sortMenuImportIssuesForDisplay,
@@ -35,6 +39,9 @@ export default async function VendorMenuImportJobPage({
   params: Promise<{ vendorId: string; jobId: string }>;
 }) {
   const { vendorId, jobId } = await params;
+  const vendorCtx = await requireVendorMenuSourceContext(vendorId);
+  gateDeliverectMenuRoutes(vendorCtx, vendorId);
+
   const job = await fetchAdminMenuImportJobDetail(jobId);
   if (!job) notFound();
   if (job.vendorId !== vendorId) notFound();

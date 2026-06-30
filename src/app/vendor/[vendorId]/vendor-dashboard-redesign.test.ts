@@ -19,9 +19,11 @@ describe("vendor dashboard operating layout", () => {
     expect(page).not.toContain('redirect(`/vendor/${vendorId}/orders`)');
   });
 
-  it("nav prioritizes dashboard, orders, menu, hours, payouts, setup, settings", () => {
+  it("nav prioritizes dashboard, orders, menu tooling, hours, payouts, setup, settings", () => {
     const nav = readVendor("VendorAreaNav.tsx");
-    expect(nav).toMatch(/dashboard.*Orders.*Menu.*Hours.*Payouts.*Setup.*Vendor Profile/s);
+    expect(nav).toMatch(/dashboard.*Orders.*Hours.*Payouts.*Setup.*Vendor Profile/s);
+    expect(nav).toContain("vendorMenuSourceNavLabel");
+    expect(nav).toContain("menu-builder");
     expect(nav).not.toContain('"analytics"');
     expect(nav).toContain("Kitchen");
   });

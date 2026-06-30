@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
+import { isVendorDeliverectLiveForUi } from "@/lib/vendor-order-routing-mode";
 import {
   isDeliverectVendorOrderRoutingDegraded,
   shouldOmitVendorOrderFromDeliverectDashboard,
@@ -92,9 +93,10 @@ export function serializeVendorOrdersForBoard(
   vendor: NonNullable<Awaited<ReturnType<typeof getVendorOrdersBoardData>>>["vendor"],
   nowMs: number
 ) {
-  const isDeliverectLive = isRoutingRetryAvailable();
+  const isDeliverectEnvLive = isRoutingRetryAvailable();
+  const isDeliverectLive = isVendorDeliverectLiveForUi(vendor.orderRoutingMode, isDeliverectEnvLive);
   const visible = vendorOrders.filter(
-    (vo) => !shouldOmitVendorOrderFromDeliverectDashboard(vo, vendor, isDeliverectLive, nowMs)
+    (vo) => !shouldOmitVendorOrderFromDeliverectDashboard(vo, vendor, isDeliverectEnvLive, nowMs)
   );
 
   return visible.map((vo) => ({
@@ -112,7 +114,7 @@ export function serializeVendorOrdersForBoard(
     deliverectRoutingDegraded: isDeliverectVendorOrderRoutingDegraded(
       vo,
       vendor,
-      isDeliverectLive,
+      isDeliverectEnvLive,
       nowMs
     ),
   }));

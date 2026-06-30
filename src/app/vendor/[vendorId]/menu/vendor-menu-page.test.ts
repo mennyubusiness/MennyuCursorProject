@@ -14,6 +14,7 @@ describe("vendor menu page workspace", () => {
   it("loads page data through server loader", () => {
     expect(pageSrc).toMatch(/loadVendorMenuPageData/);
     expect(pageSrc).toMatch(/VendorMenuPageView/);
+    expect(pageSrc).toMatch(/gateDeliverectMenuRoutes/);
   });
 
   it("shows live menu summary and latest import cards", () => {

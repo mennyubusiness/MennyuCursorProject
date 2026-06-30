@@ -21,6 +21,15 @@ import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { AdminVendorOrderRoutingSection } from "./AdminVendorOrderRoutingSection";
 import {
+  vendorDashboardPresenceDetail,
+  vendorDashboardPresenceLabel,
+} from "@/lib/vendor-dashboard-presence";
+import { vendorOrderRoutingModeAdminLabel } from "@/lib/vendor-order-routing-mode";
+import {
+  getVendorMenuSourceMismatchWarning,
+  vendorMenuSourceLabel,
+} from "@/lib/vendor-menu-source";
+import {
   adminAttachVendorToPodFromVendorAction,
   adminDetachVendorFromPodFromVendorAction,
   adminHideVendorAction,
@@ -59,6 +68,12 @@ export function AdminVendorRescueClient({
       return r;
     });
 
+  const menuMismatch = getVendorMenuSourceMismatchWarning({
+    menuSource: detail.vendor.menuSource as import("@prisma/client").VendorMenuSource,
+    orderRoutingMode: detail.vendor.orderRoutingMode as VendorOrderRoutingMode,
+    deliverectChannelLinkId: detail.vendor.deliverectChannelLinkId,
+  });
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <AdminSection title="Overview">
@@ -66,6 +81,36 @@ export function AdminVendorRescueClient({
         <AdminInfoRow label="Public URL" value={detail.vendor.publicPathPreview} />
         <AdminInfoRow label="Public visibility" value={detail.vendor.isActive ? "Visible" : "Hidden"} />
         <AdminInfoRow label="Ordering" value={detail.vendor.mennyuOrdersPaused ? "Paused" : "Open"} />
+        <AdminInfoRow
+          label="Routing mode"
+          value={vendorOrderRoutingModeAdminLabel(detail.vendor.orderRoutingMode as VendorOrderRoutingMode)}
+        />
+        <AdminInfoRow
+          label="Menu source"
+          value={vendorMenuSourceLabel(detail.vendor.menuSource as import("@prisma/client").VendorMenuSource)}
+        />
+        <AdminInfoRow
+          label="Active menu tool"
+          value={vendorMenuSourceLabel(detail.vendor.menuSource as import("@prisma/client").VendorMenuSource)}
+        />
+        {menuMismatch ? (
+          <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            <strong>{menuMismatch.headline}.</strong> {menuMismatch.detail}
+          </p>
+        ) : null}
+        <AdminInfoRow
+          label="Dashboard presence"
+          value={vendorDashboardPresenceLabel(detail.vendor.vendorDashboardLastSeenAt)}
+        />
+        {detail.vendor.vendorDashboardLastSeenAt ? (
+          <AdminInfoRow
+            label="Dashboard last seen"
+            value={
+              vendorDashboardPresenceDetail(detail.vendor.vendorDashboardLastSeenAt) ??
+              new Date(detail.vendor.vendorDashboardLastSeenAt).toLocaleString()
+            }
+          />
+        ) : null}
         <AdminInfoRow label="Readiness" value={detail.readinessSummary.label} />
         <AdminInfoRow label="Onboarding" value={detail.vendor.onboardingStatus} />
         <AdminInfoRow label="Created" value={new Date(detail.vendor.createdAt).toLocaleString()} />

@@ -114,7 +114,7 @@ export function VendorDashboardLiveOrders({
   /** When true, only render new/preparing/ready groups (dashboard preview). */
   activeGroupsOnly?: boolean;
 }) {
-  const { vendorOrders, nowMs, onStatusSuccess } = useVendorOrdersPoll({
+  const { vendorOrders, nowMs, onStatusSuccess, fetchError, refresh } = useVendorOrdersPoll({
     vendorId,
     initialOrders: initialVendorOrders,
     initialNowMs,
@@ -177,6 +177,18 @@ export function VendorDashboardLiveOrders({
   return (
     <>
       <NewOrderSoundAlert newOrderIds={newOrderIdsForSound} />
+      {fetchError ? (
+        <div className="mb-4 flex flex-wrap items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <span>{fetchError}</span>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="rounded-lg bg-red-800 px-3 py-1.5 font-semibold text-white hover:bg-red-900"
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
       {!activeGroupsOnly ? (
         <div className="mb-10">
           <VendorOrdersSummaryStrip

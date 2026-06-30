@@ -75,17 +75,17 @@ export function VendorDashboardActiveOrdersSection({
           title={VENDOR_NO_ACTIVE_ORDERS_COPY}
           description="New orders will show up here and on the Orders page."
         />
-      ) : (
-        <VendorDashboardLiveOrders
-          vendorId={vendorId}
-          vendorDeliverectChannelLinkId={vendorDeliverectChannelLinkId}
-          initialVendorOrders={initialVendorOrders}
-          initialNowMs={initialNowMs}
-          isDeliverectLive={isDeliverectLive}
-          orderRoutingMode={orderRoutingMode}
-          activeGroupsOnly
-        />
-      )}
+      ) : null}
+
+      <VendorDashboardLiveOrders
+        vendorId={vendorId}
+        vendorDeliverectChannelLinkId={vendorDeliverectChannelLinkId}
+        initialVendorOrders={initialVendorOrders}
+        initialNowMs={initialNowMs}
+        isDeliverectLive={isDeliverectLive}
+        orderRoutingMode={orderRoutingMode}
+        activeGroupsOnly
+      />
     </DashboardSection>
   );
 }

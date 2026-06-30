@@ -265,6 +265,12 @@ enum VendorOrderRoutingMode {
   deliverect
 }
 
+/// Which menu management path and published menu source a vendor uses.
+enum VendorMenuSource {
+  open_order
+  deliverect
+}
+
 /// Unified auth: one User can hold multiple role-specific memberships (vendor, pod, customer profile).
 model User {
   id            String   @id @default(cuid())
@@ -509,6 +515,8 @@ model Vendor {
   posConnectionStatus     PosConnectionStatus      @default(not_connected)
   /// Post-checkout order routing: Open Order dashboard/tablet vs Deliverect POS.
   orderRoutingMode        VendorOrderRoutingMode   @default(manual_dashboard)
+  /// Menu tooling and published menu source: Open Order builder vs Deliverect sync.
+  menuSource              VendorMenuSource         @default(open_order)
   /// Short location line for onboarding (city / neighborhood).
   locationSummary         String?
   /// When true, block new Mennyu orders for this vendor (intake only); existing orders still visible.
@@ -529,6 +537,8 @@ model Vendor {
   deliverectSyncedCustomerOrderingHoursLastError String?
   /// Legacy: shared secret for Bearer/automation and magic-link cookie bootstrap. Prefer User session + VendorMembership.
   vendorDashboardToken    String?
+  /// Last vendor dashboard/kitchen poll or presence ping (admin tablet monitoring).
+  vendorDashboardLastSeenAt DateTime?
   /// Business / kitchen contact (may match User email for sole operators).
   contactName               String?
   contactEmail              String?
@@ -558,7 +568,23 @@ model Vendor {
   vendorPayoutTransferReversals VendorPayoutTransferReversal[]
   menuImportJobs          MenuImportJob[]
   menuVersions            MenuVersion[]
+  openOrderMenuCategories VendorMenuCategory[]
   vendorMemberships       VendorMembership[]
+}
+
+/// Open Order Menu Builder categories (manual / open_order menu source only).
+model VendorMenuCategory {
+  id        String   @id @default(cuid())
+  vendorId  String
+  name      String
+  sortOrder Int      @default(0)
+  isVisible Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, sortOrder])
 }
 
 // ---- Deliverect-first menu import (Phase 1B: draft only; no live MenuItem writes) ----

@@ -11,7 +11,7 @@ import {
   isVendorRoutingOperationalReady,
   type VendorRoutingReadinessInput,
 } from "@/lib/vendor-order-routing-mode";
-import type { VendorOrderRoutingMode } from "@prisma/client";
+import type { VendorMenuSource, VendorOrderRoutingMode } from "@prisma/client";
 
 export type VendorMenuReadinessSummary = {
   hasPublishedMenuVersion?: boolean;
@@ -28,6 +28,7 @@ export type VendorStripeReadinessSummary = {
 
 export type VendorPosReadinessSummary = VendorRoutingReadinessInput & {
   hasUnmatchedChannelRegistration: boolean;
+  menuSource?: VendorMenuSource;
 };
 
 export type VendorReadinessVendorFields = {
@@ -56,7 +57,8 @@ function isVendorPosReady(pos: VendorPosReadinessSummary): boolean {
 }
 
 function isVendorDeliverectMappingReady(pos: VendorPosReadinessSummary): boolean {
-  if (pos.orderRoutingMode !== "deliverect") return true;
+  if (pos.menuSource === "open_order") return true;
+  if (pos.menuSource !== "deliverect" && pos.orderRoutingMode !== "deliverect") return true;
   return pos.deliverectMappingReady !== false;
 }
 

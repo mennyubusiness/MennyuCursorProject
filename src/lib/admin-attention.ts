@@ -43,6 +43,9 @@ import {
   type OrderRecoverySnapshot,
   type VendorOrderRecoverySnapshot,
 } from "@/lib/admin-needs-attention-actions";
+import {
+  resolveVendorDashboardPresenceStatus,
+} from "@/lib/vendor-dashboard-presence";
 
 // ---- Types (normalized attention item) ----
 
@@ -197,7 +200,14 @@ const VO_INCLUDE = {
       pod: { select: { id: true, name: true } },
     },
   },
-  vendor: { select: { name: true, deliverectChannelLinkId: true } },
+  vendor: {
+    select: {
+      name: true,
+      deliverectChannelLinkId: true,
+      orderRoutingMode: true,
+      vendorDashboardLastSeenAt: true,
+    },
+  },
 } as const;
 
 type VoAttentionRow = Awaited<
@@ -241,10 +251,21 @@ function attachVendorOrderAttentionActions(
     vendorOrderFulfillmentStatus: vo.fulfillmentStatus,
     manuallyRecoveredAt: vo.manuallyRecoveredAt,
     manualRecoveryNotes: vo.manualRecoveryNotes,
-    canRetryRouting: canRetryRouting(voSnap, orderSnap),
+    canRetryRouting: canRetryRouting(voSnap, orderSnap, vo.vendor?.orderRoutingMode),
     canManualRecover: canManualRecoverVendorOrder(voSnap, orderSnap),
-    suggestedActions: getNeedsAttentionSuggestedActions(reason, voSnap, orderSnap),
-    recommendedAction: reasonToRecommendedAction(reason, vo.fulfillmentStatus, voSnap, orderSnap),
+    suggestedActions: getNeedsAttentionSuggestedActions(
+      reason,
+      voSnap,
+      orderSnap,
+      vo.vendor?.orderRoutingMode
+    ),
+    recommendedAction: reasonToRecommendedAction(
+      reason,
+      vo.fulfillmentStatus,
+      voSnap,
+      orderSnap,
+      vo.vendor?.orderRoutingMode
+    ),
   };
 }
 
@@ -288,12 +309,17 @@ function reasonToRecommendedAction(
   reason: AdminAttentionReason,
   fulfillmentStatus?: string,
   vo?: VendorOrderRecoverySnapshot,
-  order?: OrderRecoverySnapshot
+  order?: OrderRecoverySnapshot,
+  orderRoutingMode?: string | null
 ): AdminRecommendedAction {
   switch (reason) {
     case "routing_failed":
     case "routing_stuck":
-      if (vo && order && canRetryRouting(vo, order)) return "retry_routing";
+      if (orderRoutingMode === "manual_dashboard") {
+        if (vo && order && canManualRecoverVendorOrder(vo, order)) return "mark_manually_received";
+        return "view_order";
+      }
+      if (vo && order && canRetryRouting(vo, order, orderRoutingMode)) return "retry_routing";
       if (vo && order && canManualRecoverVendorOrder(vo, order)) return "mark_manually_received";
       return fulfillmentStatus === "pending" ? "retry_routing" : "view_order";
     case "deliverect_reconciliation_overdue":
@@ -381,7 +407,15 @@ function deliverectGuidanceForAttentionVo(vo: Parameters<typeof voToDeliverectIn
 
 function reasonToLabel(
   reason: AdminAttentionReason,
-  vo?: { deliverectLastError?: string | null } | { failureCode?: string | null; failureMessage?: string | null }
+  vo?: {
+    deliverectLastError?: string | null;
+    failureCode?: string | null;
+    failureMessage?: string | null;
+    vendor?: {
+      orderRoutingMode?: string | null;
+      vendorDashboardLastSeenAt?: Date | string | null;
+    } | null;
+  }
 ): string {
   switch (reason) {
     case "routing_failed":
@@ -389,11 +423,22 @@ function reasonToLabel(
         ? (vo.deliverectLastError?.slice(0, 80) ?? "Routing failed")
         : "Routing failed";
     case "routing_stuck":
+      if (vo?.vendor?.orderRoutingMode === "manual_dashboard") {
+        return `Post-payment routing did not confirm after ${ROUTING_STUCK_THRESHOLD_MINUTES}+ min — check dashboard/tablet flow`;
+      }
       return `Routing still pending after ${ROUTING_STUCK_THRESHOLD_MINUTES}+ min`;
     case "deliverect_reconciliation_overdue":
       return `Submitted to Deliverect, but no POS webhook confirmation after ${DELIVERECT_RECONCILIATION_STALE_MINUTES}+ min`;
-    case "fulfillment_stuck":
+    case "fulfillment_stuck": {
+      if (vo?.vendor?.orderRoutingMode === "manual_dashboard") {
+        const offline =
+          resolveVendorDashboardPresenceStatus(vo.vendor.vendorDashboardLastSeenAt) === "offline";
+        return offline
+          ? "Vendor has not accepted this dashboard/tablet order — dashboard appears offline"
+          : "Vendor has not accepted this dashboard/tablet order";
+      }
       return "Fulfillment in early state for too long";
+    }
     case "open_issue":
       return "Order or vendor order has an open issue";
     case "customer_reported_issue":
@@ -526,6 +571,8 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
     if (vo.fulfillmentStatus !== "pending") continue;
     const urgency = getExceptionUrgency(vo.createdAt);
     const reason: AdminAttentionReason = "routing_stuck";
+    const orderSnap = orderRecoverySnapshot(vo);
+    const voSnap = voRecoverySnapshot(vo);
     items.push(
       attachVendorOrderAttentionActions(
         {
@@ -535,7 +582,13 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
           bucket: reasonToBucket(reason),
           severity: urgencyToSeverity(urgency.urgency),
           ageMinutes: urgency.ageMinutes,
-          recommendedAction: "retry_routing",
+          recommendedAction: reasonToRecommendedAction(
+            reason,
+            vo.fulfillmentStatus,
+            voSnap,
+            orderSnap,
+            vo.vendor?.orderRoutingMode
+          ),
           reasonLabel: reasonToLabel(reason, vo),
           currentStatus: buildCurrentStatus(vo.routingStatus, vo.fulfillmentStatus),
           orderId: vo.orderId,

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { searchAdminVendors } from "@/services/admin-vendor-detail.service";
 import { AdminVendorSearchForm } from "./AdminVendorSearchForm";
+import {
+  vendorDashboardPresenceLabel,
+} from "@/lib/vendor-dashboard-presence";
+import { vendorOrderRoutingModeShortLabel } from "@/lib/vendor-order-routing-mode";
 
 export default async function AdminVendorsPage({
   searchParams,
@@ -29,6 +33,8 @@ export default async function AdminVendorsPage({
             <thead>
               <tr className="border-b border-oo-light-stone text-oo-stone-gray">
                 <th className="px-4 py-3 font-medium">Vendor</th>
+                <th className="px-4 py-3 font-medium">Routing</th>
+                <th className="px-4 py-3 font-medium">Dashboard</th>
                 <th className="px-4 py-3 font-medium">State</th>
                 <th className="px-4 py-3 font-medium">Pods</th>
                 <th className="px-4 py-3 font-medium">Owners</th>
@@ -38,7 +44,7 @@ export default async function AdminVendorsPage({
             <tbody>
               {results.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-oo-stone-gray">
+                  <td colSpan={7} className="px-4 py-8 text-center text-oo-stone-gray">
                     No vendors matched &ldquo;{query}&rdquo;.
                   </td>
                 </tr>
@@ -51,6 +57,12 @@ export default async function AdminVendorsPage({
                       </Link>
                       <p className="font-mono text-xs text-oo-stone-gray">{row.slug}</p>
                       <p className="text-xs text-oo-stone-gray">{row.publicPathPreview}</p>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-oo-stone-gray">
+                      {vendorOrderRoutingModeShortLabel(row.orderRoutingMode)}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-oo-stone-gray">
+                      {vendorDashboardPresenceLabel(row.vendorDashboardLastSeenAt)}
                     </td>
                     <td className="px-4 py-3 text-xs">
                       {!row.isActive ? "Hidden" : row.mennyuOrdersPaused ? "Ordering paused" : "Public"}

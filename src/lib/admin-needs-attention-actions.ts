@@ -28,8 +28,15 @@ export function formatOrderPaymentLabel(status: string): string {
 
 export function canRetryRouting(
   vo: VendorOrderRecoverySnapshot,
-  order: OrderRecoverySnapshot
+  order: OrderRecoverySnapshot,
+  orderRoutingMode?: string | null
 ): boolean {
+  if (orderRoutingMode === "manual_dashboard") {
+    if (!isOrderPaidForAdminRecovery(order)) return false;
+    if (TERMINAL_FULFILLMENT.has(vo.fulfillmentStatus)) return false;
+    if (vo.manuallyRecoveredAt != null) return false;
+    return vo.routingStatus === "failed";
+  }
   if (!isOrderPaidForAdminRecovery(order)) return false;
   if (TERMINAL_FULFILLMENT.has(vo.fulfillmentStatus)) return false;
   if (vo.manuallyRecoveredAt != null) return false;
@@ -71,7 +78,8 @@ export type WorkbenchSuggestedAction = "retry_routing" | "manual_recovery" | "vi
 export function getNeedsAttentionSuggestedActions(
   reason: AdminAttentionReason,
   vo: VendorOrderRecoverySnapshot | null,
-  order: OrderRecoverySnapshot | null
+  order: OrderRecoverySnapshot | null,
+  orderRoutingMode?: string | null
 ): WorkbenchSuggestedAction[] {
   if (!vo || !order) {
     if (reason === "open_issue" || reason === "customer_reported_issue") return ["resolve_issue"];
@@ -79,7 +87,7 @@ export function getNeedsAttentionSuggestedActions(
   }
 
   const actions: WorkbenchSuggestedAction[] = ["view_order"];
-  if (canRetryRouting(vo, order)) actions.unshift("retry_routing");
+  if (canRetryRouting(vo, order, orderRoutingMode)) actions.unshift("retry_routing");
   if (canManualRecoverVendorOrder(vo, order)) actions.push("manual_recovery");
   if (reason === "open_issue") actions.push("resolve_issue");
   return [...new Set(actions)];

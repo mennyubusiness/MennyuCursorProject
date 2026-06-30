@@ -23,6 +23,8 @@ export type AdminVendorDetailView = {
     deliverectChannelLinkId: string | null;
     deliverectLocationId: string | null;
     orderRoutingMode: string;
+    menuSource: string;
+    vendorDashboardLastSeenAt: string | null;
     stripeConnectedAccountId: string | null;
     stripeDetailsSubmitted: boolean;
     stripeChargesEnabled: boolean;
@@ -127,6 +129,8 @@ export async function loadAdminVendorDetail(vendorId: string): Promise<AdminVend
       deliverectChannelLinkId: vendor.deliverectChannelLinkId,
       deliverectLocationId: vendor.deliverectLocationId,
       orderRoutingMode: vendor.orderRoutingMode,
+      menuSource: vendor.menuSource,
+      vendorDashboardLastSeenAt: vendor.vendorDashboardLastSeenAt?.toISOString() ?? null,
       stripeConnectedAccountId: vendor.stripeConnectedAccountId,
       stripeDetailsSubmitted: vendor.stripeDetailsSubmitted,
       stripeChargesEnabled: vendor.stripeChargesEnabled,
@@ -185,6 +189,8 @@ export type AdminVendorSearchRow = {
   isActive: boolean;
   mennyuOrdersPaused: boolean;
   posConnectionStatus: string;
+  orderRoutingMode: string;
+  vendorDashboardLastSeenAt: string | null;
   podNames: string[];
   ownerEmails: string[];
   publicPathPreview: string;
@@ -228,6 +234,8 @@ export async function searchAdminVendors(rawQuery: string, limit = 50): Promise<
     isActive: v.isActive,
     mennyuOrdersPaused: v.mennyuOrdersPaused,
     posConnectionStatus: v.posConnectionStatus,
+    orderRoutingMode: v.orderRoutingMode,
+    vendorDashboardLastSeenAt: v.vendorDashboardLastSeenAt?.toISOString() ?? null,
     podNames: v.pods.map((p) => p.pod.name),
     ownerEmails: v.vendorMemberships.map((m) => m.user.email),
     publicPathPreview: v.pods[0]

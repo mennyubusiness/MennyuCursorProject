@@ -37,6 +37,7 @@ import {
   vendorRoutingStatusFieldLabel,
   vendorRoutingStatusLabel,
 } from "@/lib/vendor-order-routing-mode";
+import { isDeliverectMenuSource } from "@/lib/vendor-menu-source";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 
 function startOfToday(): Date {
@@ -65,6 +66,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       deliverectLocationId: true,
       posConnectionStatus: true,
       orderRoutingMode: true,
+      menuSource: true,
       pendingDeliverectConnectionKey: true,
       deliverectAutoMapLastOutcome: true,
       deliverectAutoMapLastAt: true,
@@ -121,7 +123,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
   const menuReady = isVendorMenuReady(menuSummary);
 
   let deliverectMappingReady = true;
-  if (isDeliverectRoutingMode(vendorRecord.orderRoutingMode)) {
+  if (isDeliverectMenuSource(vendorRecord)) {
     const { loadVendorDeliverectMappingReadyMap } = await import(
       "@/services/vendor-deliverect-mapping-readiness.server"
     );
@@ -143,6 +145,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     pendingDeliverectConnectionKey: vendorRecord.pendingDeliverectConnectionKey,
     hasUnmatchedChannelRegistration,
     orderRoutingMode: vendorRecord.orderRoutingMode,
+    menuSource: vendorRecord.menuSource,
     deliverectMappingReady,
   };
 
@@ -150,6 +153,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     {
       podId: currentPod?.pod.id ?? vendorId,
       vendorId,
+      menuSource: vendorRecord.menuSource,
       pod: { isActive: currentPod?.pod.isActive ?? true },
       podVendor: currentPod ? { isActive: currentPod.isActive } : null,
       vendor: {

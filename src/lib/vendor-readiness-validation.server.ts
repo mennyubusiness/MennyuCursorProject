@@ -31,6 +31,7 @@ const vendorReadinessSelect = {
   deliverectAutoMapLastOutcome: true,
   pendingDeliverectConnectionKey: true,
   orderRoutingMode: true,
+  menuSource: true,
 } as const;
 
 export type VendorReadinessBundle = {
@@ -109,6 +110,7 @@ export async function loadVendorReadinessBundles(
         pendingDeliverectConnectionKey: vendor.pendingDeliverectConnectionKey,
         hasUnmatchedChannelRegistration: false,
         orderRoutingMode: vendor.orderRoutingMode,
+        menuSource: vendor.menuSource,
         deliverectMappingReady,
       },
     });

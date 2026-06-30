@@ -3,15 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import type { VendorMenuSource } from "@prisma/client";
 import { VendorAreaNav } from "./VendorAreaNav";
 
 export function VendorLayoutChrome({
   vendorId,
   vendorName,
+  menuSource,
   children,
 }: {
   vendorId: string;
   vendorName: string;
+  menuSource: VendorMenuSource;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -22,6 +25,7 @@ export function VendorLayoutChrome({
     pathname?.includes(`/vendor/${vendorId}/dashboard`) ||
     pathname?.includes(`/vendor/${vendorId}/orders`) ||
     pathname?.includes(`/vendor/${vendorId}/menu`) ||
+    pathname?.includes(`/vendor/${vendorId}/menu-builder`) ||
     pathname?.includes(`/vendor/${vendorId}/menu-imports`) ||
     pathname?.includes(`/vendor/${vendorId}/hours`) ||
     pathname?.includes(`/vendor/${vendorId}/payouts`) ||
@@ -44,7 +48,7 @@ export function VendorLayoutChrome({
         <div className={headerWidth}>
           <h1 className="oo-dash-titlebar-heading">{vendorName}</h1>
         </div>
-        <VendorAreaNav vendorId={vendorId} wide={isWideWorkspace} />
+        <VendorAreaNav vendorId={vendorId} menuSource={menuSource} wide={isWideWorkspace} />
       </header>
       <main className={mainWidth}>{children}</main>
     </div>

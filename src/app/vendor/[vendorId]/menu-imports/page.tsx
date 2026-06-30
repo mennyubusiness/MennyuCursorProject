@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { MenuImportIssueSeverity } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
+  gateDeliverectMenuRoutes,
+  requireVendorMenuSourceContext,
+} from "@/lib/vendor-menu-route-guard.server";
+import {
   menuImportFriendlySource,
   menuImportListSummaryLine,
   vendorMenuImportListBadge,
@@ -19,6 +23,9 @@ export default async function VendorMenuImportsListPage({
   params: Promise<{ vendorId: string }>;
 }) {
   const { vendorId } = await params;
+  const vendorCtx = await requireVendorMenuSourceContext(vendorId);
+  gateDeliverectMenuRoutes(vendorCtx, vendorId);
+
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
     select: { id: true, name: true, autoPublishMenus: true },

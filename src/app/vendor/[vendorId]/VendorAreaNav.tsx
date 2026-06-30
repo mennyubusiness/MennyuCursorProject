@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { VendorMenuSource } from "@prisma/client";
+import { vendorMenuSourceNavLabel, vendorUsesMenuBuilder } from "@/lib/vendor-menu-source";
 
-const NAV_LINKS = [
+const BASE_NAV_LINKS = [
   { href: "dashboard", label: "Dashboard" },
   { href: "orders", label: "Orders" },
-  { href: "menu", label: "Menu" },
   { href: "hours", label: "Hours" },
   { href: "payouts", label: "Payouts" },
   { href: "setup", label: "Setup" },
@@ -21,15 +22,37 @@ function navLinkIsActive(pathname: string, base: string, href: string): boolean 
   if (href === "orders") {
     return pathname === path || pathname.startsWith(`${path}/`);
   }
-  if (href === "menu") {
-    return pathname === path || pathname.startsWith(`${path}/`);
+  if (href === "menu" || href === "menu-builder") {
+    return (
+      pathname === `${base}/menu` ||
+      pathname.startsWith(`${base}/menu/`) ||
+      pathname === `${base}/menu-builder` ||
+      pathname.startsWith(`${base}/menu-builder/`) ||
+      pathname.startsWith(`${base}/menu-imports`)
+    );
   }
   return pathname === path || pathname.startsWith(`${path}/`);
 }
 
-export function VendorAreaNav({ vendorId, wide = false }: { vendorId: string; wide?: boolean }) {
+export function VendorAreaNav({
+  vendorId,
+  menuSource,
+  wide = false,
+}: {
+  vendorId: string;
+  menuSource: VendorMenuSource;
+  wide?: boolean;
+}) {
   const pathname = usePathname();
   const base = `/vendor/${vendorId}`;
+  const menuHref = vendorUsesMenuBuilder(menuSource) ? "menu-builder" : "menu";
+  const menuLabel = vendorMenuSourceNavLabel(menuSource);
+  const navLinks = [
+    BASE_NAV_LINKS[0],
+    BASE_NAV_LINKS[1],
+    { href: menuHref, label: menuLabel },
+    ...BASE_NAV_LINKS.slice(2),
+  ];
   const widthClass = wide
     ? "mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-2"
     : "mx-auto flex max-w-2xl flex-wrap items-center gap-2 px-4 py-2";
@@ -38,7 +61,7 @@ export function VendorAreaNav({ vendorId, wide = false }: { vendorId: string; wi
     <nav className="oo-dash-nav" aria-label="Vendor area">
       <div className={widthClass}>
         <div className="flex flex-wrap gap-1">
-          {NAV_LINKS.map(({ href, label }) => {
+          {navLinks.map(({ href, label }) => {
             const path = `${base}/${href}`;
             const isActive = navLinkIsActive(pathname, base, href);
             return (
