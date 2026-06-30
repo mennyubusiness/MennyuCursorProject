@@ -15,8 +15,6 @@ type VendorStoreStatusCardProps = {
   paymentsLabel: string;
   storefrontHref: string | null;
   todayHoursLabel: string;
-  nextOpeningLabel: string | null;
-  hoursSourceLabel: string;
   ordersPaused: boolean;
   posManaged: boolean;
 };
@@ -32,8 +30,6 @@ export function VendorStoreStatusCard({
   paymentsLabel,
   storefrontHref,
   todayHoursLabel,
-  nextOpeningLabel,
-  hoursSourceLabel,
   ordersPaused,
   posManaged,
 }: VendorStoreStatusCardProps) {
@@ -83,10 +79,6 @@ export function VendorStoreStatusCard({
         <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
           <dt className="text-xs font-medium text-oo-stone-gray">Today</dt>
           <dd className="mt-1 text-sm font-medium text-oo-charcoal">{todayHoursLabel}</dd>
-          {nextOpeningLabel ? (
-            <dd className="mt-1 text-xs text-oo-stone-gray">{nextOpeningLabel}</dd>
-          ) : null}
-          <dd className="mt-1 text-xs text-oo-stone-gray">{hoursSourceLabel}</dd>
         </div>
         <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
           <dt className="text-xs font-medium text-oo-stone-gray">{routingStatusFieldLabel}</dt>

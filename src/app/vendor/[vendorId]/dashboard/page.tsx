@@ -50,8 +50,6 @@ export default async function VendorDashboardPage({
           paymentsLabel={ctx.paymentsLabel}
           storefrontHref={ctx.storefrontHref}
           todayHoursLabel={ctx.hoursSummary.todayLabel}
-          nextOpeningLabel={ctx.hoursSummary.nextOpeningLabel}
-          hoursSourceLabel={ctx.hoursSummary.sourceLabel}
           ordersPaused={ctx.vendorRecord.mennyuOrdersPaused ?? false}
           posManaged={ctx.posManaged}
         />

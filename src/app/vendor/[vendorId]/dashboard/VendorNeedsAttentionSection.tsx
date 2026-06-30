@@ -1,31 +1,16 @@
 import Link from "next/link";
 
 import type { VendorAttentionItem } from "@/lib/vendor-dashboard-attention";
-import { VENDOR_ALL_READY_COPY } from "@/lib/vendor-operational-copy";
 
 export function VendorNeedsAttentionSection({
-  vendorId,
   items,
-  setupComplete,
 }: {
   vendorId: string;
   items: VendorAttentionItem[];
   setupComplete: boolean;
 }) {
   if (items.length === 0) {
-    return (
-      <section className="rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-950">
-        <p className="font-medium">{VENDOR_ALL_READY_COPY}</p>
-        {!setupComplete ? (
-          <p className="mt-1 text-emerald-900/90">
-            <Link href={`/vendor/${vendorId}/setup`} className="font-semibold underline">
-              Finish setup
-            </Link>{" "}
-            to unlock every feature.
-          </p>
-        ) : null}
-      </section>
-    );
+    return null;
   }
 
   const summaryItems = items.filter((item) => item.kind === "summary");

@@ -27,7 +27,6 @@ export function VendorKitchenPauseToggle({
 
   const pauseLabel = variant === "orders" ? "Pause order intake" : "Pause intake";
   const resumeLabel = variant === "orders" ? "Resume order intake" : "Resume intake";
-  const statusLabel = paused ? "Order intake paused" : "Accepting orders";
 
   async function handleToggle() {
     setError(null);
@@ -77,9 +76,6 @@ export function VendorKitchenPauseToggle({
 
   return (
     <div className={`flex flex-col gap-1 ${variant === "orders" ? "items-end text-right" : "items-end"}`}>
-      {variant === "orders" ? (
-        <p className="text-xs font-medium text-oo-stone-gray">{statusLabel}</p>
-      ) : null}
       <button type="button" onClick={() => void handleToggle()} disabled={loading} className={buttonClass}>
         {loading ? "…" : paused ? resumeLabel : pauseLabel}
       </button>

@@ -157,6 +157,7 @@ export function VendorDashboardLiveOrders({
 
   const activeOrderCount = order.reduce((sum, key) => sum + (grouped[key]?.length ?? 0), 0);
   const showActiveEmpty = activeGroupsOnly && activeOrderCount === 0;
+  const showEmptyState = !activeGroupsOnly && vendorOrders.length === 0;
 
   const highlightNow = Date.now();
   const newOrderIdsForSound = grouped.new?.map((vo) => vo.id) ?? [];
@@ -199,12 +200,12 @@ export function VendorDashboardLiveOrders({
           />
         </div>
       ) : null}
-      {showActiveEmpty || vendorOrders.length === 0 ? (
+      {showEmptyState ? (
         <DashboardEmptyState
           title="No active orders right now."
           description="New orders will appear here when customers place them."
         />
-      ) : (
+      ) : showActiveEmpty ? null : (
         <div className="space-y-12">
           {order.map((key) => {
           const list = grouped[key];
