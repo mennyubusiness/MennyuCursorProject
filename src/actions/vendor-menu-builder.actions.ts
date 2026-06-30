@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { buildPodCustomerPath, buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
+import { parseMenuPriceToCents } from "@/lib/menu-price";
 import { authorizeVendorSettingsWrite } from "@/lib/server/vendor-settings-authorization";
 import {
   openOrderCategoryDeliverectId,
@@ -32,14 +34,16 @@ async function authorizeOpenOrderMenuBuilder(vendorId: string): Promise<ActionRe
   return { ok: true };
 }
 
-async function revalidateMenuBuilderSurfaces(vendorId: string) {
+async function revalidateCustomerMenuSurfaces(vendorId: string) {
   const id = vendorId.trim();
-  revalidatePath(`/vendor/${id}/menu-builder`);
-  revalidatePath(`/vendor/${id}/menu`);
-  revalidatePath(`/vendor/${id}/setup`);
-  revalidatePath(`/vendor/${id}/dashboard`);
   revalidateOperationalMenuCacheForVendor(id);
   revalidateCustomerVendorMenuCacheForVendor(id);
+
+  const vendor = await prisma.vendor.findUnique({
+    where: { id },
+    select: { slug: true },
+  });
+
   const pods = await prisma.podVendor.findMany({
     where: { vendorId: id },
     select: { podId: true, pod: { select: { slug: true } } },
@@ -47,24 +51,27 @@ async function revalidateMenuBuilderSurfaces(vendorId: string) {
   for (const { podId, pod } of pods) {
     revalidatePath(`/pod/${podId}`);
     if (pod.slug) {
-      revalidatePath(`/pod/${podId}/vendor/${id}`);
+      revalidatePath(buildPodCustomerPath(pod.slug));
+      if (vendor?.slug) {
+        revalidatePath(buildVendorMenuCustomerPath(pod.slug, vendor.slug));
+      }
     }
+    revalidatePath(`/pod/${podId}/vendor/${id}`);
   }
 }
 
+async function revalidateMenuBuilderSurfaces(vendorId: string) {
+  const id = vendorId.trim();
+  await revalidateCustomerMenuSurfaces(id);
+  revalidatePath(`/vendor/${id}/menu-builder`);
+  revalidatePath(`/vendor/${id}/menu`);
+  revalidatePath(`/vendor/${id}/setup`);
+  revalidatePath(`/vendor/${id}/dashboard`);
+}
+
 function parsePriceToCents(raw: string): number | null {
-  const trimmed = raw.trim().replace(/^\$/, "");
-  if (!trimmed) return null;
-  if (/^\d+$/.test(trimmed)) {
-    const cents = Number(trimmed);
-    return Number.isInteger(cents) && cents >= 0 ? cents : null;
-  }
-  const match = trimmed.match(/^(\d+)(?:\.(\d{1,2}))?$/);
-  if (!match) return null;
-  const dollars = Number(match[1]);
-  const frac = (match[2] ?? "").padEnd(2, "0").slice(0, 2);
-  const cents = dollars * 100 + Number(frac);
-  return Number.isInteger(cents) && cents >= 0 ? cents : null;
+  const parsed = parseMenuPriceToCents(raw);
+  return parsed.ok ? parsed.cents : null;
 }
 
 export async function createOpenOrderMenuCategory(
@@ -92,7 +99,7 @@ export async function createOpenOrderMenuCategory(
     select: { id: true },
   });
 
-  await revalidateMenuBuilderSurfaces(vendorId);
+  await revalidateCustomerMenuSurfaces(vendorId);
   return { ok: true, categoryId: category.id };
 }
 
@@ -126,7 +133,7 @@ export async function updateOpenOrderMenuCategory(
   }
 
   await prisma.vendorMenuCategory.update({ where: { id: categoryId }, data });
-  await revalidateMenuBuilderSurfaces(vendorId);
+  await revalidateCustomerMenuSurfaces(vendorId);
   return { ok: true };
 }
 
@@ -157,7 +164,7 @@ export async function deleteOpenOrderMenuCategory(
   }
 
   await prisma.vendorMenuCategory.delete({ where: { id: categoryId } });
-  await revalidateMenuBuilderSurfaces(vendorId);
+  await revalidateCustomerMenuSurfaces(vendorId);
   return { ok: true };
 }
 
@@ -184,7 +191,9 @@ export async function createOpenOrderMenuItem(
   if (!category) return { ok: false, error: "Category not found." };
 
   const priceCents = parsePriceToCents(input.price);
-  if (priceCents == null) return { ok: false, error: "Enter a valid price (e.g. 12.50 or 1250 cents)." };
+  if (priceCents == null) {
+    return { ok: false, error: "Price must be a valid dollar amount." };
+  }
 
   const description = input.description?.trim() || null;
   if (description && description.length > 2000) {
@@ -214,7 +223,7 @@ export async function createOpenOrderMenuItem(
     data: { deliverectProductId: openOrderProductDeliverectId(item.id) },
   });
 
-  await revalidateMenuBuilderSurfaces(vendorId);
+  await revalidateCustomerMenuSurfaces(vendorId);
   return { ok: true, itemId: item.id };
 }
 
@@ -267,7 +276,7 @@ export async function updateOpenOrderMenuItem(
   }
   if (input.price !== undefined) {
     const priceCents = parsePriceToCents(input.price);
-    if (priceCents == null) return { ok: false, error: "Enter a valid price." };
+    if (priceCents == null) return { ok: false, error: "Price must be a valid dollar amount." };
     data.priceCents = priceCents;
   }
   if (input.categoryId !== undefined) {
@@ -287,7 +296,7 @@ export async function updateOpenOrderMenuItem(
   }
 
   await prisma.menuItem.update({ where: { id: itemId }, data });
-  await revalidateMenuBuilderSurfaces(vendorId);
+  await revalidateCustomerMenuSurfaces(vendorId);
   return { ok: true };
 }
 
@@ -312,7 +321,7 @@ export async function deleteOpenOrderMenuItem(vendorId: string, itemId: string):
       where: { id: itemId },
       data: { isAvailable: false },
     });
-    await revalidateMenuBuilderSurfaces(vendorId);
+    await revalidateCustomerMenuSurfaces(vendorId);
     return {
       ok: false,
       error: "This item has order history and was marked unavailable instead of deleted.",
@@ -320,7 +329,7 @@ export async function deleteOpenOrderMenuItem(vendorId: string, itemId: string):
   }
 
   await prisma.menuItem.delete({ where: { id: itemId } });
-  await revalidateMenuBuilderSurfaces(vendorId);
+  await revalidateCustomerMenuSurfaces(vendorId);
   return { ok: true };
 }
 
