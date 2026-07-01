@@ -20,6 +20,7 @@ const baseVendor = {
 };
 
 const baseMenu = {
+  hasPublishedMenuVersion: true,
   hasOperationalItems: true,
   hasAvailableOperationalItems: true,
 };
@@ -39,6 +40,7 @@ const basePos = {
   hasUnmatchedChannelRegistration: false,
   orderRoutingMode: "manual_dashboard" as const,
   deliverectMappingReady: true,
+  menuSource: "open_order" as const,
 };
 
 function evaluation(overrides?: Partial<Parameters<typeof getVendorOrderabilityState>[0]>) {
@@ -60,6 +62,21 @@ describe("public profile visibility", () => {
     expect(isVendorPublicProfileReady(input)).toBe(false);
     expect(getVendorPublicProfileMissingItems(input)).toContain("menu");
     expect(getVendorPublicVisibilityState(input)).toBe("hidden");
+  });
+
+  it("hides open_order vendor when menu is draft-only (not published)", () => {
+    const input = evaluation({
+      menuSummary: {
+        ...baseMenu,
+        hasPublishedMenuVersion: false,
+        hasOperationalItems: true,
+        hasAvailableOperationalItems: true,
+      },
+      posSummary: { ...basePos, menuSource: "open_order" },
+    });
+    expect(getVendorPublicProfileMissingItems(input)).toContain("menu");
+    expect(getVendorPublicVisibilityState(input)).toBe("hidden");
+    expect(getVendorOrderabilityState(input).orderable).toBe(false);
   });
 
   it("hides vendor when customer ordering hours are missing", () => {

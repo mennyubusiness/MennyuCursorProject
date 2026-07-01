@@ -60,7 +60,7 @@ export function VendorKitchenPauseToggle({
     }
   }
 
-  if (posManaged && variant === "orders") {
+  if (posManaged && (variant === "orders" || variant === "kitchen")) {
     return (
       <div className="flex flex-col items-end gap-1 text-right">
         <p className="rounded-xl border border-oo-light-stone bg-oo-cream/80 px-4 py-2.5 text-sm text-oo-stone-gray">

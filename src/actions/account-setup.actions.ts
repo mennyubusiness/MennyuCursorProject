@@ -182,6 +182,13 @@ export async function createVendorProfile(input: {
     if (accept.ok) {
       podConnected = true;
       redirectPath = `/vendor/${accept.vendorId}/setup?access=pod_connected`;
+    } else {
+      return {
+        ok: false,
+        error:
+          accept.message ??
+          "Your vendor profile was created, but we could not connect you to the pod. Open your invite link again to finish connecting.",
+      };
     }
   }
 

@@ -309,13 +309,18 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
     {
       key: "menu",
       label: openOrderMenu ? "Build menu" : "Publish menu",
-      complete: menuSummary.hasOperationalItems,
+      complete: openOrderMenu
+        ? Boolean(menuSummary.hasPublishedMenuVersion && menuSummary.hasOperationalItems)
+        : menuSummary.hasOperationalItems,
       owner: "vendor",
-      description: menuSummary.hasOperationalItems
-        ? "Menu items are available on your public page."
-        : openOrderMenu
-          ? "Add categories and items in Menu Builder, then publish."
-          : "Publish or import a menu before appearing on the pod page.",
+      description:
+        openOrderMenu && !menuSummary.hasPublishedMenuVersion && menuSummary.hasOperationalItems
+          ? "Publish your Menu Builder draft before customers can order."
+          : menuSummary.hasOperationalItems
+            ? "Menu items are available on your public page."
+            : openOrderMenu
+              ? "Add categories and items in Menu Builder, then publish."
+              : "Publish or import a menu before appearing on the pod page.",
       actionHref:
         audience === "vendor" ? menuVendorPath : podOwnerVendorHref(podId, podSlug, vendor.slug),
       actionLabel: audience === "vendor" ? (openOrderMenu ? "Open Menu Builder" : "Review menu") : "View menu page",

@@ -78,6 +78,8 @@ export function VendorKitchenBoard({
 
   posWarning,
 
+  posManaged = false,
+
 }: {
 
   vendorId: string;
@@ -98,6 +100,8 @@ export function VendorKitchenBoard({
 
   posWarning: string | null;
 
+  posManaged?: boolean;
+
 }) {
 
   const [intakePaused, setIntakePaused] = useState(ordersPaused);
@@ -112,7 +116,7 @@ export function VendorKitchenBoard({
 
 
 
-  const { vendorOrders, nowMs, onStatusSuccess, fetchError, refresh, isPolling, lastFetchedAtMs } =
+  const { vendorOrders, nowMs, onStatusSuccess, fetchError, refresh } =
 
     useVendorOrdersPoll({
 
@@ -212,11 +216,7 @@ export function VendorKitchenBoard({
 
         posWarning={posWarning}
 
-        lastFetchedAtMs={lastFetchedAtMs}
-
-        nowMs={nowMs}
-
-        fetchError={fetchError}
+        posManaged={posManaged}
 
       />
 
@@ -261,14 +261,6 @@ export function VendorKitchenBoard({
           </button>
 
         </div>
-
-      ) : null}
-
-
-
-      {isPolling && vendorOrders.length === 0 && !fetchError ? (
-
-        <p className="px-4 py-6 text-center text-sm text-oo-stone-gray sm:px-6">Loading orders…</p>
 
       ) : null}
 

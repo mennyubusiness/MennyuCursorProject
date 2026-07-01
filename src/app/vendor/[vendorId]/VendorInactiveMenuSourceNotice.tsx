@@ -2,23 +2,16 @@
 
 import { useSearchParams } from "next/navigation";
 
-const COPY = {
-  deliverect: {
-    title: "Deliverect menu sync is inactive",
-    body: "This location uses the Open Order Menu Builder for menus. Your Deliverect menu data is saved and will return if routing switches back to Deliverect.",
-  },
-  open_order: {
-    title: "Menu Builder is inactive",
-    body: "This location uses Deliverect menu sync for menus. Your Menu Builder data is saved and will return if routing switches back to the Open Order dashboard.",
-  },
+const INACTIVE_MENU_BUILDER_COPY = {
+  title: "Menu Builder is inactive",
+  body: "This location uses Deliverect menu sync for menus. Your Menu Builder data is saved and will return if routing switches back to the Open Order dashboard.",
 } as const;
 
 export function VendorInactiveMenuSourceNotice() {
   const sp = useSearchParams();
-  const code = sp.get("inactive_menu_source");
-  if (code !== "deliverect" && code !== "open_order") return null;
+  if (sp.get("inactive_menu_source") !== "open_order") return null;
 
-  const row = COPY[code];
+  const row = INACTIVE_MENU_BUILDER_COPY;
 
   return (
     <div

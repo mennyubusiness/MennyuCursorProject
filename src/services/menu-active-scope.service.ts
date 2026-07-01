@@ -204,6 +204,11 @@ async function fallbackWinnersNoPublishedMenu(vendorId: string): Promise<Set<str
     select: { menuSource: true },
   });
 
+  // Open Order Menu Builder requires an explicit publish before items are orderable.
+  if (menuSource?.menuSource === "open_order") {
+    return new Set();
+  }
+
   const rows = await prisma.menuItem.findMany({
     where: { vendorId, deliverectProductId: { not: null } },
     select: { id: true, deliverectProductId: true, deliverectPlu: true, updatedAt: true },

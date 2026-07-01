@@ -53,6 +53,6 @@ export async function POST(request: Request) {
     podId: result.podId,
     podName: result.podName,
     alreadyAccepted: result.alreadyAccepted,
-    redirectPath: `/vendor/${result.vendorId}/settings`,
+    redirectPath: `/vendor/${result.vendorId}/setup?access=pod_connected`,
   });
 }

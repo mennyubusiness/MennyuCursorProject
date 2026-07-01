@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import {
   isVendorDeliverectLiveForUi,
+  isVendorPosManagedForUi,
   vendorKitchenStatusWarning,
 } from "@/lib/vendor-order-routing-mode";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
@@ -58,6 +59,7 @@ export default async function VendorKitchenPage({
       vendorDeliverectChannelLinkId={vendor.deliverectChannelLinkId}
       ordersPaused={vendor.mennyuOrdersPaused ?? false}
       posWarning={posWarning}
+      posManaged={isVendorPosManagedForUi(vendor.orderRoutingMode, posUi)}
     />
   );
 }

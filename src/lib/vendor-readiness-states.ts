@@ -62,8 +62,19 @@ function isVendorDeliverectMappingReady(pos: VendorPosReadinessSummary): boolean
   return pos.deliverectMappingReady !== false;
 }
 
-function isVendorMenuReady(menu: VendorMenuReadinessSummary): boolean {
+function isVendorMenuReady(menu: VendorMenuReadinessSummary, menuSource?: VendorMenuSource): boolean {
+  if (menuSource === "open_order" && !menu.hasPublishedMenuVersion) return false;
   return menu.hasAvailableOperationalItems;
+}
+
+function isVendorPublicMenuReady(
+  menuSummary: VendorMenuReadinessSummary,
+  menuSource?: VendorMenuSource
+): boolean {
+  if (menuSource === "open_order") {
+    return Boolean(menuSummary.hasPublishedMenuVersion && menuSummary.hasOperationalItems);
+  }
+  return menuSummary.hasOperationalItems;
 }
 
 function isVendorCustomerOrderingHoursReady(customerOrderingHours: unknown): boolean {
@@ -130,14 +141,14 @@ export function isVendorPublicProfileReady(input: VendorReadinessEvaluationInput
 export function getVendorPublicProfileMissingItems(
   input: VendorReadinessEvaluationInput
 ): VendorPublicProfileMissingKey[] {
-  const { vendor, menuSummary } = input;
+  const { vendor, menuSummary, posSummary } = input;
   const missing: VendorPublicProfileMissingKey[] = [];
 
   if (!vendor.name?.trim()) missing.push("name");
   if (!vendor.description?.trim()) missing.push("description");
   if (!vendor.imageUrl?.trim()) missing.push("banner");
   if (!vendor.cuisineCategory?.trim()) missing.push("cuisine");
-  if (!menuSummary.hasOperationalItems) missing.push("menu");
+  if (!isVendorPublicMenuReady(menuSummary, posSummary.menuSource)) missing.push("menu");
   if (!isVendorCustomerOrderingHoursReady(vendor.customerOrderingHours)) missing.push("hours");
 
   return missing;
@@ -174,7 +185,7 @@ export function getVendorOperationalMissingItems(
   if (!isVendorStripePayoutReady(stripeSummary)) missing.push("stripe");
   if (!isVendorPosReady(posSummary)) missing.push("pos");
   if (!isVendorDeliverectMappingReady(posSummary)) missing.push("deliverect_mapping");
-  if (!isVendorMenuReady(menuSummary)) missing.push("menu_unavailable");
+  if (!isVendorMenuReady(menuSummary, posSummary.menuSource)) missing.push("menu_unavailable");
 
   const availability = getVendorAvailability(
     input.vendorAvailability ?? {
