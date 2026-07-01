@@ -25,6 +25,8 @@ const baseAccountMenu: HeaderAccountMenu = {
   podPublicPageHref: "/riverside-pod",
   podSettingsHref: null,
   podVendorsHref: null,
+  continueSetupHref: null,
+  continueSetupLabel: null,
 };
 
 describe("resolvePrimaryNavModeFromMemberships", () => {
@@ -150,5 +152,24 @@ describe("buildRoleAccountActions", () => {
     });
     expect(actions.some((a) => a.type === "link" && a.label === "Orders")).toBe(true);
     expect(actions.some((a) => a.type === "link" && a.label === "Kitchen mode")).toBe(false);
+  });
+
+  it("shows continue vendor setup for customer mode when onboarding is pending", () => {
+    const actions = buildRoleAccountActions({
+      mode: "customer",
+      accountMenu: {
+        ...baseAccountMenu,
+        roleHint: "Vendor setup",
+        vendorDashboardHref: null,
+        primaryVendorId: null,
+        continueSetupHref: "/account/setup/vendor",
+        continueSetupLabel: "Continue vendor setup",
+      },
+      dashboardHref: null,
+    });
+    expect(actions.some((a) => a.type === "link" && a.label === "Continue vendor setup")).toBe(
+      true
+    );
+    expect(actions.some((a) => a.type === "link" && a.label === "Dashboard")).toBe(false);
   });
 });

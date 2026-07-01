@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
 import { prisma } from "@/lib/db";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 
@@ -20,7 +21,8 @@ export default async function VendorDashboardHubPage() {
   });
 
   if (memberships.length === 0) {
-    redirect("/orders");
+    const pending = await getPendingAccountSetupRedirect(session.user.id);
+    redirect(pending ?? "/account");
   }
   if (memberships.length === 1) {
     redirect(`/vendor/${memberships[0].vendorId}`);

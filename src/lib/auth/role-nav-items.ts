@@ -80,6 +80,12 @@ export function buildRoleAccountActions(input: {
     const vendorDashboard = vendorDashboardHref(accountMenu, dashboardHref);
     if (vendorDashboard) {
       actions.push({ type: "link", href: vendorDashboard, label: "Dashboard" });
+    } else if (accountMenu.continueSetupHref && accountMenu.continueSetupLabel) {
+      actions.push({
+        type: "link",
+        href: accountMenu.continueSetupHref,
+        label: accountMenu.continueSetupLabel,
+      });
     }
     if (accountMenu.vendorPublicPageHref) {
       actions.push({
@@ -99,6 +105,12 @@ export function buildRoleAccountActions(input: {
     const podDashboard = podDashboardHref(accountMenu, dashboardHref);
     if (podDashboard) {
       actions.push({ type: "link", href: podDashboard, label: "Dashboard" });
+    } else if (accountMenu.continueSetupHref && accountMenu.continueSetupLabel) {
+      actions.push({
+        type: "link",
+        href: accountMenu.continueSetupHref,
+        label: accountMenu.continueSetupLabel,
+      });
     }
     if (accountMenu.podPublicPageHref) {
       actions.push({
@@ -120,6 +132,14 @@ export function buildRoleAccountActions(input: {
       : "Account";
 
   actions.push({ type: "link", href: ACCOUNT_HUB_PATH, label: accountLabel });
+
+  if (accountMenu.continueSetupHref && accountMenu.continueSetupLabel) {
+    actions.push({
+      type: "link",
+      href: accountMenu.continueSetupHref,
+      label: accountMenu.continueSetupLabel,
+    });
+  }
 
   switch (mode) {
     case "customer":

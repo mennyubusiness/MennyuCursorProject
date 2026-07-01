@@ -64,25 +64,10 @@ export async function ensureVendorRegistrationIntentForInvite(): Promise<ActionR
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "Not signed in." };
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      registrationIntent: true,
-      needsAccountRoleSelection: true,
-      vendorMemberships: { select: { id: true }, take: 1 },
-    },
-  });
-  if (!user) return { ok: false, error: "Account not found." };
-  if (user.vendorMemberships.length > 0) return { ok: true };
-  if (user.registrationIntent === RegistrationIntent.vendor) return { ok: true };
+  const { ensureVendorRegistrationIntent } = await import("@/lib/auth/account-setup");
+  const ok = await ensureVendorRegistrationIntent(userId);
+  if (!ok) return { ok: false, error: "Account not found." };
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      registrationIntent: RegistrationIntent.vendor,
-      needsAccountRoleSelection: false,
-    },
-  });
   revalidatePath("/account");
   return { ok: true };
 }

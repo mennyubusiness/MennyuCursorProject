@@ -19,6 +19,9 @@ export type HeaderAccountMenu = {
   podPublicPageHref: string | null;
   podSettingsHref: string | null;
   podVendorsHref: string | null;
+  /** When profile/membership onboarding is incomplete — recovery link for header/account menus. */
+  continueSetupHref: string | null;
+  continueSetupLabel: string | null;
 };
 
 export function getHeaderAccountDisplayLabel(accountMenu: HeaderAccountMenu): string {
@@ -29,11 +32,21 @@ export function buildHeaderAccountRoleHint(input: {
   isPlatformAdmin: boolean;
   vendorCount: number;
   podCount: number;
+  pendingVendorSetup?: boolean;
+  pendingPodSetup?: boolean;
 }): string | null {
   const parts: string[] = [];
   if (input.isPlatformAdmin) parts.push("Platform admin");
-  if (input.vendorCount > 0) parts.push("Vendor");
-  if (input.podCount > 0) parts.push("Pod");
+  if (input.vendorCount > 0) {
+    parts.push("Vendor");
+  } else if (input.pendingVendorSetup) {
+    parts.push("Vendor setup");
+  }
+  if (input.podCount > 0) {
+    parts.push("Pod");
+  } else if (input.pendingPodSetup) {
+    parts.push("Pod setup");
+  }
   if (parts.length === 0) return null;
   return parts.join(" · ");
 }

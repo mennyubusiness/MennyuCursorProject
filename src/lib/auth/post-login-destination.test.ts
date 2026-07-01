@@ -117,4 +117,25 @@ describe("resolvePostLoginDestination", () => {
     const dest = await resolvePostLoginDestination("user_1", "/checkout?cartId=c1");
     expect(dest).toEqual({ kind: "redirect", path: "/checkout?cartId=c1" });
   });
+
+  it("prioritizes pending vendor setup over default explore destination", async () => {
+    mockGetPendingSetup.mockResolvedValue("/account/setup/vendor");
+
+    const dest = await resolvePostLoginDestination("user_1", null);
+    expect(dest).toEqual({ kind: "redirect", path: "/account/setup/vendor" });
+    expect(mockFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("preserves invite next on pending vendor setup redirect", async () => {
+    mockGetPendingSetup.mockResolvedValue("/account/setup/vendor");
+
+    const dest = await resolvePostLoginDestination(
+      "user_1",
+      "/vendor/invite/tok_abc"
+    );
+    expect(dest).toEqual({
+      kind: "redirect",
+      path: "/account/setup/vendor?next=%2Fvendor%2Finvite%2Ftok_abc",
+    });
+  });
 });

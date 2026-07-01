@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { HomeHero } from "@/components/home/HomeHero";
 import { HomeJoinGroupSection } from "@/components/home/HomeJoinGroupSection";
 import { HomeMarketingSections } from "@/components/home/HomeMarketingSections";
+import { HomePendingOnboardingBanner } from "@/components/home/HomePendingOnboardingBanner";
 import { getCustomerSessionFromRequest } from "@/lib/customer-session";
 
 export default async function HomePage() {
@@ -17,6 +18,9 @@ export default async function HomePage() {
 
   return (
     <div className="w-full">
+      {session?.user?.id ? (
+        <HomePendingOnboardingBanner userId={session.user.id} />
+      ) : null}
       <HomeHero />
       <HomeMarketingSections />
       {isSignedIn ? (

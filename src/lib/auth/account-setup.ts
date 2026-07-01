@@ -59,3 +59,29 @@ export async function getPendingAccountSetupRedirect(userId: string): Promise<st
 
   return null;
 }
+
+/**
+ * Ensures vendor registration intent for invite onboarding when the user has no vendor yet.
+ * Idempotent — safe to call on vendor setup resume.
+ */
+export async function ensureVendorRegistrationIntent(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      registrationIntent: true,
+      vendorMemberships: { select: { id: true }, take: 1 },
+    },
+  });
+  if (!user) return false;
+  if (user.vendorMemberships.length > 0) return true;
+  if (user.registrationIntent === RegistrationIntent.vendor) return true;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      registrationIntent: RegistrationIntent.vendor,
+      needsAccountRoleSelection: false,
+    },
+  });
+  return true;
+}

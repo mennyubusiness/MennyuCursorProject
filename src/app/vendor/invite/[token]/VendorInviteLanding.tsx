@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { ensureVendorRegistrationIntentForInvite } from "@/actions/account-setup.actions";
 import { buildLoginHrefWithReturn, buildRegisterHrefWithReturn } from "@/lib/auth/invite-auth-links";
 import type { PodVendorInvitePublicView } from "@/services/pod-vendor-invite.types";
 
@@ -51,6 +52,11 @@ export function VendorInviteLanding({
           return;
         }
         if (data.code === "no_vendor_account") {
+          const intent = await ensureVendorRegistrationIntentForInvite();
+          if (!intent.ok) {
+            setError(intent.error);
+            return;
+          }
           router.push(`/account/setup/vendor?next=${encodeURIComponent(invitePath)}`);
           return;
         }

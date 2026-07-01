@@ -4,8 +4,11 @@
  */
 import "server-only";
 
+import { RegistrationIntent } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { buildPodCustomerPath, buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
+import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
+import { getPendingOnboardingLabel } from "@/lib/auth/account-paths";
 import { buildHeaderAccountRoleHint } from "@/lib/auth/header-account-menu";
 import type { HeaderNavContext } from "@/lib/auth/header-nav-types";
 
@@ -19,22 +22,26 @@ const emptyNavContext: HeaderNavContext = {
 };
 
 async function contextForUserId(userId: string): Promise<HeaderNavContext> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      email: true,
-      name: true,
-      isPlatformAdmin: true,
-      vendorMemberships: {
-        select: { vendorId: true, vendor: { select: { name: true, slug: true } } },
-        orderBy: { createdAt: "asc" },
+  const [user, continueSetupHref] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        name: true,
+        isPlatformAdmin: true,
+        registrationIntent: true,
+        vendorMemberships: {
+          select: { vendorId: true, vendor: { select: { name: true, slug: true } } },
+          orderBy: { createdAt: "asc" },
+        },
+        podMemberships: {
+          select: { podId: true, pod: { select: { name: true, slug: true } } },
+          orderBy: { createdAt: "asc" },
+        },
       },
-      podMemberships: {
-        select: { podId: true, pod: { select: { name: true, slug: true } } },
-        orderBy: { createdAt: "asc" },
-      },
-    },
-  });
+    }),
+    getPendingAccountSetupRedirect(userId),
+  ]);
 
   if (!user) {
     return emptyNavContext;
@@ -42,6 +49,13 @@ async function contextForUserId(userId: string): Promise<HeaderNavContext> {
 
   const vendorCount = user.vendorMemberships.length;
   const podCount = user.podMemberships.length;
+  const pendingVendorSetup =
+    user.registrationIntent === RegistrationIntent.vendor && vendorCount === 0;
+  const pendingPodSetup =
+    user.registrationIntent === RegistrationIntent.pod_owner && podCount === 0;
+  const continueSetupLabel = continueSetupHref
+    ? getPendingOnboardingLabel(continueSetupHref)
+    : null;
   const primaryVendorId = vendorCount > 0 ? user.vendorMemberships[0].vendorId : null;
   const primaryPodId = podCount > 0 ? user.podMemberships[0].podId : null;
 
@@ -72,6 +86,8 @@ async function contextForUserId(userId: string): Promise<HeaderNavContext> {
       isPlatformAdmin: user.isPlatformAdmin,
       vendorCount,
       podCount,
+      pendingVendorSetup,
+      pendingPodSetup,
     }),
     adminDashboardHref: user.isPlatformAdmin ? "/admin" : null,
     vendorDashboardHref:
@@ -88,6 +104,8 @@ async function contextForUserId(userId: string): Promise<HeaderNavContext> {
     podPublicPageHref,
     podSettingsHref: primaryPodId ? `/pod/${primaryPodId}/settings` : null,
     podVendorsHref: primaryPodId ? `/pod/${primaryPodId}/vendors` : null,
+    continueSetupHref,
+    continueSetupLabel,
   };
 
   if (user.isPlatformAdmin) {

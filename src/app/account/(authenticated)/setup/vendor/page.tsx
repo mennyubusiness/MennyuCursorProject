@@ -2,10 +2,13 @@ import { redirect } from "next/navigation";
 import { RegistrationIntent } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
+import {
+  ensureVendorRegistrationIntent,
+  getPendingAccountSetupRedirect,
+} from "@/lib/auth/account-setup";
 import { ACCOUNT_SETUP_VENDOR_PATH } from "@/lib/auth/account-paths";
 import { sanitizeLoginReturnPath } from "@/lib/auth/login-return-path";
-import { appendNextQueryParam } from "@/lib/auth/invite-token-path";
+import { appendNextQueryParam, isVendorInvitePath } from "@/lib/auth/invite-token-path";
 import { DashboardCard } from "@/components/dashboard";
 import { VendorSetupForm } from "./VendorSetupForm";
 
@@ -29,7 +32,11 @@ export default async function VendorSetupPage({
     select: { registrationIntent: true },
   });
   if (user?.registrationIntent !== RegistrationIntent.vendor) {
-    redirect("/");
+    if (nextPath && isVendorInvitePath(nextPath)) {
+      await ensureVendorRegistrationIntent(session.user.id);
+    } else {
+      redirect("/");
+    }
   }
 
   return (

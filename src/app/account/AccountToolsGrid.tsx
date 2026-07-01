@@ -121,13 +121,29 @@ function buildToolCards(staff: AccountStaffIdentity | null, primaryMode: HeaderN
 type AccountToolsGridProps = {
   staff: AccountStaffIdentity | null;
   primaryMode: HeaderNavMode;
+  pendingSetup?: { href: string; label: string } | null;
 };
 
-export function AccountToolsGrid({ staff, primaryMode }: AccountToolsGridProps) {
+export function AccountToolsGrid({ staff, primaryMode, pendingSetup = null }: AccountToolsGridProps) {
   const tools = buildToolCards(staff, primaryMode);
+  const showPendingFirst = pendingSetup && primaryMode === "customer";
 
   return (
     <DashboardCard title="Your tools" description="Shortcuts based on your account and roles.">
+      {showPendingFirst ? (
+        <div className="mb-4">
+          <Link
+            href={pendingSetup.href}
+            className="flex flex-col rounded-lg border border-brand/35 bg-brand/5 p-4 transition hover:border-brand/55 hover:bg-brand/10"
+          >
+            <span className="font-semibold text-oo-charcoal">{pendingSetup.label}</span>
+            <span className="mt-1 text-sm text-oo-stone-gray">
+              Pick up account setup where you left off.
+            </span>
+            <span className="mt-3 text-sm font-semibold text-brand">Continue →</span>
+          </Link>
+        </div>
+      ) : null}
       <ul className="grid gap-3 sm:grid-cols-2">
         {tools.map((tool) => (
           <li key={`${tool.href}-${tool.title}`}>

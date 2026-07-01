@@ -72,6 +72,11 @@ async function canRedirectToPath(userId: string, path: string): Promise<boolean>
 }
 
 async function resolveDefaultDestinationForUser(userId: string): Promise<PostLoginDestinationResult> {
+  const pendingSetup = await getPendingAccountSetupRedirect(userId);
+  if (pendingSetup) {
+    return { kind: "redirect", path: pendingSetup };
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {

@@ -33,7 +33,7 @@ describe("vendor orders ledger layout", () => {
     expect(ledger).toContain("Open Kitchen Mode");
     expect(ledger).toContain("VendorKitchenPauseToggle");
     expect(ledger).not.toContain("VendorDashboardLiveOrders");
-    expect(ledger).not.toContain("VendorOrdersHistorySection");
+    expect(ledger).not.toContain("filterVendorOrdersForHistory");
   });
 });
 
