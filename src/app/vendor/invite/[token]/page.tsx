@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { ensureVendorRegistrationIntentForInvite } from "@/actions/account-setup.actions";
 import { ACCOUNT_SETUP_VENDOR_PATH } from "@/lib/auth/account-paths";
+import { persistPendingVendorInviteFromToken } from "@/lib/auth/pending-vendor-invite.server";
 import {
   appendNextQueryParam,
   buildVendorInvitePath,
@@ -40,7 +40,7 @@ export default async function VendorInvitePage({
     }
 
     if (acceptResult.code === "no_vendor_account") {
-      await ensureVendorRegistrationIntentForInvite();
+      await persistPendingVendorInviteFromToken(session.user.id, token);
       redirect(appendNextQueryParam(ACCOUNT_SETUP_VENDOR_PATH, invitePath));
     }
 

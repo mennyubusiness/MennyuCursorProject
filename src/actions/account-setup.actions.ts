@@ -15,7 +15,15 @@ import {
   ACCOUNT_SETUP_VENDOR_PATH,
 } from "@/lib/auth/account-paths";
 import { uniquePodSlugFromName, uniqueVendorSlugFromName } from "@/lib/slug-server";
-import { acceptPodVendorInviteForUser } from "@/services/pod-vendor-invite.service";
+import {
+  getValidatedPendingVendorInviteForUser,
+  persistPendingVendorInviteFromReturnPath,
+  persistPendingVendorInviteFromToken,
+} from "@/lib/auth/pending-vendor-invite.server";
+import {
+  acceptPodVendorInviteById,
+  acceptPodVendorInviteForUser,
+} from "@/services/pod-vendor-invite.service";
 
 async function requireUserId(): Promise<string | null> {
   const session = await auth();
@@ -59,16 +67,41 @@ export async function setRegistrationRole(
   return { ok: true, nextPath };
 }
 
-/** Sets vendor registration intent for pod invite onboarding when the user has no vendor yet. */
-export async function ensureVendorRegistrationIntentForInvite(): Promise<ActionResult> {
+/** Sets vendor registration intent and persists invite for pod invite onboarding. */
+export async function ensureVendorRegistrationIntentForInvite(
+  inviteToken?: string
+): Promise<ActionResult> {
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "Not signed in." };
 
-  const { ensureVendorRegistrationIntent } = await import("@/lib/auth/account-setup");
-  const ok = await ensureVendorRegistrationIntent(userId);
-  if (!ok) return { ok: false, error: "Account not found." };
+  if (inviteToken?.trim()) {
+    const persisted = await persistPendingVendorInviteFromToken(userId, inviteToken.trim());
+    if (!persisted.ok) return { ok: false, error: persisted.error };
+  } else {
+    const { ensureVendorRegistrationIntent } = await import("@/lib/auth/account-setup");
+    const ok = await ensureVendorRegistrationIntent(userId);
+    if (!ok) return { ok: false, error: "Account not found." };
+  }
 
   revalidatePath("/account");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Persists pending pod vendor invite from a safe return path (e.g. `/vendor/invite/{token}`). */
+export async function recordPendingVendorInviteFromReturnPath(
+  returnPath: string | null
+): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Not signed in." };
+
+  const result = await persistPendingVendorInviteFromReturnPath(userId, returnPath);
+  if ("error" in result) {
+    return { ok: false, error: result.error };
+  }
+
+  revalidatePath("/account");
+  revalidatePath("/");
   return { ok: true };
 }
 
@@ -122,13 +155,20 @@ export async function createVendorProfile(input: {
   /** City / area — optional onboarding field */
   locationSummary?: string;
   inviteToken?: string;
-}): Promise<ActionResult & { vendorId?: string; redirectPath?: string; podConnected?: boolean }> {
+}): Promise<
+  ActionResult & {
+    vendorId?: string;
+    redirectPath?: string;
+    podConnected?: boolean;
+    inviteWarning?: string;
+  }
+> {
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "Not signed in." };
 
   const u = await prisma.user.findUnique({
     where: { id: userId },
-    select: { registrationIntent: true },
+    select: { registrationIntent: true, email: true },
   });
   if (u?.registrationIntent !== RegistrationIntent.vendor) {
     return { ok: false, error: "This form is only for vendor accounts." };
@@ -176,23 +216,35 @@ export async function createVendorProfile(input: {
 
   let redirectPath = `/vendor/${vendor.id}/settings`;
   let podConnected = false;
+  let inviteWarning: string | undefined;
+
+  const userEmail = u.email;
   const inviteToken = input.inviteToken?.trim();
+  let acceptResult = null;
+
   if (inviteToken) {
-    const accept = await acceptPodVendorInviteForUser({ token: inviteToken, userId });
-    if (accept.ok) {
-      podConnected = true;
-      redirectPath = `/vendor/${accept.vendorId}/setup?access=pod_connected`;
-    } else {
-      return {
-        ok: false,
-        error:
-          accept.message ??
-          "Your vendor profile was created, but we could not connect you to the pod. Open your invite link again to finish connecting.",
-      };
+    acceptResult = await acceptPodVendorInviteForUser({ token: inviteToken, userId });
+  } else if (userEmail) {
+    const pending = await getValidatedPendingVendorInviteForUser(userId);
+    if (pending.status === "active") {
+      acceptResult = await acceptPodVendorInviteById({
+        inviteId: pending.inviteId,
+        userId,
+        userEmail,
+      });
+    } else if (pending.status !== "none") {
+      inviteWarning = pending.message;
     }
   }
 
-  return { ok: true, vendorId: vendor.id, redirectPath, podConnected };
+  if (acceptResult?.ok) {
+    podConnected = true;
+    redirectPath = `/vendor/${acceptResult.vendorId}/setup?access=pod_connected`;
+  } else if (acceptResult && !acceptResult.ok) {
+    inviteWarning = acceptResult.message;
+  }
+
+  return { ok: true, vendorId: vendor.id, redirectPath, podConnected, inviteWarning };
 }
 
 export async function createPodProfile(input: {

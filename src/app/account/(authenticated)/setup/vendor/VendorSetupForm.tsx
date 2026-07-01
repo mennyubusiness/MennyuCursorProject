@@ -17,7 +17,15 @@ const POS_OPTIONS = [
   { value: "unknown", label: "Not sure yet" },
 ];
 
-export function VendorSetupForm({ nextPath = null }: { nextPath?: string | null }) {
+export function VendorSetupForm({
+  nextPath = null,
+  inviteContext = null,
+  inviteWarning = null,
+}: {
+  nextPath?: string | null;
+  inviteContext?: { podName: string; invitedVendorName: string | null } | null;
+  inviteWarning?: string | null;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +53,12 @@ export function VendorSetupForm({ nextPath = null }: { nextPath?: string | null 
         return;
       }
       if (r.vendorId) {
-        router.push(r.redirectPath ?? nextPath ?? `/vendor/${r.vendorId}/settings`);
+        const base = r.redirectPath ?? nextPath ?? `/vendor/${r.vendorId}/settings`;
+        const dest =
+          r.inviteWarning && !r.podConnected
+            ? `${base}${base.includes("?") ? "&" : "?"}pod_invite_notice=${encodeURIComponent(r.inviteWarning)}`
+            : base;
+        router.push(dest);
         router.refresh();
       }
     } finally {
@@ -58,8 +71,24 @@ export function VendorSetupForm({ nextPath = null }: { nextPath?: string | null 
       <DashboardPageHeader
         headingLevel={1}
         title="Restaurant profile"
-        description="Create your workspace now — set up payments and connect your menu system when you're ready."
+        description={
+          inviteContext
+            ? `Create your workspace to join ${inviteContext.podName}. Set up payments and your menu after this step.`
+            : "Create your workspace now — set up payments and connect your menu system when you're ready."
+        }
       />
+      {inviteContext ? (
+        <p className="rounded-lg border border-brand/25 bg-brand/5 px-3 py-2 text-sm text-oo-charcoal">
+          You&apos;re joining <span className="font-semibold">{inviteContext.podName}</span>
+          {inviteContext.invitedVendorName ? ` as ${inviteContext.invitedVendorName}` : ""}. We&apos;ll
+          connect you to this pod after you submit this form.
+        </p>
+      ) : null}
+      {inviteWarning ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950" role="status">
+          {inviteWarning}
+        </p>
+      ) : null}
       <label className="block text-sm">
         <span className="font-medium text-oo-charcoal">Business name</span>
         <input name="businessName" required className="oo-input mt-1 w-full" />

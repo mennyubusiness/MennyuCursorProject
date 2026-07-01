@@ -99,6 +99,19 @@ describe("deriveVendorAttentionItems", () => {
     expect(items.some((item) => item.id === "stripe")).toBe(true);
   });
 
+  it("does not surface pending pod invites as attention when vendor already has pod membership", () => {
+    const items = deriveVendorAttentionItems({
+      ...base,
+      publicProfileReady: false,
+      canAcceptOrders: false,
+      hasPodMembership: true,
+      pendingPodInviteCount: 2,
+    });
+
+    expect(items.some((item) => item.id === "pod_invite")).toBe(false);
+    expect(items.some((item) => item.id === "no_pod")).toBe(false);
+  });
+
   it("does not show Deliverect POS warnings in manual dashboard routing mode", () => {
     const items = deriveVendorAttentionItems({
       ...base,

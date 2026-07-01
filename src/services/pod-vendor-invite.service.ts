@@ -9,6 +9,7 @@ import {
   POD_VENDOR_INVITE_TTL_MS,
 } from "@/lib/auth/secure-invite-token";
 import { attachVendorToPod } from "@/lib/attach-vendor-to-pod";
+import { clearPendingVendorInviteForUser } from "@/lib/auth/pending-vendor-invite.server";
 import { getPublicSiteOriginFromEnv } from "@/lib/public-site-url";
 import { prisma } from "@/lib/db";
 import { sendPodVendorInviteEmail } from "@/lib/email/pod-vendor-invite-email";
@@ -189,6 +190,7 @@ async function finalizePodVendorInviteAcceptance(input: {
     acceptedByUserId: input.userId,
     membershipRequestId: input.membershipRequestId,
   });
+  await clearPendingVendorInviteForUser(input.userId);
   revalidatePodInviteSurfaces(input.podId, input.vendorId);
 }
 
@@ -459,26 +461,26 @@ async function resolveVendorForInviteAcceptance(input: {
   return { error: "Create a vendor account to accept this invite.", code: "no_vendor_account" };
 }
 
-export async function acceptPodVendorInvite(input: {
-  rawToken: string;
+type PodVendorInviteAcceptRow = {
+  id: string;
+  podId: string;
+  status: string;
+  expiresAt: Date;
+  invitedEmail: string;
+  targetVendorId: string | null;
+  membershipRequestId: string | null;
+  acceptedVendorId: string | null;
+  acceptedByUserId: string | null;
+  pod: { id: string; name: string };
+};
+
+async function acceptPodVendorInviteRecord(input: {
+  invite: PodVendorInviteAcceptRow;
   userId: string;
   userEmail: string;
 }): Promise<AcceptPodVendorInviteResult> {
   const userEmail = normalizeAccountEmail(input.userEmail);
-  const token = input.rawToken.trim();
-  if (!token) {
-    return { ok: false, code: "invalid", message: "This invite link is not valid." };
-  }
-
-  const tokenHash = hashSecureInviteToken(token);
-  const invite = await prisma.podVendorInvite.findUnique({
-    where: { tokenHash },
-    include: { pod: { select: { id: true, name: true } } },
-  });
-
-  if (!invite) {
-    return { ok: false, code: "invalid", message: "This invite link is not valid." };
-  }
+  const invite = input.invite;
 
   if (invite.status === POD_VENDOR_INVITE_STATUS.cancelled) {
     return { ok: false, code: "cancelled", message: "This invite was cancelled. Ask the pod owner for a new invite." };
@@ -505,10 +507,12 @@ export async function acceptPodVendorInvite(input: {
   }
 
   if (invite.expiresAt.getTime() < Date.now()) {
-    await prisma.podVendorInvite.update({
-      where: { id: invite.id },
-      data: { status: POD_VENDOR_INVITE_STATUS.expired, updatedAt: new Date() },
-    });
+    if (invite.status === POD_VENDOR_INVITE_STATUS.pending) {
+      await prisma.podVendorInvite.update({
+        where: { id: invite.id },
+        data: { status: POD_VENDOR_INVITE_STATUS.expired, updatedAt: new Date() },
+      });
+    }
     return { ok: false, code: "expired", message: "This invite has expired. Ask the pod owner for a new invite." };
   }
 
@@ -585,6 +589,52 @@ export async function acceptPodVendorInvite(input: {
     podName: invite.pod.name,
     alreadyAccepted: false,
   };
+}
+
+export async function acceptPodVendorInviteById(input: {
+  inviteId: string;
+  userId: string;
+  userEmail: string;
+}): Promise<AcceptPodVendorInviteResult> {
+  const invite = await prisma.podVendorInvite.findUnique({
+    where: { id: input.inviteId },
+    include: { pod: { select: { id: true, name: true } } },
+  });
+  if (!invite) {
+    return { ok: false, code: "invalid", message: "This invite link is not valid." };
+  }
+  return acceptPodVendorInviteRecord({
+    invite,
+    userId: input.userId,
+    userEmail: input.userEmail,
+  });
+}
+
+export async function acceptPodVendorInvite(input: {
+  rawToken: string;
+  userId: string;
+  userEmail: string;
+}): Promise<AcceptPodVendorInviteResult> {
+  const token = input.rawToken.trim();
+  if (!token) {
+    return { ok: false, code: "invalid", message: "This invite link is not valid." };
+  }
+
+  const tokenHash = hashSecureInviteToken(token);
+  const invite = await prisma.podVendorInvite.findUnique({
+    where: { tokenHash },
+    include: { pod: { select: { id: true, name: true } } },
+  });
+
+  if (!invite) {
+    return { ok: false, code: "invalid", message: "This invite link is not valid." };
+  }
+
+  return acceptPodVendorInviteRecord({
+    invite,
+    userId: input.userId,
+    userEmail: input.userEmail,
+  });
 }
 
 /** Accept a pod-scoped vendor invite for the signed-in user (alias for invite onboarding flows). */

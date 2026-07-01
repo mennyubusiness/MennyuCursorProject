@@ -16,7 +16,7 @@ const mockPrisma = {
   podVendor: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
   podMembershipRequest: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   vendorMembership: { findMany: vi.fn() },
-  user: { findUnique: vi.fn() },
+  user: { findUnique: vi.fn(), updateMany: vi.fn() },
   $transaction: vi.fn(),
 };
 

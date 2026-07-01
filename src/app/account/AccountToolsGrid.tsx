@@ -121,7 +121,7 @@ function buildToolCards(staff: AccountStaffIdentity | null, primaryMode: HeaderN
 type AccountToolsGridProps = {
   staff: AccountStaffIdentity | null;
   primaryMode: HeaderNavMode;
-  pendingSetup?: { href: string; label: string } | null;
+  pendingSetup?: { href: string; label: string; description?: string } | null;
 };
 
 export function AccountToolsGrid({ staff, primaryMode, pendingSetup = null }: AccountToolsGridProps) {
@@ -138,7 +138,7 @@ export function AccountToolsGrid({ staff, primaryMode, pendingSetup = null }: Ac
           >
             <span className="font-semibold text-oo-charcoal">{pendingSetup.label}</span>
             <span className="mt-1 text-sm text-oo-stone-gray">
-              Pick up account setup where you left off.
+              {pendingSetup.description ?? "Pick up account setup where you left off."}
             </span>
             <span className="mt-3 text-sm font-semibold text-brand">Continue →</span>
           </Link>

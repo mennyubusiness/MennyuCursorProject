@@ -7,6 +7,10 @@ import {
   getPendingAccountSetupRedirect,
 } from "@/lib/auth/account-setup";
 import { ACCOUNT_SETUP_VENDOR_PATH } from "@/lib/auth/account-paths";
+import {
+  getValidatedPendingVendorInviteForUser,
+  persistPendingVendorInviteFromReturnPath,
+} from "@/lib/auth/pending-vendor-invite.server";
 import { sanitizeLoginReturnPath } from "@/lib/auth/login-return-path";
 import { appendNextQueryParam, isVendorInvitePath } from "@/lib/auth/invite-token-path";
 import { DashboardCard } from "@/components/dashboard";
@@ -27,6 +31,10 @@ export default async function VendorSetupPage({
     redirect(nextPath ? appendNextQueryParam(pending, nextPath) : pending);
   }
 
+  if (nextPath && isVendorInvitePath(nextPath)) {
+    await persistPendingVendorInviteFromReturnPath(session.user.id, nextPath);
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { registrationIntent: true },
@@ -39,9 +47,22 @@ export default async function VendorSetupPage({
     }
   }
 
+  const pendingInvite = await getValidatedPendingVendorInviteForUser(session.user.id);
+  const inviteContext =
+    pendingInvite.status === "active"
+      ? {
+          podName: pendingInvite.podName,
+          invitedVendorName: pendingInvite.invitedVendorName,
+        }
+      : null;
+  const inviteWarning =
+    pendingInvite.status !== "active" && pendingInvite.status !== "none"
+      ? pendingInvite.message
+      : null;
+
   return (
     <DashboardCard>
-      <VendorSetupForm nextPath={nextPath} />
+      <VendorSetupForm nextPath={nextPath} inviteContext={inviteContext} inviteWarning={inviteWarning} />
     </DashboardCard>
   );
 }

@@ -52,7 +52,7 @@ export function VendorInviteLanding({
           return;
         }
         if (data.code === "no_vendor_account") {
-          const intent = await ensureVendorRegistrationIntentForInvite();
+          const intent = await ensureVendorRegistrationIntentForInvite(token);
           if (!intent.ok) {
             setError(intent.error);
             return;

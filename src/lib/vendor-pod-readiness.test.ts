@@ -4,11 +4,13 @@ import {
   deriveVendorPodReadiness,
   isVendorCustomerOrderingHoursReady,
   isVendorMenuReady,
+  isVendorPodAssignmentReady,
   isVendorPosReady,
   isVendorProfileComplete,
   isVendorStripePayoutReady,
   VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS,
 } from "./vendor-pod-readiness";
+import { isVendorSetupComplete } from "./vendor-dashboard-attention";
 import { defaultVendorCustomerOrderingWeek } from "./vendor-customer-ordering-hours";
 
 const baseVendor = {
@@ -111,6 +113,13 @@ describe("vendor setup sub-helpers", () => {
     expect(isVendorCustomerOrderingHoursReady(undefined)).toBe(false);
     const allClosed = defaultVendorCustomerOrderingWeek().map((row) => ({ ...row, isOpen: false }));
     expect(isVendorCustomerOrderingHoursReady(allClosed)).toBe(false);
+  });
+
+  it("treats pod assignment as ready when vendor has membership, even with pending invites", () => {
+    expect(isVendorPodAssignmentReady({ hasPodMembership: true, pendingPodInviteCount: 1 })).toBe(true);
+    expect(isVendorPodAssignmentReady({ hasPodMembership: true, pendingPodInviteCount: 0 })).toBe(true);
+    expect(isVendorPodAssignmentReady({ hasPodMembership: false, pendingPodInviteCount: 1 })).toBe(false);
+    expect(isVendorPodAssignmentReady({ hasPodMembership: false, pendingPodInviteCount: 0 })).toBe(false);
   });
 });
 
@@ -252,6 +261,56 @@ describe("deriveVendorPodReadiness vendor checklist", () => {
 
     const invite = result.checklist.find((item) => item.key === "pod_invite");
     expect(invite?.complete).toBe(false);
+    expect(invite?.description).toBe("1 pending invitation(s) below.");
+  });
+
+  it("marks pod assignment complete when vendor has membership and a pending invite", () => {
+    const result = deriveVendorPodReadiness(
+      {
+        podId: "pod_1",
+        vendorId: "vendor_1",
+        pod: { isActive: true },
+        podVendor: { isActive: true },
+        vendor: baseVendor,
+        menuSummary: baseMenu,
+        posSummary: basePos,
+        stripeSummary: baseStripe,
+        pendingPodInviteCount: 1,
+        hasPodMembership: true,
+        customerOrderingHours: baseCustomerOrderingHours,
+      },
+      { audience: "vendor" }
+    );
+
+    const invite = result.checklist.find((item) => item.key === "pod_invite");
+    expect(invite?.complete).toBe(true);
+    expect(invite?.description).toBe("Linked to a pod. 1 additional invitation(s) are optional.");
+
+    const completeKeys = result.checklist.filter((item) => item.complete).map((item) => item.key);
+    expect(isVendorSetupComplete(completeKeys)).toBe(true);
+  });
+
+  it("marks pod assignment incomplete when vendor has no membership and no pending invite", () => {
+    const result = deriveVendorPodReadiness(
+      {
+        podId: "pod_1",
+        vendorId: "vendor_1",
+        pod: { isActive: true },
+        podVendor: null,
+        vendor: baseVendor,
+        menuSummary: baseMenu,
+        posSummary: basePos,
+        stripeSummary: baseStripe,
+        pendingPodInviteCount: 0,
+        hasPodMembership: false,
+        customerOrderingHours: baseCustomerOrderingHours,
+      },
+      { audience: "vendor" }
+    );
+
+    const invite = result.checklist.find((item) => item.key === "pod_invite");
+    expect(invite?.complete).toBe(false);
+    expect(invite?.description).toBe("Join a pod when a pod owner invites you.");
   });
 });
 

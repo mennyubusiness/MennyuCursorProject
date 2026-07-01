@@ -6,7 +6,7 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { RegistrationIntent } from "@prisma/client";
 import { registerWithEmailPassword } from "@/actions/register.actions";
-import { setRegistrationRole } from "@/actions/account-setup.actions";
+import { setRegistrationRole, recordPendingVendorInviteFromReturnPath } from "@/actions/account-setup.actions";
 import { ACCOUNT_ROLE_PATH } from "@/lib/auth/account-paths";
 import {
   appendNextQueryParam,
@@ -62,6 +62,13 @@ export function RegisterForm() {
         if (!role.ok) {
           setError(role.error);
           return;
+        }
+        if (returnPathSafe && isVendorInvitePath(returnPathSafe)) {
+          const persisted = await recordPendingVendorInviteFromReturnPath(returnPathSafe);
+          if (!persisted.ok) {
+            setError(persisted.error);
+            return;
+          }
         }
         const setupPath = role.nextPath ?? "/account/setup/vendor";
         router.push(

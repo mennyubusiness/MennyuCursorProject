@@ -6,6 +6,7 @@ import { loadAccountPageContext } from "@/lib/account-page-context";
 import { resolveAccountPrimaryNavMode } from "@/lib/account-primary-nav-mode";
 import { ACCOUNT_SIGN_IN_PATH, getPendingOnboardingLabel } from "@/lib/auth/account-paths";
 import { getPendingAccountSetupRedirect } from "@/lib/auth/account-setup";
+import { getValidatedPendingVendorInviteForUser } from "@/lib/auth/pending-vendor-invite.server";
 import { getOrdersForSignedInUser } from "@/services/customer-account-orders.service";
 
 import { loadUserEmailVerificationState } from "@/lib/auth/email-verification-access.server";
@@ -26,9 +27,19 @@ export default async function AccountPage() {
   }
 
   const ctx = await loadAccountPageContext(await headers());
-  const pendingSetupHref = await getPendingAccountSetupRedirect(session.user.id);
+  const [pendingSetupHref, pendingInvite] = await Promise.all([
+    getPendingAccountSetupRedirect(session.user.id),
+    getValidatedPendingVendorInviteForUser(session.user.id),
+  ]);
   const pendingSetup = pendingSetupHref
-    ? { href: pendingSetupHref, label: getPendingOnboardingLabel(pendingSetupHref) }
+    ? {
+        href: pendingSetupHref,
+        label: getPendingOnboardingLabel(pendingSetupHref),
+        description:
+          pendingInvite.status === "active"
+            ? `Join ${pendingInvite.podName} — finish your restaurant profile.`
+            : "Pick up account setup where you left off.",
+      }
     : null;
   const recentOrders = (
     await getOrdersForSignedInUser(session.user.id, session.user.email)

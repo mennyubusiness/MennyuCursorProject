@@ -231,6 +231,7 @@ model PodVendorInvite {
   acceptedByUser User?   @relation("PodVendorInviteAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
   acceptedVendor Vendor? @relation("PodVendorInviteAcceptedVendor", fields: [acceptedVendorId], references: [id], onDelete: SetNull)
   targetVendor   Vendor? @relation("PodVendorInviteTargetVendor", fields: [targetVendorId], references: [id], onDelete: SetNull)
+  pendingForUser User?   @relation("UserPendingVendorInvite")
 
   @@index([podId, status])
   @@index([invitedEmail])
@@ -291,6 +292,8 @@ model User {
   registrationIntent RegistrationIntent?
   /// True only for new email signups until they pick a role on `/account/role`.
   needsAccountRoleSelection Boolean @default(false)
+  /// Pod vendor invite to resume after interrupted invite-based onboarding (cleared on accept or invalid invite).
+  pendingVendorInviteId String? @unique
   vendorMemberships  VendorMembership[]
   podMemberships       PodMembership[]
   customerProfile      CustomerProfile?
@@ -315,6 +318,7 @@ model User {
   podPayoutStripeLastSyncedAt          DateTime?
   podVendorInvitesCreated              PodVendorInvite[] @relation("PodVendorInviteCreatedBy")
   podVendorInvitesAccepted             PodVendorInvite[] @relation("PodVendorInviteAcceptedBy")
+  pendingVendorInvite                  PodVendorInvite?  @relation("UserPendingVendorInvite", fields: [pendingVendorInviteId], references: [id], onDelete: SetNull)
   adminAuditLogs                       AdminAuditLog[]   @relation("AdminAuditLogActor")
   slugRedirectsCreated                 SlugRedirect[]    @relation("SlugRedirectCreatedBy")
   /// When set, credentials login and active JWT sessions are blocked.

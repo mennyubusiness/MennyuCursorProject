@@ -150,6 +150,14 @@ export function isVendorCustomerOrderingHoursReady(customerOrderingHours: unknow
   return hasValidVendorCustomerOrderingHours(customerOrderingHours);
 }
 
+/** Pod assignment is satisfied by active membership; pending invites only matter when not yet in a pod. */
+export function isVendorPodAssignmentReady(input: {
+  hasPodMembership?: boolean;
+  pendingPodInviteCount?: number;
+}): boolean {
+  return Boolean(input.hasPodMembership);
+}
+
 /** Public profile fields required before a vendor appears on the public pod page. */
 export const VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS = [
   "name",
@@ -381,8 +389,9 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
   ];
 
   if (audience === "vendor") {
-    const inviteComplete =
-      (input.pendingPodInviteCount ?? 0) === 0 && Boolean(input.hasPodMembership);
+    const pendingPodInviteCount = input.pendingPodInviteCount ?? 0;
+    const hasPodMembership = Boolean(input.hasPodMembership);
+    const inviteComplete = isVendorPodAssignmentReady(input);
     const hoursComplete = isVendorCustomerOrderingHoursReady(input.customerOrderingHours);
     items.push({
       key: "hours",
@@ -400,12 +409,13 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
       label: "Accept pod invitations",
       complete: inviteComplete,
       owner: "vendor",
-      description:
-        (input.pendingPodInviteCount ?? 0) > 0
-          ? `${input.pendingPodInviteCount} pending invitation(s) below.`
-          : input.hasPodMembership
-            ? "You are linked to a pod."
-            : "Join a pod when a pod owner invites you.",
+      description: hasPodMembership
+        ? pendingPodInviteCount > 0
+          ? `Linked to a pod. ${pendingPodInviteCount} additional invitation(s) are optional.`
+          : "You are linked to a pod."
+        : pendingPodInviteCount > 0
+          ? `${pendingPodInviteCount} pending invitation(s) below.`
+          : "Join a pod when a pod owner invites you.",
       actionHref: `${settingsBase}?section=pod-membership`,
       actionLabel: "View invitations",
     });

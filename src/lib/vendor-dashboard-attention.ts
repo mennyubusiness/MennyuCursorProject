@@ -94,7 +94,7 @@ export function deriveVendorAttentionItems(input: {
       });
     }
 
-    if (input.pendingPodInviteCount > 0) {
+    if (input.pendingPodInviteCount > 0 && !input.hasPodMembership) {
       items.push({
         id: "pod_invite",
         title: "Pod membership pending",
