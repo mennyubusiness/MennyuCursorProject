@@ -414,9 +414,9 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
           ? `Linked to a pod. ${pendingPodInviteCount} additional invitation(s) are optional.`
           : "You are linked to a pod."
         : pendingPodInviteCount > 0
-          ? `${pendingPodInviteCount} pending invitation(s) below.`
+          ? `${pendingPodInviteCount} pending invitation(s) in Vendor Profile.`
           : "Join a pod when a pod owner invites you.",
-      actionHref: `${settingsBase}?section=pod-membership`,
+      actionHref: `${settingsBase}#pod-invites`,
       actionLabel: "View invitations",
     });
     items.push({

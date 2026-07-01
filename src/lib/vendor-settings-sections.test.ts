@@ -33,7 +33,7 @@ describe("resolveLegacyVendorSettingsRedirect", () => {
       "/vendor/v1/payouts?payout_notice=link_expired"
     );
     expect(resolveLegacyVendorSettingsRedirect("v1", "pos-menu")).toBe("/vendor/v1/connect-pos");
-    expect(resolveLegacyVendorSettingsRedirect("v1", "pod-membership")).toBe("/vendor/v1/setup");
+    expect(resolveLegacyVendorSettingsRedirect("v1", "pod-membership")).toBe("/vendor/v1/settings#pod-invites");
     expect(resolveLegacyVendorSettingsRedirect("v1", "ordering")).toBe("/vendor/v1/hours");
     expect(resolveLegacyVendorSettingsRedirect("v1", "account")).toBe("/vendor/v1/dashboard");
   });

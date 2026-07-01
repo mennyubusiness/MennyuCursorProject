@@ -74,9 +74,11 @@ function inviteOrigin(requestOrigin?: string): string {
 
 export function revalidatePodInviteSurfaces(podId: string, vendorId?: string): void {
   revalidatePath(`/pod/${podId}/dashboard`);
+  revalidatePath(`/pod/${podId}/vendors`);
   if (vendorId) {
     revalidatePath(`/vendor/${vendorId}/settings`);
     revalidatePath(`/vendor/${vendorId}/dashboard`);
+    revalidatePath(`/vendor/${vendorId}/setup`);
   }
 }
 

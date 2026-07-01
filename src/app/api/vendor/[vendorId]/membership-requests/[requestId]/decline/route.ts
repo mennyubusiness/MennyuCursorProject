@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
+import { revalidatePodInviteSurfaces } from "@/services/pod-vendor-invite.service";
 
 const PENDING = "pending";
 const DECLINED = "declined";
@@ -29,7 +30,7 @@ export async function POST(
 
   const req = await prisma.podMembershipRequest.findUnique({
     where: { id: requestId },
-    select: { id: true, vendorId: true, status: true },
+    select: { id: true, vendorId: true, podId: true, status: true },
   });
   if (!req) return NextResponse.json({ error: "Request not found" }, { status: 404 });
   if (req.vendorId !== vendorId) {
@@ -47,6 +48,8 @@ export async function POST(
     where: { id: requestId },
     data: { status: DECLINED, respondedAt: now, updatedAt: now },
   });
+
+  revalidatePodInviteSurfaces(req.podId, req.vendorId);
 
   return NextResponse.json({ ok: true });
 }

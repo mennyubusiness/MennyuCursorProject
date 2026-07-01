@@ -45,7 +45,7 @@ export function resolveLegacyVendorSettingsRedirect(
       const params = new URLSearchParams();
       if (extra?.access?.trim()) params.set("access", extra.access.trim());
       const qs = params.toString();
-      return qs ? `/vendor/${id}/setup?${qs}` : `/vendor/${id}/setup`;
+      return qs ? `/vendor/${id}/settings?${qs}#pod-invites` : `/vendor/${id}/settings#pod-invites`;
     }
     case "ordering":
       return `/vendor/${id}/hours`;

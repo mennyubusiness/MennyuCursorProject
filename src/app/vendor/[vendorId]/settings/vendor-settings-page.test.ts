@@ -12,6 +12,7 @@ import {
 const dir = dirname(fileURLToPath(import.meta.url));
 const pageSrc = readFileSync(join(dir, "page.tsx"), "utf8");
 const formSrc = readFileSync(join(dir, "VendorBrandProfileForm.tsx"), "utf8");
+const sidebarSrc = readFileSync(join(dir, "VendorPodInvitesSidebar.tsx"), "utf8");
 const navSrc = readFileSync(join(dir, "../VendorAreaNav.tsx"), "utf8");
 
 describe("vendor profile page routing", () => {
@@ -24,7 +25,7 @@ describe("vendor profile page routing", () => {
     expect(resolveLegacyVendorSettingsRedirect("v1", "payouts")).toBe("/vendor/v1/payouts");
     expect(resolveLegacyVendorSettingsRedirect("v1", "pos-menu")).toBe("/vendor/v1/connect-pos");
     expect(resolveLegacyVendorSettingsRedirect("v1", "pod-membership", { access: "pod_connected" })).toBe(
-      "/vendor/v1/setup?access=pod_connected"
+      "/vendor/v1/settings?access=pod_connected#pod-invites"
     );
     expect(resolveLegacyVendorSettingsRedirect("v1", "hours")).toBe(null);
     expect(resolveLegacyVendorSettingsRedirect("v1", "profile")).toBe(null);
@@ -41,6 +42,10 @@ describe("vendor profile page content", () => {
     expect(pageSrc).toMatch(/Manage the public details customers see for this vendor\./);
     expect(pageSrc).toMatch(/title="Public profile"/);
     expect(pageSrc).toMatch(/VendorBrandProfileForm/);
+    expect(pageSrc).toMatch(/VendorPodInvitesSidebar/);
+    expect(pageSrc).toMatch(/lg:grid-cols-\[minmax\(0,1fr\)_320px\]/);
+    expect(sidebarSrc).toMatch(/id="pod-invites"/);
+    expect(sidebarSrc).toMatch(/Pod invites/);
     expect(pageSrc).not.toMatch(/VendorSettingsShell/);
     expect(pageSrc).not.toMatch(/VendorSettingsSectionPanels/);
     expect(pageSrc).not.toMatch(/deriveVendorPodReadiness/);

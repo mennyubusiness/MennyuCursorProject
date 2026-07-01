@@ -261,7 +261,7 @@ describe("deriveVendorPodReadiness vendor checklist", () => {
 
     const invite = result.checklist.find((item) => item.key === "pod_invite");
     expect(invite?.complete).toBe(false);
-    expect(invite?.description).toBe("1 pending invitation(s) below.");
+    expect(invite?.description).toBe("1 pending invitation(s) in Vendor Profile.");
   });
 
   it("marks pod assignment complete when vendor has membership and a pending invite", () => {

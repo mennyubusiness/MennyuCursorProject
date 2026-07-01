@@ -239,7 +239,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     if (item.id === "pod_invite") {
       return {
         ...item,
-        actionHref: `/vendor/${vendorId}/setup`,
+        actionHref: `/vendor/${vendorId}/settings#pod-invites`,
         actionLabel: "View invitations",
       };
     }
