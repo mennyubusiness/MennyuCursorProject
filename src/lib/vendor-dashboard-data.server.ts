@@ -251,7 +251,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       };
     }
     if (item.id === "failed_orders") {
-      return { ...item, actionHref: `/vendor/${vendorId}/orders`, actionLabel: "View orders" };
+      return { ...item, actionHref: `/vendor/${vendorId}/orders?filter=issues`, actionLabel: "View orders" };
     }
     if (item.id === "hours_setup" || item.id === "hours") {
       return { ...item, actionHref: `/vendor/${vendorId}/hours`, actionLabel: "Set hours" };

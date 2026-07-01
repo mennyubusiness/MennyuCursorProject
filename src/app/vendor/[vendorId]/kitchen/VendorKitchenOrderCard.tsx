@@ -343,10 +343,10 @@ export function VendorKitchenOrderCard({
 
       <div className="mt-3 border-t border-oo-light-stone/60 pt-2">
         <Link
-          href={`/vendor/${vendorId}/issues`}
+          href={`/vendor/${vendorId}/orders?filter=issues`}
           className="inline-flex min-h-[40px] items-center text-sm font-semibold text-oo-stone-gray hover:text-oo-charcoal"
         >
-          Need help with this order?
+          View issue in Orders ledger
         </Link>
       </div>
     </article>

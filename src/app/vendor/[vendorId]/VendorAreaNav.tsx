@@ -79,9 +79,6 @@ export function VendorAreaNav({
           <Link href={`${base}/kitchen`} className="oo-dash-nav-link">
             Kitchen
           </Link>
-          <Link href={`${base}/issues`} className="oo-dash-nav-link">
-            Issues
-          </Link>
         </div>
       </div>
     </nav>

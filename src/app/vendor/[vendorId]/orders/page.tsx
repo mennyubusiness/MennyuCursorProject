@@ -19,7 +19,7 @@ export default async function VendorOrdersPage({
         headingLevel={1}
         eyebrow={ctx.vendorRecord.name}
         title="Orders"
-        description="Your operational workbench — active board, history, and order details."
+        description="Chronological order ledger — active, completed, and customer issues."
       />
 
       <div className="mt-8">
