@@ -1,8 +1,8 @@
 import { attachVendorToPod } from "@/lib/attach-vendor-to-pod";
 import { prisma } from "@/lib/db";
+import { revalidateVendorPodMembershipSurfaces } from "@/lib/revalidate-vendor-pod-surfaces.server";
 import {
   markPodVendorInvitesAcceptedForVendorPod,
-  revalidatePodInviteSurfaces,
 } from "@/services/pod-vendor-invite.service";
 
 const PENDING = "pending";
@@ -35,7 +35,12 @@ export async function acceptPodMembershipRequest(requestId: string): Promise<Acc
     vendorId: req.vendorId,
     membershipRequestId: req.id,
   });
-  revalidatePodInviteSurfaces(req.podId, req.vendorId);
+
+  const podIds = [req.podId];
+  if (attach.previousPodId && attach.previousPodId !== req.podId) {
+    podIds.push(attach.previousPodId);
+  }
+  await revalidateVendorPodMembershipSurfaces({ vendorId: req.vendorId, podIds });
 
   return { ok: true };
 }

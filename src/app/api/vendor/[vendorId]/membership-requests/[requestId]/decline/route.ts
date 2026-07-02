@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
-import { revalidatePodInviteSurfaces } from "@/services/pod-vendor-invite.service";
+import { revalidateVendorPodMembershipSurfaces } from "@/lib/revalidate-vendor-pod-surfaces.server";
 
 const PENDING = "pending";
 const DECLINED = "declined";
@@ -49,7 +49,7 @@ export async function POST(
     data: { status: DECLINED, respondedAt: now, updatedAt: now },
   });
 
-  revalidatePodInviteSurfaces(req.podId, req.vendorId);
+  await revalidateVendorPodMembershipSurfaces({ vendorId: req.vendorId, podIds: [req.podId] });
 
   return NextResponse.json({ ok: true });
 }

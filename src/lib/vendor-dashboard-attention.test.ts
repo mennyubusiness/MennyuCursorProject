@@ -112,6 +112,27 @@ describe("deriveVendorAttentionItems", () => {
     expect(items.some((item) => item.id === "no_pod")).toBe(false);
   });
 
+  it("shows orderability diagnostics when setup is complete but customers cannot order", () => {
+    const items = deriveVendorAttentionItems({
+      ...base,
+      canAcceptOrders: false,
+      setupComplete: true,
+      orderabilityDiagnostics: [
+        "Visible, not accepting orders: outside customer ordering hours.",
+      ],
+      checklist: [
+        ...completePublicChecklist,
+        { key: "stripe", label: "Connect Stripe payouts", complete: true, owner: "vendor" },
+        { key: "pos", label: "Connect POS", complete: true, owner: "vendor" },
+        { key: "menu_available", label: "Publish menu", complete: true, owner: "vendor" },
+        { key: "pod_invite", label: "Accept pod invitations", complete: true, owner: "vendor" },
+      ],
+    });
+
+    expect(items.some((item) => item.id === "ordering_closed")).toBe(true);
+    expect(items.some((item) => item.id === "orderability_0")).toBe(true);
+  });
+
   it("does not show Deliverect POS warnings in manual dashboard routing mode", () => {
     const items = deriveVendorAttentionItems({
       ...base,

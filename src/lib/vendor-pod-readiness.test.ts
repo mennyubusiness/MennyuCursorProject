@@ -11,6 +11,7 @@ import {
   VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS,
 } from "./vendor-pod-readiness";
 import { isVendorSetupComplete } from "./vendor-dashboard-attention";
+import { getVendorOrderabilityInPod } from "./vendor-orderability-in-pod";
 import { defaultVendorCustomerOrderingWeek } from "./vendor-customer-ordering-hours";
 
 const baseVendor = {
@@ -311,6 +312,75 @@ describe("deriveVendorPodReadiness vendor checklist", () => {
     const invite = result.checklist.find((item) => item.key === "pod_invite");
     expect(invite?.complete).toBe(false);
     expect(invite?.description).toBe("Join a pod when a pod owner invites you.");
+  });
+
+  it("aligns dashboard canAcceptOrders with public orderability after pod membership is active", () => {
+    const hours = defaultVendorCustomerOrderingWeek();
+    const vendorAvailability = { isActive: true, mennyuOrdersPaused: false, posOpen: true };
+
+    const readiness = deriveVendorPodReadiness(
+      {
+        podId: "pod_b",
+        vendorId: "vendor_1",
+        pod: { isActive: true },
+        podVendor: { isActive: true },
+        vendor: baseVendor,
+        menuSummary: baseMenu,
+        posSummary: basePos,
+        stripeSummary: baseStripe,
+        pendingPodInviteCount: 0,
+        hasPodMembership: true,
+        customerOrderingHours: hours,
+        vendorAvailability,
+      },
+      { audience: "vendor" }
+    );
+
+    expect(isVendorSetupComplete(readiness.checklist.filter((item) => item.complete).map((item) => item.key))).toBe(
+      true
+    );
+    expect(readiness.canAcceptOrders).toBe(true);
+    expect(readiness.orderabilityDiagnostics).toEqual([]);
+
+    const publicOrderability = getVendorOrderabilityInPod({
+      podActive: true,
+      podVendorExists: true,
+      podVendorActive: true,
+      vendor: vendorAvailability,
+      readiness: {
+        vendor: { ...baseVendor, customerOrderingHours: hours },
+        menuSummary: baseMenu,
+        stripeSummary: baseStripe,
+        posSummary: basePos,
+      },
+    });
+
+    expect(publicOrderability.orderable).toBe(true);
+  });
+
+  it("surfaces orderability diagnostics when setup checklist is complete but hours are closed", () => {
+    const hours = defaultVendorCustomerOrderingWeek();
+    const vendorAvailability = { isActive: true, mennyuOrdersPaused: false, posOpen: false };
+
+    const readiness = deriveVendorPodReadiness(
+      {
+        podId: "pod_b",
+        vendorId: "vendor_1",
+        pod: { isActive: true },
+        podVendor: { isActive: true },
+        vendor: baseVendor,
+        menuSummary: baseMenu,
+        posSummary: basePos,
+        stripeSummary: baseStripe,
+        hasPodMembership: true,
+        customerOrderingHours: hours,
+        vendorAvailability,
+      },
+      { audience: "vendor" }
+    );
+
+    expect(readiness.canAcceptOrders).toBe(false);
+    expect(readiness.orderabilityDiagnostics.some((line) => line.toLowerCase().includes("hours"))).toBe(true);
   });
 });
 

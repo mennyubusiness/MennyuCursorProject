@@ -16,6 +16,10 @@ import {
   computePodLaunchReadinessSummary,
 } from "@/lib/pod-vendor-adoption";
 import { derivePodSetupChecklist, deriveVendorPodReadinessForRoster } from "@/lib/vendor-pod-readiness";
+import {
+  resolveVendorHoursTimezone,
+  summarizeVendorCustomerOrderingHours,
+} from "@/lib/vendor-customer-ordering-hours";
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
@@ -42,6 +46,7 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
       announcementText: true,
       announcementIsActive: true,
       pickupInstructions: true,
+      pickupTimezone: true,
       vendors: {
         include: {
           vendor: {
@@ -121,8 +126,19 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
   const mappingReadyByVendor = await loadVendorDeliverectMappingReadyMap(vendorIdsInPod, routingModes);
   const stripeConnectConfigured = Boolean(env.STRIPE_SECRET_KEY);
 
+  const hoursTimezone = resolveVendorHoursTimezone(pod.pickupTimezone);
+
   const rosterRows: PodRosterVendorRow[] = pod.vendors.map((pv) => {
     const vendor = pv.vendor;
+    const hoursSummary = summarizeVendorCustomerOrderingHours({
+      vendor: { customerOrderingHours: vendor.customerOrderingHours },
+      timeZone: hoursTimezone,
+    });
+    const vendorAvailability = {
+      isActive: vendor.isActive,
+      mennyuOrdersPaused: vendor.mennyuOrdersPaused ?? false,
+      posOpen: hoursSummary.posOpen,
+    };
     const readiness = deriveVendorPodReadinessForRoster({
       podId: pod.id,
       podSlug: pod.slug,
@@ -161,6 +177,7 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
         stripeConnectConfigured,
       },
       customerOrderingHours: vendor.customerOrderingHours,
+      vendorAvailability,
     });
 
     return {

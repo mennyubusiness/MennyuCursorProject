@@ -5,7 +5,7 @@ const ACCEPTED = "accepted";
 const CANCELLED = "cancelled";
 
 export type AttachVendorToPodResult =
-  | { ok: true; alreadyAttached: boolean }
+  | { ok: true; alreadyAttached: boolean; previousPodId: string | null }
   | { ok: false; error: string };
 
 /**
@@ -22,14 +22,17 @@ export async function attachVendorToPod(podId: string, vendorId: string): Promis
         select: { podId: true },
       });
 
+      let previousPodId: string | null = null;
+
       if (existing) {
         if (existing.podId === podId) {
           await tx.podMembershipRequest.updateMany({
             where: { podId, vendorId, status: PENDING },
             data: { status: ACCEPTED, respondedAt: now, updatedAt: now },
           });
-          return { alreadyAttached: true };
+          return { alreadyAttached: true, previousPodId: null };
         }
+        previousPodId = existing.podId;
         await tx.podVendor.deleteMany({ where: { vendorId } });
       }
 
@@ -40,7 +43,7 @@ export async function attachVendorToPod(podId: string, vendorId: string): Promis
       const nextSort = (maxRow._max.sortOrder ?? -1) + 1;
 
       await tx.podVendor.create({
-        data: { podId, vendorId, sortOrder: nextSort },
+        data: { podId, vendorId, sortOrder: nextSort, isActive: true },
       });
 
       await tx.podMembershipRequest.updateMany({
@@ -53,10 +56,14 @@ export async function attachVendorToPod(podId: string, vendorId: string): Promis
         data: { status: CANCELLED, updatedAt: now },
       });
 
-      return { alreadyAttached: false };
+      return { alreadyAttached: false, previousPodId };
     });
 
-    return { ok: true, alreadyAttached: result.alreadyAttached };
+    return {
+      ok: true,
+      alreadyAttached: result.alreadyAttached,
+      previousPodId: result.previousPodId,
+    };
   } catch (e) {
     console.error("[attachVendorToPod]", e);
     return { ok: false, error: "Could not attach vendor to pod." };

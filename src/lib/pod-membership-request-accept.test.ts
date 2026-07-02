@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockFindUnique = vi.fn();
 const mockAttachVendorToPod = vi.fn();
 const mockMarkPodVendorInvitesAcceptedForVendorPod = vi.fn();
-const mockRevalidatePodInviteSurfaces = vi.fn();
+const mockRevalidateVendorPodMembershipSurfaces = vi.fn();
+
+vi.mock("@/lib/revalidate-vendor-pod-surfaces.server", () => ({
+  revalidateVendorPodMembershipSurfaces: (...args: unknown[]) =>
+    mockRevalidateVendorPodMembershipSurfaces(...args),
+}));
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -20,7 +25,6 @@ vi.mock("@/lib/attach-vendor-to-pod", () => ({
 vi.mock("@/services/pod-vendor-invite.service", () => ({
   markPodVendorInvitesAcceptedForVendorPod: (...args: unknown[]) =>
     mockMarkPodVendorInvitesAcceptedForVendorPod(...args),
-  revalidatePodInviteSurfaces: (...args: unknown[]) => mockRevalidatePodInviteSurfaces(...args),
 }));
 
 import { acceptPodMembershipRequest } from "./pod-membership-request-accept";
@@ -57,7 +61,11 @@ describe("acceptPodMembershipRequest", () => {
       status: "pending",
       pod: { id: "pod_1", name: "Pod" },
     });
-    mockAttachVendorToPod.mockResolvedValue({ ok: true, alreadyAttached: false });
+    mockAttachVendorToPod.mockResolvedValue({
+      ok: true,
+      alreadyAttached: false,
+      previousPodId: "pod_old",
+    });
 
     const result = await acceptPodMembershipRequest("req_1");
     expect(result.ok).toBe(true);
@@ -67,6 +75,9 @@ describe("acceptPodMembershipRequest", () => {
       vendorId: "vendor_1",
       membershipRequestId: "req_1",
     });
-    expect(mockRevalidatePodInviteSurfaces).toHaveBeenCalledWith("pod_1", "vendor_1");
+    expect(mockRevalidateVendorPodMembershipSurfaces).toHaveBeenCalledWith({
+      vendorId: "vendor_1",
+      podIds: ["pod_1", "pod_old"],
+    });
   });
 });

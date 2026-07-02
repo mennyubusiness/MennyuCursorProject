@@ -1,6 +1,5 @@
 import "server-only";
 
-import { revalidatePath } from "next/cache";
 import { normalizeAccountEmail, validateAccountEmail } from "@/lib/auth/password-policy";
 import {
   buildPodVendorInviteUrl,
@@ -10,6 +9,7 @@ import {
 } from "@/lib/auth/secure-invite-token";
 import { attachVendorToPod } from "@/lib/attach-vendor-to-pod";
 import { clearPendingVendorInviteForUser } from "@/lib/auth/pending-vendor-invite.server";
+import { revalidateVendorPodMembershipSurfaces } from "@/lib/revalidate-vendor-pod-surfaces.server";
 import { getPublicSiteOriginFromEnv } from "@/lib/public-site-url";
 import { prisma } from "@/lib/db";
 import { sendPodVendorInviteEmail } from "@/lib/email/pod-vendor-invite-email";
@@ -72,14 +72,19 @@ function inviteOrigin(requestOrigin?: string): string {
   return (requestOrigin ?? fromEnv).replace(/\/$/, "");
 }
 
-export function revalidatePodInviteSurfaces(podId: string, vendorId?: string): void {
-  revalidatePath(`/pod/${podId}/dashboard`);
-  revalidatePath(`/pod/${podId}/vendors`);
-  if (vendorId) {
-    revalidatePath(`/vendor/${vendorId}/settings`);
-    revalidatePath(`/vendor/${vendorId}/dashboard`);
-    revalidatePath(`/vendor/${vendorId}/setup`);
+export async function revalidatePodInviteSurfaces(
+  podId: string,
+  vendorId?: string,
+  previousPodId?: string | null
+): Promise<void> {
+  if (!vendorId) {
+    return;
   }
+  const podIds = [podId];
+  if (previousPodId && previousPodId !== podId) {
+    podIds.push(previousPodId);
+  }
+  await revalidateVendorPodMembershipSurfaces({ vendorId, podIds });
 }
 
 type MarkPodVendorInviteAcceptedInput = {
@@ -180,6 +185,7 @@ async function finalizePodVendorInviteAcceptance(input: {
   vendorId: string;
   userId: string;
   membershipRequestId?: string | null;
+  previousPodId?: string | null;
 }): Promise<void> {
   await markPodVendorInviteAccepted({
     inviteId: input.inviteId,
@@ -193,7 +199,7 @@ async function finalizePodVendorInviteAcceptance(input: {
     membershipRequestId: input.membershipRequestId,
   });
   await clearPendingVendorInviteForUser(input.userId);
-  revalidatePodInviteSurfaces(input.podId, input.vendorId);
+  await revalidatePodInviteSurfaces(input.podId, input.vendorId, input.previousPodId);
 }
 
 export async function resolvePodVendorInviteByToken(rawToken: string): Promise<PodVendorInvitePublicView> {
@@ -564,16 +570,18 @@ async function acceptPodVendorInviteRecord(input: {
     where: { vendorId: vendorResolution.vendorId },
     select: { podId: true },
   });
-  if (vendorInOtherPod && vendorInOtherPod.podId !== invite.podId) {
+
+  let previousPodId: string | null = null;
+  if (!alreadyInPod) {
     const attach = await attachVendorToPod(invite.podId, vendorResolution.vendorId);
     if (!attach.ok) {
-      return { ok: false, code: "vendor_in_other_pod", message: attach.error };
+      return {
+        ok: false,
+        code: vendorInOtherPod && vendorInOtherPod.podId !== invite.podId ? "vendor_in_other_pod" : "invalid",
+        message: attach.error,
+      };
     }
-  } else {
-    const attach = await attachVendorToPod(invite.podId, vendorResolution.vendorId);
-    if (!attach.ok) {
-      return { ok: false, code: "invalid", message: attach.error };
-    }
+    previousPodId = attach.previousPodId;
   }
 
   await finalizePodVendorInviteAcceptance({
@@ -582,6 +590,7 @@ async function acceptPodVendorInviteRecord(input: {
     vendorId: vendorResolution.vendorId,
     userId: input.userId,
     membershipRequestId: invite.membershipRequestId,
+    previousPodId,
   });
 
   return {

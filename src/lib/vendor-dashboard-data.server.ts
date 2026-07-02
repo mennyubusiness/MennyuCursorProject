@@ -149,6 +149,20 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     deliverectMappingReady,
   };
 
+  const hoursTimezone = resolveVendorHoursTimezone(currentPod?.pod.pickupTimezone);
+  const hoursSummary = summarizeVendorCustomerOrderingHours({
+    vendor: {
+      customerOrderingHours: vendorRecord.customerOrderingHours,
+    },
+    timeZone: hoursTimezone,
+  });
+
+  const vendorAvailabilityInput = {
+    isActive: vendorRecord.isActive,
+    mennyuOrdersPaused: vendorRecord.mennyuOrdersPaused ?? false,
+    posOpen: hoursSummary.posOpen,
+  };
+
   const readiness = deriveVendorPodReadiness(
     {
       podId: currentPod?.pod.id ?? vendorId,
@@ -178,6 +192,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       pendingPodInviteCount: pendingInvites,
       hasPodMembership: Boolean(currentPod),
       customerOrderingHours: vendorRecord.customerOrderingHours,
+      vendorAvailability: vendorAvailabilityInput,
     },
     { audience: "vendor" }
   );
@@ -186,19 +201,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     readiness.checklist.filter((item) => item.complete).map((item) => item.key)
   );
 
-  const hoursTimezone = resolveVendorHoursTimezone(currentPod?.pod.pickupTimezone);
-  const hoursSummary = summarizeVendorCustomerOrderingHours({
-    vendor: {
-      customerOrderingHours: vendorRecord.customerOrderingHours,
-    },
-    timeZone: hoursTimezone,
-  });
-
-  const availability = getVendorAvailability({
-    isActive: vendorRecord.isActive,
-    mennyuOrdersPaused: vendorRecord.mennyuOrdersPaused ?? false,
-    posOpen: hoursSummary.posOpen,
-  });
+  const availability = getVendorAvailability(vendorAvailabilityInput);
 
   const intakeLabel = vendorIntakeStatusLabel({
     availabilityStatus: availability.status,
@@ -219,6 +222,8 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     checklist: readiness.checklist,
     publicProfileReady: readiness.setupSummary.publicProfile,
     canAcceptOrders: readiness.canAcceptOrders,
+    orderabilityDiagnostics: readiness.orderabilityDiagnostics,
+    setupComplete,
     posState,
     deliverectRoutingMode: isDeliverectRoutingMode(vendorRecord.orderRoutingMode),
     hasPodMembership: Boolean(currentPod),
@@ -227,6 +232,15 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     vendorPaused: Boolean(vendorRecord.mennyuOrdersPaused),
     currentlyOpen: availability.status === "open",
   }).map((item) => {
+    if (item.id.startsWith("orderability_")) {
+      if (item.description?.toLowerCase().includes("hours")) {
+        return { ...item, actionHref: `/vendor/${vendorId}/hours`, actionLabel: "Set hours" };
+      }
+      if (item.description?.toLowerCase().includes("payment") || item.description?.toLowerCase().includes("stripe")) {
+        return { ...item, actionHref: `/vendor/${vendorId}/payouts`, actionLabel: "Finish setup" };
+      }
+      return item;
+    }
     if (item.id === "stripe" && !item.actionHref) {
       return { ...item, actionHref: `/vendor/${vendorId}/payouts`, actionLabel: "Finish setup" };
     }

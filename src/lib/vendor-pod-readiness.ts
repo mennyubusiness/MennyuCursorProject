@@ -4,6 +4,7 @@
  */
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { PosConnectionStatus, VendorMenuSource, VendorOrderRoutingMode } from "@prisma/client";
+import type { VendorAvailabilityInput } from "@/lib/vendor-availability";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { hasValidVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
 import { VENDOR_HOURS_PUBLIC_COPY } from "@/lib/vendor-operational-copy";
@@ -15,6 +16,7 @@ import {
 import { isOpenOrderMenuSource, vendorMenuSourceVendorPath } from "@/lib/vendor-menu-source";
 import {
   getVendorOrderabilityState,
+  getVendorPodOwnerMissingLines,
   getVendorPublicProfileMissingItems,
   isVendorPublicProfileFieldsComplete,
   isVendorPublicProfileReady,
@@ -84,6 +86,8 @@ export type VendorPodReadinessInput = {
   hasPodMembership?: boolean;
   /** Saved manual customer ordering hours JSON. */
   customerOrderingHours?: unknown;
+  /** Resolved live availability (hours, pause) for orderability parity with customer surfaces. */
+  vendorAvailability?: VendorAvailabilityInput;
 };
 
 export type VendorPodReadinessResult = {
@@ -101,6 +105,8 @@ export type VendorPodReadinessResult = {
     hours: boolean;
   };
   canAcceptOrders: boolean;
+  /** Human-readable blockers when setup is complete but customers cannot order yet. */
+  orderabilityDiagnostics: string[];
 };
 
 /** Profile presentation fields (name, description, banner, cuisine) — excludes menu and hours. */
@@ -111,7 +117,7 @@ export function isVendorProfileComplete(
 }
 
 function toReadinessEvaluationInput(input: VendorPodReadinessInput): VendorReadinessEvaluationInput {
-  return {
+  const evaluation: VendorReadinessEvaluationInput = {
     vendor: { ...input.vendor, customerOrderingHours: input.customerOrderingHours },
     menuSummary: input.menuSummary,
     stripeSummary: input.stripeSummary,
@@ -121,6 +127,10 @@ function toReadinessEvaluationInput(input: VendorPodReadinessInput): VendorReadi
       ? { exists: true, isActive: input.podVendor.isActive }
       : { exists: false, isActive: false },
   };
+  if (input.vendorAvailability) {
+    evaluation.vendorAvailability = input.vendorAvailability;
+  }
+  return evaluation;
 }
 
 /** Mirrors vendor-payout-transfer.service isVendorConnectPayoutReady (charges + payouts + account id). */
@@ -523,6 +533,7 @@ export function deriveVendorPodReadiness(
 
   const orderabilityState = getVendorOrderabilityState(evaluation);
   const canAcceptOrders = orderabilityState.orderable;
+  const orderabilityDiagnostics = canAcceptOrders ? [] : getVendorPodOwnerMissingLines(evaluation);
 
   const status = derivePrimaryStatus(input, setupSummary, canAcceptOrders);
   const checklist = buildSetupChecklist(input, audience);
@@ -586,6 +597,7 @@ export function deriveVendorPodReadiness(
     checklist,
     setupSummary,
     canAcceptOrders,
+    orderabilityDiagnostics,
   };
 }
 
@@ -594,7 +606,7 @@ export function deriveVendorPodReadinessForRoster(
   input: VendorPodReadinessInput
 ): Pick<
   VendorPodReadinessResult,
-  "status" | "label" | "description" | "blockingReasons" | "setupSummary" | "canAcceptOrders"
+  "status" | "label" | "description" | "blockingReasons" | "setupSummary" | "canAcceptOrders" | "orderabilityDiagnostics"
 > {
   const full = deriveVendorPodReadiness(input, { audience: "pod_owner" });
   return {
@@ -604,6 +616,7 @@ export function deriveVendorPodReadinessForRoster(
     blockingReasons: full.blockingReasons,
     setupSummary: full.setupSummary,
     canAcceptOrders: full.canAcceptOrders,
+    orderabilityDiagnostics: full.orderabilityDiagnostics,
   };
 }
 

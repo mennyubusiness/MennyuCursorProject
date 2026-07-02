@@ -26,11 +26,16 @@ vi.mock("next/cache", () => ({
 }));
 
 const mockAttachVendorToPod = vi.fn();
+const mockRevalidateVendorPodMembershipSurfaces = vi.fn();
 const mockSendPodVendorInviteEmail = vi.fn();
 
 vi.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/attach-vendor-to-pod", () => ({
   attachVendorToPod: (...args: unknown[]) => mockAttachVendorToPod(...args),
+}));
+vi.mock("@/lib/revalidate-vendor-pod-surfaces.server", () => ({
+  revalidateVendorPodMembershipSurfaces: (...args: unknown[]) =>
+    mockRevalidateVendorPodMembershipSurfaces(...args),
 }));
 vi.mock("@/lib/email/pod-vendor-invite-email", () => ({
   sendPodVendorInviteEmail: (...args: unknown[]) => mockSendPodVendorInviteEmail(...args),
@@ -43,7 +48,8 @@ describe("pod vendor invite service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSendPodVendorInviteEmail.mockResolvedValue({ status: "dry_run" });
-    mockAttachVendorToPod.mockResolvedValue({ ok: true, alreadyAttached: false });
+    mockAttachVendorToPod.mockResolvedValue({ ok: true, alreadyAttached: false, previousPodId: null });
+    mockRevalidateVendorPodMembershipSurfaces.mockResolvedValue(undefined);
     mockPrisma.podVendorInvite.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.podVendor.findUnique.mockResolvedValue(null);
     mockPrisma.vendor.findUnique.mockResolvedValue({ contactEmail: "vendor@example.com" });
