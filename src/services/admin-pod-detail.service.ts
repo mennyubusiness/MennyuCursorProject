@@ -21,6 +21,9 @@ export type AdminPodDetailView = {
     imageUrl: string | null;
     isActive: boolean;
     mennyuOrdersPaused: boolean;
+    deletedAt: string | null;
+    deletedByUserId: string | null;
+    deletedByEmail: string | null;
     onboardingStatus: string;
     createdAt: string;
     updatedAt: string;
@@ -54,6 +57,7 @@ export type AdminPodDetailView = {
   recentOrders: Array<{ id: string; status: string; createdAt: string; totalCents: number }>;
   slugRedirects: Array<{ id: string; oldSlug: string; newSlug: string; createdAt: string }>;
   readinessLabel: string;
+  activeVendorCount: number;
   auditLogs: Array<{
     id: string;
     actionType: string;
@@ -78,6 +82,7 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
               slug: true,
               isActive: true,
               mennyuOrdersPaused: true,
+              deletedAt: true,
             },
           },
         },
@@ -90,6 +95,13 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
     },
   });
   if (!pod) return null;
+
+  const deletedByUser = pod.deletedByUserId
+    ? await prisma.user.findUnique({
+        where: { id: pod.deletedByUserId },
+        select: { email: true },
+      })
+    : null;
 
   const origin = getPublicSiteOriginFromEnv();
   const publicPath = buildPodCustomerPath(pod.slug);
@@ -136,6 +148,9 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       imageUrl: pod.imageUrl,
       isActive: pod.isActive,
       mennyuOrdersPaused: pod.mennyuOrdersPaused,
+      deletedAt: pod.deletedAt?.toISOString() ?? null,
+      deletedByUserId: pod.deletedByUserId,
+      deletedByEmail: deletedByUser?.email ?? null,
       onboardingStatus: pod.onboardingStatus,
       createdAt: pod.createdAt.toISOString(),
       updatedAt: pod.updatedAt.toISOString(),
@@ -198,6 +213,9 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       createdAt: r.createdAt.toISOString(),
     })),
     readinessLabel: adminPodReadinessLabel(pod.onboardingStatus, pod.isActive),
+    activeVendorCount: pod.vendors.filter(
+      (pv) => pv.isActive && pv.vendor.isActive && !pv.vendor.deletedAt
+    ).length,
     auditLogs: auditRows.map((row) => ({
       id: row.id,
       actionType: row.actionType,

@@ -78,12 +78,16 @@ describe("orderability pod pause", () => {
 describe("admin rescue UI wiring", () => {
   it("vendor rescue client includes required sections", () => {
     expect(vendorRescueClient).toContain("Ordering controls");
+    expect(vendorRescueClient).toContain("AdminEntityDeleteDangerZone");
+    expect(vendorRescueClient).toContain("adminDeleteVendorProfileAction");
     expect(vendorRescueClient).toContain("Menu / POS status");
     expect(vendorRescueClient).toContain("Menu refresh is not configured yet.");
     expect(vendorRescueClient).toContain("Audit log");
   });
 
-  it("pod rescue client includes QR and roster sections", () => {
+  it("pod rescue client includes delete danger zone and roster sections", () => {
+    expect(podRescueClient).toContain("AdminEntityDeleteDangerZone");
+    expect(podRescueClient).toContain("adminDeletePodProfileAction");
     expect(podRescueClient).toContain("QR / public link");
     expect(podRescueClient).toContain("Vendor roster");
     expect(podRescueClient).toContain("Pause pod ordering");

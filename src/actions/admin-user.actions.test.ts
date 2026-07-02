@@ -20,6 +20,7 @@ vi.mock("@/services/admin-user-recovery.service", () => ({
   adminSendPasswordReset: vi.fn(),
   adminSendEmailVerification: vi.fn(),
   adminRevokeEmailVerificationTokens: vi.fn(),
+  adminDeleteUserAccount: vi.fn(),
 }));
 
 vi.mock("@/services/admin-role-repair.service", () => ({
@@ -44,7 +45,7 @@ vi.mock("@/services/admin-audit-log.service", () => ({
   createAdminAuditLog: (...args: unknown[]) => mockCreateAuditLog(...args),
 }));
 
-import { adminDisableUserAction, adminSendEmailVerificationAction } from "@/actions/admin-user.actions";
+import { adminDisableUserAction, adminDeleteUserAccountAction, adminSendEmailVerificationAction } from "@/actions/admin-user.actions";
 
 const usersPage = readFileSync(
   join(process.cwd(), "src/app/admin/(dashboard)/users/page.tsx"),
@@ -115,6 +116,8 @@ describe("admin users UI wiring", () => {
     expect(detailClient).toContain("adminSendEmailVerificationAction");
     expect(detailClient).toContain("adminRevokeEmailVerificationTokensAction");
     expect(detailClient).toContain("emailVerificationLastSentAt");
+    expect(detailClient).toContain("AdminEntityDeleteDangerZone");
+    expect(detailClient).toContain("adminDeleteUserAccountAction");
   });
 
   it("admin dashboard layout gates unverified platform admin sessions", () => {

@@ -18,6 +18,9 @@ export type AdminVendorDetailView = {
     imageUrl: string | null;
     isActive: boolean;
     mennyuOrdersPaused: boolean;
+    deletedAt: string | null;
+    deletedByUserId: string | null;
+    deletedByEmail: string | null;
     posConnectionStatus: string;
     posProvider: string | null;
     deliverectChannelLinkId: string | null;
@@ -76,6 +79,13 @@ export async function loadAdminVendorDetail(vendorId: string): Promise<AdminVend
   });
   if (!vendor) return null;
 
+  const deletedByUser = vendor.deletedByUserId
+    ? await prisma.user.findUnique({
+        where: { id: vendor.deletedByUserId },
+        select: { email: true },
+      })
+    : null;
+
   const primaryPod = vendor.pods[0]?.pod ?? null;
 
   const [menuSync, recentOrders, auditRows, slugRedirects] = await Promise.all([
@@ -124,6 +134,9 @@ export async function loadAdminVendorDetail(vendorId: string): Promise<AdminVend
       imageUrl: vendor.imageUrl,
       isActive: vendor.isActive,
       mennyuOrdersPaused: vendor.mennyuOrdersPaused,
+      deletedAt: vendor.deletedAt?.toISOString() ?? null,
+      deletedByUserId: vendor.deletedByUserId,
+      deletedByEmail: deletedByUser?.email ?? null,
       posConnectionStatus: vendor.posConnectionStatus,
       posProvider: vendor.posProvider,
       deliverectChannelLinkId: vendor.deliverectChannelLinkId,

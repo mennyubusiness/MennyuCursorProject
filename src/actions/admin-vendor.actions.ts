@@ -15,9 +15,12 @@ import {
   adminUnpauseVendorOrdering,
   adminUpdateVendorPublicProfile,
   adminUpdateVendorOrderRoutingMode,
+  adminDeleteVendorProfile,
 } from "@/services/admin-vendor-rescue.service";
 
-type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string }
+  | { ok: false; error: string; blockers?: string[] };
 
 async function withAdmin<T extends ActionResult>(
   fn: (ctx: { adminUserId: string | null }) => Promise<T>
@@ -127,6 +130,18 @@ export async function adminUpdateVendorOrderRoutingModeAction(input: {
     adminUpdateVendorOrderRoutingMode({ ...input, adminUserId }).then((r) => {
       if (r.ok) revalidatePath(`/admin/vendors/${input.vendorId}`);
       return r;
+    })
+  );
+}
+
+export async function adminDeleteVendorProfileAction(vendorId: string, reason: string) {
+  return withAdmin(({ adminUserId }) =>
+    adminDeleteVendorProfile({ vendorId, adminUserId, reason }).then((r) => {
+      if (r.ok) {
+        revalidatePath(`/admin/vendors/${vendorId}`);
+        return { ok: true as const, message: "Vendor deleted." };
+      }
+      return { ok: false as const, error: r.error, blockers: r.blockers };
     })
   );
 }

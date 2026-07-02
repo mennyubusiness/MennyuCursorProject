@@ -1,3 +1,4 @@
+import type { OrderStatus, VendorFulfillmentStatus } from "@prisma/client";
 import {
   CHECKOUT_IN_PROGRESS_ORDER_STATUSES,
   TERMINAL_ORDER_STATUSES,
@@ -142,21 +143,21 @@ export async function precheckPodDeletion(
 }
 
 export const ACTIVE_ORDER_STATUS_FILTER = {
-  notIn: [...TERMINAL_ORDER_STATUSES, ...CHECKOUT_IN_PROGRESS_ORDER_STATUSES],
-} as const;
+  notIn: [...TERMINAL_ORDER_STATUSES, ...CHECKOUT_IN_PROGRESS_ORDER_STATUSES] as OrderStatus[],
+};
 
 export const ACTIVE_VENDOR_FULFILLMENT_FILTER = {
-  notIn: ["completed", "cancelled"],
-} as const;
+  notIn: ["completed", "cancelled"] as VendorFulfillmentStatus[],
+};
 
 export const ACTIVE_ORDER_ISSUE_STATUS_FILTER = {
   in: [...ACTIVE_ORDER_ISSUE_STATUSES],
-} as const;
+};
 
 export const BLOCKING_VENDOR_PAYOUT_STATUS_FILTER = {
   in: [...BLOCKING_VENDOR_PAYOUT_TRANSFER_STATUSES],
-} as const;
+};
 
 export const BLOCKING_POD_PAYOUT_STATUS_FILTER = {
   in: [...BLOCKING_POD_PAYOUT_TRANSFER_STATUSES],
-} as const;
+};

@@ -20,7 +20,9 @@ import { attachVendorToPod } from "@/lib/attach-vendor-to-pod";
 import { createAdminAuditLog } from "@/services/admin-audit-log.service";
 import { pullDeliverectMenuAndIngestPhase1b } from "@/services/deliverect-menu-pull-ingest.service";
 
-type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string }
+  | { ok: false; error: string; blockers?: string[] };
 
 function revalidateVendorPaths(vendorId: string) {
   revalidatePath(`/admin/vendors/${vendorId}`);

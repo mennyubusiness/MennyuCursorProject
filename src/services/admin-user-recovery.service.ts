@@ -7,7 +7,9 @@ import { prisma } from "@/lib/db";
 import { requestPasswordReset } from "@/services/password-reset.service";
 import { createAdminAuditLog } from "@/services/admin-audit-log.service";
 
-type ActionResult = { ok: true } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string }
+  | { ok: false; error: string; blockers?: string[] };
 
 async function loadTargetUser(userId: string) {
   return prisma.user.findUnique({
@@ -298,7 +300,13 @@ export async function adminDeleteUserAccount(input: {
     userId: input.userId,
     actorUserId: input.adminUserId ?? input.userId,
   });
-  if (!result.ok) return { ok: false, error: result.error };
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.error,
+      blockers: result.blockers,
+    };
+  }
 
   await createAdminAuditLog({
     adminUserId: input.adminUserId,

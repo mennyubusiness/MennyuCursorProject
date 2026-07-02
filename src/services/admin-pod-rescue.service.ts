@@ -9,7 +9,9 @@ import { attachVendorToPod } from "@/lib/attach-vendor-to-pod";
 import { createSlugRedirect, validatePublicSlug } from "@/lib/slug-admin.server";
 import { createAdminAuditLog } from "@/services/admin-audit-log.service";
 
-type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string }
+  | { ok: false; error: string; blockers?: string[] };
 
 function revalidatePodPaths(podId: string) {
   revalidatePath(`/admin/pods/${podId}`);
@@ -497,6 +499,7 @@ export async function adminDeletePodProfile(input: {
   podId: string;
   adminUserId: string | null;
   reason: string;
+  acknowledgeActiveVendors?: boolean;
 }): Promise<ActionResult> {
   const reasonCheck = requireAdminReason(input.reason);
   if (!reasonCheck.ok) return reasonCheck;
@@ -505,7 +508,7 @@ export async function adminDeletePodProfile(input: {
   return deletePodProfile({
     podId: input.podId,
     actorUserId: input.adminUserId ?? input.podId,
-    acknowledgeActiveVendors: true,
+    acknowledgeActiveVendors: input.acknowledgeActiveVendors === true,
     adminReason: reasonCheck.reason,
   });
 }

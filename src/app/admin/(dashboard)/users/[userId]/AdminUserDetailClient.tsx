@@ -33,9 +33,11 @@ import {
   adminRevokeInviteAction,
   adminSendEmailVerificationAction,
   adminSendPasswordResetAction,
+  adminDeleteUserAccountAction,
   adminTransferPodOwnershipAction,
   adminTransferVendorOwnershipAction,
 } from "@/actions/admin-user.actions";
+import { AdminEntityDeleteDangerZone } from "@/components/admin/AdminEntityDeleteDangerZone";
 
 type Option = { id: string; name: string };
 
@@ -197,6 +199,7 @@ export function AdminUserDetailClient({ detail, vendorOptions, podOptions }: Pro
   const router = useRouter();
   const userId = detail.user.id;
   const isDisabled = Boolean(detail.user.disabledAt);
+  const isDeleted = Boolean(detail.user.deletedAt);
 
   const run = (fn: () => Promise<{ ok: true; message?: string; inviteUrl?: string } | { ok: false; error: string }>) =>
     fn().then((r) => {
@@ -234,7 +237,15 @@ export function AdminUserDetailClient({ detail, vendorOptions, podOptions }: Pro
           label="Phone verified"
           value={detail.user.phoneVerified ? "Yes" : "No"}
         />
-        <InfoRow label="Account status" value={isDisabled ? "Disabled" : "Active"} />
+        <InfoRow label="Account status" value={isDeleted ? "Deleted" : isDisabled ? "Disabled" : "Active"} />
+        {detail.user.deletedAt ? (
+          <>
+            <InfoRow label="Deleted at" value={new Date(detail.user.deletedAt).toLocaleString()} />
+            {detail.user.deletedByEmail ? (
+              <InfoRow label="Deleted by" value={detail.user.deletedByEmail} />
+            ) : null}
+          </>
+        ) : null}
         <InfoRow label="Last login" value={detail.user.lastLoginLabel} />
         <InfoRow label="Auth" value={detail.user.authProviderLabel} />
         <InfoRow label="Platform admin" value={detail.user.isPlatformAdmin ? "Yes" : "No"} />
@@ -650,6 +661,21 @@ export function AdminUserDetailClient({ detail, vendorOptions, podOptions }: Pro
           </ul>
         )}
       </Section>
+
+      <AdminEntityDeleteDangerZone
+        title="Deactivate account"
+        description="The account will be disabled and anonymized. Login will be blocked. Order, payment, and business records are preserved where required."
+        confirmLabel="Deactivate account"
+        confirmationAlternatives={["DELETE", detail.user.email]}
+        deletedAt={detail.user.deletedAt}
+        deletedByEmail={detail.user.deletedByEmail}
+        onSubmit={({ reason }) =>
+          adminDeleteUserAccountAction(userId, reason).then((result) => {
+            if (result.ok) router.refresh();
+            return result;
+          })
+        }
+      />
     </div>
   );
 }

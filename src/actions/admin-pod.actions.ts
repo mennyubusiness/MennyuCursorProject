@@ -15,9 +15,12 @@ import {
   adminShowPod,
   adminUnpausePodOrdering,
   adminUpdatePodPublicProfile,
+  adminDeletePodProfile,
 } from "@/services/admin-pod-rescue.service";
 
-type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string }
+  | { ok: false; error: string; blockers?: string[] };
 
 async function withAdmin<T extends ActionResult>(
   fn: (ctx: { adminUserId: string | null }) => Promise<T>
@@ -138,4 +141,25 @@ export async function adminLogPodQrRegeneratedAction(input: {
 
 export async function adminRecheckPodReadinessAction(podId: string, reason: string) {
   return withAdmin(({ adminUserId }) => adminLogPodReadinessRecheck({ podId, adminUserId, reason }));
+}
+
+export async function adminDeletePodProfileAction(
+  podId: string,
+  reason: string,
+  acknowledgeActiveVendors?: boolean
+) {
+  return withAdmin(({ adminUserId }) =>
+    adminDeletePodProfile({
+      podId,
+      adminUserId,
+      reason,
+      acknowledgeActiveVendors,
+    }).then((r) => {
+      if (r.ok) {
+        revalidatePath(`/admin/pods/${podId}`);
+        return { ok: true as const, message: "Pod deleted." };
+      }
+      return { ok: false as const, error: r.error, blockers: r.blockers };
+    })
+  );
 }

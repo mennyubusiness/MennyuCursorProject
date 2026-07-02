@@ -41,7 +41,9 @@ import {
   adminShowVendorAction,
   adminUnpauseVendorOrderingAction,
   adminUpdateVendorPublicProfileAction,
+  adminDeleteVendorProfileAction,
 } from "@/actions/admin-vendor.actions";
+import { AdminEntityDeleteDangerZone } from "@/components/admin/AdminEntityDeleteDangerZone";
 
 type Option = { id: string; name: string };
 
@@ -84,7 +86,15 @@ export function AdminVendorRescueClient({
       <AdminSection title="Overview">
         <AdminInfoRow label="ID" value={detail.vendor.id} />
         <AdminInfoRow label="Public URL" value={detail.vendor.publicPathPreview} />
-        <AdminInfoRow label="Public visibility" value={detail.vendor.isActive ? "Visible" : "Hidden"} />
+        <AdminInfoRow label="Public visibility" value={detail.vendor.deletedAt ? "Deleted" : detail.vendor.isActive ? "Visible" : "Hidden"} />
+        {detail.vendor.deletedAt ? (
+          <>
+            <AdminInfoRow label="Deleted at" value={new Date(detail.vendor.deletedAt).toLocaleString()} />
+            {detail.vendor.deletedByEmail ? (
+              <AdminInfoRow label="Deleted by" value={detail.vendor.deletedByEmail} />
+            ) : null}
+          </>
+        ) : null}
         <AdminInfoRow label="Ordering" value={detail.vendor.mennyuOrdersPaused ? "Paused" : "Open"} />
         <AdminInfoRow
           label="Routing mode"
@@ -412,6 +422,21 @@ export function AdminVendorRescueClient({
           </ul>
         )}
       </AdminSection>
+
+      <AdminEntityDeleteDangerZone
+        title="Delete vendor"
+        description="The vendor will be hidden, paused, and removed from public ordering. Historical orders and payment records are preserved."
+        confirmLabel="Delete vendor"
+        confirmationAlternatives={["DELETE", detail.vendor.name]}
+        deletedAt={detail.vendor.deletedAt}
+        deletedByEmail={detail.vendor.deletedByEmail}
+        onSubmit={({ reason }) =>
+          adminDeleteVendorProfileAction(vendorId, reason).then((result) => {
+            if (result.ok) router.refresh();
+            return result;
+          })
+        }
+      />
     </div>
   );
 }

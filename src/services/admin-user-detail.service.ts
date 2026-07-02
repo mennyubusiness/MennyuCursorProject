@@ -36,6 +36,9 @@ export type AdminUserDetailView = {
     phoneVerified: boolean;
     phoneVerifiedAt: string | null;
     disabledAt: string | null;
+    deletedAt: string | null;
+    deletedByUserId: string | null;
+    deletedByEmail: string | null;
     isPlatformAdmin: boolean;
     registrationIntent: string | null;
     needsAccountRoleSelection: boolean;
@@ -134,6 +137,13 @@ export async function loadAdminUserDetail(userId: string): Promise<AdminUserDeta
   });
   if (!user) return null;
 
+  const deletedByUser = user.deletedByUserId
+    ? await prisma.user.findUnique({
+        where: { id: user.deletedByUserId },
+        select: { email: true },
+      })
+    : null;
+
   const emailNorm = user.email.toLowerCase();
   const [recentOrders, inviteRows, auditRows] = await Promise.all([
     user.customerAccount
@@ -203,6 +213,9 @@ export async function loadAdminUserDetail(userId: string): Promise<AdminUserDeta
       phoneVerified: Boolean(user.customerAccount?.phoneVerifiedAt),
       phoneVerifiedAt: user.customerAccount?.phoneVerifiedAt?.toISOString() ?? null,
       disabledAt: user.disabledAt?.toISOString() ?? null,
+      deletedAt: user.deletedAt?.toISOString() ?? null,
+      deletedByUserId: user.deletedByUserId,
+      deletedByEmail: deletedByUser?.email ?? null,
       isPlatformAdmin: user.isPlatformAdmin,
       registrationIntent: user.registrationIntent,
       needsAccountRoleSelection: user.needsAccountRoleSelection,

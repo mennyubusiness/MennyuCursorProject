@@ -31,7 +31,9 @@ import {
   adminShowPodAction,
   adminUnpausePodOrderingAction,
   adminUpdatePodPublicProfileAction,
+  adminDeletePodProfileAction,
 } from "@/actions/admin-pod.actions";
+import { AdminEntityDeleteDangerZone } from "@/components/admin/AdminEntityDeleteDangerZone";
 
 type Option = { id: string; name: string };
 
@@ -71,7 +73,15 @@ export function AdminPodRescueClient({
             </Link>
           }
         />
-        <AdminInfoRow label="Public visibility" value={detail.pod.isActive ? "Visible" : "Hidden"} />
+        <AdminInfoRow label="Public visibility" value={detail.pod.deletedAt ? "Deleted" : detail.pod.isActive ? "Visible" : "Hidden"} />
+        {detail.pod.deletedAt ? (
+          <>
+            <AdminInfoRow label="Deleted at" value={new Date(detail.pod.deletedAt).toLocaleString()} />
+            {detail.pod.deletedByEmail ? (
+              <AdminInfoRow label="Deleted by" value={detail.pod.deletedByEmail} />
+            ) : null}
+          </>
+        ) : null}
         <AdminInfoRow label="Ordering" value={detail.pod.mennyuOrdersPaused ? "Paused" : "Open"} />
         <AdminInfoRow label="Readiness" value={detail.readinessLabel} />
         <AdminInfoRow label="Created" value={new Date(detail.pod.createdAt).toLocaleString()} />
@@ -380,6 +390,23 @@ export function AdminPodRescueClient({
           </ul>
         )}
       </AdminSection>
+
+      <AdminEntityDeleteDangerZone
+        title="Delete pod"
+        description="The pod will be hidden from public ordering and explore. QR and order links stop accepting new orders. Historical records are preserved."
+        confirmLabel="Delete pod"
+        confirmationAlternatives={["DELETE", detail.pod.name]}
+        deletedAt={detail.pod.deletedAt}
+        deletedByEmail={detail.pod.deletedByEmail}
+        requireActiveVendorAck={detail.activeVendorCount > 0}
+        activeVendorCount={detail.activeVendorCount}
+        onSubmit={({ reason, acknowledgeActiveVendors }) =>
+          adminDeletePodProfileAction(podId, reason, acknowledgeActiveVendors).then((result) => {
+            if (result.ok) router.refresh();
+            return result;
+          })
+        }
+      />
     </div>
   );
 }

@@ -29,9 +29,12 @@ import {
   adminRevokeEmailVerificationTokens,
   adminSendEmailVerification,
   adminSendPasswordReset,
+  adminDeleteUserAccount,
 } from "@/services/admin-user-recovery.service";
 
-type ActionResult = { ok: true; message?: string; inviteUrl?: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string; inviteUrl?: string }
+  | { ok: false; error: string; blockers?: string[] };
 
 async function withAdmin<T extends ActionResult>(
   fn: (ctx: { adminUserId: string | null }) => Promise<T>
@@ -257,5 +260,17 @@ export async function adminRepairInviteAttachmentAction(input: {
   return withAdmin(async ({ adminUserId }) => {
     const result = await adminRepairInviteAttachment({ ...input, adminUserId });
     return result.ok ? { ok: true, message: "Invite attachment repaired." } : result;
+  });
+}
+
+export async function adminDeleteUserAccountAction(userId: string, reason: string): Promise<ActionResult> {
+  return withAdmin(async ({ adminUserId }) => {
+    const result = await adminDeleteUserAccount({ userId, adminUserId, reason });
+    if (result.ok) {
+      revalidatePath(`/admin/users/${userId}`);
+      revalidatePath("/admin/users");
+      return { ok: true, message: "Account deactivated and anonymized." };
+    }
+    return { ok: false, error: result.error, blockers: result.blockers };
   });
 }
