@@ -222,7 +222,6 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     checklist: readiness.checklist,
     publicProfileReady: readiness.setupSummary.publicProfile,
     canAcceptOrders: readiness.canAcceptOrders,
-    orderabilityDiagnostics: readiness.orderabilityDiagnostics,
     setupComplete,
     posState,
     deliverectRoutingMode: isDeliverectRoutingMode(vendorRecord.orderRoutingMode),
@@ -232,15 +231,6 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     vendorPaused: Boolean(vendorRecord.mennyuOrdersPaused),
     currentlyOpen: availability.status === "open",
   }).map((item) => {
-    if (item.id.startsWith("orderability_")) {
-      if (item.description?.toLowerCase().includes("hours")) {
-        return { ...item, actionHref: `/vendor/${vendorId}/hours`, actionLabel: "Set hours" };
-      }
-      if (item.description?.toLowerCase().includes("payment") || item.description?.toLowerCase().includes("stripe")) {
-        return { ...item, actionHref: `/vendor/${vendorId}/payouts`, actionLabel: "Finish setup" };
-      }
-      return item;
-    }
     if (item.id === "stripe" && !item.actionHref) {
       return { ...item, actionHref: `/vendor/${vendorId}/payouts`, actionLabel: "Finish setup" };
     }

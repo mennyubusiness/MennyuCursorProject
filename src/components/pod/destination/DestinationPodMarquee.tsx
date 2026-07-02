@@ -1,3 +1,8 @@
+import type { CSSProperties } from "react";
+
+import { FULL_BLEED_VIEWPORT_CLASS } from "@/lib/full-bleed-layout";
+import { getMarqueeDurationToMatchAdminBanner } from "@/lib/marquee-scroll-timing";
+
 type DestinationPodMarqueeProps = {
   items: string[];
 };
@@ -23,10 +28,10 @@ function MarqueeRow({ items, ariaHidden = false }: { items: string[]; ariaHidden
   );
 }
 
-import { FULL_BLEED_VIEWPORT_CLASS } from "@/lib/full-bleed-layout";
-
 export function DestinationPodMarquee({ items }: DestinationPodMarqueeProps) {
   if (items.length === 0) return null;
+
+  const { mobileSeconds, desktopSeconds } = getMarqueeDurationToMatchAdminBanner(items);
 
   return (
     <div className={FULL_BLEED_VIEWPORT_CLASS}>
@@ -38,7 +43,15 @@ export function DestinationPodMarquee({ items }: DestinationPodMarqueeProps) {
 
         {/* Animated seamless loop: two identical rows, track animates -50% */}
         <div className="w-full overflow-hidden motion-reduce:hidden">
-          <div className="flex w-max shrink-0 will-change-transform animate-destination-pod-marquee sm:animate-destination-pod-marquee-desktop">
+          <div
+            className="flex w-max shrink-0 will-change-transform oo-marquee-scroll-track"
+            style={
+              {
+                "--oo-marquee-duration-mobile": `${mobileSeconds}s`,
+                "--oo-marquee-duration-desktop": `${desktopSeconds}s`,
+              } as CSSProperties
+            }
+          >
             <MarqueeRow items={items} />
             <MarqueeRow items={items} ariaHidden />
           </div>

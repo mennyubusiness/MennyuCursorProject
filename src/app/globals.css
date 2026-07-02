@@ -256,4 +256,15 @@
   .oo-dash-table-wrap {
     @apply overflow-x-auto rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm;
   }
+
+  /** Responsive marquee duration — set --oo-marquee-duration-mobile/desktop on the track. */
+  .oo-marquee-scroll-track {
+    animation: destination-pod-marquee var(--oo-marquee-duration-mobile, 60s) linear infinite;
+  }
+
+  @media (min-width: 640px) {
+    .oo-marquee-scroll-track {
+      animation-duration: var(--oo-marquee-duration-desktop, 48s);
+    }
+  }
 }

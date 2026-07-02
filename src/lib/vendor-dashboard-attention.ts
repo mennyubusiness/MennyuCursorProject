@@ -56,7 +56,6 @@ export function deriveVendorAttentionItems(input: {
   publicProfileReady: boolean;
   canAcceptOrders: boolean;
   setupComplete?: boolean;
-  orderabilityDiagnostics?: string[];
   posState: VendorPosUiState;
   /** When false (manual dashboard routing), skip Deliverect/POS connection warnings. */
   deliverectRoutingMode?: boolean;
@@ -108,7 +107,12 @@ export function deriveVendorAttentionItems(input: {
     return items;
   }
 
-  if (!input.canAcceptOrders) {
+  const hasOperationalSetupGaps = incompleteOperational.length > 0;
+  const showOrderabilityAttention =
+    !input.canAcceptOrders &&
+    (!input.setupComplete || hasOperationalSetupGaps || input.vendorPaused);
+
+  if (showOrderabilityAttention) {
     items.push({
       id: "ordering_closed",
       kind: "summary",
@@ -119,18 +123,6 @@ export function deriveVendorAttentionItems(input: {
 
     for (const item of incompleteOperational) {
       items.push(checklistItemToAttention(item));
-    }
-
-    const diagnostics = input.orderabilityDiagnostics ?? [];
-    for (const [index, line] of diagnostics.entries()) {
-      const id = `orderability_${index}`;
-      if (items.some((item) => item.description === line)) continue;
-      items.push({
-        id,
-        title: "Customers cannot order yet",
-        description: line,
-        severity: "warning",
-      });
     }
 
     if (input.deliverectRoutingMode !== false) {
