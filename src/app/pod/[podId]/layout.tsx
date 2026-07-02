@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AdminModeBanner } from "@/components/admin/AdminModeBanner";
@@ -36,9 +37,16 @@ export default async function PodAreaLayout({
 
   const pod = await prisma.pod.findUnique({
     where: { id: podId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, deletedAt: true },
   });
   if (!pod) notFound();
+
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") ?? "";
+  const onSettingsRoute = pathname.includes(`/pod/${podId}/settings`);
+  if (pod.deletedAt && !onSettingsRoute) {
+    redirect(`/pod/${podId}/settings?deleted=1`);
+  }
 
   if (!(await shouldSkipEmailVerificationGate())) {
     const session = await auth();

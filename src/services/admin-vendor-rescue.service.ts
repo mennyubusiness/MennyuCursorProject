@@ -560,4 +560,20 @@ export function buildPodPublicPathPreview(slug: string) {
   return buildPodCustomerPath(slug);
 }
 
+export async function adminDeleteVendorProfile(input: {
+  vendorId: string;
+  adminUserId: string | null;
+  reason: string;
+}): Promise<ActionResult> {
+  const reasonCheck = requireAdminReason(input.reason);
+  if (!reasonCheck.ok) return reasonCheck;
+
+  const { deleteVendorProfile } = await import("@/services/entity-deletion.service");
+  return deleteVendorProfile({
+    vendorId: input.vendorId,
+    actorUserId: input.adminUserId ?? input.vendorId,
+    adminReason: reasonCheck.reason,
+  });
+}
+
 export type { SlugEntityType };

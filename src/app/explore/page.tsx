@@ -17,7 +17,7 @@ function extractMenuCategoryNames(snapshot: unknown): string[] {
 
 export default async function ExplorePage() {
   const pods = await prisma.pod.findMany({
-    where: { isActive: true },
+    where: { isActive: true, deletedAt: null },
     orderBy: { name: "asc" },
     include: {
       vendors: {
@@ -33,10 +33,11 @@ export default async function ExplorePage() {
               imageUrl: true,
               isActive: true,
               mennyuOrdersPaused: true,
+              deletedAt: true,
             },
           },
         },
-        where: { isActive: true },
+        where: { isActive: true, vendor: { isActive: true, deletedAt: null } },
         orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
       },
     },

@@ -63,10 +63,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             passwordChangedAt: true,
             emailVerified: true,
             disabledAt: true,
+            deletedAt: true,
           },
         });
         if (!user?.passwordHash) return null;
-        if (user.disabledAt) return null;
+        if (user.disabledAt || user.deletedAt) return null;
         const ok = await verifyPassword(passwordRaw, user.passwordHash);
         if (!ok) return null;
         return {

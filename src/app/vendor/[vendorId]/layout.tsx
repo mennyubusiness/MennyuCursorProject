@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AdminModeBanner } from "@/components/admin/AdminModeBanner";
@@ -22,9 +23,16 @@ export default async function VendorAreaLayout({
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { id: true, name: true, menuSource: true, vendorDashboardToken: true },
+    select: { id: true, name: true, menuSource: true, vendorDashboardToken: true, deletedAt: true },
   });
   if (!vendor) notFound();
+
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") ?? "";
+  const onSettingsRoute = pathname.includes(`/vendor/${vendorId}/settings`);
+  if (vendor.deletedAt && !onSettingsRoute) {
+    redirect(`/vendor/${vendorId}/settings?deleted=1`);
+  }
 
   if (!isVendorDashboardDevOpen()) {
     const allowed = await canAccessVendorDashboard(vendorId);

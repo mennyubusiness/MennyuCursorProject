@@ -64,6 +64,9 @@ model Pod {
   /// Pickup-only sales tax rate in basis points (e.g. 825 = 8.25%). Applied to food subtotal by Mennyu at checkout — not vendor-entered per order. Null/omit = no automatic tax.
   pickupSalesTaxBps  Int?
   isActive           Boolean                @default(true)
+  /// Soft deletion — hidden from public ordering; historical records retained.
+  deletedAt          DateTime?
+  deletedByUserId    String?
   /// When true, pod remains public but customer ordering is paused for all vendors.
   mennyuOrdersPaused Boolean                @default(false)
   onboardingStatus   AccountOnboardingStatus @default(ready_for_next_step)
@@ -79,6 +82,8 @@ model Pod {
   payoutSettings     PodPayoutSettings?
   podPayoutAllocations PodPayoutAllocation[]
   podPayoutTransfers   PodPayoutTransfer[]
+
+  @@index([deletedAt])
 }
 
 /// Per-pod revenue share configuration for pod owner payouts (allocation only in P1; transfers in later phases).
@@ -323,6 +328,11 @@ model User {
   slugRedirectsCreated                 SlugRedirect[]    @relation("SlugRedirectCreatedBy")
   /// When set, credentials login and active JWT sessions are blocked.
   disabledAt                           DateTime?
+  /// Self-serve or admin account deletion — personal fields may be anonymized; financial records retained.
+  deletedAt                            DateTime?
+  deletedByUserId                      String?
+
+  @@index([deletedAt])
 }
 
 /// Single-use email password reset token (raw token never stored).
@@ -502,6 +512,9 @@ model Vendor {
   /// Customer-facing brand accent, e.g. #c2410c — validated app-side; null = use default Mennyu styling.
   accentColor             String?
   isActive                Boolean                @default(true)
+  /// Soft deletion — hidden from public ordering; historical records retained.
+  deletedAt               DateTime?
+  deletedByUserId         String?
   createdAt               DateTime               @default(now())
   updatedAt               DateTime               @updatedAt
   deliverectChannelLinkId String?
@@ -575,6 +588,8 @@ model Vendor {
   menuVersions            MenuVersion[]
   openOrderMenuCategories VendorMenuCategory[]
   vendorMemberships       VendorMembership[]
+
+  @@index([deletedAt])
 }
 
 /// Open Order Menu Builder categories (manual / open_order menu source only).

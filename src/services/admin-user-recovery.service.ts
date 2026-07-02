@@ -285,6 +285,33 @@ export async function adminInvalidateUserSessions(input: {
   return { ok: true };
 }
 
+export async function adminDeleteUserAccount(input: {
+  userId: string;
+  adminUserId: string | null;
+  reason: string;
+}): Promise<ActionResult> {
+  const reasonCheck = requireAdminReason(input.reason);
+  if (!reasonCheck.ok) return reasonCheck;
+
+  const { deleteUserAccount } = await import("@/services/entity-deletion.service");
+  const result = await deleteUserAccount({
+    userId: input.userId,
+    actorUserId: input.adminUserId ?? input.userId,
+  });
+  if (!result.ok) return { ok: false, error: result.error };
+
+  await createAdminAuditLog({
+    adminUserId: input.adminUserId,
+    actionType: ADMIN_AUDIT_ACTION.USER_DELETED,
+    targetType: ADMIN_AUDIT_TARGET.user,
+    targetId: input.userId,
+    reason: reasonCheck.reason,
+  });
+
+  revalidatePath(`/admin/users/${input.userId}`);
+  return { ok: true };
+}
+
 export async function adminSendPasswordReset(input: {
   userId: string;
   adminUserId: string | null;

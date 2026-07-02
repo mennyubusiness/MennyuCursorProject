@@ -19,6 +19,7 @@ import { AccountRecentOrders } from "./AccountRecentOrders";
 import { AccountSecurityCard } from "./AccountSecurityCard";
 import { AccountSignOutSection } from "./AccountSignOutSection";
 import { AccountToolsGrid } from "./AccountToolsGrid";
+import { AccountDeleteSection } from "./AccountDeleteSection";
 
 export default async function AccountPage() {
   const session = await auth();
@@ -66,6 +67,7 @@ export default async function AccountPage() {
       )}
       <AccountSecurityCard email={session.user.email} />
       <AccountToolsGrid staff={ctx.staff} primaryMode={primaryMode} pendingSetup={pendingSetup} />
+      <AccountDeleteSection />
       <AccountSignOutSection />
     </div>
   );

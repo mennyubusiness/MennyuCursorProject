@@ -9,6 +9,7 @@ import {
 import { prisma } from "@/lib/db";
 import { parsePodAmenities, parsePodCustomAmenities } from "@/lib/pod-amenities";
 import { PodBrandProfileForm } from "./PodBrandProfileForm";
+import { PodDeleteSection } from "./PodDeleteSection";
 
 export default async function PodSettingsPage({
   params,
@@ -35,9 +36,14 @@ export default async function PodSettingsPage({
       pickupInstructions: true,
       amenities: true,
       customAmenities: true,
+      deletedAt: true,
     },
   });
   if (!pod) notFound();
+
+  const activeVendorCount = await prisma.podVendor.count({
+    where: { podId: pod.id, isActive: true, vendor: { deletedAt: null, isActive: true } },
+  });
 
   const amenities = parsePodAmenities(pod.amenities);
   const customAmenities = parsePodCustomAmenities(pod.customAmenities);
@@ -79,6 +85,19 @@ export default async function PodSettingsPage({
               />
             </div>
           </DashboardCard>
+        </DashboardSection>
+
+        <DashboardSection
+          id="delete-pod"
+          title="Danger zone"
+          description="Permanently remove this pod from public ordering and explore."
+        >
+          <PodDeleteSection
+            podId={pod.id}
+            podName={pod.name}
+            deletedAt={pod.deletedAt}
+            activeVendorCount={activeVendorCount}
+          />
         </DashboardSection>
       </div>
     </DashboardShell>

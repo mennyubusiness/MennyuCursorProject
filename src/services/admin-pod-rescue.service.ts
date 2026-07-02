@@ -492,3 +492,20 @@ export async function adminLogVendorReadinessRecheck(input: {
 export function buildPodPublicPathPreview(slug: string) {
   return buildPodCustomerPath(slug);
 }
+
+export async function adminDeletePodProfile(input: {
+  podId: string;
+  adminUserId: string | null;
+  reason: string;
+}): Promise<ActionResult> {
+  const reasonCheck = requireAdminReason(input.reason);
+  if (!reasonCheck.ok) return reasonCheck;
+
+  const { deletePodProfile } = await import("@/services/entity-deletion.service");
+  return deletePodProfile({
+    podId: input.podId,
+    actorUserId: input.adminUserId ?? input.podId,
+    acknowledgeActiveVendors: true,
+    adminReason: reasonCheck.reason,
+  });
+}

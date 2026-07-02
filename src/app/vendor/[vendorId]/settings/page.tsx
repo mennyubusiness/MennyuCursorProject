@@ -14,6 +14,7 @@ import { resolveLegacyVendorSettingsRedirect } from "@/lib/vendor-settings-secti
 import { loadVendorPendingPodInvites } from "@/lib/vendor-pending-pod-invites.server";
 import { VendorAccessQueryMessages } from "./VendorAccessMessages";
 import { VendorBrandProfileForm } from "./VendorBrandProfileForm";
+import { VendorDeleteSection } from "./VendorDeleteSection";
 import { VendorPodInvitesSidebar } from "./VendorPodInvitesSidebar";
 
 export default async function VendorProfilePage({
@@ -55,6 +56,7 @@ export default async function VendorProfilePage({
         imageUrl: true,
         accentColor: true,
         cuisineCategory: true,
+        deletedAt: true,
       },
     }),
     prisma.podVendor.findFirst({
@@ -121,6 +123,18 @@ export default async function VendorProfilePage({
                 />
               </div>
             </DashboardCard>
+          </DashboardSection>
+
+          <DashboardSection
+            id="delete-vendor"
+            title="Danger zone"
+            description="Permanently remove this vendor from public ordering."
+          >
+            <VendorDeleteSection
+              vendorId={vendor.id}
+              vendorName={vendor.name}
+              deletedAt={vendor.deletedAt}
+            />
           </DashboardSection>
         </div>
 
