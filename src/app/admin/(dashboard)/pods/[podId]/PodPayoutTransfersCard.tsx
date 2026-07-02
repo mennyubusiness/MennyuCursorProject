@@ -144,7 +144,7 @@ export function PodPayoutTransfersCard({
           href="/admin/payout-transfers"
           className="text-sm text-sky-800 underline hover:text-sky-900"
         >
-          Vendor payouts
+          All payouts
         </Link>
       </div>
 

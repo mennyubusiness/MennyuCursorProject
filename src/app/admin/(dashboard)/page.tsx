@@ -35,7 +35,7 @@ const QUICK_LINK_GROUPS = [
       { label: "Notifications", href: "/admin/notifications", hint: "SMS log visibility" },
       { label: "Webhooks", href: "/admin/webhooks", hint: "Stripe & Deliverect health" },
       {
-        label: "Vendor transfers",
+        label: "Payouts",
         href: "/admin/payout-transfers",
         hint: "Connect transfers to vendors",
       },

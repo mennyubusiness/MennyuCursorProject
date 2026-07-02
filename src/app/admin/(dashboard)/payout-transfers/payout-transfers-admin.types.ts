@@ -62,3 +62,41 @@ export type AdminTransferReversalRow = {
 };
 
 export type AdminVendorOption = { id: string; name: string };
+
+export type AdminPodOption = { id: string; name: string };
+
+export type AdminPodPayoutTransferRow = {
+  id: string;
+  podId: string;
+  podName: string;
+  orderId: string;
+  amountCents: number;
+  currency: string;
+  destinationAccountId: string | null;
+  status: string;
+  statusLabel: string;
+  stripeTransferId: string | null;
+  blockedReason: string | null;
+  blockedReasonLabel: string | null;
+  failureMessage: string | null;
+  batchKey: string | null;
+  createdAt: string;
+  submittedAt: string | null;
+  paidAt: string | null;
+  revenueShareBps: number;
+  recipientEmail: string | null;
+  recipientUserId: string | null;
+};
+
+export type PodPayoutGlobalSummary = {
+  needsActionCount: number;
+  needsActionAmountCents: number;
+  readyToTransferCount: number;
+  readyToTransferAmountCents: number;
+  blockedCount: number;
+  blockedAmountCents: number;
+  paidCount: number;
+  paidAmountCents: number;
+};
+
+export type PayoutCategoryTab = "all" | "vendors" | "pods" | "blocked";

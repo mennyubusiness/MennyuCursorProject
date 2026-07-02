@@ -68,7 +68,7 @@ describe("admin home quick links", () => {
   it("uses readable link labels on the home page", () => {
     const page = readAdmin("page.tsx");
     expect(page).toContain("Order issues");
-    expect(page).toContain("Vendor transfers");
+    expect(page).toContain("Payouts");
     expect(page).toContain("POS connections");
     expect(page).toContain("Platform pricing");
   });

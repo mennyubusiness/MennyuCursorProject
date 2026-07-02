@@ -10,7 +10,7 @@ type NavItem = { href: string; label: string };
 const ORDERS: NavItem[] = [
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/exceptions", label: "Issues & refunds" },
-  { href: "/admin/payout-transfers", label: "Vendor transfers" },
+  { href: "/admin/payout-transfers", label: "Payouts" },
 ];
 
 const MARKETPLACE: NavItem[] = [

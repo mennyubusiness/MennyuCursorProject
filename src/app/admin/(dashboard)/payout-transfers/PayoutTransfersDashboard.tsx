@@ -74,11 +74,17 @@ import {
 } from "@/lib/admin-payout-transfers-ux";
 import { VendorClawbackReviewActions } from "@/components/admin/VendorClawbackReviewActions";
 import type { StripePlatformBalanceSnapshot } from "@/services/stripe-balance.service";
+import { AdminPodPayoutTransfersSection } from "./AdminPodPayoutTransfersSection";
+import type { PodPayoutQuickFilter } from "@/lib/admin-pod-payout-transfers-ux";
 
 import type {
   AdminPayoutTransferRow,
+  AdminPodOption,
+  AdminPodPayoutTransferRow,
   AdminTransferReversalRow,
   AdminVendorOption,
+  PayoutCategoryTab,
+  PodPayoutGlobalSummary,
 } from "./payout-transfers-admin.types";
 
 type DatePreset = "all" | "today" | "7d";
@@ -232,6 +238,9 @@ function groupReversalKey(row: AdminTransferReversalRow): string {
 export function PayoutTransfersDashboard({
   initialTransfers,
   initialReversals,
+  initialPodTransfers,
+  podOptions,
+  podSummary,
   vendors,
   initialBalance,
   initialBalanceError,
@@ -239,6 +248,9 @@ export function PayoutTransfersDashboard({
 }: {
   initialTransfers: AdminPayoutTransferRow[];
   initialReversals: AdminTransferReversalRow[];
+  initialPodTransfers: AdminPodPayoutTransferRow[];
+  podOptions: AdminPodOption[];
+  podSummary: PodPayoutGlobalSummary;
   vendors: AdminVendorOption[];
   initialBalance: StripePlatformBalanceSnapshot | null;
   initialBalanceError: string | null;
@@ -248,8 +260,11 @@ export function PayoutTransfersDashboard({
   const [, startTransition] = useTransition();
   const [transfers, setTransfers] = useState(initialTransfers);
   const [reversals, setReversals] = useState(initialReversals);
+  const [podTransfers] = useState(initialPodTransfers);
+  const [payoutCategoryTab, setPayoutCategoryTab] = useState<PayoutCategoryTab>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [vendorId, setVendorId] = useState<string>("");
+  const [podId, setPodId] = useState<string>("");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -258,6 +273,7 @@ export function PayoutTransfersDashboard({
   const [batchErr, setBatchErr] = useState<string | null>(null);
   const [batchBusy, setBatchBusy] = useState<"payout" | "retry_all" | "reconcile" | "reversal" | null>(null);
   const [vendorSearch, setVendorSearch] = useState("");
+  const [podSearch, setPodSearch] = useState("");
   const [retryPayoutId, setRetryPayoutId] = useState<string | null>(null);
   const [reconcilePayoutId, setReconcilePayoutId] = useState<string | null>(null);
   const [reconcileNotes, setReconcileNotes] = useState<Record<string, string>>({});
@@ -277,6 +293,17 @@ export function PayoutTransfersDashboard({
     setBalanceError(initialBalanceError);
   }, [initialTransfers, initialReversals, initialBalance, initialBalanceError]);
 
+  const showVendorSections =
+    payoutCategoryTab === "all" || payoutCategoryTab === "vendors" || payoutCategoryTab === "blocked";
+  const showPodSections =
+    payoutCategoryTab === "all" || payoutCategoryTab === "pods" || payoutCategoryTab === "blocked";
+  const effectiveQuickFilter: SectionQuickFilter =
+    payoutCategoryTab === "blocked" ? "blocked" : quickFilter;
+  const podQuickFilter: PodPayoutQuickFilter =
+    effectiveQuickFilter === "clawbacks" || effectiveQuickFilter === "cancelled"
+      ? "all"
+      : effectiveQuickFilter;
+
   const vendorsFiltered = useMemo(() => {
     const q = vendorSearch.trim().toLowerCase();
     if (!q) return vendors;
@@ -288,12 +315,16 @@ export function PayoutTransfersDashboard({
       if (!inDateRange(t.createdAt, datePreset)) return false;
       if (vendorId && t.vendorId !== vendorId) return false;
       if (statusFilter !== "all" && statusFilterBucket(t.status) !== statusFilter) return false;
-      if (quickFilter !== "all" && quickFilter !== "default" && !transferMatchesQuickFilter(t, quickFilter)) {
+      if (
+        effectiveQuickFilter !== "all" &&
+        effectiveQuickFilter !== "default" &&
+        !transferMatchesQuickFilter(t, effectiveQuickFilter)
+      ) {
         return false;
       }
       return true;
     });
-  }, [transfers, datePreset, vendorId, statusFilter, quickFilter]);
+  }, [transfers, datePreset, vendorId, statusFilter, effectiveQuickFilter]);
 
   const filteredReversals = useMemo(() => {
     return reversals.filter((r) => {
@@ -795,13 +826,46 @@ export function PayoutTransfersDashboard({
     liabilityTotals.blockedInsufficientBalanceCents + liabilityTotals.idempotencyMismatchCents;
   const blockedMetricCount = blockedCount + manualReviewCount;
 
+  const podsFiltered = useMemo(() => {
+    const q = podSearch.trim().toLowerCase();
+    if (!q) return podOptions;
+    return podOptions.filter((p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
+  }, [podOptions, podSearch]);
+
+  const combinedNeedsActionCount = actionItemCount + podSummary.needsActionCount;
+  const combinedNeedsActionAmountCents = needsActionAmountCents + podSummary.needsActionAmountCents;
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-oo-charcoal">Vendor Transfers</h1>
+        <h1 className="text-2xl font-semibold text-oo-charcoal">Payouts</h1>
         <p className="mt-1 text-sm text-oo-stone-gray">
-          Track vendor Connect transfers and recover blocked payouts.
+          Vendor Connect transfers, pod revenue share payouts, and platform balance in one place.
         </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["all", "All"],
+            ["vendors", "Vendors"],
+            ["pods", "Pods"],
+            ["blocked", "Blocked / Needs review"],
+          ] as const
+        ).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setPayoutCategoryTab(tab)}
+            className={`rounded-lg border px-3 py-1.5 text-sm font-semibold ${
+              payoutCategoryTab === tab
+                ? "border-brand bg-brand text-white"
+                : "border-oo-light-stone bg-oo-warm-white text-oo-charcoal hover:bg-oo-cream"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm sm:p-5">
@@ -815,28 +879,58 @@ export function PayoutTransfersDashboard({
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Needs action</p>
             <p className="mt-1 text-base font-semibold tabular-nums text-amber-950">
-              {formatMoney(needsActionAmountCents, "usd")}
+              {formatMoney(
+                payoutCategoryTab === "pods" ? podSummary.needsActionAmountCents : combinedNeedsActionAmountCents,
+                "usd"
+              )}
             </p>
-            <p className="text-xs text-oo-stone-gray">{actionItemCount}</p>
+            <p className="text-xs text-oo-stone-gray">
+              {payoutCategoryTab === "pods" ? podSummary.needsActionCount : combinedNeedsActionCount}
+            </p>
           </div>
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Ready to send</p>
             <p className="mt-1 text-base font-semibold tabular-nums text-oo-charcoal">
-              {formatMoney(liabilityTotals.readyToTransferCents, "usd")}
+              {formatMoney(
+                payoutCategoryTab === "pods"
+                  ? podSummary.readyToTransferAmountCents
+                  : liabilityTotals.readyToTransferCents +
+                      (payoutCategoryTab === "all" ? podSummary.readyToTransferAmountCents : 0),
+                "usd"
+              )}
             </p>
-            <p className="text-xs text-oo-stone-gray">{readyCount}</p>
+            <p className="text-xs text-oo-stone-gray">
+              {payoutCategoryTab === "pods"
+                ? podSummary.readyToTransferCount
+                : readyCount + (payoutCategoryTab === "all" ? podSummary.readyToTransferCount : 0)}
+            </p>
           </div>
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Blocked</p>
             <p className="mt-1 text-base font-semibold tabular-nums text-orange-900">
-              {formatMoney(blockedAmountCents, "usd")}
+              {formatMoney(
+                payoutCategoryTab === "pods"
+                  ? podSummary.blockedAmountCents
+                  : blockedAmountCents + (payoutCategoryTab === "all" ? podSummary.blockedAmountCents : 0),
+                "usd"
+              )}
             </p>
-            <p className="text-xs text-oo-stone-gray">{blockedMetricCount}</p>
+            <p className="text-xs text-oo-stone-gray">
+              {payoutCategoryTab === "pods"
+                ? podSummary.blockedCount
+                : blockedMetricCount + (payoutCategoryTab === "all" ? podSummary.blockedCount : 0)}
+            </p>
           </div>
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Sent</p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-emerald-900">
-              {formatMoney(liabilityTotals.vendorPaidCents, "usd")}
+              {formatMoney(
+                payoutCategoryTab === "pods"
+                  ? podSummary.paidAmountCents
+                  : liabilityTotals.vendorPaidCents +
+                      (payoutCategoryTab === "all" ? podSummary.paidAmountCents : 0),
+                "usd"
+              )}
             </p>
           </div>
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
@@ -856,56 +950,71 @@ export function PayoutTransfersDashboard({
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={actionLocked || retryAllDisabled}
-            onClick={() => void runRetryAllPayouts()}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
-              retryAllDisabled
-                ? "border-oo-light-stone bg-oo-cream text-oo-stone-gray"
-                : "border-orange-300 bg-orange-50 text-orange-950 hover:bg-orange-100"
-            }`}
-          >
-            {batchBusy === "retry_all" ? "Retrying…" : "Retry eligible transfers"}
-          </button>
-          <button
-            type="button"
-            disabled={actionLocked || batchDisabled}
-            onClick={() => void runPayoutBatch()}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
-              batchDisabled
-                ? "border border-oo-light-stone bg-oo-cream text-oo-stone-gray"
-                : "bg-brand text-white hover:bg-brand-hover"
-            }`}
-          >
-            {batchBusy === "payout" ? "Running…" : "Run batch"}
-          </button>
-          <button
-            type="button"
-            disabled={balanceBusy || actionLocked}
-            onClick={() => void refreshBalance()}
-            className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-white disabled:opacity-50"
-          >
-            {balanceBusy ? "Refreshing…" : "Refresh balance"}
-          </button>
-        </div>
-
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs font-semibold text-oo-stone-gray hover:text-oo-charcoal">
-            More actions
-          </summary>
-          <div className="mt-2">
+        {showVendorSections ? (
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={actionLocked}
-              onClick={() => void runBulkReconcile()}
-              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+              disabled={actionLocked || retryAllDisabled}
+              onClick={() => void runRetryAllPayouts()}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                retryAllDisabled
+                  ? "border-oo-light-stone bg-oo-cream text-oo-stone-gray"
+                  : "border-orange-300 bg-orange-50 text-orange-950 hover:bg-orange-100"
+              }`}
             >
-              {batchBusy === "reconcile" ? "Reconciling…" : "Reconcile with Stripe"}
+              {batchBusy === "retry_all" ? "Retrying…" : "Retry eligible vendor transfers"}
+            </button>
+            <button
+              type="button"
+              disabled={actionLocked || batchDisabled}
+              onClick={() => void runPayoutBatch()}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                batchDisabled
+                  ? "border border-oo-light-stone bg-oo-cream text-oo-stone-gray"
+                  : "bg-brand text-white hover:bg-brand-hover"
+              }`}
+            >
+              {batchBusy === "payout" ? "Running…" : "Run vendor batch"}
+            </button>
+            <button
+              type="button"
+              disabled={balanceBusy || actionLocked}
+              onClick={() => void refreshBalance()}
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-white disabled:opacity-50"
+            >
+              {balanceBusy ? "Refreshing…" : "Refresh balance"}
             </button>
           </div>
-        </details>
+        ) : (
+          <div className="mt-3">
+            <button
+              type="button"
+              disabled={balanceBusy || actionLocked}
+              onClick={() => void refreshBalance()}
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-white disabled:opacity-50"
+            >
+              {balanceBusy ? "Refreshing…" : "Refresh balance"}
+            </button>
+          </div>
+        )}
+
+        {showVendorSections ? (
+          <details className="mt-2">
+            <summary className="cursor-pointer text-xs font-semibold text-oo-stone-gray hover:text-oo-charcoal">
+              More vendor actions
+            </summary>
+            <div className="mt-2">
+              <button
+                type="button"
+                disabled={actionLocked}
+                onClick={() => void runBulkReconcile()}
+                className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+              >
+                {batchBusy === "reconcile" ? "Reconciling…" : "Reconcile vendor transfers with Stripe"}
+              </button>
+            </div>
+          </details>
+        ) : null}
 
         <div className="mt-4 flex flex-col gap-4 border-t border-oo-light-stone pt-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-wrap items-end gap-3">
@@ -948,11 +1057,13 @@ export function PayoutTransfersDashboard({
                 onChange={(e) => setVendorSearch(e.target.value)}
                 placeholder="Filter list…"
                 className="mb-1 rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-1 text-sm text-oo-charcoal"
+                disabled={!showVendorSections}
               />
               <select
                 value={vendorId}
                 onChange={(e) => setVendorId(e.target.value)}
-                className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm text-oo-charcoal"
+                className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm text-oo-charcoal disabled:opacity-50"
+                disabled={!showVendorSections}
               >
                 <option value="">All vendors</option>
                 {vendorsFiltered.map((v) => (
@@ -962,6 +1073,30 @@ export function PayoutTransfersDashboard({
                 ))}
               </select>
             </label>
+            {showPodSections ? (
+              <label className="flex min-w-[12rem] flex-col gap-1 text-xs font-medium text-oo-stone-gray">
+                Pod
+                <input
+                  type="search"
+                  value={podSearch}
+                  onChange={(e) => setPodSearch(e.target.value)}
+                  placeholder="Filter list…"
+                  className="mb-1 rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-1 text-sm text-oo-charcoal"
+                />
+                <select
+                  value={podId}
+                  onChange={(e) => setPodId(e.target.value)}
+                  className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-1.5 text-sm text-oo-charcoal"
+                >
+                  <option value="">All pods</option>
+                  {podsFiltered.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <label className="flex flex-col gap-1 text-xs font-medium text-oo-stone-gray">
               Date range
               <select
@@ -994,8 +1129,10 @@ export function PayoutTransfersDashboard({
         {batchMsg && <p className="mt-3 text-sm text-emerald-800">{batchMsg}</p>}
       </div>
 
+      {showVendorSections ? (
+      <>
       <section className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-oo-charcoal">Needs action</h2>
+        <h2 className="text-lg font-semibold text-oo-charcoal">Vendor transfers — needs action</h2>
         {needsActionCount === 0 ? (
           <p className="rounded-lg border border-dashed border-emerald-200 bg-emerald-50/30 p-6 text-center text-sm text-emerald-950">
             No vendor transfers or clawbacks need action.
@@ -1064,6 +1201,7 @@ export function PayoutTransfersDashboard({
         )}
       </section>
 
+      {payoutCategoryTab !== "blocked" ? (
       <section className="space-y-3 rounded-xl border border-violet-200/60 bg-violet-50/20 p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-oo-charcoal">Vendor clawbacks</h2>
@@ -1120,7 +1258,9 @@ export function PayoutTransfersDashboard({
           </details>
         ) : null}
       </section>
+      ) : null}
 
+      {payoutCategoryTab !== "blocked" ? (
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-oo-charcoal">Recently sent to vendors</h2>
@@ -1154,8 +1294,9 @@ export function PayoutTransfersDashboard({
           </div>
         )}
       </section>
+      ) : null}
 
-      {sectionData.cancelled.length > 0 ? (
+      {payoutCategoryTab !== "blocked" && sectionData.cancelled.length > 0 ? (
         <details className="rounded-xl border border-slate-200 bg-slate-50/50 shadow-sm">
           <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-900">
             Cancelled vendor transfers ({sectionData.cancelled.length})
@@ -1185,13 +1326,14 @@ export function PayoutTransfersDashboard({
         </details>
       ) : null}
 
+      {payoutCategoryTab !== "blocked" ? (
       <details
         className="rounded-xl border border-oo-light-stone bg-oo-warm-white shadow-sm"
         open={historyOpen}
         onToggle={(e) => setHistoryOpen((e.target as HTMLDetailsElement).open)}
       >
         <summary className="cursor-pointer px-4 py-3 text-lg font-semibold text-oo-charcoal">
-          Transfer history
+          Vendor transfer history
         </summary>
         <div className="space-y-3 border-t border-oo-light-stone p-4">
         {transferGroups.length === 0 ? (
@@ -1242,6 +1384,26 @@ export function PayoutTransfersDashboard({
         )}
         </div>
       </details>
+      ) : null}
+      </>
+      ) : null}
+
+      {showPodSections ? (
+        <AdminPodPayoutTransfersSection
+          transfers={podTransfers}
+          pods={podOptions}
+          summary={podSummary}
+          datePreset={datePreset}
+          statusFilter={statusFilter}
+          podId={podId}
+          podSearch={podSearch}
+          quickFilter={podQuickFilter}
+          showSummary={payoutCategoryTab !== "blocked"}
+          showNeedsAction={payoutCategoryTab === "all" || payoutCategoryTab === "blocked"}
+          showHistory={payoutCategoryTab === "all" || payoutCategoryTab === "pods"}
+          variant={payoutCategoryTab === "blocked" ? "blocked_only" : "default"}
+        />
+      ) : null}
 
       <details className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
         <summary className="cursor-pointer text-sm font-semibold text-oo-charcoal">How this works</summary>

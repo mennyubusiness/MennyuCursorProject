@@ -9,13 +9,14 @@ import type {
   AdminVendorOption,
 } from "./payout-transfers-admin.types";
 import { clawbackBadgesForPayoutTransfers } from "@/services/admin-payout-transfer-list.service";
+import { listPodPayoutTransfersForAdminDashboard } from "@/services/admin-pod-payout-transfer-list.service";
 import { PayoutTransfersDashboard } from "./PayoutTransfersDashboard";
 
 const TRANSFER_TAKE = 400;
 const REVERSAL_TAKE = 400;
 
 export default async function AdminPayoutTransfersPage() {
-  const [vendors, transfers, reversals, balanceResult] = await Promise.all([
+  const [vendors, transfers, reversals, balanceResult, podPayoutData] = await Promise.all([
     prisma.vendor.findMany({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
@@ -87,6 +88,7 @@ export default async function AdminPayoutTransfersPage() {
       },
     }),
     fetchStripePlatformBalance("usd"),
+    listPodPayoutTransfersForAdminDashboard(TRANSFER_TAKE),
   ]);
 
   const clawbackBadgeByTransferId = await clawbackBadgesForPayoutTransfers(transfers, reversals);
@@ -163,6 +165,9 @@ export default async function AdminPayoutTransfersPage() {
     <PayoutTransfersDashboard
       initialTransfers={initialTransfers}
       initialReversals={initialReversals}
+      initialPodTransfers={podPayoutData.transfers}
+      podOptions={podPayoutData.pods}
+      podSummary={podPayoutData.summary}
       vendors={vendorOptions}
       initialBalance={balanceResult.ok ? balanceResult.balance : null}
       initialBalanceError={balanceResult.ok ? null : balanceResult.error}

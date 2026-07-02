@@ -34,8 +34,8 @@ describe("admin vendor transfers page terminology", () => {
   });
 
   it("uses compact operational subtitle and keeps educational copy collapsed", () => {
-    expect(dashboardSrc).toMatch(/Vendor Transfers/);
-    expect(dashboardSrc).toMatch(/Track vendor Connect transfers and recover blocked payouts/);
+    expect(dashboardSrc).toMatch(/Payouts/);
+    expect(dashboardSrc).toMatch(/Vendor Connect transfers, pod revenue share payouts/);
     expect(dashboardSrc).toMatch(/How this works/);
     expect(dashboardSrc).toMatch(/stripe-platform-payout-config\.shared/);
     expect(dashboardSrc).toMatch(/ADMIN_VENDOR_AUTO_TRANSFER_WARNING/);
@@ -55,20 +55,27 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).not.toMatch(/Recommended platform minimum balance/);
   });
 
+  it("loads pod payout transfers for the unified admin payouts page", () => {
+    expect(pageSrc).toMatch(/listPodPayoutTransfersForAdminDashboard/);
+    expect(pageSrc).toMatch(/initialPodTransfers=/);
+    expect(dashboardSrc).toMatch(/AdminPodPayoutTransfersSection/);
+    expect(dashboardSrc).toMatch(/payoutCategoryTab/);
+  });
+
   it("uses short primary action labels in the recommended order", () => {
     const actionsBlock = dashboardSrc.slice(
-      dashboardSrc.indexOf("Retry eligible transfers"),
-      dashboardSrc.indexOf("More actions")
+      dashboardSrc.indexOf("Retry eligible vendor transfers"),
+      dashboardSrc.indexOf("More vendor actions")
     );
-    const retryIdx = actionsBlock.indexOf("Retry eligible transfers");
-    const batchIdx = actionsBlock.indexOf("Run batch");
+    const retryIdx = actionsBlock.indexOf("Retry eligible vendor transfers");
+    const batchIdx = actionsBlock.indexOf("Run vendor batch");
     const refreshIdx = actionsBlock.indexOf("Refresh balance");
     expect(retryIdx).toBeGreaterThan(-1);
     expect(batchIdx).toBeGreaterThan(retryIdx);
     expect(refreshIdx).toBeGreaterThan(batchIdx);
     expect(actionsBlock).not.toMatch(/Reconcile with Stripe/);
-    expect(dashboardSrc).toMatch(/More actions/);
-    expect(dashboardSrc).toMatch(/Reconcile with Stripe/);
+    expect(dashboardSrc).toMatch(/More vendor actions/);
+    expect(dashboardSrc).toMatch(/Reconcile vendor transfers with Stripe/);
     expect(dashboardSrc).not.toMatch(/Run vendor transfer batch/);
     expect(dashboardSrc).not.toMatch(/Retry all eligible vendor transfers/);
   });
@@ -81,8 +88,8 @@ describe("admin vendor transfers page terminology", () => {
   });
 
   it("renders Needs action table with Problem column and collapsed Details", () => {
-    expect(dashboardSrc.indexOf("Needs action")).toBeLessThan(
-      dashboardSrc.indexOf("Transfer history")
+    expect(dashboardSrc.indexOf("Vendor transfers — needs action")).toBeLessThan(
+      dashboardSrc.indexOf("Vendor transfer history")
     );
     expect(dashboardSrc).toMatch(/>Problem</);
     expect(dashboardSrc).toMatch(/transferProblemLabel/);
@@ -98,7 +105,7 @@ describe("admin vendor transfers page terminology", () => {
   });
 
   it("collapses full transfer history by default", () => {
-    expect(dashboardSrc).toMatch(/Transfer history/);
+    expect(dashboardSrc).toMatch(/Vendor transfer history/);
     expect(dashboardSrc).toMatch(/historyOpen/);
   });
 

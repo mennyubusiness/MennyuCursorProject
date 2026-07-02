@@ -34,7 +34,7 @@ describe("admin stripe money movement UI terminology", () => {
     expect(breakdown).toMatch(/Platform payout to Open Order bank/);
     expect(breakdown).toMatch(/mode === "accounting"/);
     expect(panel).toMatch(/StripeMoneyMovementBreakdown/);
-    expect(nav).toMatch(/Vendor transfers/);
+    expect(nav).toMatch(/Payouts/);
   });
 
   it("blocked row copy uses vendor transfer blocked wording", () => {
