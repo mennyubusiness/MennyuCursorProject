@@ -715,6 +715,11 @@ async function runEligibleVendorPayoutTransferRetries(params: {
   batchKey: string;
   take?: number;
 }): Promise<PayoutTransferBatchRunResult> {
+  const { reEvaluateBlockedVendorPayoutTransferRows } = await import(
+    "@/services/vendor-payout-transfer-recovery.service"
+  );
+  await reEvaluateBlockedVendorPayoutTransferRows({ take: params.take ?? 200 });
+
   const rows = await prisma.vendorPayoutTransfer.findMany(eligibleRetryTransferWhere(params.take));
 
   const summary = emptyBatchSummary(params.batchKey);
@@ -759,6 +764,11 @@ export async function runManualVendorPayoutTransferBatch(params?: {
   batchKey?: string;
 }): Promise<PayoutTransferBatchRunResult> {
   const batchKey = params?.batchKey ?? new Date().toISOString().slice(0, 10);
+
+  const { reEvaluateBlockedVendorPayoutTransferRows } = await import(
+    "@/services/vendor-payout-transfer-recovery.service"
+  );
+  await reEvaluateBlockedVendorPayoutTransferRows({ take: 500 });
 
   const pending = await prisma.vendorPayoutTransfer.findMany({
     where: {

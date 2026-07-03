@@ -277,6 +277,9 @@ async function refreshTransferRowFromBatchContext(
   return { ok: true };
 }
 
+/** Re-runs allocation/connect/refund/minimum decision for an existing pod transfer row. */
+export const recomputePodPayoutTransferRowFromContext = refreshTransferRowFromBatchContext;
+
 async function markPodPayoutBlockedInsufficientBalance(
   transferId: string,
   message: string,
@@ -468,6 +471,61 @@ export async function executePodPayoutTransfer(
   }
 }
 
+/**
+ * Admin retry for failed or balance-blocked pod transfers (not refund-blocked or idempotency mismatch).
+ */
+export async function retryFailedPodPayoutTransfer(
+  transferId: string,
+  opts?: ExecuteOpts
+): Promise<ExecutePodPayoutTransferResult> {
+  const row = await prisma.podPayoutTransfer.findUnique({ where: { id: transferId } });
+  if (!row) {
+    return { outcome: "skipped", reason: "not_found" };
+  }
+  if (isPodPayoutTransferExecutionBlockedByRefund(row)) {
+    return {
+      outcome: "skipped",
+      reason: isPodPayoutCancelledDueToRefundTransfer(row)
+        ? POD_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund
+        : POD_PAYOUT_TRANSFER_STATUS.blockedPartialRefundReview,
+    };
+  }
+  if (row.status === POD_PAYOUT_TRANSFER_STATUS.paid && row.stripeTransferId) {
+    return { outcome: "skipped", reason: "already_paid" };
+  }
+  if (row.stripeTransferId?.trim() && row.status !== POD_PAYOUT_TRANSFER_STATUS.paid) {
+    return { outcome: "skipped", reason: "inconsistent_stripe_transfer_id" };
+  }
+  if (row.status === POD_PAYOUT_TRANSFER_STATUS.blockedIdempotencyMismatch) {
+    return { outcome: "skipped", reason: POD_PAYOUT_TRANSFER_STATUS.blockedIdempotencyMismatch };
+  }
+  const retryable =
+    row.status === POD_PAYOUT_TRANSFER_STATUS.failed ||
+    row.status === POD_PAYOUT_TRANSFER_STATUS.blockedInsufficientBalance;
+  if (!retryable) {
+    return { outcome: "skipped", reason: `not_retryable_status_${row.status}` };
+  }
+  if (
+    !row.destinationAccountId ||
+    row.destinationAccountId === POD_PAYOUT_TRANSFER_BLOCKED_DESTINATION
+  ) {
+    return { outcome: "skipped", reason: "blocked_destination" };
+  }
+
+  await prisma.podPayoutTransfer.update({
+    where: { id: transferId },
+    data: {
+      status: POD_PAYOUT_TRANSFER_STATUS.pending,
+      failureMessage: null,
+      failureCode: null,
+      failedAt: null,
+      blockedReason: null,
+    },
+  });
+
+  return executePodPayoutTransfer(transferId, opts);
+}
+
 export type PodPayoutTransferBatchSummary = {
   batchKey: string;
   rowsCreated: number;
@@ -522,6 +580,12 @@ export async function runManualPodPayoutTransferBatchForPod(
 ): Promise<PodPayoutTransferBatchRunResult> {
   const batchKey = params?.batchKey ?? `pod-${podId.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}`;
   const minimumPayoutCents = await loadPodMinimumPayoutCents(podId);
+
+  const { reEvaluateBlockedPodPayoutTransferRows } = await import(
+    "@/services/pod-payout-transfer-recovery.service"
+  );
+  await reEvaluateBlockedPodPayoutTransferRows({ podId });
+
   const { created: rowsCreated } = await ensurePodPayoutTransferRowsForPod(podId);
 
   const pending = await prisma.podPayoutTransfer.findMany({

@@ -7,6 +7,7 @@ import {
   adminFetchStripePlatformBalanceAction,
   adminReconcileEligibleVendorPayoutTransfersAction,
   adminReconcileVendorPayoutTransferAction,
+  adminRecheckBlockedPayoutTransfersAction,
   adminRetryAllEligibleVendorPayoutTransfersAction,
   adminRetryVendorPayoutTransferAction,
   adminRetryVendorPayoutTransferWithNewKeyAction,
@@ -39,6 +40,7 @@ import {
   ADMIN_VENDOR_TRANSFER_VS_PLATFORM_PAYOUT,
   formatRecommendedPlatformMinimumBalanceLabel,
 } from "@/lib/stripe-platform-payout-config.shared";
+import { ADMIN_PAYOUT_BETA_RUNBOOK } from "@/lib/payout-transfer-recovery";
 import {
   CANCELLED_DUE_TO_REFUND_STATUS,
   isCancelledDueToRefundTransfer,
@@ -245,6 +247,7 @@ export function PayoutTransfersDashboard({
   initialBalance,
   initialBalanceError,
   recommendedMinimumBalanceCents,
+  initialCategoryTab = "all",
 }: {
   initialTransfers: AdminPayoutTransferRow[];
   initialReversals: AdminTransferReversalRow[];
@@ -255,13 +258,14 @@ export function PayoutTransfersDashboard({
   initialBalance: StripePlatformBalanceSnapshot | null;
   initialBalanceError: string | null;
   recommendedMinimumBalanceCents: number;
+  initialCategoryTab?: PayoutCategoryTab;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [transfers, setTransfers] = useState(initialTransfers);
   const [reversals, setReversals] = useState(initialReversals);
   const [podTransfers] = useState(initialPodTransfers);
-  const [payoutCategoryTab, setPayoutCategoryTab] = useState<PayoutCategoryTab>("all");
+  const [payoutCategoryTab, setPayoutCategoryTab] = useState<PayoutCategoryTab>(initialCategoryTab);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [vendorId, setVendorId] = useState<string>("");
   const [podId, setPodId] = useState<string>("");
@@ -271,7 +275,7 @@ export function PayoutTransfersDashboard({
   const [batchKey, setBatchKey] = useState("");
   const [batchMsg, setBatchMsg] = useState<string | null>(null);
   const [batchErr, setBatchErr] = useState<string | null>(null);
-  const [batchBusy, setBatchBusy] = useState<"payout" | "retry_all" | "reconcile" | "reversal" | null>(null);
+  const [batchBusy, setBatchBusy] = useState<"payout" | "retry_all" | "reconcile" | "reversal" | "recheck" | null>(null);
   const [vendorSearch, setVendorSearch] = useState("");
   const [podSearch, setPodSearch] = useState("");
   const [retryPayoutId, setRetryPayoutId] = useState<string | null>(null);
@@ -285,6 +289,10 @@ export function PayoutTransfersDashboard({
   const [balanceBusy, setBalanceBusy] = useState(false);
   const [quickFilter, setQuickFilter] = useState<SectionQuickFilter>("default");
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  useEffect(() => {
+    setPayoutCategoryTab(initialCategoryTab);
+  }, [initialCategoryTab]);
 
   useEffect(() => {
     setTransfers(initialTransfers);
@@ -485,6 +493,28 @@ export function PayoutTransfersDashboard({
       startTransition(() => router.refresh());
     } catch (e) {
       setBatchErr(e instanceof Error ? e.message : "Batch failed");
+    } finally {
+      setBatchBusy(null);
+    }
+  }
+
+  async function runRecheckBlockedTransfers() {
+    setBatchBusy("recheck");
+    setBatchErr(null);
+    setBatchMsg(null);
+    try {
+      const r = await adminRecheckBlockedPayoutTransfersAction();
+      if (!r.ok) {
+        setBatchErr(r.error);
+        return;
+      }
+      const { vendor, pod } = r.summary;
+      setBatchMsg(
+        `Rechecked blocked transfers — vendor: ${vendor.promotedToPending} promoted, ${vendor.updatedBlocked} updated blocked, ${vendor.unchanged} unchanged. Pod: ${pod.promotedToPending} promoted, ${pod.updatedBlocked} updated blocked, ${pod.unchanged} unchanged.`
+      );
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setBatchErr(e instanceof Error ? e.message : "Recheck failed");
     } finally {
       setBatchBusy(null);
     }
@@ -978,6 +1008,14 @@ export function PayoutTransfersDashboard({
             </button>
             <button
               type="button"
+              disabled={actionLocked}
+              onClick={() => void runRecheckBlockedTransfers()}
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+            >
+              {batchBusy === "recheck" ? "Rechecking…" : "Recheck blocked transfers"}
+            </button>
+            <button
+              type="button"
               disabled={balanceBusy || actionLocked}
               onClick={() => void refreshBalance()}
               className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-white disabled:opacity-50"
@@ -986,7 +1024,15 @@ export function PayoutTransfersDashboard({
             </button>
           </div>
         ) : (
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={actionLocked}
+              onClick={() => void runRecheckBlockedTransfers()}
+              className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-1.5 text-xs font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50"
+            >
+              {batchBusy === "recheck" ? "Rechecking…" : "Recheck blocked transfers"}
+            </button>
             <button
               type="button"
               disabled={balanceBusy || actionLocked}
@@ -1402,6 +1448,7 @@ export function PayoutTransfersDashboard({
           showNeedsAction={payoutCategoryTab === "all" || payoutCategoryTab === "blocked"}
           showHistory={payoutCategoryTab === "all" || payoutCategoryTab === "pods"}
           variant={payoutCategoryTab === "blocked" ? "blocked_only" : "default"}
+          actionLocked={actionLocked}
         />
       ) : null}
 
@@ -1415,6 +1462,22 @@ export function PayoutTransfersDashboard({
           <p>{ADMIN_VENDOR_TRANSFERS_BALANCE_NOTE}</p>
           <p>{ADMIN_STRIPE_PLATFORM_MINIMUM_BALANCE_INSTRUCTION}</p>
         </div>
+      </details>
+
+      <details className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
+        <summary className="cursor-pointer text-sm font-semibold text-oo-charcoal">Beta payout runbook</summary>
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-xs leading-relaxed text-oo-stone-gray">
+          {ADMIN_PAYOUT_BETA_RUNBOOK.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <p className="mt-3 text-[11px] text-oo-stone-gray">
+          Vendor retry cron: scheduled every 20 minutes when deployed with{" "}
+          <code className="rounded bg-oo-cream px-1">vercel.json</code> crons and{" "}
+          <code className="rounded bg-oo-cream px-1">CRON_SECRET</code> /{" "}
+          <code className="rounded bg-oo-cream px-1">INTERNAL_JOB_SECRET</code>. See{" "}
+          <span className="font-medium text-oo-charcoal">docs/vendor-payout-transfer-retry-cron.md</span>.
+        </p>
       </details>
     </div>
   );

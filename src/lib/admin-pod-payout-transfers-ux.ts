@@ -2,6 +2,11 @@
  * Pod payout transfer row classification for admin Payouts page (presentation only).
  */
 import { POD_PAYOUT_TRANSFER_STATUS } from "@/lib/pod-payout-transfer-decision";
+import {
+  isPodPayoutCancelledDueToRefundTransfer,
+  isPodPayoutPartialRefundReviewTransfer,
+} from "@/lib/pod-payout-transfer-refund-eligibility";
+import { isReconcilablePodPayoutTransfer } from "@/lib/pod-payout-transfer-reconciliation";
 
 export type PodPayoutTransferRowLike = {
   id: string;
@@ -96,4 +101,38 @@ export function podTransferMatchesQuickFilter(
 export function formatRevenueShareBps(bps: number): string {
   const pct = bps / 100;
   return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(2)}%`;
+}
+
+export function isRetryablePodPayoutTransfer(row: {
+  status: string;
+  stripeTransferId?: string | null;
+  blockedReason?: string | null;
+  destinationAccountId?: string | null;
+}): boolean {
+  if (
+    row.status === POD_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund ||
+    row.status === POD_PAYOUT_TRANSFER_STATUS.paid
+  ) {
+    return false;
+  }
+  if (isPodPayoutPartialRefundReviewTransfer(row)) return false;
+  if (row.status === POD_PAYOUT_TRANSFER_STATUS.blockedIdempotencyMismatch) return false;
+  if (row.destinationAccountId === "blocked" || !row.destinationAccountId?.trim()) return false;
+  if (row.stripeTransferId?.trim()) return false;
+  return (
+    row.status === POD_PAYOUT_TRANSFER_STATUS.failed ||
+    row.status === POD_PAYOUT_TRANSFER_STATUS.blockedInsufficientBalance
+  );
+}
+
+export function isReconcilablePodPayoutTransferRow(row: {
+  status: string;
+  destinationAccountId?: string | null;
+  stripeTransferId?: string | null;
+  blockedReason?: string | null;
+}): boolean {
+  return isReconcilablePodPayoutTransfer({
+    ...row,
+    destinationAccountId: row.destinationAccountId ?? null,
+  });
 }

@@ -76,7 +76,7 @@ describe("pod payout transfer P4 guardrails", () => {
       join(root, "src/app/admin/(dashboard)/pods/[podId]/page.tsx"),
       "utf8"
     );
-    expect(page).toContain("PodPayoutTransfersCard");
+    expect(page).toContain("AdminPodPayoutSection");
     expect(page).toContain("getPodPayoutTransferAdminSummary");
     expect(page).not.toMatch(/stripe\.transfers\.create/);
   });

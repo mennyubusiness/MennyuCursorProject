@@ -6,6 +6,15 @@ vi.mock("@/lib/admin-auth", () => ({
 
 vi.mock("@/services/pod-payout-transfer.service", () => ({
   runManualPodPayoutTransferBatchForPod: vi.fn(),
+  retryFailedPodPayoutTransfer: vi.fn(),
+}));
+
+vi.mock("@/services/pod-payout-transfer-reconciliation.service", () => ({
+  reconcilePodPayoutTransfer: vi.fn(),
+}));
+
+vi.mock("@/services/admin-pod-payout-transfer-list.service", () => ({
+  listPodPayoutTransfersForAdminDashboard: vi.fn(async () => ({ transfers: [], pods: [], summary: {} })),
 }));
 
 vi.mock("next/cache", () => ({
@@ -13,8 +22,11 @@ vi.mock("next/cache", () => ({
 }));
 
 import { isAdminDashboardLayoutAuthorized } from "@/lib/admin-auth";
-import { adminRunPodPayoutTransferBatchAction } from "@/actions/admin-pod-payout-transfer.actions";
-import { runManualPodPayoutTransferBatchForPod } from "@/services/pod-payout-transfer.service";
+import {
+  adminRetryPodPayoutTransferAction,
+  adminRunPodPayoutTransferBatchAction,
+} from "@/actions/admin-pod-payout-transfer.actions";
+import { retryFailedPodPayoutTransfer, runManualPodPayoutTransferBatchForPod } from "@/services/pod-payout-transfer.service";
 
 describe("adminRunPodPayoutTransferBatchAction", () => {
   beforeEach(() => {
@@ -47,5 +59,15 @@ describe("adminRunPodPayoutTransferBatchAction", () => {
     const result = await adminRunPodPayoutTransferBatchAction("pod_1");
     expect(result.ok).toBe(true);
     expect(runManualPodPayoutTransferBatchForPod).toHaveBeenCalledWith("pod_1");
+  });
+
+  it("retries failed pod transfer for admin", async () => {
+    vi.mocked(retryFailedPodPayoutTransfer).mockResolvedValue({
+      outcome: "paid",
+      stripeTransferId: "tr_1",
+    });
+    const result = await adminRetryPodPayoutTransferAction("ppt_1");
+    expect(result.ok).toBe(true);
+    expect(retryFailedPodPayoutTransfer).toHaveBeenCalledWith("ppt_1");
   });
 });

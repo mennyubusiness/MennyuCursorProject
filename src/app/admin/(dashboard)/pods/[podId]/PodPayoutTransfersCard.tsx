@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { adminRunPodPayoutTransferBatchAction } from "@/actions/admin-pod-payout-transfer.actions";
+import {
+  adminReconcilePodPayoutTransferAction,
+  adminRetryPodPayoutTransferAction,
+  adminRunPodPayoutTransferBatchAction,
+} from "@/actions/admin-pod-payout-transfer.actions";
+import {
+  isReconcilablePodPayoutTransferRow,
+  isRetryablePodPayoutTransfer,
+} from "@/lib/admin-pod-payout-transfers-ux";
 import type {
   PodPayoutTransferAdminRow,
   PodPayoutTransferAdminSummary,
@@ -41,6 +49,9 @@ export function PodPayoutTransfersCard({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [retryId, setRetryId] = useState<string | null>(null);
+  const [reconcileId, setReconcileId] = useState<string | null>(null);
+  const [rowNotes, setRowNotes] = useState<Record<string, string>>({});
 
   async function runBatch() {
     setError(null);
@@ -60,6 +71,40 @@ export function PodPayoutTransfersCard({
       router.refresh();
     } finally {
       setPending(false);
+    }
+  }
+
+  async function retryRow(id: string) {
+    setError(null);
+    setRetryId(id);
+    try {
+      const result = await adminRetryPodPayoutTransferAction(id);
+      if (!result.ok) {
+        setRowNotes((prev) => ({ ...prev, [id]: result.error }));
+        return;
+      }
+      setRowNotes((prev) => ({ ...prev, [id]: result.message }));
+      router.refresh();
+    } finally {
+      setRetryId(null);
+    }
+  }
+
+  async function reconcileRow(id: string) {
+    setError(null);
+    setReconcileId(id);
+    try {
+      const result = await adminReconcilePodPayoutTransferAction(id);
+      if (!result.ok) {
+        setRowNotes((prev) => ({ ...prev, [id]: result.error }));
+        return;
+      }
+      setRowNotes((prev) => ({ ...prev, [id]: result.result.message }));
+      if (result.result.outcome === "updated_paid" || result.result.outcome === "already_paid") {
+        router.refresh();
+      }
+    } finally {
+      setReconcileId(null);
     }
   }
 
@@ -179,6 +224,9 @@ export function PodPayoutTransfersCard({
               <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
                 Batch
               </th>
+              <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
+                Action
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -217,6 +265,33 @@ export function PodPayoutTransfersCard({
                   {row.stripeTransferId ?? "—"}
                 </td>
                 <td className="px-3 py-2 text-xs text-oo-stone-gray">{row.batchKey ?? "—"}</td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-col gap-1">
+                    {isRetryablePodPayoutTransfer(row) ? (
+                      <button
+                        type="button"
+                        disabled={pending || retryId === row.id}
+                        onClick={() => void retryRow(row.id)}
+                        className="text-left text-xs font-semibold text-orange-900 underline disabled:opacity-50"
+                      >
+                        {retryId === row.id ? "Retrying…" : "Retry"}
+                      </button>
+                    ) : null}
+                    {isReconcilablePodPayoutTransferRow(row) ? (
+                      <button
+                        type="button"
+                        disabled={pending || reconcileId === row.id}
+                        onClick={() => void reconcileRow(row.id)}
+                        className="text-left text-xs font-semibold text-sky-800 underline disabled:opacity-50"
+                      >
+                        {reconcileId === row.id ? "Checking…" : "Check Stripe"}
+                      </button>
+                    ) : null}
+                    {rowNotes[row.id] ? (
+                      <p className="text-[10px] text-oo-stone-gray">{rowNotes[row.id]}</p>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

@@ -7,6 +7,7 @@ import { PaymentStatus, type OrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { HEALTH_WINDOW_24H_MS, INCIDENT_LOOKBACK_DAYS } from "@/lib/admin-health-thresholds";
 import { VENDOR_PAYOUT_TRANSFER_STATUS } from "@/services/vendor-payout-transfer.service";
+import { POD_PAYOUT_TRANSFER_STATUS } from "@/lib/pod-payout-transfer-decision";
 
 export type AdminPaymentHealthIssueType =
   | "payment_succeeded_order_failed"
@@ -208,6 +209,7 @@ export async function countPaymentHealthIssues(): Promise<{
   orderPaidPaymentMissing: number;
   paymentMismatch: number;
   vendorTransfersBlocked: number;
+  podTransfersBlocked: number;
   refundReviewRequired: number;
 }> {
   const since = lookbackStart();
@@ -219,6 +221,7 @@ export async function countPaymentHealthIssues(): Promise<{
     paymentIntentMismatch,
     paymentAmountMismatch,
     vendorTransfersBlocked,
+    podTransfersBlocked,
     refundReviewRequired,
   ] = await Promise.all([
     prisma.payment.count({
@@ -279,6 +282,22 @@ export async function countPaymentHealthIssues(): Promise<{
         updatedAt: { gte: last24h },
       },
     }),
+    prisma.podPayoutTransfer.count({
+      where: {
+        status: {
+          in: [
+            POD_PAYOUT_TRANSFER_STATUS.blocked,
+            POD_PAYOUT_TRANSFER_STATUS.blockedInsufficientBalance,
+            POD_PAYOUT_TRANSFER_STATUS.blockedConnectNotReady,
+            POD_PAYOUT_TRANSFER_STATUS.blockedBelowMinimum,
+            POD_PAYOUT_TRANSFER_STATUS.blockedPartialRefundReview,
+            POD_PAYOUT_TRANSFER_STATUS.blockedIdempotencyMismatch,
+            POD_PAYOUT_TRANSFER_STATUS.failed,
+          ],
+        },
+        updatedAt: { gte: last24h },
+      },
+    }),
     prisma.orderRefund.count({
       where: {
         status: "pending",
@@ -295,6 +314,7 @@ export async function countPaymentHealthIssues(): Promise<{
     orderPaidPaymentMissing,
     paymentMismatch: paymentIntentMismatch + paymentAmountMismatch,
     vendorTransfersBlocked,
+    podTransfersBlocked,
     refundReviewRequired: refundReviewRequired,
   };
 }

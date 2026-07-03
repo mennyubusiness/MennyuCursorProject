@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildDeletedUserEmail,
+  isBlockingPodPayoutTransferStatus,
   isBlockingVendorPayoutTransferStatus,
   isDeletedPlaceholderEmail,
 } from "@/lib/entity-deletion/entity-deletion.constants";
@@ -41,6 +42,16 @@ describe("entity deletion constants", () => {
   it("treats pending vendor payout transfers as blocking", () => {
     expect(isBlockingVendorPayoutTransferStatus("pending")).toBe(true);
     expect(isBlockingVendorPayoutTransferStatus("paid")).toBe(false);
+    expect(isBlockingVendorPayoutTransferStatus("failed")).toBe(true);
+    expect(isBlockingVendorPayoutTransferStatus("blocked_insufficient_balance")).toBe(true);
+    expect(isBlockingVendorPayoutTransferStatus("blocked_idempotency_mismatch")).toBe(true);
+  });
+
+  it("treats unresolved pod payout transfers as blocking", () => {
+    expect(isBlockingPodPayoutTransferStatus("failed")).toBe(true);
+    expect(isBlockingPodPayoutTransferStatus("blocked_partial_refund_review")).toBe(true);
+    expect(isBlockingPodPayoutTransferStatus("paid")).toBe(false);
+    expect(isBlockingPodPayoutTransferStatus("cancelled_due_to_refund")).toBe(false);
   });
 });
 
@@ -70,6 +81,24 @@ describe("entity deletion prechecks", () => {
     );
     expect(result.ok).toBe(false);
     expect(result.blockers.some((b) => b.code === "active_vendor_orders")).toBe(true);
+  });
+
+  it("blocks vendor deletion when blocking payout transfers exist", async () => {
+    const result = await precheckVendorDeletion(
+      "vendor_1",
+      mockDeps({ countBlockingVendorPayoutTransfers: async () => 2 })
+    );
+    expect(result.ok).toBe(false);
+    expect(result.blockers.some((b) => b.code === "pending_vendor_payouts")).toBe(true);
+  });
+
+  it("blocks pod deletion when blocking payout transfers exist", async () => {
+    const result = await precheckPodDeletion(
+      "pod_1",
+      mockDeps({ countBlockingPodPayoutTransfers: async () => 1 })
+    );
+    expect(result.ok).toBe(false);
+    expect(result.blockers.some((b) => b.code === "pending_pod_payouts")).toBe(true);
   });
 
   it("blocks pod deletion until active vendors are acknowledged", async () => {

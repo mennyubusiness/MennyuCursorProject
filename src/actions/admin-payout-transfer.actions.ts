@@ -14,6 +14,9 @@ import {
   reconcileVendorPayoutTransfer,
 } from "@/services/vendor-payout-transfer-reconciliation.service";
 import { fetchStripePlatformBalance } from "@/services/stripe-balance.service";
+import { reEvaluateBlockedPodPayoutTransferRows } from "@/services/pod-payout-transfer-recovery.service";
+import { reEvaluateBlockedVendorPayoutTransferRows } from "@/services/vendor-payout-transfer-recovery.service";
+import type { PayoutReEvaluateSummary } from "@/lib/payout-transfer-recovery";
 
 export async function adminRunVendorPayoutTransferBatchAction(batchKey?: string) {
   const ok = await isAdminDashboardLayoutAuthorized();
@@ -159,5 +162,23 @@ export async function adminReconcileEligibleVendorPayoutTransfersAction(limit?: 
     return { ok: false as const, error: "Unauthorized" };
   }
   const summary = await reconcileEligibleVendorPayoutTransfers({ limit });
+  return { ok: true as const, summary };
+}
+
+export async function adminRecheckBlockedPayoutTransfersAction(params?: {
+  vendorTake?: number;
+  podTake?: number;
+}) {
+  const ok = await isAdminDashboardLayoutAuthorized();
+  if (!ok) {
+    return { ok: false as const, error: "Unauthorized" };
+  }
+
+  const [vendor, pod] = await Promise.all([
+    reEvaluateBlockedVendorPayoutTransferRows({ take: params?.vendorTake ?? 500 }),
+    reEvaluateBlockedPodPayoutTransferRows({ take: params?.podTake ?? 500 }),
+  ]);
+
+  const summary: { vendor: PayoutReEvaluateSummary; pod: PayoutReEvaluateSummary } = { vendor, pod };
   return { ok: true as const, summary };
 }

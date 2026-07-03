@@ -11,11 +11,25 @@ import type {
 import { clawbackBadgesForPayoutTransfers } from "@/services/admin-payout-transfer-list.service";
 import { listPodPayoutTransfersForAdminDashboard } from "@/services/admin-pod-payout-transfer-list.service";
 import { PayoutTransfersDashboard } from "./PayoutTransfersDashboard";
+import type { PayoutCategoryTab } from "./payout-transfers-admin.types";
 
 const TRANSFER_TAKE = 400;
 const REVERSAL_TAKE = 400;
 
-export default async function AdminPayoutTransfersPage() {
+function parseInitialCategoryTab(tab: string | undefined): PayoutCategoryTab {
+  if (tab === "blocked" || tab === "pods" || tab === "vendors" || tab === "all") {
+    return tab;
+  }
+  return "all";
+}
+
+export default async function AdminPayoutTransfersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const sp = await searchParams;
+  const initialCategoryTab = parseInitialCategoryTab(sp.tab);
   const [vendors, transfers, reversals, balanceResult, podPayoutData] = await Promise.all([
     prisma.vendor.findMany({
       select: { id: true, name: true },
@@ -172,6 +186,7 @@ export default async function AdminPayoutTransfersPage() {
       initialBalance={balanceResult.ok ? balanceResult.balance : null}
       initialBalanceError={balanceResult.ok ? null : balanceResult.error}
       recommendedMinimumBalanceCents={recommendedMinimumBalanceCents}
+      initialCategoryTab={initialCategoryTab}
     />
   );
 }

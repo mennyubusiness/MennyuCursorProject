@@ -123,8 +123,21 @@ describe("admin vendor transfers page terminology", () => {
     expect(dashboardSrc).toMatch(/runRetryAllPayouts/);
     expect(dashboardSrc).toMatch(/refreshBalance/);
     expect(dashboardSrc).toMatch(/runBulkReconcile/);
+    expect(dashboardSrc).toMatch(/runRecheckBlockedTransfers/);
     expect(dashboardSrc).toMatch(/adminRetryVendorPayoutTransferAction/);
     expect(dashboardSrc).toMatch(/Retrying…" : "Retry"/);
     expect(dashboardSrc).toMatch(/updatedFromStripe/);
+    expect(dashboardSrc).toMatch(/Beta payout runbook/);
+    expect(dashboardSrc).toMatch(/ADMIN_PAYOUT_BETA_RUNBOOK/);
+  });
+
+  it("wires pod retry and reconcile actions in pod section", () => {
+    const podSectionSrc = readFileSync(
+      join(root, "src/app/admin/(dashboard)/payout-transfers/AdminPodPayoutTransfersSection.tsx"),
+      "utf8"
+    );
+    expect(podSectionSrc).toMatch(/adminRetryPodPayoutTransferAction/);
+    expect(podSectionSrc).toMatch(/adminReconcilePodPayoutTransferAction/);
+    expect(podSectionSrc).toMatch(/Check Stripe/);
   });
 });

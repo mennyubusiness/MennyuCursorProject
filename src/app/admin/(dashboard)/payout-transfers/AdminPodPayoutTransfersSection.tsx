@@ -1,9 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import {
+  adminReconcilePodPayoutTransferAction,
+  adminRetryPodPayoutTransferAction,
+} from "@/actions/admin-pod-payout-transfer.actions";
 import {
   formatRevenueShareBps,
+  isReconcilablePodPayoutTransferRow,
+  isRetryablePodPayoutTransfer,
   podStatusFilterBucket,
   podTransferIsBlocked,
   podTransferMatchesQuickFilter,
@@ -70,6 +77,7 @@ export function AdminPodPayoutTransfersSection({
   showNeedsAction = true,
   showHistory = true,
   variant = "default",
+  actionLocked = false,
 }: {
   transfers: AdminPodPayoutTransferRow[];
   pods: AdminPodOption[];
@@ -83,7 +91,13 @@ export function AdminPodPayoutTransfersSection({
   showNeedsAction?: boolean;
   showHistory?: boolean;
   variant?: "default" | "blocked_only";
+  actionLocked?: boolean;
 }) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [retryId, setRetryId] = useState<string | null>(null);
+  const [reconcileId, setReconcileId] = useState<string | null>(null);
+  const [actionNotes, setActionNotes] = useState<Record<string, string>>({});
   const filtered = useMemo(() => {
     return transfers.filter((row) => {
       if (!inDateRange(row.createdAt, datePreset)) return false;
@@ -109,6 +123,46 @@ export function AdminPodPayoutTransfersSection({
     [filtered]
   );
 
+  async function retryPodTransfer(id: string) {
+    const confirmed = window.confirm(
+      "Retry this pod payout transfer? Existing Stripe safety checks apply — no duplicate transfer if one already exists."
+    );
+    if (!confirmed) return;
+    setRetryId(id);
+    try {
+      const r = await adminRetryPodPayoutTransferAction(id);
+      if (!r.ok) {
+        setActionNotes((prev) => ({ ...prev, [id]: r.error }));
+        return;
+      }
+      setActionNotes((prev) => ({ ...prev, [id]: r.message }));
+      startTransition(() => router.refresh());
+    } finally {
+      setRetryId(null);
+    }
+  }
+
+  async function reconcilePodTransfer(id: string) {
+    setReconcileId(id);
+    try {
+      const r = await adminReconcilePodPayoutTransferAction(id);
+      if (!r.ok) {
+        setActionNotes((prev) => ({ ...prev, [id]: r.error }));
+        return;
+      }
+      const msg =
+        r.result.detail && r.result.outcome !== "updated_paid"
+          ? `${r.result.message} (${r.result.detail})`
+          : r.result.message;
+      setActionNotes((prev) => ({ ...prev, [id]: msg }));
+      if (r.result.outcome === "updated_paid" || r.result.outcome === "already_paid") {
+        startTransition(() => router.refresh());
+      }
+    } finally {
+      setReconcileId(null);
+    }
+  }
+
   if (transfers.length === 0) {
     return (
       <section className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
@@ -133,8 +187,7 @@ export function AdminPodPayoutTransfersSection({
               </p>
             </div>
             <p className="text-xs text-oo-stone-gray">
-              Reconcile / per-row retry:{" "}
-              <span className="font-medium text-oo-charcoal">Not available for pod transfers yet</span>
+              Per-row retry and Check Stripe reconciliation available below for eligible rows.
             </p>
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -178,7 +231,16 @@ export function AdminPodPayoutTransfersSection({
               No pod payout transfers need action for the current filters.
             </p>
           ) : (
-            <PodTransferTable rows={needsActionRows} showProblem />
+            <PodTransferTable
+              rows={needsActionRows}
+              showProblem
+              retryId={retryId}
+              reconcileId={reconcileId}
+              actionLocked={actionLocked}
+              actionNotes={actionNotes}
+              onRetry={retryPodTransfer}
+              onReconcile={reconcilePodTransfer}
+            />
           )}
         </section>
       ) : null}
@@ -189,7 +251,15 @@ export function AdminPodPayoutTransfersSection({
           {filtered.length === 0 ? (
             <p className="text-sm text-oo-stone-gray">No pod transfers match the current filters.</p>
           ) : (
-            <PodTransferTable rows={filtered} />
+            <PodTransferTable
+              rows={filtered}
+              retryId={retryId}
+              reconcileId={reconcileId}
+              actionLocked={actionLocked}
+              actionNotes={actionNotes}
+              onRetry={retryPodTransfer}
+              onReconcile={reconcilePodTransfer}
+            />
           )}
         </section>
       ) : null}
@@ -197,7 +267,16 @@ export function AdminPodPayoutTransfersSection({
       {variant === "blocked_only" && filtered.length > 0 && !showNeedsAction ? (
         <section className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
           <h3 className="text-base font-semibold text-oo-charcoal">Pod payouts — blocked / needs review</h3>
-          <PodTransferTable rows={filtered.filter((r) => podTransferIsBlocked(r))} showProblem />
+          <PodTransferTable
+            rows={filtered.filter((r) => podTransferIsBlocked(r))}
+            showProblem
+            retryId={retryId}
+            reconcileId={reconcileId}
+            actionLocked={actionLocked}
+            actionNotes={actionNotes}
+            onRetry={retryPodTransfer}
+            onReconcile={reconcilePodTransfer}
+          />
         </section>
       ) : null}
     </div>
@@ -207,9 +286,21 @@ export function AdminPodPayoutTransfersSection({
 function PodTransferTable({
   rows,
   showProblem,
+  retryId,
+  reconcileId,
+  actionLocked,
+  actionNotes,
+  onRetry,
+  onReconcile,
 }: {
   rows: AdminPodPayoutTransferRow[];
   showProblem?: boolean;
+  retryId?: string | null;
+  reconcileId?: string | null;
+  actionLocked?: boolean;
+  actionNotes?: Record<string, string>;
+  onRetry?: (id: string) => void;
+  onReconcile?: (id: string) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-oo-light-stone">
@@ -271,13 +362,39 @@ function PodTransferTable({
                 {row.stripeTransferId ?? "—"}
               </td>
               <td className="px-3 py-2">
-                <Link
-                  href={`/admin/pods/${row.podId}?section=payouts`}
-                  className="text-xs font-semibold text-sky-800 underline"
-                >
-                  Pod payouts
-                </Link>
-                <p className="mt-1 text-[10px] text-oo-stone-gray">Batch on pod detail</p>
+                <div className="flex flex-col gap-1">
+                  {isRetryablePodPayoutTransfer(row) && onRetry ? (
+                    <button
+                      type="button"
+                      disabled={actionLocked || retryId === row.id}
+                      onClick={() => void onRetry(row.id)}
+                      className="text-left text-xs font-semibold text-orange-900 underline disabled:opacity-50"
+                    >
+                      {retryId === row.id ? "Retrying…" : "Retry"}
+                    </button>
+                  ) : null}
+                  {isReconcilablePodPayoutTransferRow(row) && onReconcile ? (
+                    <button
+                      type="button"
+                      disabled={actionLocked || reconcileId === row.id}
+                      onClick={() => void onReconcile(row.id)}
+                      className="text-left text-xs font-semibold text-sky-800 underline disabled:opacity-50"
+                    >
+                      {reconcileId === row.id ? "Checking…" : "Check Stripe"}
+                    </button>
+                  ) : null}
+                  <Link
+                    href={`/admin/pods/${row.podId}?section=payouts`}
+                    className="text-xs font-semibold text-sky-800 underline"
+                  >
+                    Pod payouts
+                  </Link>
+                  {actionNotes?.[row.id] ? (
+                    <p className="text-[10px] text-oo-stone-gray">{actionNotes[row.id]}</p>
+                  ) : (
+                    <p className="text-[10px] text-oo-stone-gray">Batch on pod detail</p>
+                  )}
+                </div>
               </td>
             </tr>
           ))}

@@ -248,8 +248,22 @@ export async function getAdminHealthDashboard(): Promise<AdminHealthDashboard> {
         }),
         metric("transfers_blocked", "Vendor transfers blocked", "Blocked transfers in last 24h", paymentCounts.vendorTransfersBlocked, {
           tone: paymentCounts.vendorTransfersBlocked > 0 ? "warning" : "default",
-          href: "/admin/payout-transfers",
+          href: "/admin/payout-transfers?tab=blocked",
         }),
+        ...(paymentCounts.podTransfersBlocked > 0
+          ? [
+              metric(
+                "pod_transfers_blocked",
+                "Pod transfers blocked",
+                "Blocked or failed pod transfers in last 24h",
+                paymentCounts.podTransfersBlocked,
+                {
+                  tone: "warning",
+                  href: "/admin/payout-transfers?tab=blocked",
+                }
+              ),
+            ]
+          : []),
       ],
     },
     {

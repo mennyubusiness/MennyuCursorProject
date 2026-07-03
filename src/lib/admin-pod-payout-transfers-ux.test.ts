@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   formatRevenueShareBps,
+  isReconcilablePodPayoutTransferRow,
+  isRetryablePodPayoutTransfer,
   podTransferIsBlocked,
   podTransferMatchesQuickFilter,
   podTransferNeedsAction,
@@ -47,5 +49,42 @@ describe("admin-pod-payout-transfers-ux", () => {
   it("formats revenue share bps for admin display", () => {
     expect(formatRevenueShareBps(500)).toBe("5%");
     expect(formatRevenueShareBps(125)).toBe("1.25%");
+  });
+
+  it("allows retry only for failed and balance-blocked pod rows", () => {
+    expect(
+      isRetryablePodPayoutTransfer({
+        ...baseRow,
+        status: POD_PAYOUT_TRANSFER_STATUS.failed,
+      })
+    ).toBe(true);
+    expect(
+      isRetryablePodPayoutTransfer({
+        ...baseRow,
+        status: POD_PAYOUT_TRANSFER_STATUS.pending,
+      })
+    ).toBe(false);
+    expect(
+      isRetryablePodPayoutTransfer({
+        ...baseRow,
+        status: POD_PAYOUT_TRANSFER_STATUS.paid,
+        stripeTransferId: "tr_1",
+      })
+    ).toBe(false);
+    expect(
+      isRetryablePodPayoutTransfer({
+        ...baseRow,
+        status: POD_PAYOUT_TRANSFER_STATUS.blockedPartialRefundReview,
+      })
+    ).toBe(false);
+  });
+
+  it("allows reconcile for failed rows without stripe transfer id", () => {
+    expect(
+      isReconcilablePodPayoutTransferRow({
+        ...baseRow,
+        status: POD_PAYOUT_TRANSFER_STATUS.failed,
+      })
+    ).toBe(true);
   });
 });

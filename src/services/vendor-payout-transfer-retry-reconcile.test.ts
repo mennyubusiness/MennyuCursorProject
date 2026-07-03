@@ -43,6 +43,16 @@ vi.mock("./vendor-payout-transfer-reconciliation.service", () => ({
   reconcileVendorPayoutTransfer: (...args: unknown[]) => mockReconcile(...args),
 }));
 
+vi.mock("./vendor-payout-transfer-recovery.service", () => ({
+  reEvaluateBlockedVendorPayoutTransferRows: vi.fn(async () => ({
+    examined: 0,
+    promotedToPending: 0,
+    updatedBlocked: 0,
+    unchanged: 0,
+    skippedTerminal: 0,
+  })),
+}));
+
 import {
   executeVendorPayoutTransfer,
   retryAllEligibleFailedVendorPayoutTransfers,
@@ -215,6 +225,7 @@ describe("vendor payout transfer reconcile-before-send", () => {
   });
 
   it("does not retry refund-blocked partial review rows", async () => {
+    mockFindUnique.mockReset();
     mockFindUnique.mockResolvedValue({
       id: "vpt_review",
       status: VENDOR_PAYOUT_TRANSFER_STATUS.blockedPartialRefundReview,
@@ -230,6 +241,7 @@ describe("vendor payout transfer reconcile-before-send", () => {
   });
 
   it("does not retry idempotency mismatch rows", async () => {
+    mockFindUnique.mockReset();
     mockFindUnique.mockResolvedValue({
       id: "vpt_mismatch",
       status: VENDOR_PAYOUT_TRANSFER_STATUS.blockedIdempotencyMismatch,
