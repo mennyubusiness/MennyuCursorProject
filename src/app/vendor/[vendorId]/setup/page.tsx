@@ -11,6 +11,11 @@ import {
   vendorSetupPageIncompleteDescription,
 } from "@/lib/vendor-order-routing-mode";
 import { VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS } from "@/lib/vendor-pod-readiness";
+import { getVendorIntegrationObservability } from "@/lib/integrations/provider-observability.service";
+import { VendorIntegrationReadinessCard } from "@/components/vendor/VendorIntegrationReadinessCard";
+import { getSquareIntegrationUiState } from "@/actions/vendor-square-connect.actions";
+import { VendorSquareConnectionCard } from "@/components/vendor/VendorSquareConnectionCard";
+import { getSquareConfigSnapshot } from "@/lib/integrations/square/square-config";
 
 export default async function VendorSetupPage({
   params,
@@ -20,6 +25,13 @@ export default async function VendorSetupPage({
   const { vendorId } = await params;
   const ctx = await loadVendorDashboardContext(vendorId);
   if (!ctx) notFound();
+
+  const integrationObservability = await getVendorIntegrationObservability(vendorId);
+  const squareSnap = getSquareConfigSnapshot();
+  const squareUi =
+    squareSnap.configured || squareSnap.partiallyConfigured
+      ? await getSquareIntegrationUiState(vendorId)
+      : null;
 
   const publicProfileReady = ctx.readiness.setupSummary.publicProfile;
   const appearance = ctx.readiness.checklist.filter((item) =>
@@ -65,6 +77,23 @@ export default async function VendorSetupPage({
         ) : null}
 
         <VendorSetupChecklist items={appearance} title="Required to appear on pod page" />
+
+        {integrationObservability ? (
+          <section id="integrations">
+            <VendorIntegrationReadinessCard observability={integrationObservability} />
+          </section>
+        ) : null}
+
+        {squareUi ? (
+          <section id="square">
+            <VendorSquareConnectionCard
+              vendorId={vendorId}
+              snap={squareUi.snap}
+              connection={squareUi.connection}
+              health={squareUi.health}
+            />
+          </section>
+        ) : null}
 
         {publicProfileReady ? (
           <VendorSetupChecklist items={acceptingOrders} title="Required to accept orders" />

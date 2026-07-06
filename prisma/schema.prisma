@@ -588,6 +588,10 @@ model Vendor {
   menuVersions            MenuVersion[]
   openOrderMenuCategories VendorMenuCategory[]
   vendorMemberships       VendorMembership[]
+  integrationConnections  VendorIntegrationConnection[]
+  providerEntityMappings  ProviderEntityMapping[]
+  providerWebhookEvents   ProviderWebhookEvent[]
+  integrationCredentials  IntegrationProviderCredential[]
 
   @@index([deletedAt])
 }
@@ -1460,6 +1464,159 @@ model WebhookEvent {
 
   @@index([provider, eventId])
   @@index([idempotencyKey])
+}
+
+// ---- Integration provider spine (Square-ready; Deliverect/manual coexist) ----
+
+enum IntegrationProvider {
+  manual_dashboard
+  open_order
+  deliverect
+  square
+  toast
+  clover
+  lightspeed
+}
+
+enum IntegrationConnectionStatus {
+  not_configured
+  pending
+  connected
+  error
+  disconnected
+}
+
+enum IntegrationCapability {
+  menu_import
+  menu_publish
+  order_injection
+  order_status_webhooks
+  inventory_availability
+  hours_sync
+  price_sync
+  external_order_lookup
+  payments
+  refunds
+}
+
+enum ProviderEntityType {
+  menu_item
+  modifier_group
+  modifier_option
+  category
+  vendor_order
+}
+
+enum ProviderWebhookProcessingStatus {
+  received
+  processed
+  ignored
+  failed
+}
+
+/// Normalized vendor ↔ external provider connection (OAuth refs stored by key, not raw tokens).
+model VendorIntegrationConnection {
+  id                 String                      @id @default(cuid())
+  vendorId           String
+  provider           IntegrationProvider
+  status             IntegrationConnectionStatus @default(not_configured)
+  displayName        String?
+  externalAccountId  String?
+  externalMerchantId String?
+  externalLocationId String?
+  externalStoreId    String?
+  /// Opaque credential reference (e.g. secret manager key). Square OAuth will populate later.
+  accessTokenRef     String?
+  refreshTokenRef    String?
+  /// JSON array of IntegrationCapability strings enabled for this connection.
+  capabilities       Json?
+  lastSyncAt           DateTime?
+  lastWebhookAt        DateTime?
+  lastHealthCheckAt    DateTime?
+  errorCode            String?
+  errorMessage         String?
+  isActive             Boolean                     @default(true)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+
+  vendor         Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  entityMappings ProviderEntityMapping[]
+  webhookEvents  ProviderWebhookEvent[]
+
+  @@index([vendorId, provider])
+  @@index([vendorId, provider, isActive])
+  @@index([provider, externalLocationId])
+}
+
+/// Encrypted OAuth tokens for integration providers — referenced by VendorIntegrationConnection.accessTokenRef.
+model IntegrationProviderCredential {
+  id                    String              @id @default(cuid())
+  vendorId              String
+  provider              IntegrationProvider
+  encryptedAccessToken  String
+  encryptedRefreshToken String?
+  accessTokenExpiresAt  DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, provider])
+}
+
+/// Provider-neutral external ID mapping (Square uses from day one; Deliverect fields remain source of truth until migrated).
+model ProviderEntityMapping {
+  id                 String              @id @default(cuid())
+  vendorId           String
+  connectionId       String?
+  provider           IntegrationProvider
+  internalEntityType ProviderEntityType
+  internalEntityId   String
+  externalId         String
+  externalLocationId String?
+  externalPayloadHash String?
+  isActive           Boolean             @default(true)
+  lastSeenAt         DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  vendor     Vendor                       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  connection VendorIntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@unique([vendorId, provider, internalEntityType, internalEntityId, externalLocationId])
+  @@index([provider, externalId])
+  @@index([vendorId, provider, internalEntityType])
+  @@index([connectionId])
+}
+
+/// Provider-neutral inbound webhook / event log (sanitized payload; no secrets).
+model ProviderWebhookEvent {
+  id                  String                          @id @default(cuid())
+  provider            IntegrationProvider
+  connectionId        String?
+  vendorId            String?
+  externalEventId     String?
+  externalObjectId    String?
+  eventType           String
+  payloadHash         String?
+  sanitizedPayloadJson Json?
+  processingStatus    ProviderWebhookProcessingStatus @default(received)
+  errorCode           String?
+  errorMessage        String?
+  relatedOrderId      String?
+  relatedVendorOrderId String?
+  receivedAt          DateTime                        @default(now())
+  processedAt         DateTime?
+  createdAt           DateTime                        @default(now())
+
+  connection VendorIntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  vendor     Vendor?                      @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, externalEventId])
+  @@index([provider, processingStatus, receivedAt])
+  @@index([vendorId, receivedAt])
+  @@index([connectionId, receivedAt])
+  @@index([relatedVendorOrderId])
 }
 
 enum OrderStatus {

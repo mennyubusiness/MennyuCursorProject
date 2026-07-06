@@ -111,6 +111,20 @@ const envSchema = z.object({
   /** Verbose Deliverect HTTP / normalize logging (server). Keeps warnings for failures. */
   DEBUG_DELIVERECT: z.enum(["true", "false"]).optional(),
   /** Verbose add-to-cart trace logs (server). Off in production; dev/test only when "true". */
+  SQUARE_WEBHOOK_SIGNATURE_KEY: z.string().optional(),
+  SQUARE_APPLICATION_ID: z.string().optional(),
+  SQUARE_APPLICATION_SECRET: z.string().optional(),
+  /** sandbox | production — alias: SQUARE_MODE */
+  SQUARE_ENVIRONMENT: z.enum(["sandbox", "production"]).optional(),
+  SQUARE_MODE: z.enum(["sandbox", "production"]).optional(),
+  SQUARE_OAUTH_REDIRECT_URL: z.string().url().optional(),
+  /** When true, Square connect UI and OAuth are enabled in production. */
+  ENABLE_SQUARE_INTEGRATION: z.enum(["true", "false"]).optional(),
+  /**
+   * Encrypts integration OAuth tokens at rest (IntegrationProviderCredential).
+   * Min 32 characters; falls back to AUTH_SECRET in dev/test only.
+   */
+  INTEGRATION_TOKEN_ENCRYPTION_KEY: z.string().min(32).optional(),
   DEBUG_ADD_TO_CART_TRACE: z.enum(["true", "false"]).optional(),
   /**
    * When "true", enables legacy POST/PATCH/DELETE on /api/cart. Default off — use cart.actions.

@@ -5,6 +5,7 @@
 import "server-only";
 
 import type { Env } from "@/lib/env";
+import { validateSquareProductionConfig } from "@/lib/integrations/square/square-config";
 
 export function isNextCompileBuild(): boolean {
   return (
@@ -260,6 +261,11 @@ export function validateProductionConfig(env: Env): ProductionConfigValidation {
     warnings.push(
       "INTERNAL_JOB_SECRET and CRON_SECRET are unset: /api/internal/jobs/* endpoints return 503 until one is configured."
     );
+  }
+
+  // --- Square (optional — does not block app launch) ---
+  for (const warning of validateSquareProductionConfig(env).warnings) {
+    warnings.push(warning);
   }
 
   return { errors, warnings };
