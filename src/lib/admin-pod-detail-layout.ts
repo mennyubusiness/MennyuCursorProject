@@ -64,8 +64,7 @@ export function deriveAdminPodDetailLayout(input: {
   const hasTransferablePodPayout =
     input.podPayoutsEnabled &&
     connectReady &&
-    input.transferSummary.transferableCount > 0 &&
-    input.transferSummary.transferableAmountCents >= input.transferSummary.minimumPayoutCents;
+    input.transferSummary.canRunPayoutBatch;
 
   const shouldShowFullPayoutDetailsByDefault =
     Boolean(input.expandedByDefault) || hasPayoutIssues;

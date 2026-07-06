@@ -20,6 +20,8 @@ const emptyTransferSummary = {
   paidTransferAmountCents: 0,
   paidTransferCount: 0,
   minimumPayoutCents: 1000,
+  canRunPayoutBatch: false,
+  nonTransferableAllocations: [],
 };
 
 describe("adminPodReadinessLabel", () => {
@@ -48,7 +50,7 @@ describe("deriveAdminPodDetailLayout", () => {
     expect(layout.shouldShowRunPayoutBatch).toBe(false);
   });
 
-  it("allows run payout batch only when transferable amount meets minimum", () => {
+  it("allows run payout batch when transferable allocations exist", () => {
     const layout = deriveAdminPodDetailLayout({
       podPayoutsEnabled: true,
       podPayoutRecipientUserId: "user_1",
@@ -58,15 +60,43 @@ describe("deriveAdminPodDetailLayout", () => {
         ...emptyTransferSummary,
         transferableAmountCents: 1500,
         transferableCount: 2,
+        canRunPayoutBatch: true,
         minimumPayoutCents: 1000,
       },
       allocationCount: 2,
-      transferCount: 2,
+      transferCount: 0,
       failedTransferCount: 0,
     });
 
     expect(layout.hasTransferablePodPayout).toBe(true);
     expect(layout.shouldShowRunPayoutBatch).toBe(true);
-    expect(layout.shouldShowTransferTable).toBe(true);
+  });
+
+  it("allows run payout batch for eligible pending allocations without transfer rows yet", () => {
+    const layout = deriveAdminPodDetailLayout({
+      podPayoutsEnabled: true,
+      podPayoutRecipientUserId: "user_1",
+      recipientConnectStatus: { ready: true, adminLabel: "Ready", ownerLabel: "Ready" },
+      allocationSummary: {
+        ...emptyAllocationSummary,
+        pending: { count: 7, amountCents: 302 },
+      },
+      transferSummary: {
+        ...emptyTransferSummary,
+        pendingAllocationAmountCents: 302,
+        pendingAllocationCount: 7,
+        transferableAmountCents: 302,
+        transferableCount: 7,
+        canRunPayoutBatch: true,
+        minimumPayoutCents: 0,
+      },
+      allocationCount: 7,
+      transferCount: 0,
+      failedTransferCount: 0,
+    });
+
+    expect(layout.hasTransferablePodPayout).toBe(true);
+    expect(layout.shouldShowRunPayoutBatch).toBe(true);
+    expect(layout.shouldShowTransferTable).toBe(false);
   });
 });

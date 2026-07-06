@@ -172,6 +172,27 @@ export function PodPayoutTransfersCard({
         </div>
       </dl>
 
+      {transferSummary.pendingAllocationCount > 0 &&
+      transferSummary.transferableCount === 0 &&
+      transferSummary.nonTransferableAllocations.length > 0 ? (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+          <p className="text-xs font-semibold text-amber-950">
+            Pending allocations not yet transferable
+          </p>
+          <ul className="mt-2 space-y-1.5 text-xs text-amber-950">
+            {transferSummary.nonTransferableAllocations.map((row) => (
+              <li key={row.allocationId}>
+                <Link href={`/admin/orders/${row.orderId}`} className="font-medium underline">
+                  Order {row.orderId.slice(-8)}
+                </Link>
+                {": "}
+                {formatMoney(row.amountCents)} — {row.reasonLabel}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {showRunBatch ? (
           <button
