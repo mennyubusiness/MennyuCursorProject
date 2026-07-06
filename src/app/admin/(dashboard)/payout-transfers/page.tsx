@@ -182,6 +182,7 @@ export default async function AdminPayoutTransfersPage({
       initialPodTransfers={podPayoutData.transfers}
       podOptions={podPayoutData.pods}
       podSummary={podPayoutData.summary}
+      podReadiness={podPayoutData.readiness}
       vendors={vendorOptions}
       initialBalance={balanceResult.ok ? balanceResult.balance : null}
       initialBalanceError={balanceResult.ok ? null : balanceResult.error}

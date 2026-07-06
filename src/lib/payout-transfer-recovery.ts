@@ -91,7 +91,7 @@ export function isPodReEvaluateSkippedTerminal(status: string): boolean {
 
 export const ADMIN_PAYOUT_BETA_RUNBOOK = [
   "Vendor Connect transfers are created at payment and attempted automatically when the vendor account is payout-ready.",
-  "If vendor retry cron is enabled (every 15–30 minutes), failed or balance-blocked vendor transfers are retried with existing safety checks. Admins can also retry or reconcile from this page.",
+  "If vendor retry cron is enabled (daily on Vercel Hobby), failed or balance-blocked vendor transfers are retried once per day with existing safety checks. Admins can also retry or reconcile from this page at any time.",
   "Pod revenue share payouts are manual: run a payout batch on each active pod from the pod admin page (Payouts section) or after vendor transfers settle.",
   "Beta cadence: review blocked transfers daily; run pod batches daily or after vendor batches; keep Stripe platform minimum balance at $2,500.",
   "Review blocked_partial_refund_review rows before sending any transfer.",

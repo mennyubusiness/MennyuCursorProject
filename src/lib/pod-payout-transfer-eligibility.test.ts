@@ -67,7 +67,7 @@ describe("evaluatePodPayoutAllocationTransferEligibility", () => {
     expect(result.reason).toBe("waiting_on_vendor_transfer");
   });
 
-  it("treats existing pending transfer row as transferable", () => {
+  it("treats existing pending transfer row as transferable when vendor is paid", () => {
     const result = evaluatePodPayoutAllocationTransferEligibility({
       allocationStatus: POD_PAYOUT_ALLOCATION_STATUS.pending,
       podPayoutAmountCents: 43,
@@ -78,7 +78,22 @@ describe("evaluatePodPayoutAllocationTransferEligibility", () => {
       existingTransferStatus: POD_PAYOUT_TRANSFER_STATUS.pending,
     });
     expect(result.transferable).toBe(true);
-    expect(result.reason).toBe("existing_transfer_pending");
+    expect(result.reason).toBe("eligible");
+    expect(result.ensureDecision?.status).toBe(POD_PAYOUT_TRANSFER_STATUS.pending);
+  });
+
+  it("blocks existing pending transfer row while vendor transfer is still pending", () => {
+    const result = evaluatePodPayoutAllocationTransferEligibility({
+      allocationStatus: POD_PAYOUT_ALLOCATION_STATUS.pending,
+      podPayoutAmountCents: 43,
+      minimumPayoutCents: 0,
+      paymentRefundStatus: "none",
+      recipientConnect: readyConnect,
+      paymentAllocations: vendorPending,
+      existingTransferStatus: POD_PAYOUT_TRANSFER_STATUS.pending,
+    });
+    expect(result.transferable).toBe(false);
+    expect(result.reason).toBe("waiting_on_vendor_transfer");
   });
 
   it("blocks connect-not-ready even when vendor is paid", () => {

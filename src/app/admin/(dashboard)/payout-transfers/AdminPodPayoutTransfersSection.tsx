@@ -21,6 +21,7 @@ import {
 import { POD_PAYOUT_TRANSFER_STATUS } from "@/lib/pod-payout-transfer-decision";
 import type {
   AdminPodOption,
+  AdminPodPayoutReadinessRow,
   AdminPodPayoutTransferRow,
   PodPayoutGlobalSummary,
 } from "./payout-transfers-admin.types";
@@ -66,8 +67,9 @@ function podStatusBadgeClass(status: string): string {
 
 export function AdminPodPayoutTransfersSection({
   transfers,
-  pods,
+  pods: _pods,
   summary,
+  readiness,
   datePreset,
   statusFilter,
   podId,
@@ -82,6 +84,7 @@ export function AdminPodPayoutTransfersSection({
   transfers: AdminPodPayoutTransferRow[];
   pods: AdminPodOption[];
   summary: PodPayoutGlobalSummary;
+  readiness: AdminPodPayoutReadinessRow[];
   datePreset: DatePreset;
   statusFilter: string;
   podId: string;
@@ -98,6 +101,33 @@ export function AdminPodPayoutTransfersSection({
   const [retryId, setRetryId] = useState<string | null>(null);
   const [reconcileId, setReconcileId] = useState<string | null>(null);
   const [actionNotes, setActionNotes] = useState<Record<string, string>>({});
+
+  const filteredReadiness = useMemo(() => {
+    const q = podSearch.trim().toLowerCase();
+    return readiness.filter((row) => {
+      if (podId && row.podId !== podId) return false;
+      if (!q) return true;
+      return row.podName.toLowerCase().includes(q) || row.podId.toLowerCase().includes(q);
+    });
+  }, [readiness, podId, podSearch]);
+
+  const readyToBatchPods = useMemo(
+    () => filteredReadiness.filter((row) => row.canRunPayoutBatch),
+    [filteredReadiness]
+  );
+
+  const pendingNotReadyPods = useMemo(
+    () =>
+      filteredReadiness.filter(
+        (row) =>
+          !row.canRunPayoutBatch &&
+          (row.waitingOnVendorCount > 0 ||
+            row.blockedAllocationCount > 0 ||
+            row.pendingAllocationCount > 0)
+      ),
+    [filteredReadiness]
+  );
+
   const filtered = useMemo(() => {
     return transfers.filter((row) => {
       if (!inDateRange(row.createdAt, datePreset)) return false;
@@ -122,6 +152,12 @@ export function AdminPodPayoutTransfersSection({
     () => filtered.filter((row) => podTransferNeedsAction(row)),
     [filtered]
   );
+
+  const hasPodActivity =
+    transfers.length > 0 ||
+    readiness.length > 0 ||
+    summary.pendingAllocationCount > 0 ||
+    summary.readyToBatchAmountCents > 0;
 
   async function retryPodTransfer(id: string) {
     const confirmed = window.confirm(
@@ -163,13 +199,13 @@ export function AdminPodPayoutTransfersSection({
     }
   }
 
-  if (transfers.length === 0) {
+  if (!hasPodActivity) {
     return (
       <section className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
         <h2 className="text-lg font-semibold text-oo-charcoal">Pod payouts / revenue share</h2>
         <p className="rounded-lg border border-dashed border-oo-light-stone bg-oo-cream/30 p-6 text-center text-sm text-oo-stone-gray">
-          No pod payout transfers yet. Pod revenue share transfers appear here after orders are paid and pod payout
-          batches run from a pod&apos;s admin detail page.
+          No pod payout activity yet. Pod revenue share appears here after orders are paid and pod payout
+          allocations are created. Run pod payout batches from each pod&apos;s admin detail page.
         </p>
       </section>
     );
@@ -183,52 +219,182 @@ export function AdminPodPayoutTransfersSection({
             <div>
               <h2 className="text-lg font-semibold text-oo-charcoal">Pod payouts / revenue share</h2>
               <p className="mt-1 text-xs text-oo-stone-gray">
-                Stripe Connect transfers to pod payout account owners. Run batches per pod from pod admin detail.
+                Allocation-level readiness across pods. Pod payout batches run on each pod&apos;s admin detail
+                page — this page does not send pod batches directly.
               </p>
             </div>
             <p className="text-xs text-oo-stone-gray">
-              Per-row retry and Check Stripe reconciliation available below for eligible rows.
+              Per-row retry and Check Stripe reconciliation available below for existing transfer rows.
             </p>
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Needs action</p>
-              <p className="mt-1 text-base font-semibold tabular-nums text-amber-950">
-                {formatMoney(summary.needsActionAmountCents, "usd")}
+              <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">
+                Pending allocations
               </p>
-              <p className="text-xs text-oo-stone-gray">{summary.needsActionCount}</p>
-            </div>
-            <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Ready to send</p>
               <p className="mt-1 text-base font-semibold tabular-nums text-oo-charcoal">
-                {formatMoney(summary.readyToTransferAmountCents, "usd")}
+                {formatMoney(summary.pendingAllocationAmountCents, "usd")}
               </p>
-              <p className="text-xs text-oo-stone-gray">{summary.readyToTransferCount}</p>
+              <p className="text-xs text-oo-stone-gray">{summary.pendingAllocationCount} allocation(s)</p>
             </div>
             <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Blocked</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">
+                Ready to batch
+              </p>
+              <p className="mt-1 text-base font-semibold tabular-nums text-emerald-950">
+                {formatMoney(summary.readyToBatchAmountCents, "usd")}
+              </p>
+              <p className="text-xs text-oo-stone-gray">
+                {summary.readyToBatchCount} allocation(s) · {summary.readyToBatchPodCount} pod(s)
+              </p>
+            </div>
+            <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">
+                Blocked / needs review
+              </p>
               <p className="mt-1 text-base font-semibold tabular-nums text-orange-900">
                 {formatMoney(summary.blockedAmountCents, "usd")}
               </p>
-              <p className="text-xs text-oo-stone-gray">{summary.blockedCount}</p>
+              <p className="text-xs text-oo-stone-gray">{summary.blockedCount} item(s)</p>
             </div>
             <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
               <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Sent</p>
               <p className="mt-1 text-base font-semibold tabular-nums text-emerald-900">
                 {formatMoney(summary.paidAmountCents, "usd")}
               </p>
-              <p className="text-xs text-oo-stone-gray">{summary.paidCount}</p>
+              <p className="text-xs text-oo-stone-gray">{summary.paidCount} transfer(s)</p>
             </div>
           </div>
         </div>
       ) : null}
 
+      {readyToBatchPods.length > 0 ? (
+        <section className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 shadow-sm">
+          <div>
+            <h3 className="text-base font-semibold text-emerald-950">Pods ready to batch</h3>
+            <p className="mt-1 text-xs text-emerald-900">
+              Eligible pending allocations with no transfer rows yet, or pending transfer rows ready to send.
+              Open the pod payout section to run the batch.
+            </p>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-emerald-200 bg-oo-warm-white">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-emerald-200 bg-emerald-50/60 text-xs font-medium uppercase text-emerald-950">
+                <tr>
+                  <th className="px-3 py-2">Pod</th>
+                  <th className="px-3 py-2">Ready to batch</th>
+                  <th className="px-3 py-2">Pending allocations</th>
+                  <th className="px-3 py-2">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-emerald-100">
+                {readyToBatchPods.map((row) => (
+                  <tr key={row.podId}>
+                    <td className="px-3 py-2 font-medium text-oo-charcoal">{row.podName}</td>
+                    <td className="px-3 py-2 tabular-nums text-emerald-950">
+                      {formatMoney(row.readyToBatchAmountCents, "usd")}
+                      <span className="ml-1 text-xs text-oo-stone-gray">({row.readyToBatchCount})</span>
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-oo-charcoal">
+                      {formatMoney(row.pendingAllocationAmountCents, "usd")}
+                      <span className="ml-1 text-xs text-oo-stone-gray">({row.pendingAllocationCount})</span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Link
+                        href={`/admin/pods/${row.podId}?section=payouts`}
+                        className="text-xs font-semibold text-sky-800 underline"
+                      >
+                        Open pod payout batch
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {pendingNotReadyPods.length > 0 ? (
+        <section className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/30 p-4 shadow-sm">
+          <div>
+            <h3 className="text-base font-semibold text-amber-950">Pending — not yet transferable</h3>
+            <p className="mt-1 text-xs text-amber-900">
+              Allocations waiting on vendor transfers, Connect setup, refund review, or other blockers.
+            </p>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-amber-200 bg-oo-warm-white">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-amber-200 bg-amber-50/60 text-xs font-medium uppercase text-amber-950">
+                <tr>
+                  <th className="px-3 py-2">Pod</th>
+                  <th className="px-3 py-2">Pending</th>
+                  <th className="px-3 py-2">Waiting on vendor</th>
+                  <th className="px-3 py-2">Blocked</th>
+                  <th className="px-3 py-2">Top reason</th>
+                  <th className="px-3 py-2">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-100">
+                {pendingNotReadyPods.map((row) => (
+                  <tr key={row.podId}>
+                    <td className="px-3 py-2 font-medium text-oo-charcoal">{row.podName}</td>
+                    <td className="px-3 py-2 tabular-nums">
+                      {formatMoney(row.pendingAllocationAmountCents, "usd")}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-oo-stone-gray">
+                      {row.waitingOnVendorCount > 0
+                        ? `${formatMoney(row.waitingOnVendorAmountCents, "usd")} (${row.waitingOnVendorCount})`
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-orange-900">
+                      {row.blockedAllocationCount + row.blockedTransferCount > 0
+                        ? formatMoney(
+                            row.blockedAllocationAmountCents + row.blockedTransferAmountCents,
+                            "usd"
+                          )
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-oo-charcoal">
+                      {row.topBlockerReasonLabel ?? "Waiting on dependencies"}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Link
+                        href={`/admin/pods/${row.podId}?section=payouts`}
+                        className="text-xs font-semibold text-sky-800 underline"
+                      >
+                        View pod payouts
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {transfers.length === 0 && summary.readyToBatchAmountCents > 0 ? (
+        <p className="rounded-lg border border-dashed border-emerald-200 bg-emerald-50/40 p-4 text-sm text-emerald-950">
+          No pod payout transfer rows yet, but{" "}
+          <span className="font-semibold tabular-nums">
+            {formatMoney(summary.readyToBatchAmountCents, "usd")}
+          </span>{" "}
+          is ready to batch across {summary.readyToBatchPodCount} pod(s). Use{" "}
+          <span className="font-medium">Open pod payout batch</span> above to run batches on each pod detail
+          page.
+        </p>
+      ) : null}
+
       {showNeedsAction ? (
         <section className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
-          <h3 className="text-base font-semibold text-oo-charcoal">Pod payouts — needs action</h3>
+          <h3 className="text-base font-semibold text-oo-charcoal">Pod transfer rows — needs action</h3>
           {needsActionRows.length === 0 ? (
             <p className="rounded-lg border border-dashed border-emerald-200 bg-emerald-50/30 p-4 text-center text-sm text-emerald-950">
-              No pod payout transfers need action for the current filters.
+              No existing pod payout transfer rows need action for the current filters.
+              {summary.readyToBatchAmountCents > 0
+                ? ` ${formatMoney(summary.readyToBatchAmountCents, "usd")} is ready to batch on pod detail pages.`
+                : null}
             </p>
           ) : (
             <PodTransferTable
@@ -249,7 +415,12 @@ export function AdminPodPayoutTransfersSection({
         <section className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
           <h3 className="text-base font-semibold text-oo-charcoal">Pod transfer history</h3>
           {filtered.length === 0 ? (
-            <p className="text-sm text-oo-stone-gray">No pod transfers match the current filters.</p>
+            <p className="text-sm text-oo-stone-gray">
+              No pod transfer rows match the current filters.
+              {summary.readyToBatchAmountCents > 0
+                ? ` ${formatMoney(summary.readyToBatchAmountCents, "usd")} is ready to batch on pod detail pages.`
+                : null}
+            </p>
           ) : (
             <PodTransferTable
               rows={filtered}
@@ -387,7 +558,7 @@ function PodTransferTable({
                     href={`/admin/pods/${row.podId}?section=payouts`}
                     className="text-xs font-semibold text-sky-800 underline"
                   >
-                    Pod payouts
+                    Open pod payout batch
                   </Link>
                   {actionNotes?.[row.id] ? (
                     <p className="text-[10px] text-oo-stone-gray">{actionNotes[row.id]}</p>

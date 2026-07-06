@@ -12,6 +12,10 @@ import {
   isReconcilablePodPayoutTransferRow,
   isRetryablePodPayoutTransfer,
 } from "@/lib/admin-pod-payout-transfers-ux";
+import {
+  formatPodPayoutTransferBatchResultMessage,
+  POD_PAYOUT_TRANSFER_SKIP_REASON_LABELS,
+} from "@/lib/pod-payout-transfer-batch-skip";
 import type {
   PodPayoutTransferAdminRow,
   PodPayoutTransferAdminSummary,
@@ -64,10 +68,17 @@ export function PodPayoutTransfersCard({
         return;
       }
       const s = result.summary;
-      setMessage(
-        `Batch ${s.batchKey}: created ${s.rowsCreated} transfer row(s), examined ${s.examined}, settled ${s.settled}, skipped ${s.skipped}, failed ${s.failed}.` +
-          (s.stoppedEarlyForBalance ? " Stopped early due to insufficient Stripe balance." : "")
-      );
+      setMessage(formatPodPayoutTransferBatchResultMessage(s));
+      if (s.skippedRows.length > 0) {
+        const detail = s.skippedRows
+          .slice(0, 8)
+          .map(
+            (row) =>
+              `${row.transferId.slice(-8)}: ${POD_PAYOUT_TRANSFER_SKIP_REASON_LABELS[row.skipReasonKey]}`
+          )
+          .join("; ");
+        setMessage((prev) => `${prev} Skipped rows: ${detail}${s.skippedRows.length > 8 ? "…" : ""}.`);
+      }
       router.refresh();
     } finally {
       setPending(false);
@@ -139,7 +150,7 @@ export function PodPayoutTransfersCard({
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-oo-stone-gray">Blocked transfer amount</dt>
+          <dt className="text-xs text-oo-stone-gray">Blocked / needs review</dt>
           <dd className="mt-0.5 text-sm font-medium tabular-nums text-oo-charcoal">
             {formatMoney(transferSummary.blockedTransferAmountCents)}
             <span className="ml-1 text-xs font-normal text-oo-stone-gray">

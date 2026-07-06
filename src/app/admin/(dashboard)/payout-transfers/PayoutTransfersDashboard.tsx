@@ -82,6 +82,7 @@ import type { PodPayoutQuickFilter } from "@/lib/admin-pod-payout-transfers-ux";
 import type {
   AdminPayoutTransferRow,
   AdminPodOption,
+  AdminPodPayoutReadinessRow,
   AdminPodPayoutTransferRow,
   AdminTransferReversalRow,
   AdminVendorOption,
@@ -243,6 +244,7 @@ export function PayoutTransfersDashboard({
   initialPodTransfers,
   podOptions,
   podSummary,
+  podReadiness,
   vendors,
   initialBalance,
   initialBalanceError,
@@ -254,6 +256,7 @@ export function PayoutTransfersDashboard({
   initialPodTransfers: AdminPodPayoutTransferRow[];
   podOptions: AdminPodOption[];
   podSummary: PodPayoutGlobalSummary;
+  podReadiness: AdminPodPayoutReadinessRow[];
   vendors: AdminVendorOption[];
   initialBalance: StripePlatformBalanceSnapshot | null;
   initialBalanceError: string | null;
@@ -907,36 +910,46 @@ export function PayoutTransfersDashboard({
 
         <div className="grid gap-2 lg:grid-cols-5">
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Needs action</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">
+              {payoutCategoryTab === "pods" ? "Pending allocations" : "Needs action"}
+            </p>
             <p className="mt-1 text-base font-semibold tabular-nums text-amber-950">
               {formatMoney(
-                payoutCategoryTab === "pods" ? podSummary.needsActionAmountCents : combinedNeedsActionAmountCents,
-                "usd"
-              )}
-            </p>
-            <p className="text-xs text-oo-stone-gray">
-              {payoutCategoryTab === "pods" ? podSummary.needsActionCount : combinedNeedsActionCount}
-            </p>
-          </div>
-          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Ready to send</p>
-            <p className="mt-1 text-base font-semibold tabular-nums text-oo-charcoal">
-              {formatMoney(
                 payoutCategoryTab === "pods"
-                  ? podSummary.readyToTransferAmountCents
-                  : liabilityTotals.readyToTransferCents +
-                      (payoutCategoryTab === "all" ? podSummary.readyToTransferAmountCents : 0),
+                  ? podSummary.pendingAllocationAmountCents
+                  : combinedNeedsActionAmountCents,
                 "usd"
               )}
             </p>
             <p className="text-xs text-oo-stone-gray">
               {payoutCategoryTab === "pods"
-                ? podSummary.readyToTransferCount
-                : readyCount + (payoutCategoryTab === "all" ? podSummary.readyToTransferCount : 0)}
+                ? podSummary.pendingAllocationCount
+                : combinedNeedsActionCount}
             </p>
           </div>
           <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">Blocked</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">
+              {payoutCategoryTab === "pods" ? "Ready to batch" : "Ready to send"}
+            </p>
+            <p className="mt-1 text-base font-semibold tabular-nums text-oo-charcoal">
+              {formatMoney(
+                payoutCategoryTab === "pods"
+                  ? podSummary.readyToBatchAmountCents
+                  : liabilityTotals.readyToTransferCents +
+                      (payoutCategoryTab === "all" ? podSummary.readyToBatchAmountCents : 0),
+                "usd"
+              )}
+            </p>
+            <p className="text-xs text-oo-stone-gray">
+              {payoutCategoryTab === "pods"
+                ? `${podSummary.readyToBatchCount} · ${podSummary.readyToBatchPodCount} pod(s)`
+                : readyCount + (payoutCategoryTab === "all" ? podSummary.readyToBatchCount : 0)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-oo-stone-gray">
+              {payoutCategoryTab === "pods" ? "Blocked / needs review" : "Blocked"}
+            </p>
             <p className="mt-1 text-base font-semibold tabular-nums text-orange-900">
               {formatMoney(
                 payoutCategoryTab === "pods"
@@ -1439,6 +1452,7 @@ export function PayoutTransfersDashboard({
           transfers={podTransfers}
           pods={podOptions}
           summary={podSummary}
+          readiness={podReadiness}
           datePreset={datePreset}
           statusFilter={statusFilter}
           podId={podId}
@@ -1472,10 +1486,10 @@ export function PayoutTransfersDashboard({
           ))}
         </ul>
         <p className="mt-3 text-[11px] text-oo-stone-gray">
-          Vendor retry cron: scheduled every 20 minutes when deployed with{" "}
-          <code className="rounded bg-oo-cream px-1">vercel.json</code> crons and{" "}
+          Vendor retry cron: daily at 10:00 UTC on Hobby-compatible{" "}
+          <code className="rounded bg-oo-cream px-1">vercel.json</code> schedules (requires{" "}
           <code className="rounded bg-oo-cream px-1">CRON_SECRET</code> /{" "}
-          <code className="rounded bg-oo-cream px-1">INTERNAL_JOB_SECRET</code>. See{" "}
+          <code className="rounded bg-oo-cream px-1">INTERNAL_JOB_SECRET</code>). See{" "}
           <span className="font-medium text-oo-charcoal">docs/vendor-payout-transfer-retry-cron.md</span>.
         </p>
       </details>

@@ -89,14 +89,40 @@ export type AdminPodPayoutTransferRow = {
 };
 
 export type PodPayoutGlobalSummary = {
-  needsActionCount: number;
-  needsActionAmountCents: number;
+  pendingAllocationCount: number;
+  pendingAllocationAmountCents: number;
+  readyToBatchCount: number;
+  readyToBatchAmountCents: number;
+  readyToBatchPodCount: number;
+  /** Alias for readyToBatchAmountCents — used by top-level dashboard metrics. */
   readyToTransferCount: number;
+  /** Alias for readyToBatchAmountCents — used by top-level dashboard metrics. */
   readyToTransferAmountCents: number;
   blockedCount: number;
   blockedAmountCents: number;
   paidCount: number;
   paidAmountCents: number;
+  needsActionCount: number;
+  needsActionAmountCents: number;
+};
+
+export type AdminPodPayoutReadinessRow = {
+  podId: string;
+  podName: string;
+  pendingAllocationCount: number;
+  pendingAllocationAmountCents: number;
+  readyToBatchAmountCents: number;
+  readyToBatchCount: number;
+  canRunPayoutBatch: boolean;
+  blockedAllocationCount: number;
+  blockedAllocationAmountCents: number;
+  blockedTransferCount: number;
+  blockedTransferAmountCents: number;
+  paidTransferCount: number;
+  paidTransferAmountCents: number;
+  waitingOnVendorCount: number;
+  waitingOnVendorAmountCents: number;
+  topBlockerReasonLabel: string | null;
 };
 
 export type PayoutCategoryTab = "all" | "vendors" | "pods" | "blocked";

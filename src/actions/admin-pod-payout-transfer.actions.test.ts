@@ -14,7 +14,12 @@ vi.mock("@/services/pod-payout-transfer-reconciliation.service", () => ({
 }));
 
 vi.mock("@/services/admin-pod-payout-transfer-list.service", () => ({
-  listPodPayoutTransfersForAdminDashboard: vi.fn(async () => ({ transfers: [], pods: [], summary: {} })),
+  listPodPayoutTransfersForAdminDashboard: vi.fn(async () => ({
+    transfers: [],
+    pods: [],
+    summary: {},
+    readiness: [],
+  })),
 }));
 
 vi.mock("next/cache", () => ({
@@ -43,6 +48,8 @@ describe("adminRunPodPayoutTransferBatchAction", () => {
         failed: 0,
         blockedInsufficientBalance: 0,
         stoppedEarlyForBalance: false,
+        skipReasonCounts: {},
+        skippedRows: [],
         failures: [],
       },
     });

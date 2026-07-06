@@ -86,19 +86,11 @@ export function evaluatePodPayoutAllocationTransferEligibility(input: {
     };
   }
 
-  if (input.existingTransferStatus === POD_PAYOUT_TRANSFER_STATUS.pending) {
-    return {
-      transferable: true,
-      reason: "existing_transfer_pending",
-      reasonLabel: POD_PAYOUT_TRANSFERABILITY_REASON_LABELS.existing_transfer_pending,
-      ensureDecision: null,
-    };
-  }
-
   if (
     input.existingTransferStatus &&
     input.existingTransferStatus !== POD_PAYOUT_TRANSFER_STATUS.paid &&
-    input.existingTransferStatus !== POD_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund
+    input.existingTransferStatus !== POD_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund &&
+    input.existingTransferStatus !== POD_PAYOUT_TRANSFER_STATUS.pending
   ) {
     return {
       transferable: false,

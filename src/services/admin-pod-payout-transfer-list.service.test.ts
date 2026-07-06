@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { computePodPayoutGlobalSummary } from "@/services/admin-pod-payout-transfer-list.service";
+import {
+  aggregatePodPayoutGlobalSummary,
+  buildAdminPodPayoutReadinessRow,
+  computePodPayoutGlobalSummary,
+} from "@/services/admin-pod-payout-transfer-list.service";
 import type { AdminPodPayoutTransferRow } from "@/app/admin/(dashboard)/payout-transfers/payout-transfers-admin.types";
 import { POD_PAYOUT_TRANSFER_STATUS } from "@/lib/pod-payout-transfer-decision";
+import type { PodPayoutTransferAdminSummary } from "@/services/pod-payout-transfer.service";
 
-function row(
+function transferRow(
   partial: Partial<AdminPodPayoutTransferRow> & Pick<AdminPodPayoutTransferRow, "status" | "amountCents">
 ): AdminPodPayoutTransferRow {
   return {
@@ -29,13 +34,30 @@ function row(
   };
 }
 
-describe("computePodPayoutGlobalSummary", () => {
+function podSummary(partial: Partial<PodPayoutTransferAdminSummary>): PodPayoutTransferAdminSummary {
+  return {
+    pendingAllocationAmountCents: 0,
+    pendingAllocationCount: 0,
+    transferableAmountCents: 0,
+    transferableCount: 0,
+    blockedTransferAmountCents: 0,
+    blockedTransferCount: 0,
+    paidTransferAmountCents: 0,
+    paidTransferCount: 0,
+    minimumPayoutCents: 0,
+    canRunPayoutBatch: false,
+    nonTransferableAllocations: [],
+    ...partial,
+  };
+}
+
+describe("computePodPayoutGlobalSummary (transfer rows only)", () => {
   it("aggregates ready, blocked, and paid pod transfer totals", () => {
     const summary = computePodPayoutGlobalSummary([
-      row({ status: POD_PAYOUT_TRANSFER_STATUS.pending, amountCents: 1000 }),
-      row({ id: "ppt-2", status: POD_PAYOUT_TRANSFER_STATUS.failed, amountCents: 200 }),
-      row({ id: "ppt-3", status: POD_PAYOUT_TRANSFER_STATUS.paid, amountCents: 3000 }),
-      row({
+      transferRow({ status: POD_PAYOUT_TRANSFER_STATUS.pending, amountCents: 1000 }),
+      transferRow({ id: "ppt-2", status: POD_PAYOUT_TRANSFER_STATUS.failed, amountCents: 200 }),
+      transferRow({ id: "ppt-3", status: POD_PAYOUT_TRANSFER_STATUS.paid, amountCents: 3000 }),
+      transferRow({
         id: "ppt-4",
         status: POD_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund,
         amountCents: 999,
@@ -50,5 +72,81 @@ describe("computePodPayoutGlobalSummary", () => {
     expect(summary.paidAmountCents).toBe(3000);
     expect(summary.needsActionCount).toBe(2);
     expect(summary.needsActionAmountCents).toBe(1200);
+  });
+});
+
+describe("aggregatePodPayoutGlobalSummary", () => {
+  it("aggregates allocation-level readiness across pods", () => {
+    const summary = aggregatePodPayoutGlobalSummary([
+      podSummary({
+        pendingAllocationCount: 2,
+        pendingAllocationAmountCents: 302,
+        transferableCount: 1,
+        transferableAmountCents: 302,
+        canRunPayoutBatch: true,
+        nonTransferableAllocations: [
+          {
+            allocationId: "ppa_2",
+            orderId: "ord_2",
+            amountCents: 38,
+            reason: "waiting_on_vendor_transfer",
+            reasonLabel: "Waiting on vendor transfer",
+          },
+        ],
+        paidTransferCount: 1,
+        paidTransferAmountCents: 500,
+      }),
+      podSummary({
+        blockedTransferCount: 1,
+        blockedTransferAmountCents: 100,
+        nonTransferableAllocations: [
+          {
+            allocationId: "ppa_3",
+            orderId: "ord_3",
+            amountCents: 50,
+            reason: "refund_review",
+            reasonLabel: "Refund review required",
+          },
+        ],
+      }),
+    ]);
+
+    expect(summary.pendingAllocationCount).toBe(2);
+    expect(summary.pendingAllocationAmountCents).toBe(302);
+    expect(summary.readyToBatchAmountCents).toBe(302);
+    expect(summary.readyToBatchCount).toBe(1);
+    expect(summary.readyToBatchPodCount).toBe(1);
+    expect(summary.readyToTransferAmountCents).toBe(302);
+    expect(summary.blockedCount).toBe(3);
+    expect(summary.blockedAmountCents).toBe(188);
+    expect(summary.paidCount).toBe(1);
+    expect(summary.paidAmountCents).toBe(500);
+  });
+});
+
+describe("buildAdminPodPayoutReadinessRow", () => {
+  it("returns ready pod row when allocations are transferable without transfer rows", () => {
+    const row = buildAdminPodPayoutReadinessRow(
+      "pod_1",
+      "Test Pod",
+      podSummary({
+        pendingAllocationCount: 1,
+        pendingAllocationAmountCents: 302,
+        transferableCount: 1,
+        transferableAmountCents: 302,
+        canRunPayoutBatch: true,
+      })
+    );
+
+    expect(row).toMatchObject({
+      podId: "pod_1",
+      podName: "Test Pod",
+      canRunPayoutBatch: true,
+      readyToBatchAmountCents: 302,
+    });
+  });
+
+  it("returns null when pod has no payout activity", () => {
+    expect(buildAdminPodPayoutReadinessRow("pod_1", "Empty Pod", podSummary({}))).toBeNull();
   });
 });

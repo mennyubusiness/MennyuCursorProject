@@ -84,6 +84,40 @@ describe("getPodPayoutTransferAdminSummary", () => {
     expect(summary.nonTransferableAllocations[0]?.reason).toBe("waiting_on_vendor_transfer");
   });
 
+  it("does not count pending transfer rows as blocked in summary totals", async () => {
+    mockPodPayoutAllocationFindMany.mockResolvedValue([
+      {
+        id: "ppa_1",
+        orderId: "ord_1",
+        podPayoutAmountCents: 302,
+        status: POD_PAYOUT_ALLOCATION_STATUS.pending,
+        order: { paymentRefundStatus: "none" },
+        podPayoutRecipientUser: {
+          podPayoutStripeConnectedAccountId: "acct_pod",
+          podPayoutStripeDetailsSubmitted: true,
+          podPayoutStripePayoutsEnabled: true,
+        },
+        payment: {
+          allocations: [
+            {
+              netVendorTransferCents: 500,
+              payoutTransfer: { amountCents: 500, status: "paid" },
+            },
+          ],
+        },
+        podPayoutTransfer: { status: "pending" },
+      },
+    ]);
+    mockPodPayoutTransferFindMany.mockResolvedValue([
+      { status: "pending", amountCents: 302 },
+    ]);
+
+    const summary = await getPodPayoutTransferAdminSummary("pod_1");
+    expect(summary.transferableAmountCents).toBe(302);
+    expect(summary.blockedTransferAmountCents).toBe(0);
+    expect(summary.blockedTransferCount).toBe(0);
+  });
+
   it("reports zero transferable only when every pending allocation has a real blocker", async () => {
     mockPodPayoutAllocationFindMany.mockResolvedValue([
       {

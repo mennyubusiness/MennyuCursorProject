@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
+import { POD_PAYOUT_ALLOCATION_STATUS } from "@/lib/pod-payout-allocation";
 import {
   POD_PAYOUT_TRANSFER_BLOCKED_REASON_LABELS,
   POD_PAYOUT_TRANSFER_STATUS,
@@ -8,9 +9,15 @@ import {
 } from "@/lib/pod-payout-transfer-decision";
 import type {
   AdminPodOption,
+  AdminPodPayoutReadinessRow,
   AdminPodPayoutTransferRow,
   PodPayoutGlobalSummary,
 } from "@/app/admin/(dashboard)/payout-transfers/payout-transfers-admin.types";
+import {
+  computePodPayoutTransferAdminSummaryFromData,
+  podPayoutTransferAdminSummaryAllocationSelect,
+  type PodPayoutTransferAdminSummary,
+} from "@/services/pod-payout-transfer.service";
 
 const DEFAULT_TAKE = 400;
 
@@ -62,6 +69,110 @@ async function loadPodPayoutTransferRows(take: number) {
   });
 }
 
+export function aggregatePodPayoutGlobalSummary(
+  podSummaries: PodPayoutTransferAdminSummary[]
+): PodPayoutGlobalSummary {
+  let pendingAllocationCount = 0;
+  let pendingAllocationAmountCents = 0;
+  let readyToBatchCount = 0;
+  let readyToBatchAmountCents = 0;
+  let readyToBatchPodCount = 0;
+  let blockedAllocationCount = 0;
+  let blockedAllocationAmountCents = 0;
+  let blockedTransferCount = 0;
+  let blockedTransferAmountCents = 0;
+  let paidCount = 0;
+  let paidAmountCents = 0;
+
+  for (const summary of podSummaries) {
+    pendingAllocationCount += summary.pendingAllocationCount;
+    pendingAllocationAmountCents += summary.pendingAllocationAmountCents;
+    readyToBatchCount += summary.transferableCount;
+    readyToBatchAmountCents += summary.transferableAmountCents;
+    if (summary.canRunPayoutBatch) {
+      readyToBatchPodCount++;
+    }
+
+    for (const allocation of summary.nonTransferableAllocations) {
+      blockedAllocationCount++;
+      blockedAllocationAmountCents += allocation.amountCents;
+    }
+
+    blockedTransferCount += summary.blockedTransferCount;
+    blockedTransferAmountCents += summary.blockedTransferAmountCents;
+    paidCount += summary.paidTransferCount;
+    paidAmountCents += summary.paidTransferAmountCents;
+  }
+
+  const blockedCount = blockedAllocationCount + blockedTransferCount;
+  const blockedAmountCents = blockedAllocationAmountCents + blockedTransferAmountCents;
+  const needsActionCount = readyToBatchCount + blockedCount;
+  const needsActionAmountCents = readyToBatchAmountCents + blockedAmountCents;
+
+  return {
+    pendingAllocationCount,
+    pendingAllocationAmountCents,
+    readyToBatchCount,
+    readyToBatchAmountCents,
+    readyToBatchPodCount,
+    readyToTransferCount: readyToBatchCount,
+    readyToTransferAmountCents: readyToBatchAmountCents,
+    blockedCount,
+    blockedAmountCents,
+    paidCount,
+    paidAmountCents,
+    needsActionCount,
+    needsActionAmountCents,
+  };
+}
+
+export function buildAdminPodPayoutReadinessRow(
+  podId: string,
+  podName: string,
+  summary: PodPayoutTransferAdminSummary
+): AdminPodPayoutReadinessRow | null {
+  const hasActivity =
+    summary.pendingAllocationCount > 0 ||
+    summary.blockedTransferCount > 0 ||
+    summary.paidTransferCount > 0 ||
+    summary.canRunPayoutBatch;
+
+  if (!hasActivity) {
+    return null;
+  }
+
+  const waitingAllocations = summary.nonTransferableAllocations.filter(
+    (row) => row.reason === "waiting_on_vendor_transfer"
+  );
+  const blockedAllocations = summary.nonTransferableAllocations.filter(
+    (row) => row.reason !== "waiting_on_vendor_transfer"
+  );
+
+  const topBlockerReasonLabel =
+    blockedAllocations[0]?.reasonLabel ??
+    (summary.blockedTransferCount > 0 ? "Blocked transfer row" : null);
+
+  return {
+    podId,
+    podName,
+    pendingAllocationCount: summary.pendingAllocationCount,
+    pendingAllocationAmountCents: summary.pendingAllocationAmountCents,
+    readyToBatchAmountCents: summary.transferableAmountCents,
+    readyToBatchCount: summary.transferableCount,
+    canRunPayoutBatch: summary.canRunPayoutBatch,
+    blockedAllocationCount: blockedAllocations.length,
+    blockedAllocationAmountCents: blockedAllocations.reduce((sum, row) => sum + row.amountCents, 0),
+    blockedTransferCount: summary.blockedTransferCount,
+    blockedTransferAmountCents: summary.blockedTransferAmountCents,
+    paidTransferCount: summary.paidTransferCount,
+    paidTransferAmountCents: summary.paidTransferAmountCents,
+    waitingOnVendorCount: waitingAllocations.length,
+    waitingOnVendorAmountCents: waitingAllocations.reduce((sum, row) => sum + row.amountCents, 0),
+    topBlockerReasonLabel,
+  };
+}
+
+/** @deprecated Use aggregatePodPayoutGlobalSummary with allocation-level pod summaries. */
 export function computePodPayoutGlobalSummary(
   transfers: AdminPodPayoutTransferRow[]
 ): PodPayoutGlobalSummary {
@@ -103,15 +214,80 @@ export function computePodPayoutGlobalSummary(
   }
 
   return {
-    needsActionCount,
-    needsActionAmountCents,
+    pendingAllocationCount: 0,
+    pendingAllocationAmountCents: 0,
+    readyToBatchCount: readyToTransferCount,
+    readyToBatchAmountCents: readyToTransferAmountCents,
+    readyToBatchPodCount: 0,
     readyToTransferCount,
     readyToTransferAmountCents,
     blockedCount,
     blockedAmountCents,
     paidCount,
     paidAmountCents,
+    needsActionCount,
+    needsActionAmountCents,
   };
+}
+
+async function loadPodPayoutReadinessSummaries(): Promise<{
+  summariesByPodId: Map<string, PodPayoutTransferAdminSummary>;
+  podNamesById: Map<string, string>;
+}> {
+  const [pendingAllocations, settingsRows, transferRows, pods] = await Promise.all([
+    prisma.podPayoutAllocation.findMany({
+      where: { status: POD_PAYOUT_ALLOCATION_STATUS.pending },
+      select: {
+        podId: true,
+        ...podPayoutTransferAdminSummaryAllocationSelect,
+      },
+    }),
+    prisma.podPayoutSettings.findMany({
+      select: { podId: true, minimumPayoutCents: true },
+    }),
+    prisma.podPayoutTransfer.findMany({
+      select: { podId: true, status: true, amountCents: true },
+    }),
+    prisma.pod.findMany({
+      select: { id: true, name: true },
+    }),
+  ]);
+
+  const minimumByPodId = new Map(settingsRows.map((row) => [row.podId, row.minimumPayoutCents]));
+  const podNamesById = new Map(pods.map((pod) => [pod.id, pod.name]));
+  const allocationsByPodId = new Map<string, typeof pendingAllocations>();
+  const transfersByPodId = new Map<string, Array<{ status: string; amountCents: number }>>();
+
+  for (const allocation of pendingAllocations) {
+    const list = allocationsByPodId.get(allocation.podId) ?? [];
+    list.push(allocation);
+    allocationsByPodId.set(allocation.podId, list);
+  }
+
+  for (const transfer of transferRows) {
+    const list = transfersByPodId.get(transfer.podId) ?? [];
+    list.push({ status: transfer.status, amountCents: transfer.amountCents });
+    transfersByPodId.set(transfer.podId, list);
+  }
+
+  const podIds = new Set<string>([
+    ...allocationsByPodId.keys(),
+    ...transfersByPodId.keys(),
+  ]);
+
+  const summariesByPodId = new Map<string, PodPayoutTransferAdminSummary>();
+  for (const podId of podIds) {
+    summariesByPodId.set(
+      podId,
+      computePodPayoutTransferAdminSummaryFromData({
+        minimumPayoutCents: minimumByPodId.get(podId) ?? 0,
+        pendingAllocations: allocationsByPodId.get(podId) ?? [],
+        transfers: transfersByPodId.get(podId) ?? [],
+      })
+    );
+  }
+
+  return { summariesByPodId, podNamesById };
 }
 
 export async function listPodPayoutTransfersForAdminDashboard(
@@ -120,8 +296,10 @@ export async function listPodPayoutTransfersForAdminDashboard(
   transfers: AdminPodPayoutTransferRow[];
   pods: AdminPodOption[];
   summary: PodPayoutGlobalSummary;
+  readiness: AdminPodPayoutReadinessRow[];
 }> {
-  const [rows, pods] = await Promise.all([
+  const [{ summariesByPodId, podNamesById }, rows, pods] = await Promise.all([
+    loadPodPayoutReadinessSummaries(),
     loadPodPayoutTransferRows(take),
     prisma.pod.findMany({
       select: { id: true, name: true },
@@ -129,10 +307,25 @@ export async function listPodPayoutTransfersForAdminDashboard(
     }),
   ]);
 
-  const transfers = rows.map(mapPodTransferRow);
+  const podSummaries = [...summariesByPodId.values()];
+  const summary = aggregatePodPayoutGlobalSummary(podSummaries);
+
+  const readiness = [...summariesByPodId.entries()]
+    .map(([podId, podSummary]) =>
+      buildAdminPodPayoutReadinessRow(podId, podNamesById.get(podId) ?? podId, podSummary)
+    )
+    .filter((row): row is AdminPodPayoutReadinessRow => row !== null)
+    .sort((a, b) => {
+      if (a.canRunPayoutBatch !== b.canRunPayoutBatch) {
+        return a.canRunPayoutBatch ? -1 : 1;
+      }
+      return b.readyToBatchAmountCents - a.readyToBatchAmountCents;
+    });
+
   return {
-    transfers,
+    transfers: rows.map(mapPodTransferRow),
     pods,
-    summary: computePodPayoutGlobalSummary(transfers),
+    summary,
+    readiness,
   };
 }

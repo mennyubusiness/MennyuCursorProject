@@ -20,6 +20,7 @@ import {
   POD_PAYOUT_TRANSFER_STATUS_LABELS,
   POD_PAYOUT_TRANSFER_BLOCKED_DESTINATION,
   POD_PAYOUT_TRANSFER_STATUS,
+  isPodPayoutTransferBlockedSummaryStatus,
   stablePodPayoutTransferIdempotencyKey,
 } from "@/lib/pod-payout-transfer-decision";
 import {
@@ -40,6 +41,11 @@ import {
   type PodPayoutTransferabilityReason,
 } from "@/lib/pod-payout-transfer-eligibility";
 import type { PaymentAllocationVendorGateRow } from "@/lib/pod-payout-vendor-transfer-gate";
+import {
+  createEmptyPodPayoutTransferSkipReasonCounts,
+  normalizePodPayoutTransferSkipReason,
+  type PodPayoutTransferSkipReasonKey,
+} from "@/lib/pod-payout-transfer-batch-skip";
 import {
   fetchStripePlatformBalance,
   type StripePlatformBalanceSnapshot,
@@ -284,10 +290,10 @@ async function refreshTransferRowFromBatchContext(
 
   const decision = eligibility.ensureDecision;
   if (!decision) {
-    if (!eligibility.transferable) {
-      return { ok: false, reason: eligibility.reason };
+    if (eligibility.transferable) {
+      return { ok: true };
     }
-    return { ok: false, reason: "allocation_not_pending" };
+    return { ok: false, reason: eligibility.reason };
   }
 
   if (decision.status !== POD_PAYOUT_TRANSFER_STATUS.pending) {
@@ -579,6 +585,12 @@ export type PodPayoutTransferBatchSummary = {
   failed: number;
   blockedInsufficientBalance: number;
   stoppedEarlyForBalance: boolean;
+  skipReasonCounts: Record<PodPayoutTransferSkipReasonKey, number>;
+  skippedRows: Array<{
+    transferId: string;
+    reason: string;
+    skipReasonKey: PodPayoutTransferSkipReasonKey;
+  }>;
   failures: Array<{ transferId: string; message: string }>;
 };
 
@@ -592,6 +604,22 @@ export type PodPayoutTransferBatchRunResult =
       summary: PodPayoutTransferBatchSummary;
     };
 
+function recordPodPayoutTransferSkip(
+  transferId: string,
+  reason: string,
+  summary: PodPayoutTransferBatchSummary
+): void {
+  const skipReasonKey = normalizePodPayoutTransferSkipReason(reason);
+  summary.skipReasonCounts[skipReasonKey]++;
+  summary.skippedRows.push({ transferId, reason, skipReasonKey });
+  if (skipReasonKey === "unknown_skip") {
+    console.error("[pod_payout_batch_skip_unknown]", {
+      transferId,
+      reason,
+    });
+  }
+}
+
 function summarizePodExecuteResult(
   transferId: string,
   r: ExecutePodPayoutTransferResult,
@@ -601,16 +629,34 @@ function summarizePodExecuteResult(
     summary.settled++;
     return false;
   }
-  if (r.outcome === "skipped" || r.outcome === "blocked_balance_unavailable") {
+  if (r.outcome === "skipped") {
     summary.skipped++;
+    recordPodPayoutTransferSkip(transferId, r.reason, summary);
+    return false;
+  }
+  if (r.outcome === "blocked_balance_unavailable") {
+    summary.skipped++;
+    recordPodPayoutTransferSkip(transferId, "blocked_balance_unavailable", summary);
     return false;
   }
   if (r.outcome === "blocked_insufficient_balance") {
     summary.blockedInsufficientBalance++;
+    summary.skipReasonCounts.insufficient_balance++;
+    summary.skippedRows.push({
+      transferId,
+      reason: r.message,
+      skipReasonKey: "insufficient_balance",
+    });
     summary.failures.push({ transferId, message: r.message });
     return true;
   }
-  if (r.outcome === "blocked_idempotency_mismatch" || r.outcome === "failed") {
+  if (r.outcome === "blocked_idempotency_mismatch") {
+    summary.failed++;
+    summary.skipReasonCounts.idempotency_mismatch++;
+    summary.failures.push({ transferId, message: r.message });
+    return false;
+  }
+  if (r.outcome === "failed") {
     summary.failed++;
     summary.failures.push({ transferId, message: r.message });
     return false;
@@ -650,6 +696,8 @@ export async function runManualPodPayoutTransferBatchForPod(
     failed: 0,
     blockedInsufficientBalance: 0,
     stoppedEarlyForBalance: false,
+    skipReasonCounts: createEmptyPodPayoutTransferSkipReasonCounts(),
+    skippedRows: [],
     failures: [],
   };
 
@@ -726,51 +774,65 @@ export type PodPayoutTransferAdminSummary = {
   nonTransferableAllocations: PodPayoutNonTransferableAllocation[];
 };
 
-export async function getPodPayoutTransferAdminSummary(
-  podId: string
-): Promise<PodPayoutTransferAdminSummary> {
-  const [settings, pendingAllocations, transfers] = await Promise.all([
-    prisma.podPayoutSettings.findUnique({
-      where: { podId },
-      select: { minimumPayoutCents: true },
-    }),
-    prisma.podPayoutAllocation.findMany({
-      where: { podId, status: POD_PAYOUT_ALLOCATION_STATUS.pending },
-      select: {
-        id: true,
-        orderId: true,
-        podPayoutAmountCents: true,
-        status: true,
-        order: { select: { paymentRefundStatus: true } },
-        podPayoutRecipientUser: {
-          select: {
-            podPayoutStripeConnectedAccountId: true,
-            podPayoutStripeDetailsSubmitted: true,
-            podPayoutStripePayoutsEnabled: true,
-          },
-        },
-        payment: {
-          select: {
-            allocations: {
-              select: {
-                netVendorTransferCents: true,
-                payoutTransfer: {
-                  select: { amountCents: true, status: true },
-                },
-              },
-            },
-          },
-        },
-        podPayoutTransfer: { select: { status: true } },
-      },
-    }),
-    prisma.podPayoutTransfer.findMany({
-      where: { podId },
-      select: { status: true, amountCents: true },
-    }),
-  ]);
+export type PodPayoutTransferAdminSummaryAllocationRow = {
+  id: string;
+  orderId: string;
+  podPayoutAmountCents: number;
+  status: string;
+  order: { paymentRefundStatus: string | null };
+  podPayoutRecipientUser: {
+    podPayoutStripeConnectedAccountId: string | null;
+    podPayoutStripeDetailsSubmitted: boolean;
+    podPayoutStripePayoutsEnabled: boolean;
+  } | null;
+  payment: {
+    allocations: Array<{
+      netVendorTransferCents: number;
+      payoutTransfer: { amountCents: number; status: string } | null;
+    }>;
+  };
+  podPayoutTransfer: { status: string } | null;
+};
 
-  const minimumPayoutCents = settings?.minimumPayoutCents ?? 0;
+export type PodPayoutTransferAdminSummaryTransferRow = {
+  status: string;
+  amountCents: number;
+};
+
+export const podPayoutTransferAdminSummaryAllocationSelect = {
+  id: true,
+  orderId: true,
+  podPayoutAmountCents: true,
+  status: true,
+  order: { select: { paymentRefundStatus: true } },
+  podPayoutRecipientUser: {
+    select: {
+      podPayoutStripeConnectedAccountId: true,
+      podPayoutStripeDetailsSubmitted: true,
+      podPayoutStripePayoutsEnabled: true,
+    },
+  },
+  payment: {
+    select: {
+      allocations: {
+        select: {
+          netVendorTransferCents: true,
+          payoutTransfer: {
+            select: { amountCents: true, status: true },
+          },
+        },
+      },
+    },
+  },
+  podPayoutTransfer: { select: { status: true } },
+} as const;
+
+export function computePodPayoutTransferAdminSummaryFromData(input: {
+  minimumPayoutCents: number;
+  pendingAllocations: PodPayoutTransferAdminSummaryAllocationRow[];
+  transfers: PodPayoutTransferAdminSummaryTransferRow[];
+}): PodPayoutTransferAdminSummary {
+  const { minimumPayoutCents, pendingAllocations, transfers } = input;
   const pendingAllocationAmountCents = pendingAllocations.reduce(
     (sum, row) => sum + row.podPayoutAmountCents,
     0
@@ -824,7 +886,7 @@ export async function getPodPayoutTransferAdminSummary(
     if (row.status === POD_PAYOUT_TRANSFER_STATUS.paid) {
       paidTransferAmountCents += row.amountCents;
       paidTransferCount++;
-    } else if (row.status !== POD_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund) {
+    } else if (isPodPayoutTransferBlockedSummaryStatus(row.status)) {
       blockedTransferAmountCents += row.amountCents;
       blockedTransferCount++;
     }
@@ -843,6 +905,31 @@ export async function getPodPayoutTransferAdminSummary(
     canRunPayoutBatch: transferableCount > 0,
     nonTransferableAllocations,
   };
+}
+
+export async function getPodPayoutTransferAdminSummary(
+  podId: string
+): Promise<PodPayoutTransferAdminSummary> {
+  const [settings, pendingAllocations, transfers] = await Promise.all([
+    prisma.podPayoutSettings.findUnique({
+      where: { podId },
+      select: { minimumPayoutCents: true },
+    }),
+    prisma.podPayoutAllocation.findMany({
+      where: { podId, status: POD_PAYOUT_ALLOCATION_STATUS.pending },
+      select: podPayoutTransferAdminSummaryAllocationSelect,
+    }),
+    prisma.podPayoutTransfer.findMany({
+      where: { podId },
+      select: { status: true, amountCents: true },
+    }),
+  ]);
+
+  return computePodPayoutTransferAdminSummaryFromData({
+    minimumPayoutCents: settings?.minimumPayoutCents ?? 0,
+    pendingAllocations,
+    transfers,
+  });
 }
 
 export async function listRecentPodPayoutTransfersForAdmin(

@@ -58,6 +58,7 @@ describe("admin vendor transfers page terminology", () => {
   it("loads pod payout transfers for the unified admin payouts page", () => {
     expect(pageSrc).toMatch(/listPodPayoutTransfersForAdminDashboard/);
     expect(pageSrc).toMatch(/initialPodTransfers=/);
+    expect(pageSrc).toMatch(/podReadiness=/);
     expect(dashboardSrc).toMatch(/AdminPodPayoutTransfersSection/);
     expect(dashboardSrc).toMatch(/payoutCategoryTab/);
   });
@@ -139,5 +140,8 @@ describe("admin vendor transfers page terminology", () => {
     expect(podSectionSrc).toMatch(/adminRetryPodPayoutTransferAction/);
     expect(podSectionSrc).toMatch(/adminReconcilePodPayoutTransferAction/);
     expect(podSectionSrc).toMatch(/Check Stripe/);
+    expect(podSectionSrc).toMatch(/Open pod payout batch/);
+    expect(podSectionSrc).toMatch(/Ready to batch/);
+    expect(podSectionSrc).toMatch(/Pending allocations/);
   });
 });

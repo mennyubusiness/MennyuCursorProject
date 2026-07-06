@@ -51,6 +51,15 @@ export function isPodPayoutConnectTransferReady(user: PodPayoutConnectTransferFi
   );
 }
 
+/** Transfer rows in these statuses are not blocked for admin summary totals. */
+export function isPodPayoutTransferBlockedSummaryStatus(status: string): boolean {
+  return (
+    status !== POD_PAYOUT_TRANSFER_STATUS.paid &&
+    status !== POD_PAYOUT_TRANSFER_STATUS.pending &&
+    status !== POD_PAYOUT_TRANSFER_STATUS.cancelledDueToRefund
+  );
+}
+
 export function blockedReasonForPodPayoutConnect(user: PodPayoutConnectTransferFields): string {
   if (!user.podPayoutStripeConnectedAccountId?.trim()) {
     return POD_PAYOUT_TRANSFER_BLOCKED_REASON.connectAccountMissing;
