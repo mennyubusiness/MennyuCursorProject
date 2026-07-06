@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/internal/jobs/vendor-payout-transfer-retry?take=100",
-      "schedule": "*/20 * * * *"
+      "schedule": "0 10 * * *"
     }
   ]
 }

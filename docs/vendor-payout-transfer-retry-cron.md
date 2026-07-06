@@ -23,18 +23,24 @@ Accepted:
 
 **Do not** commit secrets in `vercel.json`.
 
-## Schedule
+## Schedule (Hobby-compatible)
 
-`vercel.json` ships a cron entry every **20 minutes**:
+**Vercel Hobby** only allows cron jobs that run **once per day**. Sub-daily schedules (e.g. every 15–30 minutes) will **fail deployment** on Hobby.
+
+`vercel.json` ships a **daily** cron entry:
 
 - Path: `/api/internal/jobs/vendor-payout-transfer-retry?take=100`
-- Schedule: `*/20 * * * *`
+- Schedule: `0 10 * * *` (10:00 UTC daily)
 
-On **Vercel Hobby**, sub-daily cron may fail deployment. If so, remove the `crons` entry and use an external scheduler with the same path and auth.
+### Beta operations
+
+- **Hobby (daily cron):** Automatic vendor retry runs once per day. Use **Retry eligible vendor transfers** and per-row retry/reconcile on `/admin/payout-transfers` between cron runs.
+- **Higher frequency without code changes:** Use an **external scheduler** (GitHub Actions, cron-job.org, etc.) to `GET` or `POST` the same path with `Authorization: Bearer …` or `?secret=…` every 15–30 minutes.
+- **Vercel Pro:** You may add additional or more frequent cron jobs in the Vercel dashboard if your plan allows sub-daily schedules.
 
 ## Disable safely
 
-1. Remove the cron job from Vercel dashboard or delete the `crons` entry.
+1. Remove the cron job from Vercel dashboard or delete the `crons` entry in `vercel.json`.
 2. Unset both `INTERNAL_JOB_SECRET` and `CRON_SECRET` — the route returns **503** and does not run retries.
 
 ## Manual run
