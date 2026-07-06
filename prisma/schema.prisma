@@ -117,7 +117,7 @@ model PodPayoutAllocation {
   eligibleSubtotalCentsAfterRefunds Int?
   revenueShareBps                   Int
   podPayoutAmountCents              Int
-  /// pending | blocked | cancelled_due_to_refund | blocked_partial_refund_review
+  /// pending | paid | blocked | cancelled_due_to_refund | blocked_partial_refund_review
   status                            String
   blockedReason                     String?
   podPayoutRecipientUserId          String?

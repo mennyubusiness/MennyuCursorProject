@@ -131,6 +131,10 @@ export async function getPodPayoutAllocationSummary(podId: string): Promise<PodP
       case "blocked_partial_refund_review":
         summary.blockedPartialRefundReview = bucket;
         break;
+      case "paid":
+        summary.other.count += bucket.count;
+        summary.other.amountCents += bucket.amountCents;
+        break;
       default:
         summary.other.count += bucket.count;
         summary.other.amountCents += bucket.amountCents;

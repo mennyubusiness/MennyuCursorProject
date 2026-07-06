@@ -27,6 +27,7 @@ function shortenId(id: string): string {
 const FILTER_OPTIONS = [
   { id: "all", label: "All" },
   { id: POD_PAYOUT_ALLOCATION_STATUS.pending, label: "Pending" },
+  { id: POD_PAYOUT_ALLOCATION_STATUS.paid, label: "Paid" },
   { id: POD_PAYOUT_ALLOCATION_STATUS.blocked, label: "Blocked" },
   { id: POD_PAYOUT_ALLOCATION_STATUS.cancelledDueToRefund, label: "Cancelled after refund" },
   { id: POD_PAYOUT_ALLOCATION_STATUS.blockedPartialRefundReview, label: "Needs review" },
@@ -150,6 +151,7 @@ export function PodPayoutAllocationsCard({
                 <th className="px-3 py-2">Revenue share</th>
                 <th className="px-3 py-2">Allocation</th>
                 <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Transfer</th>
                 <th className="px-3 py-2">Recipient</th>
               </tr>
             </thead>
@@ -185,7 +187,9 @@ export function PodPayoutAllocationsCard({
                   <td className="px-3 py-2">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        row.status === POD_PAYOUT_ALLOCATION_STATUS.pending
+                        row.status === POD_PAYOUT_ALLOCATION_STATUS.paid
+                          ? "bg-sky-100 text-sky-900"
+                          : row.status === POD_PAYOUT_ALLOCATION_STATUS.pending
                           ? "bg-emerald-100 text-emerald-900"
                           : row.status === POD_PAYOUT_ALLOCATION_STATUS.blocked
                             ? "bg-amber-100 text-amber-900"
@@ -201,6 +205,17 @@ export function PodPayoutAllocationsCard({
                         {blockedReasonLabel(row.blockedReason)}
                       </p>
                     ) : null}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-oo-charcoal">
+                    {row.stripeTransferId ? (
+                      <span className="font-mono" title={row.stripeTransferId}>
+                        {row.stripeTransferId.slice(0, 10)}…
+                      </span>
+                    ) : row.podPayoutTransferStatus ? (
+                      <span className="text-oo-stone-gray">{row.podPayoutTransferStatus}</span>
+                    ) : (
+                      <span className="text-oo-stone-gray">—</span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-xs text-oo-charcoal">
                     {row.recipientLabel ?? (

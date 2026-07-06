@@ -69,6 +69,8 @@ export function podPayoutAllocationRefundStatusLabel(status: string, blockedReas
   switch (status) {
     case POD_PAYOUT_ALLOCATION_STATUS.pending:
       return "Pending";
+    case POD_PAYOUT_ALLOCATION_STATUS.paid:
+      return "Paid";
     case POD_PAYOUT_ALLOCATION_STATUS.blocked:
       return "Blocked";
     default:

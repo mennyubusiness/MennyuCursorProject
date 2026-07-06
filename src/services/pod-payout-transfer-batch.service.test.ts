@@ -7,6 +7,9 @@ const mockPodPayoutTransferFindMany = vi.fn();
 const mockPodPayoutTransferUpdate = vi.fn();
 const mockPodPayoutSettingsFindUnique = vi.fn();
 const mockPodPayoutAllocationFindMany = vi.fn();
+const mockPodPayoutAllocationUpdateMany = vi.fn();
+const mockSyncStalePaid = vi.fn();
+const mockMarkAllocationPaid = vi.fn();
 const mockTransaction = vi.fn();
 const mockStripeTransfersCreate = vi.fn();
 const mockFetchBalance = vi.fn();
@@ -36,6 +39,7 @@ vi.mock("@/lib/db", () => ({
     },
     podPayoutAllocation: {
       findMany: (...args: unknown[]) => mockPodPayoutAllocationFindMany(...args),
+      updateMany: (...args: unknown[]) => mockPodPayoutAllocationUpdateMany(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
@@ -47,6 +51,11 @@ vi.mock("@/services/stripe-balance.service", () => ({
 
 vi.mock("@/services/pod-payout-transfer-recovery.service", () => ({
   reEvaluateBlockedPodPayoutTransferRows: (...args: unknown[]) => mockReEvaluate(...args),
+}));
+
+vi.mock("@/services/pod-payout-allocation.service", () => ({
+  markPodPayoutAllocationPaidForTransfer: (...args: unknown[]) => mockMarkAllocationPaid(...args),
+  syncStalePaidPodPayoutAllocationStatusesForPod: (...args: unknown[]) => mockSyncStalePaid(...args),
 }));
 
 import {
@@ -143,6 +152,14 @@ describe("executePodPayoutTransfer", () => {
       balance: { currency: "usd", availableCents: 10_000, pendingCents: 0 },
     });
     mockPodPayoutTransferUpdate.mockResolvedValue({});
+    mockPodPayoutAllocationUpdateMany.mockResolvedValue({ count: 1 });
+    mockMarkAllocationPaid.mockResolvedValue(true);
+    mockSyncStalePaid.mockResolvedValue(0);
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) =>
+      fn({
+        podPayoutTransfer: { update: mockPodPayoutTransferUpdate },
+      })
+    );
     mockStripeTransfersCreate.mockResolvedValue({ id: "tr_pod_1" });
   });
 
@@ -154,16 +171,8 @@ describe("executePodPayoutTransfer", () => {
 
     expect(result).toEqual({ outcome: "paid", stripeTransferId: "tr_pod_1" });
     expect(mockStripeTransfersCreate).toHaveBeenCalledTimes(1);
-    expect(mockPodPayoutTransferUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "ppt_1" },
-        data: expect.objectContaining({
-          status: POD_PAYOUT_TRANSFER_STATUS.paid,
-          stripeTransferId: "tr_pod_1",
-          batchKey: "batch_1",
-        }),
-      })
-    );
+    expect(mockTransaction).toHaveBeenCalled();
+    expect(mockMarkAllocationPaid).toHaveBeenCalledWith("ppa_1", expect.anything());
   });
 
   it("returns waiting_on_vendor_transfer skip when vendor payout is pending", async () => {
@@ -190,12 +199,19 @@ describe("runManualPodPayoutTransferBatchForPod", () => {
     mockReEvaluate.mockResolvedValue({ reEvaluated: 0 });
     mockPodPayoutSettingsFindUnique.mockResolvedValue({ minimumPayoutCents: 0 });
     mockPodPayoutAllocationFindMany.mockResolvedValue([]);
-    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => fn({}));
     mockFetchBalance.mockResolvedValue({
       ok: true,
       balance: { currency: "usd", availableCents: 10_000, pendingCents: 0 },
     });
     mockPodPayoutTransferUpdate.mockResolvedValue({});
+    mockPodPayoutAllocationUpdateMany.mockResolvedValue({ count: 1 });
+    mockMarkAllocationPaid.mockResolvedValue(true);
+    mockSyncStalePaid.mockResolvedValue(0);
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) =>
+      fn({
+        podPayoutTransfer: { update: mockPodPayoutTransferUpdate },
+      })
+    );
     mockStripeTransfersCreate.mockResolvedValue({ id: "tr_pod_1" });
   });
 

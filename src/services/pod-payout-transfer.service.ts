@@ -47,6 +47,10 @@ import {
   type PodPayoutTransferSkipReasonKey,
 } from "@/lib/pod-payout-transfer-batch-skip";
 import {
+  markPodPayoutAllocationPaidForTransfer,
+  syncStalePaidPodPayoutAllocationStatusesForPod,
+} from "@/services/pod-payout-allocation.service";
+import {
   fetchStripePlatformBalance,
   type StripePlatformBalanceSnapshot,
 } from "@/services/stripe-balance.service";
@@ -330,6 +334,20 @@ async function refreshTransferRowFromBatchContext(
 /** Re-runs allocation/connect/refund/minimum decision for an existing pod transfer row. */
 export const recomputePodPayoutTransferRowFromContext = refreshTransferRowFromBatchContext;
 
+async function markPodPayoutTransferPaidWithAllocation(
+  transferId: string,
+  podPayoutAllocationId: string,
+  data: Prisma.PodPayoutTransferUpdateInput
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    await tx.podPayoutTransfer.update({
+      where: { id: transferId },
+      data,
+    });
+    await markPodPayoutAllocationPaidForTransfer(podPayoutAllocationId, tx);
+  });
+}
+
 async function markPodPayoutBlockedInsufficientBalance(
   transferId: string,
   message: string,
@@ -425,14 +443,11 @@ export async function executePodPayoutTransfer(
 
   if (current.amountCents <= 0) {
     const now = new Date();
-    await prisma.podPayoutTransfer.update({
-      where: { id: transferId },
-      data: {
-        status: POD_PAYOUT_TRANSFER_STATUS.paid,
-        submittedAt: now,
-        paidAt: now,
-        ...(opts?.batchKey ? { batchKey: opts.batchKey } : {}),
-      },
+    await markPodPayoutTransferPaidWithAllocation(transferId, row.podPayoutAllocationId, {
+      status: POD_PAYOUT_TRANSFER_STATUS.paid,
+      submittedAt: now,
+      paidAt: now,
+      ...(opts?.batchKey ? { batchKey: opts.batchKey } : {}),
     });
     return { outcome: "paid", stripeTransferId: "" };
   }
@@ -482,19 +497,16 @@ export async function executePodPayoutTransfer(
 
     tracker.remainingAvailableCents = Math.max(0, tracker.remainingAvailableCents - stripeRow.amountCents);
     const now = new Date();
-    await prisma.podPayoutTransfer.update({
-      where: { id: transferId },
-      data: {
-        status: POD_PAYOUT_TRANSFER_STATUS.paid,
-        stripeTransferId: tr.id,
-        submittedAt: now,
-        paidAt: now,
-        blockedReason: null,
-        failureCode: null,
-        failureMessage: null,
-        failedAt: null,
-        ...(opts?.batchKey ? { batchKey: opts.batchKey } : {}),
-      },
+    await markPodPayoutTransferPaidWithAllocation(transferId, stripeRow.podPayoutAllocationId, {
+      status: POD_PAYOUT_TRANSFER_STATUS.paid,
+      stripeTransferId: tr.id,
+      submittedAt: now,
+      paidAt: now,
+      blockedReason: null,
+      failureCode: null,
+      failureMessage: null,
+      failedAt: null,
+      ...(opts?.batchKey ? { batchKey: opts.batchKey } : {}),
     });
     return { outcome: "paid", stripeTransferId: tr.id };
   } catch (e) {
@@ -910,6 +922,8 @@ export function computePodPayoutTransferAdminSummaryFromData(input: {
 export async function getPodPayoutTransferAdminSummary(
   podId: string
 ): Promise<PodPayoutTransferAdminSummary> {
+  await syncStalePaidPodPayoutAllocationStatusesForPod(podId);
+
   const [settings, pendingAllocations, transfers] = await Promise.all([
     prisma.podPayoutSettings.findUnique({
       where: { podId },

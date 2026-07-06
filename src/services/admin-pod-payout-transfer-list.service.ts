@@ -13,6 +13,7 @@ import type {
   AdminPodPayoutTransferRow,
   PodPayoutGlobalSummary,
 } from "@/app/admin/(dashboard)/payout-transfers/payout-transfers-admin.types";
+import { syncStalePaidPodPayoutAllocationStatusesGlobal } from "@/services/pod-payout-allocation.service";
 import {
   computePodPayoutTransferAdminSummaryFromData,
   podPayoutTransferAdminSummaryAllocationSelect,
@@ -234,6 +235,8 @@ async function loadPodPayoutReadinessSummaries(): Promise<{
   summariesByPodId: Map<string, PodPayoutTransferAdminSummary>;
   podNamesById: Map<string, string>;
 }> {
+  await syncStalePaidPodPayoutAllocationStatusesGlobal();
+
   const [pendingAllocations, settingsRows, transferRows, pods] = await Promise.all([
     prisma.podPayoutAllocation.findMany({
       where: { status: POD_PAYOUT_ALLOCATION_STATUS.pending },

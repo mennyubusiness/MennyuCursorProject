@@ -15,6 +15,7 @@ import {
   type StripePodTransferMatchInput,
 } from "@/lib/pod-payout-transfer-reconciliation";
 import { POD_PAYOUT_TRANSFER_STATUS } from "@/lib/pod-payout-transfer-decision";
+import { markPodPayoutAllocationPaidForTransfer } from "@/services/pod-payout-allocation.service";
 
 export type ReconcilePodPayoutTransferOutcome =
   | "updated_paid"
@@ -109,23 +110,27 @@ async function stripeTransferIdUsedByOtherPodRow(
 
 async function markPodRowPaidFromStripe(
   rowId: string,
+  podPayoutAllocationId: string,
   stripeTransferId: string,
   submittedAt: Date | null
 ): Promise<void> {
   const now = new Date();
-  await prisma.podPayoutTransfer.update({
-    where: { id: rowId },
-    data: {
-      status: POD_PAYOUT_TRANSFER_STATUS.paid,
-      stripeTransferId,
-      submittedAt: submittedAt ?? now,
-      paidAt: now,
-      reconciledAt: now,
-      blockedReason: null,
-      failureMessage: null,
-      failureCode: null,
-      failedAt: null,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.podPayoutTransfer.update({
+      where: { id: rowId },
+      data: {
+        status: POD_PAYOUT_TRANSFER_STATUS.paid,
+        stripeTransferId,
+        submittedAt: submittedAt ?? now,
+        paidAt: now,
+        reconciledAt: now,
+        blockedReason: null,
+        failureMessage: null,
+        failureCode: null,
+        failedAt: null,
+      },
+    });
+    await markPodPayoutAllocationPaidForTransfer(podPayoutAllocationId, tx);
   });
 }
 
@@ -302,6 +307,7 @@ export async function reconcilePodPayoutTransfer(
 
   await markPodRowPaidFromStripe(
     rowId,
+    row.podPayoutAllocationId,
     match.transfer.id,
     row.submittedAt ?? new Date(match.transfer.created * 1000)
   );

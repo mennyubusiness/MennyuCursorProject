@@ -10,6 +10,7 @@ import {
   resolveBlockedPodPayoutAllocationRepair,
   resolvePodPayoutAllocationDecision,
 } from "@/lib/pod-payout-allocation";
+import { POD_PAYOUT_TRANSFER_STATUS } from "@/lib/pod-payout-transfer-decision";
 
 export type EnsurePodPayoutAllocationInput = {
   paymentId: string;
@@ -83,13 +84,88 @@ export type AdminPodPayoutAllocationRow = {
   blockedReason: string | null;
   podPayoutRecipientUserId: string | null;
   recipientLabel: string | null;
+  podPayoutTransferId: string | null;
+  podPayoutTransferStatus: string | null;
+  stripeTransferId: string | null;
+  transferPaidAt: Date | null;
 };
 
 const RECENT_ALLOCATIONS_TAKE = 50;
 
+type AllocationDbClient = Prisma.TransactionClient | typeof prisma;
+
+/**
+ * Marks a pending allocation paid after its pod payout transfer settles.
+ * Does not overwrite refund-blocked, cancelled, or blocked allocation statuses.
+ */
+export async function markPodPayoutAllocationPaidForTransfer(
+  podPayoutAllocationId: string,
+  db: AllocationDbClient = prisma
+): Promise<boolean> {
+  const result = await db.podPayoutAllocation.updateMany({
+    where: {
+      id: podPayoutAllocationId,
+      status: POD_PAYOUT_ALLOCATION_STATUS.pending,
+    },
+    data: {
+      status: POD_PAYOUT_ALLOCATION_STATUS.paid,
+    },
+  });
+  return result.count > 0;
+}
+
+/**
+ * Repairs allocations left pending after their linked transfer row was paid (legacy rows).
+ */
+export async function syncStalePaidPodPayoutAllocationStatusesForPod(
+  podId: string
+): Promise<number> {
+  const stale = await prisma.podPayoutAllocation.findMany({
+    where: {
+      podId,
+      status: POD_PAYOUT_ALLOCATION_STATUS.pending,
+      podPayoutTransfer: { status: POD_PAYOUT_TRANSFER_STATUS.paid },
+    },
+    select: { id: true },
+  });
+  if (stale.length === 0) return 0;
+
+  const result = await prisma.podPayoutAllocation.updateMany({
+    where: {
+      id: { in: stale.map((row) => row.id) },
+      status: POD_PAYOUT_ALLOCATION_STATUS.pending,
+    },
+    data: { status: POD_PAYOUT_ALLOCATION_STATUS.paid },
+  });
+  return result.count;
+}
+
+export async function syncStalePaidPodPayoutAllocationStatusesGlobal(): Promise<number> {
+  const stale = await prisma.podPayoutAllocation.findMany({
+    where: {
+      status: POD_PAYOUT_ALLOCATION_STATUS.pending,
+      podPayoutTransfer: { status: POD_PAYOUT_TRANSFER_STATUS.paid },
+    },
+    select: { id: true },
+    take: 500,
+  });
+  if (stale.length === 0) return 0;
+
+  const result = await prisma.podPayoutAllocation.updateMany({
+    where: {
+      id: { in: stale.map((row) => row.id) },
+      status: POD_PAYOUT_ALLOCATION_STATUS.pending,
+    },
+    data: { status: POD_PAYOUT_ALLOCATION_STATUS.paid },
+  });
+  return result.count;
+}
+
 export async function listRecentPodPayoutAllocationsForAdmin(
   podId: string
 ): Promise<AdminPodPayoutAllocationRow[]> {
+  await syncStalePaidPodPayoutAllocationStatusesForPod(podId);
+
   const rows = await prisma.podPayoutAllocation.findMany({
     where: { podId },
     orderBy: { createdAt: "desc" },
@@ -106,6 +182,14 @@ export async function listRecentPodPayoutAllocationsForAdmin(
       blockedReason: true,
       podPayoutRecipientUserId: true,
       podPayoutRecipientUser: { select: { name: true, email: true } },
+      podPayoutTransfer: {
+        select: {
+          id: true,
+          status: true,
+          stripeTransferId: true,
+          paidAt: true,
+        },
+      },
     },
   });
 
@@ -128,6 +212,10 @@ export async function listRecentPodPayoutAllocationsForAdmin(
       blockedReason: row.blockedReason,
       podPayoutRecipientUserId: row.podPayoutRecipientUserId,
       recipientLabel,
+      podPayoutTransferId: row.podPayoutTransfer?.id ?? null,
+      podPayoutTransferStatus: row.podPayoutTransfer?.status ?? null,
+      stripeTransferId: row.podPayoutTransfer?.stripeTransferId ?? null,
+      transferPaidAt: row.podPayoutTransfer?.paidAt ?? null,
     };
   });
 }

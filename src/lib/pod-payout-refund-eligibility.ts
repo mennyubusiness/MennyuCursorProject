@@ -89,6 +89,10 @@ export function resolvePodPayoutRefundSyncDecision(input: {
     }
   }
 
+  if (allocation.status === POD_PAYOUT_ALLOCATION_STATUS.paid && !isRefundActive(paymentRefundStatus)) {
+    return { action: "noop" };
+  }
+
   if (isPodPayoutAllocationPostTransferRefundReview(allocation)) {
     return { action: "noop" };
   }

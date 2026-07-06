@@ -10,6 +10,7 @@ export const POD_PAYOUT_MAX_REVENUE_SHARE_BPS = 500;
 
 export const POD_PAYOUT_ALLOCATION_STATUS = {
   pending: "pending",
+  paid: "paid",
   blocked: "blocked",
   cancelledDueToRefund: "cancelled_due_to_refund",
   blockedPartialRefundReview: "blocked_partial_refund_review",
@@ -17,6 +18,10 @@ export const POD_PAYOUT_ALLOCATION_STATUS = {
 
 export type PodPayoutAllocationStatus =
   (typeof POD_PAYOUT_ALLOCATION_STATUS)[keyof typeof POD_PAYOUT_ALLOCATION_STATUS];
+
+export function isPodPayoutAllocationPaidStatus(status: string): boolean {
+  return status === POD_PAYOUT_ALLOCATION_STATUS.paid;
+}
 
 export const POD_PAYOUT_BLOCKED_REASON = {
   missingRecipient: "missing_recipient",

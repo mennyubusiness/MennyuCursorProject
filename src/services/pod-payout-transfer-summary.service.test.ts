@@ -4,6 +4,9 @@ const mockPodPayoutSettingsFindUnique = vi.fn();
 const mockPodPayoutAllocationFindMany = vi.fn();
 const mockPodPayoutTransferFindMany = vi.fn();
 
+const mockPodPayoutAllocationUpdateMany = vi.fn();
+const mockSyncStalePaid = vi.fn();
+
 vi.mock("@/lib/db", () => ({
   prisma: {
     podPayoutSettings: {
@@ -11,11 +14,16 @@ vi.mock("@/lib/db", () => ({
     },
     podPayoutAllocation: {
       findMany: (...args: unknown[]) => mockPodPayoutAllocationFindMany(...args),
+      updateMany: (...args: unknown[]) => mockPodPayoutAllocationUpdateMany(...args),
     },
     podPayoutTransfer: {
       findMany: (...args: unknown[]) => mockPodPayoutTransferFindMany(...args),
     },
   },
+}));
+
+vi.mock("@/services/pod-payout-allocation.service", () => ({
+  syncStalePaidPodPayoutAllocationStatusesForPod: (...args: unknown[]) => mockSyncStalePaid(...args),
 }));
 
 import { getPodPayoutTransferAdminSummary } from "./pod-payout-transfer.service";
@@ -26,6 +34,7 @@ describe("getPodPayoutTransferAdminSummary", () => {
     vi.clearAllMocks();
     mockPodPayoutSettingsFindUnique.mockResolvedValue({ minimumPayoutCents: 0 });
     mockPodPayoutTransferFindMany.mockResolvedValue([]);
+    mockSyncStalePaid.mockResolvedValue(0);
   });
 
   it("counts transferable from pending allocations without transfer rows when vendor is paid", async () => {
@@ -146,5 +155,20 @@ describe("getPodPayoutTransferAdminSummary", () => {
     const summary = await getPodPayoutTransferAdminSummary("pod_1");
     expect(summary.transferableCount).toBe(0);
     expect(summary.canRunPayoutBatch).toBe(false);
+  });
+
+  it("excludes paid allocations from pending transferable totals", async () => {
+    mockPodPayoutAllocationFindMany.mockResolvedValue([]);
+    mockPodPayoutTransferFindMany.mockResolvedValue([
+      { status: "paid", amountCents: 302 },
+    ]);
+
+    const summary = await getPodPayoutTransferAdminSummary("pod_1");
+    expect(summary.pendingAllocationCount).toBe(0);
+    expect(summary.pendingAllocationAmountCents).toBe(0);
+    expect(summary.transferableCount).toBe(0);
+    expect(summary.canRunPayoutBatch).toBe(false);
+    expect(summary.paidTransferCount).toBe(1);
+    expect(summary.paidTransferAmountCents).toBe(302);
   });
 });

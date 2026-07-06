@@ -81,6 +81,9 @@ export function aggregatePodOwnerPayoutTotals(
   };
 
   for (const row of allocations) {
+    if (row.status === POD_PAYOUT_ALLOCATION_STATUS.paid) {
+      continue;
+    }
     if (row.status === POD_PAYOUT_ALLOCATION_STATUS.pending) {
       totals.pendingAllocationAmountCents += row.podPayoutAmountCents;
       totals.pendingAllocationCount++;
