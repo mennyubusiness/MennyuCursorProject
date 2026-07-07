@@ -5,6 +5,7 @@ import {
   assertSquareOAuthConfigured,
   buildSquareAuthorizationUrl,
   getSquareConfigSnapshot,
+  SQUARE_OAUTH_SCOPES,
 } from "@/lib/integrations/square/square-config";
 import { signSquareOAuthState } from "@/lib/integrations/square/square-oauth-state";
 
@@ -46,6 +47,29 @@ export async function GET(
   }
 
   const state = signSquareOAuthState(vendorId, userId);
-  const url = buildSquareAuthorizationUrl({ state });
-  return NextResponse.redirect(url);
+  const authorizeUrl = buildSquareAuthorizationUrl({ state });
+  const parsedAuthorizeUrl = new URL(authorizeUrl);
+  const cfg = assertSquareOAuthConfigured();
+
+  console.info(
+    JSON.stringify({
+      event: "square_oauth_start_redirect",
+      authorizeHost: parsedAuthorizeUrl.hostname,
+      redirectUri: cfg.redirectUrl,
+      environment: cfg.environment,
+      vendorId,
+    })
+  );
+
+  if (request.nextUrl.searchParams.get("debug") === "1") {
+    return NextResponse.json({
+      authorizeUrlHost: parsedAuthorizeUrl.hostname,
+      redirectUri: cfg.redirectUrl,
+      environment: cfg.environment,
+      scopes: SQUARE_OAUTH_SCOPES.join(" "),
+      hasState: Boolean(state?.trim()),
+    });
+  }
+
+  return NextResponse.redirect(authorizeUrl);
 }

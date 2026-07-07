@@ -110,6 +110,7 @@ describe("square config", () => {
     configureSquareOAuth("sandbox");
     const url = buildSquareAuthorizationUrl({ state: "signed_state_token" });
     expect(url.startsWith("https://connect.squareupsandbox.com/oauth2/authorize")).toBe(true);
+    expect(url.includes("https://squareupsandbox.com/oauth2/authorize")).toBe(false);
 
     const parsed = new URL(url);
     expect(parsed.hostname).toBe("connect.squareupsandbox.com");

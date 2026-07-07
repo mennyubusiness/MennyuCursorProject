@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 vi.mock("@/auth", () => ({
   auth: vi.fn(),
@@ -30,9 +31,10 @@ describe("square oauth start route", () => {
 
   it("requires vendor manager auth", async () => {
     vi.mocked(auth).mockResolvedValue(null as never);
-    const res = await GET(new Request("http://localhost/api/vendor/v1/square/oauth/start") as never, {
-      params: Promise.resolve({ vendorId: "v1" }),
-    });
+    const res = await GET(
+      new NextRequest("http://localhost/api/vendor/v1/square/oauth/start"),
+      { params: Promise.resolve({ vendorId: "v1" }) }
+    );
     expect(res.status).toBeGreaterThanOrEqual(300);
   });
 
@@ -50,9 +52,10 @@ describe("square oauth start route", () => {
       apiBaseUrl: "https://connect.squareupsandbox.com",
       tokenStorageReady: true,
     });
-    const res = await GET(new Request("http://localhost/api/vendor/v1/square/oauth/start") as never, {
-      params: Promise.resolve({ vendorId: "v1" }),
-    });
+    const res = await GET(
+      new NextRequest("http://localhost/api/vendor/v1/square/oauth/start"),
+      { params: Promise.resolve({ vendorId: "v1" }) }
+    );
     expect(res.status).toBe(403);
   });
 });
