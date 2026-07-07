@@ -339,7 +339,13 @@ export async function evaluateSquareConnectionHealth(vendorId: string) {
   const warnings: string[] = [];
 
   if (!snap.configured) {
-    missing.push("Square OAuth is not configured on this deployment");
+    missing.push(
+      ...snap.missingConfigLabels,
+      ...snap.invalidConfigLabels,
+      ...(snap.missingConfigLabels.length === 0
+        ? ["Square OAuth is not configured on this deployment"]
+        : [])
+    );
     return {
       provider: "square" as const,
       status: "not_configured" as IntegrationConnectionStatus,

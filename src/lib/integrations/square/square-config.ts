@@ -10,6 +10,18 @@ export const SQUARE_OAUTH_SCOPES = [
   "ITEMS_READ",
 ] as const;
 
+/** OAuth authorize + token endpoints — must use connect.*, never bare squareup hosts. */
+export const SQUARE_OAUTH_CONNECT_BASE_URLS = {
+  production: "https://connect.squareup.com",
+  sandbox: "https://connect.squareupsandbox.com",
+} as const satisfies Record<SquareEnvironment, string>;
+
+/** Square REST API v2 base URLs (same connect.* hosts as OAuth). */
+export const SQUARE_API_BASE_URLS = {
+  production: "https://connect.squareup.com",
+  sandbox: "https://connect.squareupsandbox.com",
+} as const satisfies Record<SquareEnvironment, string>;
+
 export type SquareConfigSnapshot = {
   configured: boolean;
   partiallyConfigured: boolean;
@@ -20,6 +32,9 @@ export type SquareConfigSnapshot = {
   apiBaseUrl: string | null;
   tokenStorageReady: boolean;
   enabled: boolean;
+  missingConfigLabels: string[];
+  invalidConfigLabels: string[];
+  disabledReasonLabels: string[];
 };
 
 function parseSquareEnvironment(): SquareEnvironment | null {
@@ -28,18 +43,55 @@ function parseSquareEnvironment(): SquareEnvironment | null {
   return null;
 }
 
+function buildSquareConfigDiagnostics(input: {
+  applicationId: string | null;
+  applicationSecret: string | null;
+  redirectUrl: string | null;
+  environment: SquareEnvironment | null;
+  configured: boolean;
+  enableFlag: boolean;
+  tokenStorageReady: boolean;
+}): Pick<SquareConfigSnapshot, "missingConfigLabels" | "invalidConfigLabels" | "disabledReasonLabels"> {
+  const missingConfigLabels: string[] = [];
+  if (!input.applicationId) missingConfigLabels.push("Missing SQUARE_APPLICATION_ID");
+  if (!input.applicationSecret) missingConfigLabels.push("Missing SQUARE_APPLICATION_SECRET");
+  if (!input.redirectUrl) missingConfigLabels.push("Missing SQUARE_OAUTH_REDIRECT_URL");
+  if (!input.environment) {
+    missingConfigLabels.push("Missing SQUARE_ENVIRONMENT or SQUARE_MODE (must be sandbox or production)");
+  }
+
+  const invalidConfigLabels: string[] = [];
+  const encryptionKey = env.INTEGRATION_TOKEN_ENCRYPTION_KEY?.trim();
+  if (encryptionKey && encryptionKey.length < 32) {
+    invalidConfigLabels.push("Invalid INTEGRATION_TOKEN_ENCRYPTION_KEY (min 32 characters)");
+  }
+
+  const disabledReasonLabels: string[] = [];
+  if (!input.configured) {
+    disabledReasonLabels.push("Square OAuth quartet incomplete (see missing config labels)");
+  }
+  if (env.NODE_ENV === "production" && !input.enableFlag) {
+    disabledReasonLabels.push("ENABLE_SQUARE_INTEGRATION is not true in production");
+  }
+  if (!input.tokenStorageReady) {
+    disabledReasonLabels.push(
+      "Missing INTEGRATION_TOKEN_ENCRYPTION_KEY or AUTH_SECRET (min 32 characters) for token storage"
+    );
+  }
+
+  return { missingConfigLabels, invalidConfigLabels, disabledReasonLabels };
+}
+
 export function resolveSquareEnvironment(): SquareEnvironment {
   return parseSquareEnvironment() ?? "sandbox";
 }
 
 export function getSquareConnectBaseUrl(environment: SquareEnvironment = resolveSquareEnvironment()): string {
-  return environment === "production"
-    ? "https://connect.squareup.com"
-    : "https://connect.squareupsandbox.com";
+  return SQUARE_OAUTH_CONNECT_BASE_URLS[environment];
 }
 
 export function getSquareApiBaseUrl(environment: SquareEnvironment = resolveSquareEnvironment()): string {
-  return getSquareConnectBaseUrl(environment);
+  return SQUARE_API_BASE_URLS[environment];
 }
 
 export function getSquareConfigSnapshot(): SquareConfigSnapshot {
@@ -51,7 +103,35 @@ export function getSquareConfigSnapshot(): SquareConfigSnapshot {
   const partiallyConfigured = squareVars.length > 0 && squareVars.length < 4;
   const configured = Boolean(applicationId && applicationSecret && redirectUrl && environment);
   const enableFlag = env.ENABLE_SQUARE_INTEGRATION?.trim().toLowerCase() === "true";
-  const enabled = configured && (enableFlag || env.NODE_ENV !== "production");
+  const tokenStorageReady = isIntegrationTokenEncryptionConfigured();
+  const enabled =
+    configured && (enableFlag || env.NODE_ENV !== "production") && tokenStorageReady;
+  const diagnostics = buildSquareConfigDiagnostics({
+    applicationId,
+    applicationSecret,
+    redirectUrl,
+    environment,
+    configured,
+    enableFlag,
+    tokenStorageReady,
+  });
+
+  if (partiallyConfigured || (configured && !enabled)) {
+    console.warn(
+      JSON.stringify({
+        event: "square_config_diagnostics",
+        configured,
+        partiallyConfigured,
+        enabled,
+        tokenStorageReady,
+        enableFlag,
+        nodeEnv: env.NODE_ENV,
+        missingConfigLabels: diagnostics.missingConfigLabels,
+        invalidConfigLabels: diagnostics.invalidConfigLabels,
+        disabledReasonLabels: diagnostics.disabledReasonLabels,
+      })
+    );
+  }
 
   return {
     configured,
@@ -61,8 +141,9 @@ export function getSquareConfigSnapshot(): SquareConfigSnapshot {
     redirectUrl,
     connectBaseUrl: configured ? getSquareConnectBaseUrl(environment!) : null,
     apiBaseUrl: configured ? getSquareApiBaseUrl(environment!) : null,
-    tokenStorageReady: isIntegrationTokenEncryptionConfigured(),
-    enabled: enabled && configured && isIntegrationTokenEncryptionConfigured(),
+    tokenStorageReady,
+    enabled,
+    ...diagnostics,
   };
 }
 
@@ -99,15 +180,13 @@ export function buildSquareAuthorizationUrl(input: {
   scopes?: readonly string[];
 }): string {
   const cfg = assertSquareOAuthConfigured();
-  const base = getSquareConnectBaseUrl(cfg.environment);
-  const params = new URLSearchParams({
-    client_id: cfg.applicationId,
-    scope: (input.scopes ?? SQUARE_OAUTH_SCOPES).join(" "),
-    state: input.state,
-    session: "false",
-    redirect_uri: cfg.redirectUrl,
-  });
-  return `${base}/oauth2/authorize?${params.toString()}`;
+  const authorizeUrl = new URL("/oauth2/authorize", getSquareConnectBaseUrl(cfg.environment));
+  authorizeUrl.searchParams.set("client_id", cfg.applicationId);
+  authorizeUrl.searchParams.set("scope", (input.scopes ?? SQUARE_OAUTH_SCOPES).join(" "));
+  authorizeUrl.searchParams.set("state", input.state);
+  authorizeUrl.searchParams.set("session", "false");
+  authorizeUrl.searchParams.set("redirect_uri", cfg.redirectUrl);
+  return authorizeUrl.toString();
 }
 
 export function validateSquareProductionConfig(envInput: {

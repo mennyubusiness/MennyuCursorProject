@@ -63,10 +63,31 @@ export function VendorSquareConnectionCard({
       </div>
 
       {!snap.enabled ? (
-        <p className="mt-4 text-sm text-oo-stone-gray">
-          Square connect is disabled in this environment
-          {snap.configured ? " (set ENABLE_SQUARE_INTEGRATION=true in production)." : "."}
-        </p>
+        <div className="mt-4 space-y-2 text-sm text-oo-stone-gray">
+          <p>
+            Square connect is disabled in this environment
+            {snap.configured && snap.disabledReasonLabels.includes(
+              "ENABLE_SQUARE_INTEGRATION is not true in production"
+            )
+              ? " (set ENABLE_SQUARE_INTEGRATION=true in production)."
+              : "."}
+          </p>
+          {snap.disabledReasonLabels.length > 0 ? (
+            <ul className="list-inside list-disc text-xs">
+              {snap.disabledReasonLabels.map((label) => (
+                <li key={label}>{label}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+
+      {(snap.missingConfigLabels.length > 0 || snap.invalidConfigLabels.length > 0) && !snap.configured ? (
+        <ul className="mt-3 list-inside list-disc text-xs text-oo-stone-gray">
+          {[...snap.missingConfigLabels, ...snap.invalidConfigLabels].map((label) => (
+            <li key={label}>{label}</li>
+          ))}
+        </ul>
       ) : null}
 
       {!snap.tokenStorageReady ? (
