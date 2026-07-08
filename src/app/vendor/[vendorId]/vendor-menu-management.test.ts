@@ -93,7 +93,19 @@ describe("vendor menu management UX", () => {
       "utf8"
     );
     expect(controls).toContain("menu-imports/${importReport.jobId}");
-    expect(controls).toContain("Review draft import");
+    expect(controls).toContain("Preview and publish menu");
+  });
+
+  it("square panel includes grouped draft menu preview and publish action", () => {
+    const squarePanel = readFileSync(
+      join(vendorDir, "../../../components/vendor/menu-imports/VendorSquareMenuImportsPanel.tsx"),
+      "utf8"
+    );
+    expect(squarePanel).toContain("MenuImportMenuPreview");
+    expect(squarePanel).toContain("Draft menu preview");
+    expect(squarePanel).toContain("MenuImportPublishPanel");
+    expect(squarePanel).toContain("Publish imported menu");
+    expect(squarePanel).toContain("VendorMenuImportsJobTable");
   });
 
   it("square integration page links to Menu Imports for catalog import", () => {

@@ -152,6 +152,12 @@ function evaluateAwaitingReviewDraft(input: {
   if (parsed?.success && parsed.data.products.length === 0) {
     blockers.push("Add at least one menu item before publishing.");
   }
+  if (parsed?.success) {
+    const availableCount = parsed.data.products.filter((product) => product.isAvailable).length;
+    if (parsed.data.products.length > 0 && availableCount === 0) {
+      blockers.push("Add at least one available menu item before publishing.");
+    }
+  }
 
   const blocking = input.issues.filter(
     (issue) => issue.severity === MenuImportIssueSeverity.blocking && !issue.waived

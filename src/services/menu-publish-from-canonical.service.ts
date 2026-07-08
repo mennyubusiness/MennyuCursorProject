@@ -110,6 +110,14 @@ export function classifyMenuImportForPublish(job: MenuImportJobForPublish):
     throw new MenuPublishValidationError("EMPTY_MENU", "Cannot publish a canonical menu with zero products");
   }
 
+  const availableProducts = menu.products.filter((product) => product.isAvailable);
+  if (availableProducts.length === 0) {
+    throw new MenuPublishValidationError(
+      "NO_AVAILABLE_PRODUCTS",
+      "Cannot publish a menu with zero available products"
+    );
+  }
+
   return {
     kind: "ready",
     menu,

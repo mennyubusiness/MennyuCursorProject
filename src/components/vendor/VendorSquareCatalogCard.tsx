@@ -136,7 +136,7 @@ export function VendorSquareCatalogImportControls({
             href={`/vendor/${vendorId}/menu-imports/${importReport.jobId}`}
             className="inline-flex text-sm font-semibold text-emerald-900 underline"
           >
-            Review draft import
+            Preview and publish menu
           </Link>
         </div>
       ) : null}

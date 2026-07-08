@@ -126,6 +126,7 @@ export default async function VendorMenuImportJobPage({
   const vendorDiscardUrl = `/api/vendor/${encodeURIComponent(vendorId)}/menu-imports/${encodeURIComponent(job.id)}/discard-draft`;
 
   const vendorActionsUnlocked = true;
+  const isSquareImport = job.source === "SQUARE_CATALOG_PULL";
 
   const headlineStatus = vendorMenuImportDetailPrimaryStatus({
     status: job.status,
@@ -180,7 +181,11 @@ export default async function VendorMenuImportJobPage({
 
       <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
         <h2 className="font-medium text-oo-charcoal">Menu preview</h2>
-        <p className="mt-1 text-sm text-oo-stone-gray">How this draft will look after you publish.</p>
+        <p className="mt-1 text-sm text-oo-stone-gray">
+          {isSquareImport
+            ? "Draft preview grouped by category — not visible to customers until you publish."
+            : "How this draft will look after you publish."}
+        </p>
         <div className="mt-4">
           <MenuImportMenuPreview
             menu={menu}
@@ -204,6 +209,13 @@ export default async function VendorMenuImportJobPage({
               adminSecretForPublish={null}
               publishUrlOverride={vendorPublishUrl}
               variant="minimal"
+              publishButtonLabel={isSquareImport ? "Publish imported menu" : "Publish…"}
+              confirmTitle={isSquareImport ? "Publish imported Square menu" : "Confirm publish"}
+              confirmDescription={
+                isSquareImport
+                  ? "Publishing will replace this vendor's currently published menu with the imported Square menu. Open Order checkout and payouts are unchanged."
+                  : null
+              }
             />
           </div>
           <div className="min-w-0 flex-1">

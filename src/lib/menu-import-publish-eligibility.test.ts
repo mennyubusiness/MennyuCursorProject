@@ -103,6 +103,33 @@ describe("evaluateMenuImportPublishEligibility", () => {
     expect(withIssues.blockers.some((line) => /critical issue/i.test(line))).toBe(true);
   });
 
+  it("blocks publish when every product is unavailable", () => {
+    const result = evaluateMenuImportPublishEligibility({
+      status: MenuImportJobStatus.awaiting_review,
+      draftVersionId: "mv_draft",
+      draftVersion: {
+        state: MenuVersionState.draft,
+        canonicalSnapshot: minimalCanonical({
+          products: [
+            {
+              deliverectId: "prod_1",
+              plu: "PLU-1",
+              name: "Burger",
+              priceCents: 1200,
+              isAvailable: false,
+              sortOrder: 0,
+              modifierGroupDeliverectIds: [],
+            },
+          ],
+        }),
+      },
+      issues: [],
+    });
+
+    expect(result.canPublish).toBe(false);
+    expect(result.blockers.some((line) => /available menu item/i.test(line))).toBe(true);
+  });
+
   it("shows failed copy for failed jobs", () => {
     const result = evaluateMenuImportPublishEligibility({
       status: MenuImportJobStatus.failed,

@@ -20,6 +20,31 @@ export function squareModifierOptionInternalId(squareModifierId: string): string
   return `${SQUARE_MODIFIER_OPTION_ID_PREFIX}${squareModifierId}`;
 }
 
+export function isSquareCategoryDeliverectId(id: string | null | undefined): boolean {
+  return Boolean(id?.startsWith(SQUARE_CATEGORY_ID_PREFIX));
+}
+
+export function isSquareProductDeliverectId(id: string | null | undefined): boolean {
+  return Boolean(id?.startsWith(SQUARE_PRODUCT_ID_PREFIX));
+}
+
+export function isSquareModifierGroupDeliverectId(id: string | null | undefined): boolean {
+  return Boolean(id?.startsWith(SQUARE_MODIFIER_GROUP_ID_PREFIX));
+}
+
+export function isSquareModifierOptionDeliverectId(id: string | null | undefined): boolean {
+  return Boolean(id?.startsWith(SQUARE_MODIFIER_OPTION_ID_PREFIX));
+}
+
+export function isSquareMenuEntityDeliverectId(id: string | null | undefined): boolean {
+  return (
+    isSquareCategoryDeliverectId(id) ||
+    isSquareProductDeliverectId(id) ||
+    isSquareModifierGroupDeliverectId(id) ||
+    isSquareModifierOptionDeliverectId(id)
+  );
+}
+
 export function parseSquareExternalId(internalId: string): string | null {
   for (const prefix of [
     SQUARE_PRODUCT_ID_PREFIX,

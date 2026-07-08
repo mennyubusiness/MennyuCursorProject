@@ -53,6 +53,12 @@ describe("vendor-menu-source", () => {
     expect(
       canonicalMenuSourceFromSnapshot({
         ...base,
+        deliverect: { sourcePayloadKind: "square_catalog_v1" },
+      })
+    ).toBe("open_order");
+    expect(
+      canonicalMenuSourceFromSnapshot({
+        ...base,
         deliverect: { sourcePayloadKind: "deliverect_menu_api_v1" },
       })
     ).toBe("deliverect");
@@ -60,7 +66,9 @@ describe("vendor-menu-source", () => {
 
   it("matches menu item product ids to menu source", () => {
     expect(menuItemDeliverectIdMatchesMenuSource("oo:prod:abc", "open_order")).toBe(true);
+    expect(menuItemDeliverectIdMatchesMenuSource("sq:prod:abc", "open_order")).toBe(true);
     expect(menuItemDeliverectIdMatchesMenuSource("oo:prod:abc", "deliverect")).toBe(false);
+    expect(menuItemDeliverectIdMatchesMenuSource("sq:prod:abc", "deliverect")).toBe(false);
     expect(menuItemDeliverectIdMatchesMenuSource("del-123", "deliverect")).toBe(true);
     expect(menuItemDeliverectIdMatchesMenuSource("del-123", "open_order")).toBe(false);
   });

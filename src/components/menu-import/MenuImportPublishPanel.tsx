@@ -26,6 +26,9 @@ export function MenuImportPublishPanel({
   publishUrlOverride = null,
   /** Shorter copy; hide vendor auth notes (dashboard session is enough). */
   variant = "full",
+  publishButtonLabel = "Publish…",
+  confirmTitle = "Confirm publish",
+  confirmDescription,
 }: {
   jobId: string;
   canPublish: boolean;
@@ -35,6 +38,9 @@ export function MenuImportPublishPanel({
   adminSecretForPublish?: string | null;
   publishUrlOverride?: string | null;
   variant?: "full" | "minimal";
+  publishButtonLabel?: string;
+  confirmTitle?: string;
+  confirmDescription?: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -98,15 +104,16 @@ export function MenuImportPublishPanel({
     >
       <h2 className="font-medium text-stone-900">Publish to live menu</h2>
       <p className="mt-1 text-sm text-stone-600">
-        {isMinimal
-          ? "Applies this draft to your live Open Order menu (items, modifiers, availability). "
-          : "Writes the draft snapshot to your live menu tables. "}
-        {!isMinimal && publishUrlOverride
+        {confirmDescription ??
+          (isMinimal
+            ? "Applies this draft to your live Open Order menu (items, modifiers, availability). "
+            : "Writes the draft snapshot to your live menu tables. ")}
+        {!confirmDescription && !isMinimal && publishUrlOverride
           ? "Confirm when you are ready. "
-          : !isMinimal
+          : !confirmDescription && !isMinimal
             ? "Confirm manually unless the vendor has auto-publish enabled for webhook imports. "
             : null}
-        {!isMinimal && "Removed items in Deliverect are marked unavailable, not deleted."}
+        {!confirmDescription && !isMinimal && "Removed items in Deliverect are marked unavailable, not deleted."}
       </p>
 
       {!isMinimal && publishUrlOverride && (
@@ -140,7 +147,7 @@ export function MenuImportPublishPanel({
           }}
           className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Publish…
+          {publishButtonLabel}
         </button>
       </div>
 
@@ -151,8 +158,11 @@ export function MenuImportPublishPanel({
           aria-labelledby="publish-confirm-title"
         >
           <h3 id="publish-confirm-title" className="text-sm font-semibold text-stone-900">
-            Confirm publish
+            {confirmTitle}
           </h3>
+          {confirmDescription ? (
+            <p className="mt-2 text-sm text-stone-700">{confirmDescription}</p>
+          ) : null}
           {diffUnavailableNote && (
             <p className="mt-2 text-sm text-amber-900">{diffUnavailableNote}</p>
           )}

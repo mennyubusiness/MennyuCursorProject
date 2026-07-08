@@ -19,6 +19,8 @@ export function menuImportFriendlySource(source: MenuImportSource): string {
       return "Deliverect";
     case "DELIVERECT_API_PULL":
       return "Deliverect (sync)";
+    case "SQUARE_CATALOG_PULL":
+      return "Square catalog";
     default:
       return String(source);
   }

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
+import { assertSquareMenuPublishAllowed } from "@/lib/integrations/square/square-menu-publish-guard.server";
 import {
   MenuPublishValidationError,
   publishMenuImportDraftToLive,
@@ -41,13 +42,20 @@ export async function POST(
 
   const job = await prisma.menuImportJob.findUnique({
     where: { id: jobId.trim() },
-    select: { id: true, vendorId: true },
+    select: { id: true, vendorId: true, source: true },
   });
   if (!job) {
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
   if (job.vendorId !== vendor.id) {
     return NextResponse.json({ error: "This menu import does not belong to this vendor." }, { status: 403 });
+  }
+
+  if (job.source === "SQUARE_CATALOG_PULL") {
+    const squareGate = await assertSquareMenuPublishAllowed(vendor.id);
+    if (!squareGate.ok) {
+      return NextResponse.json({ error: squareGate.error, code: "SQUARE_NOT_READY" }, { status: 400 });
+    }
   }
 
   try {
@@ -62,6 +70,7 @@ export async function POST(
       publishedBy,
     });
     revalidatePath(`/vendor/${vendor.id}/menu`);
+    revalidatePath(`/vendor/${vendor.id}/menu/imports`);
     revalidatePath(`/vendor/${vendor.id}/menu-imports`);
     return NextResponse.json(result);
   } catch (e) {

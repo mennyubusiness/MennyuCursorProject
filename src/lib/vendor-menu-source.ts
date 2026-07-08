@@ -4,6 +4,7 @@ import {
   type MennyuCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
 import { isOpenOrderProductDeliverectId } from "@/lib/open-order-menu-ids";
+import { isSquareProductDeliverectId } from "@/lib/integrations/square/square-menu-ids";
 
 export type VendorMenuSourceFields = {
   menuSource: VendorMenuSource;
@@ -46,7 +47,11 @@ export function vendorUsesMenuBuilder(menuSource: VendorMenuSource): boolean {
 }
 
 export function canonicalMenuSourceFromMenu(menu: MennyuCanonicalMenu): VendorMenuSource {
-  return menu.deliverect.sourcePayloadKind === "open_order_builder_v1" ? "open_order" : "deliverect";
+  const kind = menu.deliverect.sourcePayloadKind;
+  if (kind === "open_order_builder_v1" || kind === "square_catalog_v1") {
+    return "open_order";
+  }
+  return "deliverect";
 }
 
 export function canonicalMenuSourceFromSnapshot(snapshot: unknown): VendorMenuSource | null {
@@ -68,7 +73,11 @@ export function menuItemDeliverectIdMatchesMenuSource(
 ): boolean {
   if (!deliverectProductId) return false;
   const isOpenOrder = isOpenOrderProductDeliverectId(deliverectProductId);
-  return menuSource === "open_order" ? isOpenOrder : !isOpenOrder;
+  const isSquare = isSquareProductDeliverectId(deliverectProductId);
+  if (menuSource === "open_order") {
+    return isOpenOrder || isSquare;
+  }
+  return !isOpenOrder && !isSquare;
 }
 
 export type VendorMenuSourceMismatch = {
