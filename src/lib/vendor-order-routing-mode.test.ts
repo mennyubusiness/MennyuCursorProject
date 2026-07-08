@@ -8,6 +8,8 @@ import {
   isVendorPosManagedForUi,
   isVendorPosMenuManagedForUi,
   isVendorRoutingOperationalReady,
+  isVendorSetupPosReady,
+  vendorSetupPageIncompleteDescription,
   normalizeVendorOrderRoutingMode,
   vendorKitchenStatusLine,
   vendorKitchenStatusWarning,
@@ -113,6 +115,56 @@ describe("isVendorRoutingOperationalReady", () => {
         squareOrderRoutingEnabled: false,
       })
     ).toMatch(/not enabled/i);
+  });
+
+  it("square setup checklist passes on connection only without admin injection enablement", () => {
+    expect(
+      isVendorSetupPosReady({
+        ...connectedPos,
+        orderRoutingMode: "square",
+        squareConnectionReady: true,
+        squareOrderRoutingEnabled: false,
+      })
+    ).toBe(true);
+    expect(
+      isVendorSetupPosReady({
+        ...connectedPos,
+        orderRoutingMode: "square",
+        squareConnectionReady: false,
+      })
+    ).toBe(false);
+  });
+
+  it("manual dashboard setup does not require Square connection", () => {
+    expect(
+      isVendorSetupPosReady({
+        ...connectedPos,
+        orderRoutingMode: "manual_dashboard",
+        squareConnectionReady: false,
+      })
+    ).toBe(true);
+  });
+
+  it("deliverect setup requires connected POS", () => {
+    expect(
+      isVendorSetupPosReady({
+        ...connectedPos,
+        orderRoutingMode: "deliverect",
+      })
+    ).toBe(true);
+    expect(
+      isVendorSetupPosReady({
+        ...connectedPos,
+        orderRoutingMode: "deliverect",
+        deliverectChannelLinkId: null,
+        posConnectionStatus: "not_connected",
+      })
+    ).toBe(false);
+  });
+
+  it("uses provider-agnostic setup page description", () => {
+    expect(vendorSetupPageIncompleteDescription("square")).toMatch(/public profile, menu, hours, payouts/i);
+    expect(vendorSetupPageIncompleteDescription("square")).not.toMatch(/Square connection setup/i);
   });
 
   it("does not treat square as manual dashboard", () => {

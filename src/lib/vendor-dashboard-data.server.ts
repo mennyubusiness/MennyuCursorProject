@@ -69,6 +69,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       posConnectionStatus: true,
       orderRoutingMode: true,
       menuSource: true,
+      squareOrderRoutingEnabled: true,
       pendingDeliverectConnectionKey: true,
       deliverectAutoMapLastOutcome: true,
       deliverectAutoMapLastAt: true,
@@ -140,6 +141,14 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     }
   }
 
+  let squareCatalogImportReady = false;
+  let squareConnectionReady = false;
+  if (isSquareRoutingMode(vendorRecord.orderRoutingMode)) {
+    const squareHealth = await evaluateSquareConnectionHealth(vendorId);
+    squareConnectionReady = squareHealth.isReady;
+    squareCatalogImportReady = squareConnectionReady;
+  }
+
   const readinessPosSummary: VendorPosReadinessSummary = {
     deliverectChannelLinkId: vendorRecord.deliverectChannelLinkId,
     posConnectionStatus: vendorRecord.posConnectionStatus,
@@ -149,13 +158,9 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     orderRoutingMode: vendorRecord.orderRoutingMode,
     menuSource: vendorRecord.menuSource,
     deliverectMappingReady,
+    squareConnectionReady,
+    squareOrderRoutingEnabled: vendorRecord.squareOrderRoutingEnabled ?? false,
   };
-
-  let squareCatalogImportReady = false;
-  if (isSquareRoutingMode(vendorRecord.orderRoutingMode)) {
-    const squareHealth = await evaluateSquareConnectionHealth(vendorId);
-    squareCatalogImportReady = squareHealth.isReady;
-  }
 
   const hoursTimezone = resolveVendorHoursTimezone(currentPod?.pod.pickupTimezone);
   const hoursSummary = summarizeVendorCustomerOrderingHours({
@@ -198,6 +203,8 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
         stripeConnectConfigured: Boolean(env.STRIPE_SECRET_KEY),
       },
       squareCatalogImportReady,
+      squareConnectionReady,
+      squareOrderRoutingEnabled: vendorRecord.squareOrderRoutingEnabled ?? false,
       pendingPodInviteCount: pendingInvites,
       hasPodMembership: Boolean(currentPod),
       customerOrderingHours: vendorRecord.customerOrderingHours,

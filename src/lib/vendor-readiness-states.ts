@@ -8,7 +8,7 @@ import {
   hasValidVendorCustomerOrderingHours,
 } from "@/lib/vendor-customer-ordering-hours";
 import {
-  isVendorRoutingOperationalReady,
+  isVendorSetupPosReady,
   type VendorRoutingReadinessInput,
 } from "@/lib/vendor-order-routing-mode";
 import type { VendorMenuSource, VendorOrderRoutingMode } from "@prisma/client";
@@ -53,7 +53,7 @@ function isVendorStripePayoutReady(stripe: VendorStripeReadinessSummary): boolea
 }
 
 function isVendorPosReady(pos: VendorPosReadinessSummary): boolean {
-  return isVendorRoutingOperationalReady(pos);
+  return isVendorSetupPosReady(pos);
 }
 
 function isVendorDeliverectMappingReady(pos: VendorPosReadinessSummary): boolean {

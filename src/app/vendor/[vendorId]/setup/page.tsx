@@ -9,13 +9,12 @@ import { loadVendorDashboardContext } from "@/lib/vendor-dashboard-data.server";
 import {
   vendorSetupOperationalLockedDescription,
   vendorSetupPageIncompleteDescription,
+  isSquareRoutingMode,
 } from "@/lib/vendor-order-routing-mode";
 import { VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS } from "@/lib/vendor-pod-readiness";
 import { getVendorIntegrationObservability } from "@/lib/integrations/provider-observability.service";
 import { VendorIntegrationReadinessCard } from "@/components/vendor/VendorIntegrationReadinessCard";
-import { getSquareIntegrationUiState } from "@/actions/vendor-square-connect.actions";
-import { VendorSquareConnectionCard } from "@/components/vendor/VendorSquareConnectionCard";
-import { getSquareConfigSnapshot } from "@/lib/integrations/square/square-config";
+import { VendorSquareSetupSummary } from "@/components/vendor/VendorSquareSetupSummary";
 
 export default async function VendorSetupPage({
   params,
@@ -27,11 +26,7 @@ export default async function VendorSetupPage({
   if (!ctx) notFound();
 
   const integrationObservability = await getVendorIntegrationObservability(vendorId);
-  const squareSnap = getSquareConfigSnapshot();
-  const squareUi =
-    squareSnap.configured || squareSnap.partiallyConfigured
-      ? await getSquareIntegrationUiState(vendorId)
-      : null;
+  const showSquareSummary = isSquareRoutingMode(ctx.vendorRecord.orderRoutingMode);
 
   const publicProfileReady = ctx.readiness.setupSummary.publicProfile;
   const appearance = ctx.readiness.checklist.filter((item) =>
@@ -54,7 +49,7 @@ export default async function VendorSetupPage({
         description={
           ctx.setupComplete
             ? "Readiness checklist — everything required before customers can order."
-            : vendorSetupPageIncompleteDescription(ctx.vendorRecord.orderRoutingMode)
+            : vendorSetupPageIncompleteDescription()
         }
         actions={
           ctx.setupComplete ? (
@@ -80,19 +75,20 @@ export default async function VendorSetupPage({
 
         {integrationObservability ? (
           <section id="integrations">
-            <VendorIntegrationReadinessCard observability={integrationObservability} />
+            <VendorIntegrationReadinessCard
+              observability={integrationObservability}
+              squareOrderRoutingEnabled={ctx.vendorRecord.squareOrderRoutingEnabled ?? false}
+            />
           </section>
         ) : null}
 
-        {squareUi ? (
-          <section id="square">
-            <VendorSquareConnectionCard
-              vendorId={vendorId}
-              snap={squareUi.snap}
-              connection={squareUi.connection}
-              health={squareUi.health}
-            />
-          </section>
+        {showSquareSummary ? (
+          <VendorSquareSetupSummary
+            vendorId={vendorId}
+            orderRoutingMode={ctx.vendorRecord.orderRoutingMode}
+            squareConnectionReady={ctx.readinessPosSummary.squareConnectionReady === true}
+            squareOrderRoutingEnabled={ctx.vendorRecord.squareOrderRoutingEnabled ?? false}
+          />
         ) : null}
 
         {publicProfileReady ? (
@@ -100,9 +96,7 @@ export default async function VendorSetupPage({
         ) : (
           <section className="rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/40 px-4 py-4 text-sm text-oo-stone-gray">
             <h3 className="font-semibold text-oo-charcoal">Required to accept orders</h3>
-            <p className="mt-2">
-              {vendorSetupOperationalLockedDescription(ctx.vendorRecord.orderRoutingMode)}
-            </p>
+            <p className="mt-2">{vendorSetupOperationalLockedDescription()}</p>
           </section>
         )}
       </div>

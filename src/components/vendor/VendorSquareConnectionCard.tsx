@@ -10,6 +10,7 @@ import {
 import type { ProviderConnectionHealth } from "@/lib/integrations/types";
 import type { SquareConfigSnapshot } from "@/lib/integrations/square/square-config";
 import type { SquareConnectionView } from "@/lib/integrations/square/square-connection.service";
+import { filterSquareVendorFacingWarnings } from "@/lib/integrations/square/square-vendor-facing-health";
 
 function EnvironmentBadge({ environment }: { environment: string }) {
   const isSandbox = environment === "sandbox";
@@ -56,6 +57,7 @@ export function VendorSquareConnectionCard({
   const showConnect = snap.enabled && !connection;
   const connectionEnvironment =
     connection?.squareEnvironment ?? connection?.capabilitiesMeta?.squareEnvironment ?? snap.environment;
+  const vendorFacingWarnings = filterSquareVendorFacingWarnings(health.warnings);
 
   return (
     <DashboardCard className="max-w-3xl">
@@ -115,22 +117,10 @@ export function VendorSquareConnectionCard({
         </div>
       ) : null}
 
-      {(snap.missingConfigLabels.length > 0 ||
-        snap.invalidConfigLabels.length > 0 ||
-        snap.environmentMismatchWarnings.length > 0) &&
+      {(snap.missingConfigLabels.length > 0 || snap.invalidConfigLabels.length > 0) &&
       !snap.configured ? (
         <ul className="mt-3 list-inside list-disc text-xs text-oo-stone-gray">
-          {[...snap.missingConfigLabels, ...snap.invalidConfigLabels, ...snap.environmentMismatchWarnings].map(
-            (label) => (
-              <li key={label}>{label}</li>
-            )
-          )}
-        </ul>
-      ) : null}
-
-      {snap.configured && snap.environmentMismatchWarnings.length > 0 ? (
-        <ul className="mt-3 list-inside list-disc text-xs text-amber-900">
-          {snap.environmentMismatchWarnings.map((label) => (
+          {[...snap.missingConfigLabels, ...snap.invalidConfigLabels].map((label) => (
             <li key={label}>{label}</li>
           ))}
         </ul>
@@ -193,17 +183,17 @@ export function VendorSquareConnectionCard({
         </div>
       ) : null}
 
-      {health.missingRequirements.length > 0 ? (
+      {filterSquareVendorFacingWarnings(health.missingRequirements).length > 0 ? (
         <ul className="mt-3 list-inside list-disc text-xs text-oo-stone-gray">
-          {health.missingRequirements.map((item) => (
+          {filterSquareVendorFacingWarnings(health.missingRequirements).map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
       ) : null}
 
-      {health.warnings.length > 0 ? (
+      {vendorFacingWarnings.length > 0 ? (
         <ul className="mt-3 list-inside list-disc text-xs text-amber-900">
-          {health.warnings.map((item) => (
+          {vendorFacingWarnings.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>

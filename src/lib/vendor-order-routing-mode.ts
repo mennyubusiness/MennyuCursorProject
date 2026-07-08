@@ -67,10 +67,29 @@ export function isVendorDeliverectPosConnected(pos: VendorPosConnectionSummary):
 export type VendorRoutingReadinessInput = VendorPosConnectionSummary & {
   orderRoutingMode?: VendorOrderRoutingMode | null;
   deliverectMappingReady?: boolean;
+  /** Vendor OAuth connection healthy with selected location (setup checklist). */
+  squareConnectionReady?: boolean;
   squareOrderRoutingEnabled?: boolean;
   /** Precomputed: Square connection + published Square menu (from loadSquareOrderRoutingReadiness). */
   squareOrderRoutingReady?: boolean;
 };
+
+/**
+ * Vendor-facing setup readiness for the POS / routing checklist row.
+ * Square mode checks OAuth connection only — not admin order-injection enablement.
+ */
+export function isVendorSetupPosReady(input: VendorRoutingReadinessInput): boolean {
+  if (isManualDashboardRoutingMode(input.orderRoutingMode)) {
+    return true;
+  }
+  if (isSquareRoutingMode(input.orderRoutingMode)) {
+    return input.squareConnectionReady === true;
+  }
+  if (!isVendorDeliverectPosConnected(input)) {
+    return false;
+  }
+  return input.deliverectMappingReady !== false;
+}
 
 /**
  * Operational routing readiness: manual mode always passes; Deliverect mode requires
@@ -235,37 +254,19 @@ export function vendorKitchenStatusWarning(
 }
 
 export function vendorSetupPageIncompleteDescription(
-  mode: VendorOrderRoutingMode | string | null | undefined
+  _mode?: VendorOrderRoutingMode | string | null
 ): string {
-  if (isDeliverectRoutingMode(mode)) {
-    return "Complete public profile steps to appear on your pod page, then finish payment and Deliverect setup to accept orders.";
-  }
-  if (isSquareRoutingMode(mode)) {
-    return "Complete public profile steps to appear on your pod page, then finish payment and Square connection setup to accept orders.";
-  }
-  return "Complete public profile steps to appear on your pod page, then finish payment and order routing setup to accept orders.";
+  return "Complete your public profile, menu, hours, payouts, and order routing setup before accepting orders.";
 }
 
 export function vendorSetupOperationalLockedDescription(
-  mode: VendorOrderRoutingMode | string | null | undefined
+  _mode?: VendorOrderRoutingMode | string | null
 ): string {
-  if (isDeliverectRoutingMode(mode)) {
-    return "Finish the public profile requirements above first. Payment, Deliverect, and ordering controls unlock after your vendor is visible on the pod page.";
-  }
-  if (isSquareRoutingMode(mode)) {
-    return "Finish the public profile requirements above first. Payment, Square connection, and ordering controls unlock after your vendor is visible on the pod page.";
-  }
   return "Finish the public profile requirements above first. Payment, order routing, and ordering controls unlock after your vendor is visible on the pod page.";
 }
 
 export function vendorSetupIncompleteBannerCopy(
-  mode: VendorOrderRoutingMode | string | null | undefined
+  _mode?: VendorOrderRoutingMode | string | null
 ): string {
-  if (isDeliverectRoutingMode(mode)) {
-    return "— finish Deliverect connection and payments on the Setup page when you are ready.";
-  }
-  if (isSquareRoutingMode(mode)) {
-    return "— finish Square connection and payments on the Setup page when you are ready.";
-  }
-  return "— finish order routing and payments on the Setup page when you are ready.";
+  return "— finish setup on the Setup page when you are ready.";
 }

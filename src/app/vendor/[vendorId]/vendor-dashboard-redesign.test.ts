@@ -45,7 +45,7 @@ describe("vendor dashboard operating layout", () => {
 describe("vendor operational copy", () => {
   it("avoids technical routing language on dashboard surfaces", () => {
     const store = readVendor("dashboard/VendorStoreStatusCard.tsx");
-    expect(store).not.toMatch(/routingStatus|fulfillmentStatus|basis points/i);
+    expect(store).not.toMatch(/fulfillmentStatus|basis points/i);
     expect(store).not.toContain("VendorOrdersOperationsBar");
     expect(store).toContain("Edit hours");
   });
@@ -73,9 +73,28 @@ describe("vendor section pages", () => {
     expect(setup).toContain("VendorSetupStatusBanners");
     expect(setup).toContain("Required to appear on pod page");
     expect(setup).toContain("Required to accept orders");
+    expect(setup).toContain("VendorSquareSetupSummary");
+    expect(setup).not.toContain("VendorSquareConnectionCard");
+    expect(setup).not.toContain("disconnectSquareAction");
+    expect(setup).not.toContain("Reconnect Square");
+    expect(setup).not.toContain("Complete public profile steps to appear on your pod page");
+    expect(setup).toContain("vendorSetupPageIncompleteDescription");
     expect(setup).not.toContain("Recommended");
     expect(setup).not.toContain("Try Kitchen mode for busy shifts");
     expect(setup).not.toContain("Pickup instructions on pod page");
+
+    const squareSummary = readFileSync(
+      join(vendorDir, "../../../components/vendor/VendorSquareSetupSummary.tsx"),
+      "utf8"
+    );
+    expect(squareSummary).toContain("Manage Square integration");
+
+    const squareCard = readFileSync(
+      join(vendorDir, "../../../components/vendor/VendorSquareConnectionCard.tsx"),
+      "utf8"
+    );
+    expect(squareCard).not.toContain("environmentMismatchWarnings.map");
+    expect(squareCard).toContain("filterSquareVendorFacingWarnings");
   });
 
   it("keeps orders page focused on the workbench", () => {

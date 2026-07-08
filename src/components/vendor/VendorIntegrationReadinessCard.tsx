@@ -1,5 +1,6 @@
 import { DashboardCard } from "@/components/dashboard";
 import type { VendorIntegrationObservability } from "@/lib/integrations/provider-observability.service";
+import { filterSquareVendorFacingWarnings } from "@/lib/integrations/square/square-vendor-facing-health";
 
 function statusBadgeClass(ready: boolean): string {
   return ready
@@ -9,16 +10,22 @@ function statusBadgeClass(ready: boolean): string {
 
 export function VendorIntegrationReadinessCard({
   observability,
+  squareOrderRoutingEnabled = false,
 }: {
   observability: VendorIntegrationObservability;
+  squareOrderRoutingEnabled?: boolean;
 }) {
-  const { readiness, connections, mappingHealth, squareHealth } = observability;
+  const { readiness, squareHealth } = observability;
+
+  const squareMissing = squareHealth
+    ? filterSquareVendorFacingWarnings(squareHealth.missingRequirements)
+    : [];
 
   return (
     <DashboardCard className="max-w-3xl">
       <h3 className="text-sm font-semibold text-oo-charcoal">Integration readiness</h3>
       <p className="mt-1 text-xs text-oo-stone-gray">
-        Normalized provider health — existing setup checklist remains authoritative.
+        Summary of your order routing and menu integrations.
       </p>
 
       <div className="mt-4 space-y-3">
@@ -80,50 +87,21 @@ export function VendorIntegrationReadinessCard({
                     : "Needs attention"}
               </span>
             </div>
-            {squareHealth.missingRequirements.length > 0 ? (
+            {squareMissing.length > 0 ? (
               <ul className="mt-2 list-inside list-disc text-xs text-oo-stone-gray">
-                {squareHealth.missingRequirements.map((item) => (
+                {squareMissing.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
             ) : null}
+            {squareHealth.isReady && !squareOrderRoutingEnabled ? (
+              <p className="mt-2 text-xs text-oo-stone-gray">
+                Square order routing is pending Open Order admin enablement.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>
-
-      {connections.length > 0 ? (
-        <div className="mt-6">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
-            Connection records
-          </h4>
-          <ul className="mt-2 space-y-2 text-xs text-oo-charcoal">
-            {connections.map((c) => (
-              <li key={c.id} className="rounded border border-oo-light-stone px-2 py-1.5">
-                <span className="font-medium">{c.providerLabel}</span>
-                <span className="text-oo-stone-gray"> — {c.status}</span>
-                {c.externalLocationId ? (
-                  <span className="block font-mono text-[11px] text-oo-stone-gray">
-                    Location: {c.externalLocationId}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {Object.keys(mappingHealth).length > 0 ? (
-        <div className="mt-4 text-xs text-oo-stone-gray">
-          {Object.entries(mappingHealth).map(([provider, health]) =>
-            health ? (
-              <p key={provider}>
-                {provider} mappings: {health.activeMappings} active
-                {!health.isHealthy ? " — needs attention" : ""}
-              </p>
-            ) : null
-          )}
-        </div>
-      ) : null}
     </DashboardCard>
   );
 }

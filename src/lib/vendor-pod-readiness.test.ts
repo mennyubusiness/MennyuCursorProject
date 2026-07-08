@@ -175,6 +175,67 @@ describe("deriveVendorPodReadiness status priority", () => {
     expect(result.status).toBe("needs_pos");
   });
 
+  it("marks Square connected when OAuth is ready even without admin order injection", () => {
+    const result = deriveVendorPodReadiness(
+      {
+        podId: "pod_1",
+        vendorId: "vendor_1",
+        pod: { isActive: true },
+        podVendor: { isActive: true },
+        vendor: baseVendor,
+        menuSummary: baseMenu,
+        posSummary: {
+          ...basePos,
+          orderRoutingMode: "square",
+          deliverectChannelLinkId: null,
+          posConnectionStatus: "not_connected",
+          squareConnectionReady: true,
+          squareOrderRoutingEnabled: false,
+        },
+        stripeSummary: baseStripe,
+        customerOrderingHours: baseCustomerOrderingHours,
+        hasPodMembership: true,
+        squareConnectionReady: true,
+        squareOrderRoutingEnabled: false,
+      },
+      { audience: "vendor" }
+    );
+
+    const pos = result.checklist.find((item) => item.key === "pos");
+    expect(pos?.complete).toBe(true);
+    expect(pos?.label).toBe("Square connected");
+    expect(pos?.description).toMatch(/pending Open Order admin enablement/i);
+    expect(pos?.actionLabel).toBe("Manage Square integration");
+    expect(result.canAcceptOrders).toBe(true);
+  });
+
+  it("does not show Square connection requirement for manual dashboard routing", () => {
+    const result = deriveVendorPodReadiness(
+      {
+        podId: "pod_1",
+        vendorId: "vendor_1",
+        pod: { isActive: true },
+        podVendor: { isActive: true },
+        vendor: baseVendor,
+        menuSummary: baseMenu,
+        posSummary: {
+          ...basePos,
+          orderRoutingMode: "manual_dashboard",
+          deliverectChannelLinkId: null,
+          posConnectionStatus: "not_connected",
+        },
+        stripeSummary: baseStripe,
+        customerOrderingHours: baseCustomerOrderingHours,
+        hasPodMembership: true,
+      },
+      { audience: "vendor" }
+    );
+
+    const pos = result.checklist.find((item) => item.key === "pos");
+    expect(pos?.label).toBe("Manual order dashboard ready");
+    expect(pos?.complete).toBe(true);
+  });
+
   it("square menu checklist links to Menu Imports when catalog import is ready", () => {
     const result = deriveVendorPodReadiness(
       {

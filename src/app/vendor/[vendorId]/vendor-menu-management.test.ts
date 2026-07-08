@@ -67,6 +67,7 @@ describe("vendor menu management UX", () => {
       "utf8"
     );
     expect(squarePanel).toContain("Connect Square before importing");
+    expect(squarePanel).not.toContain("SQUARE_OAUTH_REDIRECT_URL uses production domain");
     expect(squarePanel).toContain("Open Square integration");
     expect(squarePanel).toContain("!squareStatus.hasConnection");
     expect(squarePanel).not.toContain("coming next");
