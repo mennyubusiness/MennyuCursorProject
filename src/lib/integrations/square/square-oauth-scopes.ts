@@ -111,7 +111,8 @@ export function buildSquareOAuthScopeCapabilities(input: {
     requiredScopes: coverage.requiredScopes,
     missingRequiredScopes: coverage.missingRequiredScopes,
     permissionsVersion: coverage.permissionsVersion,
-    ...coverage,
+    hasOrderInjectionScopes: coverage.hasOrderInjectionScopes,
+    needsReconnectForInjection: coverage.needsReconnectForInjection,
   };
 }
 
