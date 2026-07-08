@@ -20,9 +20,11 @@ vi.mock("@/lib/env", () => ({
 
 import {
   buildSquareAuthorizationUrl,
+  detectSquareEnvironmentMismatchWarnings,
   getSquareApiBaseUrl,
   getSquareConfigSnapshot,
   getSquareConnectBaseUrl,
+  inferSquareApplicationIdEnvironment,
   SQUARE_API_BASE_URLS,
   SQUARE_OAUTH_CONNECT_BASE_URLS,
   validateSquareProductionConfig,
@@ -135,5 +137,23 @@ describe("square config", () => {
     expect(parsed.searchParams.get("state")).toBe("signed_state_token");
     expect(parsed.searchParams.get("session")).toBe("false");
     expect(parsed.searchParams.get("redirect_uri")).toBe(REDIRECT_URL);
+  });
+});
+
+describe("square environment mismatch detection", () => {
+  it("detects sandbox app id with production environment", () => {
+    expect(inferSquareApplicationIdEnvironment("sandbox-sq0idp-abc")).toBe("sandbox");
+    const warnings = detectSquareEnvironmentMismatchWarnings({
+      applicationId: "sandbox-sq0idp-abc",
+      environment: "production",
+      redirectUrl: "https://www.openorderco.com/api/integrations/square/oauth/callback",
+    });
+    expect(warnings.some((w) => w.includes("sandbox") && w.includes("production"))).toBe(true);
+  });
+
+  it("missing webhook key does not appear in config missing labels", () => {
+    const snap = getSquareConfigSnapshot();
+    const labels = [...snap.missingConfigLabels, ...snap.invalidConfigLabels];
+    expect(labels.some((l) => l.toLowerCase().includes("webhook"))).toBe(false);
   });
 });

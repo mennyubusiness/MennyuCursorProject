@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "MenuImportSource" ADD VALUE 'SQUARE_CATALOG_PULL';

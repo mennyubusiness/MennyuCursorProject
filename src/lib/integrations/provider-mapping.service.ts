@@ -109,3 +109,29 @@ export async function countActiveMappingsForVendor(input: {
     },
   });
 }
+
+/** Mark mappings inactive when Square objects disappear from a re-import. */
+export async function deactivateProviderMappingsNotSeen(input: {
+  vendorId: string;
+  provider: IntegrationProvider;
+  externalLocationId?: string | null;
+  seenExternalIds: Set<string>;
+}): Promise<number> {
+  const locationId = input.externalLocationId ?? null;
+  const existing = await prisma.providerEntityMapping.findMany({
+    where: {
+      vendorId: input.vendorId,
+      provider: input.provider,
+      externalLocationId: locationId,
+      isActive: true,
+    },
+    select: { id: true, externalId: true },
+  });
+  const toDeactivate = existing.filter((row) => !input.seenExternalIds.has(row.externalId));
+  if (toDeactivate.length === 0) return 0;
+  await prisma.providerEntityMapping.updateMany({
+    where: { id: { in: toDeactivate.map((r) => r.id) } },
+    data: { isActive: false },
+  });
+  return toDeactivate.length;
+}

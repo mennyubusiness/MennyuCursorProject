@@ -51,6 +51,10 @@ describe("square oauth start route", () => {
       connectBaseUrl: "https://connect.squareupsandbox.com",
       apiBaseUrl: "https://connect.squareupsandbox.com",
       tokenStorageReady: true,
+      missingConfigLabels: [],
+      invalidConfigLabels: [],
+      disabledReasonLabels: [],
+      environmentMismatchWarnings: [],
     });
     const res = await GET(
       new NextRequest("http://localhost/api/vendor/v1/square/oauth/start"),

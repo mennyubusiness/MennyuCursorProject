@@ -3,9 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { VendorSquareConnectionCard } from "@/components/vendor/VendorSquareConnectionCard";
+import { VendorSquareCatalogCard } from "@/components/vendor/VendorSquareCatalogCard";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canViewVendor } from "@/lib/permissions";
 import { getSquareIntegrationUiState } from "@/actions/vendor-square-connect.actions";
+import { resolveSquareOAuthUserMessage } from "@/lib/integrations/square/square-oauth-errors";
 
 export default async function VendorSquareIntegrationPage({
   params,
@@ -33,7 +35,7 @@ export default async function VendorSquareIntegrationPage({
       <DashboardPageHeader
         headingLevel={1}
         title="Square integration"
-        description="OAuth connection and location selection for future Square menu and order sync."
+        description="OAuth connection, location selection, and Square catalog import (draft only)."
         actions={
           <Link
             href={`/vendor/${vendorId}/setup`}
@@ -52,7 +54,7 @@ export default async function VendorSquareIntegrationPage({
         ) : null}
         {sp.square_error ? (
           <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-            Square connection failed: {sp.square_error}
+            Square connection failed: {resolveSquareOAuthUserMessage(sp.square_error)}
           </p>
         ) : null}
         {sp.select_location === "1" && connection?.needsLocationSelection ? (
@@ -66,6 +68,17 @@ export default async function VendorSquareIntegrationPage({
           snap={snap}
           connection={connection}
           health={health}
+        />
+
+        <VendorSquareCatalogCard
+          vendorId={vendorId}
+          health={health}
+          canImport={health.isReady}
+          disabledReason={
+            health.isReady
+              ? null
+              : health.missingRequirements[0] ?? "Complete Square connection setup first."
+          }
         />
       </div>
     </DashboardShell>

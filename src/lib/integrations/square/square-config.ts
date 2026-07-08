@@ -35,6 +35,7 @@ export type SquareConfigSnapshot = {
   missingConfigLabels: string[];
   invalidConfigLabels: string[];
   disabledReasonLabels: string[];
+  environmentMismatchWarnings: string[];
 };
 
 function parseSquareEnvironment(): SquareEnvironment | null {
@@ -82,6 +83,58 @@ function buildSquareConfigDiagnostics(input: {
   return { missingConfigLabels, invalidConfigLabels, disabledReasonLabels };
 }
 
+/** Square sandbox application IDs are prefixed with `sandbox-`. */
+export function inferSquareApplicationIdEnvironment(
+  applicationId: string
+): SquareEnvironment | null {
+  const id = applicationId.trim().toLowerCase();
+  if (id.startsWith("sandbox-")) return "sandbox";
+  if (id.startsWith("sq0idp-") || id.startsWith("sq0idb-")) return "production";
+  return null;
+}
+
+export function detectSquareEnvironmentMismatchWarnings(input: {
+  applicationId: string | null;
+  environment: SquareEnvironment | null;
+  redirectUrl: string | null;
+}): string[] {
+  const warnings: string[] = [];
+  if (input.applicationId && input.environment) {
+    const inferred = inferSquareApplicationIdEnvironment(input.applicationId);
+    if (inferred && inferred !== input.environment) {
+      warnings.push(
+        `SQUARE_APPLICATION_ID looks like ${inferred} credentials but SQUARE_ENVIRONMENT is ${input.environment}`
+      );
+    }
+  }
+  if (input.redirectUrl && input.environment) {
+    try {
+      const host = new URL(input.redirectUrl).hostname.toLowerCase();
+      if (
+        input.environment === "production" &&
+        (host.includes("localhost") ||
+          host.endsWith(".vercel.app") ||
+          host.includes("127.0.0.1"))
+      ) {
+        warnings.push(
+          "SQUARE_OAUTH_REDIRECT_URL hostname looks non-production while SQUARE_ENVIRONMENT is production"
+        );
+      }
+      if (
+        input.environment === "sandbox" &&
+        (host === "www.openorderco.com" || host === "openorderco.com")
+      ) {
+        warnings.push(
+          "SQUARE_OAUTH_REDIRECT_URL uses production domain while SQUARE_ENVIRONMENT is sandbox — confirm Square sandbox redirect URL matches exactly"
+        );
+      }
+    } catch {
+      warnings.push("SQUARE_OAUTH_REDIRECT_URL is not a valid URL");
+    }
+  }
+  return warnings;
+}
+
 export function resolveSquareEnvironment(): SquareEnvironment {
   return parseSquareEnvironment() ?? "sandbox";
 }
@@ -115,8 +168,13 @@ export function getSquareConfigSnapshot(): SquareConfigSnapshot {
     enableFlag,
     tokenStorageReady,
   });
+  const environmentMismatchWarnings = detectSquareEnvironmentMismatchWarnings({
+    applicationId,
+    environment,
+    redirectUrl,
+  });
 
-  if (partiallyConfigured || (configured && !enabled)) {
+  if (partiallyConfigured || (configured && !enabled) || environmentMismatchWarnings.length > 0) {
     console.warn(
       JSON.stringify({
         event: "square_config_diagnostics",
@@ -126,9 +184,11 @@ export function getSquareConfigSnapshot(): SquareConfigSnapshot {
         tokenStorageReady,
         enableFlag,
         nodeEnv: env.NODE_ENV,
+        environment,
         missingConfigLabels: diagnostics.missingConfigLabels,
         invalidConfigLabels: diagnostics.invalidConfigLabels,
         disabledReasonLabels: diagnostics.disabledReasonLabels,
+        environmentMismatchWarnings,
       })
     );
   }
@@ -144,6 +204,7 @@ export function getSquareConfigSnapshot(): SquareConfigSnapshot {
     tokenStorageReady,
     enabled,
     ...diagnostics,
+    environmentMismatchWarnings,
   };
 }
 
@@ -214,6 +275,15 @@ export function validateSquareProductionConfig(envInput: {
     );
   }
   const envName = (envInput.SQUARE_ENVIRONMENT ?? envInput.SQUARE_MODE)?.trim().toLowerCase();
+  const environment =
+    envName === "sandbox" || envName === "production" ? (envName as SquareEnvironment) : null;
+  warnings.push(
+    ...detectSquareEnvironmentMismatchWarnings({
+      applicationId: envInput.SQUARE_APPLICATION_ID?.trim() || null,
+      environment,
+      redirectUrl: envInput.SQUARE_OAUTH_REDIRECT_URL?.trim() || null,
+    })
+  );
   if (envName === "sandbox") {
     warnings.push("Square is configured for sandbox — use production credentials only on live hosts.");
   } else if (envName === "production" && envInput.NODE_ENV === "production") {

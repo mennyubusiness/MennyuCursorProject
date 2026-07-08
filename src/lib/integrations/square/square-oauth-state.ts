@@ -9,7 +9,19 @@ const TTL_SEC = 60 * 15;
 export type SquareOAuthStatePayload = {
   vendorId: string;
   userId: string;
+  nonce: string;
+  exp: number;
 };
+
+export class SquareOAuthStateError extends Error {
+  constructor(
+    message: string,
+    readonly vendorId?: string
+  ) {
+    super(message);
+    this.name = "SquareOAuthStateError";
+  }
+}
 
 function getSigningSecret(): string {
   const fromEnv = env.AUTH_SECRET?.trim();
@@ -39,7 +51,7 @@ export function signSquareOAuthState(vendorId: string, userId: string): string {
 export function verifySquareOAuthState(state: string): SquareOAuthStatePayload {
   const secret = getSigningSecret();
   const tilde = state.lastIndexOf("~");
-  if (tilde <= 0) throw new Error("invalid_oauth_state");
+  if (tilde <= 0) throw new SquareOAuthStateError("invalid_oauth_state");
 
   const payloadB64 = state.slice(0, tilde);
   const sig = state.slice(tilde + 1);
@@ -48,10 +60,11 @@ export function verifySquareOAuthState(state: string): SquareOAuthStatePayload {
     const a = Buffer.from(sig, "hex");
     const b = Buffer.from(expectedSig, "hex");
     if (a.length !== b.length || !timingSafeEqual(a, b)) {
-      throw new Error("bad_oauth_state_signature");
+      throw new SquareOAuthStateError("bad_oauth_state_signature");
     }
-  } catch {
-    throw new Error("bad_oauth_state_signature");
+  } catch (e) {
+    if (e instanceof SquareOAuthStateError) throw e;
+    throw new SquareOAuthStateError("bad_oauth_state_signature");
   }
 
   const raw = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as {
@@ -59,12 +72,22 @@ export function verifySquareOAuthState(state: string): SquareOAuthStatePayload {
     vendorId: string;
     userId: string;
     exp: number;
+    nonce?: string;
   };
-  if (raw.v !== PAYLOAD_VERSION) throw new Error("bad_oauth_state_version");
+  const vendorId = raw.vendorId?.trim();
+  if (raw.v !== PAYLOAD_VERSION) throw new SquareOAuthStateError("bad_oauth_state_version", vendorId);
   if (typeof raw.exp !== "number" || raw.exp < Math.floor(Date.now() / 1000)) {
-    throw new Error("oauth_state_expired");
+    throw new SquareOAuthStateError("oauth_state_expired", vendorId);
   }
-  if (!raw.vendorId?.trim() || !raw.userId?.trim()) throw new Error("oauth_state_incomplete");
+  if (!vendorId || !raw.userId?.trim()) {
+    throw new SquareOAuthStateError("oauth_state_incomplete", vendorId);
+  }
+  if (!raw.nonce?.trim()) throw new SquareOAuthStateError("oauth_state_incomplete", vendorId);
 
-  return { vendorId: raw.vendorId.trim(), userId: raw.userId.trim() };
+  return {
+    vendorId,
+    userId: raw.userId.trim(),
+    nonce: raw.nonce.trim(),
+    exp: raw.exp,
+  };
 }

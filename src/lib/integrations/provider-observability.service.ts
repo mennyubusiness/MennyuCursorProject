@@ -43,6 +43,11 @@ export type VendorIntegrationObservability = {
     externalEventId: string | null;
   }>;
   squareHealth: ProviderConnectionHealth | null;
+  squareConnection: Awaited<
+    ReturnType<
+      typeof import("@/lib/integrations/square/square-connection.service").getSquareConnectionObservability
+    >
+  >;
 };
 
 function parseCapabilities(raw: unknown): string[] {
@@ -94,13 +99,15 @@ export async function getVendorIntegrationObservability(
   );
 
   let squareHealth: ProviderConnectionHealth | null = null;
+  let squareConnection: VendorIntegrationObservability["squareConnection"] = null;
   const { getSquareConfigSnapshot } = await import("@/lib/integrations/square/square-config");
   const squareSnap = getSquareConfigSnapshot();
   if (squareSnap.configured || squareSnap.partiallyConfigured || connections.some((c) => c.provider === "square")) {
-    const { evaluateSquareConnectionHealth } = await import(
+    const { evaluateSquareConnectionHealth, getSquareConnectionObservability } = await import(
       "@/lib/integrations/square/square-connection.service"
     );
     squareHealth = await evaluateSquareConnectionHealth(vendorId);
+    squareConnection = await getSquareConnectionObservability(vendorId);
   }
 
   return {
@@ -133,5 +140,6 @@ export async function getVendorIntegrationObservability(
       provider: e.provider as IntegrationProvider,
     })),
     squareHealth,
+    squareConnection,
   };
 }

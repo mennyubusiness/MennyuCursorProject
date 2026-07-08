@@ -592,6 +592,7 @@ model Vendor {
   providerEntityMappings  ProviderEntityMapping[]
   providerWebhookEvents   ProviderWebhookEvent[]
   integrationCredentials  IntegrationProviderCredential[]
+  integrationOAuthStateNonces IntegrationOAuthStateNonce[]
 
   @@index([deletedAt])
 }
@@ -616,6 +617,7 @@ model VendorMenuCategory {
 enum MenuImportSource {
   DELIVERECT_API_PULL
   DELIVERECT_MENU_WEBHOOK
+  SQUARE_CATALOG_PULL
 }
 
 enum MenuImportJobStatus {
@@ -1562,6 +1564,21 @@ model IntegrationProviderCredential {
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@index([vendorId, provider])
+}
+
+/// One-time OAuth state nonces (replay protection for integration OAuth callbacks).
+model IntegrationOAuthStateNonce {
+  id         String   @id @default(cuid())
+  vendorId   String
+  userId     String
+  nonce      String   @unique
+  expiresAt  DateTime
+  consumedAt DateTime @default(now())
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([vendorId])
 }
 
 /// Provider-neutral external ID mapping (Square uses from day one; Deliverect fields remain source of truth until migrated).

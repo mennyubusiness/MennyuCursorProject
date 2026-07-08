@@ -11,6 +11,7 @@ export const deliverectMenuImportMetaSchema = z.object({
     "deliverect_menu_api_v1",
     "deliverect_menu_webhook_v1",
     "open_order_builder_v1",
+    "square_catalog_v1",
   ]),
 });
 

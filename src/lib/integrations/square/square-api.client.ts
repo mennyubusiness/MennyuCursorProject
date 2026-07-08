@@ -5,6 +5,11 @@ import {
   getSquareApiBaseUrl,
   resolveSquareEnvironment,
 } from "@/lib/integrations/square/square-config";
+import {
+  SQUARE_CATALOG_LIST_TYPES,
+  type SquareCatalogListResponse,
+  type SquareCatalogObject,
+} from "@/lib/integrations/square/square-catalog.types";
 
 const SQUARE_API_VERSION = "2025-04-16";
 
@@ -134,4 +139,60 @@ export async function fetchSquareMerchantProfile(accessToken: string): Promise<{
     throw new SquareApiError(`Square merchant fetch failed: ${detail}`, res.status, body);
   }
   return body.merchant ?? {};
+}
+
+function squareCatalogHeaders(accessToken: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: "application/json",
+    "Square-Version": SQUARE_API_VERSION,
+  };
+}
+
+/** List all catalog objects for menu import (paginated). */
+export async function fetchSquareCatalogObjects(
+  accessToken: string,
+  types: readonly string[] = SQUARE_CATALOG_LIST_TYPES
+): Promise<SquareCatalogObject[]> {
+  const base = getSquareApiBaseUrl(resolveSquareEnvironment());
+  const objects: SquareCatalogObject[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const params = new URLSearchParams({ types: types.join(",") });
+    if (cursor) params.set("cursor", cursor);
+    const res = await fetch(`${base}/v2/catalog/list?${params.toString()}`, {
+      headers: squareCatalogHeaders(accessToken),
+    });
+    const body = (await res.json().catch(() => ({}))) as SquareCatalogListResponse;
+    if (!res.ok) {
+      const detail = body.errors?.[0]?.detail ?? res.statusText;
+      throw new SquareApiError(`Square catalog list failed: ${detail}`, res.status, body);
+    }
+    if (body.objects?.length) objects.push(...body.objects);
+    cursor = body.cursor?.trim() || undefined;
+  } while (cursor);
+
+  return objects;
+}
+
+export async function fetchSquareCatalogForLocation(
+  accessToken: string,
+  locationId: string
+): Promise<SquareCatalogObject[]> {
+  const all = await fetchSquareCatalogObjects(accessToken);
+  return all.filter((obj) => isSquareCatalogObjectAvailableAtLocation(obj, locationId));
+}
+
+export function isSquareCatalogObjectAvailableAtLocation(
+  obj: SquareCatalogObject,
+  locationId: string
+): boolean {
+  if (obj.is_deleted) return false;
+  if (obj.present_at_all_locations) {
+    return !(obj.absent_at_location_ids ?? []).includes(locationId);
+  }
+  const present = obj.present_at_location_ids ?? [];
+  if (present.length > 0) return present.includes(locationId);
+  return true;
 }

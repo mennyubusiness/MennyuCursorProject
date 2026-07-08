@@ -1,4 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/integrations/square/square-config", () => ({
+  getSquareConfigSnapshot: vi.fn(() => ({
+    configured: false,
+    partiallyConfigured: false,
+    tokenStorageReady: false,
+    enabled: false,
+    environment: null,
+    missingConfigLabels: ["Missing SQUARE_APPLICATION_ID"],
+    invalidConfigLabels: [],
+    disabledReasonLabels: [],
+    environmentMismatchWarnings: [],
+  })),
+}));
+
 import {
   assertProviderSupportsCapabilityOrThrow,
   getMenuProviderAdapter,
