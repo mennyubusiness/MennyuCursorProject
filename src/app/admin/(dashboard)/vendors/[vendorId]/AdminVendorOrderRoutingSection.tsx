@@ -36,12 +36,13 @@ export function AdminVendorOrderRoutingSection({
   const [mode, setMode] = useState<VendorOrderRoutingMode>(orderRoutingMode);
   const [pending, startTransition] = useTransition();
   const deliverectMode = isDeliverectRoutingMode(mode);
-  const squareMode = isSquareRoutingMode(mode);
+  const squareModeSelected = isSquareRoutingMode(mode);
+  const squareModeSaved = isSquareRoutingMode(orderRoutingMode);
   const routingReady = isVendorRoutingOperationalReady({
     ...posSummary,
     orderRoutingMode: mode,
     squareOrderRoutingEnabled: mode === "square" ? squareOrderRoutingEnabled : undefined,
-    squareOrderRoutingReady: mode === "square" ? squareOrderRoutingReady.ready : undefined,
+    squareOrderRoutingReady: mode === "square" ? squareOrderRoutingReady.injectionOperationalReady : undefined,
   });
   const squareSelectable = squareStatus.isSelectable;
 
@@ -141,28 +142,34 @@ export function AdminVendorOrderRoutingSection({
         </p>
       ) : null}
 
-      {squareMode && !routingReady ? (
+      {squareModeSelected && !routingReady ? (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           {VENDOR_ROUTING_MODE_COPY.square.incompleteWarning}
-          {!squareOrderRoutingReady.ready && squareOrderRoutingReady.missingRequirements.length > 0 ? (
-            <span className="mt-1 block">{squareOrderRoutingReady.missingRequirements.join(" ")}</span>
+          {squareOrderRoutingReady.injectionBlockingReasons.length > 0 ? (
+            <span className="mt-1 block">{squareOrderRoutingReady.injectionBlockingReasons.join(" ")}</span>
           ) : null}
         </p>
       ) : null}
 
-      {squareMode ? (
+      {squareModeSaved ? (
         <div className="mt-4 rounded-lg border border-oo-light-stone bg-oo-cream/30 p-3">
           <p className="text-sm font-medium text-oo-charcoal">Square order injection</p>
-          <p className="mt-1 text-xs text-oo-stone-gray">
-            {squareOrderRoutingEnabled
-              ? "Enabled — paid orders inject to Square after Stripe checkout (when SQUARE_ROUTING_LIVE is on)."
-              : "Disabled — menu publish does not enable this automatically."}
-          </p>
+          {squareOrderRoutingEnabled ? (
+            <p className="mt-1 text-xs text-oo-stone-gray">
+              When enabled, paid Open Order orders for this vendor are sent to Square as prepaid pickup orders.
+              Stripe checkout and Open Order payouts remain unchanged.
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-oo-stone-gray">
+              Square is connected, but order injection is disabled. Orders will be accepted in Open Order but will
+              not be sent to Square.
+            </p>
+          )}
           {squareOrderRoutingEnabled ? (
             <AdminReasonActionForm
-              label="Disable Square order routing"
+              label="Disable Square order injection"
               description="Stops sending new paid orders to Square. Existing Square orders are unchanged."
-              confirmLabel={pending ? "Saving…" : "Disable Square order routing"}
+              confirmLabel={pending ? "Saving…" : "Disable Square order injection"}
               onSubmit={(reason) =>
                 new Promise((resolve) => {
                   startTransition(async () => {
@@ -179,11 +186,13 @@ export function AdminVendorOrderRoutingSection({
             />
           ) : (
             <AdminReasonActionForm
-              label="Enable Square order routing"
-              description="Requires healthy Square connection, selected location, and a published Square-imported menu."
-              confirmLabel={pending ? "Saving…" : "Enable Square order routing"}
-              disabled={!squareOrderRoutingReady.ready}
-              disabledReason={squareOrderRoutingReady.missingRequirements.join(" ") || "Prerequisites incomplete."}
+              label="Enable Square order injection"
+              description="When enabled, paid Open Order orders for this vendor will be sent to Square as prepaid pickup orders. Stripe checkout and Open Order payouts remain unchanged."
+              confirmLabel={pending ? "Saving…" : "Enable Square order injection"}
+              disabled={!squareOrderRoutingReady.prerequisitesReady}
+              disabledReason={
+                squareOrderRoutingReady.prerequisiteBlockers.join(" ") || "Prerequisites incomplete."
+              }
               onSubmit={(reason) =>
                 new Promise((resolve) => {
                   startTransition(async () => {
@@ -218,7 +227,7 @@ export function AdminVendorOrderRoutingSection({
                   });
                   if (result.ok) router.refresh();
                   resolve(result);
-                });
+                })
               })
             }
           />

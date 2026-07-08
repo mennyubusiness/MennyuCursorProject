@@ -19,10 +19,12 @@ import {
 import type { BusinessHoursEvaluation } from "@/lib/business-time";
 import type { AdminVendorDetailView } from "@/services/admin-vendor-detail.service";
 import type { AdminSquareRoutingStatus } from "@/lib/integrations/square/square-routing-readiness";
+import type { AdminSquareOrderInjectionDiagnostics } from "@/lib/integrations/square/admin-square-order-injection-diagnostics.server";
 import type { SquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { AdminVendorOrderRoutingSection } from "./AdminVendorOrderRoutingSection";
+import { AdminSquareOrderInjectionDiagnosticsPanel } from "./AdminSquareOrderInjectionDiagnosticsPanel";
 import {
   vendorDashboardPresenceDetail,
   vendorDashboardPresenceLabel,
@@ -60,6 +62,7 @@ export function AdminVendorRescueClient({
   posSummary,
   squareStatus,
   squareOrderRoutingReady,
+  squareInjectionDiagnostics,
   hoursDebug,
   hoursDebugPodName,
 }: {
@@ -68,6 +71,7 @@ export function AdminVendorRescueClient({
   posSummary: VendorPosReadinessSummary | null;
   squareStatus: AdminSquareRoutingStatus;
   squareOrderRoutingReady: SquareOrderRoutingReadiness;
+  squareInjectionDiagnostics: AdminSquareOrderInjectionDiagnostics | null;
   hoursDebug?: BusinessHoursEvaluation | null;
   hoursDebugPodName?: string | null;
 }) {
@@ -387,6 +391,13 @@ export function AdminVendorRescueClient({
           squareStatus={squareStatus}
           squareOrderRoutingEnabled={detail.vendor.squareOrderRoutingEnabled}
           squareOrderRoutingReady={squareOrderRoutingReady}
+        />
+      ) : null}
+
+      {squareInjectionDiagnostics ? (
+        <AdminSquareOrderInjectionDiagnosticsPanel
+          vendorId={vendorId}
+          diagnostics={squareInjectionDiagnostics}
         />
       ) : null}
 

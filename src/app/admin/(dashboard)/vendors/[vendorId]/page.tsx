@@ -4,9 +4,12 @@ import { prisma } from "@/lib/db";
 import { loadVendorReadinessBundles } from "@/lib/vendor-readiness-validation.server";
 import { loadAdminSquareRoutingStatus } from "@/lib/integrations/square/square-routing-readiness";
 import { loadSquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
+import { loadAdminSquareOrderInjectionDiagnostics } from "@/lib/integrations/square/admin-square-order-injection-diagnostics.server";
 import { loadAdminVendorDetail } from "@/services/admin-vendor-detail.service";
 import { evaluateVendorCustomerOrderingHoursDebug } from "@/lib/vendor-customer-ordering-hours";
 import { AdminVendorRescueClient } from "./AdminVendorRescueClient";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminVendorDetailPage({
   params,
@@ -17,8 +20,15 @@ export default async function AdminVendorDetailPage({
   const id = vendorId?.trim();
   if (!id) notFound();
 
-  const [detail, podOptions, readinessBundles, vendorHoursRow, squareStatus, squareOrderRoutingReady] =
-    await Promise.all([
+  const [
+    detail,
+    podOptions,
+    readinessBundles,
+    vendorHoursRow,
+    squareStatus,
+    squareOrderRoutingReady,
+    squareInjectionDiagnostics,
+  ] = await Promise.all([
     loadAdminVendorDetail(id),
     prisma.pod.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: 500 }),
     loadVendorReadinessBundles([id], { includeDeliverectMappingIntegrity: true }),
@@ -35,6 +45,7 @@ export default async function AdminVendorDetailPage({
     }),
     loadAdminSquareRoutingStatus(id),
     loadSquareOrderRoutingReadiness(id),
+    loadAdminSquareOrderInjectionDiagnostics(id),
   ]);
   if (!detail) notFound();
   const posSummary = readinessBundles.get(id)?.posSummary ?? null;
@@ -65,6 +76,7 @@ export default async function AdminVendorDetailPage({
         posSummary={posSummary}
         squareStatus={squareStatus}
         squareOrderRoutingReady={squareOrderRoutingReady}
+        squareInjectionDiagnostics={squareInjectionDiagnostics}
         hoursDebug={hoursDebug}
         hoursDebugPodName={hoursDebugPodName}
       />

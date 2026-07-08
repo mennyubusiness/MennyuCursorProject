@@ -467,7 +467,7 @@ export async function adminSetSquareOrderRoutingEnabled(input: {
 
   if (input.enabled) {
     const gate = await import("@/lib/integrations/square/square-order-routing-readiness").then((m) =>
-      m.assertSquareOrderRoutingReady(input.vendorId)
+      m.assertSquareOrderRoutingPrerequisites(input.vendorId)
     );
     if (!gate.ok) return { ok: false, error: gate.error };
   }

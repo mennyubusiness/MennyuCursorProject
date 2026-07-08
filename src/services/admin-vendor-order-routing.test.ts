@@ -37,7 +37,17 @@ vi.mock("@/lib/integrations/square/square-routing-readiness", () => ({
   assertSquareRoutingSelectable: vi.fn(),
 }));
 
-import { adminUpdateVendorOrderRoutingMode } from "@/services/admin-vendor-rescue.service";
+const mockAssertPrerequisites = vi.fn();
+
+vi.mock("@/lib/integrations/square/square-order-routing-readiness", () => ({
+  assertSquareOrderRoutingPrerequisites: (...args: unknown[]) => mockAssertPrerequisites(...args),
+}));
+
+import { revalidatePath } from "next/cache";
+import {
+  adminSetSquareOrderRoutingEnabled,
+  adminUpdateVendorOrderRoutingMode,
+} from "@/services/admin-vendor-rescue.service";
 import { assertSquareRoutingSelectable } from "@/lib/integrations/square/square-routing-readiness";
 
 describe("adminUpdateVendorOrderRoutingMode", () => {
@@ -123,6 +133,56 @@ describe("adminUpdateVendorOrderRoutingMode", () => {
       adminUserId: "admin_1",
       reason: "test square blocked",
     });
+    expect(result.ok).toBe(false);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("adminSetSquareOrderRoutingEnabled", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFindUnique.mockResolvedValue({
+      id: "vendor_1",
+      orderRoutingMode: "square",
+      squareOrderRoutingEnabled: false,
+    });
+    mockUpdate.mockResolvedValue({});
+    mockCreateAudit.mockResolvedValue({});
+    mockAssertPrerequisites.mockResolvedValue({ ok: true, locationId: "LOC_1" });
+  });
+
+  it("enables squareOrderRoutingEnabled when prerequisites pass", async () => {
+    const result = await adminSetSquareOrderRoutingEnabled({
+      vendorId: "vendor_1",
+      enabled: true,
+      adminUserId: "admin_1",
+      reason: "enable injection",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mockAssertPrerequisites).toHaveBeenCalledWith("vendor_1");
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { squareOrderRoutingEnabled: true },
+      })
+    );
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/vendors/vendor_1");
+  });
+
+  it("rejects enable when prerequisites fail", async () => {
+    mockAssertPrerequisites.mockResolvedValue({
+      ok: false,
+      error: "Square location is not selected.",
+      code: "SQUARE_ROUTING_NOT_READY",
+    });
+
+    const result = await adminSetSquareOrderRoutingEnabled({
+      vendorId: "vendor_1",
+      enabled: true,
+      adminUserId: "admin_1",
+      reason: "enable injection",
+    });
+
     expect(result.ok).toBe(false);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
