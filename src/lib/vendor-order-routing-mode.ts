@@ -1,5 +1,6 @@
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import type { PosConnectionStatus } from "@prisma/client";
+import { vendorKitchenModeNotice, vendorKitchenModeStatusLine } from "@/lib/integrations/provider-display";
 import { vendorPosConnectionLabel } from "@/lib/vendor-operational-copy";
 import type { VendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
@@ -219,38 +220,19 @@ export function vendorKitchenStatusLine(
   mode: VendorOrderRoutingMode | string | null | undefined,
   posState: VendorPosUiState
 ): string {
-  if (isManualDashboardRoutingMode(mode)) {
-    return "Orders managed in Open Order — use buttons below to update order status";
-  }
-  if (isSquareRoutingMode(mode)) {
-    return "Square routing configured — manage orders in Open Order until POS sync is live";
-  }
-  switch (posState) {
-    case "connected":
-      return "POS connected — status may sync from kitchen system";
-    case "needs_attention":
-      return "POS needs attention — confirm orders in Open Order if needed";
-    case "not_connected":
-    default:
-      return "POS not connected — confirm orders in Open Order if needed";
-  }
+  return vendorKitchenModeStatusLine({ orderRoutingMode: mode, posState });
 }
 
 export function vendorKitchenStatusWarning(
   mode: VendorOrderRoutingMode | string | null | undefined,
-  posState: VendorPosUiState
+  posState: VendorPosUiState,
+  options?: { squareInjectionOperational?: boolean }
 ): string | null {
-  if (isManualDashboardRoutingMode(mode)) return null;
-  if (isSquareRoutingMode(mode)) {
-    return "Square order injection is not live yet. Kitchen actions update Open Order directly.";
-  }
-  if (posState === "needs_attention") {
-    return "POS connection needs attention. Orders may not sync automatically until this is resolved.";
-  }
-  if (posState === "not_connected") {
-    return "POS not connected — kitchen actions update Open Order directly.";
-  }
-  return null;
+  return vendorKitchenModeNotice({
+    orderRoutingMode: mode,
+    posState,
+    squareInjectionOperational: options?.squareInjectionOperational,
+  });
 }
 
 export function vendorSetupPageIncompleteDescription(

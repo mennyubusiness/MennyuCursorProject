@@ -38,10 +38,10 @@ export default async function VendorSquareIntegrationPage({
         description="OAuth connection, location selection, and connection health."
         actions={
           <Link
-            href={`/vendor/${vendorId}/setup`}
+            href={`/vendor/${vendorId}/integrations`}
             className="inline-flex items-center justify-center rounded-xl border border-oo-light-stone bg-oo-warm-white px-4 py-2.5 text-sm font-semibold text-oo-charcoal hover:bg-oo-cream"
           >
-            Back to setup
+            Back to integrations
           </Link>
         }
       />

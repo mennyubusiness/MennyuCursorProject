@@ -29,6 +29,12 @@ import {
   vendorDashboardPresenceDetail,
   vendorDashboardPresenceLabel,
 } from "@/lib/vendor-dashboard-presence";
+import {
+  adminDeliverectMenuPosSectionVisible,
+  adminRefreshMenuActionDescription,
+  adminRefreshMenuActionLabel,
+  adminSquareInjectionDiagnosticsVisible,
+} from "@/lib/integrations/provider-display";
 import { vendorOrderRoutingModeAdminLabel } from "@/lib/vendor-order-routing-mode";
 import {
   getVendorMenuManagementMode,
@@ -95,6 +101,10 @@ export function AdminVendorRescueClient({
     orderRoutingMode: detail.vendor.orderRoutingMode as VendorOrderRoutingMode,
     deliverectChannelLinkId: detail.vendor.deliverectChannelLinkId,
   });
+
+  const routingMode = detail.vendor.orderRoutingMode as VendorOrderRoutingMode;
+  const showSquareDiagnostics = adminSquareInjectionDiagnosticsVisible(routingMode);
+  const showDeliverectMenuPos = adminDeliverectMenuPosSectionVisible(routingMode);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -394,30 +404,41 @@ export function AdminVendorRescueClient({
         />
       ) : null}
 
-      {squareInjectionDiagnostics ? (
+      {showSquareDiagnostics && squareInjectionDiagnostics ? (
         <AdminSquareOrderInjectionDiagnosticsPanel
           vendorId={vendorId}
           diagnostics={squareInjectionDiagnostics}
         />
       ) : null}
 
-      <AdminSection title="Menu / POS status">
-        <AdminInfoRow label="POS status" value={detail.vendor.posConnectionStatus} />
-        <AdminInfoRow label="POS provider" value={detail.vendor.posProvider ?? "—"} />
-        <AdminInfoRow label="Deliverect channel" value={detail.vendor.deliverectChannelLinkId ?? "—"} />
-        <AdminInfoRow label="Deliverect location" value={detail.vendor.deliverectLocationId ?? "—"} />
-        <AdminInfoRow label="Menu items" value={`${detail.menuSync.totalItems} total · ${detail.menuSync.visibleItems} visible · ${detail.menuSync.unavailableItems} unavailable`} />
-        <AdminInfoRow label="Last successful sync" value={detail.menuSync.lastSuccessAt ? new Date(detail.menuSync.lastSuccessAt).toLocaleString() : "—"} />
-        <AdminInfoRow label="Last failed sync" value={detail.menuSync.lastFailedAt ? new Date(detail.menuSync.lastFailedAt).toLocaleString() : "—"} />
-        <AdminReasonActionForm
-          label="Refresh menu from POS/Deliverect"
-          description="Triggers the existing Deliverect menu pull. Requires a channel link."
-          confirmLabel="Refresh menu"
-          disabled={!detail.menuSync.refreshConfigured}
-          disabledReason="Menu refresh is not configured yet."
-          onSubmit={(reason) => run(() => adminRefreshVendorMenuAction(vendorId, reason))}
-        />
-      </AdminSection>
+      {showDeliverectMenuPos ? (
+        <AdminSection title="Menu / POS status">
+          <AdminInfoRow label="POS status" value={detail.vendor.posConnectionStatus} />
+          <AdminInfoRow label="POS provider" value={detail.vendor.posProvider ?? "—"} />
+          <AdminInfoRow label="Deliverect channel" value={detail.vendor.deliverectChannelLinkId ?? "—"} />
+          <AdminInfoRow label="Deliverect location" value={detail.vendor.deliverectLocationId ?? "—"} />
+          <AdminInfoRow
+            label="Menu items"
+            value={`${detail.menuSync.totalItems} total · ${detail.menuSync.visibleItems} visible · ${detail.menuSync.unavailableItems} unavailable`}
+          />
+          <AdminInfoRow
+            label="Last successful sync"
+            value={detail.menuSync.lastSuccessAt ? new Date(detail.menuSync.lastSuccessAt).toLocaleString() : "—"}
+          />
+          <AdminInfoRow
+            label="Last failed sync"
+            value={detail.menuSync.lastFailedAt ? new Date(detail.menuSync.lastFailedAt).toLocaleString() : "—"}
+          />
+          <AdminReasonActionForm
+            label={adminRefreshMenuActionLabel(routingMode)}
+            description={adminRefreshMenuActionDescription(routingMode)}
+            confirmLabel="Refresh menu"
+            disabled={!detail.menuSync.refreshConfigured}
+            disabledReason="Menu refresh is not configured yet."
+            onSubmit={(reason) => run(() => adminRefreshVendorMenuAction(vendorId, reason))}
+          />
+        </AdminSection>
+      ) : null}
 
       <AdminSection title="Stripe / setup">
         <AdminInfoRow label="Connect account" value={detail.vendor.stripeConnectedAccountId ?? "Not connected"} />

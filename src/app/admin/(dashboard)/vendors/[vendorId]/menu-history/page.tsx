@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
+import { vendorMenuManagementPageSubtitle } from "@/lib/integrations/provider-display";
 import { fetchVendorMenuVersionHistoryForAdmin } from "@/lib/admin-vendor-menu-history-queries";
 import { VendorImportsSection } from "./VendorImportsSection";
 import { VendorMenuHistoryClient, type MenuHistoryRowClient } from "./VendorMenuHistoryClient";
@@ -17,7 +18,7 @@ export default async function AdminVendorMenuHistoryPage({
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId.trim() },
-    select: { id: true, name: true, slug: true },
+    select: { id: true, name: true, slug: true, orderRoutingMode: true },
   });
   if (!vendor) notFound();
 
@@ -52,11 +53,15 @@ export default async function AdminVendorMenuHistoryPage({
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-oo-charcoal">Menu management</h1>
         <p className="mt-2 max-w-2xl text-sm text-oo-stone-gray">
-          Deliverect imports, draft review, and published menu snapshots for <strong>{vendor.name}</strong>.
+          {vendorMenuManagementPageSubtitle(vendor.orderRoutingMode, vendor.name)}
         </p>
       </div>
 
-      <VendorImportsSection vendorId={vendor.id} vendorName={vendor.name} />
+      <VendorImportsSection
+        vendorId={vendor.id}
+        vendorName={vendor.name}
+        orderRoutingMode={vendor.orderRoutingMode}
+      />
 
       <VendorMenuHistoryClient
         vendorId={vendor.id}

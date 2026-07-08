@@ -12,6 +12,9 @@ import {
   isOpenOrderMenuSource,
   type VendorMenuSourceFields,
 } from "@/lib/vendor-menu-source";
+import { integratedOrderRoutingLabel } from "@/lib/integrations/provider-display";
+
+export { integratedOrderRoutingLabel };
 
 export type VendorMenuSourceContext = VendorMenuSourceFields & {
   id: string;
@@ -90,12 +93,5 @@ export function isSquareIntegratedVendor(
   return vendor.orderRoutingMode === "square";
 }
 
-export function integratedOrderRoutingLabel(
-  orderRoutingMode: VendorOrderRoutingMode | string | null | undefined
-): string {
-  if (orderRoutingMode === "deliverect") return "Deliverect";
-  if (orderRoutingMode === "square") return "Square";
-  return "Manual / Tablet";
-}
 
 export { isOpenOrderMenuSource, isDeliverectMenuSource };

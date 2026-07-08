@@ -48,11 +48,13 @@ describe("vendor menu management UX", () => {
     expect(guard).toContain("vendorMenuManagementPath");
   });
 
-  it("generic menu imports page renders provider panels", () => {
+  it("generic menu imports page renders provider panels with provider-aware copy", () => {
     const importsPage = readVendor("menu/imports/page.tsx");
-    expect(importsPage).toContain("Menu Imports");
+    expect(importsPage).toContain("Menu management");
+    expect(importsPage).toContain("vendorMenuImportsPageSubtitle");
     expect(importsPage).toContain("VendorDeliverectMenuImportsPanel");
     expect(importsPage).toContain("VendorSquareMenuImportsPanel");
+    expect(importsPage).not.toContain("Deliverect imports, draft review");
   });
 
   it("legacy menu-imports list redirects to menu/imports", () => {
@@ -116,12 +118,26 @@ describe("vendor menu management UX", () => {
     expect(squareIntegration).not.toContain("VendorSquareCatalogCard");
   });
 
-  it("admin vendor detail shows menu management mode", () => {
+  it("admin vendor detail gates provider-specific diagnostics", () => {
     const admin = readFileSync(
       join(vendorDir, "../../../app/admin/(dashboard)/vendors/[vendorId]/AdminVendorRescueClient.tsx"),
       "utf8"
     );
-    expect(admin).toContain("Menu management");
-    expect(admin).toContain("vendorMenuManagementModeLabel");
+    const adminPage = readFileSync(
+      join(vendorDir, "../../../app/admin/(dashboard)/vendors/[vendorId]/page.tsx"),
+      "utf8"
+    );
+    expect(admin).toContain("adminSquareInjectionDiagnosticsVisible");
+    expect(admin).toContain("adminDeliverectMenuPosSectionVisible");
+    expect(adminPage).toContain("adminMenuManagementToolDescription");
+    expect(adminPage).toContain("adminPosMappingToolVisible");
+  });
+
+  it("integrations hub page is provider-aware", () => {
+    const hub = readVendor("integrations/page.tsx");
+    expect(hub).toContain("vendorIntegrationsHubDescription");
+    expect(hub).toContain("isSquareRoutingMode");
+    expect(hub).toContain("isDeliverectRoutingMode");
+    expect(hub).toContain("isManualDashboardRoutingMode");
   });
 });

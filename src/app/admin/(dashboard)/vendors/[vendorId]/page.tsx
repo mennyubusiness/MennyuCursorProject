@@ -7,6 +7,12 @@ import { loadSquareOrderRoutingReadiness } from "@/lib/integrations/square/squar
 import { loadAdminSquareOrderInjectionDiagnostics } from "@/lib/integrations/square/admin-square-order-injection-diagnostics.server";
 import { loadAdminVendorDetail } from "@/services/admin-vendor-detail.service";
 import { evaluateVendorCustomerOrderingHoursDebug } from "@/lib/vendor-customer-ordering-hours";
+import {
+  adminMenuManagementToolDescription,
+  adminPosMappingToolDescription,
+  adminPosMappingToolTitle,
+  adminPosMappingToolVisible,
+} from "@/lib/integrations/provider-display";
 import { AdminVendorRescueClient } from "./AdminVendorRescueClient";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +60,8 @@ export default async function AdminVendorDetailPage({
     podPickupTimezone: vendorHoursRow?.pods[0]?.pod.pickupTimezone,
   });
   const hoursDebugPodName = vendorHoursRow?.pods[0]?.pod.name ?? null;
+  const routingMode = detail.vendor.orderRoutingMode;
+  const showPosMappingTool = adminPosMappingToolVisible(routingMode);
 
   return (
     <div className="space-y-8">
@@ -90,18 +98,24 @@ export default async function AdminVendorDetailPage({
               className="flex flex-col rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm hover:bg-oo-cream/80"
             >
               <span className="font-medium text-oo-charcoal">Menu management</span>
-              <span className="mt-1 text-sm text-oo-stone-gray">Deliverect imports, publish/discard, snapshots</span>
+              <span className="mt-1 text-sm text-oo-stone-gray">
+                {adminMenuManagementToolDescription(routingMode)}
+              </span>
             </Link>
           </li>
-          <li>
-            <Link
-              href={`/admin/vendors/${id}/deliverect-mapping`}
-              className="flex flex-col rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm hover:bg-oo-cream/80"
-            >
-              <span className="font-medium text-oo-charcoal">POS &amp; Deliverect IDs</span>
-              <span className="mt-1 text-sm text-oo-stone-gray">Channel mapping and POS health</span>
-            </Link>
-          </li>
+          {showPosMappingTool ? (
+            <li>
+              <Link
+                href={`/admin/vendors/${id}/deliverect-mapping`}
+                className="flex flex-col rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm hover:bg-oo-cream/80"
+              >
+                <span className="font-medium text-oo-charcoal">{adminPosMappingToolTitle(routingMode)}</span>
+                <span className="mt-1 text-sm text-oo-stone-gray">
+                  {adminPosMappingToolDescription(routingMode)}
+                </span>
+              </Link>
+            </li>
+          ) : null}
         </ul>
       </section>
     </div>

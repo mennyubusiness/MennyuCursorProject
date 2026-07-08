@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import {
+  isSquareRoutingMode,
   isVendorDeliverectLiveForUi,
   isVendorPosManagedForUi,
   vendorKitchenStatusWarning,
 } from "@/lib/vendor-order-routing-mode";
+import { loadSquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import {
@@ -40,7 +42,13 @@ export default async function VendorKitchenPage({
     hasUnmatchedChannelRegistrationForVendor: hasUnmatchedChannelRegistration,
   });
 
-  const posWarning = vendorKitchenStatusWarning(vendor.orderRoutingMode, posUi);
+  const posWarning = isSquareRoutingMode(vendor.orderRoutingMode)
+    ? vendorKitchenStatusWarning(vendor.orderRoutingMode, posUi, {
+        squareInjectionOperational: (
+          await loadSquareOrderRoutingReadiness(vendorId)
+        ).injectionOperationalReady,
+      })
+    : vendorKitchenStatusWarning(vendor.orderRoutingMode, posUi);
 
   const initialVendorOrders = serializeVendorOrdersForBoard(
     data.vendorOrders,

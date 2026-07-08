@@ -10,6 +10,10 @@ import {
   isDuplicatePayloadJob,
 } from "@/lib/admin-menu-import-queries";
 import {
+  menuImportDraftReviewBanner,
+  getProviderDisplayProfile,
+} from "@/lib/integrations/provider-display";
+import {
   menuImportFriendlySource,
   menuImportListSummaryLine,
   vendorMenuImportListBadge,
@@ -33,9 +37,11 @@ function isDraftAwaitingReview(j: {
 export async function VendorImportsSection({
   vendorId,
   vendorName,
+  orderRoutingMode,
 }: {
   vendorId: string;
   vendorName: string;
+  orderRoutingMode?: string | null;
 }) {
   const adminSecret = env.ADMIN_SECRET?.trim() ?? null;
 
@@ -53,6 +59,8 @@ export async function VendorImportsSection({
   const draftJobs = jobs.filter((j) => isDraftAwaitingReview(j));
   const previousJobs = jobs.filter((j) => !isDraftAwaitingReview(j));
 
+  const sectionTitle = getProviderDisplayProfile(orderRoutingMode).menuImportsSectionTitle;
+
   return (
     <div id="vendor-imports" className="space-y-6">
       {pendingJob && (
@@ -62,8 +70,7 @@ export async function VendorImportsSection({
         >
           <p className="font-semibold">Draft available · Unpublished changes</p>
           <p className="mt-1 text-amber-900/90">
-            A Deliverect import is waiting for review before it affects the live menu for{" "}
-            <strong>{vendorName}</strong>.
+            {menuImportDraftReviewBanner(pendingJob.source, vendorName)}
           </p>
           <Link
             href={`/admin/menu-imports/${pendingJob.id}#admin-menu-import-publish`}
@@ -75,7 +82,7 @@ export async function VendorImportsSection({
       )}
 
       <div>
-        <h2 className="text-lg font-semibold text-oo-charcoal">Deliverect imports</h2>
+        <h2 className="text-lg font-semibold text-oo-charcoal">{sectionTitle}</h2>
         <p className="mt-1 text-sm text-oo-stone-gray">
           Import runs for this vendor. Open a row to view changes, publish, or discard — same as before.
         </p>
