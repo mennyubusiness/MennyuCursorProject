@@ -73,12 +73,28 @@ export function fulfillmentStatusBadge(fulfillmentStatus: string): { label: stri
   }
 }
 
+export function isSquareRoutedVendorOrder(vo: {
+  squareOrderId?: string | null;
+  squareSubmittedAt?: Date | null;
+  vendor?: { orderRoutingMode?: string | null };
+}): boolean {
+  if (vo.vendor?.orderRoutingMode === "square") return true;
+  if (vo.squareOrderId?.trim()) return true;
+  if (vo.squareSubmittedAt) return true;
+  return false;
+}
+
 export function providerLabel(vo: {
   deliverectChannelLinkId?: string | null;
-  vendor: { deliverectChannelLinkId?: string | null };
+  vendor: { deliverectChannelLinkId?: string | null; orderRoutingMode?: string | null };
   deliverectSubmittedAt?: Date | null;
+  squareOrderId?: string | null;
+  squareSubmittedAt?: Date | null;
   routingStatus: string;
 }): { label: string; className: string } {
+  if (isSquareRoutedVendorOrder(vo)) {
+    return { label: "Square", className: "bg-sky-100 text-sky-900" };
+  }
   const deliverect = hasDeliverectChannelLink({
     deliverectChannelLinkId: vo.deliverectChannelLinkId,
     vendorDeliverectChannelLinkId: vo.vendor.deliverectChannelLinkId,

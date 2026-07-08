@@ -90,16 +90,29 @@ describe("isVendorRoutingOperationalReady", () => {
     ).toBe(false);
   });
 
-  it("blocks square routing until order injection is live", () => {
+  it("square routing is ready only when explicitly enabled and prerequisites pass", () => {
     expect(
       isVendorRoutingOperationalReady({
         ...connectedPos,
         orderRoutingMode: "square",
+        squareOrderRoutingEnabled: false,
+        squareOrderRoutingReady: true,
       })
     ).toBe(false);
-    expect(vendorRoutingSetupBlockerLabel({ orderRoutingMode: "square" })).toContain(
-      "order injection"
-    );
+    expect(
+      isVendorRoutingOperationalReady({
+        ...connectedPos,
+        orderRoutingMode: "square",
+        squareOrderRoutingEnabled: true,
+        squareOrderRoutingReady: true,
+      })
+    ).toBe(true);
+    expect(
+      vendorRoutingSetupBlockerLabel({
+        orderRoutingMode: "square",
+        squareOrderRoutingEnabled: false,
+      })
+    ).toMatch(/not enabled/i);
   });
 
   it("does not treat square as manual dashboard", () => {

@@ -19,6 +19,7 @@ import {
 import type { BusinessHoursEvaluation } from "@/lib/business-time";
 import type { AdminVendorDetailView } from "@/services/admin-vendor-detail.service";
 import type { AdminSquareRoutingStatus } from "@/lib/integrations/square/square-routing-readiness";
+import type { SquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { AdminVendorOrderRoutingSection } from "./AdminVendorOrderRoutingSection";
@@ -58,6 +59,7 @@ export function AdminVendorRescueClient({
   podOptions,
   posSummary,
   squareStatus,
+  squareOrderRoutingReady,
   hoursDebug,
   hoursDebugPodName,
 }: {
@@ -65,6 +67,7 @@ export function AdminVendorRescueClient({
   podOptions: Option[];
   posSummary: VendorPosReadinessSummary | null;
   squareStatus: AdminSquareRoutingStatus;
+  squareOrderRoutingReady: SquareOrderRoutingReadiness;
   hoursDebug?: BusinessHoursEvaluation | null;
   hoursDebugPodName?: string | null;
 }) {
@@ -382,6 +385,8 @@ export function AdminVendorRescueClient({
           orderRoutingMode={detail.vendor.orderRoutingMode as VendorOrderRoutingMode}
           posSummary={posSummary}
           squareStatus={squareStatus}
+          squareOrderRoutingEnabled={detail.vendor.squareOrderRoutingEnabled}
+          squareOrderRoutingReady={squareOrderRoutingReady}
         />
       ) : null}
 

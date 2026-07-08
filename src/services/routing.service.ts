@@ -1,15 +1,13 @@
 /**
  * Routing abstraction: single entry point for vendor-order routing.
  * Callers use this service instead of Deliverect-specific modules.
- *
- * Provider selection: Deliverect when vendor (or VO) has deliverectChannelLinkId set;
- * otherwise manual/no-op path. Future: explicit Vendor.routingProvider or capability flag.
- * - cancelVendorOrderRouting(vendorOrderId) when cancellation to POS is required.
  */
 
 import { prisma } from "@/lib/db";
 import { submitVendorOrderToDeliverect } from "@/services/deliverect.service";
+import { submitVendorOrderToSquare } from "@/services/square-order.service";
 import { applyVendorOrderStatusWithMeta } from "@/services/vendor-order-status-instrumentation";
+import { isSquareRoutingMode } from "@/lib/vendor-order-routing-mode";
 
 /** Normalized result for any routing backend. Keeps callers independent of provider. */
 export interface RoutingResult {
@@ -34,9 +32,6 @@ const DEFAULT_PREP_MINUTES = 15;
 /**
  * Submit a vendor order for routing. Used after payment (post-payment flow) and by any flow
  * that needs to send a pending vendor order to the kitchen/POS.
- *
- * Chooses path by vendor config: Deliverect when channel link ID is set; otherwise manual
- * (VO set to routingStatus confirmed and history recorded; vendor handles order manually or via other means).
  */
 export async function submitVendorOrder(
   vendorOrderId: string,
@@ -49,6 +44,7 @@ export async function submitVendorOrder(
       vendor: {
         select: {
           orderRoutingMode: true,
+          squareOrderRoutingEnabled: true,
           deliverectChannelLinkId: true,
           deliverectBusyDelayMinutes: true,
         },
@@ -62,11 +58,35 @@ export async function submitVendorOrder(
   const channelLinkId =
     voHead.vendor.deliverectChannelLinkId ?? voHead.deliverectChannelLinkId;
 
-  if (routingMode === "square") {
+  if (isSquareRoutingMode(routingMode)) {
+    if (!voHead.vendor.squareOrderRoutingEnabled) {
+      return {
+        success: false,
+        error: "Square order routing is not enabled for this vendor.",
+        code: "SQUARE_ROUTING_DISABLED",
+      };
+    }
+    const result = await submitVendorOrderToSquare(vendorOrderId, {
+      customerPhone: context.customerPhone,
+      customerEmail: context.customerEmail,
+    });
+    if (!result.success && !result.skipped) {
+      console.warn(
+        JSON.stringify({
+          event: "submit_vendor_order_failed",
+          scope: "square_routing",
+          vendorOrderId,
+          error: result.error ?? null,
+          code: result.code ?? null,
+        })
+      );
+    }
     return {
-      success: false,
-      error: "Square order routing is not implemented yet.",
-      code: "SQUARE_ROUTING_NOT_IMPLEMENTED",
+      success: result.success,
+      externalOrderId: result.squareOrderId,
+      error: result.error,
+      code: result.code,
+      skipped: result.skipped,
     };
   }
 
@@ -140,8 +160,6 @@ export async function submitVendorOrder(
       where: { id: vendorOrderId },
       select: { statusAuthority: true },
     });
-    // Do not mark POS-managed until a Deliverect webhook proves sync (promoted there).
-    // Until then, vendor may use dashboard; explicit vendor_manual avoids legacy infer edge cases.
     await prisma.vendorOrder.update({
       where: { id: vendorOrderId },
       data: {
@@ -161,8 +179,6 @@ export async function submitVendorOrder(
 
 /**
  * Retry routing for a vendor order (e.g. admin "Retry routing" from Needs Attention).
- * Loads order context and calls submitVendorOrder. Use when the vendor order already exists
- * and may have failed a previous submission.
  */
 export async function retryVendorOrderRouting(vendorOrderId: string): Promise<RoutingResult> {
   const vo = await prisma.vendorOrder.findUnique({

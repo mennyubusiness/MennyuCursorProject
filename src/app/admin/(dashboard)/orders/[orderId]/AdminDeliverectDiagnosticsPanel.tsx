@@ -13,7 +13,7 @@ import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import type { AdminOrderDetail } from "@/lib/admin-order-detail-query";
 import type { DeliverectPayloadValidationSnapshot } from "@/integrations/deliverect/payload-validation";
 import type { VendorOrderStatusAuthority, VendorOrderStatusSource } from "@prisma/client";
-import { formatAdminOrderDate } from "@/lib/admin-order-detail-ui";
+import { formatAdminOrderDate, isSquareRoutedVendorOrder } from "@/lib/admin-order-detail-ui";
 import { AdminDeliverectRecheck } from "./AdminDeliverectRecheck";
 import { AdminVendorOrderOperationalPanel } from "./AdminVendorOrderOperationalPanel";
 
@@ -90,6 +90,79 @@ function toLifecycleInput(vo: VoRow): DeliverectAdminVoInput {
   };
 }
 
+/** Collapsed-by-default dense Square routing debug fields. */
+export function AdminSquareRoutingTechnicalDetails({ vo }: { vo: VoRow }) {
+  if (!isSquareRoutedVendorOrder(vo)) return null;
+
+  const live = isRoutingRetryAvailable();
+  const mappingIssues =
+    vo.lastSquarePayload != null &&
+    typeof vo.lastSquarePayload === "object" &&
+    "mappingIssues" in (vo.lastSquarePayload as object)
+      ? (vo.lastSquarePayload as { mappingIssues?: unknown }).mappingIssues
+      : null;
+
+  return (
+    <details className="mt-4 rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
+      <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
+        Square routing details
+      </summary>
+      <div className="mt-3 space-y-3 text-xs text-oo-charcoal">
+        <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+          <div>
+            <dt className="text-oo-stone-gray">Provider</dt>
+            <dd>Square{live ? "" : " (live routing disabled in env)"}</dd>
+          </div>
+          <div>
+            <dt className="text-oo-stone-gray">Routing status</dt>
+            <dd>{vo.routingStatus}</dd>
+          </div>
+          <div>
+            <dt className="text-oo-stone-gray">Square order id</dt>
+            <dd className="break-all font-mono text-[11px]">{vo.squareOrderId ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-oo-stone-gray">Submitted at</dt>
+            <dd>{vo.squareSubmittedAt ? formatAdminOrderDate(vo.squareSubmittedAt) : "—"}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-oo-stone-gray">Last error</dt>
+            <dd className="text-red-900">{vo.squareLastError ?? "—"}</dd>
+          </div>
+        </dl>
+
+        {mappingIssues ? (
+          <div className="rounded-md border border-red-200 bg-red-50/90 px-2.5 py-2 text-xs text-red-950">
+            <p className="font-semibold">Payload mapping issues</p>
+            <pre className="mt-1 max-h-32 overflow-auto font-mono text-[10px]">
+              {jsonBlock(mappingIssues, 4000)}
+            </pre>
+          </div>
+        ) : null}
+
+        <div className="space-y-2 border-t border-oo-light-stone pt-2">
+          <details>
+            <summary className="cursor-pointer font-medium text-oo-stone-gray hover:text-oo-charcoal">
+              Raw: last Square request audit
+            </summary>
+            <pre className="mt-1 max-h-48 overflow-auto rounded border border-oo-light-stone bg-oo-warm-white p-2 font-mono text-[10px] leading-snug">
+              {jsonBlock(vo.lastSquarePayload, 8000)}
+            </pre>
+          </details>
+          <details>
+            <summary className="cursor-pointer font-medium text-oo-stone-gray hover:text-oo-charcoal">
+              Raw: last Square API response
+            </summary>
+            <pre className="mt-1 max-h-48 overflow-auto rounded border border-oo-light-stone bg-oo-warm-white p-2 font-mono text-[10px] leading-snug">
+              {jsonBlock(vo.lastSquareResponse, 8000)}
+            </pre>
+          </details>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 /** Collapsed-by-default dense Deliverect / routing debug fields. */
 export function AdminVendorOrderTechnicalRoutingDetails({
   vo,
@@ -98,6 +171,9 @@ export function AdminVendorOrderTechnicalRoutingDetails({
   vo: VoRow;
   showRecheck?: boolean;
 }) {
+  if (isSquareRoutedVendorOrder(vo)) {
+    return <AdminSquareRoutingTechnicalDetails vo={vo} />;
+  }
   if (!shouldShowDeliverectAdminDiagnostics(vo)) return null;
 
   const now = new Date();

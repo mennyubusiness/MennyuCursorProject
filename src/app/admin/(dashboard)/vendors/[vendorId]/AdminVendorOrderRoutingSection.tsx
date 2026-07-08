@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { AdminReasonActionForm } from "@/components/admin/AdminReasonActionForm";
-import { adminUpdateVendorOrderRoutingModeAction } from "@/actions/admin-vendor.actions";
+import { adminUpdateVendorOrderRoutingModeAction, adminSetSquareOrderRoutingEnabledAction } from "@/actions/admin-vendor.actions";
+import type { SquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
 import type { AdminSquareRoutingStatus } from "@/lib/integrations/square/square-routing-readiness";
 import {
   isDeliverectRoutingMode,
@@ -21,18 +22,27 @@ export function AdminVendorOrderRoutingSection({
   orderRoutingMode,
   posSummary,
   squareStatus,
+  squareOrderRoutingEnabled,
+  squareOrderRoutingReady,
 }: {
   vendorId: string;
   orderRoutingMode: VendorOrderRoutingMode;
   posSummary: VendorPosReadinessSummary;
   squareStatus: AdminSquareRoutingStatus;
+  squareOrderRoutingEnabled: boolean;
+  squareOrderRoutingReady: SquareOrderRoutingReadiness;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<VendorOrderRoutingMode>(orderRoutingMode);
   const [pending, startTransition] = useTransition();
   const deliverectMode = isDeliverectRoutingMode(mode);
   const squareMode = isSquareRoutingMode(mode);
-  const routingReady = isVendorRoutingOperationalReady({ ...posSummary, orderRoutingMode: mode });
+  const routingReady = isVendorRoutingOperationalReady({
+    ...posSummary,
+    orderRoutingMode: mode,
+    squareOrderRoutingEnabled: mode === "square" ? squareOrderRoutingEnabled : undefined,
+    squareOrderRoutingReady: mode === "square" ? squareOrderRoutingReady.ready : undefined,
+  });
   const squareSelectable = squareStatus.isSelectable;
 
   return (
@@ -134,7 +144,62 @@ export function AdminVendorOrderRoutingSection({
       {squareMode && !routingReady ? (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           {VENDOR_ROUTING_MODE_COPY.square.incompleteWarning}
+          {!squareOrderRoutingReady.ready && squareOrderRoutingReady.missingRequirements.length > 0 ? (
+            <span className="mt-1 block">{squareOrderRoutingReady.missingRequirements.join(" ")}</span>
+          ) : null}
         </p>
+      ) : null}
+
+      {squareMode ? (
+        <div className="mt-4 rounded-lg border border-oo-light-stone bg-oo-cream/30 p-3">
+          <p className="text-sm font-medium text-oo-charcoal">Square order injection</p>
+          <p className="mt-1 text-xs text-oo-stone-gray">
+            {squareOrderRoutingEnabled
+              ? "Enabled — paid orders inject to Square after Stripe checkout (when SQUARE_ROUTING_LIVE is on)."
+              : "Disabled — menu publish does not enable this automatically."}
+          </p>
+          {squareOrderRoutingEnabled ? (
+            <AdminReasonActionForm
+              label="Disable Square order routing"
+              description="Stops sending new paid orders to Square. Existing Square orders are unchanged."
+              confirmLabel={pending ? "Saving…" : "Disable Square order routing"}
+              onSubmit={(reason) =>
+                new Promise((resolve) => {
+                  startTransition(async () => {
+                    const result = await adminSetSquareOrderRoutingEnabledAction({
+                      vendorId,
+                      enabled: false,
+                      reason,
+                    });
+                    if (result.ok) router.refresh();
+                    resolve(result);
+                  });
+                })
+              }
+            />
+          ) : (
+            <AdminReasonActionForm
+              label="Enable Square order routing"
+              description="Requires healthy Square connection, selected location, and a published Square-imported menu."
+              confirmLabel={pending ? "Saving…" : "Enable Square order routing"}
+              disabled={!squareOrderRoutingReady.ready}
+              disabledReason={squareOrderRoutingReady.missingRequirements.join(" ") || "Prerequisites incomplete."}
+              onSubmit={(reason) =>
+                new Promise((resolve) => {
+                  startTransition(async () => {
+                    const result = await adminSetSquareOrderRoutingEnabledAction({
+                      vendorId,
+                      enabled: true,
+                      reason,
+                    });
+                    if (result.ok) router.refresh();
+                    resolve(result);
+                  });
+                })
+              }
+            />
+          )}
+        </div>
       ) : null}
 
       {mode !== orderRoutingMode ? (

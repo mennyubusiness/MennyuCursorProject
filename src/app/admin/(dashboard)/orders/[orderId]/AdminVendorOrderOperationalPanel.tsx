@@ -43,16 +43,24 @@ export function AdminVendorOrderOperationalPanel({ vo }: { vo: VoRow }) {
       <div className="sm:col-span-2">
         <dt className="text-xs font-medium text-oo-stone-gray">POS / routing</dt>
         <dd className="mt-0.5 text-oo-stone-gray">
-          {provider.label === "Deliverect"
-            ? "Connected to POS (Deliverect)"
-            : "Manual routing (no POS link)"}
+          {provider.label === "Square"
+            ? "Connected to POS (Square)"
+            : provider.label === "Deliverect"
+              ? "Connected to POS (Deliverect)"
+              : "Manual routing (no POS link)"}
         </dd>
       </div>
-      {vo.deliverectLastError && vo.routingStatus === "failed" && (
+      {vo.squareOrderId?.trim() ? (
+        <div className="sm:col-span-2">
+          <dt className="text-xs font-medium text-oo-stone-gray">Square order id</dt>
+          <dd className="mt-0.5 break-all font-mono text-[11px] text-oo-charcoal">{vo.squareOrderId}</dd>
+        </div>
+      ) : null}
+      {(vo.squareLastError || vo.deliverectLastError) && vo.routingStatus === "failed" && (
         <div className="sm:col-span-2">
           <p className="rounded border border-red-200 bg-red-50/70 px-2.5 py-2 text-xs text-red-900">
-            Routing problem: {vo.deliverectLastError.slice(0, 160)}
-            {vo.deliverectLastError.length > 160 ? "…" : ""}
+            Routing problem: {(vo.squareLastError ?? vo.deliverectLastError ?? "").slice(0, 160)}
+            {(vo.squareLastError ?? vo.deliverectLastError ?? "").length > 160 ? "…" : ""}
           </p>
         </div>
       )}

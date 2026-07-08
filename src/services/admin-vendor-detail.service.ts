@@ -26,6 +26,7 @@ export type AdminVendorDetailView = {
     deliverectChannelLinkId: string | null;
     deliverectLocationId: string | null;
     orderRoutingMode: string;
+    squareOrderRoutingEnabled: boolean;
     menuSource: string;
     vendorDashboardLastSeenAt: string | null;
     stripeConnectedAccountId: string | null;
@@ -142,6 +143,7 @@ export async function loadAdminVendorDetail(vendorId: string): Promise<AdminVend
       deliverectChannelLinkId: vendor.deliverectChannelLinkId,
       deliverectLocationId: vendor.deliverectLocationId,
       orderRoutingMode: vendor.orderRoutingMode,
+      squareOrderRoutingEnabled: vendor.squareOrderRoutingEnabled,
       menuSource: vendor.menuSource,
       vendorDashboardLastSeenAt: vendor.vendorDashboardLastSeenAt?.toISOString() ?? null,
       stripeConnectedAccountId: vendor.stripeConnectedAccountId,

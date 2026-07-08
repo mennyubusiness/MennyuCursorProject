@@ -10,6 +10,12 @@ import {
   type SquareCatalogListResponse,
   type SquareCatalogObject,
 } from "@/lib/integrations/square/square-catalog.types";
+import type {
+  SquareCreateExternalPaymentRequest,
+  SquareCreateOrderRequest,
+  SquareCreateOrderResponse,
+  SquareCreatePaymentResponse,
+} from "@/lib/integrations/square/square-order.types";
 
 const SQUARE_API_VERSION = "2025-04-16";
 
@@ -195,4 +201,49 @@ export function isSquareCatalogObjectAvailableAtLocation(
   const present = obj.present_at_location_ids ?? [];
   if (present.length > 0) return present.includes(locationId);
   return true;
+}
+
+function squareApiHeaders(accessToken: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    "Square-Version": SQUARE_API_VERSION,
+  };
+}
+
+export async function createSquareOrder(
+  accessToken: string,
+  body: SquareCreateOrderRequest
+): Promise<SquareCreateOrderResponse> {
+  const base = getSquareApiBaseUrl(resolveSquareEnvironment());
+  const res = await fetch(`${base}/v2/orders`, {
+    method: "POST",
+    headers: squareApiHeaders(accessToken),
+    body: JSON.stringify(body),
+  });
+  const json = (await res.json().catch(() => ({}))) as SquareCreateOrderResponse;
+  if (!res.ok) {
+    const detail = json.errors?.[0]?.detail ?? res.statusText;
+    throw new SquareApiError(`Square create order failed: ${detail}`, res.status, json);
+  }
+  return json;
+}
+
+export async function createSquareExternalPayment(
+  accessToken: string,
+  body: SquareCreateExternalPaymentRequest
+): Promise<SquareCreatePaymentResponse> {
+  const base = getSquareApiBaseUrl(resolveSquareEnvironment());
+  const res = await fetch(`${base}/v2/payments`, {
+    method: "POST",
+    headers: squareApiHeaders(accessToken),
+    body: JSON.stringify({ ...body, autocomplete: body.autocomplete ?? true }),
+  });
+  const json = (await res.json().catch(() => ({}))) as SquareCreatePaymentResponse;
+  if (!res.ok) {
+    const detail = json.errors?.[0]?.detail ?? res.statusText;
+    throw new SquareApiError(`Square external payment failed: ${detail}`, res.status, json);
+  }
+  return json;
 }

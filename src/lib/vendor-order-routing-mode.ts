@@ -67,19 +67,21 @@ export function isVendorDeliverectPosConnected(pos: VendorPosConnectionSummary):
 export type VendorRoutingReadinessInput = VendorPosConnectionSummary & {
   orderRoutingMode?: VendorOrderRoutingMode | null;
   deliverectMappingReady?: boolean;
+  squareOrderRoutingEnabled?: boolean;
+  /** Precomputed: Square connection + published Square menu (from loadSquareOrderRoutingReadiness). */
+  squareOrderRoutingReady?: boolean;
 };
 
 /**
  * Operational routing readiness: manual mode always passes; Deliverect mode requires
- * channel link + completed product/modifier mappings (when deliverectMappingReady is supplied).
- * Square mode is never operationally ready until Square order injection is implemented.
+ * channel link + completed product/modifier mappings; Square requires explicit enable + readiness.
  */
 export function isVendorRoutingOperationalReady(input: VendorRoutingReadinessInput): boolean {
   if (isManualDashboardRoutingMode(input.orderRoutingMode)) {
     return true;
   }
   if (isSquareRoutingMode(input.orderRoutingMode)) {
-    return false;
+    return input.squareOrderRoutingEnabled === true && input.squareOrderRoutingReady === true;
   }
   if (!isVendorDeliverectPosConnected(input)) {
     return false;
@@ -92,7 +94,13 @@ export function vendorRoutingSetupBlockerLabel(input: VendorRoutingReadinessInpu
     return null;
   }
   if (isSquareRoutingMode(input.orderRoutingMode)) {
-    return "Square order routing is selected but order injection is not live yet.";
+    if (!input.squareOrderRoutingEnabled) {
+      return "Square order routing is selected but not enabled yet.";
+    }
+    if (!input.squareOrderRoutingReady) {
+      return "Square order routing is enabled but prerequisites are incomplete (connection, location, or published Square menu).";
+    }
+    return null;
   }
   if (!isVendorDeliverectPosConnected(input)) {
     return "Deliverect is not connected.";
@@ -124,7 +132,7 @@ export const VENDOR_ROUTING_MODE_COPY = {
     vendorHelper:
       "Your orders are configured for Square routing. Order injection must be enabled before customers can place orders with this routing mode.",
     incompleteWarning:
-      "Square routing is selected but order injection is not live yet. This vendor cannot receive orders until Square order routing is implemented.",
+      "Square routing is selected but order injection is not enabled or prerequisites are incomplete.",
     notConnectedWarning:
       "Square is not ready. The vendor must connect Square and select an active location before Square routing can be enabled.",
   },
@@ -139,7 +147,7 @@ export function vendorRoutingStatusLabel(
     return vendorOrderRoutingModeAdminLabel(mode);
   }
   if (isSquareRoutingMode(mode)) {
-    return "Square routing (order injection pending)";
+    return "Square routing";
   }
   return vendorPosConnectionLabel(posState);
 }

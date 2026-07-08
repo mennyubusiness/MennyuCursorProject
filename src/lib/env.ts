@@ -103,6 +103,8 @@ const envSchema = z.object({
    * Use only for staging/demo; not for live launch.
    */
   ALLOW_ROUTING_MODE_MOCK: z.enum(["true", "false"]).optional(),
+  /** When "true", Square order injection calls the live Square Orders + Payments API after Stripe checkout. */
+  SQUARE_ROUTING_LIVE: z.enum(["true", "false"]).optional(),
   /**
    * When "true", allows DELIVERECT_ENV=staging (channel-link HMAC) while NODE_ENV=production.
    * For Deliverect sandbox on preview hosts only — not for live partner webhooks.

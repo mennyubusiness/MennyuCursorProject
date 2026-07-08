@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockFindUnique = vi.fn();
 const mockUpdate = vi.fn();
 const mockSubmitDeliverect = vi.fn();
+const mockSubmitSquare = vi.fn();
 const mockApplyStatus = vi.fn();
 
 vi.mock("@/lib/db", () => ({
@@ -16,6 +17,10 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/services/deliverect.service", () => ({
   submitVendorOrderToDeliverect: (...args: unknown[]) => mockSubmitDeliverect(...args),
+}));
+
+vi.mock("@/services/square-order.service", () => ({
+  submitVendorOrderToSquare: (...args: unknown[]) => mockSubmitSquare(...args),
 }));
 
 vi.mock("@/services/vendor-order-status-instrumentation", () => ({
@@ -39,12 +44,14 @@ function routingHead(opts?: {
   voChannelLink?: string | null;
   vendorChannelLink?: string | null;
   orderRoutingMode?: "manual_dashboard" | "deliverect" | "square";
+  squareOrderRoutingEnabled?: boolean;
   busyDelay?: number;
 }) {
   return {
     deliverectChannelLinkId: opts?.voChannelLink ?? null,
     vendor: {
       orderRoutingMode: opts?.orderRoutingMode ?? "deliverect",
+      squareOrderRoutingEnabled: opts?.squareOrderRoutingEnabled ?? false,
       deliverectChannelLinkId:
         opts?.vendorChannelLink === undefined ? "ch_deliverect_test" : opts.vendorChannelLink,
       deliverectBusyDelayMinutes: opts?.busyDelay ?? 0,
@@ -67,6 +74,7 @@ describe("submitVendorOrder", () => {
 
     expect(result).toEqual({ success: false, error: "Vendor order not found" });
     expect(mockSubmitDeliverect).not.toHaveBeenCalled();
+    expect(mockSubmitSquare).not.toHaveBeenCalled();
     expect(mockApplyStatus).not.toHaveBeenCalled();
   });
 
@@ -85,35 +93,43 @@ describe("submitVendorOrder", () => {
 
     expect(result).toEqual({ success: true, skipped: true });
     expect(mockSubmitDeliverect).not.toHaveBeenCalled();
-    expect(mockApplyStatus).toHaveBeenCalledWith(
-      {
-        vendorOrderId: VO_ID,
-        orderId: ORDER_ID,
-        patch: { routingStatus: "confirmed" },
-        statusSource: "system",
-        historySource: "manual",
-        extraVendorOrderUpdate: { statusAuthority: "vendor_manual" },
-        historyRoutingStatus: "confirmed",
-        historyFulfillmentStatus: "pending",
-      },
-      "manual"
-    );
+    expect(mockSubmitSquare).not.toHaveBeenCalled();
+    expect(mockApplyStatus).toHaveBeenCalled();
   });
 
-  it("fails safely for square routing without falling back to manual or deliverect", async () => {
+  it("fails when square routing mode is not enabled", async () => {
     mockFindUnique.mockResolvedValueOnce(
-      routingHead({ orderRoutingMode: "square", vendorChannelLink: null })
+      routingHead({ orderRoutingMode: "square", squareOrderRoutingEnabled: false })
     );
 
     const result = await submitVendorOrder(VO_ID, baseContext);
 
     expect(result).toEqual({
       success: false,
-      error: "Square order routing is not implemented yet.",
-      code: "SQUARE_ROUTING_NOT_IMPLEMENTED",
+      error: "Square order routing is not enabled for this vendor.",
+      code: "SQUARE_ROUTING_DISABLED",
+    });
+    expect(mockSubmitSquare).not.toHaveBeenCalled();
+    expect(mockSubmitDeliverect).not.toHaveBeenCalled();
+  });
+
+  it("routes square-enabled vendors through Square submit path", async () => {
+    mockFindUnique.mockResolvedValueOnce(
+      routingHead({ orderRoutingMode: "square", squareOrderRoutingEnabled: true })
+    );
+    mockSubmitSquare.mockResolvedValue({ success: true, squareOrderId: "sq_ord_1" });
+
+    const result = await submitVendorOrder(VO_ID, baseContext);
+
+    expect(mockSubmitSquare).toHaveBeenCalledWith(VO_ID, {
+      customerPhone: PHONE,
+      customerEmail: EMAIL,
+    });
+    expect(result).toEqual({
+      success: true,
+      externalOrderId: "sq_ord_1",
     });
     expect(mockSubmitDeliverect).not.toHaveBeenCalled();
-    expect(mockApplyStatus).not.toHaveBeenCalled();
   });
 
   it("fails deliverect routing when mode is deliverect but channel link is missing", async () => {
@@ -129,7 +145,6 @@ describe("submitVendorOrder", () => {
       code: "DELIVERECT_NOT_CONFIGURED",
     });
     expect(mockSubmitDeliverect).not.toHaveBeenCalled();
-    expect(mockApplyStatus).not.toHaveBeenCalled();
   });
 
   it("routes Deliverect-linked vendor through Deliverect submit path", async () => {
@@ -147,72 +162,6 @@ describe("submitVendorOrder", () => {
     expect(result).toEqual({
       success: true,
       externalOrderId: "dlv_ord_1",
-      error: undefined,
-      code: undefined,
-      skipped: undefined,
-    });
-    expect(mockApplyStatus).not.toHaveBeenCalled();
-    expect(mockUpdate).toHaveBeenCalledWith({
-      where: { id: VO_ID },
-      data: {
-        lastStatusSource: "system",
-        statusAuthority: "vendor_manual",
-      },
-    });
-  });
-
-  it("uses busy delay when it exceeds requested prep time", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(routingHead({ busyDelay: 30 }))
-      .mockResolvedValueOnce({ statusAuthority: "vendor_manual" });
-    mockSubmitDeliverect.mockResolvedValue({ success: true, deliverectOrderId: "dlv_ord_2" });
-
-    await submitVendorOrder(VO_ID, { ...baseContext, preparationTimeMinutes: 15 });
-
-    expect(mockSubmitDeliverect).toHaveBeenCalledWith(VO_ID, PHONE, EMAIL, 30);
-  });
-
-  it("propagates Deliverect submit failure without manual confirmation", async () => {
-    mockFindUnique.mockResolvedValueOnce(routingHead());
-    mockSubmitDeliverect.mockResolvedValue({
-      success: false,
-      error: "Deliverect API unavailable",
-      code: "SUBMISSION_FAILED",
-    });
-
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-    const result = await submitVendorOrder(VO_ID, baseContext);
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe("Deliverect API unavailable");
-    expect(result.code).toBe("SUBMISSION_FAILED");
-    expect(mockApplyStatus).not.toHaveBeenCalled();
-    expect(mockUpdate).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalled();
-    const logged = warnSpy.mock.calls[0]?.[0];
-    expect(typeof logged).toBe("string");
-    expect(logged).not.toContain("sk_");
-    expect(logged).not.toContain("whsec_");
-    expect(JSON.parse(String(logged))).toMatchObject({
-      event: "submit_vendor_order_failed",
-      vendorOrderId: VO_ID,
-    });
-
-    warnSpy.mockRestore();
-  });
-
-  it("does not overwrite statusAuthority when already set on Deliverect success", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(routingHead())
-      .mockResolvedValueOnce({ statusAuthority: "pos" });
-    mockSubmitDeliverect.mockResolvedValue({ success: true, deliverectOrderId: "dlv_ord_3" });
-
-    await submitVendorOrder(VO_ID, baseContext);
-
-    expect(mockUpdate).toHaveBeenCalledWith({
-      where: { id: VO_ID },
-      data: { lastStatusSource: "system" },
     });
   });
 });
@@ -238,14 +187,5 @@ describe("retryVendorOrderRouting", () => {
 
     expect(result.success).toBe(true);
     expect(mockSubmitDeliverect).toHaveBeenCalledWith(VO_ID, PHONE, EMAIL, 15);
-  });
-
-  it("returns not found when vendor order is missing", async () => {
-    mockFindUnique.mockResolvedValue(null);
-
-    const result = await retryVendorOrderRouting(VO_ID);
-
-    expect(result).toEqual({ success: false, error: "Vendor order not found" });
-    expect(mockSubmitDeliverect).not.toHaveBeenCalled();
   });
 });

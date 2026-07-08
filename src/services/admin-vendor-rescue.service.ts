@@ -447,6 +447,59 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
   return { ok: true, message: "Order routing mode updated." };
 }
 
+export async function adminSetSquareOrderRoutingEnabled(input: {
+  vendorId: string;
+  enabled: boolean;
+  adminUserId: string | null;
+  reason: string;
+}): Promise<ActionResult> {
+  const reasonCheck = requireAdminReason(input.reason);
+  if (!reasonCheck.ok) return reasonCheck;
+
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: input.vendorId },
+    select: { id: true, orderRoutingMode: true, squareOrderRoutingEnabled: true },
+  });
+  if (!vendor) return { ok: false, error: "Vendor not found." };
+  if (!isSquareRoutingMode(vendor.orderRoutingMode)) {
+    return { ok: false, error: "Square order routing can only be enabled when order routing mode is Square." };
+  }
+
+  if (input.enabled) {
+    const gate = await import("@/lib/integrations/square/square-order-routing-readiness").then((m) =>
+      m.assertSquareOrderRoutingReady(input.vendorId)
+    );
+    if (!gate.ok) return { ok: false, error: gate.error };
+  }
+
+  if (vendor.squareOrderRoutingEnabled === input.enabled) {
+    return { ok: true, message: input.enabled ? "Square order routing already enabled." : "Square order routing already disabled." };
+  }
+
+  await prisma.vendor.update({
+    where: { id: input.vendorId },
+    data: { squareOrderRoutingEnabled: input.enabled },
+  });
+
+  await createAdminAuditLog({
+    adminUserId: input.adminUserId,
+    actionType: ADMIN_AUDIT_ACTION.VENDOR_ORDER_ROUTING_MODE_UPDATED,
+    targetType: ADMIN_AUDIT_TARGET.vendor,
+    targetId: input.vendorId,
+    reason: reasonCheck.reason,
+    oldValue: String(vendor.squareOrderRoutingEnabled),
+    newValue: String(input.enabled),
+  });
+
+  await revalidateVendorOrderingSurfaces(input.vendorId);
+  return {
+    ok: true,
+    message: input.enabled
+      ? "Square order routing enabled. Paid orders will inject to Square when SQUARE_ROUTING_LIVE is on."
+      : "Square order routing disabled.",
+  };
+}
+
 export async function adminRefreshVendorMenu(input: {
   vendorId: string;
   adminUserId: string | null;

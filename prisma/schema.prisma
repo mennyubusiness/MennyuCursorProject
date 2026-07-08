@@ -534,6 +534,8 @@ model Vendor {
   posConnectionStatus     PosConnectionStatus      @default(not_connected)
   /// Post-checkout order routing: Open Order dashboard/tablet vs Deliverect POS.
   orderRoutingMode        VendorOrderRoutingMode   @default(manual_dashboard)
+  /// When true and orderRoutingMode=square, paid orders inject to Square (requires healthy connection + published Square menu).
+  squareOrderRoutingEnabled Boolean                @default(false)
   /// Menu tooling and published menu source: Open Order builder vs Deliverect sync.
   menuSource              VendorMenuSource         @default(open_order)
   /// Short location line for onboarding (city / neighborhood).
@@ -1034,6 +1036,7 @@ model VendorOrder {
   vendorNetPayoutCents                 Int?
   deliverectOrderId       String?
   deliverectChannelLinkId String?
+  squareOrderId           String?
   routingStatus           VendorRoutingStatus
   fulfillmentStatus       VendorFulfillmentStatus
   lastDeliverectPayload   Json?
@@ -1043,6 +1046,11 @@ model VendorOrder {
   updatedAt               DateTime                    @updatedAt
   deliverectLastError     String?
   deliverectSubmittedAt   DateTime?
+  squareAttempts          Int                         @default(0)
+  squareLastError         String?
+  squareSubmittedAt       DateTime?
+  lastSquarePayload       Json?
+  lastSquareResponse      Json?
   lastDeliverectResponse  Json?
   manuallyRecoveredAt     DateTime?
   manuallyRecoveredBy     String?
@@ -1073,6 +1081,7 @@ model VendorOrder {
   statusHistory           VendorOrderStatusHistory[]
 
   @@index([deliverectOrderId])
+  @@index([squareOrderId])
   @@index([orderId])
   @@index([vendorId])
 }

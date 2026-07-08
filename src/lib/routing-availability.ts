@@ -5,12 +5,12 @@
  * on the client, ROUTING_MODE is undefined and we return false / generic message.
  */
 export function isRoutingRetryAvailable(): boolean {
-  return process.env.ROUTING_MODE === "deliverect";
+  return process.env.ROUTING_MODE === "deliverect" || process.env.SQUARE_ROUTING_LIVE === "true";
 }
 
 export function getRoutingUnavailableReason(): string {
-  if (process.env.ROUTING_MODE === "mock") {
-    return "Routing retry is unavailable because Deliverect is not configured (ROUTING_MODE is mock).";
+  if (process.env.ROUTING_MODE === "mock" && process.env.SQUARE_ROUTING_LIVE !== "true") {
+    return "Routing retry is unavailable because live POS routing is disabled in this environment.";
   }
-  return "Routing retry is unavailable because Deliverect is not configured.";
+  return "Routing retry is unavailable because Deliverect/Square live routing is not configured.";
 }
