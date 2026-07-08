@@ -8,6 +8,10 @@ import {
   getActiveSquareConnectionForVendor,
 } from "@/lib/integrations/square/square-connection.service";
 import { loadSquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
+import {
+  evaluateSquareOAuthScopeCoverageFromMeta,
+  SQUARE_OAUTH_SCOPES,
+} from "@/lib/integrations/square/square-oauth-scopes";
 import { prisma } from "@/lib/db";
 
 export type AdminSquareConnectionDiagnosticStatus = "connected" | "error" | "missing";
@@ -31,6 +35,10 @@ export type AdminSquareOrderInjectionDiagnostics = {
     blockingReasons: string[];
     prerequisitesReady: boolean;
     injectionOperationalReady: boolean;
+    requiredOAuthScopes: string[];
+    authorizedOAuthScopes: string[];
+    missingOAuthScopes: string[];
+    oauthPermissionsVersion: number | null;
   };
 };
 
@@ -78,6 +86,8 @@ export async function loadAdminSquareOrderInjectionDiagnostics(
     connectionStatus: connection?.status ?? null,
   });
 
+  const scopeCoverage = evaluateSquareOAuthScopeCoverageFromMeta(connection?.capabilitiesMeta);
+
   return {
     global: loadAdminSquareEnvDiagnostics(),
     vendor: {
@@ -92,6 +102,12 @@ export async function loadAdminSquareOrderInjectionDiagnostics(
       blockingReasons: readiness.injectionBlockingReasons,
       prerequisitesReady: readiness.prerequisitesReady,
       injectionOperationalReady: readiness.injectionOperationalReady,
+      requiredOAuthScopes: scopeCoverage.requiredScopes.length
+        ? scopeCoverage.requiredScopes
+        : [...SQUARE_OAUTH_SCOPES],
+      authorizedOAuthScopes: scopeCoverage.authorizedScopes,
+      missingOAuthScopes: scopeCoverage.missingRequiredScopes,
+      oauthPermissionsVersion: scopeCoverage.permissionsVersion,
     },
   };
 }

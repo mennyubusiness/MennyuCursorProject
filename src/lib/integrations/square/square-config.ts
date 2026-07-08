@@ -2,13 +2,21 @@ import "server-only";
 
 import { env } from "@/lib/env";
 import { isIntegrationTokenEncryptionConfigured } from "@/lib/integrations/integration-token-crypto";
+import {
+  formatSquareOAuthScopesForAuthorize,
+  resolveSquareOAuthScopesForAuthorize,
+  SQUARE_OAUTH_MINIMAL_DEBUG_SCOPES,
+  SQUARE_OAUTH_SCOPES,
+} from "@/lib/integrations/square/square-oauth-scopes";
 
 export type SquareEnvironment = "sandbox" | "production";
 
-export const SQUARE_OAUTH_SCOPES = [
-  "MERCHANT_PROFILE_READ",
-  "ITEMS_READ",
-] as const;
+export {
+  SQUARE_OAUTH_SCOPES,
+  SQUARE_OAUTH_MINIMAL_DEBUG_SCOPES,
+  formatSquareOAuthScopesForAuthorize,
+  resolveSquareOAuthScopesForAuthorize,
+} from "@/lib/integrations/square/square-oauth-scopes";
 
 /** OAuth authorize + token endpoints — must use connect.*, never bare squareup hosts. */
 export const SQUARE_OAUTH_CONNECT_BASE_URLS = {

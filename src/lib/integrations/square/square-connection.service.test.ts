@@ -338,6 +338,74 @@ describe("square connection service", () => {
     expect(mockUpdate).toHaveBeenCalled();
   });
 
+  it("stores expanded OAuth scopes after reconnect when Square returns scope", async () => {
+    vi.mocked(exchangeSquareOAuthCode).mockResolvedValue({
+      access_token: "at_1",
+      merchant_id: "merchant_1",
+      scope:
+        "MERCHANT_PROFILE_READ ITEMS_READ ORDERS_READ ORDERS_WRITE PAYMENTS_READ PAYMENTS_WRITE",
+    });
+    vi.mocked(fetchSquareLocations).mockResolvedValue([
+      { id: "loc_only", name: "Only", status: "ACTIVE" },
+    ]);
+    mockFindFirst.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "conn_1" });
+
+    await completeSquareOAuthForVendor({ vendorId: "v1", code: "code_1" });
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          capabilities: expect.objectContaining({
+            authorizedScopes: expect.arrayContaining(["ORDERS_WRITE", "PAYMENTS_WRITE"]),
+            permissionsVersion: 2,
+            missingRequiredScopes: [],
+          }),
+        }),
+      })
+    );
+  });
+
+  it("warns when legacy connection is missing order injection OAuth scopes", async () => {
+    mockFindFirst.mockResolvedValue({
+      id: "conn_1",
+      status: "connected",
+      displayName: "Square",
+      externalMerchantId: "m1",
+      externalLocationId: "loc_a",
+      externalStoreId: "loc_a",
+      accessTokenRef: "cred_1",
+      createdAt: new Date(),
+      lastHealthCheckAt: null,
+      errorCode: null,
+      errorMessage: null,
+      isActive: true,
+      capabilities: {
+        declaredCapabilities: [],
+        squareEnvironment: "sandbox",
+        locations: [{ id: "loc_a", name: "A", status: "ACTIVE" }],
+        pendingLocationSelection: false,
+        selectedLocationName: "A",
+        authorizedScopes: ["MERCHANT_PROFILE_READ", "ITEMS_READ"],
+        permissionsVersion: 1,
+      },
+    });
+    mockUpdate.mockResolvedValue({});
+    vi.mocked(loadIntegrationProviderTokens).mockResolvedValue({
+      credentialId: "cred_1",
+      accessToken: "at",
+      refreshToken: "rt",
+      accessTokenExpiresAt: new Date(Date.now() + 60_000),
+    });
+    vi.mocked(fetchSquareLocations).mockResolvedValue([{ id: "loc_a", name: "A", status: "ACTIVE" }]);
+
+    const health = await evaluateSquareConnectionHealth("v1");
+    expect(health.warnings.some((w) => /Reconnect Square to grant order routing permissions/i.test(w))).toBe(
+      true
+    );
+    expect(health.oauthScopes?.hasOrderInjectionScopes).toBe(false);
+  });
+
   it("returns missing location when no location selected", async () => {
     mockFindFirst.mockResolvedValue({
       id: "conn_1",

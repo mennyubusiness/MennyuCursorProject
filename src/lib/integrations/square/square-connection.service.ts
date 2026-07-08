@@ -20,10 +20,20 @@ import {
   resolveSquareEnvironment,
   type SquareEnvironment,
 } from "@/lib/integrations/square/square-config";
+import {
+  buildSquareOAuthScopeCapabilities,
+  evaluateSquareOAuthScopeCoverageFromMeta,
+  parseSquareAuthorizedScopes,
+  SQUARE_OAUTH_PERMISSIONS_VERSION,
+  SQUARE_OAUTH_SCOPES,
+  SQUARE_OAUTH_SCOPE_RECONNECT_MESSAGE,
+  type SquareOAuthScopeMeta,
+} from "@/lib/integrations/square/square-oauth-scopes";
+import type { SquareOAuthTokenResponse } from "@/lib/integrations/square/square-api.client";
 import { IntegrationTokenEncryptionNotConfiguredError } from "@/lib/integrations/integration-token-crypto";
 import { prisma } from "@/lib/db";
 
-export type SquareConnectionCapabilitiesMeta = {
+export type SquareConnectionCapabilitiesMeta = SquareOAuthScopeMeta & {
   declaredCapabilities: string[];
   squareEnvironment: string;
   locations?: Array<
@@ -115,7 +125,24 @@ function parseCapabilitiesMeta(raw: unknown): SquareConnectionCapabilitiesMeta |
     connectedAt: typeof obj.connectedAt === "string" ? obj.connectedAt : null,
     lastTokenRefreshAt:
       typeof obj.lastTokenRefreshAt === "string" ? obj.lastTokenRefreshAt : null,
+    authorizedScopes: Array.isArray(obj.authorizedScopes)
+      ? obj.authorizedScopes.filter((v): v is string => typeof v === "string")
+      : null,
+    requiredScopes: Array.isArray(obj.requiredScopes)
+      ? obj.requiredScopes.filter((v): v is string => typeof v === "string")
+      : null,
+    missingRequiredScopes: Array.isArray(obj.missingRequiredScopes)
+      ? obj.missingRequiredScopes.filter((v): v is string => typeof v === "string")
+      : null,
+    permissionsVersion:
+      typeof obj.permissionsVersion === "number" ? obj.permissionsVersion : null,
   };
+}
+
+function resolveOAuthScopeCapabilitiesFromToken(tokenResponse: SquareOAuthTokenResponse) {
+  const parsed = parseSquareAuthorizedScopes(tokenResponse.scope);
+  const authorizedScopes = parsed.length > 0 ? parsed : [...SQUARE_OAUTH_SCOPES];
+  return buildSquareOAuthScopeCapabilities({ authorizedScopes });
 }
 
 function buildCapabilitiesJson(input: {
@@ -125,7 +152,9 @@ function buildCapabilitiesJson(input: {
   selectedLocationAddress?: string | null;
   connectedAt?: string | null;
   lastTokenRefreshAt?: string | null;
+  oauthScopes?: ReturnType<typeof buildSquareOAuthScopeCapabilities>;
 }): SquareConnectionCapabilitiesMeta {
+  const scopeMeta = input.oauthScopes;
   return {
     declaredCapabilities: getProviderCapabilities("square"),
     squareEnvironment: resolveSquareEnvironment(),
@@ -135,6 +164,10 @@ function buildCapabilitiesJson(input: {
     selectedLocationAddress: input.selectedLocationAddress ?? null,
     connectedAt: input.connectedAt ?? new Date().toISOString(),
     lastTokenRefreshAt: input.lastTokenRefreshAt ?? null,
+    authorizedScopes: scopeMeta?.authorizedScopes ?? null,
+    requiredScopes: scopeMeta?.requiredScopes ?? null,
+    missingRequiredScopes: scopeMeta?.missingRequiredScopes ?? null,
+    permissionsVersion: scopeMeta?.permissionsVersion ?? SQUARE_OAUTH_PERMISSIONS_VERSION,
   };
 }
 
@@ -355,6 +388,7 @@ export async function completeSquareOAuthForVendor(input: {
   const businessName =
     typeof merchant.business_name === "string" ? merchant.business_name : null;
   const displayName = businessName ? `Square — ${businessName}` : "Square connection";
+  const oauthScopes = resolveOAuthScopeCapabilitiesFromToken(tokenResponse);
 
   if (activeLocations.length === 0) {
     const connection = await upsertSquareConnection({
@@ -364,7 +398,7 @@ export async function completeSquareOAuthForVendor(input: {
       externalMerchantId: tokenResponse.merchant_id ?? null,
       accessTokenRef: credentialId,
       refreshTokenRef: credentialId,
-      capabilities: buildCapabilitiesJson({ locations }),
+      capabilities: buildCapabilitiesJson({ locations, oauthScopes }),
       errorCode: "no_active_locations",
       errorMessage:
         "Square authorized successfully but no active locations were found. Activate a location in Square, then reconnect.",
@@ -393,6 +427,7 @@ export async function completeSquareOAuthForVendor(input: {
         pendingLocationSelection: false,
         selectedLocationName: loc.name,
         selectedLocationAddress: formatSquareLocationAddress(loc),
+        oauthScopes,
       }),
     });
     await replaceSquareCredentialAfterReconnect({
@@ -413,6 +448,7 @@ export async function completeSquareOAuthForVendor(input: {
     capabilities: buildCapabilitiesJson({
       locations: activeLocations,
       pendingLocationSelection: true,
+      oauthScopes,
     }),
     errorCode: null,
     errorMessage: null,
@@ -641,6 +677,16 @@ export async function evaluateSquareConnectionHealth(vendorId: string) {
     missing.push(connection.errorMessage ?? "Square connection error");
   }
 
+  const scopeCoverage = evaluateSquareOAuthScopeCoverageFromMeta(connection.capabilitiesMeta);
+  if (scopeCoverage.needsReconnectForInjection) {
+    warnings.push(SQUARE_OAUTH_SCOPE_RECONNECT_MESSAGE);
+    if (scopeCoverage.missingRequiredScopes.length > 0) {
+      warnings.push(
+        `Missing Square OAuth scopes: ${scopeCoverage.missingRequiredScopes.join(", ")}`
+      );
+    }
+  }
+
   let nextStatus: IntegrationConnectionStatus = connection.status;
   let nextErrorCode = connection.errorCode;
   let nextErrorMessage = connection.errorMessage;
@@ -693,8 +739,51 @@ export async function evaluateSquareConnectionHealth(vendorId: string) {
     isReady,
     missingRequirements: missing,
     warnings,
+    oauthScopes: {
+      requiredScopes: scopeCoverage.requiredScopes,
+      authorizedScopes: scopeCoverage.authorizedScopes,
+      missingRequiredScopes: scopeCoverage.missingRequiredScopes,
+      permissionsVersion: scopeCoverage.permissionsVersion,
+      hasOrderInjectionScopes: scopeCoverage.hasOrderInjectionScopes,
+      needsReconnectForInjection: scopeCoverage.needsReconnectForInjection,
+    },
     lastCheckedAt: new Date(),
   };
+}
+
+export async function markSquareConnectionInsufficientPermissions(
+  connectionId: string,
+  missingScopes?: string[]
+): Promise<void> {
+  const row = await prisma.vendorIntegrationConnection.findUnique({
+    where: { id: connectionId },
+    select: { capabilities: true },
+  });
+  const meta = parseCapabilitiesMeta(row?.capabilities) ?? buildCapabilitiesJson({});
+  const coverage = evaluateSquareOAuthScopeCoverageFromMeta(meta);
+  const nextMissing =
+    missingScopes && missingScopes.length > 0
+      ? [...new Set([...coverage.missingRequiredScopes, ...missingScopes])]
+      : coverage.missingRequiredScopes.length > 0
+        ? coverage.missingRequiredScopes
+        : [...SQUARE_OAUTH_SCOPES].filter(
+            (scope) => !coverage.authorizedScopes.includes(scope)
+          );
+
+  await prisma.vendorIntegrationConnection.update({
+    where: { id: connectionId },
+    data: {
+      status: "error",
+      errorCode: "insufficient_oauth_scopes",
+      errorMessage: SQUARE_OAUTH_SCOPE_RECONNECT_MESSAGE,
+      lastHealthCheckAt: new Date(),
+      capabilities: {
+        ...meta,
+        missingRequiredScopes: nextMissing,
+        permissionsVersion: meta.permissionsVersion ?? 1,
+      } as object,
+    },
+  });
 }
 
 export type SquareConnectionObservability = {

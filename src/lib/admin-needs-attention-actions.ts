@@ -2,12 +2,17 @@
  * Shared rules for admin Needs Attention / recovery actions (workbench + order detail).
  */
 import type { AdminAttentionReason } from "@/lib/admin-attention";
+import {
+  isSquareInsufficientPermissionsError,
+  SQUARE_OAUTH_PERMISSIONS_ADMIN_MESSAGE,
+} from "@/lib/integrations/square/square-oauth-scopes";
 
 export type VendorOrderRecoverySnapshot = {
   routingStatus: string;
   fulfillmentStatus: string;
   deliverectOrderId?: string | null;
   manuallyRecoveredAt?: Date | string | null;
+  squareLastError?: string | null;
 };
 
 export type OrderRecoverySnapshot = {
@@ -26,11 +31,27 @@ export function formatOrderPaymentLabel(status: string): string {
   return "Paid";
 }
 
+export function isSquarePermissionsRetryBlocked(
+  squareLastError?: string | null,
+  orderRoutingMode?: string | null
+): boolean {
+  if (orderRoutingMode !== "square") return false;
+  const error = squareLastError?.trim();
+  if (!error) return false;
+  return (
+    isSquareInsufficientPermissionsError(error) ||
+    error === SQUARE_OAUTH_PERMISSIONS_ADMIN_MESSAGE
+  );
+}
+
 export function canRetryRouting(
   vo: VendorOrderRecoverySnapshot,
   order: OrderRecoverySnapshot,
   orderRoutingMode?: string | null
 ): boolean {
+  if (isSquarePermissionsRetryBlocked(vo.squareLastError, orderRoutingMode)) {
+    return false;
+  }
   if (orderRoutingMode === "manual_dashboard") {
     if (!isOrderPaidForAdminRecovery(order)) return false;
     if (TERMINAL_FULFILLMENT.has(vo.fulfillmentStatus)) return false;

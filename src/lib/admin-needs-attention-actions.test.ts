@@ -55,6 +55,20 @@ describe("admin needs attention recovery rules", () => {
     ).toBe(false);
   });
 
+  it("blocks retry routing for Square insufficient permissions failures", () => {
+    expect(
+      canRetryRouting(
+        {
+          ...routingFailedPaid,
+          squareLastError:
+            "Square permissions are missing. Reconnect Square and approve ORDERS_WRITE/PAYMENTS_WRITE.",
+        },
+        paid,
+        "square"
+      )
+    ).toBe(false);
+  });
+
   it("allows retry for routing failed and blocks sent with deliverect id (duplicate guard)", () => {
     expect(canRetryRouting(routingFailedPaid, paid)).toBe(true);
     expect(

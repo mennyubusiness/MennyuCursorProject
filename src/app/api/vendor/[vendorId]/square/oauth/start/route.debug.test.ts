@@ -32,6 +32,7 @@ vi.mock("@/lib/permissions", () => ({
 }));
 
 import { GET } from "@/app/api/vendor/[vendorId]/square/oauth/start/route";
+import { formatSquareOAuthScopesForAuthorize, SQUARE_OAUTH_MINIMAL_DEBUG_SCOPES, SQUARE_OAUTH_SCOPES } from "@/lib/integrations/square/square-oauth-scopes";
 
 describe("square oauth start route debug", () => {
   beforeEach(() => {
@@ -62,7 +63,9 @@ describe("square oauth start route debug", () => {
     expect(body.authorizeUrlHost).not.toBe("squareupsandbox.com");
     expect(body.redirectUri).toBe(envState.SQUARE_OAUTH_REDIRECT_URL);
     expect(body.environment).toBe("sandbox");
-    expect(body.scopes).toBe("MERCHANT_PROFILE_READ ITEMS_READ");
+    expect(body.scopes).toBe(formatSquareOAuthScopesForAuthorize(SQUARE_OAUTH_SCOPES));
+    expect(body.scopes).toContain("ORDERS_WRITE");
+    expect(body.scopes).toContain("PAYMENTS_WRITE");
     expect(body.hasState).toBe(true);
 
     const logLine = infoSpy.mock.calls
@@ -98,5 +101,20 @@ describe("square oauth start route debug", () => {
     const parsed = new URL(location!);
     expect(parsed.hostname).toBe("connect.squareupsandbox.com");
     expect(parsed.pathname).toBe("/oauth2/authorize");
+  });
+
+  it("returns minimal debug scopes only when debug=1 and minimal_scope=1", async () => {
+    const res = await GET(
+      new NextRequest(
+        "https://www.openorderco.com/api/vendor/vendor_1/square/oauth/start?debug=1&minimal_scope=1"
+      ),
+      { params: Promise.resolve({ vendorId: "vendor_1" }) }
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { scopes: string; minimalScope: boolean };
+    expect(body.scopes).toBe(formatSquareOAuthScopesForAuthorize(SQUARE_OAUTH_MINIMAL_DEBUG_SCOPES));
+    expect(body.minimalScope).toBe(true);
+    expect(body.scopes).not.toContain("ORDERS_WRITE");
   });
 });

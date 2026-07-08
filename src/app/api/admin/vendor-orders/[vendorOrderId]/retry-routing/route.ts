@@ -4,7 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { isAdminApiRequestAuthorized } from "@/lib/admin-auth";
-import { canRetryRouting, isOrderPaidForAdminRecovery } from "@/lib/admin-needs-attention-actions";
+import { canRetryRouting, isOrderPaidForAdminRecovery, isSquarePermissionsRetryBlocked } from "@/lib/admin-needs-attention-actions";
 import { isRoutingRetryAvailable, getRoutingUnavailableReason } from "@/lib/routing-availability";
 import { retryVendorOrderRouting } from "@/services/routing.service";
 import { recomputeAndPersistParentStatus } from "@/services/order-status.service";
@@ -41,7 +41,9 @@ export async function POST(
       fulfillmentStatus: true,
       deliverectOrderId: true,
       manuallyRecoveredAt: true,
+      squareLastError: true,
       order: { select: { status: true } },
+      vendor: { select: { orderRoutingMode: true } },
     },
   });
   if (!vo) {
@@ -62,13 +64,22 @@ export async function POST(
     fulfillmentStatus: vo.fulfillmentStatus,
     deliverectOrderId: vo.deliverectOrderId,
     manuallyRecoveredAt: vo.manuallyRecoveredAt,
+    squareLastError: vo.squareLastError,
   };
-  if (!canRetryRouting(voSnap, orderSnap)) {
+  if (
+    isSquarePermissionsRetryBlocked(vo.squareLastError, vo.vendor.orderRoutingMode) ||
+    !canRetryRouting(voSnap, orderSnap, vo.vendor.orderRoutingMode)
+  ) {
+    const permissionsBlocked = isSquarePermissionsRetryBlocked(
+      vo.squareLastError,
+      vo.vendor.orderRoutingMode
+    );
     return NextResponse.json({
       ok: false,
-      error:
-        "Routing retry is not safe for this vendor order (already sent to POS, terminal state, or manually recovered). Use manual recovery or view the order.",
-      code: "NOT_ELIGIBLE",
+      error: permissionsBlocked
+        ? "Square permissions are missing. Reconnect Square and approve ORDERS_WRITE/PAYMENTS_WRITE before retrying routing."
+        : "Routing retry is not safe for this vendor order (already sent to POS, terminal state, or manually recovered). Use manual recovery or view the order.",
+      code: permissionsBlocked ? "SQUARE_INSUFFICIENT_PERMISSIONS" : "NOT_ELIGIBLE",
     });
   }
 

@@ -12,6 +12,7 @@ const mockCreatePayment = vi.fn();
 const mockUpsertMapping = vi.fn();
 const mockGetIssues = vi.fn();
 const mockCreateIssue = vi.fn();
+const mockMarkPermissions = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -38,6 +39,7 @@ vi.mock("@/lib/integrations/square/square-order-routing-readiness", () => ({
 vi.mock("@/lib/integrations/square/square-connection.service", () => ({
   getActiveSquareConnectionForVendor: (...args: unknown[]) => mockGetConnection(...args),
   ensureSquareAccessToken: (...args: unknown[]) => mockEnsureToken(...args),
+  markSquareConnectionInsufficientPermissions: (...args: unknown[]) => mockMarkPermissions(...args),
 }));
 
 vi.mock("@/lib/integrations/square/square-api.client", () => ({
@@ -163,6 +165,35 @@ describe("submitVendorOrderToSquare", () => {
       "routing_failure",
       "HIGH",
       expect.objectContaining({ notes: "Square 503" })
+    );
+  });
+
+  it("maps insufficient Square permissions to reconnect guidance and marks connection", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce({ routingStatus: "pending", squareOrderId: null })
+      .mockResolvedValueOnce({ routingStatus: "pending", squareAttempts: 0 });
+    mockCreateOrder.mockRejectedValue(
+      new Error(
+        "The merchant has not given your application sufficient permissions... required scopes: ORDERS_WRITE"
+      )
+    );
+
+    const result = await submitVendorOrderToSquare(VO_ID, {
+      customerPhone: "+1555",
+      customerEmail: null,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.code).toBe("SQUARE_INSUFFICIENT_PERMISSIONS");
+    expect(result.error).toMatch(/Reconnect Square and approve ORDERS_WRITE\/PAYMENTS_WRITE/i);
+    expect(mockMarkPermissions).toHaveBeenCalledWith("conn_1");
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          routingStatus: "failed",
+          squareLastError: expect.stringMatching(/Reconnect Square and approve ORDERS_WRITE\/PAYMENTS_WRITE/i),
+        }),
+      })
     );
   });
 });

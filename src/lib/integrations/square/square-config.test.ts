@@ -27,8 +27,10 @@ import {
   inferSquareApplicationIdEnvironment,
   SQUARE_API_BASE_URLS,
   SQUARE_OAUTH_CONNECT_BASE_URLS,
+  SQUARE_OAUTH_SCOPES,
   validateSquareProductionConfig,
 } from "@/lib/integrations/square/square-config";
+import { formatSquareOAuthScopesForAuthorize } from "@/lib/integrations/square/square-oauth-scopes";
 
 const REDIRECT_URL = "https://www.openorderco.com/api/integrations/square/oauth/callback";
 
@@ -118,7 +120,7 @@ describe("square config", () => {
     expect(parsed.hostname).toBe("connect.squareupsandbox.com");
     expect(parsed.pathname).toBe("/oauth2/authorize");
     expect(parsed.searchParams.get("client_id")).toBe("sq0idp-test-app");
-    expect(parsed.searchParams.get("scope")).toBe("MERCHANT_PROFILE_READ ITEMS_READ");
+    expect(parsed.searchParams.get("scope")).toBe(formatSquareOAuthScopesForAuthorize(SQUARE_OAUTH_SCOPES));
     expect(parsed.searchParams.get("state")).toBe("signed_state_token");
     expect(parsed.searchParams.get("session")).toBe("false");
     expect(parsed.searchParams.get("redirect_uri")).toBe(REDIRECT_URL);
@@ -133,7 +135,11 @@ describe("square config", () => {
     expect(parsed.hostname).toBe("connect.squareup.com");
     expect(parsed.pathname).toBe("/oauth2/authorize");
     expect(parsed.searchParams.get("client_id")).toBe("sq0idp-test-app");
-    expect(parsed.searchParams.get("scope")).toBe("MERCHANT_PROFILE_READ ITEMS_READ");
+    const scope = parsed.searchParams.get("scope")!;
+    expect(scope).toContain("MERCHANT_PROFILE_READ");
+    expect(scope).toContain("ITEMS_READ");
+    expect(scope).toContain("ORDERS_WRITE");
+    expect(scope).toContain("PAYMENTS_WRITE");
     expect(parsed.searchParams.get("state")).toBe("signed_state_token");
     expect(parsed.searchParams.get("session")).toBe("false");
     expect(parsed.searchParams.get("redirect_uri")).toBe(REDIRECT_URL);

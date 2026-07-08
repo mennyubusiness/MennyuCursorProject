@@ -43,11 +43,32 @@ function baseVendor(overrides?: Partial<{ orderRoutingMode: string; squareOrderR
   };
 }
 
+function fullScopeConnection(overrides?: {
+  externalLocationId?: string | null;
+  capabilitiesMeta?: Record<string, unknown> | null;
+}) {
+  return {
+    externalLocationId: "LOC_1",
+    capabilitiesMeta: {
+      authorizedScopes: [
+        "MERCHANT_PROFILE_READ",
+        "ITEMS_READ",
+        "ORDERS_READ",
+        "ORDERS_WRITE",
+        "PAYMENTS_READ",
+        "PAYMENTS_WRITE",
+      ],
+      permissionsVersion: 2,
+    },
+    ...overrides,
+  };
+}
+
 describe("loadSquareOrderRoutingReadiness", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockHealth.mockResolvedValue({ isReady: true, missingRequirements: [] });
-    mockConnection.mockResolvedValue({ externalLocationId: "LOC_1" });
+    mockConnection.mockResolvedValue(fullScopeConnection());
     mockActiveMenu.mockResolvedValue({
       state: "published",
       menu: { deliverect: { sourcePayloadKind: "square_catalog_v1" } },
@@ -148,13 +169,34 @@ describe("loadSquareOrderRoutingReadiness", () => {
     expect(status.prerequisitesReady).toBe(false);
     expect(status.prerequisiteBlockers.some((m) => /item mappings/i.test(m))).toBe(true);
   });
+
+  it("is not prerequisite-ready when Square OAuth injection scopes are missing", async () => {
+    mockVendorFind.mockResolvedValue(baseVendor());
+    mockConnection.mockResolvedValue(
+      fullScopeConnection({
+        capabilitiesMeta: {
+          authorizedScopes: ["MERCHANT_PROFILE_READ", "ITEMS_READ"],
+          permissionsVersion: 1,
+        },
+      })
+    );
+
+    const status = await loadSquareOrderRoutingReadiness(VENDOR_ID);
+
+    expect(status.prerequisitesReady).toBe(false);
+    expect(
+      status.prerequisiteBlockers.some((m) =>
+        /Reconnect Square to grant order routing permissions/i.test(m)
+      )
+    ).toBe(true);
+  });
 });
 
 describe("assertSquareOrderRoutingPrerequisites", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockHealth.mockResolvedValue({ isReady: true, missingRequirements: [] });
-    mockConnection.mockResolvedValue({ externalLocationId: "LOC_1" });
+    mockConnection.mockResolvedValue(fullScopeConnection());
     mockActiveMenu.mockResolvedValue({
       state: "published",
       menu: { deliverect: { sourcePayloadKind: "square_catalog_v1" } },
@@ -176,7 +218,7 @@ describe("assertSquareOrderRoutingReady", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockHealth.mockResolvedValue({ isReady: true, missingRequirements: [] });
-    mockConnection.mockResolvedValue({ externalLocationId: "LOC_1" });
+    mockConnection.mockResolvedValue(fullScopeConnection());
     mockActiveMenu.mockResolvedValue({
       state: "published",
       menu: { deliverect: { sourcePayloadKind: "square_catalog_v1" } },

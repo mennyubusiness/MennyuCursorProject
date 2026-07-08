@@ -220,6 +220,7 @@ function voRecoverySnapshot(vo: VoAttentionRow): VendorOrderRecoverySnapshot {
     fulfillmentStatus: vo.fulfillmentStatus,
     deliverectOrderId: vo.deliverectOrderId,
     manuallyRecoveredAt: vo.manuallyRecoveredAt,
+    squareLastError: vo.squareLastError,
   };
 }
 

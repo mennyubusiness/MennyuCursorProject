@@ -5,7 +5,8 @@ import {
   assertSquareOAuthConfigured,
   buildSquareAuthorizationUrl,
   getSquareConfigSnapshot,
-  SQUARE_OAUTH_SCOPES,
+  resolveSquareOAuthScopesForAuthorize,
+  formatSquareOAuthScopesForAuthorize,
 } from "@/lib/integrations/square/square-config";
 import { signSquareOAuthState } from "@/lib/integrations/square/square-oauth-state";
 
@@ -47,7 +48,10 @@ export async function GET(
   }
 
   const state = signSquareOAuthState(vendorId, userId);
-  const authorizeUrl = buildSquareAuthorizationUrl({ state });
+  const debug = request.nextUrl.searchParams.get("debug") === "1";
+  const minimalScope = request.nextUrl.searchParams.get("minimal_scope") === "1";
+  const oauthScopes = resolveSquareOAuthScopesForAuthorize({ debug, minimalScope });
+  const authorizeUrl = buildSquareAuthorizationUrl({ state, scopes: oauthScopes });
   const parsedAuthorizeUrl = new URL(authorizeUrl);
   const cfg = assertSquareOAuthConfigured();
 
@@ -61,12 +65,13 @@ export async function GET(
     })
   );
 
-  if (request.nextUrl.searchParams.get("debug") === "1") {
+  if (debug) {
     return NextResponse.json({
       authorizeUrlHost: parsedAuthorizeUrl.hostname,
       redirectUri: cfg.redirectUrl,
       environment: cfg.environment,
-      scopes: SQUARE_OAUTH_SCOPES.join(" "),
+      scopes: formatSquareOAuthScopesForAuthorize(oauthScopes),
+      minimalScope: minimalScope && debug,
       hasState: Boolean(state?.trim()),
     });
   }

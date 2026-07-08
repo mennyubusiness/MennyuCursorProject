@@ -70,6 +70,22 @@ export function AdminSquareOrderInjectionDiagnosticsPanel({
           <AdminInfoRow label="published Square-imported menu" value={vendor.publishedSquareImportedMenu} />
           <AdminInfoRow label="active item mappings" value={String(vendor.activeItemMappings)} />
           <AdminInfoRow label="active modifier mappings" value={String(vendor.activeModifierMappings)} />
+          <AdminInfoRow
+            label="required OAuth scopes"
+            value={vendor.requiredOAuthScopes.join(", ") || "—"}
+          />
+          <AdminInfoRow
+            label="authorized OAuth scopes"
+            value={vendor.authorizedOAuthScopes.length > 0 ? vendor.authorizedOAuthScopes.join(", ") : "unknown (reconnect required)"}
+          />
+          <AdminInfoRow
+            label="missing OAuth scopes"
+            value={vendor.missingOAuthScopes.length > 0 ? vendor.missingOAuthScopes.join(", ") : "none"}
+          />
+          <AdminInfoRow
+            label="OAuth permissions version"
+            value={vendor.oauthPermissionsVersion != null ? String(vendor.oauthPermissionsVersion) : "—"}
+          />
           <AdminInfoRow label="routing readiness" value={readinessLabel(vendor.routingReadiness)} />
         </dl>
       </div>

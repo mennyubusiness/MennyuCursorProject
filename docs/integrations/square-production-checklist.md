@@ -7,12 +7,12 @@ Use this checklist before enabling Square connect for real vendors on production
 - OAuth connect + encrypted token storage
 - Merchant profile + location discovery/selection
 - Connection health checks
+- Square catalog/menu import
+- Square order injection (when admin-enabled + prerequisites met + `SQUARE_ROUTING_LIVE=true`)
 
-## What Square connection does **not** do yet
+## What Square connection does **not** do
 
-- No Square catalog/menu import
-- No Square order injection
-- No Square payments (Open Order checkout remains Stripe)
+- No Square customer payments (Open Order checkout remains Stripe)
 - No payout/allocation changes
 - No Deliverect or manual routing changes
 
@@ -28,9 +28,17 @@ Use this checklist before enabling Square connect for real vendors on production
    https://<your-host>/api/integrations/square/oauth/callback
    ```
 3. Note **Sandbox Application ID** and **Sandbox Application Secret**.
-4. Required OAuth scopes (already requested by Open Order):
+4. Required OAuth scopes (requested by Open Order on normal connect — also enable these in the Square Developer Dashboard for your application):
    - `MERCHANT_PROFILE_READ`
    - `ITEMS_READ`
+   - `ORDERS_READ`
+   - `ORDERS_WRITE`
+   - `PAYMENTS_READ`
+   - `PAYMENTS_WRITE`
+
+   **Reconnect required:** vendors connected before order-injection scopes were added only have catalog scopes until they reconnect and approve the expanded permissions.
+
+   Debug-only minimal scopes (catalog connect diagnostics): `GET /api/vendor/{vendorId}/square/oauth/start?debug=1&minimal_scope=1`
 
 ### Production app
 
@@ -55,6 +63,7 @@ Set on the correct Vercel scope (**Production** vs Preview).
 | `SQUARE_ENVIRONMENT` | `production` | `sandbox` |
 | `SQUARE_OAUTH_REDIRECT_URL` | Exact production callback URL | Exact preview/sandbox callback URL |
 | `INTEGRATION_TOKEN_ENCRYPTION_KEY` | Min 32 chars (required) | Min 32 chars recommended |
+| `SQUARE_ROUTING_LIVE` | `true` when live Square order injection is allowed | Usually `false` on preview unless testing injection |
 | `AUTH_SECRET` | Required (OAuth state signing) | Required |
 | `SQUARE_WEBHOOK_SIGNATURE_KEY` | Optional until webhooks sprint | Optional — **does not block OAuth** |
 
@@ -138,4 +147,5 @@ Square sandbox OAuth may show a blank page unless the **Square Sandbox test acco
 - [ ] Disconnect removes credentials and deactivates connection
 - [ ] Reconnect replaces credentials without orphan rows
 - [ ] Invalid/expired OAuth state returns friendly error on integration page
+- [ ] Reconnect test vendor after scope expansion shows `ORDERS_WRITE` / `PAYMENTS_WRITE` in admin diagnostics
 - [ ] Manual/Deliverect vendor flows unchanged

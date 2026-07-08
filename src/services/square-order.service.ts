@@ -15,8 +15,14 @@ import {
 import {
   ensureSquareAccessToken,
   getActiveSquareConnectionForVendor,
+  markSquareConnectionInsufficientPermissions,
 } from "@/lib/integrations/square/square-connection.service";
 import { assertSquareOrderRoutingReady } from "@/lib/integrations/square/square-order-routing-readiness";
+import {
+  isSquareInsufficientPermissionsError,
+  SQUARE_OAUTH_PERMISSIONS_ADMIN_MESSAGE,
+  SQUARE_ROUTING_PERMISSIONS_ERROR_CODE,
+} from "@/lib/integrations/square/square-oauth-scopes";
 import {
   getVendorOrderForSquare,
   mapVendorOrderToSquareCreateOrder,
@@ -30,7 +36,7 @@ export interface SubmitVendorOrderToSquareResult {
   success: boolean;
   squareOrderId?: string;
   error?: string;
-  code?: "VALIDATION_FAILED" | "SUBMISSION_FAILED" | "ROUTING_NOT_READY";
+  code?: "VALIDATION_FAILED" | "SUBMISSION_FAILED" | "ROUTING_NOT_READY" | typeof SQUARE_ROUTING_PERMISSIONS_ERROR_CODE;
   skipped?: boolean;
 }
 
@@ -242,18 +248,29 @@ export async function submitVendorOrderToSquare(
 
     return { success: true, squareOrderId };
   } catch (e) {
-    const message =
+    const rawMessage =
       e instanceof SquareApiError
         ? e.message
         : e instanceof Error
           ? e.message
           : "Square order submission failed.";
+    const permissionsError = isSquareInsufficientPermissionsError(rawMessage);
+    const message = permissionsError ? SQUARE_OAUTH_PERMISSIONS_ADMIN_MESSAGE : rawMessage;
+
+    if (permissionsError && connection?.id) {
+      await markSquareConnectionInsufficientPermissions(connection.id);
+    }
+
     console.warn(`${LOG_PREFIX} Failure vendorOrderId=${vendorOrderId} error=${message}`);
     await recordSquareRoutingFailure(vendorOrderId, message, {
       lastSquarePayload: audit,
       lastSquareResponse:
         e instanceof SquareApiError ? { status: e.status, body: e.body } : { error: message },
     });
-    return { success: false, error: message, code: "SUBMISSION_FAILED" };
+    return {
+      success: false,
+      error: message,
+      code: permissionsError ? SQUARE_ROUTING_PERMISSIONS_ERROR_CODE : "SUBMISSION_FAILED",
+    };
   }
 }

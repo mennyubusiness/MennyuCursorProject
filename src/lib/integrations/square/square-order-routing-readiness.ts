@@ -7,6 +7,10 @@ import { env } from "@/lib/env";
 import { loadActiveMenuVersionForVendor } from "@/lib/vendor-active-menu-version.server";
 import { isSquareRoutingMode } from "@/lib/vendor-order-routing-mode";
 import { evaluateSquareConnectionHealth, getActiveSquareConnectionForVendor } from "@/lib/integrations/square/square-connection.service";
+import {
+  evaluateSquareOAuthScopeCoverageFromMeta,
+  SQUARE_OAUTH_SCOPE_RECONNECT_MESSAGE,
+} from "@/lib/integrations/square/square-oauth-scopes";
 
 export type SquareOrderRoutingReadiness = {
   /** All technical prerequisites except admin enablement and global live switch. */
@@ -102,6 +106,16 @@ export async function loadSquareOrderRoutingReadiness(
     prerequisiteBlockers.push(...health.missingRequirements);
   }
 
+  const scopeCoverage = evaluateSquareOAuthScopeCoverageFromMeta(connection?.capabilitiesMeta);
+  if (!scopeCoverage.hasOrderInjectionScopes) {
+    prerequisiteBlockers.push(SQUARE_OAUTH_SCOPE_RECONNECT_MESSAGE);
+    if (scopeCoverage.missingRequiredScopes.length > 0) {
+      prerequisiteBlockers.push(
+        `Missing Square OAuth scopes: ${scopeCoverage.missingRequiredScopes.join(", ")}`
+      );
+    }
+  }
+
   const locationId = connection?.externalLocationId ?? null;
   if (!locationId?.trim()) {
     prerequisiteBlockers.push("Square location is not selected.");
@@ -141,6 +155,7 @@ export async function loadSquareOrderRoutingReadiness(
   const prerequisitesReady =
     squareMode &&
     connectionHealthy &&
+    scopeCoverage.hasOrderInjectionScopes &&
     Boolean(locationId?.trim()) &&
     hasSquarePublishedMenu &&
     activeItemMappingCount > 0;

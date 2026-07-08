@@ -25,6 +25,8 @@ export type SquareOAuthTokenResponse = {
   expires_at?: string;
   merchant_id?: string;
   token_type?: string;
+  /** Space-separated granted OAuth scopes (when returned by Square). */
+  scope?: string;
 };
 
 export type SquareLocation = {
