@@ -3,6 +3,7 @@ import "server-only";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
+import { isSquareRoutingMode } from "@/lib/vendor-order-routing-mode";
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
 import type { VendorAvailabilityInput } from "@/lib/vendor-availability";
 import type {
@@ -76,6 +77,23 @@ export async function loadVendorReadinessBundles(
 
   const stripeConnectConfigured = Boolean(env.STRIPE_SECRET_KEY);
 
+  const squareVendorIds = vendors
+    .filter((vendor) => isSquareRoutingMode(vendor.orderRoutingMode))
+    .map((vendor) => vendor.id);
+
+  const squareConnectionReadyByVendor = new Map<string, boolean>();
+  if (squareVendorIds.length > 0) {
+    const { evaluateSquareConnectionHealth } = await import(
+      "@/lib/integrations/square/square-connection.service"
+    );
+    await Promise.all(
+      squareVendorIds.map(async (id) => {
+        const health = await evaluateSquareConnectionHealth(id);
+        squareConnectionReadyByVendor.set(id, health.isReady);
+      })
+    );
+  }
+
   for (const vendor of vendors) {
     const deliverectMappingReady = options.includeDeliverectMappingIntegrity
       ? (mappingReadyByVendor.get(vendor.id) ?? true)
@@ -112,6 +130,9 @@ export async function loadVendorReadinessBundles(
         orderRoutingMode: vendor.orderRoutingMode,
         menuSource: vendor.menuSource,
         deliverectMappingReady,
+        ...(isSquareRoutingMode(vendor.orderRoutingMode)
+          ? { squareConnectionReady: squareConnectionReadyByVendor.get(vendor.id) ?? false }
+          : {}),
       },
     });
   }

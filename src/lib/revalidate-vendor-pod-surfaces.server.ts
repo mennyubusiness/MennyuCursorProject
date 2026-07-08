@@ -55,3 +55,37 @@ export async function revalidateVendorPodMembershipSurfaces(input: {
     revalidatePath(`/pod/${pod.id}/vendor/${vendorId}`);
   }
 }
+
+/** Revalidate customer-facing pod/vendor pages and caches after orderability-affecting changes. */
+export async function revalidateVendorCustomerOrderingSurfaces(vendorId: string): Promise<void> {
+  const id = vendorId.trim();
+  if (!id) return;
+
+  revalidatePath(`/vendor/${id}/dashboard`);
+  revalidatePath(`/vendor/${id}/setup`);
+  revalidatePath("/explore");
+
+  revalidateOperationalMenuCacheForVendor(id);
+  revalidateCustomerVendorMenuCacheForVendor(id);
+
+  const [vendor, memberships] = await Promise.all([
+    prisma.vendor.findUnique({ where: { id }, select: { slug: true } }),
+    prisma.podVendor.findMany({
+      where: { vendorId: id },
+      select: { pod: { select: { id: true, slug: true } } },
+    }),
+  ]);
+
+  for (const membership of memberships) {
+    const pod = membership.pod;
+    revalidatePath(`/pod/${pod.id}/dashboard`);
+    revalidatePath(`/pod/${pod.id}/vendors`);
+    if (pod.slug) {
+      revalidatePath(buildPodCustomerPath(pod.slug));
+      if (vendor?.slug) {
+        revalidatePath(buildVendorMenuCustomerPath(pod.slug, vendor.slug));
+      }
+    }
+    revalidatePath(`/pod/${pod.id}/vendor/${id}`);
+  }
+}

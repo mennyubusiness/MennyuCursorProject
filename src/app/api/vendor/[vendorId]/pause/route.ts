@@ -5,6 +5,7 @@
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { revalidateVendorCustomerOrderingSurfaces } from "@/lib/revalidate-vendor-pod-surfaces.server";
 import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
 
 export async function PATCH(
@@ -54,6 +55,8 @@ export async function PATCH(
     where: { id: vendorId },
     data: { mennyuOrdersPaused: paused },
   });
+
+  await revalidateVendorCustomerOrderingSurfaces(vendorId);
 
   return NextResponse.json({ paused });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { revalidateVendorCustomerOrderingSurfaces } from "@/lib/revalidate-vendor-pod-surfaces.server";
 import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
 import {
   parseVendorCustomerOrderingWeek,
@@ -62,6 +63,8 @@ export async function PATCH(
       customerOrderingHours,
     },
   });
+
+  await revalidateVendorCustomerOrderingSurfaces(vendorId);
 
   return NextResponse.json({
     ok: true,

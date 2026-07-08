@@ -168,6 +168,48 @@ describe("orderability", () => {
     expect(state.podOwnerDisplay).toBe("live");
   });
 
+  it("is orderable for square routing when connection is ready without admin injection enablement", () => {
+    const input = evaluation({
+      posSummary: {
+        ...basePos,
+        orderRoutingMode: "square",
+        deliverectChannelLinkId: null,
+        posConnectionStatus: "not_connected",
+        squareConnectionReady: true,
+        squareOrderRoutingEnabled: false,
+      },
+    });
+    expect(getVendorOrderabilityState(input).orderable).toBe(true);
+  });
+
+  it("blocks square routing vendors when Square connection is not ready", () => {
+    const input = evaluation({
+      posSummary: {
+        ...basePos,
+        orderRoutingMode: "square",
+        deliverectChannelLinkId: null,
+        posConnectionStatus: "not_connected",
+        squareConnectionReady: false,
+      },
+    });
+    const state = getVendorOrderabilityState(input);
+    expect(state.orderable).toBe(false);
+    expect(state.customerBannerLine).not.toMatch(/admin|injection/i);
+  });
+
+  it("does not block square vendors solely because squareOrderRoutingEnabled is false", () => {
+    const input = evaluation({
+      posSummary: {
+        ...basePos,
+        orderRoutingMode: "square",
+        squareConnectionReady: true,
+        squareOrderRoutingEnabled: false,
+        squareOrderRoutingReady: false,
+      },
+    });
+    expect(getVendorOrderabilityState(input).orderable).toBe(true);
+  });
+
   it("blocks ordering when manually paused", () => {
     const input = evaluation({
       vendor: { ...baseVendor, mennyuOrdersPaused: true },

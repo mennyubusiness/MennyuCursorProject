@@ -399,6 +399,10 @@ export function getVendorPodOwnerMissingLines(input: VendorReadinessEvaluationIn
   return [...new Set(lines)];
 }
 
+export function isVendorCustomerOrderable(input: VendorReadinessEvaluationInput): boolean {
+  return getVendorOrderabilityState(input).orderable;
+}
+
 export function getVendorOrderabilityState(input: VendorReadinessEvaluationInput): VendorOrderabilityState {
   const visibility = getVendorPublicVisibilityState(input);
   const availability = resolveVendorAvailability(input);

@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { revalidateVendorCustomerOrderingSurfaces } from "@/lib/revalidate-vendor-pod-surfaces.server";
 import { verifyVendorAccessForApi } from "@/lib/vendor-dashboard-auth";
 import { assertSquareMenuPublishAllowed } from "@/lib/integrations/square/square-menu-publish-guard.server";
 import {
@@ -72,6 +73,7 @@ export async function POST(
     revalidatePath(`/vendor/${vendor.id}/menu`);
     revalidatePath(`/vendor/${vendor.id}/menu/imports`);
     revalidatePath(`/vendor/${vendor.id}/menu-imports`);
+    await revalidateVendorCustomerOrderingSurfaces(vendor.id);
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof MenuPublishValidationError) {

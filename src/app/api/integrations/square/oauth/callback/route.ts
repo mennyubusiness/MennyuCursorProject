@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { canManageVendor } from "@/lib/permissions";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
 import { completeSquareOAuthForVendor } from "@/lib/integrations/square/square-connection.service";
+import { revalidateVendorCustomerOrderingSurfaces } from "@/lib/revalidate-vendor-pod-surfaces.server";
 import {
   buildSquareIntegrationPageUrl,
   buildSquareOAuthErrorRedirect,
@@ -101,6 +102,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await completeSquareOAuthForVendor({ vendorId, code: code.trim() });
+    await revalidateVendorCustomerOrderingSurfaces(vendorId);
     logSquareOAuthCallback("square_oauth_callback_success", {
       vendorId,
       needsLocationSelection: result.needsLocationSelection,
