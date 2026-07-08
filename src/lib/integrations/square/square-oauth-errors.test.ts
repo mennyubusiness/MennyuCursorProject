@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSquareOAuthErrorRedirect,
+  mapSquareApiErrorToOAuthCode,
   normalizeSquareOAuthErrorCode,
   resolveSquareOAuthUserMessage,
 } from "@/lib/integrations/square/square-oauth-errors";
@@ -25,5 +26,20 @@ describe("square oauth errors", () => {
     const message = resolveSquareOAuthUserMessage("token_exchange_failed");
     expect(message).toContain("authorization code");
     expect(message.toLowerCase()).not.toContain("secret");
+  });
+
+  it("maps SquareApiError messages to safe OAuth redirect codes", () => {
+    expect(mapSquareApiErrorToOAuthCode("Square OAuth token exchange failed: invalid_grant")).toBe(
+      "token_exchange_failed"
+    );
+    expect(mapSquareApiErrorToOAuthCode("Square locations fetch failed: unauthorized")).toBe(
+      "locations_fetch_failed"
+    );
+    expect(mapSquareApiErrorToOAuthCode("Square merchant fetch failed: not found")).toBe(
+      "merchant_fetch_failed"
+    );
+    expect(mapSquareApiErrorToOAuthCode("unexpected provider detail with secrets")).toBe(
+      "oauth_failed"
+    );
   });
 });

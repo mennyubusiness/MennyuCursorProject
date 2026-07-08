@@ -6,6 +6,7 @@ import { completeSquareOAuthForVendor } from "@/lib/integrations/square/square-c
 import {
   buildSquareIntegrationPageUrl,
   buildSquareOAuthErrorRedirect,
+  mapSquareApiErrorToOAuthCode,
   normalizeSquareOAuthErrorCode,
 } from "@/lib/integrations/square/square-oauth-errors";
 import { verifySquareOAuthState, SquareOAuthStateError } from "@/lib/integrations/square/square-oauth-state";
@@ -110,14 +111,18 @@ export async function GET(request: NextRequest) {
       : buildSquareIntegrationPageUrl(origin, vendorId, { square_connected: "1" });
     return NextResponse.redirect(dest);
   } catch (e) {
+    // SquareApiError messages may include provider detail — map to a safe redirect code.
     const errorCode =
-      e instanceof Error ? normalizeSquareOAuthErrorCode(e.message) : "oauth_failed";
-    const safeMessage =
-      e instanceof SquareApiError ? errorCode : errorCode;
+      e instanceof SquareApiError
+        ? mapSquareApiErrorToOAuthCode(e.message)
+        : e instanceof Error
+          ? normalizeSquareOAuthErrorCode(e.message)
+          : "oauth_failed";
     logSquareOAuthCallback("square_oauth_callback_failed", {
       vendorId,
-      errorCode: safeMessage,
+      errorCode,
+      ...(e instanceof SquareApiError ? { squareStatus: e.status } : {}),
     });
-    return NextResponse.redirect(buildSquareOAuthErrorRedirect(origin, vendorId, safeMessage));
+    return NextResponse.redirect(buildSquareOAuthErrorRedirect(origin, vendorId, errorCode));
   }
 }

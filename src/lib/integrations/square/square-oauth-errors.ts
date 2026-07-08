@@ -62,6 +62,27 @@ export function normalizeSquareOAuthErrorCode(raw: string): string {
   return trimmed;
 }
 
+/**
+ * Map Square API client errors to safe OAuth redirect codes.
+ * Never pass raw Square API detail (status body text) into redirects.
+ */
+export function mapSquareApiErrorToOAuthCode(message: string): SquareOAuthErrorCode {
+  const lower = message.toLowerCase();
+  if (lower.includes("token exchange") || lower.includes("oauth2/token") || lower.includes("authorization_code")) {
+    return SQUARE_OAUTH_ERROR_CODES.token_exchange_failed;
+  }
+  if (lower.includes("refresh")) {
+    return SQUARE_OAUTH_ERROR_CODES.token_exchange_failed;
+  }
+  if (lower.includes("merchant")) {
+    return SQUARE_OAUTH_ERROR_CODES.merchant_fetch_failed;
+  }
+  if (lower.includes("location")) {
+    return SQUARE_OAUTH_ERROR_CODES.locations_fetch_failed;
+  }
+  return SQUARE_OAUTH_ERROR_CODES.oauth_failed;
+}
+
 export function resolveSquareOAuthUserMessage(code: string): string {
   const normalized = normalizeSquareOAuthErrorCode(code);
   return (

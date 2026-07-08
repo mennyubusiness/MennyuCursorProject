@@ -88,6 +88,22 @@ describe("square oauth callback route", () => {
     expect(res.headers.get("location")).toContain("/vendor/vendor_1/integrations/square");
     expect(res.headers.get("location")).toContain("square_connected=1");
   });
+
+  it("maps SquareApiError to a safe oauth redirect code (not raw provider detail)", async () => {
+    const { SquareApiError } = await import("@/lib/integrations/square/square-api.client");
+    mockCompleteSquareOAuth.mockRejectedValue(
+      new SquareApiError("Square locations fetch failed: secret_token_xyz leaked detail", 401)
+    );
+    const state = signSquareOAuthStateForTest("vendor_1", "user_1", 900);
+    const res = await GET(
+      new NextRequest(
+        `https://www.openorderco.com/api/integrations/square/oauth/callback?code=abc&state=${encodeURIComponent(state)}`
+      )
+    );
+    const location = res.headers.get("location")!;
+    expect(location).toContain("square_error=locations_fetch_failed");
+    expect(location).not.toContain("secret_token");
+  });
 });
 
 function signSquareOAuthStateForTest(vendorId: string, userId: string, ttlSec: number): string {

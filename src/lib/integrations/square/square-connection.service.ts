@@ -445,22 +445,52 @@ export async function selectSquareLocationForVendor(input: {
   }
 
   if (connection.accessTokenRef) {
-    const token = await ensureSquareAccessToken(connection);
-    if (token) {
-      const liveLocations = await fetchSquareLocations(token);
-      const live = liveLocations.find((l) => l.id === input.locationId);
-      if (!live) {
+    try {
+      const token = await ensureSquareAccessToken(connection);
+      if (token) {
+        const liveLocations = await fetchSquareLocations(token);
+        const live = liveLocations.find((l) => l.id === input.locationId);
+        if (!live) {
+          return {
+            ok: false,
+            error: "Location is no longer available on this Square account.",
+          };
+        }
+        if (activeSquareLocations([live]).length === 0) {
+          return {
+            ok: false,
+            error: "Selected location is not active in Square.",
+          };
+        }
+      }
+    } catch (e) {
+      // ensureSquareAccessToken may throw after marking the connection error on refresh failure.
+      // fetchSquareLocations may also throw. Honor the Result-style API contract either way.
+      if (e instanceof SquareApiError) {
+        const lower = e.message.toLowerCase();
+        if (lower.includes("refresh") || lower.includes("oauth")) {
+          return {
+            ok: false,
+            error: "Could not refresh Square credentials. Reconnect Square and try again.",
+          };
+        }
+        if (lower.includes("location")) {
+          return {
+            ok: false,
+            error: "Could not load Square locations to validate selection. Try again.",
+          };
+        }
+      }
+      if (e instanceof Error && /refresh|token/i.test(e.message)) {
         return {
           ok: false,
-          error: "Location is no longer available on this Square account.",
+          error: "Square credentials expired or could not be refreshed. Reconnect Square and try again.",
         };
       }
-      if (activeSquareLocations([live]).length === 0) {
-        return {
-          ok: false,
-          error: "Selected location is not active in Square.",
-        };
-      }
+      return {
+        ok: false,
+        error: "Could not validate the selected Square location. Reconnect Square and try again.",
+      };
     }
   }
 

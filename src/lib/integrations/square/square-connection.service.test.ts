@@ -235,6 +235,50 @@ describe("square connection service", () => {
     }
   });
 
+  it("returns graceful error when token refresh throws during location select", async () => {
+    mockFindFirst.mockResolvedValue({
+      id: "conn_1",
+      status: "pending",
+      displayName: "Square",
+      externalMerchantId: "m1",
+      externalLocationId: null,
+      externalStoreId: null,
+      accessTokenRef: "cred_1",
+      createdAt: new Date(),
+      lastHealthCheckAt: null,
+      errorCode: null,
+      errorMessage: null,
+      isActive: true,
+      capabilities: {
+        locations: [{ id: "loc_a", name: "A", status: "ACTIVE" }],
+        pendingLocationSelection: true,
+      },
+    });
+    mockFindUnique.mockResolvedValue({
+      capabilities: {
+        locations: [{ id: "loc_a", name: "A", status: "ACTIVE" }],
+      },
+    });
+    mockUpdate.mockResolvedValue({});
+    vi.mocked(loadIntegrationProviderTokens).mockResolvedValue({
+      credentialId: "cred_1",
+      accessToken: "at",
+      refreshToken: "rt",
+      accessTokenExpiresAt: new Date(Date.now() + 30_000),
+    });
+    vi.mocked(refreshSquareOAuthToken).mockRejectedValue(new Error("Square OAuth refresh failed"));
+
+    const result = await selectSquareLocationForVendor({
+      vendorId: "v1",
+      locationId: "loc_a",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.toLowerCase()).toMatch(/refresh|reconnect|credential/);
+    }
+  });
+
   it("disconnect deactivates connection and deletes credentials", async () => {
     mockFindFirst.mockResolvedValue({
       id: "conn_1",
