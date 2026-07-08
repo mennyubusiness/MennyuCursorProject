@@ -270,6 +270,7 @@ enum PosConnectionStatus {
 enum VendorOrderRoutingMode {
   manual_dashboard
   deliverect
+  square
 }
 
 /// Which menu management path and published menu source a vendor uses.

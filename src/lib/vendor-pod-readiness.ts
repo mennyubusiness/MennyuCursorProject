@@ -10,10 +10,14 @@ import { hasValidVendorCustomerOrderingHours } from "@/lib/vendor-customer-order
 import { VENDOR_HOURS_PUBLIC_COPY } from "@/lib/vendor-operational-copy";
 import {
   isDeliverectRoutingMode,
+  isSquareRoutingMode,
   isVendorRoutingOperationalReady,
   VENDOR_ROUTING_MODE_COPY,
 } from "@/lib/vendor-order-routing-mode";
-import { isOpenOrderMenuSource, vendorMenuSourceVendorPath } from "@/lib/vendor-menu-source";
+import {
+  usesVendorMenuBuilder,
+  vendorMenuManagementPath,
+} from "@/lib/vendor-menu-management";
 import {
   getVendorOrderabilityState,
   getVendorPodOwnerMissingLines,
@@ -88,6 +92,8 @@ export type VendorPodReadinessInput = {
   customerOrderingHours?: unknown;
   /** Resolved live availability (hours, pause) for orderability parity with customer surfaces. */
   vendorAvailability?: VendorAvailabilityInput;
+  /** Square OAuth healthy with selected location — enables catalog import CTA (square routing only). */
+  squareCatalogImportReady?: boolean;
 };
 
 export type VendorPodReadinessResult = {
@@ -212,7 +218,9 @@ export function vendorPodReadinessStatusLabel(
     case "needs_pos":
       return isDeliverectRoutingMode(orderRoutingMode)
         ? "Waiting on Deliverect setup"
-        : "Waiting on order routing setup";
+        : isSquareRoutingMode(orderRoutingMode)
+          ? "Waiting on Square setup"
+          : "Waiting on order routing setup";
     case "needs_menu":
       return "Menu unavailable";
     case "needs_hours":
@@ -240,13 +248,15 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
   const posComplete = isVendorPosReady(posSummary);
   const menuComplete = isVendorMenuReady(menuSummary);
   const deliverectMode = isDeliverectRoutingMode(posSummary.orderRoutingMode);
-  const openOrderMenu = isOpenOrderMenuSource({
-    menuSource: input.menuSource ?? posSummary.menuSource ?? "open_order",
-  });
-  const menuVendorPath = vendorMenuSourceVendorPath(
-    vendorId,
-    openOrderMenu ? "open_order" : "deliverect"
-  );
+  const squareMode = isSquareRoutingMode(posSummary.orderRoutingMode);
+  const builderMode = usesVendorMenuBuilder(posSummary.orderRoutingMode);
+  const menuVendorPath = vendorMenuManagementPath(vendorId, posSummary.orderRoutingMode);
+  const squareMenuActionHref =
+    audience === "vendor" && squareMode
+      ? input.squareCatalogImportReady
+        ? `/vendor/${vendorId}/menu/imports`
+        : `/vendor/${vendorId}/integrations/square`
+      : menuVendorPath;
   const posState = deriveVendorPosUiState({
     deliverectChannelLinkId: posSummary.deliverectChannelLinkId,
     posConnectionStatus: posSummary.posConnectionStatus,
@@ -326,22 +336,39 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
     ...publicProfileItems,
     {
       key: "menu",
-      label: openOrderMenu ? "Build menu" : "Publish menu",
-      complete: openOrderMenu
+      label: builderMode ? "Build menu" : squareMode ? "Prepare Square menu import" : "Import/sync menu",
+      complete: builderMode
         ? Boolean(menuSummary.hasPublishedMenuVersion && menuSummary.hasOperationalItems)
         : menuSummary.hasOperationalItems,
       owner: "vendor",
       description:
-        openOrderMenu && !menuSummary.hasPublishedMenuVersion && menuSummary.hasOperationalItems
+        builderMode && !menuSummary.hasPublishedMenuVersion && menuSummary.hasOperationalItems
           ? "Publish your Menu Builder draft before customers can order."
           : menuSummary.hasOperationalItems
             ? "Menu items are available on your public page."
-            : openOrderMenu
+            : builderMode
               ? "Add categories and items in Menu Builder, then publish."
-              : "Publish or import a menu before appearing on the pod page.",
+              : squareMode
+                ? input.squareCatalogImportReady
+                  ? "Import your Square catalog from Menu Imports, then publish when ready."
+                  : "Connect Square, then import your menu from Menu Imports."
+                : "Import or publish a menu before appearing on the pod page.",
       actionHref:
-        audience === "vendor" ? menuVendorPath : podOwnerVendorHref(podId, podSlug, vendor.slug),
-      actionLabel: audience === "vendor" ? (openOrderMenu ? "Open Menu Builder" : "Review menu") : "View menu page",
+        audience === "vendor"
+          ? squareMode
+            ? squareMenuActionHref
+            : menuVendorPath
+          : podOwnerVendorHref(podId, podSlug, vendor.slug),
+      actionLabel:
+        audience === "vendor"
+          ? builderMode
+            ? "Open Menu Builder"
+            : squareMode
+              ? input.squareCatalogImportReady
+                ? "Open Menu Imports"
+                : "Connect Square"
+              : "Open Menu Imports"
+          : "View menu page",
     },
     {
       key: "stripe",
@@ -357,44 +384,67 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
     },
     {
       key: "pos",
-      label: deliverectMode ? "Connect Deliverect POS" : "Order routing: Open Order dashboard",
+      label: deliverectMode
+        ? "Connect Deliverect POS"
+        : squareMode
+          ? "Connect Square"
+          : "Order routing: Open Order dashboard",
       complete: posComplete,
-      owner: deliverectMode ? "vendor" : "open_order",
+      owner: deliverectMode || squareMode ? "vendor" : "open_order",
       description: deliverectMode
         ? posComplete
           ? "Deliverect is connected and mappings are ready for routing."
           : posState === "connected"
             ? "Deliverect is connected but product/modifier mappings still need attention."
             : "Connect Deliverect so orders can route to the kitchen POS."
-        : VENDOR_ROUTING_MODE_COPY.manualDashboard.vendorHelper,
+        : squareMode
+          ? posComplete
+            ? "Square is connected. Order injection is not live yet."
+            : "Connect Square and select an active location before Square routing can go live."
+          : VENDOR_ROUTING_MODE_COPY.manualDashboard.vendorHelper,
       actionHref:
         audience === "vendor"
           ? deliverectMode
             ? `/vendor/${vendorId}/connect-pos`
-            : `/vendor/${vendorId}/kitchen`
+            : squareMode
+              ? `/vendor/${vendorId}/integrations/square`
+              : `/vendor/${vendorId}/kitchen`
           : undefined,
       actionLabel:
         audience === "vendor"
           ? deliverectMode
             ? "Connect POS"
-            : "Open Kitchen Mode"
+            : squareMode
+              ? "Connect Square"
+              : "Open Kitchen Mode"
           : undefined,
     },
     {
       key: "menu_available",
-      label: openOrderMenu ? "Publish Open Order menu" : "Confirm menu availability",
+      label: builderMode ? "Publish Open Order menu" : "Confirm menu availability",
       complete: menuComplete,
       owner: "vendor",
       description: menuSummary.hasOperationalItems
         ? menuComplete
           ? "At least one menu item is available to order."
           : "Menu items exist but none are available right now."
-        : openOrderMenu
+        : builderMode
           ? "Publish your Menu Builder menu with at least one available item."
-          : "Publish or import a menu with at least one available item.",
+          : squareMode
+            ? "Import your Square catalog from Menu Imports, then publish when ready."
+            : "Publish or import a menu with at least one available item.",
       actionHref:
-        audience === "vendor" ? menuVendorPath : podOwnerVendorHref(podId, podSlug, vendor.slug),
-      actionLabel: audience === "vendor" ? (openOrderMenu ? "Open Menu Builder" : "Review menu") : "View menu page",
+        audience === "vendor"
+          ? squareMode
+            ? squareMenuActionHref
+            : menuVendorPath
+          : podOwnerVendorHref(podId, podSlug, vendor.slug),
+      actionLabel:
+        audience === "vendor"
+          ? builderMode
+            ? "Open Menu Builder"
+            : "Open Menu Imports"
+          : "View menu page",
     },
   ];
 

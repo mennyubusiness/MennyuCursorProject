@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  gateDeliverectMenuRoutes,
+  gateMenuImportsRoutes,
   requireVendorMenuSourceContext,
 } from "@/lib/vendor-menu-route-guard.server";
 import {
@@ -40,7 +40,7 @@ export default async function VendorMenuImportJobPage({
 }) {
   const { vendorId, jobId } = await params;
   const vendorCtx = await requireVendorMenuSourceContext(vendorId);
-  gateDeliverectMenuRoutes(vendorCtx, vendorId);
+  gateMenuImportsRoutes(vendorCtx, vendorId);
 
   const job = await fetchAdminMenuImportJobDetail(jobId);
   if (!job) notFound();
@@ -141,7 +141,7 @@ export default async function VendorMenuImportJobPage({
   return (
     <div className="space-y-8">
       <div>
-        <Link href={`/vendor/${vendorId}/menu-imports`} className="text-sm text-oo-stone-gray hover:underline">
+        <Link href={`/vendor/${vendorId}/menu/imports`} className="text-sm text-oo-stone-gray hover:underline">
           ← Menu updates
         </Link>
         <h1 className="mt-2 text-xl font-semibold text-oo-charcoal">Menu update</h1>

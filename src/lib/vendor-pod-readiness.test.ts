@@ -175,6 +175,58 @@ describe("deriveVendorPodReadiness status priority", () => {
     expect(result.status).toBe("needs_pos");
   });
 
+  it("square menu checklist links to Menu Imports when catalog import is ready", () => {
+    const result = deriveVendorPodReadiness(
+      {
+        podId: "pod_1",
+        vendorId: "vendor_1",
+        pod: { isActive: true },
+        podVendor: { isActive: true },
+        vendor: baseVendor,
+        menuSummary: { ...baseMenu, hasOperationalItems: false, hasAvailableOperationalItems: false },
+        posSummary: {
+          ...basePos,
+          orderRoutingMode: "square",
+          deliverectChannelLinkId: null,
+          posConnectionStatus: "not_connected",
+        },
+        stripeSummary: baseStripe,
+        squareCatalogImportReady: true,
+      },
+      { audience: "vendor" }
+    );
+
+    const menu = result.checklist.find((item) => item.key === "menu");
+    expect(menu?.actionHref).toBe("/vendor/vendor_1/menu/imports");
+    expect(menu?.actionLabel).toBe("Open Menu Imports");
+  });
+
+  it("square menu checklist links to Square integration when not connected", () => {
+    const result = deriveVendorPodReadiness(
+      {
+        podId: "pod_1",
+        vendorId: "vendor_1",
+        pod: { isActive: true },
+        podVendor: { isActive: true },
+        vendor: baseVendor,
+        menuSummary: { ...baseMenu, hasOperationalItems: false, hasAvailableOperationalItems: false },
+        posSummary: {
+          ...basePos,
+          orderRoutingMode: "square",
+          deliverectChannelLinkId: null,
+          posConnectionStatus: "not_connected",
+        },
+        stripeSummary: baseStripe,
+        squareCatalogImportReady: false,
+      },
+      { audience: "vendor" }
+    );
+
+    const menu = result.checklist.find((item) => item.key === "menu");
+    expect(menu?.actionHref).toBe("/vendor/vendor_1/integrations/square");
+    expect(menu?.actionLabel).toBe("Connect Square");
+  });
+
   it("does not block manual dashboard vendors without Deliverect", () => {
     const result = readiness({
       posSummary: {

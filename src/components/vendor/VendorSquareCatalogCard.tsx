@@ -13,7 +13,7 @@ import type {
   SquareCatalogPreviewReport,
 } from "@/lib/integrations/square/square-menu-import.service";
 
-export function VendorSquareCatalogCard({
+export function VendorSquareCatalogImportControls({
   vendorId,
   health,
   canImport,
@@ -30,19 +30,9 @@ export function VendorSquareCatalogCard({
   const [importReport, setImportReport] = useState<SquareCatalogImportReport | null>(null);
 
   return (
-    <DashboardCard className="max-w-3xl">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-oo-charcoal">Square catalog</h3>
-          <p className="mt-1 text-xs text-oo-stone-gray">
-            Preview or import Square catalog into an unpublished draft menu. Does not change your
-            live menu until you publish from menu imports.
-          </p>
-        </div>
-      </div>
-
+    <>
       {!canImport ? (
-        <div className="mt-4 space-y-2 text-sm text-amber-900">
+        <div className="space-y-2 text-sm text-amber-900">
           <p>{disabledReason ?? "Square connection must be healthy before catalog import."}</p>
           {health.missingRequirements.length > 0 ? (
             <ul className="list-inside list-disc text-xs">
@@ -54,7 +44,7 @@ export function VendorSquareCatalogCard({
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3">
         <button
           type="button"
           disabled={pending || !canImport}
@@ -150,6 +140,41 @@ export function VendorSquareCatalogCard({
           </Link>
         </div>
       ) : null}
+    </>
+  );
+}
+
+export function VendorSquareCatalogCard({
+  vendorId,
+  health,
+  canImport,
+  disabledReason,
+}: {
+  vendorId: string;
+  health: ProviderConnectionHealth;
+  canImport: boolean;
+  disabledReason: string | null;
+}) {
+  return (
+    <DashboardCard className="max-w-3xl">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-oo-charcoal">Square catalog</h3>
+          <p className="mt-1 text-xs text-oo-stone-gray">
+            Preview or import Square catalog into an unpublished draft menu. Does not change your
+            live menu until you publish from menu imports.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <VendorSquareCatalogImportControls
+          vendorId={vendorId}
+          health={health}
+          canImport={canImport}
+          disabledReason={disabledReason}
+        />
+      </div>
     </DashboardCard>
   );
 }

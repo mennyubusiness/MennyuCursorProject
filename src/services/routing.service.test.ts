@@ -38,7 +38,7 @@ const baseContext = {
 function routingHead(opts?: {
   voChannelLink?: string | null;
   vendorChannelLink?: string | null;
-  orderRoutingMode?: "manual_dashboard" | "deliverect";
+  orderRoutingMode?: "manual_dashboard" | "deliverect" | "square";
   busyDelay?: number;
 }) {
   return {
@@ -98,6 +98,22 @@ describe("submitVendorOrder", () => {
       },
       "manual"
     );
+  });
+
+  it("fails safely for square routing without falling back to manual or deliverect", async () => {
+    mockFindUnique.mockResolvedValueOnce(
+      routingHead({ orderRoutingMode: "square", vendorChannelLink: null })
+    );
+
+    const result = await submitVendorOrder(VO_ID, baseContext);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Square order routing is not implemented yet.",
+      code: "SQUARE_ROUTING_NOT_IMPLEMENTED",
+    });
+    expect(mockSubmitDeliverect).not.toHaveBeenCalled();
+    expect(mockApplyStatus).not.toHaveBeenCalled();
   });
 
   it("fails deliverect routing when mode is deliverect but channel link is missing", async () => {

@@ -22,8 +22,8 @@ describe("vendor dashboard operating layout", () => {
   it("nav prioritizes dashboard, orders, menu tooling, hours, payouts, setup, settings", () => {
     const nav = readVendor("VendorAreaNav.tsx");
     expect(nav).toMatch(/dashboard.*Orders.*Hours.*Payouts.*Setup.*Vendor Profile/s);
-    expect(nav).toContain("vendorMenuSourceNavLabel");
-    expect(nav).toContain("menu-builder");
+    expect(nav).toContain("vendorMenuManagementNavLabel");
+    expect(nav).toContain("menu/imports");
     expect(nav).not.toContain('"analytics"');
     expect(nav).toContain("Kitchen");
   });

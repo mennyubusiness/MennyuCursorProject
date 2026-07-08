@@ -8,7 +8,7 @@ import {
   type VendorOrderAuthoritySnapshot,
 } from "@/domain/status-authority";
 import type { VendorOrderRoutingMode } from "@prisma/client";
-import { isDeliverectRoutingMode } from "@/lib/vendor-order-routing-mode";
+import { isDeliverectRoutingMode, isSquareRoutingMode } from "@/lib/vendor-order-routing-mode";
 
 export const VENDOR_DELIVERECT_CONTROLLED_MESSAGE =
   "This order is controlled by Deliverect/POS. Status updates must come from the POS.";
@@ -32,6 +32,7 @@ export function isDeliverectAuthoritativeVendorOrder(
   orderRoutingMode?: VendorOrderRoutingMode | string | null
 ): boolean {
   if (orderRoutingMode === "manual_dashboard") return false;
+  if (isSquareRoutingMode(orderRoutingMode)) return false;
   if (vo.manuallyRecoveredAt != null) return false;
   if (getEffectiveAuthority(vo) === "admin_override") return false;
   return hasDeliverectChannelLink(vo);
@@ -50,6 +51,7 @@ export function canVendorDashboardMutateVendorOrder(
   orderRoutingMode?: VendorOrderRoutingMode | string | null
 ): boolean {
   if (orderRoutingMode === "manual_dashboard") return true;
+  if (isSquareRoutingMode(orderRoutingMode)) return true;
   if (isDeliverectRoutingMode(orderRoutingMode)) {
     return isOpenOrderAuthoritativeVendorOrder(vo, orderRoutingMode);
   }

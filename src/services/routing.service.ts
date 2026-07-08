@@ -61,6 +61,15 @@ export async function submitVendorOrder(
   const routingMode = voHead.vendor.orderRoutingMode ?? "manual_dashboard";
   const channelLinkId =
     voHead.vendor.deliverectChannelLinkId ?? voHead.deliverectChannelLinkId;
+
+  if (routingMode === "square") {
+    return {
+      success: false,
+      error: "Square order routing is not implemented yet.",
+      code: "SQUARE_ROUTING_NOT_IMPLEMENTED",
+    };
+  }
+
   const provider: "deliverect" | "manual" =
     routingMode === "deliverect" ? "deliverect" : "manual";
   const busyDelay = voHead.vendor.deliverectBusyDelayMinutes ?? 0;

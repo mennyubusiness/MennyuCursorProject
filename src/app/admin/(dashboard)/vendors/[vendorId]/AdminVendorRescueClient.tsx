@@ -18,6 +18,7 @@ import {
 } from "@/lib/admin-entity-nav-links";
 import type { BusinessHoursEvaluation } from "@/lib/business-time";
 import type { AdminVendorDetailView } from "@/services/admin-vendor-detail.service";
+import type { AdminSquareRoutingStatus } from "@/lib/integrations/square/square-routing-readiness";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { AdminVendorOrderRoutingSection } from "./AdminVendorOrderRoutingSection";
@@ -26,6 +27,11 @@ import {
   vendorDashboardPresenceLabel,
 } from "@/lib/vendor-dashboard-presence";
 import { vendorOrderRoutingModeAdminLabel } from "@/lib/vendor-order-routing-mode";
+import {
+  getVendorMenuManagementMode,
+  vendorMenuManagementModeLabel,
+  vendorMenuManagementPath,
+} from "@/lib/vendor-menu-management";
 import {
   getVendorMenuSourceMismatchWarning,
   vendorMenuSourceLabel,
@@ -51,12 +57,14 @@ export function AdminVendorRescueClient({
   detail,
   podOptions,
   posSummary,
+  squareStatus,
   hoursDebug,
   hoursDebugPodName,
 }: {
   detail: AdminVendorDetailView;
   podOptions: Option[];
   posSummary: VendorPosReadinessSummary | null;
+  squareStatus: AdminSquareRoutingStatus;
   hoursDebug?: BusinessHoursEvaluation | null;
   hoursDebugPodName?: string | null;
 }) {
@@ -99,6 +107,29 @@ export function AdminVendorRescueClient({
         <AdminInfoRow
           label="Routing mode"
           value={vendorOrderRoutingModeAdminLabel(detail.vendor.orderRoutingMode as VendorOrderRoutingMode)}
+        />
+        <AdminInfoRow
+          label="Menu management"
+          value={vendorMenuManagementModeLabel(
+            getVendorMenuManagementMode(detail.vendor.orderRoutingMode as VendorOrderRoutingMode)
+          )}
+        />
+        <AdminInfoRow
+          label="Vendor menu page"
+          value={
+            <Link
+              href={vendorMenuManagementPath(
+                vendorId,
+                detail.vendor.orderRoutingMode as VendorOrderRoutingMode
+              )}
+              className="text-sky-800 hover:underline"
+            >
+              {getVendorMenuManagementMode(detail.vendor.orderRoutingMode as VendorOrderRoutingMode) ===
+              "builder"
+                ? "Open Menu Builder"
+                : "Open Menu Imports"}
+            </Link>
+          }
         />
         <AdminInfoRow
           label="Menu source"
@@ -350,6 +381,7 @@ export function AdminVendorRescueClient({
           vendorId={vendorId}
           orderRoutingMode={detail.vendor.orderRoutingMode as VendorOrderRoutingMode}
           posSummary={posSummary}
+          squareStatus={squareStatus}
         />
       ) : null}
 

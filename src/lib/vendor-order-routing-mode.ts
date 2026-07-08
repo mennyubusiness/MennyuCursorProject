@@ -6,30 +6,42 @@ import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 
 export type { VendorOrderRoutingMode };
 
-export const VENDOR_ORDER_ROUTING_MODES = ["manual_dashboard", "deliverect"] as const satisfies readonly VendorOrderRoutingMode[];
+export const VENDOR_ORDER_ROUTING_MODES = [
+  "manual_dashboard",
+  "deliverect",
+  "square",
+] as const satisfies readonly VendorOrderRoutingMode[];
 
 export function normalizeVendorOrderRoutingMode(
   mode: VendorOrderRoutingMode | string | null | undefined
 ): VendorOrderRoutingMode {
-  return mode === "deliverect" ? "deliverect" : "manual_dashboard";
+  if (mode === "deliverect") return "deliverect";
+  if (mode === "square") return "square";
+  return "manual_dashboard";
 }
 
 export function isDeliverectRoutingMode(mode: VendorOrderRoutingMode | string | null | undefined): boolean {
   return normalizeVendorOrderRoutingMode(mode) === "deliverect";
 }
 
+export function isSquareRoutingMode(mode: VendorOrderRoutingMode | string | null | undefined): boolean {
+  return normalizeVendorOrderRoutingMode(mode) === "square";
+}
+
 export function isManualDashboardRoutingMode(mode: VendorOrderRoutingMode | string | null | undefined): boolean {
-  return !isDeliverectRoutingMode(mode);
+  return normalizeVendorOrderRoutingMode(mode) === "manual_dashboard";
 }
 
 export function vendorOrderRoutingModeShortLabel(mode: VendorOrderRoutingMode | string | null | undefined): string {
-  return isDeliverectRoutingMode(mode) ? "Deliverect" : "Manual dashboard";
+  if (isDeliverectRoutingMode(mode)) return "Deliverect";
+  if (isSquareRoutingMode(mode)) return "Square";
+  return "Manual dashboard";
 }
 
 export function vendorOrderRoutingModeAdminLabel(mode: VendorOrderRoutingMode | string | null | undefined): string {
-  return isDeliverectRoutingMode(mode)
-    ? "Deliverect / POS-connected routing"
-    : "Open Order Dashboard / Tablet";
+  if (isDeliverectRoutingMode(mode)) return "Deliverect / POS-connected routing";
+  if (isSquareRoutingMode(mode)) return "Square / POS-connected routing";
+  return "Open Order Dashboard / Tablet";
 }
 
 export type VendorPosConnectionSummary = {
@@ -60,10 +72,14 @@ export type VendorRoutingReadinessInput = VendorPosConnectionSummary & {
 /**
  * Operational routing readiness: manual mode always passes; Deliverect mode requires
  * channel link + completed product/modifier mappings (when deliverectMappingReady is supplied).
+ * Square mode is never operationally ready until Square order injection is implemented.
  */
 export function isVendorRoutingOperationalReady(input: VendorRoutingReadinessInput): boolean {
   if (isManualDashboardRoutingMode(input.orderRoutingMode)) {
     return true;
+  }
+  if (isSquareRoutingMode(input.orderRoutingMode)) {
+    return false;
   }
   if (!isVendorDeliverectPosConnected(input)) {
     return false;
@@ -74,6 +90,9 @@ export function isVendorRoutingOperationalReady(input: VendorRoutingReadinessInp
 export function vendorRoutingSetupBlockerLabel(input: VendorRoutingReadinessInput): string | null {
   if (isManualDashboardRoutingMode(input.orderRoutingMode)) {
     return null;
+  }
+  if (isSquareRoutingMode(input.orderRoutingMode)) {
+    return "Square order routing is selected but order injection is not live yet.";
   }
   if (!isVendorDeliverectPosConnected(input)) {
     return "Deliverect is not connected.";
@@ -99,6 +118,16 @@ export const VENDOR_ROUTING_MODE_COPY = {
     incompleteWarning:
       "Deliverect routing is selected but setup is incomplete. This vendor cannot receive orders until Deliverect is connected and mappings are complete.",
   },
+  square: {
+    adminHelper:
+      "Orders will route through Square when order injection is live. Requires a healthy Square OAuth connection with a selected active location. Menu source stays on Open Order until Square menu publish is enabled.",
+    vendorHelper:
+      "Your orders are configured for Square routing. Order injection must be enabled before customers can place orders with this routing mode.",
+    incompleteWarning:
+      "Square routing is selected but order injection is not live yet. This vendor cannot receive orders until Square order routing is implemented.",
+    notConnectedWarning:
+      "Square is not ready. The vendor must connect Square and select an active location before Square routing can be enabled.",
+  },
 } as const;
 
 /** Dashboard / status card label for the active routing mode (not raw POS connection when manual). */
@@ -109,12 +138,15 @@ export function vendorRoutingStatusLabel(
   if (isManualDashboardRoutingMode(mode)) {
     return vendorOrderRoutingModeAdminLabel(mode);
   }
+  if (isSquareRoutingMode(mode)) {
+    return "Square routing (order injection pending)";
+  }
   return vendorPosConnectionLabel(posState);
 }
 
 /** Field label beside routing status on vendor dashboard cards. */
 export function vendorRoutingStatusFieldLabel(mode: VendorOrderRoutingMode | string | null | undefined): string {
-  return isDeliverectRoutingMode(mode) ? "POS" : "Order routing";
+  return isManualDashboardRoutingMode(mode) ? "Order routing" : "POS";
 }
 
 export function vendorMenuSyncLabelForRouting(input: {
@@ -163,6 +195,9 @@ export function vendorKitchenStatusLine(
   if (isManualDashboardRoutingMode(mode)) {
     return "Orders managed in Open Order — use buttons below to update order status";
   }
+  if (isSquareRoutingMode(mode)) {
+    return "Square routing configured — manage orders in Open Order until POS sync is live";
+  }
   switch (posState) {
     case "connected":
       return "POS connected — status may sync from kitchen system";
@@ -179,6 +214,9 @@ export function vendorKitchenStatusWarning(
   posState: VendorPosUiState
 ): string | null {
   if (isManualDashboardRoutingMode(mode)) return null;
+  if (isSquareRoutingMode(mode)) {
+    return "Square order injection is not live yet. Kitchen actions update Open Order directly.";
+  }
   if (posState === "needs_attention") {
     return "POS connection needs attention. Orders may not sync automatically until this is resolved.";
   }
@@ -194,6 +232,9 @@ export function vendorSetupPageIncompleteDescription(
   if (isDeliverectRoutingMode(mode)) {
     return "Complete public profile steps to appear on your pod page, then finish payment and Deliverect setup to accept orders.";
   }
+  if (isSquareRoutingMode(mode)) {
+    return "Complete public profile steps to appear on your pod page, then finish payment and Square connection setup to accept orders.";
+  }
   return "Complete public profile steps to appear on your pod page, then finish payment and order routing setup to accept orders.";
 }
 
@@ -203,6 +244,9 @@ export function vendorSetupOperationalLockedDescription(
   if (isDeliverectRoutingMode(mode)) {
     return "Finish the public profile requirements above first. Payment, Deliverect, and ordering controls unlock after your vendor is visible on the pod page.";
   }
+  if (isSquareRoutingMode(mode)) {
+    return "Finish the public profile requirements above first. Payment, Square connection, and ordering controls unlock after your vendor is visible on the pod page.";
+  }
   return "Finish the public profile requirements above first. Payment, order routing, and ordering controls unlock after your vendor is visible on the pod page.";
 }
 
@@ -211,6 +255,9 @@ export function vendorSetupIncompleteBannerCopy(
 ): string {
   if (isDeliverectRoutingMode(mode)) {
     return "— finish Deliverect connection and payments on the Setup page when you are ready.";
+  }
+  if (isSquareRoutingMode(mode)) {
+    return "— finish Square connection and payments on the Setup page when you are ready.";
   }
   return "— finish order routing and payments on the Setup page when you are ready.";
 }

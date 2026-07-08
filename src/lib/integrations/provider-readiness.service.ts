@@ -4,7 +4,7 @@ import type { IntegrationProvider, ProviderConnectionHealth, ProviderMappingHeal
 import { getMenuProviderAdapter, getOrderProviderAdapter } from "@/lib/integrations/provider-registry";
 import { countActiveMappingsForVendor } from "@/lib/integrations/provider-mapping.service";
 import { providerDisplayLabel } from "@/lib/integrations/provider-capabilities";
-import { isDeliverectRoutingMode } from "@/lib/vendor-order-routing-mode";
+import { isDeliverectRoutingMode, isSquareRoutingMode } from "@/lib/vendor-order-routing-mode";
 import { isDeliverectMenuSource, isOpenOrderMenuSource } from "@/lib/vendor-menu-source";
 import { prisma } from "@/lib/db";
 
@@ -19,7 +19,9 @@ export type VendorMenuProviderReadiness = {
 };
 
 function orderProviderForVendor(orderRoutingMode: string): IntegrationProvider {
-  return isDeliverectRoutingMode(orderRoutingMode) ? "deliverect" : "manual_dashboard";
+  if (isDeliverectRoutingMode(orderRoutingMode)) return "deliverect";
+  if (isSquareRoutingMode(orderRoutingMode)) return "square";
+  return "manual_dashboard";
 }
 
 function menuProviderForVendor(menuSource: string): IntegrationProvider {

@@ -23,7 +23,8 @@ export function isDeliverectMenuSource(vendor: Pick<VendorMenuSourceFields, "men
 export function menuSourceForOrderRoutingMode(
   orderRoutingMode: VendorOrderRoutingMode
 ): VendorMenuSource {
-  return orderRoutingMode === "deliverect" ? "deliverect" : "open_order";
+  if (orderRoutingMode === "deliverect") return "deliverect";
+  return "open_order";
 }
 
 export function vendorMenuSourceLabel(menuSource: VendorMenuSource): string {
@@ -95,6 +96,14 @@ export function getVendorMenuSourceMismatchWarning(
       headline: "Menu source mismatch",
       detail:
         "This vendor routes orders through Deliverect but uses the Open Order Menu Builder for menus. Confirm this is intentional before launch.",
+    };
+  }
+
+  if (vendor.orderRoutingMode === "square" && vendor.menuSource === "deliverect") {
+    return {
+      headline: "Menu source mismatch",
+      detail:
+        "This vendor routes orders through Square but uses Deliverect menu sync. Confirm this is intentional before launch.",
     };
   }
 

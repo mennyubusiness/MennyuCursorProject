@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
-import {
-  gateOpenOrderMenuBuilderRoutes,
+import {  gateOpenOrderMenuBuilderRoutes,
   requireVendorMenuSourceContext,
 } from "@/lib/vendor-menu-route-guard.server";
 import { loadVendorMenuBuilderPageData } from "@/lib/vendor-menu-builder-data.server";

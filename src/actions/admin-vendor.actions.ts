@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { VendorOrderRoutingMode } from "@prisma/client";
 import { requireAdminActionContext } from "@/lib/admin-action-context";
 import {
   adminAttachVendorToPodFromVendor,
@@ -123,7 +124,7 @@ export async function adminRecheckVendorReadinessAction(vendorId: string, reason
 
 export async function adminUpdateVendorOrderRoutingModeAction(input: {
   vendorId: string;
-  orderRoutingMode: "manual_dashboard" | "deliverect";
+  orderRoutingMode: VendorOrderRoutingMode;
   reason: string;
 }) {
   return withAdmin(({ adminUserId }) =>

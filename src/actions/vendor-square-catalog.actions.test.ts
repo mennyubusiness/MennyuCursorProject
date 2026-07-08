@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const mockRevalidatePath = vi.fn();
+
 vi.mock("next/cache", () => ({
-  revalidatePath: vi.fn(),
+  revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
 }));
 
 vi.mock("@/auth", () => ({
@@ -84,5 +86,7 @@ describe("vendor square catalog actions", () => {
     const result = await importSquareCatalogAction("vendor_1");
     expect(result.ok).toBe(true);
     expect(importSquareCatalog).toHaveBeenCalledWith("vendor_1", "user_1");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/vendor/vendor_1/menu/imports");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/vendor/vendor_1/menu-imports/job_1");
   });
 });

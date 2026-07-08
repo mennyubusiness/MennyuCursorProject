@@ -31,12 +31,14 @@ import { resolveVendorHoursTimezone } from "@/lib/vendor-customer-ordering-hours
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import {
   isDeliverectRoutingMode,
+  isSquareRoutingMode,
   isVendorDeliverectLiveForUi,
   isVendorPosManagedForUi,
   vendorMenuSyncLabelForRouting,
   vendorRoutingStatusFieldLabel,
   vendorRoutingStatusLabel,
 } from "@/lib/vendor-order-routing-mode";
+import { evaluateSquareConnectionHealth } from "@/lib/integrations/square/square-connection.service";
 import { isDeliverectMenuSource } from "@/lib/vendor-menu-source";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 
@@ -149,6 +151,12 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     deliverectMappingReady,
   };
 
+  let squareCatalogImportReady = false;
+  if (isSquareRoutingMode(vendorRecord.orderRoutingMode)) {
+    const squareHealth = await evaluateSquareConnectionHealth(vendorId);
+    squareCatalogImportReady = squareHealth.isReady;
+  }
+
   const hoursTimezone = resolveVendorHoursTimezone(currentPod?.pod.pickupTimezone);
   const hoursSummary = summarizeVendorCustomerOrderingHours({
     vendor: {
@@ -189,6 +197,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
         stripePayoutsEnabled: vendorRecord.stripePayoutsEnabled ?? false,
         stripeConnectConfigured: Boolean(env.STRIPE_SECRET_KEY),
       },
+      squareCatalogImportReady,
       pendingPodInviteCount: pendingInvites,
       hasPodMembership: Boolean(currentPod),
       customerOrderingHours: vendorRecord.customerOrderingHours,

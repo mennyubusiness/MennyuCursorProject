@@ -1,8 +1,12 @@
 import "server-only";
 
 import { notFound, redirect } from "next/navigation";
-import type { VendorMenuSource } from "@prisma/client";
+import type { VendorMenuSource, VendorOrderRoutingMode } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import {
+  getVendorMenuManagementMode,
+  vendorMenuManagementPath,
+} from "@/lib/vendor-menu-management";
 import {
   isDeliverectMenuSource,
   isOpenOrderMenuSource,
@@ -37,23 +41,61 @@ export async function requireVendorMenuSourceContext(vendorId: string): Promise<
   return vendor;
 }
 
-/** Redirect manual/open_order vendors away from Deliverect menu tooling. */
-export function gateDeliverectMenuRoutes(vendor: Pick<VendorMenuSourceFields, "menuSource">, vendorId: string) {
-  if (isOpenOrderMenuSource(vendor)) {
-    redirect(`/vendor/${vendorId}/menu-builder`);
+/** Redirect manual vendors away from integrated Menu Imports tooling. */
+export function gateMenuImportsRoutes(
+  vendor: Pick<VendorMenuSourceFields, "orderRoutingMode">,
+  vendorId: string
+) {
+  if (getVendorMenuManagementMode(vendor.orderRoutingMode) === "builder") {
+    redirect(vendorMenuManagementPath(vendorId, vendor.orderRoutingMode));
   }
 }
 
-/** Redirect Deliverect vendors away from Open Order Menu Builder editing. */
-export function gateOpenOrderMenuBuilderRoutes(
-  vendor: Pick<VendorMenuSourceFields, "menuSource">,
+/** @deprecated Use gateMenuImportsRoutes — kept for existing imports. */
+export function gateDeliverectMenuRoutes(
+  vendor: Pick<VendorMenuSourceFields, "menuSource" | "orderRoutingMode">,
   vendorId: string
 ) {
-  if (isDeliverectMenuSource(vendor)) {
-    redirect(`/vendor/${vendorId}/menu?inactive_menu_source=open_order`);
+  gateMenuImportsRoutes(vendor, vendorId);
+}
+
+/** Redirect integrated-route vendors away from Open Order Menu Builder. */
+export function gateOpenOrderMenuBuilderRoutes(
+  vendor: Pick<VendorMenuSourceFields, "orderRoutingMode">,
+  vendorId: string
+) {
+  if (getVendorMenuManagementMode(vendor.orderRoutingMode) === "imports") {
+    redirect(vendorMenuManagementPath(vendorId, vendor.orderRoutingMode));
   }
+}
+
+/** Menu source checks for publish/canonical validation — not primary nav routing. */
+export function vendorUsesMenuBuilderByMenuSource(menuSource: VendorMenuSource): boolean {
+  return menuSource === "open_order";
 }
 
 export function vendorUsesMenuBuilder(menuSource: VendorMenuSource): boolean {
-  return menuSource === "open_order";
+  return vendorUsesMenuBuilderByMenuSource(menuSource);
 }
+
+export function isDeliverectIntegratedVendor(
+  vendor: Pick<VendorMenuSourceFields, "orderRoutingMode">
+): boolean {
+  return vendor.orderRoutingMode === "deliverect";
+}
+
+export function isSquareIntegratedVendor(
+  vendor: Pick<VendorMenuSourceFields, "orderRoutingMode">
+): boolean {
+  return vendor.orderRoutingMode === "square";
+}
+
+export function integratedOrderRoutingLabel(
+  orderRoutingMode: VendorOrderRoutingMode | string | null | undefined
+): string {
+  if (orderRoutingMode === "deliverect") return "Deliverect";
+  if (orderRoutingMode === "square") return "Square";
+  return "Manual / Tablet";
+}
+
+export { isOpenOrderMenuSource, isDeliverectMenuSource };

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
+import { DashboardCard } from "@/components/dashboard";
 import { VendorSquareConnectionCard } from "@/components/vendor/VendorSquareConnectionCard";
-import { VendorSquareCatalogCard } from "@/components/vendor/VendorSquareCatalogCard";
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canViewVendor } from "@/lib/permissions";
 import { getSquareIntegrationUiState } from "@/actions/vendor-square-connect.actions";
@@ -35,7 +35,7 @@ export default async function VendorSquareIntegrationPage({
       <DashboardPageHeader
         headingLevel={1}
         title="Square integration"
-        description="OAuth connection, location selection, and Square catalog import (draft only)."
+        description="OAuth connection, location selection, and connection health."
         actions={
           <Link
             href={`/vendor/${vendorId}/setup`}
@@ -70,16 +70,19 @@ export default async function VendorSquareIntegrationPage({
           health={health}
         />
 
-        <VendorSquareCatalogCard
-          vendorId={vendorId}
-          health={health}
-          canImport={health.isReady}
-          disabledReason={
-            health.isReady
-              ? null
-              : health.missingRequirements[0] ?? "Complete Square connection setup first."
-          }
-        />
+        <DashboardCard className="max-w-3xl">
+          <h3 className="text-sm font-semibold text-oo-charcoal">Menu import</h3>
+          <p className="mt-1 text-xs text-oo-stone-gray">
+            Preview and import your Square catalog from Menu Imports. Imports create a draft menu
+            for review — they do not publish automatically.
+          </p>
+          <Link
+            href={`/vendor/${vendorId}/menu/imports`}
+            className="mt-4 inline-flex items-center justify-center rounded-xl border border-oo-light-stone bg-oo-warm-white px-4 py-2.5 text-sm font-semibold text-oo-charcoal hover:bg-oo-cream"
+          >
+            Manage Square menu import
+          </Link>
+        </DashboardCard>
       </div>
     </DashboardShell>
   );

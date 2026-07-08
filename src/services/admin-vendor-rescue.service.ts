@@ -3,8 +3,9 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { MenuImportJobStatus, type VendorOrderRoutingMode } from "@prisma/client";
 import { ADMIN_AUDIT_ACTION, ADMIN_AUDIT_TARGET, requireAdminReason } from "@/lib/admin-audit-log";
-import { VENDOR_ORDER_ROUTING_MODES } from "@/lib/vendor-order-routing-mode";
+import { VENDOR_ORDER_ROUTING_MODES, isSquareRoutingMode } from "@/lib/vendor-order-routing-mode";
 import { menuSourceForOrderRoutingMode } from "@/lib/vendor-menu-source";
+import { assertSquareRoutingSelectable } from "@/lib/integrations/square/square-routing-readiness";
 import { buildVendorMenuCustomerPath, buildPodCustomerPath } from "@/lib/customer-public-url";
 import { prisma } from "@/lib/db";
 import { revalidateCustomerVendorMenuCacheForVendor } from "@/services/vendor-customer-menu-cache.service";
@@ -33,6 +34,7 @@ function revalidateVendorPaths(vendorId: string) {
   revalidatePath(`/vendor/${vendorId}/kitchen`);
   revalidatePath(`/vendor/${vendorId}/menu`);
   revalidatePath(`/vendor/${vendorId}/menu-builder`);
+  revalidatePath(`/vendor/${vendorId}/menu/imports`);
   revalidatePath(`/vendor/${vendorId}/menu-imports`);
   revalidatePath(`/vendor/${vendorId}/connect-pos`);
   revalidatePath("/explore");
@@ -402,6 +404,11 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
 
   if (!VENDOR_ORDER_ROUTING_MODES.includes(input.orderRoutingMode)) {
     return { ok: false, error: "Invalid order routing mode." };
+  }
+
+  if (isSquareRoutingMode(input.orderRoutingMode)) {
+    const squareGate = await assertSquareRoutingSelectable(input.vendorId);
+    if (!squareGate.ok) return { ok: false, error: squareGate.error };
   }
 
   const vendor = await prisma.vendor.findUnique({

@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { VendorMenuSource } from "@prisma/client";
-import { vendorMenuSourceNavLabel, vendorUsesMenuBuilder } from "@/lib/vendor-menu-source";
+import type { VendorOrderRoutingMode } from "@prisma/client";
+import {
+  vendorMenuManagementNavLabel,
+  vendorMenuManagementPath,
+} from "@/lib/vendor-menu-management";
 
 const BASE_NAV_LINKS = [
   { href: "dashboard", label: "Dashboard" },
@@ -22,12 +25,14 @@ function navLinkIsActive(pathname: string, base: string, href: string): boolean 
   if (href === "orders") {
     return pathname === path || pathname.startsWith(`${path}/`);
   }
-  if (href === "menu" || href === "menu-builder") {
+  if (href === "menu-builder" || href === "menu/imports") {
     return (
-      pathname === `${base}/menu` ||
-      pathname.startsWith(`${base}/menu/`) ||
       pathname === `${base}/menu-builder` ||
       pathname.startsWith(`${base}/menu-builder/`) ||
+      pathname === `${base}/menu/imports` ||
+      pathname.startsWith(`${base}/menu/imports/`) ||
+      pathname === `${base}/menu` ||
+      pathname.startsWith(`${base}/menu/`) ||
       pathname.startsWith(`${base}/menu-imports`)
     );
   }
@@ -36,17 +41,18 @@ function navLinkIsActive(pathname: string, base: string, href: string): boolean 
 
 export function VendorAreaNav({
   vendorId,
-  menuSource,
+  orderRoutingMode,
   wide = false,
 }: {
   vendorId: string;
-  menuSource: VendorMenuSource;
+  orderRoutingMode: VendorOrderRoutingMode;
   wide?: boolean;
 }) {
   const pathname = usePathname();
   const base = `/vendor/${vendorId}`;
-  const menuHref = vendorUsesMenuBuilder(menuSource) ? "menu-builder" : "menu";
-  const menuLabel = vendorMenuSourceNavLabel(menuSource);
+  const menuPath = vendorMenuManagementPath(vendorId, orderRoutingMode);
+  const menuHref = menuPath.replace(`${base}/`, "");
+  const menuLabel = vendorMenuManagementNavLabel(orderRoutingMode);
   const navLinks = [
     BASE_NAV_LINKS[0],
     BASE_NAV_LINKS[1],
@@ -62,7 +68,7 @@ export function VendorAreaNav({
       <div className={widthClass}>
         <div className="flex flex-wrap gap-1">
           {navLinks.map(({ href, label }) => {
-            const path = `${base}/${href}`;
+            const path = href.includes("/") ? `${base}/${href}` : `${base}/${href}`;
             const isActive = navLinkIsActive(pathname, base, href);
             return (
               <Link

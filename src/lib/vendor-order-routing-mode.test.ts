@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isDeliverectRoutingMode,
   isManualDashboardRoutingMode,
+  isSquareRoutingMode,
   isVendorDeliverectLiveForUi,
   isVendorDeliverectPosConnected,
   isVendorPosManagedForUi,
@@ -13,6 +14,7 @@ import {
   vendorMenuSyncLabelForRouting,
   vendorOrderRoutingModeAdminLabel,
   vendorOrderRoutingModeShortLabel,
+  vendorRoutingSetupBlockerLabel,
   vendorRoutingStatusFieldLabel,
   vendorRoutingStatusLabel,
 } from "./vendor-order-routing-mode";
@@ -24,8 +26,9 @@ describe("normalizeVendorOrderRoutingMode", () => {
     expect(normalizeVendorOrderRoutingMode("other")).toBe("manual_dashboard");
   });
 
-  it("preserves deliverect mode", () => {
+  it("preserves deliverect and square modes", () => {
     expect(normalizeVendorOrderRoutingMode("deliverect")).toBe("deliverect");
+    expect(normalizeVendorOrderRoutingMode("square")).toBe("square");
   });
 });
 
@@ -33,8 +36,10 @@ describe("routing mode labels", () => {
   it("uses admin and short labels per mode", () => {
     expect(vendorOrderRoutingModeAdminLabel("manual_dashboard")).toContain("Dashboard");
     expect(vendorOrderRoutingModeAdminLabel("deliverect")).toContain("Deliverect");
+    expect(vendorOrderRoutingModeAdminLabel("square")).toContain("Square");
     expect(vendorOrderRoutingModeShortLabel("manual_dashboard")).toBe("Manual dashboard");
     expect(vendorOrderRoutingModeShortLabel("deliverect")).toBe("Deliverect");
+    expect(vendorOrderRoutingModeShortLabel("square")).toBe("Square");
   });
 });
 
@@ -57,6 +62,7 @@ describe("isVendorRoutingOperationalReady", () => {
     ).toBe(true);
     expect(isManualDashboardRoutingMode("manual_dashboard")).toBe(true);
     expect(isDeliverectRoutingMode("manual_dashboard")).toBe(false);
+    expect(isSquareRoutingMode("manual_dashboard")).toBe(false);
   });
 
   it("requires Deliverect connection and mappings in deliverect mode", () => {
@@ -82,6 +88,22 @@ describe("isVendorRoutingOperationalReady", () => {
         deliverectMappingReady: false,
       })
     ).toBe(false);
+  });
+
+  it("blocks square routing until order injection is live", () => {
+    expect(
+      isVendorRoutingOperationalReady({
+        ...connectedPos,
+        orderRoutingMode: "square",
+      })
+    ).toBe(false);
+    expect(vendorRoutingSetupBlockerLabel({ orderRoutingMode: "square" })).toContain(
+      "order injection"
+    );
+  });
+
+  it("does not treat square as manual dashboard", () => {
+    expect(isManualDashboardRoutingMode("square")).toBe(false);
   });
 });
 
@@ -114,6 +136,13 @@ describe("vendor-facing routing UI helpers", () => {
       menuReady: true,
       hasOperationalItems: true,
     })).toBe("Menu ready");
+  });
+
+  it("shows square-specific copy without treating it as deliverect", () => {
+    expect(vendorRoutingStatusLabel("square", "connected")).toContain("Square");
+    expect(isVendorPosManagedForUi("square", "connected")).toBe(false);
+    expect(isVendorDeliverectLiveForUi("square", true)).toBe(false);
+    expect(vendorKitchenStatusWarning("square", "connected")).toContain("order injection");
   });
 });
 

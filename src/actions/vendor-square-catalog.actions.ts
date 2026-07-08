@@ -42,6 +42,7 @@ export async function importSquareCatalogAction(vendorId: string) {
   try {
     const report = await importSquareCatalog(vendorId, gate.userId);
     revalidatePath(`/vendor/${vendorId}/integrations/square`);
+    revalidatePath(`/vendor/${vendorId}/menu/imports`);
     revalidatePath(`/vendor/${vendorId}/menu-imports`);
     revalidatePath(`/vendor/${vendorId}/menu-imports/${report.jobId}`);
     return { ok: true as const, report };
