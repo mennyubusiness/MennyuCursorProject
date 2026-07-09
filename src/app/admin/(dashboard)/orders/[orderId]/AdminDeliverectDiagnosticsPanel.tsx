@@ -17,9 +17,12 @@ import { formatAdminOrderDate, isSquareRoutedVendorOrder } from "@/lib/admin-ord
 import {
   parseSquareOrderAudit,
   squareRoutingFailureGuidance,
+  squareStatusSyncAdminSummary,
+  isSquareStatusSyncConfiguredForAdmin,
 } from "@/lib/integrations/square/square-order-audit";
 import { SQUARE_TOTAL_MISMATCH_ADMIN_COPY } from "@/lib/integrations/square/square-order-total-comparison";
 import { AdminDeliverectRecheck } from "./AdminDeliverectRecheck";
+import { AdminSquareStatusSync } from "./AdminSquareStatusSync";
 import { AdminVendorOrderOperationalPanel } from "./AdminVendorOrderOperationalPanel";
 
 type VoRow = AdminOrderDetail["vendorOrders"][number];
@@ -101,6 +104,12 @@ export function AdminSquareRoutingTechnicalDetails({ vo }: { vo: VoRow }) {
 
   const live = isRoutingRetryAvailable();
   const audit = parseSquareOrderAudit(vo.lastSquarePayload);
+  const statusSync = squareStatusSyncAdminSummary({
+    statusSyncConfigured: isSquareStatusSyncConfiguredForAdmin(),
+    audit,
+    lastExternalStatus: vo.lastExternalStatus,
+    lastExternalStatusAt: vo.lastExternalStatusAt,
+  });
   const guidance = squareRoutingFailureGuidance({
     error: vo.squareLastError,
     squareRoutingLive: live,
@@ -194,6 +203,39 @@ export function AdminSquareRoutingTechnicalDetails({ vo }: { vo: VoRow }) {
             ) : null}
           </div>
         ) : null}
+
+        <div className="rounded-md border border-oo-light-stone bg-oo-warm-white px-2.5 py-2">
+          <p className="font-semibold text-oo-charcoal">Square status sync</p>
+          <dl className="mt-2 grid gap-1 sm:grid-cols-2">
+            <div>
+              <dt className="text-oo-stone-gray">Configured</dt>
+              <dd>{statusSync.configuredLabel}</dd>
+            </div>
+            <div>
+              <dt className="text-oo-stone-gray">Last synced at</dt>
+              <dd>{statusSync.lastSyncedAt ? formatAdminOrderDate(new Date(statusSync.lastSyncedAt)) : "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-oo-stone-gray">Last Square fulfillment state</dt>
+              <dd>{statusSync.lastFulfillmentState ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-oo-stone-gray">Last Square order state</dt>
+              <dd>{statusSync.lastOrderState ?? "—"}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-oo-stone-gray">Last sync error</dt>
+              <dd className="text-red-900">{statusSync.lastError ?? "—"}</dd>
+            </div>
+            {audit.statusSync?.outcome ? (
+              <div className="sm:col-span-2">
+                <dt className="text-oo-stone-gray">Last apply outcome</dt>
+                <dd>{audit.statusSync.outcome}</dd>
+              </div>
+            ) : null}
+          </dl>
+          {vo.squareOrderId ? <AdminSquareStatusSync vendorOrderId={vo.id} /> : null}
+        </div>
 
         {audit.mappingIssues ? (
           <div className="rounded-md border border-red-200 bg-red-50/90 px-2.5 py-2 text-xs text-red-950">

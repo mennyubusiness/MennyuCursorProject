@@ -15,6 +15,7 @@ import type {
   SquareCreateOrderRequest,
   SquareCreateOrderResponse,
   SquareCreatePaymentResponse,
+  SquareRetrieveOrderResponse,
 } from "@/lib/integrations/square/square-order.types";
 
 const SQUARE_API_VERSION = "2025-04-16";
@@ -212,6 +213,22 @@ function squareApiHeaders(accessToken: string): Record<string, string> {
     "Content-Type": "application/json",
     "Square-Version": SQUARE_API_VERSION,
   };
+}
+
+export async function fetchSquareOrder(
+  accessToken: string,
+  orderId: string
+): Promise<SquareRetrieveOrderResponse> {
+  const base = getSquareApiBaseUrl(resolveSquareEnvironment());
+  const res = await fetch(`${base}/v2/orders/${encodeURIComponent(orderId)}`, {
+    headers: squareApiHeaders(accessToken),
+  });
+  const json = (await res.json().catch(() => ({}))) as SquareRetrieveOrderResponse;
+  if (!res.ok) {
+    const detail = json.errors?.[0]?.detail ?? res.statusText;
+    throw new SquareApiError(`Square retrieve order failed: ${detail}`, res.status, json);
+  }
+  return json;
 }
 
 export async function createSquareOrder(

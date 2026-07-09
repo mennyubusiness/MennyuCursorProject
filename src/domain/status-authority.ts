@@ -14,6 +14,7 @@ export type VendorOrderStatusAuthority =
 export type VendorOrderStatusSource =
   | "deliverect_webhook"
   | "deliverect_fallback"
+  | "square_webhook"
   | "dma_action"
   | "vendor_dashboard"
   | "admin_action"
@@ -29,6 +30,7 @@ export const VENDOR_ORDER_STATUS_AUTHORITIES: VendorOrderStatusAuthority[] = [
 export const VENDOR_ORDER_STATUS_SOURCES: VendorOrderStatusSource[] = [
   "deliverect_webhook",
   "deliverect_fallback",
+  "square_webhook",
   "dma_action",
   "vendor_dashboard",
   "admin_action",

@@ -118,6 +118,8 @@ const envSchema = z.object({
   DEBUG_DELIVERECT: z.enum(["true", "false"]).optional(),
   /** Verbose add-to-cart trace logs (server). Off in production; dev/test only when "true". */
   SQUARE_WEBHOOK_SIGNATURE_KEY: z.string().optional(),
+  /** Exact notification URL registered in Square Developer Dashboard (for signature verification). */
+  SQUARE_WEBHOOK_NOTIFICATION_URL: z.string().url().optional(),
   SQUARE_APPLICATION_ID: z.string().optional(),
   SQUARE_APPLICATION_SECRET: z.string().optional(),
   /** sandbox | production — alias: SQUARE_MODE */

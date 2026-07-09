@@ -1,5 +1,9 @@
-import type { SquareOrderSubmitAudit } from "@/lib/integrations/square/square-order.types";
+import type {
+  SquareOrderSubmitAudit,
+  SquareWebhookLastApplyRecord,
+} from "@/lib/integrations/square/square-order.types";
 import type { SquareOrderTotalComparison } from "@/lib/integrations/square/square-order-total-comparison";
+import { isSquareStatusSyncConfigured } from "@/services/square-status-sync.service";
 
 export type SquareOrderAuditView = {
   squarePaymentId: string | null;
@@ -8,6 +12,7 @@ export type SquareOrderAuditView = {
   squareLastAttemptAt: string | null;
   reconciliation: SquareOrderTotalComparison | null;
   mappingIssues: unknown;
+  statusSync: SquareWebhookLastApplyRecord | null;
 };
 
 export function extractSquareOrderIdFromAudit(
@@ -38,7 +43,34 @@ export function parseSquareOrderAudit(payload: unknown): SquareOrderAuditView {
       audit != null && "mappingIssues" in audit
         ? (audit as { mappingIssues?: unknown }).mappingIssues ?? null
         : null,
+    statusSync: audit?.statusSync ?? null,
   };
+}
+
+export function squareStatusSyncAdminSummary(input: {
+  statusSyncConfigured: boolean;
+  audit: SquareOrderAuditView;
+  lastExternalStatus: string | null;
+  lastExternalStatusAt: Date | string | null;
+}): {
+  configuredLabel: string;
+  lastSyncedAt: string | null;
+  lastFulfillmentState: string | null;
+  lastOrderState: string | null;
+  lastError: string | null;
+} {
+  const sync = input.audit.statusSync;
+  return {
+    configuredLabel: input.statusSyncConfigured ? "Yes" : "No — set SQUARE_WEBHOOK_SIGNATURE_KEY",
+    lastSyncedAt: sync?.processedAt ?? (input.lastExternalStatusAt ? String(input.lastExternalStatusAt) : null),
+    lastFulfillmentState: sync?.squareFulfillmentState ?? null,
+    lastOrderState: sync?.squareOrderState ?? input.audit.squareOrderState,
+    lastError: sync?.lastError ?? (sync?.outcome === "fetch_failed" ? sync.detail ?? null : null),
+  };
+}
+
+export function isSquareStatusSyncConfiguredForAdmin(): boolean {
+  return isSquareStatusSyncConfigured();
 }
 
 export function squareRoutingFailureGuidance(input: {

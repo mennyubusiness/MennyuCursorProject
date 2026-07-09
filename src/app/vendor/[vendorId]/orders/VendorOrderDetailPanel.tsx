@@ -9,12 +9,17 @@ import {
 } from "@/lib/vendor-order-vendor-display";
 import { formatVendorCustomerPhone } from "@/lib/vendor-order-next-action";
 import { getVendorOrderOperatingMode } from "@/lib/vendor-order-operating-mode";
-import { VENDOR_DELIVERECT_CONTROLLED_NOTICE } from "@/lib/deliverect-vendor-order-authority";
+import {
+  isSquareRoutedVendorOrderWithSync,
+  VENDOR_DELIVERECT_CONTROLLED_NOTICE,
+  VENDOR_SQUARE_SYNC_NOTICE,
+} from "@/lib/deliverect-vendor-order-authority";
 
 export type VendorOrderDetailData = {
   id: string;
   routingStatus: string;
   fulfillmentStatus: string;
+  squareOrderId?: string | null;
   manuallyRecoveredAt?: string | null;
   totalCents: number;
   tipCents: number;
@@ -97,6 +102,15 @@ export function VendorOrderDetailPanel({
       {posManaged ? (
         <p className="mt-3 rounded-lg bg-oo-warm-white px-3 py-2 text-oo-stone-gray">
           {VENDOR_DELIVERECT_CONTROLLED_NOTICE}
+        </p>
+      ) : null}
+
+      {isSquareRoutedVendorOrderWithSync({
+        orderRoutingMode,
+        squareOrderId: vendorOrder.squareOrderId,
+      }) ? (
+        <p className="mt-3 rounded-lg bg-oo-warm-white px-3 py-2 text-oo-stone-gray">
+          {VENDOR_SQUARE_SYNC_NOTICE}
         </p>
       ) : null}
 

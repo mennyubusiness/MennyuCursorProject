@@ -46,6 +46,16 @@ export function isOpenOrderAuthoritativeVendorOrder(
   return !isDeliverectAuthoritativeVendorOrder(vo, orderRoutingMode);
 }
 
+export const VENDOR_SQUARE_SYNC_NOTICE =
+  "This order is routed to Square. Status updates from Square will update Open Order.";
+
+export function isSquareRoutedVendorOrderWithSync(input: {
+  squareOrderId?: string | null;
+  orderRoutingMode?: VendorOrderRoutingMode | string | null;
+}): boolean {
+  return isSquareRoutingMode(input.orderRoutingMode) && Boolean(input.squareOrderId?.trim());
+}
+
 export function canVendorDashboardMutateVendorOrder(
   vo: VendorOrderAuthoritySnapshot,
   orderRoutingMode?: VendorOrderRoutingMode | string | null

@@ -53,6 +53,17 @@ OO/Stripe remains source of truth for customer payment and payouts.
 
 Sandbox QA runbook: `docs/integrations/square-order-injection-qa.md`.
 
+### Square status sync webhooks
+
+| Variable | Example | Effect |
+|----------|---------|--------|
+| `SQUARE_WEBHOOK_SIGNATURE_KEY` | From Square webhook subscription | Enables `POST /api/webhooks/square` signature verification |
+| `SQUARE_WEBHOOK_NOTIFICATION_URL` | `https://www.openorderco.com/api/webhooks/square` | Exact notification URL for HMAC verification (must match Square Dashboard) |
+
+When unset, status sync is disabled (`503` on webhook); checkout, injection, Deliverect, and manual routing are unaffected.
+
+Docs: `docs/integrations/square-status-sync.md`.
+
 ## Deliverect / manual
 
 Unchanged by Square scope updates. See `ROUTING_MODE`, `DELIVERECT_*`, and Deliverect docs for Deliverect-specific routing.

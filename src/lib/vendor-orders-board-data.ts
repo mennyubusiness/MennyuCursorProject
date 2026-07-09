@@ -55,6 +55,7 @@ export const getVendorOrdersBoardData = cache(async (vendorId: string) => {
       },
       deliverectAttempts: true,
       deliverectChannelLinkId: true,
+      squareOrderId: true,
       statusAuthority: true,
       lastExternalStatus: true,
       lastExternalStatusAt: true,

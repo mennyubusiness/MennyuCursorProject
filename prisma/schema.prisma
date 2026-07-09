@@ -1723,6 +1723,8 @@ enum VendorOrderStatusSource {
   deliverect_webhook
   /// Active reconciliation via Deliverect API lookup (not webhook).
   deliverect_fallback
+  /// Square order.updated webhook or admin manual Square status sync.
+  square_webhook
   dma_action
   vendor_dashboard
   admin_action

@@ -9,8 +9,10 @@ Use this checklist before enabling Square connect for real vendors on production
 - Connection health checks
 - Square catalog/menu import
 - Square order injection (when `orderRoutingMode=square` + prerequisites met + `SQUARE_ROUTING_LIVE=true`)
+- Square → Open Order status sync via `order.updated` webhooks (when `SQUARE_WEBHOOK_SIGNATURE_KEY` is set)
 
-QA runbook: [square-order-injection-qa.md](./square-order-injection-qa.md)
+QA runbook: [square-order-injection-qa.md](./square-order-injection-qa.md)  
+Status sync: [square-status-sync.md](./square-status-sync.md)
 
 ## What Square connection does **not** do
 
@@ -67,7 +69,8 @@ Set on the correct Vercel scope (**Production** vs Preview).
 | `INTEGRATION_TOKEN_ENCRYPTION_KEY` | Min 32 chars (required) | Min 32 chars recommended |
 | `SQUARE_ROUTING_LIVE` | `true` when live Square order injection is allowed | Usually `false` on preview unless testing injection |
 | `AUTH_SECRET` | Required (OAuth state signing) | Required |
-| `SQUARE_WEBHOOK_SIGNATURE_KEY` | Optional until webhooks sprint | Optional — **does not block OAuth** |
+| `SQUARE_WEBHOOK_SIGNATURE_KEY` | Webhook signature key from Square subscription | Optional until status sync enabled |
+| `SQUARE_WEBHOOK_NOTIFICATION_URL` | `https://www.openorderco.com/api/webhooks/square` | Must match Square subscription URL exactly |
 
 **Never** mix sandbox credentials with `SQUARE_ENVIRONMENT=production` or vice versa.
 
