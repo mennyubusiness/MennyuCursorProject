@@ -27,14 +27,11 @@ import {
   type CartSnapshotMeta,
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
-import {
-  runOptimisticCartMutation,
-} from "@/lib/cart-optimistic-mutations";
 import { enqueueCartMutation, markCartSnapshotCommitted } from "@/lib/cart-mutation-queue";
+import { scheduleOptimisticSimpleAdd } from "@/lib/cart-optimistic-line-mutations";
 import { normalizeAuthoritativeCartSnapshot } from "@/lib/cart-group-metadata";
 import {
   optimisticPendingModifierLine,
-  optimisticSimpleAdd,
   type OptimisticSimpleAddParams,
 } from "@/lib/cart-optimistic";
 
@@ -66,7 +63,7 @@ type VendorMenuCartContextValue = {
   applyLocalCartUpdate: (cart: Cart) => void;
   runSimpleAddToCart: (
     params: OptimisticSimpleAddParams & {
-      add: () => Promise<
+      add?: () => Promise<
         | { success: true; cart: Cart }
         | { success: false; error: string; code?: string }
       >;
@@ -307,21 +304,18 @@ export function VendorMenuCartProvider({
   );
 
   const runSimpleAddToCart = useCallback(
-    async ({
-      add,
-      ...optimisticParams
-    }: OptimisticSimpleAddParams & {
-      add: () => Promise<
+    async (optimisticParams: OptimisticSimpleAddParams & {
+      add?: () => Promise<
         | { success: true; cart: Cart }
         | { success: false; error: string; code?: string }
       >;
     }) => {
-      return runOptimisticCartMutation({
+      const { add: _add, ...params } = optimisticParams;
+      return scheduleOptimisticSimpleAdd({
         cartId: cartRef.current.id,
+        podId: cartRef.current.podId,
         source: "vendor-menu",
         getCurrentCart: () => cartRef.current,
-        applyOptimistic: (snapshot) => optimisticSimpleAdd(snapshot, optimisticParams),
-        runServer: add,
         applyLocal: applyLocalCartUpdate,
         setError: (message) => {
           if (message) {
@@ -330,6 +324,7 @@ export function VendorMenuCartProvider({
             setCartMutationError(null);
           }
         },
+        optimistic: params,
       });
     },
     [applyLocalCartUpdate, reportCartMutationError]

@@ -2,7 +2,7 @@
 
 import { useQuickCartOptional } from "@/components/cart/QuickCartContext";
 import { MobileBottomActionBar } from "@/components/mobile/MobileBottomActionBar";
-import { flushCartMutations } from "@/lib/cart-mutation-queue";
+import { flushAllCartWork } from "@/lib/cart-sync-scheduler";
 import { formatMobileBottomActionSummary } from "@/lib/mobile-customer-ui";
 import { useVendorMenuCartOptional } from "@/components/vendor-menu/VendorMenuCartContext";
 
@@ -25,7 +25,7 @@ export function VendorMenuMobileCartBar({ className }: VendorMenuMobileCartBarPr
       return;
     }
     const cartId = displayCart?.id;
-    void flushCartMutations(cartId).then(() => {
+    void flushAllCartWork(cartId).then(() => {
       window.location.href = "/cart";
     });
   };

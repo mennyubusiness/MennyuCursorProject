@@ -34,7 +34,7 @@ export function resolveCartCheckoutCtaState(input: CartCheckoutCtaInput): CartCh
     !input.groupSubmitted;
 
   const blockedLabel = input.isSyncingCart
-    ? "Syncing your cart…"
+    ? "Updating cart…"
     : !input.viewerCanCheckout && !input.showParticipantTotalsOnly
       ? "Only the host can check out for this group order"
       : !input.canCheckout && input.isRevalidating

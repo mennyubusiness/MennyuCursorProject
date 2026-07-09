@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { addToCartAction } from "@/actions/cart.actions";
 import type { ModifierConfigForUI } from "@/app/pod/[podId]/vendor/[vendorId]/modifier-config";
 import { useVendorMenuModifier } from "@/components/vendor-menu/VendorMenuModifierContext";
 import { useVendorMenuCart } from "@/components/vendor-menu/VendorMenuCartContext";
@@ -35,7 +34,6 @@ export function useMenuItemAddAction({
 }: MenuItemAddActionParams) {
   const { openModifier } = useVendorMenuModifier();
   const { cartId: liveCartId, vendorCartItems, runSimpleAddToCart } = useVendorMenuCart();
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasModifiers = Boolean(modifierConfig && modifierConfig.groups.length > 0);
@@ -74,7 +72,6 @@ export function useMenuItemAddAction({
 
   const addDirect = useCallback(async () => {
     if (!liveCartId) return;
-    setLoading(true);
     setError(null);
     try {
       const result = await runSimpleAddToCart({
@@ -84,21 +81,17 @@ export function useMenuItemAddAction({
         menuItemName,
         unitPriceCents,
         shellDeliverectPlu,
-        add: () => addToCartAction(liveCartId, menuItemId, 1, undefined, undefined, podId),
       });
       if (!result.success) {
         setError(result.error);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add to cart");
-    } finally {
-      setLoading(false);
     }
   }, [
     liveCartId,
     menuItemId,
     menuItemName,
-    podId,
     runSimpleAddToCart,
     shellDeliverectPlu,
     unitPriceCents,
@@ -107,7 +100,7 @@ export function useMenuItemAddAction({
   ]);
 
   const triggerAddFlow = useCallback(() => {
-    if (orderingDisabled || loading || !liveCartId) return;
+    if (orderingDisabled || !liveCartId) return;
     if (hasModifiers && modifierConfig) {
       openModifierFlow();
       return;
@@ -117,7 +110,6 @@ export function useMenuItemAddAction({
     addDirect,
     hasModifiers,
     liveCartId,
-    loading,
     modifierConfig,
     openModifierFlow,
     orderingDisabled,
@@ -130,14 +122,14 @@ export function useMenuItemAddAction({
 
   return {
     liveCartId,
-    loading,
+    loading: false,
     error,
     hasModifiers,
     linesForThisItem,
     triggerAddFlow,
     openCustomizeAnother,
     addDirect,
-    buttonDisabled: loading || !liveCartId || orderingDisabled,
+    buttonDisabled: !liveCartId || orderingDisabled,
   };
 }
 

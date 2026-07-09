@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ComponentProps, MouseEvent } from "react";
-import { flushCartMutations } from "@/lib/cart-mutation-queue";
+import { flushAllCartWork } from "@/lib/cart-sync-scheduler";
 
 type AwaitCartNavigationLinkProps = Omit<ComponentProps<typeof Link>, "onClick"> & {
   cartId?: string | null;
@@ -31,7 +31,7 @@ export function AwaitCartNavigationLink({
         if (event.defaultPrevented) return;
         event.preventDefault();
         const target = typeof href === "string" ? href : href.pathname ?? "/cart";
-        void flushCartMutations(cartId).then(() => {
+        void flushAllCartWork(cartId).then(() => {
           router.push(target);
         });
       }}

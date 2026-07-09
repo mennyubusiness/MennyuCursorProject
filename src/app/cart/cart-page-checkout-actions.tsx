@@ -56,7 +56,7 @@ function useCartCheckoutActionState(props: CartPageCheckoutActionProps) {
     !(props.groupSubmitted ?? false);
 
   const blockedLabel = props.isSyncingCart
-    ? "Syncing your cart…"
+    ? "Updating cart…"
     : !props.viewerCanCheckout && !props.showParticipantTotalsOnly
       ? "Only the host can check out for this group order"
       : !props.canCheckout && props.isRevalidating

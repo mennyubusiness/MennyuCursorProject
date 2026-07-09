@@ -13,7 +13,7 @@ import {
   removeCartItem,
   CartValidationError,
 } from "@/services/cart.service";
-import type { AddToCartResult, UpdateCartItemResult, RemoveFromCartResult, CartItemSelectionInput } from "./cart.actions.types";
+import type { AddToCartResult, UpdateCartItemResult, RemoveFromCartResult, CartItemSelectionInput, CartSyncBatchResult, CartSyncOperationInput } from "./cart.actions.types";
 import { revalidatePath } from "next/cache";
 import { getMennyuSessionIdForRequest, getOrCreateMennyuSessionIdForCart } from "@/lib/session-request";
 import { assertCartSessionAccess } from "@/lib/cart-session-access";
@@ -333,4 +333,206 @@ export async function removeFromCartAction(
     }
     throw e;
   }
+}
+
+/**
+ * Apply multiple cart operations in one request. Returns an authoritative cart snapshot
+ * plus per-operation applied/rejected results. Validation rules match single-op actions.
+ */
+export async function syncCartBatchAction(
+  cartId: string,
+  operations: CartSyncOperationInput[],
+  podId?: string | null
+): Promise<CartSyncBatchResult> {
+  const appliedOperations: Array<{ operationId: string; status: "applied" }> = [];
+  const rejectedOperations: Array<{
+    operationId: string;
+    status: "rejected";
+    reason: string;
+    code?: string;
+  }> = [];
+
+  if (!Array.isArray(operations) || operations.length === 0) {
+    const access = await assertCartAccessForAction(cartId, "read");
+    if (!access.ok) {
+      return {
+        success: false,
+        error: access.error,
+        code: access.code,
+        appliedOperations: [],
+        rejectedOperations: [],
+      };
+    }
+    const cart = await getCartById(cartId);
+    if (!cart) {
+      return {
+        success: false,
+        error: "Cart not found.",
+        code: "CART_NOT_FOUND",
+        appliedOperations: [],
+        rejectedOperations: [],
+      };
+    }
+    return { success: true, cart, appliedOperations: [], rejectedOperations: [] };
+  }
+
+  // Coalesce setQuantity/removeLine for the same cartItemId to the last intent.
+  const coalesced: CartSyncOperationInput[] = [];
+  const qtyIndexByItem = new Map<string, number>();
+  for (const op of operations) {
+    if (op.type === "setQuantity" || op.type === "removeLine") {
+      const existing = qtyIndexByItem.get(op.cartItemId);
+      if (existing != null) {
+        coalesced[existing] = op;
+      } else {
+        qtyIndexByItem.set(op.cartItemId, coalesced.length);
+        coalesced.push(op);
+      }
+      continue;
+    }
+    coalesced.push(op);
+  }
+
+  let effectiveCartId = cartId;
+  let lastCart: Awaited<ReturnType<typeof getCartById>> = null;
+  let fatalError: string | null = null;
+  let fatalCode: string | undefined;
+
+  for (const op of coalesced) {
+    if (op.type === "addItem") {
+      const result = await addToCartAction(
+        effectiveCartId,
+        op.menuItemId,
+        op.quantity,
+        op.specialInstructions,
+        op.selections,
+        podId
+      );
+      if (result.success) {
+        effectiveCartId = result.cart.id;
+        lastCart = result.cart;
+        appliedOperations.push({ operationId: op.operationId, status: "applied" });
+      } else {
+        rejectedOperations.push({
+          operationId: op.operationId,
+          status: "rejected",
+          reason: result.error,
+          code: result.code,
+        });
+        if (result.code === "CART_ACCESS_DENIED" || result.code === "SESSION_REQUIRED") {
+          fatalError = result.error;
+          fatalCode = result.code;
+          break;
+        }
+      }
+      continue;
+    }
+
+    if (op.type === "removeLine") {
+      const result = await removeFromCartAction(effectiveCartId, op.cartItemId, podId);
+      if (result.success) {
+        effectiveCartId = result.cart.id;
+        lastCart = result.cart;
+        appliedOperations.push({ operationId: op.operationId, status: "applied" });
+      } else {
+        rejectedOperations.push({
+          operationId: op.operationId,
+          status: "rejected",
+          reason: result.error,
+          code: result.code,
+        });
+        if (result.cart) lastCart = result.cart;
+        if (result.code === "CART_ACCESS_DENIED" || result.code === "SESSION_REQUIRED") {
+          fatalError = result.error;
+          fatalCode = result.code;
+          break;
+        }
+      }
+      continue;
+    }
+
+    // setQuantity
+    const result = await updateCartItemAction(
+      effectiveCartId,
+      op.cartItemId,
+      op.quantity,
+      op.specialInstructions ?? null,
+      undefined,
+      podId
+    );
+    if (!result) {
+      rejectedOperations.push({
+        operationId: op.operationId,
+        status: "rejected",
+        reason: "This item is no longer in your cart.",
+        code: "ITEM_GONE",
+      });
+      continue;
+    }
+    if (result.success) {
+      effectiveCartId = result.cart.id;
+      lastCart = result.cart;
+      appliedOperations.push({ operationId: op.operationId, status: "applied" });
+    } else {
+      rejectedOperations.push({
+        operationId: op.operationId,
+        status: "rejected",
+        reason: result.error,
+        code: result.code,
+      });
+      if (result.cart) lastCart = result.cart;
+      if (result.code === "CART_ACCESS_DENIED" || result.code === "SESSION_REQUIRED") {
+        fatalError = result.error;
+        fatalCode = result.code;
+        break;
+      }
+    }
+  }
+
+  if (!lastCart) {
+    const cart = await getCartById(effectiveCartId);
+    lastCart = cart;
+  }
+
+  if (fatalError) {
+    return {
+      success: false,
+      error: fatalError,
+      code: fatalCode,
+      cart: lastCart ?? undefined,
+      appliedOperations,
+      rejectedOperations,
+    };
+  }
+
+  if (!lastCart) {
+    return {
+      success: false,
+      error: "Cart not found.",
+      code: "CART_NOT_FOUND",
+      appliedOperations,
+      rejectedOperations,
+    };
+  }
+
+  if (rejectedOperations.length > 0) {
+    return {
+      success: false,
+      error:
+        rejectedOperations.length === 1
+          ? rejectedOperations[0]!.reason
+          : "Some items could not be updated.",
+      code: rejectedOperations[0]?.code,
+      cart: lastCart,
+      appliedOperations,
+      rejectedOperations,
+    };
+  }
+
+  return {
+    success: true,
+    cart: lastCart,
+    appliedOperations,
+    rejectedOperations,
+  };
 }

@@ -28,10 +28,10 @@ import {
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
 import {
-  flushCartMutations,
-  hasPendingCartMutations,
-  subscribeCartMutationPending,
-} from "@/lib/cart-mutation-queue";
+  flushAllCartWork,
+  hasAnyPendingCartWork,
+  subscribeAnyCartPending,
+} from "@/lib/cart-sync-scheduler";
 import {
   buildErrorByCartItemId,
   cartMutationFingerprint,
@@ -100,7 +100,7 @@ export function CartPageMutationProvider({
   const [serverValidation, setServerValidation] = useState(initialValidation);
   const [isRevalidating, setIsRevalidating] = useState(false);
   const [isSyncingCart, setIsSyncingCart] = useState(
-    () => hasPendingCartMutations(cartId)
+    () => hasAnyPendingCartWork(cartId)
   );
   const revalidateSeqRef = useRef(0);
   const lastAcceptedSnapshotMetaRef = useRef<CartSnapshotMeta | null>(
@@ -159,15 +159,15 @@ export function CartPageMutationProvider({
   }, [cartId, podId]);
 
   useEffect(() => {
-    return subscribeCartMutationPending(() => {
-      setIsSyncingCart(hasPendingCartMutations(cartId));
+    return subscribeAnyCartPending(() => {
+      setIsSyncingCart(hasAnyPendingCartWork(cartId));
     });
   }, [cartId]);
 
   useEffect(() => {
     let cancelled = false;
-    setIsSyncingCart(hasPendingCartMutations(cartId));
-    void flushCartMutations(cartId).then(async () => {
+    setIsSyncingCart(hasAnyPendingCartWork(cartId));
+    void flushAllCartWork(cartId).then(async () => {
       if (cancelled) return;
       try {
         const res = await fetch(`/api/cart?cartId=${encodeURIComponent(cartId)}`, {
@@ -296,7 +296,7 @@ export function CartPageLiveSyncBanner() {
   if (!isSyncingCart) return null;
   return (
     <p className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-700" role="status">
-      Syncing your cart…
+      Updating cart…
     </p>
   );
 }

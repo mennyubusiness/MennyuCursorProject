@@ -25,3 +25,51 @@ export type RemoveFromCartResult =
   | { success: false; error: string; code?: string; cart?: Cart };
 
 export type CartItemSelectionInput = { modifierOptionId: string; quantity: number };
+
+export type CartSyncOperationInput =
+  | {
+      operationId: string;
+      type: "setQuantity";
+      cartItemId: string;
+      quantity: number;
+      specialInstructions?: string | null;
+    }
+  | {
+      operationId: string;
+      type: "removeLine";
+      cartItemId: string;
+    }
+  | {
+      operationId: string;
+      type: "addItem";
+      menuItemId: string;
+      quantity: number;
+      specialInstructions?: string | null;
+      selections?: CartItemSelectionInput[] | null;
+    };
+
+export type CartSyncBatchResult =
+  | {
+      success: true;
+      cart: Cart;
+      appliedOperations: Array<{ operationId: string; status: "applied" }>;
+      rejectedOperations: Array<{
+        operationId: string;
+        status: "rejected";
+        reason: string;
+        code?: string;
+      }>;
+    }
+  | {
+      success: false;
+      error: string;
+      code?: string;
+      cart?: Cart;
+      appliedOperations: Array<{ operationId: string; status: "applied" }>;
+      rejectedOperations: Array<{
+        operationId: string;
+        status: "rejected";
+        reason: string;
+        code?: string;
+      }>;
+    };
