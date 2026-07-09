@@ -73,21 +73,14 @@ describe("vendor section pages", () => {
     expect(setup).toContain("VendorSetupStatusBanners");
     expect(setup).toContain("Required to appear on pod page");
     expect(setup).toContain("Required to accept orders");
-    expect(setup).toContain("VendorSquareSetupSummary");
+    expect(setup).toContain("VendorSetupIntegrationsSection");
+    expect(setup).not.toContain("VendorIntegrationReadinessCard");
+    expect(setup).not.toContain("VendorSquareSetupSummary");
     expect(setup).not.toContain("VendorSquareConnectionCard");
     expect(setup).not.toContain("disconnectSquareAction");
     expect(setup).not.toContain("Reconnect Square");
-    expect(setup).not.toContain("Complete public profile steps to appear on your pod page");
     expect(setup).toContain("vendorSetupPageIncompleteDescription");
     expect(setup).not.toContain("Recommended");
-    expect(setup).not.toContain("Try Kitchen mode for busy shifts");
-    expect(setup).not.toContain("Pickup instructions on pod page");
-
-    const squareSummary = readFileSync(
-      join(vendorDir, "../../../components/vendor/VendorSquareSetupSummary.tsx"),
-      "utf8"
-    );
-    expect(squareSummary).toContain("Manage Square integration");
 
     const squareCard = readFileSync(
       join(vendorDir, "../../../components/vendor/VendorSquareConnectionCard.tsx"),

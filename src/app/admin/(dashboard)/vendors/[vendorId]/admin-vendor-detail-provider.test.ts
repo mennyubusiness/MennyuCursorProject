@@ -31,13 +31,30 @@ describe("admin vendor detail provider cleanup", () => {
     expect(routing).not.toContain("Enable Square order injection");
     expect(routing).not.toContain("Disable Square order injection");
     expect(routing).not.toContain("adminSetSquareOrderRoutingEnabledAction");
-    expect(routing).toContain("adminSquareRoutingStatusSummary");
+  });
+
+  it("order routing section is a mode selector only without provider readiness blocks", () => {
+    const routing = readAdminVendor("AdminVendorOrderRoutingSection.tsx");
+    expect(routing).not.toContain("incompleteWarning");
+    expect(routing).not.toContain("adminSquareRoutingStatusSummary");
+    expect(routing).not.toContain("Open Square integration");
+    expect(routing).not.toContain("SQUARE_ROUTING_LIVE");
+    expect(routing).not.toContain("border-amber-200");
+    expect(routing).toContain('checked={mode === "manual_dashboard"}');
+    expect(routing).toContain('checked={mode === "deliverect"}');
+    expect(routing).toContain('checked={mode === "square"}');
+    expect(routing).toContain("adminUpdateVendorOrderRoutingModeAction");
+    expect(routing).toContain("Save order routing mode");
+    expect(routing).toContain("VENDOR_ROUTING_MODE_COPY.manualDashboard.adminHelper");
+    expect(routing).toContain("VENDOR_ROUTING_MODE_COPY.deliverect.adminHelper");
+    expect(routing).toContain("VENDOR_ROUTING_MODE_COPY.square.adminHelper");
   });
 
   it("gates Square injection diagnostics to Square routing vendors", () => {
     const rescue = readAdminVendor("AdminVendorRescueClient.tsx");
     expect(rescue).toContain("adminSquareInjectionDiagnosticsVisible");
     expect(rescue).toContain("showSquareDiagnostics && squareInjectionDiagnostics");
+    expect(rescue).toContain("AdminSquareOrderInjectionDiagnosticsPanel");
   });
 
   it("labels Deliverect downstream POS separately from routing provider", () => {
@@ -45,6 +62,12 @@ describe("admin vendor detail provider cleanup", () => {
     expect(rescue).toContain("Connected POS through Deliverect");
     expect(rescue).toContain("formatAdminDownstreamPosProvider");
     expect(rescue).not.toContain('label="POS provider"');
+  });
+
+  it("keeps detailed Deliverect diagnostics outside routing selector", () => {
+    const rescue = readAdminVendor("AdminVendorRescueClient.tsx");
+    expect(rescue).toContain('title="Menu / Deliverect status"');
+    expect(rescue).toContain('label="Deliverect connection"');
   });
 
   it("overview uses routing provider and menu status labels", () => {
