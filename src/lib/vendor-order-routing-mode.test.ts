@@ -92,29 +92,27 @@ describe("isVendorRoutingOperationalReady", () => {
     ).toBe(false);
   });
 
-  it("square routing is ready only when explicitly enabled and prerequisites pass", () => {
+  it("square routing is ready when operational prerequisites pass", () => {
     expect(
       isVendorRoutingOperationalReady({
         ...connectedPos,
         orderRoutingMode: "square",
-        squareOrderRoutingEnabled: false,
-        squareOrderRoutingReady: true,
-      })
-    ).toBe(false);
-    expect(
-      isVendorRoutingOperationalReady({
-        ...connectedPos,
-        orderRoutingMode: "square",
-        squareOrderRoutingEnabled: true,
         squareOrderRoutingReady: true,
       })
     ).toBe(true);
     expect(
+      isVendorRoutingOperationalReady({
+        ...connectedPos,
+        orderRoutingMode: "square",
+        squareOrderRoutingReady: false,
+      })
+    ).toBe(false);
+    expect(
       vendorRoutingSetupBlockerLabel({
         orderRoutingMode: "square",
-        squareOrderRoutingEnabled: false,
+        squareConnectionReady: false,
       })
-    ).toMatch(/not enabled/i);
+    ).toMatch(/Connect Square/i);
   });
 
   it("square setup checklist passes on connection only without admin injection enablement", () => {
@@ -207,13 +205,13 @@ describe("vendor-facing routing UI helpers", () => {
     expect(vendorRoutingStatusLabel("square", "connected")).toContain("Square");
     expect(isVendorPosManagedForUi("square", "connected")).toBe(false);
     expect(isVendorDeliverectLiveForUi("square", true)).toBe(false);
-    expect(vendorKitchenStatusWarning("square", "connected")).toContain("order injection is not active");
+    expect(vendorKitchenStatusWarning("square", "connected")).toContain("not ready yet");
   });
 
   it("shows square kitchen notice when injection is operational", () => {
     expect(
       vendorKitchenStatusWarning("square", "connected", { squareInjectionOperational: true })
-    ).toMatch(/Square routing is enabled/i);
+    ).toMatch(/Square routing is ready/i);
   });
 });
 

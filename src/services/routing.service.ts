@@ -44,7 +44,6 @@ export async function submitVendorOrder(
       vendor: {
         select: {
           orderRoutingMode: true,
-          squareOrderRoutingEnabled: true,
           deliverectChannelLinkId: true,
           deliverectBusyDelayMinutes: true,
         },
@@ -59,13 +58,6 @@ export async function submitVendorOrder(
     voHead.vendor.deliverectChannelLinkId ?? voHead.deliverectChannelLinkId;
 
   if (isSquareRoutingMode(routingMode)) {
-    if (!voHead.vendor.squareOrderRoutingEnabled) {
-      return {
-        success: false,
-        error: "Square order routing is not enabled for this vendor.",
-        code: "SQUARE_ROUTING_DISABLED",
-      };
-    }
     const result = await submitVendorOrderToSquare(vendorOrderId, {
       customerPhone: context.customerPhone,
       customerEmail: context.customerEmail,

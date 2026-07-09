@@ -1,11 +1,10 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { MenuImportJobStatus, type VendorOrderRoutingMode } from "@prisma/client";
+import { MenuImportJobStatus, MenuVersionState, type VendorOrderRoutingMode } from "@prisma/client";
 import { ADMIN_AUDIT_ACTION, ADMIN_AUDIT_TARGET, requireAdminReason } from "@/lib/admin-audit-log";
 import { VENDOR_ORDER_ROUTING_MODES, isSquareRoutingMode } from "@/lib/vendor-order-routing-mode";
 import { menuSourceForOrderRoutingMode } from "@/lib/vendor-menu-source";
-import { assertSquareRoutingSelectable } from "@/lib/integrations/square/square-routing-readiness";
 import { buildVendorMenuCustomerPath, buildPodCustomerPath } from "@/lib/customer-public-url";
 import { prisma } from "@/lib/db";
 import { revalidateCustomerVendorMenuCacheForVendor } from "@/services/vendor-customer-menu-cache.service";
@@ -406,11 +405,6 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
     return { ok: false, error: "Invalid order routing mode." };
   }
 
-  if (isSquareRoutingMode(input.orderRoutingMode)) {
-    const squareGate = await assertSquareRoutingSelectable(input.vendorId);
-    if (!squareGate.ok) return { ok: false, error: squareGate.error };
-  }
-
   const vendor = await prisma.vendor.findUnique({
     where: { id: input.vendorId },
     select: { id: true, orderRoutingMode: true, menuSource: true },
@@ -573,7 +567,7 @@ export async function adminRestoreVendorSlug(input: {
 export { listSlugRedirectsForEntity, normalizePublicSlug };
 
 export async function loadVendorMenuSyncSummary(vendorId: string) {
-  const [latestSuccess, latestFailed, menuCounts, vendor] = await Promise.all([
+  const [latestSuccess, latestFailed, menuCounts, vendor, publishedVersion, draftJob] = await Promise.all([
     prisma.menuImportJob.findFirst({
       where: { vendorId, status: MenuImportJobStatus.succeeded },
       orderBy: { completedAt: "desc" },
@@ -593,6 +587,18 @@ export async function loadVendorMenuSyncSummary(vendorId: string) {
       where: { id: vendorId },
       select: { deliverectChannelLinkId: true },
     }),
+    prisma.menuVersion.findFirst({
+      where: { vendorId, state: MenuVersionState.published },
+      select: { id: true },
+    }),
+    prisma.menuImportJob.findFirst({
+      where: {
+        vendorId,
+        status: MenuImportJobStatus.awaiting_review,
+        draftVersionId: { not: null },
+      },
+      select: { id: true },
+    }),
   ]);
 
   let totalItems = 0;
@@ -610,6 +616,8 @@ export async function loadVendorMenuSyncSummary(vendorId: string) {
     visibleItems: totalItems - unavailableItems,
     unavailableItems,
     refreshConfigured: Boolean(vendor?.deliverectChannelLinkId?.trim()),
+    hasPublishedMenu: Boolean(publishedVersion),
+    hasDraftAwaitingReview: Boolean(draftJob),
   };
 }
 

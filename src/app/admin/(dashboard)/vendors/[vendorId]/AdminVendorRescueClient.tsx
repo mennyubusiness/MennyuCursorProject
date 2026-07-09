@@ -31,19 +31,18 @@ import {
 } from "@/lib/vendor-dashboard-presence";
 import {
   adminDeliverectMenuPosSectionVisible,
+  adminInactiveDeliverectDiagnosticsVisible,
+  adminInactiveSquareDiagnosticsVisible,
   adminRefreshMenuActionDescription,
   adminRefreshMenuActionLabel,
   adminSquareInjectionDiagnosticsVisible,
+  adminVendorMenuStatusLabel,
+  adminVendorOverviewMenuSourceLabel,
+  adminVendorOverviewRoutingProviderLabel,
+  formatAdminDownstreamPosProvider,
 } from "@/lib/integrations/provider-display";
-import { vendorOrderRoutingModeAdminLabel } from "@/lib/vendor-order-routing-mode";
-import {
-  getVendorMenuManagementMode,
-  vendorMenuManagementModeLabel,
-  vendorMenuManagementPath,
-} from "@/lib/vendor-menu-management";
 import {
   getVendorMenuSourceMismatchWarning,
-  vendorMenuSourceLabel,
 } from "@/lib/vendor-menu-source";
 import {
   adminAttachVendorToPodFromVendorAction,
@@ -105,6 +104,20 @@ export function AdminVendorRescueClient({
   const routingMode = detail.vendor.orderRoutingMode as VendorOrderRoutingMode;
   const showSquareDiagnostics = adminSquareInjectionDiagnosticsVisible(routingMode);
   const showDeliverectMenuPos = adminDeliverectMenuPosSectionVisible(routingMode);
+  const showInactiveSquare = adminInactiveSquareDiagnosticsVisible({
+    savedMode: routingMode,
+    hasSquareConnection: squareStatus.hasConnection,
+  });
+  const showInactiveDeliverect = adminInactiveDeliverectDiagnosticsVisible({
+    savedMode: routingMode,
+    deliverectChannelLinkId: detail.vendor.deliverectChannelLinkId,
+  });
+  const downstreamPos = formatAdminDownstreamPosProvider(detail.vendor.posProvider);
+  const menuStatusLabel = adminVendorMenuStatusLabel({
+    hasPublishedMenu: detail.menuSync.hasPublishedMenu,
+    hasDraftAwaitingReview: detail.menuSync.hasDraftAwaitingReview,
+    totalItems: detail.menuSync.totalItems,
+  });
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -122,40 +135,17 @@ export function AdminVendorRescueClient({
         ) : null}
         <AdminInfoRow label="Ordering" value={detail.vendor.mennyuOrdersPaused ? "Paused" : "Open"} />
         <AdminInfoRow
-          label="Routing mode"
-          value={vendorOrderRoutingModeAdminLabel(detail.vendor.orderRoutingMode as VendorOrderRoutingMode)}
-        />
-        <AdminInfoRow
-          label="Menu management"
-          value={vendorMenuManagementModeLabel(
-            getVendorMenuManagementMode(detail.vendor.orderRoutingMode as VendorOrderRoutingMode)
-          )}
-        />
-        <AdminInfoRow
-          label="Vendor menu page"
-          value={
-            <Link
-              href={vendorMenuManagementPath(
-                vendorId,
-                detail.vendor.orderRoutingMode as VendorOrderRoutingMode
-              )}
-              className="text-sky-800 hover:underline"
-            >
-              {getVendorMenuManagementMode(detail.vendor.orderRoutingMode as VendorOrderRoutingMode) ===
-              "builder"
-                ? "Open Menu Builder"
-                : "Open Menu Imports"}
-            </Link>
-          }
+          label="Routing provider"
+          value={adminVendorOverviewRoutingProviderLabel(routingMode)}
         />
         <AdminInfoRow
           label="Menu source"
-          value={vendorMenuSourceLabel(detail.vendor.menuSource as import("@prisma/client").VendorMenuSource)}
+          value={adminVendorOverviewMenuSourceLabel({
+            orderRoutingMode: routingMode,
+            menuSource: detail.vendor.menuSource,
+          })}
         />
-        <AdminInfoRow
-          label="Active menu tool"
-          value={vendorMenuSourceLabel(detail.vendor.menuSource as import("@prisma/client").VendorMenuSource)}
-        />
+        <AdminInfoRow label="Menu status" value={menuStatusLabel} />
         {menuMismatch ? (
           <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
             <strong>{menuMismatch.headline}.</strong> {menuMismatch.detail}
@@ -399,7 +389,6 @@ export function AdminVendorRescueClient({
           orderRoutingMode={detail.vendor.orderRoutingMode as VendorOrderRoutingMode}
           posSummary={posSummary}
           squareStatus={squareStatus}
-          squareOrderRoutingEnabled={detail.vendor.squareOrderRoutingEnabled}
           squareOrderRoutingReady={squareOrderRoutingReady}
         />
       ) : null}
@@ -412,9 +401,11 @@ export function AdminVendorRescueClient({
       ) : null}
 
       {showDeliverectMenuPos ? (
-        <AdminSection title="Menu / POS status">
-          <AdminInfoRow label="POS status" value={detail.vendor.posConnectionStatus} />
-          <AdminInfoRow label="POS provider" value={detail.vendor.posProvider ?? "—"} />
+        <AdminSection title="Menu / Deliverect status">
+          <AdminInfoRow label="Deliverect connection" value={detail.vendor.posConnectionStatus} />
+          {downstreamPos ? (
+            <AdminInfoRow label="Connected POS through Deliverect" value={downstreamPos} />
+          ) : null}
           <AdminInfoRow label="Deliverect channel" value={detail.vendor.deliverectChannelLinkId ?? "—"} />
           <AdminInfoRow label="Deliverect location" value={detail.vendor.deliverectLocationId ?? "—"} />
           <AdminInfoRow
@@ -437,6 +428,51 @@ export function AdminVendorRescueClient({
             disabledReason="Menu refresh is not configured yet."
             onSubmit={(reason) => run(() => adminRefreshVendorMenuAction(vendorId, reason))}
           />
+        </AdminSection>
+      ) : null}
+
+      {showInactiveSquare || showInactiveDeliverect ? (
+        <AdminSection title="Other connected integrations">
+          {showInactiveSquare ? (
+            <details className="rounded-lg border border-oo-light-stone bg-oo-cream/30 px-3 py-2 text-sm">
+              <summary className="cursor-pointer font-medium text-oo-charcoal">
+                Square (not active routing)
+              </summary>
+              <p className="mt-2 text-xs text-oo-stone-gray">{squareStatus.statusMessage}</p>
+              {squareStatus.connectionStatus ? (
+                <p className="mt-1 text-xs text-oo-stone-gray">
+                  Connection status: {squareStatus.connectionStatus}
+                </p>
+              ) : null}
+              <Link href={squareStatus.integrationUrl} className="mt-2 inline-block text-xs font-medium underline">
+                Open Square integration
+              </Link>
+            </details>
+          ) : null}
+          {showInactiveDeliverect ? (
+            <details className="mt-2 rounded-lg border border-oo-light-stone bg-oo-cream/30 px-3 py-2 text-sm">
+              <summary className="cursor-pointer font-medium text-oo-charcoal">
+                Deliverect (not active routing)
+              </summary>
+              <p className="mt-2 text-xs text-oo-stone-gray">
+                Channel link present but Deliverect is not the active routing provider.
+              </p>
+              <AdminInfoRow
+                label="Deliverect channel"
+                value={detail.vendor.deliverectChannelLinkId ?? "—"}
+              />
+              <AdminInfoRow
+                label="Deliverect location"
+                value={detail.vendor.deliverectLocationId ?? "—"}
+              />
+              <Link
+                href={`/admin/vendors/${vendorId}/deliverect-mapping`}
+                className="mt-2 inline-block text-xs font-medium underline"
+              >
+                Open Deliverect mapping
+              </Link>
+            </details>
+          ) : null}
         </AdminSection>
       ) : null}
 

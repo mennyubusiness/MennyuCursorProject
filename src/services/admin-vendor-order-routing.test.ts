@@ -102,15 +102,19 @@ describe("adminUpdateVendorOrderRoutingMode", () => {
     );
   });
 
-  it("allows square routing when Square connection is healthy", async () => {
+  it("allows square routing even when Square is not connected", async () => {
+    mockFindUnique.mockResolvedValue({
+      id: "vendor_1",
+      orderRoutingMode: "manual_dashboard",
+      menuSource: "open_order",
+    });
     const result = await adminUpdateVendorOrderRoutingMode({
       vendorId: "vendor_1",
       orderRoutingMode: "square",
       adminUserId: "admin_1",
-      reason: "test square",
+      reason: "test square before connect",
     });
     expect(result.ok).toBe(true);
-    expect(assertSquareRoutingSelectable).toHaveBeenCalledWith("vendor_1");
     expect(mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -119,22 +123,6 @@ describe("adminUpdateVendorOrderRoutingMode", () => {
         }),
       })
     );
-  });
-
-  it("rejects square routing when Square is not ready", async () => {
-    vi.mocked(assertSquareRoutingSelectable).mockResolvedValue({
-      ok: false,
-      error:
-        "Square must be connected with a selected active location before this vendor can use Square routing.",
-    });
-    const result = await adminUpdateVendorOrderRoutingMode({
-      vendorId: "vendor_1",
-      orderRoutingMode: "square",
-      adminUserId: "admin_1",
-      reason: "test square blocked",
-    });
-    expect(result.ok).toBe(false);
-    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 

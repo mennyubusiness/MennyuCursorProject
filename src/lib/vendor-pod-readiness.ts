@@ -97,8 +97,8 @@ export type VendorPodReadinessInput = {
   squareCatalogImportReady?: boolean;
   /** Square OAuth connection ready for vendor setup checklist. */
   squareConnectionReady?: boolean;
-  /** Admin-only Square order injection toggle (informational on setup). */
-  squareOrderRoutingEnabled?: boolean;
+  /** Square operational routing ready (connection, menu, mappings, SQUARE_ROUTING_LIVE). */
+  squareOrderRoutingReady?: boolean;
 };
 
 export type VendorPodReadinessResult = {
@@ -404,10 +404,10 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
             : "Connect Deliverect so orders can route to the kitchen POS."
         : squareMode
           ? posComplete
-            ? input.squareOrderRoutingEnabled
-              ? "Square is connected and ready for order routing."
-              : "Square is connected. Square order routing is pending Open Order admin enablement."
-            : "Connect Square and select an active location."
+            ? input.squareOrderRoutingReady
+              ? "Square routing is ready for paid orders."
+              : "Square is connected. Finish menu import, mappings, and publish before orders route to Square."
+            : "Square routing is selected. Connect Square and select an active location."
           : VENDOR_ROUTING_MODE_COPY.manualDashboard.vendorHelper,
       actionHref:
         audience === "vendor"

@@ -13,12 +13,13 @@ import {
 } from "@/lib/integrations/square/square-oauth-scopes";
 
 export type SquareOrderRoutingReadiness = {
-  /** All technical prerequisites except admin enablement and global live switch. */
+  /** All technical prerequisites for Square routing (connection, location, menu, mappings, scopes). */
   prerequisitesReady: boolean;
-  /** Paid orders will inject when checkout routing runs (prerequisites + enabled + SQUARE_ROUTING_LIVE). */
+  /** Paid orders will route to Square when post-payment routing runs. */
   injectionOperationalReady: boolean;
   /** @deprecated Prefer injectionOperationalReady — kept for existing callers. */
   ready: boolean;
+  /** @deprecated squareOrderRoutingEnabled is ignored — orderRoutingMode=square is the gate. */
   enabled: boolean;
   globalRoutingLive: boolean;
   connectionHealthy: boolean;
@@ -26,13 +27,14 @@ export type SquareOrderRoutingReadiness = {
   locationId: string | null;
   activeItemMappingCount: number;
   activeModifierMappingCount: number;
-  /** Blockers for enabling injection (excludes squareOrderRoutingEnabled). */
   prerequisiteBlockers: string[];
-  /** Full list of reasons injection is not operational right now. */
   injectionBlockingReasons: string[];
   /** @deprecated Prefer injectionBlockingReasons — kept for existing callers. */
   missingRequirements: string[];
 };
+
+const SQUARE_ROUTING_LIVE_BLOCKER =
+  "Square routing is selected, but live Square API routing is disabled globally (SQUARE_ROUTING_LIVE is not true).";
 
 async function countActiveSquareMappings(vendorId: string, locationId: string | null) {
   const base = {
@@ -61,6 +63,7 @@ export async function loadSquareOrderRoutingReadiness(
     where: { id: vendorId },
     select: {
       orderRoutingMode: true,
+      // Deprecated: retained in schema only; routing mode is the source of truth.
       squareOrderRoutingEnabled: true,
     },
   });
@@ -92,8 +95,6 @@ export async function loadSquareOrderRoutingReadiness(
   if (!squareMode) {
     prerequisiteBlockers.push("Order routing mode is not Square.");
   }
-
-  const enabled = vendor.squareOrderRoutingEnabled === true;
 
   const [health, connection, activeMenu] = await Promise.all([
     evaluateSquareConnectionHealth(vendorId),
@@ -160,24 +161,18 @@ export async function loadSquareOrderRoutingReadiness(
     hasSquarePublishedMenu &&
     activeItemMappingCount > 0;
 
-  if (!enabled) {
-    injectionBlockingReasons.push("Square order injection is disabled for this vendor.");
-  }
   injectionBlockingReasons.push(...prerequisiteBlockers);
   if (!globalRoutingLive) {
-    injectionBlockingReasons.push(
-      "SQUARE_ROUTING_LIVE is not true — Square CreateOrder/CreatePayment API calls are blocked globally."
-    );
+    injectionBlockingReasons.push(SQUARE_ROUTING_LIVE_BLOCKER);
   }
 
-  const injectionOperationalReady =
-    prerequisitesReady && enabled && globalRoutingLive;
+  const injectionOperationalReady = prerequisitesReady && globalRoutingLive;
 
   return {
     prerequisitesReady,
     injectionOperationalReady,
     ready: injectionOperationalReady,
-    enabled,
+    enabled: vendor.squareOrderRoutingEnabled === true,
     globalRoutingLive,
     connectionHealthy,
     hasSquarePublishedMenu,
@@ -208,15 +203,12 @@ export async function assertSquareOrderRoutingReady(
   vendorId: string
 ): Promise<{ ok: true; locationId: string } | { ok: false; error: string; code: string }> {
   const status = await loadSquareOrderRoutingReadiness(vendorId);
-  if (status.prerequisitesReady && status.enabled && status.locationId) {
+  if (status.injectionOperationalReady && status.locationId) {
     return { ok: true, locationId: status.locationId };
   }
-  const blockers = status.enabled
-    ? status.prerequisiteBlockers
-    : status.injectionBlockingReasons.filter((reason) => !reason.includes("SQUARE_ROUTING_LIVE"));
   return {
     ok: false,
-    error: blockers.join("; ") || "Square order routing is not ready.",
+    error: status.injectionBlockingReasons.join("; ") || "Square order routing is not ready.",
     code: "SQUARE_ROUTING_NOT_READY",
   };
 }

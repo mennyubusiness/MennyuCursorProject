@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   adminDeliverectMenuPosSectionVisible,
+  adminActiveRoutingStatusMessage,
+  adminInactiveSquareDiagnosticsVisible,
   adminMenuManagementToolDescription,
   adminPosMappingToolVisible,
   adminRefreshMenuActionLabel,
+  adminShowSquareRoutingStatusPrimary,
   adminSquareInjectionDiagnosticsVisible,
+  adminVendorMenuStatusLabel,
+  adminVendorOverviewMenuSourceLabel,
+  adminVendorOverviewRoutingProviderLabel,
+  ADMIN_ORDER_ROUTING_GENERIC_COPY,
+  formatAdminDownstreamPosProvider,
+  getAdminVendorDetailTools,
   getProviderDisplayProfile,
   integratedOrderRoutingLabel,
   menuImportDraftReviewBanner,
@@ -61,7 +70,7 @@ describe("provider display registry", () => {
         posState: "connected",
         squareInjectionOperational: true,
       })
-    ).toMatch(/Square routing is enabled/i);
+    ).toMatch(/Square routing is ready/i);
 
     expect(
       vendorKitchenModeNotice({
@@ -69,7 +78,7 @@ describe("provider display registry", () => {
         posState: "connected",
         squareInjectionOperational: false,
       })
-    ).toMatch(/order injection is not active/i);
+    ).toMatch(/not ready yet/i);
 
     expect(
       vendorKitchenModeNotice({
@@ -117,5 +126,151 @@ describe("provider display registry", () => {
     expect(vendorMenuManagementPageSubtitle("square", "Poke Sea")).toMatch(/imported menus/i);
     expect(vendorMenuManagementPageSubtitle("square", "Poke Sea")).not.toMatch(/Deliverect/i);
     expect(vendorMenuManagementPageSubtitle("deliverect", "Poke Sea")).toMatch(/Deliverect/i);
+  });
+
+  it("uses consistent admin overview labels by routing mode", () => {
+    expect(adminVendorOverviewRoutingProviderLabel("deliverect")).toBe("Deliverect");
+    expect(adminVendorOverviewRoutingProviderLabel("square")).toBe("Square");
+    expect(adminVendorOverviewRoutingProviderLabel("manual_dashboard")).toBe("Open Order Dashboard");
+
+    expect(
+      adminVendorOverviewMenuSourceLabel({
+        orderRoutingMode: "deliverect",
+        menuSource: "deliverect",
+      })
+    ).toBe("Deliverect sync");
+    expect(
+      adminVendorOverviewMenuSourceLabel({
+        orderRoutingMode: "square",
+        menuSource: "open_order",
+      })
+    ).toBe("Square catalog import");
+    expect(
+      adminVendorOverviewMenuSourceLabel({
+        orderRoutingMode: "manual_dashboard",
+        menuSource: "open_order",
+      })
+    ).toBe("Open Order menu builder");
+  });
+
+  it("derives admin menu status from publish and draft state", () => {
+    expect(
+      adminVendorMenuStatusLabel({
+        hasPublishedMenu: true,
+        hasDraftAwaitingReview: false,
+        totalItems: 10,
+      })
+    ).toBe("Published");
+    expect(
+      adminVendorMenuStatusLabel({
+        hasPublishedMenu: true,
+        hasDraftAwaitingReview: true,
+        totalItems: 10,
+      })
+    ).toBe("Draft available");
+    expect(
+      adminVendorMenuStatusLabel({
+        hasPublishedMenu: false,
+        hasDraftAwaitingReview: false,
+        totalItems: 0,
+      })
+    ).toBe("Missing");
+  });
+
+  it("labels downstream POS for Deliverect without implying active routing", () => {
+    expect(formatAdminDownstreamPosProvider("toast")).toBe("Toast");
+    expect(formatAdminDownstreamPosProvider(null)).toBeNull();
+  });
+
+  it("gates Square routing status to Square saved or selected modes", () => {
+    expect(
+      adminShowSquareRoutingStatusPrimary({
+        savedMode: "deliverect",
+        selectedMode: "deliverect",
+      })
+    ).toBe(false);
+    expect(
+      adminShowSquareRoutingStatusPrimary({
+        savedMode: "deliverect",
+        selectedMode: "square",
+      })
+    ).toBe(true);
+    expect(
+      adminShowSquareRoutingStatusPrimary({
+        savedMode: "square",
+        selectedMode: "square",
+      })
+    ).toBe(true);
+  });
+
+  it("shows inactive Square diagnostics only when not active routing but connected", () => {
+    expect(
+      adminInactiveSquareDiagnosticsVisible({
+        savedMode: "deliverect",
+        hasSquareConnection: true,
+      })
+    ).toBe(true);
+    expect(
+      adminInactiveSquareDiagnosticsVisible({
+        savedMode: "deliverect",
+        hasSquareConnection: false,
+      })
+    ).toBe(false);
+    expect(
+      adminInactiveSquareDiagnosticsVisible({
+        savedMode: "square",
+        hasSquareConnection: true,
+      })
+    ).toBe(false);
+  });
+
+  it("uses provider-agnostic order routing copy without Square mention", () => {
+    expect(ADMIN_ORDER_ROUTING_GENERIC_COPY).toMatch(/managed separately/i);
+    expect(ADMIN_ORDER_ROUTING_GENERIC_COPY).not.toMatch(/Square/i);
+  });
+
+  it("filters admin vendor detail tools by routing mode", () => {
+    const deliverectTools = getAdminVendorDetailTools("v1", "deliverect");
+    expect(deliverectTools.some((t) => t.title.match(/Deliverect menu imports/i))).toBe(true);
+    expect(deliverectTools.some((t) => t.title.match(/Square injection/i))).toBe(false);
+
+    const squareTools = getAdminVendorDetailTools("v1", "square");
+    expect(squareTools.some((t) => t.title.match(/Square injection debug/i))).toBe(true);
+    expect(squareTools.some((t) => t.title.match(/Deliverect POS/i))).toBe(false);
+
+    const manualTools = getAdminVendorDetailTools("v1", "manual_dashboard");
+    expect(manualTools.some((t) => t.title.match(/Menu builder/i))).toBe(true);
+    expect(manualTools.some((t) => t.title.match(/Square|Deliverect/i))).toBe(false);
+  });
+
+  it("active routing status message is provider-specific", () => {
+    expect(
+      adminActiveRoutingStatusMessage({
+        orderRoutingMode: "deliverect",
+        deliverectConnected: true,
+        posConnectionStatus: "connected",
+        squareStatusMessage: "Square is not ready...",
+        squareConnectionStatus: null,
+      }).message
+    ).toMatch(/Deliverect is connected/i);
+    expect(
+      adminActiveRoutingStatusMessage({
+        orderRoutingMode: "deliverect",
+        deliverectConnected: true,
+        posConnectionStatus: "connected",
+        squareStatusMessage: "Square is not ready...",
+        squareConnectionStatus: null,
+      }).message
+    ).not.toMatch(/Square is not ready/i);
+
+    expect(
+      adminActiveRoutingStatusMessage({
+        orderRoutingMode: "manual_dashboard",
+        deliverectConnected: false,
+        posConnectionStatus: null,
+        squareStatusMessage: "Square is not ready...",
+        squareConnectionStatus: null,
+      }).message
+    ).toMatch(/Open Order Dashboard routing is active/i);
   });
 });

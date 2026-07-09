@@ -43,7 +43,7 @@ export function formatSquareRoutingConnectedMessage(input: {
   return "Square is connected.";
 }
 
-/** Admin UI + server validation: Square routing selectable when OAuth connection health is ready. */
+/** Admin UI: routing mode is always selectable; prerequisites are shown after selection. */
 export async function loadAdminSquareRoutingStatus(vendorId: string): Promise<AdminSquareRoutingStatus> {
   const [connection, health] = await Promise.all([
     getActiveSquareConnectionForVendor(vendorId),
@@ -57,7 +57,7 @@ export async function loadAdminSquareRoutingStatus(vendorId: string): Promise<Ad
   const locationName = connection?.capabilitiesMeta?.selectedLocationName ?? null;
 
   return {
-    isSelectable: health.isReady,
+    isSelectable: true,
     hasConnection: Boolean(connection),
     health,
     businessName,
@@ -66,17 +66,17 @@ export async function loadAdminSquareRoutingStatus(vendorId: string): Promise<Ad
     missingRequirements: health.missingRequirements,
     statusMessage: health.isReady
       ? formatSquareRoutingConnectedMessage({ businessName, locationName })
-      : SQUARE_NOT_READY_MESSAGE,
+      : "Square is not connected yet. Connect Square and select a location to finish setup.",
     integrationUrl: `/vendor/${vendorId}/integrations/square`,
     menuImportsUrl: `/vendor/${vendorId}/menu/imports`,
   };
 }
 
+/** @deprecated Routing mode is always selectable — kept for callers expecting ok. */
 export async function assertSquareRoutingSelectable(vendorId: string): Promise<
   | { ok: true }
   | { ok: false; error: string }
 > {
-  const status = await loadAdminSquareRoutingStatus(vendorId);
-  if (status.isSelectable) return { ok: true };
-  return { ok: false, error: SQUARE_ROUTING_NOT_SELECTABLE_ERROR };
+  void vendorId;
+  return { ok: true };
 }

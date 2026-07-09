@@ -190,13 +190,12 @@ describe("deriveVendorPodReadiness status priority", () => {
           deliverectChannelLinkId: null,
           posConnectionStatus: "not_connected",
           squareConnectionReady: true,
-          squareOrderRoutingEnabled: false,
         },
         stripeSummary: baseStripe,
         customerOrderingHours: baseCustomerOrderingHours,
         hasPodMembership: true,
         squareConnectionReady: true,
-        squareOrderRoutingEnabled: false,
+        squareOrderRoutingReady: false,
       },
       { audience: "vendor" }
     );
@@ -204,7 +203,7 @@ describe("deriveVendorPodReadiness status priority", () => {
     const pos = result.checklist.find((item) => item.key === "pos");
     expect(pos?.complete).toBe(true);
     expect(pos?.label).toBe("Square connected");
-    expect(pos?.description).toMatch(/pending Open Order admin enablement/i);
+    expect(pos?.description).toMatch(/Finish menu import/i);
     expect(pos?.actionLabel).toBe("Manage Square integration");
     expect(result.canAcceptOrders).toBe(true);
   });

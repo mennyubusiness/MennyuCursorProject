@@ -26,7 +26,7 @@ export function AdminSquareOrderInjectionDiagnosticsPanel({
     <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-oo-charcoal">Square order injection diagnostics</h2>
+          <h2 className="text-sm font-semibold text-oo-charcoal">Square routing diagnostics</h2>
           <p className="mt-1 text-xs text-oo-stone-gray">
             Read-only readiness snapshot. Env values are server-side and require redeploy/restart after changes.
           </p>
@@ -62,8 +62,8 @@ export function AdminSquareOrderInjectionDiagnosticsPanel({
             value={vendorOrderRoutingModeAdminLabel(vendor.orderRoutingMode)}
           />
           <AdminInfoRow
-            label="squareOrderRoutingEnabled"
-            value={boolLabel(vendor.squareOrderRoutingEnabled)}
+            label="squareOrderRoutingEnabled (deprecated)"
+            value={`${boolLabel(vendor.squareOrderRoutingEnabled)} — ignored; orderRoutingMode is source of truth`}
           />
           <AdminInfoRow label="Square connection status" value={vendor.squareConnectionStatus} />
           <AdminInfoRow label="selected Square location" value={vendor.selectedSquareLocation} />
@@ -100,7 +100,7 @@ export function AdminSquareOrderInjectionDiagnosticsPanel({
           </ul>
         </div>
       ) : (
-        <p className="mt-4 text-xs text-emerald-800">No blockers — Square order injection is operational.</p>
+        <p className="mt-4 text-xs text-emerald-800">No blockers — Square routing is operational.</p>
       )}
     </section>
   );

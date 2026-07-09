@@ -7,12 +7,7 @@ import { loadSquareOrderRoutingReadiness } from "@/lib/integrations/square/squar
 import { loadAdminSquareOrderInjectionDiagnostics } from "@/lib/integrations/square/admin-square-order-injection-diagnostics.server";
 import { loadAdminVendorDetail } from "@/services/admin-vendor-detail.service";
 import { evaluateVendorCustomerOrderingHoursDebug } from "@/lib/vendor-customer-ordering-hours";
-import {
-  adminMenuManagementToolDescription,
-  adminPosMappingToolDescription,
-  adminPosMappingToolTitle,
-  adminPosMappingToolVisible,
-} from "@/lib/integrations/provider-display";
+import { getAdminVendorDetailTools } from "@/lib/integrations/provider-display";
 import { AdminVendorRescueClient } from "./AdminVendorRescueClient";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +56,8 @@ export default async function AdminVendorDetailPage({
   });
   const hoursDebugPodName = vendorHoursRow?.pods[0]?.pod.name ?? null;
   const routingMode = detail.vendor.orderRoutingMode;
-  const showPosMappingTool = adminPosMappingToolVisible(routingMode);
+  const tools = getAdminVendorDetailTools(id, routingMode);
+  const publicPageHref = detail.pods[0]?.publicPath ?? null;
 
   return (
     <div className="space-y-8">
@@ -92,28 +88,28 @@ export default async function AdminVendorDetailPage({
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Tools</h2>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-          <li>
-            <Link
-              href={`/admin/vendors/${id}/menu-history`}
-              className="flex flex-col rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm hover:bg-oo-cream/80"
-            >
-              <span className="font-medium text-oo-charcoal">Menu management</span>
-              <span className="mt-1 text-sm text-oo-stone-gray">
-                {adminMenuManagementToolDescription(routingMode)}
-              </span>
-            </Link>
-          </li>
-          {showPosMappingTool ? (
-            <li>
+          {tools.map((tool) => (
+            <li key={tool.href}>
               <Link
-                href={`/admin/vendors/${id}/deliverect-mapping`}
+                href={tool.href}
                 className="flex flex-col rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm hover:bg-oo-cream/80"
               >
-                <span className="font-medium text-oo-charcoal">{adminPosMappingToolTitle(routingMode)}</span>
-                <span className="mt-1 text-sm text-oo-stone-gray">
-                  {adminPosMappingToolDescription(routingMode)}
-                </span>
+                <span className="font-medium text-oo-charcoal">{tool.title}</span>
+                <span className="mt-1 text-sm text-oo-stone-gray">{tool.description}</span>
               </Link>
+            </li>
+          ))}
+          {publicPageHref ? (
+            <li>
+              <a
+                href={publicPageHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm hover:bg-oo-cream/80"
+              >
+                <span className="font-medium text-oo-charcoal">Public page</span>
+                <span className="mt-1 text-sm text-oo-stone-gray">Customer-facing vendor menu and ordering</span>
+              </a>
             </li>
           ) : null}
         </ul>

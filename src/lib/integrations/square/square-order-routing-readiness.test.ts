@@ -39,7 +39,7 @@ const VENDOR_ID = "vendor_sq";
 function baseVendor(overrides?: Partial<{ orderRoutingMode: string; squareOrderRoutingEnabled: boolean }>) {
   return {
     orderRoutingMode: overrides?.orderRoutingMode ?? "square",
-    squareOrderRoutingEnabled: overrides?.squareOrderRoutingEnabled ?? true,
+    squareOrderRoutingEnabled: overrides?.squareOrderRoutingEnabled ?? false,
   };
 }
 
@@ -77,20 +77,18 @@ describe("loadSquareOrderRoutingReadiness", () => {
     mockMappingCount.mockResolvedValue(3);
   });
 
-  it("prerequisites can be ready while injection is disabled", async () => {
+  it("is operational when prerequisites pass even if squareOrderRoutingEnabled is false", async () => {
     mockVendorFind.mockResolvedValue(baseVendor({ squareOrderRoutingEnabled: false }));
 
     const status = await loadSquareOrderRoutingReadiness(VENDOR_ID);
 
     expect(status.prerequisitesReady).toBe(true);
-    expect(status.injectionOperationalReady).toBe(false);
-    expect(status.ready).toBe(false);
-    expect(status.enabled).toBe(false);
-    expect(status.prerequisiteBlockers).toHaveLength(0);
-    expect(status.injectionBlockingReasons.some((m) => /injection is disabled/i.test(m))).toBe(true);
+    expect(status.injectionOperationalReady).toBe(true);
+    expect(status.ready).toBe(true);
+    expect(status.injectionBlockingReasons.some((m) => /injection is disabled/i.test(m))).toBe(false);
   });
 
-  it("is injection-ready when prerequisites, enablement, and global live switch pass", async () => {
+  it("is injection-ready when prerequisites and global live switch pass", async () => {
     mockVendorFind.mockResolvedValue(baseVendor());
 
     const status = await loadSquareOrderRoutingReadiness(VENDOR_ID);
@@ -99,7 +97,6 @@ describe("loadSquareOrderRoutingReadiness", () => {
       prerequisitesReady: true,
       injectionOperationalReady: true,
       ready: true,
-      enabled: true,
       globalRoutingLive: true,
       connectionHealthy: true,
       hasSquarePublishedMenu: true,
@@ -205,7 +202,7 @@ describe("assertSquareOrderRoutingPrerequisites", () => {
     mockMappingCount.mockResolvedValue(2);
   });
 
-  it("allows enable when prerequisites pass even if injection is disabled", async () => {
+  it("allows routing when prerequisites pass regardless of squareOrderRoutingEnabled", async () => {
     mockVendorFind.mockResolvedValue(baseVendor({ squareOrderRoutingEnabled: false }));
 
     const gate = await assertSquareOrderRoutingPrerequisites(VENDOR_ID);
@@ -227,14 +224,11 @@ describe("assertSquareOrderRoutingReady", () => {
     mockMappingCount.mockResolvedValue(2);
   });
 
-  it("rejects submission when injection is disabled", async () => {
+  it("allows submission when operational readiness passes even if squareOrderRoutingEnabled is false", async () => {
     mockVendorFind.mockResolvedValue(baseVendor({ squareOrderRoutingEnabled: false }));
 
     const gate = await assertSquareOrderRoutingReady(VENDOR_ID);
 
-    expect(gate.ok).toBe(false);
-    if (!gate.ok) {
-      expect(gate.error).toMatch(/disabled/i);
-    }
+    expect(gate).toEqual({ ok: true, locationId: "LOC_1" });
   });
 });

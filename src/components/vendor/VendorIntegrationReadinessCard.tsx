@@ -10,10 +10,8 @@ function statusBadgeClass(ready: boolean): string {
 
 export function VendorIntegrationReadinessCard({
   observability,
-  squareOrderRoutingEnabled = false,
 }: {
   observability: VendorIntegrationObservability;
-  squareOrderRoutingEnabled?: boolean;
 }) {
   const { readiness, squareHealth } = observability;
 
@@ -93,11 +91,6 @@ export function VendorIntegrationReadinessCard({
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-            ) : null}
-            {squareHealth.isReady && !squareOrderRoutingEnabled ? (
-              <p className="mt-2 text-xs text-oo-stone-gray">
-                Square order routing is pending Open Order admin enablement.
-              </p>
             ) : null}
           </div>
         ) : null}

@@ -97,25 +97,30 @@ describe("submitVendorOrder", () => {
     expect(mockApplyStatus).toHaveBeenCalled();
   });
 
-  it("fails when square routing mode is not enabled", async () => {
+  it("routes square vendors through Square submit path without squareOrderRoutingEnabled gate", async () => {
     mockFindUnique.mockResolvedValueOnce(
       routingHead({ orderRoutingMode: "square", squareOrderRoutingEnabled: false })
     );
+    mockSubmitSquare.mockResolvedValue({
+      success: false,
+      error: "Square location is not selected.",
+      code: "ROUTING_NOT_READY",
+    });
 
     const result = await submitVendorOrder(VO_ID, baseContext);
 
-    expect(result).toEqual({
-      success: false,
-      error: "Square order routing is not enabled for this vendor.",
-      code: "SQUARE_ROUTING_DISABLED",
+    expect(mockSubmitSquare).toHaveBeenCalledWith(VO_ID, {
+      customerPhone: PHONE,
+      customerEmail: EMAIL,
     });
-    expect(mockSubmitSquare).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.code).toBe("ROUTING_NOT_READY");
     expect(mockSubmitDeliverect).not.toHaveBeenCalled();
   });
 
-  it("routes square-enabled vendors through Square submit path", async () => {
+  it("routes square vendors through Square submit path when operational", async () => {
     mockFindUnique.mockResolvedValueOnce(
-      routingHead({ orderRoutingMode: "square", squareOrderRoutingEnabled: true })
+      routingHead({ orderRoutingMode: "square", squareOrderRoutingEnabled: false })
     );
     mockSubmitSquare.mockResolvedValue({ success: true, squareOrderId: "sq_ord_1" });
 

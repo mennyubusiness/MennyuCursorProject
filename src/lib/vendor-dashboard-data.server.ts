@@ -39,6 +39,7 @@ import {
   vendorRoutingStatusLabel,
 } from "@/lib/vendor-order-routing-mode";
 import { evaluateSquareConnectionHealth } from "@/lib/integrations/square/square-connection.service";
+import { loadSquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
 import { isDeliverectMenuSource } from "@/lib/vendor-menu-source";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 
@@ -143,10 +144,15 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
 
   let squareCatalogImportReady = false;
   let squareConnectionReady = false;
+  let squareOrderRoutingReady = false;
   if (isSquareRoutingMode(vendorRecord.orderRoutingMode)) {
-    const squareHealth = await evaluateSquareConnectionHealth(vendorId);
+    const [squareHealth, squareReadiness] = await Promise.all([
+      evaluateSquareConnectionHealth(vendorId),
+      loadSquareOrderRoutingReadiness(vendorId),
+    ]);
     squareConnectionReady = squareHealth.isReady;
     squareCatalogImportReady = squareConnectionReady;
+    squareOrderRoutingReady = squareReadiness.injectionOperationalReady;
   }
 
   const readinessPosSummary: VendorPosReadinessSummary = {
@@ -159,7 +165,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     menuSource: vendorRecord.menuSource,
     deliverectMappingReady,
     squareConnectionReady,
-    squareOrderRoutingEnabled: vendorRecord.squareOrderRoutingEnabled ?? false,
+    squareOrderRoutingReady,
   };
 
   const hoursTimezone = resolveVendorHoursTimezone(currentPod?.pod.pickupTimezone);
@@ -204,7 +210,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       },
       squareCatalogImportReady,
       squareConnectionReady,
-      squareOrderRoutingEnabled: vendorRecord.squareOrderRoutingEnabled ?? false,
+      squareOrderRoutingReady,
       pendingPodInviteCount: pendingInvites,
       hasPodMembership: Boolean(currentPod),
       customerOrderingHours: vendorRecord.customerOrderingHours,

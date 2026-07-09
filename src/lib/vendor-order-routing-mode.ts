@@ -101,7 +101,7 @@ export function isVendorRoutingOperationalReady(input: VendorRoutingReadinessInp
     return true;
   }
   if (isSquareRoutingMode(input.orderRoutingMode)) {
-    return input.squareOrderRoutingEnabled === true && input.squareOrderRoutingReady === true;
+    return input.squareOrderRoutingReady === true;
   }
   if (!isVendorDeliverectPosConnected(input)) {
     return false;
@@ -114,11 +114,11 @@ export function vendorRoutingSetupBlockerLabel(input: VendorRoutingReadinessInpu
     return null;
   }
   if (isSquareRoutingMode(input.orderRoutingMode)) {
-    if (!input.squareOrderRoutingEnabled) {
-      return "Square order routing is selected but not enabled yet.";
-    }
     if (!input.squareOrderRoutingReady) {
-      return "Square order routing is enabled but prerequisites are incomplete (connection, location, or published Square menu).";
+      if (!input.squareConnectionReady) {
+        return "Square routing is selected. Connect Square to start sending paid orders to Square.";
+      }
+      return "Square routing is selected. Import and publish a Square menu before orders can be sent to Square.";
     }
     return null;
   }
@@ -148,13 +148,13 @@ export const VENDOR_ROUTING_MODE_COPY = {
   },
   square: {
     adminHelper:
-      "Orders will route through Square when order injection is live. Requires a healthy Square OAuth connection with a selected active location. Menu source stays on Open Order until Square menu publish is enabled.",
+      "Orders route through Square when routing prerequisites are met. Requires Square OAuth, location, published Square menu, and mappings.",
     vendorHelper:
-      "Your orders are configured for Square routing. Order injection must be enabled before customers can place orders with this routing mode.",
+      "Your orders are configured for Square routing. Complete Square connection and menu setup so paid orders can route to Square.",
     incompleteWarning:
-      "Square routing is selected but order injection is not enabled or prerequisites are incomplete.",
+      "Square routing is selected but prerequisites are incomplete (connection, location, menu, or mappings).",
     notConnectedWarning:
-      "Square is not ready. The vendor must connect Square and select an active location before Square routing can be enabled.",
+      "Square routing is selected. Connect Square and select a location to finish setup.",
   },
 } as const;
 

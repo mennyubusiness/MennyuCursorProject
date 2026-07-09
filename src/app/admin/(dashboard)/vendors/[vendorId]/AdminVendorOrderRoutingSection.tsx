@@ -5,12 +5,18 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { AdminReasonActionForm } from "@/components/admin/AdminReasonActionForm";
-import { adminUpdateVendorOrderRoutingModeAction, adminSetSquareOrderRoutingEnabledAction } from "@/actions/admin-vendor.actions";
+import { adminUpdateVendorOrderRoutingModeAction } from "@/actions/admin-vendor.actions";
 import type { SquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
 import type { AdminSquareRoutingStatus } from "@/lib/integrations/square/square-routing-readiness";
 import {
+  ADMIN_ORDER_ROUTING_GENERIC_COPY,
+  adminActiveRoutingStatusMessage,
+  adminSquareRoutingStatusSummary,
+} from "@/lib/integrations/provider-display";
+import {
   isDeliverectRoutingMode,
   isSquareRoutingMode,
+  isVendorDeliverectPosConnected,
   isVendorRoutingOperationalReady,
   VENDOR_ROUTING_MODE_COPY,
   vendorOrderRoutingModeAdminLabel,
@@ -22,14 +28,12 @@ export function AdminVendorOrderRoutingSection({
   orderRoutingMode,
   posSummary,
   squareStatus,
-  squareOrderRoutingEnabled,
   squareOrderRoutingReady,
 }: {
   vendorId: string;
   orderRoutingMode: VendorOrderRoutingMode;
   posSummary: VendorPosReadinessSummary;
   squareStatus: AdminSquareRoutingStatus;
-  squareOrderRoutingEnabled: boolean;
   squareOrderRoutingReady: SquareOrderRoutingReadiness;
 }) {
   const router = useRouter();
@@ -38,40 +42,34 @@ export function AdminVendorOrderRoutingSection({
   const deliverectMode = isDeliverectRoutingMode(mode);
   const squareModeSelected = isSquareRoutingMode(mode);
   const squareModeSaved = isSquareRoutingMode(orderRoutingMode);
+  const deliverectConnected = isVendorDeliverectPosConnected(posSummary);
   const routingReady = isVendorRoutingOperationalReady({
     ...posSummary,
     orderRoutingMode: mode,
-    squareOrderRoutingEnabled: mode === "square" ? squareOrderRoutingEnabled : undefined,
     squareOrderRoutingReady: mode === "square" ? squareOrderRoutingReady.injectionOperationalReady : undefined,
   });
-  const squareSelectable = squareStatus.isSelectable;
+  const activeStatus = adminActiveRoutingStatusMessage({
+    orderRoutingMode,
+    deliverectConnected,
+    posConnectionStatus: posSummary.posConnectionStatus,
+    squareStatusMessage: squareStatus.statusMessage,
+    squareConnectionStatus: squareStatus.connectionStatus,
+  });
+  const squareSummary = adminSquareRoutingStatusSummary(squareOrderRoutingReady);
 
   return (
     <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4">
       <h2 className="text-sm font-semibold text-oo-charcoal">Order routing</h2>
       <p className="mt-1 text-xs text-oo-stone-gray">
         Current mode:{" "}
-        <span className="font-medium text-oo-charcoal">{vendorOrderRoutingModeAdminLabel(mode)}</span>
+        <span className="font-medium text-oo-charcoal">{vendorOrderRoutingModeAdminLabel(orderRoutingMode)}</span>
       </p>
-      <p className="mt-2 text-xs text-oo-stone-gray">
-        Menu source stays separate from order routing. Square routing keeps Open Order menu builder unless
-        changed elsewhere.
-      </p>
+      <p className="mt-2 text-xs text-oo-stone-gray">{ADMIN_ORDER_ROUTING_GENERIC_COPY}</p>
 
       <div className="mt-3 rounded-md border border-oo-light-stone bg-oo-cream/40 px-3 py-2 text-xs text-oo-charcoal">
-        {squareStatus.isSelectable ? (
-          <p>{squareStatus.statusMessage}</p>
-        ) : (
-          <p>
-            {squareStatus.statusMessage}{" "}
-            <Link href={squareStatus.integrationUrl} className="font-medium underline">
-              Open Square integration
-            </Link>
-          </p>
-        )}
-        {squareStatus.connectionStatus ? (
-          <p className="mt-1 text-oo-stone-gray">Connection status: {squareStatus.connectionStatus}</p>
-        ) : null}
+        <p className="font-medium text-oo-charcoal">Active routing</p>
+        <p className="mt-1">{activeStatus.message}</p>
+        {activeStatus.detail ? <p className="mt-1 text-oo-stone-gray">{activeStatus.detail}</p> : null}
       </div>
 
       <div className="mt-4 space-y-3">
@@ -107,30 +105,75 @@ export function AdminVendorOrderRoutingSection({
           </span>
         </label>
 
-        <label
-          className={`flex items-start gap-2 rounded-lg border border-oo-light-stone p-3 ${
-            squareSelectable ? "cursor-pointer" : "cursor-not-allowed opacity-70"
-          }`}
-        >
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-oo-light-stone p-3">
           <input
             type="radio"
             name={`routing-mode-${vendorId}`}
             checked={mode === "square"}
-            disabled={!squareSelectable && mode !== "square"}
-            onChange={() => {
-              if (squareSelectable) setMode("square");
-            }}
+            onChange={() => setMode("square")}
             className="mt-0.5"
           />
-          <span>
+          <span className="w-full">
             <span className="block text-sm font-medium text-oo-charcoal">Square</span>
             <span className="mt-1 block text-xs text-oo-stone-gray">
               {VENDOR_ROUTING_MODE_COPY.square.adminHelper}
             </span>
-            {!squareSelectable ? (
-              <span className="mt-1 block text-xs text-amber-900">
-                {VENDOR_ROUTING_MODE_COPY.square.notConnectedWarning}
-              </span>
+            {squareModeSelected ? (
+              <div className="mt-3 space-y-2 rounded-md border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-xs text-oo-charcoal">
+                <p className={squareSummary.ready ? "text-emerald-900" : "text-amber-950"}>
+                  {squareSummary.headline}
+                </p>
+                <dl className="grid gap-1 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-oo-stone-gray">Square connection</dt>
+                    <dd className="font-medium">
+                      {squareOrderRoutingReady.connectionHealthy ? "connected" : "missing"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-oo-stone-gray">Selected location</dt>
+                    <dd className="font-medium">
+                      {squareOrderRoutingReady.locationId?.trim() ? "present" : "missing"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-oo-stone-gray">Published Square menu</dt>
+                    <dd className="font-medium">
+                      {squareOrderRoutingReady.hasSquarePublishedMenu ? "present" : "missing"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-oo-stone-gray">Item mappings</dt>
+                    <dd className="font-medium">
+                      {squareOrderRoutingReady.activeItemMappingCount > 0 ? "ready" : "missing"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-oo-stone-gray">SQUARE_ROUTING_LIVE</dt>
+                    <dd className="font-medium">
+                      {squareOrderRoutingReady.globalRoutingLive ? "true" : "false"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-oo-stone-gray">Routing status</dt>
+                    <dd className="font-medium">
+                      {squareSummary.ready
+                        ? "Ready to send paid orders to Square"
+                        : "Not ready"}
+                    </dd>
+                  </div>
+                </dl>
+                {!squareSummary.ready && squareSummary.blockers.length > 0 ? (
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-amber-900">
+                    {squareSummary.blockers.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                <Link href={squareStatus.integrationUrl} className="mt-2 inline-block font-medium underline">
+                  Open Square integration
+                </Link>
+              </div>
             ) : null}
           </span>
         </label>
@@ -142,80 +185,17 @@ export function AdminVendorOrderRoutingSection({
         </p>
       ) : null}
 
-      {squareModeSelected && !routingReady ? (
+      {squareModeSelected && !routingReady && squareModeSaved ? (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           {VENDOR_ROUTING_MODE_COPY.square.incompleteWarning}
-          {squareOrderRoutingReady.injectionBlockingReasons.length > 0 ? (
-            <span className="mt-1 block">{squareOrderRoutingReady.injectionBlockingReasons.join(" ")}</span>
-          ) : null}
         </p>
-      ) : null}
-
-      {squareModeSaved ? (
-        <div className="mt-4 rounded-lg border border-oo-light-stone bg-oo-cream/30 p-3">
-          <p className="text-sm font-medium text-oo-charcoal">Square order injection</p>
-          {squareOrderRoutingEnabled ? (
-            <p className="mt-1 text-xs text-oo-stone-gray">
-              When enabled, paid Open Order orders for this vendor are sent to Square as prepaid pickup orders.
-              Stripe checkout and Open Order payouts remain unchanged.
-            </p>
-          ) : (
-            <p className="mt-1 text-xs text-oo-stone-gray">
-              Square is connected, but order injection is disabled. Orders will be accepted in Open Order but will
-              not be sent to Square.
-            </p>
-          )}
-          {squareOrderRoutingEnabled ? (
-            <AdminReasonActionForm
-              label="Disable Square order injection"
-              description="Stops sending new paid orders to Square. Existing Square orders are unchanged."
-              confirmLabel={pending ? "Saving…" : "Disable Square order injection"}
-              onSubmit={(reason) =>
-                new Promise((resolve) => {
-                  startTransition(async () => {
-                    const result = await adminSetSquareOrderRoutingEnabledAction({
-                      vendorId,
-                      enabled: false,
-                      reason,
-                    });
-                    if (result.ok) router.refresh();
-                    resolve(result);
-                  });
-                })
-              }
-            />
-          ) : (
-            <AdminReasonActionForm
-              label="Enable Square order injection"
-              description="When enabled, paid Open Order orders for this vendor will be sent to Square as prepaid pickup orders. Stripe checkout and Open Order payouts remain unchanged."
-              confirmLabel={pending ? "Saving…" : "Enable Square order injection"}
-              disabled={!squareOrderRoutingReady.prerequisitesReady}
-              disabledReason={
-                squareOrderRoutingReady.prerequisiteBlockers.join(" ") || "Prerequisites incomplete."
-              }
-              onSubmit={(reason) =>
-                new Promise((resolve) => {
-                  startTransition(async () => {
-                    const result = await adminSetSquareOrderRoutingEnabledAction({
-                      vendorId,
-                      enabled: true,
-                      reason,
-                    });
-                    if (result.ok) router.refresh();
-                    resolve(result);
-                  });
-                })
-              }
-            />
-          )}
-        </div>
       ) : null}
 
       {mode !== orderRoutingMode ? (
         <div className="mt-4">
           <AdminReasonActionForm
             label="Save order routing mode"
-            description="Changes apply immediately to readiness checks and post-checkout routing."
+            description="Changes apply immediately to readiness checks, vendor setup UI, and post-checkout routing intent."
             confirmLabel={pending ? "Saving…" : "Save routing mode"}
             onSubmit={(reason) =>
               new Promise((resolve) => {
@@ -227,7 +207,7 @@ export function AdminVendorOrderRoutingSection({
                   });
                   if (result.ok) router.refresh();
                   resolve(result);
-                })
+                });
               })
             }
           />

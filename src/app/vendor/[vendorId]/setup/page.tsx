@@ -13,6 +13,7 @@ import {
 } from "@/lib/vendor-order-routing-mode";
 import { VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS } from "@/lib/vendor-pod-readiness";
 import { getVendorIntegrationObservability } from "@/lib/integrations/provider-observability.service";
+import { loadSquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
 import { VendorIntegrationReadinessCard } from "@/components/vendor/VendorIntegrationReadinessCard";
 import { VendorSquareSetupSummary } from "@/components/vendor/VendorSquareSetupSummary";
 
@@ -27,6 +28,9 @@ export default async function VendorSetupPage({
 
   const integrationObservability = await getVendorIntegrationObservability(vendorId);
   const showSquareSummary = isSquareRoutingMode(ctx.vendorRecord.orderRoutingMode);
+  const squareReadiness = showSquareSummary
+    ? await loadSquareOrderRoutingReadiness(vendorId)
+    : null;
 
   const publicProfileReady = ctx.readiness.setupSummary.publicProfile;
   const appearance = ctx.readiness.checklist.filter((item) =>
@@ -75,10 +79,7 @@ export default async function VendorSetupPage({
 
         {integrationObservability ? (
           <section id="integrations">
-            <VendorIntegrationReadinessCard
-              observability={integrationObservability}
-              squareOrderRoutingEnabled={ctx.vendorRecord.squareOrderRoutingEnabled ?? false}
-            />
+            <VendorIntegrationReadinessCard observability={integrationObservability} />
           </section>
         ) : null}
 
@@ -87,7 +88,7 @@ export default async function VendorSetupPage({
             vendorId={vendorId}
             orderRoutingMode={ctx.vendorRecord.orderRoutingMode}
             squareConnectionReady={ctx.readinessPosSummary.squareConnectionReady === true}
-            squareOrderRoutingEnabled={ctx.vendorRecord.squareOrderRoutingEnabled ?? false}
+            squareRoutingOperational={squareReadiness?.injectionOperationalReady ?? false}
           />
         ) : null}
 

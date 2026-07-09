@@ -62,10 +62,7 @@ export default async function VendorIntegrationsPage({
         </DashboardCard>
 
         {observability ? (
-          <VendorIntegrationReadinessCard
-            observability={observability}
-            squareOrderRoutingEnabled={ctx.vendorRecord.squareOrderRoutingEnabled ?? false}
-          />
+          <VendorIntegrationReadinessCard observability={observability} />
         ) : null}
 
         <section className="max-w-3xl space-y-3">

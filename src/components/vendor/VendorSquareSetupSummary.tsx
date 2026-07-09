@@ -6,12 +6,12 @@ export function VendorSquareSetupSummary({
   vendorId,
   orderRoutingMode,
   squareConnectionReady,
-  squareOrderRoutingEnabled,
+  squareRoutingOperational,
 }: {
   vendorId: string;
   orderRoutingMode: string | null | undefined;
   squareConnectionReady: boolean;
-  squareOrderRoutingEnabled: boolean;
+  squareRoutingOperational?: boolean;
 }) {
   if (!isSquareRoutingMode(orderRoutingMode)) return null;
 
@@ -28,14 +28,18 @@ export function VendorSquareSetupSummary({
               {squareConnectionReady ? "Connected" : "Needs attention"}
             </span>
           </p>
-          {squareConnectionReady && !squareOrderRoutingEnabled ? (
-            <p className="mt-2 text-xs text-oo-stone-gray">
-              Square is connected. Square order routing is pending Open Order admin enablement.
+          {squareRoutingOperational ? (
+            <p className="mt-2 text-xs text-emerald-900">
+              Square routing is ready. Paid Open Order orders will be sent to Square as prepaid pickup orders.
             </p>
           ) : null}
           {!squareConnectionReady ? (
             <p className="mt-2 text-xs text-oo-stone-gray">
-              Connect Square and select a location to finish order routing setup.
+              Square routing is selected. Connect Square and select a location to finish setup.
+            </p>
+          ) : !squareRoutingOperational ? (
+            <p className="mt-2 text-xs text-oo-stone-gray">
+              Square routing is selected. Import and publish a Square menu before orders can be sent to Square.
             </p>
           ) : null}
         </div>

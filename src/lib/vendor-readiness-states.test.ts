@@ -197,14 +197,13 @@ describe("orderability", () => {
     expect(state.customerBannerLine).not.toMatch(/admin|injection/i);
   });
 
-  it("does not block square vendors solely because squareOrderRoutingEnabled is false", () => {
+  it("does not block square vendors solely because squareOrderRoutingReady is false", () => {
     const input = evaluation({
       posSummary: {
         ...basePos,
         orderRoutingMode: "square",
         squareConnectionReady: true,
-        squareOrderRoutingEnabled: false,
-        squareOrderRoutingReady: false,
+          squareOrderRoutingReady: false,
       },
     });
     expect(getVendorOrderabilityState(input).orderable).toBe(true);

@@ -42,7 +42,7 @@ const SQUARE_PROFILE: ProviderDisplayProfile = {
   displayName: "Square",
   shortName: "Square",
   routingDescription:
-    "Paid Open Order orders are sent to Square as prepaid pickup orders when injection is enabled.",
+    "Paid Open Order orders are sent to Square as prepaid pickup orders when routing prerequisites are met.",
   menuImportLabel: "Square catalog import",
   catalogLabel: "Square catalog",
   connectedLabel: "Square / POS-connected routing",
@@ -195,6 +195,228 @@ export function vendorIntegrationsHubDescription(
   return `Active routing, menu source, and connections for ${profile.displayName} and other integrations.`;
 }
 
+/** Provider-agnostic admin order routing section copy. */
+export const ADMIN_ORDER_ROUTING_GENERIC_COPY =
+  "Menu source and order routing are managed separately. Changing routing does not automatically change the published menu.";
+
+export function adminVendorOverviewRoutingProviderLabel(
+  mode: VendorOrderRoutingMode | string | null | undefined
+): string {
+  return getProviderDisplayProfile(mode).displayName;
+}
+
+export function adminVendorOverviewMenuSourceLabel(input: {
+  orderRoutingMode: VendorOrderRoutingMode | string | null | undefined;
+  menuSource: string | null | undefined;
+}): string {
+  const { orderRoutingMode, menuSource } = input;
+  if (isManualDashboardRoutingMode(orderRoutingMode)) {
+    return "Open Order menu builder";
+  }
+  if (isDeliverectRoutingMode(orderRoutingMode)) {
+    return "Deliverect sync";
+  }
+  if (isSquareRoutingMode(orderRoutingMode)) {
+    return menuSource === "deliverect" ? "Deliverect sync" : "Square catalog import";
+  }
+  return "Open Order menu builder";
+}
+
+export function adminVendorMenuStatusLabel(input: {
+  hasPublishedMenu: boolean;
+  hasDraftAwaitingReview: boolean;
+  totalItems: number;
+}): string {
+  if (input.hasDraftAwaitingReview) return "Draft available";
+  if (input.hasPublishedMenu || input.totalItems > 0) return "Published";
+  return "Missing";
+}
+
+export function formatAdminDownstreamPosProvider(
+  posProvider: string | null | undefined
+): string | null {
+  if (!posProvider?.trim()) return null;
+  const normalized = posProvider.trim();
+  if (normalized.toLowerCase() === "toast") return "Toast";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+/** Primary routing section shows Square status only for saved or preview-selected Square mode. */
+export function adminShowSquareRoutingStatusPrimary(input: {
+  savedMode: VendorOrderRoutingMode | string | null | undefined;
+  selectedMode: VendorOrderRoutingMode | string | null | undefined;
+}): boolean {
+  return isSquareRoutingMode(input.savedMode) || isSquareRoutingMode(input.selectedMode);
+}
+
+export function adminInactiveSquareDiagnosticsVisible(input: {
+  savedMode: VendorOrderRoutingMode | string | null | undefined;
+  hasSquareConnection: boolean;
+}): boolean {
+  return !isSquareRoutingMode(input.savedMode) && input.hasSquareConnection;
+}
+
+export function adminInactiveDeliverectDiagnosticsVisible(input: {
+  savedMode: VendorOrderRoutingMode | string | null | undefined;
+  deliverectChannelLinkId: string | null | undefined;
+}): boolean {
+  return !isDeliverectRoutingMode(input.savedMode) && Boolean(input.deliverectChannelLinkId?.trim());
+}
+
+export type AdminVendorDetailTool = {
+  title: string;
+  description: string;
+  href: string;
+};
+
+export function getAdminVendorDetailTools(
+  vendorId: string,
+  mode: VendorOrderRoutingMode | string | null | undefined
+): AdminVendorDetailTool[] {
+  const id = vendorId.trim();
+  const tools: AdminVendorDetailTool[] = [
+    {
+      title: "Vendor dashboard",
+      description: "Open the vendor command dashboard",
+      href: `/vendor/${id}/dashboard`,
+    },
+  ];
+
+  if (isManualDashboardRoutingMode(mode)) {
+    tools.push(
+      {
+        title: "Kitchen mode",
+        description: "Operational order board for dashboard routing",
+        href: `/vendor/${id}/kitchen`,
+      },
+      {
+        title: "Menu builder",
+        description: "Edit draft menus and publish snapshots",
+        href: `/vendor/${id}/menu-builder`,
+      }
+    );
+  }
+
+  if (isDeliverectRoutingMode(mode)) {
+    tools.push(
+      {
+        title: "Deliverect menu imports",
+        description: adminMenuManagementToolDescription(mode),
+        href: `/admin/vendors/${id}/menu-history`,
+      },
+      {
+        title: "Deliverect POS & channel",
+        description: adminPosMappingToolDescription(mode),
+        href: `/admin/vendors/${id}/deliverect-mapping`,
+      }
+    );
+  }
+
+  if (isSquareRoutingMode(mode)) {
+    tools.push(
+      {
+        title: "Square menu imports",
+        description: adminMenuManagementToolDescription(mode),
+        href: `/admin/vendors/${id}/menu-history`,
+      },
+      {
+        title: "Square integration",
+        description: "OAuth connection, location, and catalog import",
+        href: `/vendor/${id}/integrations/square`,
+      },
+      {
+        title: "Square injection debug",
+        description: "Read-only JSON diagnostics for order injection",
+        href: `/admin/vendors/${id}/square-routing-debug`,
+      }
+    );
+  }
+
+  if (!isSquareRoutingMode(mode) && !isDeliverectRoutingMode(mode)) {
+    tools.push({
+      title: "Menu management",
+      description: adminMenuManagementToolDescription(mode),
+      href: `/admin/vendors/${id}/menu-history`,
+    });
+  }
+
+  return tools;
+}
+
+export function adminSquareRoutingStatusSummary(readiness: {
+  injectionOperationalReady: boolean;
+  globalRoutingLive: boolean;
+  connectionHealthy: boolean;
+  hasSquarePublishedMenu: boolean;
+  injectionBlockingReasons: string[];
+}): { headline: string; ready: boolean; blockers: string[] } {
+  const blockers = readiness.injectionBlockingReasons.filter(Boolean);
+  if (readiness.injectionOperationalReady) {
+    return {
+      headline:
+        "Square routing is ready. Paid Open Order orders will be sent to Square as prepaid pickup orders.",
+      ready: true,
+      blockers: [],
+    };
+  }
+  if (!readiness.globalRoutingLive) {
+    return {
+      headline: "Square routing is selected, but live Square API routing is disabled globally.",
+      ready: false,
+      blockers,
+    };
+  }
+  if (!readiness.connectionHealthy) {
+    return {
+      headline: "Square routing is selected. Connect Square to start sending paid orders to Square.",
+      ready: false,
+      blockers,
+    };
+  }
+  if (!readiness.hasSquarePublishedMenu) {
+    return {
+      headline:
+        "Square routing is selected. Import and publish a Square menu before orders can be sent to Square.",
+      ready: false,
+      blockers,
+    };
+  }
+  return {
+    headline:
+      "Square routing is selected. Complete the requirements below before orders can be sent to Square.",
+    ready: false,
+    blockers,
+  };
+}
+
+export function adminActiveRoutingStatusMessage(input: {
+  orderRoutingMode: VendorOrderRoutingMode | string | null | undefined;
+  deliverectConnected: boolean;
+  posConnectionStatus: string | null | undefined;
+  squareStatusMessage: string;
+  squareConnectionStatus: string | null | undefined;
+}): { message: string; detail?: string } {
+  if (isSquareRoutingMode(input.orderRoutingMode)) {
+    return {
+      message: input.squareStatusMessage,
+      detail: input.squareConnectionStatus
+        ? `Connection status: ${input.squareConnectionStatus}`
+        : undefined,
+    };
+  }
+  if (isDeliverectRoutingMode(input.orderRoutingMode)) {
+    return {
+      message: input.deliverectConnected
+        ? "Deliverect is connected for order routing."
+        : "Deliverect is not connected. Channel link and mappings are required before orders can route.",
+      detail: input.posConnectionStatus ? `Connection status: ${input.posConnectionStatus}` : undefined,
+    };
+  }
+  return {
+    message: "Open Order Dashboard routing is active. No POS connection is required.",
+  };
+}
+
 export function vendorKitchenModeStatusLine(input: {
   orderRoutingMode: VendorOrderRoutingMode | string | null | undefined;
   posState: VendorPosUiState;
@@ -228,9 +450,9 @@ export function vendorKitchenModeNotice(input: {
 
   if (isSquareRoutingMode(orderRoutingMode)) {
     if (squareInjectionOperational) {
-      return "Square routing is enabled. Paid Open Order orders are sent to Square as prepaid pickup orders. Kitchen actions here update Open Order directly.";
+      return "Square routing is ready. Paid Open Order orders are sent to Square as prepaid pickup orders. Kitchen actions here update Open Order directly.";
     }
-    return "Square is selected, but order injection is not active. Orders remain in Open Order until routing is fixed or retried.";
+    return "Square routing is selected but not ready yet. Orders remain in Open Order until Square setup is complete or routing is retried.";
   }
 
   if (isDeliverectRoutingMode(orderRoutingMode)) {

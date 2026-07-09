@@ -129,8 +129,8 @@ describe("vendor menu management UX", () => {
     );
     expect(admin).toContain("adminSquareInjectionDiagnosticsVisible");
     expect(admin).toContain("adminDeliverectMenuPosSectionVisible");
-    expect(adminPage).toContain("adminMenuManagementToolDescription");
-    expect(adminPage).toContain("adminPosMappingToolVisible");
+    expect(admin).toContain("Routing provider");
+    expect(adminPage).toContain("getAdminVendorDetailTools");
   });
 
   it("integrations hub page is provider-aware", () => {
