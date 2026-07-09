@@ -12,8 +12,9 @@ import { applyVendorOrderTransition } from "@/services/order-status.service";
 import { canVendorRejectVendorOrder } from "@/lib/cancel-eligibility";
 import {
   canVendorDashboardMutateVendorOrder,
-  VENDOR_DELIVERECT_CONTROLLED_MESSAGE,
+  vendorDashboardMutateBlockedMessage,
 } from "@/lib/deliverect-vendor-order-authority";
+import { isSquareWebhookSignatureConfigured } from "@/lib/integrations/square/square-webhook-verify";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
 import { isDeliverectVendorOrderRoutingDegraded } from "@/lib/vendor-deliverect-dashboard-visibility";
 import { getRefundDecision } from "@/lib/refund-decision";
@@ -78,6 +79,8 @@ export async function POST(
       lastStatusSource: true,
       deliverectChannelLinkId: true,
       deliverectAttempts: true,
+      squareOrderId: true,
+      deliverectOrderId: true,
       order: { select: { updatedAt: true } },
       statusHistory: { select: { source: true } },
       vendor: {
@@ -106,6 +109,11 @@ export async function POST(
     return NextResponse.json({ error: "Vendor order does not belong to this vendor" }, { status: 403 });
   }
 
+  const integration = {
+    squareStatusSyncConfigured: isSquareWebhookSignatureConfigured(),
+    deliverectRoutingLive: isRoutingRetryAvailable(),
+  };
+
   const authorityVo = {
     statusAuthority: vo.statusAuthority,
     lastStatusSource: vo.lastStatusSource,
@@ -113,9 +121,12 @@ export async function POST(
     vendor: vo.vendor,
     routingStatus: vo.routingStatus,
     manuallyRecoveredAt: vo.manuallyRecoveredAt,
+    squareOrderId: vo.squareOrderId,
+    deliverectOrderId: vo.deliverectOrderId,
+    fulfillmentStatus: vo.fulfillmentStatus,
   };
 
-  if (!canVendorDashboardMutateVendorOrder(authorityVo, vo.vendor.orderRoutingMode)) {
+  if (!canVendorDashboardMutateVendorOrder(authorityVo, vo.vendor.orderRoutingMode, integration)) {
     const isDeliverectLive = isRoutingRetryAvailable();
     const routingDegraded = isDeliverectVendorOrderRoutingDegraded(
       vo,
@@ -133,7 +144,11 @@ export async function POST(
       return NextResponse.json(
         {
           ok: false,
-          error: VENDOR_DELIVERECT_CONTROLLED_MESSAGE,
+          error: vendorDashboardMutateBlockedMessage(
+            authorityVo,
+            vo.vendor.orderRoutingMode,
+            integration
+          ),
           code: "POS_MANAGED_USE_FALLBACK",
           precedenceReason: "POS_MANAGED_USE_FALLBACK",
         },

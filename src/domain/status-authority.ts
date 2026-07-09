@@ -122,7 +122,12 @@ export function shouldApplyStatusUpdate(
   }
 
   if (authority === "pos") {
-    if (source === "deliverect_webhook" || source === "deliverect_fallback" || source === "system")
+    if (
+      source === "deliverect_webhook" ||
+      source === "deliverect_fallback" ||
+      source === "square_webhook" ||
+      source === "system"
+    )
       return { allowed: true };
     if (source === "vendor_dashboard" || source === "dma_action") {
       return { allowed: false, reason: "POS_MANAGED_USE_FALLBACK" };

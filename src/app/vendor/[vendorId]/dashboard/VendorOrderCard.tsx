@@ -21,9 +21,9 @@ import {
 import type { VendorOrderStatusAuthority } from "@/domain/status-authority";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import {
-  isDeliverectAuthoritativeVendorOrder,
-  VENDOR_DELIVERECT_CONTROLLED_NOTICE,
-} from "@/lib/deliverect-vendor-order-authority";
+  getKitchenActionPolicy,
+  vendorKitchenActionBlockedMessage,
+} from "@/lib/order-routing/kitchen-action-policy";
 import { isManualDashboardRoutingMode } from "@/lib/vendor-order-routing-mode";
 
 type VendorOrderForCard = {
@@ -36,6 +36,8 @@ type VendorOrderForCard = {
   lastExternalStatus?: string | null;
   lastExternalStatusAt?: string | null;
   deliverectChannelLinkId?: string | null;
+  squareOrderId?: string | null;
+  deliverectOrderId?: string | null;
   statusHistory?: Array<{ source?: string | null }>;
   totalCents: number;
   tipCents: number;
@@ -92,9 +94,10 @@ export function VendorOrderCard({
   siblingFirstReadyMinutesAgo = null,
   siblingBehindEscalation = "yellow",
   onStatusSuccess,
-  isDeliverectLive = false,
+  isDeliverectLive = null,
   deliverectRoutingDegraded = false,
   vendorDeliverectChannelLinkId = null,
+  squareStatusSyncConfigured = null,
   orderRoutingMode = "manual_dashboard",
 }: {
   vendorId: string;
@@ -116,16 +119,19 @@ export function VendorOrderCard({
   siblingBehindEscalation?: BehindSiblingEscalation;
   /** When set, status change success updates this VO in parent state instead of full router.refresh(). */
   onStatusSuccess?: (vendorOrderId: string, update: { routingStatus: string; fulfillmentStatus: string }) => void;
-  /** When true, healthy path expects POS sync first — hide primary Confirm until sent/confirmed. */
-  isDeliverectLive?: boolean;
+  /** When true, healthy path expects POS sync first — hide primary Confirm until sent/confirmed. null = unknown. */
+  isDeliverectLive?: boolean | null;
   /** Live Deliverect VO stuck in pending/pending past the healthy wait — show manual confirm + degraded copy. */
   deliverectRoutingDegraded?: boolean;
   vendorDeliverectChannelLinkId?: string | null;
+  /** true/false when known from server; null/omitted = unknown (neutral sync copy). */
+  squareStatusSyncConfigured?: boolean | null;
   orderRoutingMode?: VendorOrderRoutingMode;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const deliverectLive = isDeliverectLive === true;
 
   const authorityVo = {
     routingStatus: vendorOrder.routingStatus,
@@ -138,29 +144,46 @@ export function VendorOrderCard({
     vendor: { deliverectChannelLinkId: vendorDeliverectChannelLinkId },
   };
   const manualDashboard = isManualDashboardRoutingMode(orderRoutingMode);
-  const deliverectAuthoritative = isDeliverectAuthoritativeVendorOrder(
-    authorityVo,
-    orderRoutingMode
+  const kitchenPolicy = getKitchenActionPolicy(
+    {
+      orderRoutingMode,
+      deliverectChannelLinkId: vendorDeliverectChannelLinkId,
+    },
+    {
+      routingStatus: vendorOrder.routingStatus,
+      fulfillmentStatus: vendorOrder.fulfillmentStatus,
+      squareOrderId: vendorOrder.squareOrderId,
+      deliverectOrderId: vendorOrder.deliverectOrderId,
+      manuallyRecoveredAt: vendorOrder.manuallyRecoveredAt,
+      statusAuthority: authorityVo.statusAuthority,
+      deliverectChannelLinkId: authorityVo.deliverectChannelLinkId,
+      vendor: authorityVo.vendor,
+    },
+    {
+      squareStatusSyncConfigured,
+      deliverectRoutingLive: isDeliverectLive,
+    }
   );
+  const actionsLocked = kitchenPolicy.actionsLocked;
 
-  const nextAction = deliverectAuthoritative
+  const nextAction = actionsLocked
     ? null
     : getVendorOrderNextAction(
         vendorOrder.routingStatus,
         vendorOrder.fulfillmentStatus,
-        isDeliverectLive,
+        deliverectLive,
         { isManualDashboard: manualDashboard }
       );
   const showManualConfirmFallback =
     deliverectRoutingDegraded === true &&
     vendorOrder.routingStatus === "pending" &&
     vendorOrder.fulfillmentStatus === "pending";
-  const actionHint = deliverectAuthoritative
+  const actionHint = actionsLocked
     ? null
     : getOperatingModeActionHint(
         operatingMode,
         authorityVo,
-        isDeliverectLive,
+        deliverectLive,
         deliverectRoutingDegraded
       );
   const isTerminal = ["completed", "cancelled"].includes(vendorOrder.fulfillmentStatus);
@@ -331,13 +354,24 @@ export function VendorOrderCard({
         </p>
       </div>
 
-      {deliverectAuthoritative && !isTerminal && !isCancelledOrFailed && !showManualConfirmFallback && (
+      {kitchenPolicy.routingFailed && kitchenPolicy.recoveryCopy ? (
+        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          {kitchenPolicy.recoveryCopy}
+        </p>
+      ) : null}
+
+      {kitchenPolicy.showProviderManagedState && !isTerminal && !isCancelledOrFailed && !showManualConfirmFallback ? (
         <div className="mt-3 rounded-lg border border-oo-light-stone bg-oo-cream/50 px-3 py-2.5">
-          <p className="text-xs text-oo-stone-gray">{VENDOR_DELIVERECT_CONTROLLED_NOTICE}</p>
+          {kitchenPolicy.managedOrderBadge ? (
+            <p className="text-xs font-medium text-oo-charcoal">{kitchenPolicy.managedOrderBadge}</p>
+          ) : null}
+          {kitchenPolicy.statusSyncCopy ? (
+            <p className="mt-1 text-xs text-oo-stone-gray">{kitchenPolicy.statusSyncCopy}</p>
+          ) : null}
           {(vendorOrder.lastExternalStatus || vendorOrder.lastExternalStatusAt) && (
             <p className="mt-1.5 text-xs text-oo-charcoal">
               {vendorOrder.lastExternalStatus && (
-                <span className="font-medium">POS status: {vendorOrder.lastExternalStatus}</span>
+                <span className="font-medium">Provider status: {vendorOrder.lastExternalStatus}</span>
               )}
               {vendorOrder.lastExternalStatusAt && (
                 <span className="text-oo-stone-gray">
@@ -352,9 +386,9 @@ export function VendorOrderCard({
             </p>
           )}
         </div>
-      )}
+      ) : null}
 
-      {/* Status actions: Open Order–authoritative orders only */}
+      {/* Status actions: unlocked orders only */}
       {(nextAction || canDeny || showManualConfirmFallback) && !isTerminal && (
         <div className="mt-3 border-t border-oo-light-stone/90 pt-3">
           {actionHint && (
@@ -365,7 +399,8 @@ export function VendorOrderCard({
               <button
                 type="button"
                 onClick={() => handleStatusChange(nextAction.targetState)}
-                disabled={loading}
+                disabled={loading || actionsLocked}
+                title={actionsLocked ? vendorKitchenActionBlockedMessage(kitchenPolicy) : undefined}
                 className={
                   isMennyuControlsPrimary(operatingMode, authorityVo)
                     ? "rounded-lg border border-brand bg-brand px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-hover disabled:opacity-50"

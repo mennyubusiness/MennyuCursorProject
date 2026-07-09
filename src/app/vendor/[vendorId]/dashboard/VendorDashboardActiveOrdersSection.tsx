@@ -17,6 +17,7 @@ export function VendorDashboardActiveOrdersSection({
   initialVendorOrders,
   initialNowMs,
   isDeliverectLive,
+  squareStatusSyncConfigured = null,
   orderRoutingMode,
   posManaged,
   activeCounts,
@@ -25,7 +26,9 @@ export function VendorDashboardActiveOrdersSection({
   vendorDeliverectChannelLinkId: string | null;
   initialVendorOrders: Parameters<typeof VendorDashboardLiveOrders>[0]["initialVendorOrders"];
   initialNowMs: number;
-  isDeliverectLive: boolean;
+  isDeliverectLive: boolean | null;
+  /** true/false when known from server; null/omitted = unknown (neutral sync copy). */
+  squareStatusSyncConfigured?: boolean | null;
   orderRoutingMode: import("@prisma/client").VendorOrderRoutingMode;
   posManaged: boolean;
   activeCounts: ActiveCounts;
@@ -83,6 +86,7 @@ export function VendorDashboardActiveOrdersSection({
         initialVendorOrders={initialVendorOrders}
         initialNowMs={initialNowMs}
         isDeliverectLive={isDeliverectLive}
+        squareStatusSyncConfigured={squareStatusSyncConfigured}
         orderRoutingMode={orderRoutingMode}
         activeGroupsOnly
       />

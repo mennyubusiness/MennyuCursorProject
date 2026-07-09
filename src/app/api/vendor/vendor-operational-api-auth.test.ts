@@ -127,8 +127,19 @@ describe("vendor operational API auth", () => {
         routingStatus: "confirmed",
         fulfillmentStatus: "pending",
         manuallyRecoveredAt: null,
+        statusAuthority: null,
+        lastStatusSource: null,
+        deliverectChannelLinkId: null,
+        deliverectAttempts: 0,
+        squareOrderId: null,
+        deliverectOrderId: null,
         statusHistory: [],
-        vendor: { vendorDashboardToken: "token_a" },
+        order: { updatedAt: new Date() },
+        vendor: {
+          vendorDashboardToken: "token_a",
+          deliverectChannelLinkId: null,
+          orderRoutingMode: "manual_dashboard",
+        },
       };
     }
 
@@ -208,14 +219,17 @@ describe("vendor operational API auth", () => {
     it("rejects Deliverect-authoritative vendor status mutations", async () => {
       mockVendorOrderFindUnique.mockResolvedValue({
         ...voRecord(VENDOR_A),
+        routingStatus: "sent",
         statusAuthority: "pos",
         lastStatusSource: "deliverect_webhook",
         deliverectChannelLinkId: "ch_deliverect",
+        deliverectOrderId: "dct_1",
         deliverectAttempts: 1,
         order: { updatedAt: new Date(Date.now() - 600_000) },
         vendor: {
           vendorDashboardToken: "token_a",
           deliverectChannelLinkId: "ch_deliverect",
+          orderRoutingMode: "deliverect",
         },
       });
       mockVerifyVendorAccess.mockResolvedValue({ ok: true, mode: "session" });
@@ -232,6 +246,37 @@ describe("vendor operational API auth", () => {
       expect(res.status).toBe(409);
       const body = await res.json();
       expect(body.error).toMatch(/Deliverect\/POS/i);
+      expect(mockApplyTransition).not.toHaveBeenCalled();
+    });
+
+    it("rejects Square-managed vendor status mutations", async () => {
+      mockVendorOrderFindUnique.mockResolvedValue({
+        ...voRecord(VENDOR_A),
+        routingStatus: "sent",
+        statusAuthority: "pos",
+        lastStatusSource: "square_webhook",
+        squareOrderId: "sq_123",
+        vendor: {
+          vendorDashboardToken: "token_a",
+          deliverectChannelLinkId: null,
+          orderRoutingMode: "square",
+        },
+      });
+      mockVerifyVendorAccess.mockResolvedValue({ ok: true, mode: "session" });
+
+      const res = await postVendorOrderStatus(
+        new Request("http://localhost/api/vendor/orders/vo/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        }),
+        { params: Promise.resolve({ vendorOrderId: VO_ID }) }
+      );
+
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error).toMatch(/Square/i);
+      expect(body.error).not.toMatch(/Deliverect/i);
       expect(mockApplyTransition).not.toHaveBeenCalled();
     });
   });

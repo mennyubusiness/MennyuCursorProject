@@ -6,9 +6,9 @@ import type { VendorOrderRoutingMode } from "@prisma/client";
 import type { VendorOrderStatusAuthority } from "@/domain/status-authority";
 import { canVendorRejectVendorOrder } from "@/lib/cancel-eligibility";
 import {
-  isDeliverectAuthoritativeVendorOrder,
-  VENDOR_DELIVERECT_CONTROLLED_NOTICE,
-} from "@/lib/deliverect-vendor-order-authority";
+  getKitchenActionPolicy,
+  vendorKitchenActionBlockedMessage,
+} from "@/lib/order-routing/kitchen-action-policy";
 import { isVendorOrderManuallyRecovered } from "@/lib/vendor-order-effective-state";
 import { isManualDashboardRoutingMode } from "@/lib/vendor-order-routing-mode";
 import { getVendorKitchenSkipAheadActions } from "@/lib/vendor-manual-fulfillment";
@@ -31,6 +31,8 @@ export type VendorKitchenOrderCardOrder = {
   fulfillmentStatus: string;
   manuallyRecoveredAt?: string | null;
   statusAuthority?: string | null;
+  squareOrderId?: string | null;
+  deliverectOrderId?: string | null;
   lastExternalStatus?: string | null;
   lastExternalStatusAt?: string | null;
   deliverectChannelLinkId?: string | null;
@@ -66,10 +68,11 @@ export function VendorKitchenOrderCard({
   pickupCode,
   operatingMode,
   nowMs,
-  isDeliverectLive,
+  isDeliverectLive = null,
   orderRoutingMode,
   deliverectRoutingDegraded = false,
   vendorDeliverectChannelLinkId = null,
+  squareStatusSyncConfigured = null,
   needsAttention = false,
   isNewHighlight = false,
   onStatusSuccess,
@@ -79,10 +82,13 @@ export function VendorKitchenOrderCard({
   pickupCode: string;
   operatingMode: VendorOrderOperatingMode;
   nowMs: number;
-  isDeliverectLive: boolean;
+  /** When true, healthy path expects POS sync first. null = unknown for sync copy. */
+  isDeliverectLive?: boolean | null;
   orderRoutingMode: VendorOrderRoutingMode;
   deliverectRoutingDegraded?: boolean;
   vendorDeliverectChannelLinkId?: string | null;
+  /** true/false when known from server; null/omitted = unknown (neutral sync copy). */
+  squareStatusSyncConfigured?: boolean | null;
   needsAttention?: boolean;
   isNewHighlight?: boolean;
   onStatusSuccess?: (
@@ -93,6 +99,7 @@ export function VendorKitchenOrderCard({
   const [loadingTarget, setLoadingTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inFlightRef = useRef(false);
+  const deliverectLive = isDeliverectLive === true;
 
   const manualDashboard = isManualDashboardRoutingMode(orderRoutingMode);
   const loading = loadingTarget !== null;
@@ -108,16 +115,33 @@ export function VendorKitchenOrderCard({
     vendor: { deliverectChannelLinkId: vendorDeliverectChannelLinkId },
   };
 
-  const deliverectAuthoritative = isDeliverectAuthoritativeVendorOrder(
-    authorityVo,
-    orderRoutingMode
+  const kitchenPolicy = getKitchenActionPolicy(
+    {
+      orderRoutingMode,
+      deliverectChannelLinkId: vendorDeliverectChannelLinkId,
+    },
+    {
+      routingStatus: vendorOrder.routingStatus,
+      fulfillmentStatus: vendorOrder.fulfillmentStatus,
+      squareOrderId: vendorOrder.squareOrderId,
+      deliverectOrderId: vendorOrder.deliverectOrderId,
+      manuallyRecoveredAt: vendorOrder.manuallyRecoveredAt,
+      statusAuthority: authorityVo.statusAuthority,
+      deliverectChannelLinkId: authorityVo.deliverectChannelLinkId,
+      vendor: authorityVo.vendor,
+    },
+    {
+      squareStatusSyncConfigured,
+      deliverectRoutingLive: isDeliverectLive,
+    }
   );
-  const nextAction = deliverectAuthoritative
+  const actionsLocked = kitchenPolicy.actionsLocked;
+  const nextAction = actionsLocked
     ? null
     : getVendorOrderKitchenActionLabel(
         vendorOrder.routingStatus,
         vendorOrder.fulfillmentStatus,
-        isDeliverectLive,
+        deliverectLive,
         { isManualDashboard: manualDashboard }
       );
   const skipAheadActions = manualDashboard
@@ -131,9 +155,9 @@ export function VendorKitchenOrderCard({
     deliverectRoutingDegraded === true &&
     vendorOrder.routingStatus === "pending" &&
     vendorOrder.fulfillmentStatus === "pending";
-  const actionHint = deliverectAuthoritative
+  const actionHint = actionsLocked
     ? null
-    : getOperatingModeActionHint(operatingMode, authorityVo, isDeliverectLive, deliverectRoutingDegraded);
+    : getOperatingModeActionHint(operatingMode, authorityVo, deliverectLive, deliverectRoutingDegraded);
   const recovered = isVendorOrderManuallyRecovered(vendorOrder, vendorOrder.statusHistory);
   const canDeny = canVendorRejectVendorOrder(
     {
@@ -199,6 +223,11 @@ export function VendorKitchenOrderCard({
           <span className="inline-block rounded-lg bg-brand/15 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand sm:text-sm">
             {statusBadgeLabel(vendorOrder.fulfillmentStatus)}
           </span>
+          {kitchenPolicy.managedOrderBadge && kitchenPolicy.showProviderManagedState ? (
+            <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-wide text-oo-stone-gray">
+              {kitchenPolicy.managedOrderBadge}
+            </p>
+          ) : null}
           <p className="mt-2 text-lg font-bold tabular-nums text-oo-charcoal">{urgency.ageText}</p>
           <p className="text-xs text-oo-stone-gray sm:text-sm">{urgency.label}</p>
         </div>
@@ -216,7 +245,17 @@ export function VendorKitchenOrderCard({
         </p>
       ) : null}
 
-      {recovered ? (
+      {kitchenPolicy.routingFailed && kitchenPolicy.recoveryCopy ? (
+        <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-950">
+          {kitchenPolicy.recoveryCopy}
+        </p>
+      ) : null}
+
+      {kitchenPolicy.recoveryCopy && recovered ? (
+        <p className="mt-2 text-sm text-amber-900">{kitchenPolicy.recoveryCopy}</p>
+      ) : null}
+
+      {recovered && !kitchenPolicy.recoveryCopy ? (
         <p className="mt-2 text-sm text-amber-900">Manually confirmed — continue in kitchen flow.</p>
       ) : null}
 
@@ -264,13 +303,17 @@ export function VendorKitchenOrderCard({
         </p>
       ) : null}
 
-      {deliverectAuthoritative && !showManualConfirmFallback ? (
+      {kitchenPolicy.showProviderManagedState ? (
         <div className="mt-4 rounded-xl border border-oo-light-stone bg-oo-cream/60 px-4 py-3">
-          <p className="text-sm font-medium text-oo-charcoal">Status controlled by POS</p>
-          <p className="mt-1 text-sm text-oo-stone-gray">{VENDOR_DELIVERECT_CONTROLLED_NOTICE}</p>
+          {kitchenPolicy.managedOrderBadge ? (
+            <p className="text-sm font-medium text-oo-charcoal">{kitchenPolicy.managedOrderBadge}</p>
+          ) : null}
+          {kitchenPolicy.statusSyncCopy ? (
+            <p className="mt-1 text-sm text-oo-stone-gray">{kitchenPolicy.statusSyncCopy}</p>
+          ) : null}
           {vendorOrder.lastExternalStatus ? (
             <p className="mt-2 text-sm text-oo-charcoal">
-              POS: <span className="font-semibold">{vendorOrder.lastExternalStatus}</span>
+              Provider: <span className="font-semibold">{vendorOrder.lastExternalStatus}</span>
             </p>
           ) : null}
         </div>
@@ -286,7 +329,8 @@ export function VendorKitchenOrderCard({
               <button
                 type="button"
                 onClick={() => void handleStatusChange(nextAction.targetState)}
-                disabled={loading}
+                disabled={loading || actionsLocked}
+                title={actionsLocked ? vendorKitchenActionBlockedMessage(kitchenPolicy) : undefined}
                 className={
                   isMennyuControlsPrimary(operatingMode, authorityVo) || manualDashboard
                     ? "min-h-[56px] w-full rounded-xl bg-brand px-5 py-3.5 text-lg font-bold text-white shadow-sm transition hover:bg-brand-hover disabled:opacity-50"
@@ -314,7 +358,8 @@ export function VendorKitchenOrderCard({
                   key={action.targetState}
                   type="button"
                   onClick={() => void handleStatusChange(action.targetState)}
-                  disabled={loading}
+                  disabled={loading || actionsLocked}
+                  title={actionsLocked ? vendorKitchenActionBlockedMessage(kitchenPolicy) : undefined}
                   className="min-h-[44px] flex-1 rounded-xl border border-oo-light-stone bg-oo-cream/80 px-3 py-2.5 text-sm font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-50 sm:flex-none sm:px-4"
                 >
                   {loadingTarget === action.targetState ? "…" : action.label}
@@ -356,7 +401,7 @@ export function VendorKitchenOrderCard({
 export function buildKitchenOperatingMode(
   vo: VendorKitchenOrderCardOrder,
   vendorDeliverectChannelLinkId: string | null,
-  isDeliverectLive: boolean
+  isDeliverectLive: boolean | null | undefined
 ): VendorOrderOperatingMode {
   return getVendorOrderOperatingMode(
     {
@@ -368,6 +413,6 @@ export function buildKitchenOperatingMode(
       vendor: { deliverectChannelLinkId: vendorDeliverectChannelLinkId },
     },
     vo.statusHistory,
-    isDeliverectLive
+    isDeliverectLive === true
   ) as VendorOrderOperatingMode;
 }

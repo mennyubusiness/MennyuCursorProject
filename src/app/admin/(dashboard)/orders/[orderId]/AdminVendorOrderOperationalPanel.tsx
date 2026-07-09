@@ -3,6 +3,9 @@ import {
   providerLabel,
 } from "@/lib/admin-order-detail-ui";
 import type { AdminOrderDetail } from "@/lib/admin-order-detail-query";
+import { getKitchenActionPolicy } from "@/lib/order-routing/kitchen-action-policy";
+import { isRoutingRetryAvailable } from "@/lib/routing-availability";
+import { isSquareWebhookSignatureConfigured } from "@/lib/integrations/square/square-webhook-verify";
 
 type VoRow = AdminOrderDetail["vendorOrders"][number];
 
@@ -25,6 +28,26 @@ function vendorReceivedPlain(vo: VoRow): string {
 export function AdminVendorOrderOperationalPanel({ vo }: { vo: VoRow }) {
   const fulfillment = fulfillmentStatusBadge(vo.fulfillmentStatus);
   const provider = providerLabel(vo);
+  const kitchenPolicy = getKitchenActionPolicy(
+    {
+      orderRoutingMode: vo.vendor.orderRoutingMode,
+      deliverectChannelLinkId: vo.vendor.deliverectChannelLinkId,
+    },
+    {
+      routingStatus: vo.routingStatus,
+      fulfillmentStatus: vo.fulfillmentStatus,
+      squareOrderId: vo.squareOrderId,
+      deliverectOrderId: vo.deliverectOrderId,
+      manuallyRecoveredAt: vo.manuallyRecoveredAt,
+      statusAuthority: vo.statusAuthority,
+      deliverectChannelLinkId: vo.deliverectChannelLinkId,
+      vendor: vo.vendor,
+    },
+    {
+      squareStatusSyncConfigured: isSquareWebhookSignatureConfigured(),
+      deliverectRoutingLive: isRoutingRetryAvailable(),
+    }
+  );
 
   return (
     <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -50,6 +73,35 @@ export function AdminVendorOrderOperationalPanel({ vo }: { vo: VoRow }) {
               : "Manual routing (no POS link)"}
         </dd>
       </div>
+      {kitchenPolicy.showProviderManagedState && kitchenPolicy.managedOrderBadge ? (
+        <div className="sm:col-span-2">
+          <dt className="text-xs font-medium text-oo-stone-gray">Kitchen lock</dt>
+          <dd className="mt-0.5 text-oo-charcoal">
+            <span className="font-medium">{kitchenPolicy.managedOrderBadge}</span>
+            {kitchenPolicy.kitchenLockTooltip ? (
+              <span className="mt-1 block text-xs text-oo-stone-gray">{kitchenPolicy.kitchenLockTooltip}</span>
+            ) : null}
+            {kitchenPolicy.statusSyncCopy ? (
+              <span className="mt-1 block text-xs text-oo-stone-gray">
+                Status sync:{" "}
+                {kitchenPolicy.statusSyncAvailable === true
+                  ? "configured"
+                  : kitchenPolicy.statusSyncAvailable === false
+                    ? "not configured"
+                    : "availability unknown"}{" "}
+                — {kitchenPolicy.statusSyncCopy}
+              </span>
+            ) : null}
+          </dd>
+        </div>
+      ) : null}
+      {kitchenPolicy.routingFailed && kitchenPolicy.recoveryCopy ? (
+        <div className="sm:col-span-2">
+          <p className="rounded border border-amber-200 bg-amber-50/70 px-2.5 py-2 text-xs text-amber-950">
+            {kitchenPolicy.recoveryCopy}
+          </p>
+        </div>
+      ) : null}
       {vo.squareOrderId?.trim() ? (
         <div className="sm:col-span-2">
           <dt className="text-xs font-medium text-oo-stone-gray">Square order id</dt>

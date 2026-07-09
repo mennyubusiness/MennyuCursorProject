@@ -80,6 +80,8 @@ export function VendorKitchenBoard({
 
   posManaged = false,
 
+  squareStatusSyncConfigured = null,
+
 }: {
 
   vendorId: string;
@@ -90,7 +92,7 @@ export function VendorKitchenBoard({
 
   initialNowMs: number;
 
-  isDeliverectLive: boolean;
+  isDeliverectLive: boolean | null;
 
   orderRoutingMode: import("@prisma/client").VendorOrderRoutingMode;
 
@@ -101,6 +103,9 @@ export function VendorKitchenBoard({
   posWarning: string | null;
 
   posManaged?: boolean;
+
+  /** true/false when known from server; null/omitted = unknown (neutral sync copy). */
+  squareStatusSyncConfigured?: boolean | null;
 
 }) {
 
@@ -379,6 +384,8 @@ export function VendorKitchenBoard({
                             deliverectRoutingDegraded={vo.deliverectRoutingDegraded === true}
 
                             vendorDeliverectChannelLinkId={vendorDeliverectChannelLinkId}
+
+                            squareStatusSyncConfigured={squareStatusSyncConfigured}
 
                             needsAttention={needsAttention}
 

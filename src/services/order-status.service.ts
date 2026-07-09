@@ -23,6 +23,13 @@ import {
 } from "@/lib/vendor-order-effective-state";
 import type { ParentOrderStatus, VendorOrderFulfillmentStatus, VendorOrderRoutingStatus } from "@/domain/types";
 import { shouldApplyStatusUpdate } from "@/domain/status-authority";
+import {
+  canVendorDashboardMutateFromPolicy,
+  vendorKitchenActionBlockedMessage,
+  getKitchenActionPolicy,
+} from "@/lib/order-routing/kitchen-action-policy";
+import { isRoutingRetryAvailable } from "@/lib/routing-availability";
+import { isSquareWebhookSignatureConfigured } from "@/lib/integrations/square/square-webhook-verify";
 import { validateTransition, targetToUpdate, type VendorOrderTargetState } from "@/domain/vendor-order-transition";
 import {
   isVendorDashboardTransitionNoOp,
@@ -668,6 +675,16 @@ export type ApplyVendorOrderTransitionOpts = {
 const VENDOR_DASHBOARD_POS_BLOCK_MESSAGE =
   "This order is controlled by Deliverect/POS. Status updates must come from the POS.";
 
+function kitchenIntegrationForTransition(): {
+  squareStatusSyncConfigured: boolean;
+  deliverectRoutingLive: boolean;
+} {
+  return {
+    squareStatusSyncConfigured: isSquareWebhookSignatureConfigured(),
+    deliverectRoutingLive: isRoutingRetryAvailable(),
+  };
+}
+
 /**
  * Apply a single state transition for a vendor order (shared by dev simulator and vendor dashboard).
  * Validates transition, updates VendorOrder, appends history, recomputes parent order status.
@@ -689,6 +706,8 @@ export async function applyVendorOrderTransition(
       statusAuthority: true,
       lastStatusSource: true,
       deliverectChannelLinkId: true,
+      squareOrderId: true,
+      deliverectOrderId: true,
       statusHistory: { select: { source: true } },
       vendor: {
         select: { deliverectChannelLinkId: true, orderRoutingMode: true },
@@ -703,17 +722,52 @@ export async function applyVendorOrderTransition(
   const isManualDashboard = orderRoutingMode === "manual_dashboard";
 
   if (legacySourceToStatusSource(source) === "vendor_dashboard" && !isManualDashboard) {
-    const prec = shouldApplyStatusUpdate(
-      {
-        statusAuthority: vo.statusAuthority,
-        lastStatusSource: vo.lastStatusSource,
-        deliverectChannelLinkId: vo.deliverectChannelLinkId,
-        vendor: vo.vendor,
-        routingStatus: vo.routingStatus,
-        manuallyRecoveredAt: vo.manuallyRecoveredAt,
-      },
-      "vendor_dashboard"
-    );
+    const authoritySnapshot = {
+      statusAuthority: vo.statusAuthority,
+      lastStatusSource: vo.lastStatusSource,
+      deliverectChannelLinkId: vo.deliverectChannelLinkId,
+      vendor: vo.vendor,
+      routingStatus: vo.routingStatus,
+      manuallyRecoveredAt: vo.manuallyRecoveredAt,
+    };
+    const kitchenOrder = {
+      routingStatus: vo.routingStatus,
+      fulfillmentStatus: vo.fulfillmentStatus,
+      squareOrderId: vo.squareOrderId,
+      deliverectOrderId: vo.deliverectOrderId,
+      manuallyRecoveredAt: vo.manuallyRecoveredAt,
+      statusAuthority: vo.statusAuthority,
+      deliverectChannelLinkId: vo.deliverectChannelLinkId,
+      vendor: vo.vendor,
+    };
+    const integration = kitchenIntegrationForTransition();
+    if (
+      !canVendorDashboardMutateFromPolicy(
+        {
+          orderRoutingMode,
+          deliverectChannelLinkId: vo.vendor.deliverectChannelLinkId,
+        },
+        kitchenOrder,
+        integration
+      )
+    ) {
+      const policy = getKitchenActionPolicy(
+        {
+          orderRoutingMode,
+          deliverectChannelLinkId: vo.vendor.deliverectChannelLinkId,
+        },
+        kitchenOrder,
+        integration
+      );
+      return {
+        success: false,
+        error: vendorKitchenActionBlockedMessage(policy),
+        code: "POS_MANAGED_USE_FALLBACK",
+        precedenceReason: "POS_MANAGED_USE_FALLBACK",
+      };
+    }
+
+    const prec = shouldApplyStatusUpdate(authoritySnapshot, "vendor_dashboard");
     if (!prec.allowed) {
       return {
         success: false,

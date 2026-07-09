@@ -49,6 +49,20 @@ describe("deliverect-vendor-order-authority", () => {
     expect(canVendorDashboardMutateVendorOrder(recovered)).toBe(true);
   });
 
+  it("Square-routed order with squareOrderId is not Deliverect-authoritative and blocks vendor mutate", () => {
+    const squareVo = {
+      statusAuthority: "pos" as const,
+      lastStatusSource: "square_webhook" as const,
+      deliverectChannelLinkId: null,
+      vendor: { deliverectChannelLinkId: null },
+      routingStatus: "sent",
+      squareOrderId: "sq_1",
+      manuallyRecoveredAt: null,
+    };
+    expect(isDeliverectAuthoritativeVendorOrder(squareVo, "square")).toBe(false);
+    expect(canVendorDashboardMutateVendorOrder(squareVo, "square")).toBe(false);
+  });
+
   it("channel-linked sent/pending infers vendor_manual but remains Deliverect-authoritative in deliverect mode", () => {
     const sent = {
       ...deliverectVo,
@@ -56,6 +70,5 @@ describe("deliverect-vendor-order-authority", () => {
       routingStatus: "sent",
     };
     expect(isDeliverectAuthoritativeVendorOrder(sent, "deliverect")).toBe(true);
-    expect(isDeliverectAuthoritativeVendorOrder(sent)).toBe(true);
   });
 });

@@ -60,6 +60,7 @@ export default async function VendorDashboardPage({
           initialVendorOrders={ctx.initialVendorOrdersForClient}
           initialNowMs={ctx.initialNowMs}
           isDeliverectLive={ctx.isDeliverectLive}
+          squareStatusSyncConfigured={ctx.squareStatusSyncConfigured}
           orderRoutingMode={ctx.vendorRecord.orderRoutingMode}
           posManaged={ctx.posManaged}
           activeCounts={ctx.activeCounts}

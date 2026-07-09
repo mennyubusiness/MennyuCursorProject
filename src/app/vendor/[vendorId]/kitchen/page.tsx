@@ -7,6 +7,7 @@ import {
   vendorKitchenStatusWarning,
 } from "@/lib/vendor-order-routing-mode";
 import { loadSquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
+import { isSquareWebhookSignatureConfigured } from "@/lib/integrations/square/square-webhook-verify";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import {
@@ -68,6 +69,7 @@ export default async function VendorKitchenPage({
       ordersPaused={vendor.mennyuOrdersPaused ?? false}
       posWarning={posWarning}
       posManaged={isVendorPosManagedForUi(vendor.orderRoutingMode, posUi)}
+      squareStatusSyncConfigured={isSquareWebhookSignatureConfigured()}
     />
   );
 }

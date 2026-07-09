@@ -426,15 +426,15 @@ export function vendorKitchenModeStatusLine(input: {
     return "Orders appear here when customers order through Open Order.";
   }
   if (isSquareRoutingMode(orderRoutingMode)) {
-    return "Kitchen actions here update Open Order directly.";
+    return "Routed orders are managed in Square — status syncs back to Open Order.";
   }
   if (posState === "connected") {
-    return "POS connected — status may sync from kitchen system";
+    return "POS connected — manage routed orders in your kitchen system";
   }
   if (posState === "needs_attention") {
-    return "POS needs attention — confirm orders in Open Order if needed";
+    return "POS needs attention — confirm orders in Open Order if routing did not complete";
   }
-  return "POS not connected — confirm orders in Open Order if needed";
+  return "POS not connected — confirm orders in Open Order if routing did not complete";
 }
 
 export function vendorKitchenModeNotice(input: {
@@ -450,18 +450,103 @@ export function vendorKitchenModeNotice(input: {
 
   if (isSquareRoutingMode(orderRoutingMode)) {
     if (squareInjectionOperational) {
-      return "Square routing is ready. Paid Open Order orders are sent to Square as prepaid pickup orders. Kitchen actions here update Open Order directly.";
+      return "Square routing is ready. Paid orders are sent to Square — manage kitchen status in Square. Updates sync back to Open Order when configured.";
     }
     return "Square routing is selected but not ready yet. Orders remain in Open Order until Square setup is complete or routing is retried.";
   }
 
   if (isDeliverectRoutingMode(orderRoutingMode)) {
     if (posState === "connected") {
-      return "Orders are managed through Deliverect/POS. Kitchen actions may be limited.";
+      return "Orders are managed through Deliverect/POS. Kitchen actions in Open Order are limited for routed orders.";
     }
-    return "Deliverect is configured, but kitchen actions update Open Order directly.";
+    return "Deliverect is configured. Routed orders should be managed in your POS; Open Order updates when the provider sends status.";
   }
 
+  return null;
+}
+
+export function getKitchenProviderDisplayName(
+  mode: VendorOrderRoutingMode | string | null | undefined
+): string {
+  return getProviderDisplayProfile(mode).displayName;
+}
+
+export function getKitchenManagedOrderBadge(
+  mode: VendorOrderRoutingMode | string | null | undefined
+): string | null {
+  if (isManualDashboardRoutingMode(mode)) return "Managed in Open Order";
+  if (isSquareRoutingMode(mode)) return "Managed in Square";
+  if (isDeliverectRoutingMode(mode)) return "Managed in Deliverect";
+  return null;
+}
+
+/** true = sync known on; false = sync known off; null = unknown (do not claim missing). */
+export type KitchenStatusSyncConfigured = boolean | null;
+
+export function getKitchenVendorLockMessage(input: {
+  provider: VendorOrderRoutingMode | string;
+  statusSyncAvailable: KitchenStatusSyncConfigured;
+}): string {
+  const { provider, statusSyncAvailable } = input;
+  if (isSquareRoutingMode(provider)) {
+    if (statusSyncAvailable === true) {
+      return "Manage this order in Square. Updates from Square will sync back to Open Order.";
+    }
+    if (statusSyncAvailable === false) {
+      return "Manage this order in Square. Webhook sync is not configured, so Open Order may not update automatically.";
+    }
+    return "Manage this order in Square. Open Order will update when status sync is available.";
+  }
+  if (isDeliverectRoutingMode(provider)) {
+    if (statusSyncAvailable === true) {
+      return "Manage this order through Deliverect/POS. Status updates from Deliverect/POS update Open Order.";
+    }
+    if (statusSyncAvailable === false) {
+      return "Manage this order through Deliverect/POS. Open Order status may need admin recovery if the provider does not send updates.";
+    }
+    return "Manage this order through Deliverect/POS. Open Order will update when status sync is available.";
+  }
+  return "This order is managed externally. Update it in your connected system.";
+}
+
+export function getKitchenStatusSyncCopy(input: {
+  provider: VendorOrderRoutingMode | string;
+  statusSyncAvailable: KitchenStatusSyncConfigured;
+}): string | null {
+  const { provider, statusSyncAvailable } = input;
+  if (isManualDashboardRoutingMode(provider)) return null;
+  if (isSquareRoutingMode(provider)) {
+    if (statusSyncAvailable === true) {
+      return "Status updates from Square will update Open Order.";
+    }
+    if (statusSyncAvailable === false) {
+      return "Status updates should be made in Square. Webhook sync is not configured, so Open Order may not update automatically.";
+    }
+    return "Open Order will update when status sync is available.";
+  }
+  if (isDeliverectRoutingMode(provider)) {
+    if (statusSyncAvailable === true) {
+      return "Status updates from Deliverect/POS update Open Order.";
+    }
+    if (statusSyncAvailable === false) {
+      return "Orders are managed through Deliverect/POS. Open Order status may need admin recovery if the provider does not send updates.";
+    }
+    return "Open Order will update when status sync is available.";
+  }
+  return null;
+}
+
+export function getKitchenRecoveryCopy(input: {
+  provider: VendorOrderRoutingMode | string;
+  routingFailed: boolean;
+  recovered: boolean;
+}): string | null {
+  if (input.recovered) {
+    return "Manually recovered — continue managing this order in Open Order.";
+  }
+  if (input.routingFailed) {
+    return "Routing failed. Open Order still has the paid order.";
+  }
   return null;
 }
 

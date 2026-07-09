@@ -29,6 +29,7 @@ import { getVendorOrdersBoardData, serializeVendorOrdersForBoard } from "@/lib/v
 import { summarizeVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
 import { resolveVendorHoursTimezone } from "@/lib/vendor-customer-ordering-hours";
 import { isRoutingRetryAvailable } from "@/lib/routing-availability";
+import { isSquareWebhookSignatureConfigured } from "@/lib/integrations/square/square-webhook-verify";
 import {
   isDeliverectRoutingMode,
   isSquareRoutingMode,
@@ -335,6 +336,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       vendorRecord.orderRoutingMode,
       isRoutingRetryAvailable()
     ),
+    squareStatusSyncConfigured: isSquareWebhookSignatureConfigured(),
     lastMenuSyncAt: vendorRecord.deliverectAutoMapLastAt?.toISOString() ?? null,
     hoursSummary,
   };

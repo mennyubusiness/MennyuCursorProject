@@ -5,23 +5,23 @@ import { describe, expect, it } from "vitest";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../../../..");
 
-describe("VendorOrderCard Deliverect authority UI", () => {
+describe("VendorOrderCard kitchen action lock UI", () => {
   const src = readFileSync(
     join(root, "src/app/vendor/[vendorId]/dashboard/VendorOrderCard.tsx"),
     "utf8"
   );
 
-  it("shows POS-controlled notice for Deliverect-authoritative orders", () => {
-    expect(src).toMatch(/VENDOR_DELIVERECT_CONTROLLED_NOTICE/);
-    expect(src).toMatch(/deliverectAuthoritative/);
-    expect(src).toMatch(/POS status:/);
+  it("uses kitchen action policy for provider-managed orders", () => {
+    expect(src).toMatch(/getKitchenActionPolicy/);
+    expect(src).toMatch(/kitchenPolicy\.showProviderManagedState/);
+    expect(src).toMatch(/kitchenPolicy\.managedOrderBadge/);
   });
 
-  it("suppresses next action when Deliverect-authoritative", () => {
-    expect(src).toMatch(/deliverectAuthoritative\s*\?\s*null\s*:\s*getVendorOrderNextAction/);
+  it("suppresses next action when kitchen actions are locked", () => {
+    expect(src).toMatch(/actionsLocked\s*\?\s*null\s*:\s*getVendorOrderNextAction/);
   });
 
-  it("blocks deny when Deliverect-authoritative via canVendorReject", () => {
+  it("blocks deny when locked via canVendorReject", () => {
     expect(src).toMatch(/canVendorRejectVendorOrder/);
   });
 });

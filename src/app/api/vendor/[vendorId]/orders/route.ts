@@ -74,6 +74,8 @@ export async function GET(
       },
       deliverectAttempts: true,
       deliverectChannelLinkId: true,
+      squareOrderId: true,
+      deliverectOrderId: true,
       statusAuthority: true,
       lastExternalStatus: true,
       lastExternalStatusAt: true,

@@ -53,6 +53,8 @@ type VendorOrderFromApi = {
   lastExternalStatus?: string | null;
   lastExternalStatusAt?: string | null;
   deliverectChannelLinkId?: string | null;
+  squareOrderId?: string | null;
+  deliverectOrderId?: string | null;
   totalCents: number;
   tipCents: number;
   order: {
@@ -99,7 +101,8 @@ export function VendorDashboardLiveOrders({
   vendorDeliverectChannelLinkId = null,
   initialVendorOrders,
   initialNowMs,
-  isDeliverectLive = false,
+  isDeliverectLive = null,
+  squareStatusSyncConfigured = null,
   orderRoutingMode = "manual_dashboard",
   activeGroupsOnly = false,
 }: {
@@ -108,8 +111,10 @@ export function VendorDashboardLiveOrders({
   initialVendorOrders: VendorOrderFromApi[];
   /** Stable "now" from server for initial render so SSR and hydration match. */
   initialNowMs: number;
-  /** Pass from server (e.g. isRoutingRetryAvailable()) so POS vs Open Order mode is correct. */
-  isDeliverectLive?: boolean;
+  /** Pass from server (e.g. isRoutingRetryAvailable()) so POS vs Open Order mode is correct. null = unknown. */
+  isDeliverectLive?: boolean | null;
+  /** true/false when known from server; null/omitted = unknown (neutral sync copy). */
+  squareStatusSyncConfigured?: boolean | null;
   orderRoutingMode?: import("@prisma/client").VendorOrderRoutingMode;
   /** When true, only render new/preparing/ready groups (dashboard preview). */
   activeGroupsOnly?: boolean;
@@ -234,7 +239,7 @@ export function VendorDashboardLiveOrders({
                     vendor: { deliverectChannelLinkId: vendorDeliverectChannelLinkId },
                   },
                   vo.statusHistory,
-                  isDeliverectLive
+                  isDeliverectLive === true
                 ) as VendorOrderOperatingMode;
                 const urgency = getVendorOrderUrgency(new Date(vo.order.createdAt), nowMs);
                 const readyWaitMinutes = getReadyWaitMinutes(
@@ -258,6 +263,7 @@ export function VendorDashboardLiveOrders({
                     vendorDeliverectChannelLinkId={vendorDeliverectChannelLinkId}
                     orderRoutingMode={orderRoutingMode}
                     isDeliverectLive={isDeliverectLive}
+                    squareStatusSyncConfigured={squareStatusSyncConfigured}
                     deliverectRoutingDegraded={vo.deliverectRoutingDegraded === true}
                     onStatusSuccess={onStatusSuccess}
                     pickupCode={pickupCode}
@@ -271,6 +277,8 @@ export function VendorDashboardLiveOrders({
                       lastExternalStatus: vo.lastExternalStatus ?? undefined,
                       lastExternalStatusAt: vo.lastExternalStatusAt ?? undefined,
                       deliverectChannelLinkId: vo.deliverectChannelLinkId ?? undefined,
+                      squareOrderId: vo.squareOrderId ?? undefined,
+                      deliverectOrderId: vo.deliverectOrderId ?? undefined,
                       statusHistory: vo.statusHistory?.map((h) => ({ source: h.source })) ?? undefined,
                       totalCents: vo.totalCents,
                       tipCents: vo.tipCents ?? 0,
