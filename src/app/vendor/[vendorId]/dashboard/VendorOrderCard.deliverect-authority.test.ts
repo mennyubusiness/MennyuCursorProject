@@ -17,6 +17,16 @@ describe("VendorOrderCard kitchen action lock UI", () => {
     expect(src).toMatch(/kitchenPolicy\.managedOrderBadge/);
   });
 
+  it("shows only a compact managed badge without provider status details", () => {
+    expect(src).not.toMatch(/Provider status:/);
+    expect(src).not.toMatch(/statusSyncCopy/);
+    expect(src).not.toMatch(/toLocaleString\(/);
+    expect(src).toMatch(/kitchenPolicy\.managedOrderBadge/);
+    // Type may still carry lastExternalStatusAt from board payload; it must not be rendered.
+    expect(src).not.toMatch(/vendorOrder\.lastExternalStatusAt/);
+    expect(src).not.toMatch(/vendorOrder\.lastExternalStatus[^A-Za-z]/);
+  });
+
   it("suppresses next action when kitchen actions are locked", () => {
     expect(src).toMatch(/actionsLocked\s*\?\s*null\s*:\s*getVendorOrderNextAction/);
   });

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DashboardEmptyState, DashboardSection } from "@/components/dashboard";
 import { KITCHEN_COLUMN_LABELS } from "@/lib/vendor-orders-board";
 import { VENDOR_NO_ACTIVE_ORDERS_COPY, VENDOR_POS_BOARD_READONLY_COPY } from "@/lib/vendor-operational-copy";
+import { vendorKitchenCtaLabel, vendorKitchenPageHelper } from "@/lib/integrations/provider-display";
 import { VendorDashboardLiveOrders } from "./VendorDashboardLiveOrders";
 
 type ActiveCounts = {
@@ -34,6 +35,8 @@ export function VendorDashboardActiveOrdersSection({
   activeCounts: ActiveCounts;
 }) {
   const totalActive = activeCounts.new + activeCounts.preparing + activeCounts.ready;
+  const kitchenCta = vendorKitchenCtaLabel(orderRoutingMode);
+  const kitchenHelper = vendorKitchenPageHelper(orderRoutingMode);
 
   return (
     <DashboardSection
@@ -47,7 +50,7 @@ export function VendorDashboardActiveOrdersSection({
             href={`/vendor/${vendorId}/kitchen`}
             className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover"
           >
-            Open kitchen mode
+            {kitchenCta}
           </Link>
           <Link
             href={`/vendor/${vendorId}/orders`}
@@ -67,9 +70,9 @@ export function VendorDashboardActiveOrdersSection({
         ))}
       </div>
 
-      {posManaged ? (
+      {posManaged || kitchenHelper ? (
         <p className="rounded-lg bg-oo-cream/80 px-3 py-2 text-sm text-oo-stone-gray">
-          {VENDOR_POS_BOARD_READONLY_COPY}
+          {kitchenHelper ?? VENDOR_POS_BOARD_READONLY_COPY}
         </p>
       ) : null}
 

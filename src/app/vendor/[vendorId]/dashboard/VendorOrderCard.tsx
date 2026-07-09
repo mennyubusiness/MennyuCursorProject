@@ -360,32 +360,14 @@ export function VendorOrderCard({
         </p>
       ) : null}
 
-      {kitchenPolicy.showProviderManagedState && !isTerminal && !isCancelledOrFailed && !showManualConfirmFallback ? (
-        <div className="mt-3 rounded-lg border border-oo-light-stone bg-oo-cream/50 px-3 py-2.5">
-          {kitchenPolicy.managedOrderBadge ? (
-            <p className="text-xs font-medium text-oo-charcoal">{kitchenPolicy.managedOrderBadge}</p>
-          ) : null}
-          {kitchenPolicy.statusSyncCopy ? (
-            <p className="mt-1 text-xs text-oo-stone-gray">{kitchenPolicy.statusSyncCopy}</p>
-          ) : null}
-          {(vendorOrder.lastExternalStatus || vendorOrder.lastExternalStatusAt) && (
-            <p className="mt-1.5 text-xs text-oo-charcoal">
-              {vendorOrder.lastExternalStatus && (
-                <span className="font-medium">Provider status: {vendorOrder.lastExternalStatus}</span>
-              )}
-              {vendorOrder.lastExternalStatusAt && (
-                <span className="text-oo-stone-gray">
-                  {vendorOrder.lastExternalStatus ? " · " : ""}
-                  Updated{" "}
-                  {new Intl.DateTimeFormat("en-US", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  }).format(new Date(vendorOrder.lastExternalStatusAt))}
-                </span>
-              )}
-            </p>
-          )}
-        </div>
+      {kitchenPolicy.showProviderManagedState &&
+      kitchenPolicy.managedOrderBadge &&
+      !isTerminal &&
+      !isCancelledOrFailed &&
+      !showManualConfirmFallback ? (
+        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-oo-stone-gray">
+          {kitchenPolicy.managedOrderBadge}
+        </p>
       ) : null}
 
       {/* Status actions: unlocked orders only */}

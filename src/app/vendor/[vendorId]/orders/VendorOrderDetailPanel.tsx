@@ -9,11 +9,11 @@ import {
 } from "@/lib/vendor-order-vendor-display";
 import { formatVendorCustomerPhone } from "@/lib/vendor-order-next-action";
 import { getVendorOrderOperatingMode } from "@/lib/vendor-order-operating-mode";
+import { getKitchenManagedOrderBadge } from "@/lib/integrations/provider-display";
 import {
-  isSquareRoutedVendorOrderWithSync,
-  VENDOR_DELIVERECT_CONTROLLED_NOTICE,
-  VENDOR_SQUARE_SYNC_NOTICE,
-} from "@/lib/deliverect-vendor-order-authority";
+  isDeliverectRoutingMode,
+  isSquareRoutingMode,
+} from "@/lib/vendor-order-routing-mode";
 
 export type VendorOrderDetailData = {
   id: string;
@@ -84,6 +84,12 @@ export function VendorOrderDetailPanel({
   );
   const phone = formatVendorCustomerPhone(vendorOrder.order.customerPhone);
 
+  const managedBadge =
+    (posManaged && isDeliverectRoutingMode(orderRoutingMode)) ||
+    (isSquareRoutingMode(orderRoutingMode) && Boolean(vendorOrder.squareOrderId?.trim()))
+      ? getKitchenManagedOrderBadge(orderRoutingMode)
+      : null;
+
   return (
     <div className="rounded-xl border border-oo-light-stone bg-oo-cream/40 p-4 text-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -92,27 +98,17 @@ export function VendorOrderDetailPanel({
           <p className="mt-1 font-mono text-lg font-bold text-oo-charcoal">{pickupCode}</p>
           <p className="mt-1 font-medium text-oo-charcoal">{headline}</p>
           <p className="mt-1 text-oo-stone-gray">{routingLabel}</p>
+          {managedBadge ? (
+            <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-oo-stone-gray">
+              {managedBadge}
+            </p>
+          ) : null}
         </div>
         <div className="text-right text-xs text-oo-stone-gray">
           <p>{formatVendorOrderTimelineTime(vendorOrder.order.createdAt)}</p>
           {phone ? <p className="mt-1">{phone}</p> : null}
         </div>
       </div>
-
-      {posManaged ? (
-        <p className="mt-3 rounded-lg bg-oo-warm-white px-3 py-2 text-oo-stone-gray">
-          {VENDOR_DELIVERECT_CONTROLLED_NOTICE}
-        </p>
-      ) : null}
-
-      {isSquareRoutedVendorOrderWithSync({
-        orderRoutingMode,
-        squareOrderId: vendorOrder.squareOrderId,
-      }) ? (
-        <p className="mt-3 rounded-lg bg-oo-warm-white px-3 py-2 text-oo-stone-gray">
-          {VENDOR_SQUARE_SYNC_NOTICE}
-        </p>
-      ) : null}
 
       {vendorOrder.order.orderNotes?.trim() ? (
         <p className="mt-3 text-oo-stone-gray">

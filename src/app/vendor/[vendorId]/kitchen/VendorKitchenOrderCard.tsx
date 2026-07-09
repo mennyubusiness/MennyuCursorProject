@@ -233,6 +233,8 @@ export function VendorKitchenOrderCard({
         </div>
       </div>
 
+      {/* Compact provider badge only — no sync copy / provider status / timestamps on vendor cards. */}
+
       {isNewHighlight ? (
         <p className="mt-3 rounded-lg bg-brand/10 px-3 py-2 text-sm font-semibold text-brand">
           New order
@@ -301,22 +303,6 @@ export function VendorKitchenOrderCard({
         <p className="mt-3 break-words rounded-lg border border-oo-light-stone bg-oo-cream/80 px-3 py-2 text-sm text-oo-charcoal">
           <span className="font-semibold">Order note:</span> {vendorOrder.order.orderNotes}
         </p>
-      ) : null}
-
-      {kitchenPolicy.showProviderManagedState ? (
-        <div className="mt-4 rounded-xl border border-oo-light-stone bg-oo-cream/60 px-4 py-3">
-          {kitchenPolicy.managedOrderBadge ? (
-            <p className="text-sm font-medium text-oo-charcoal">{kitchenPolicy.managedOrderBadge}</p>
-          ) : null}
-          {kitchenPolicy.statusSyncCopy ? (
-            <p className="mt-1 text-sm text-oo-stone-gray">{kitchenPolicy.statusSyncCopy}</p>
-          ) : null}
-          {vendorOrder.lastExternalStatus ? (
-            <p className="mt-2 text-sm text-oo-charcoal">
-              Provider: <span className="font-semibold">{vendorOrder.lastExternalStatus}</span>
-            </p>
-          ) : null}
-        </div>
       ) : null}
 
       {(nextAction || canDeny || showManualConfirmFallback || skipAheadActions.length > 0) && (

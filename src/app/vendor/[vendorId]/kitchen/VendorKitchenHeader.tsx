@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { isManualDashboardRoutingMode } from "@/lib/vendor-order-routing-mode";
+import {
+  isManualDashboardRoutingMode,
+  isSquareRoutingMode,
+  isDeliverectRoutingMode,
+} from "@/lib/vendor-order-routing-mode";
+import {
+  vendorKitchenPageHelper,
+  vendorKitchenPageTitle,
+} from "@/lib/integrations/provider-display";
 import { VendorKitchenPauseToggle } from "./VendorKitchenPauseToggle";
 import { VendorKitchenTestSoundButton } from "./VendorKitchenTestSoundButton";
 
@@ -23,6 +31,10 @@ export function VendorKitchenHeader({
   posManaged?: boolean;
 }) {
   const manualDashboard = isManualDashboardRoutingMode(orderRoutingMode);
+  const integrated =
+    isSquareRoutingMode(orderRoutingMode) || isDeliverectRoutingMode(orderRoutingMode);
+  const title = vendorKitchenPageTitle(orderRoutingMode);
+  const helper = vendorKitchenPageHelper(orderRoutingMode);
 
   return (
     <header className="sticky top-0 z-30 border-b border-oo-light-stone bg-oo-warm-white/95 backdrop-blur-sm">
@@ -30,17 +42,21 @@ export function VendorKitchenHeader({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-oo-stone-gray">{vendorName}</p>
           <h1 className="mt-0.5 text-xl font-bold tracking-tight text-oo-charcoal sm:text-2xl">
-            Kitchen Mode
+            {title}
           </h1>
+          {helper ? (
+            <p className="mt-1 text-sm text-oo-stone-gray">{helper}</p>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <VendorKitchenTestSoundButton />
+          {!integrated ? <VendorKitchenTestSoundButton /> : null}
           <VendorKitchenPauseToggle
             vendorId={vendorId}
             initialPaused={intakePaused}
             onPausedChange={onIntakePausedChange}
             posManaged={posManaged}
+            variant="kitchen"
           />
           <Link
             href={`/vendor/${vendorId}/dashboard`}
@@ -57,6 +73,7 @@ export function VendorKitchenHeader({
         </div>
       ) : null}
 
+      {/* Setup/not-ready only — never the long “routing is ready / manage kitchen status” banner. */}
       {!manualDashboard && posWarning ? (
         <div className="border-t border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950 sm:px-6">
           {posWarning}

@@ -30,7 +30,8 @@ describe("vendor orders ledger layout", () => {
     expect(page).toContain("VendorOrdersWorkbench");
     expect(workbench).toContain("VendorOrdersLedger");
     expect(ledger).toContain("VENDOR_ORDERS_LEDGER_FILTERS");
-    expect(ledger).toContain("Open Kitchen Mode");
+    expect(ledger).toContain("vendorKitchenCtaLabel");
+    expect(ledger).toContain("vendorKitchenInlineLinkLabel");
     expect(ledger).toContain("VendorKitchenPauseToggle");
     expect(ledger).not.toContain("VendorDashboardLiveOrders");
     expect(ledger).not.toContain("filterVendorOrdersForHistory");
@@ -40,8 +41,8 @@ describe("vendor orders ledger layout", () => {
 describe("vendor orders nav cleanup", () => {
   it("removes Issues from vendor area nav", () => {
     const nav = readVendor("VendorAreaNav.tsx");
+    expect(nav).toContain("vendorKitchenNavLabel");
     expect(nav).not.toContain('`${base}/issues`');
-    expect(nav).toContain("Kitchen");
   });
 });
 

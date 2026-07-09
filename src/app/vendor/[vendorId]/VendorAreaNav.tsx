@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { VendorOrderRoutingMode } from "@prisma/client";
+import { vendorKitchenNavLabel } from "@/lib/integrations/provider-display";
 import {
   vendorMenuManagementNavLabel,
   vendorMenuManagementPath,
@@ -83,7 +84,7 @@ export function VendorAreaNav({
         </div>
         <div className="ml-auto hidden gap-1 sm:flex">
           <Link href={`${base}/kitchen`} className="oo-dash-nav-link">
-            Kitchen
+            {vendorKitchenNavLabel(orderRoutingMode)}
           </Link>
         </div>
       </div>

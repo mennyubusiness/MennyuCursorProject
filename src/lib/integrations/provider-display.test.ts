@@ -18,6 +18,11 @@ import {
   integratedOrderRoutingLabel,
   menuImportDraftReviewBanner,
   vendorKitchenModeNotice,
+  vendorKitchenPageTitle,
+  vendorKitchenPageHelper,
+  vendorKitchenCtaLabel,
+  vendorKitchenNavLabel,
+  vendorKitchenInlineLinkLabel,
   vendorMenuImportsPageSubtitle,
   vendorMenuManagementPageSubtitle,
 } from "@/lib/integrations/provider-display";
@@ -63,14 +68,14 @@ describe("provider display registry", () => {
     expect(menuImportDraftReviewBanner("OTHER", "Poke Sea")).toMatch(/menu import is waiting/i);
   });
 
-  it("shows square kitchen notice only for square vendors", () => {
+  it("shows square kitchen notice only for square vendors that are not ready", () => {
     expect(
       vendorKitchenModeNotice({
         orderRoutingMode: "square",
         posState: "connected",
         squareInjectionOperational: true,
       })
-    ).toMatch(/Square routing is ready/i);
+    ).toBeNull();
 
     expect(
       vendorKitchenModeNotice({
@@ -92,13 +97,36 @@ describe("provider display registry", () => {
         orderRoutingMode: "deliverect",
         posState: "connected",
       })
-    ).toMatch(/Deliverect\/POS/i);
+    ).toBeNull();
+
     expect(
       vendorKitchenModeNotice({
         orderRoutingMode: "deliverect",
-        posState: "connected",
+        posState: "needs_attention",
+      })
+    ).toMatch(/Deliverect needs attention/i);
+    expect(
+      vendorKitchenModeNotice({
+        orderRoutingMode: "deliverect",
+        posState: "needs_attention",
       })
     ).not.toMatch(/Square/i);
+  });
+
+  it("labels kitchen page as orders monitor for integrated vendors", () => {
+    expect(vendorKitchenPageTitle("square")).toBe("Orders monitor");
+    expect(vendorKitchenPageTitle("deliverect")).toBe("Orders monitor");
+    expect(vendorKitchenPageTitle("manual_dashboard")).toBe("Kitchen Mode");
+    expect(vendorKitchenPageHelper("square")).toBe("Manage order status in Square.");
+    expect(vendorKitchenPageHelper("deliverect")).toBe("Manage order status in Deliverect.");
+    expect(vendorKitchenPageHelper("manual_dashboard")).toBeNull();
+    expect(vendorKitchenCtaLabel("square")).toBe("View orders monitor");
+    expect(vendorKitchenCtaLabel("manual_dashboard")).toBe("Open kitchen mode");
+    expect(vendorKitchenNavLabel("square")).toBe("Orders monitor");
+    expect(vendorKitchenNavLabel("deliverect")).toBe("Orders monitor");
+    expect(vendorKitchenNavLabel("manual_dashboard")).toBe("Kitchen");
+    expect(vendorKitchenInlineLinkLabel("square")).toBe("Orders monitor");
+    expect(vendorKitchenInlineLinkLabel("manual_dashboard")).toBe("Kitchen Mode");
   });
 
   it("gates admin tools by routing mode", () => {

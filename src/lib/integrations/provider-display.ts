@@ -426,17 +426,24 @@ export function vendorKitchenModeStatusLine(input: {
     return "Orders appear here when customers order through Open Order.";
   }
   if (isSquareRoutingMode(orderRoutingMode)) {
-    return "Routed orders are managed in Square — status syncs back to Open Order.";
+    return "Manage order status in Square.";
   }
-  if (posState === "connected") {
-    return "POS connected — manage routed orders in your kitchen system";
+  if (isDeliverectRoutingMode(orderRoutingMode)) {
+    if (posState === "connected") {
+      return "Manage order status in Deliverect.";
+    }
+    if (posState === "needs_attention") {
+      return "Deliverect needs attention — confirm orders in Open Order if routing did not complete.";
+    }
+    return "Deliverect is not connected — confirm orders in Open Order if routing did not complete.";
   }
-  if (posState === "needs_attention") {
-    return "POS needs attention — confirm orders in Open Order if routing did not complete";
-  }
-  return "POS not connected — confirm orders in Open Order if routing did not complete";
+  return "Orders appear here when customers order through Open Order.";
 }
 
+/**
+ * Full-width kitchen banner copy. Ready/operational Square & Deliverect no longer show a banner —
+ * the page title + compact per-order badge are enough. Only setup/not-ready warnings remain.
+ */
 export function vendorKitchenModeNotice(input: {
   orderRoutingMode: VendorOrderRoutingMode | string | null | undefined;
   posState: VendorPosUiState;
@@ -450,19 +457,71 @@ export function vendorKitchenModeNotice(input: {
 
   if (isSquareRoutingMode(orderRoutingMode)) {
     if (squareInjectionOperational) {
-      return "Square routing is ready. Paid orders are sent to Square — manage kitchen status in Square. Updates sync back to Open Order when configured.";
+      return null;
     }
-    return "Square routing is selected but not ready yet. Orders remain in Open Order until Square setup is complete or routing is retried.";
+    return "Square routing is selected but not ready yet. Orders remain in Open Order until Square setup is complete.";
   }
 
   if (isDeliverectRoutingMode(orderRoutingMode)) {
     if (posState === "connected") {
-      return "Orders are managed through Deliverect/POS. Kitchen actions in Open Order are limited for routed orders.";
+      return null;
     }
-    return "Deliverect is configured. Routed orders should be managed in your POS; Open Order updates when the provider sends status.";
+    if (posState === "needs_attention") {
+      return "Deliverect needs attention — confirm orders in Open Order if routing did not complete.";
+    }
+    return null;
   }
 
   return null;
+}
+
+/** Page title for vendor kitchen / orders monitor. */
+export function vendorKitchenPageTitle(
+  mode: VendorOrderRoutingMode | string | null | undefined
+): string {
+  if (isSquareRoutingMode(mode) || isDeliverectRoutingMode(mode)) {
+    return "Orders monitor";
+  }
+  return "Kitchen Mode";
+}
+
+/** Short helper under the kitchen page title for integrated vendors. */
+export function vendorKitchenPageHelper(
+  mode: VendorOrderRoutingMode | string | null | undefined
+): string | null {
+  if (isSquareRoutingMode(mode)) return "Manage order status in Square.";
+  if (isDeliverectRoutingMode(mode)) return "Manage order status in Deliverect.";
+  return null;
+}
+
+/** Dashboard CTA label into kitchen / monitor. */
+export function vendorKitchenCtaLabel(
+  mode: VendorOrderRoutingMode | string | null | undefined
+): string {
+  if (isSquareRoutingMode(mode) || isDeliverectRoutingMode(mode)) {
+    return "View orders monitor";
+  }
+  return "Open kitchen mode";
+}
+
+/** Short nav link label for kitchen / monitor. */
+export function vendorKitchenNavLabel(
+  mode: VendorOrderRoutingMode | string | null | undefined
+): string {
+  if (isSquareRoutingMode(mode) || isDeliverectRoutingMode(mode)) {
+    return "Orders monitor";
+  }
+  return "Kitchen";
+}
+
+/** Footer / inline link text pointing at kitchen / monitor. */
+export function vendorKitchenInlineLinkLabel(
+  mode: VendorOrderRoutingMode | string | null | undefined
+): string {
+  if (isSquareRoutingMode(mode) || isDeliverectRoutingMode(mode)) {
+    return "Orders monitor";
+  }
+  return "Kitchen Mode";
 }
 
 export function getKitchenProviderDisplayName(

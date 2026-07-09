@@ -6,6 +6,11 @@ import { useSearchParams } from "next/navigation";
 
 import { DashboardEmptyState } from "@/components/dashboard";
 import { useVendorOrdersPoll } from "@/hooks/useVendorOrdersPoll";
+import {
+  vendorKitchenCtaLabel,
+  vendorKitchenInlineLinkLabel,
+  vendorKitchenPageHelper,
+} from "@/lib/integrations/provider-display";
 import { VENDOR_POS_BOARD_READONLY_COPY } from "@/lib/vendor-operational-copy";
 import {
   filterVendorOrdersLedger,
@@ -45,6 +50,9 @@ export function VendorOrdersLedger({
 }) {
   const searchParams = useSearchParams();
   const initialFilter = parseVendorOrdersLedgerFilter(searchParams.get("filter"));
+  const kitchenCta = vendorKitchenCtaLabel(orderRoutingMode);
+  const kitchenInline = vendorKitchenInlineLinkLabel(orderRoutingMode);
+  const kitchenHelper = vendorKitchenPageHelper(orderRoutingMode);
 
   const [ledgerFilter, setLedgerFilter] = useState<VendorOrdersLedgerFilter>(initialFilter);
   const [dateFilter, setDateFilter] = useState<VendorOrdersLedgerDateFilter>("all");
@@ -134,7 +142,7 @@ export function VendorOrdersLedger({
             href={`/vendor/${vendorId}/kitchen`}
             className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-hover"
           >
-            Open Kitchen Mode
+            {kitchenCta}
           </Link>
           <VendorKitchenPauseToggle
             vendorId={vendorId}
@@ -147,7 +155,11 @@ export function VendorOrdersLedger({
 
       {posManaged ? (
         <p className="rounded-xl border border-oo-light-stone bg-oo-cream/60 px-4 py-3 text-sm text-oo-stone-gray">
-          {VENDOR_POS_BOARD_READONLY_COPY}
+          {kitchenHelper ?? VENDOR_POS_BOARD_READONLY_COPY}
+        </p>
+      ) : kitchenHelper ? (
+        <p className="rounded-xl border border-oo-light-stone bg-oo-cream/60 px-4 py-3 text-sm text-oo-stone-gray">
+          {kitchenHelper}
         </p>
       ) : null}
 
@@ -255,11 +267,11 @@ export function VendorOrdersLedger({
       )}
 
       <p className="text-xs text-oo-stone-gray sm:text-sm">
-        For live service, use{" "}
+        For live service, open the{" "}
         <Link href={`/vendor/${vendorId}/kitchen`} className="font-semibold text-brand hover:underline">
-          Kitchen Mode
+          {kitchenInline}
         </Link>
-        . Status changes happen there for active orders.
+        {kitchenHelper ? "." : ". Status changes happen there for active orders."}
       </p>
     </div>
   );

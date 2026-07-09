@@ -206,12 +206,9 @@ describe("vendor-facing routing UI helpers", () => {
     expect(isVendorPosManagedForUi("square", "connected")).toBe(false);
     expect(isVendorDeliverectLiveForUi("square", true)).toBe(false);
     expect(vendorKitchenStatusWarning("square", "connected")).toContain("not ready yet");
-  });
-
-  it("shows square kitchen notice when injection is operational", () => {
     expect(
       vendorKitchenStatusWarning("square", "connected", { squareInjectionOperational: true })
-    ).toMatch(/Square routing is ready/i);
+    ).toBeNull();
   });
 });
 

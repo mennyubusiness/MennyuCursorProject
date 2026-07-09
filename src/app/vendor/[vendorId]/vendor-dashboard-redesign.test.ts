@@ -24,8 +24,8 @@ describe("vendor dashboard operating layout", () => {
     expect(nav).toMatch(/dashboard.*Orders.*Hours.*Payouts.*Setup.*Vendor Profile/s);
     expect(nav).toContain("vendorMenuManagementNavLabel");
     expect(nav).toContain("menu/imports");
+    expect(nav).toContain("vendorKitchenNavLabel");
     expect(nav).not.toContain('"analytics"');
-    expect(nav).toContain("Kitchen");
   });
 
   it("routes vendor root to dashboard", () => {
@@ -33,12 +33,12 @@ describe("vendor dashboard operating layout", () => {
     expect(index).toContain("/dashboard");
   });
 
-  it("shows Kitchen mode only in the active orders section, not the page header", () => {
+  it("shows Kitchen / orders monitor CTA only in the active orders section, not the page header", () => {
     const page = readVendor("dashboard/page.tsx");
     const active = readVendor("dashboard/VendorDashboardActiveOrdersSection.tsx");
     expect(page).not.toMatch(/actions=\{/);
     expect(page).not.toContain("Kitchen mode");
-    expect(active).toContain("Open kitchen mode");
+    expect(active).toContain("vendorKitchenCtaLabel");
   });
 });
 
