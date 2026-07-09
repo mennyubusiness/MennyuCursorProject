@@ -180,6 +180,92 @@ describe("vendor setup integrations view", () => {
     expect(blocked.blockers[0]).toMatch(/Square catalog/i);
   });
 
+  it("hub surface splits connected inactive providers into connected section", () => {
+    const model = buildVendorSetupIntegrationsView({
+      vendorId: "v1",
+      orderRoutingMode: "deliverect",
+      menuSource: "deliverect",
+      readiness: readinessSummary({ routingMode: "deliverect" }),
+      menuReadiness: {
+        menuSource: "deliverect",
+        orderRoutingMode: "deliverect",
+        hasPublishedMenuVersion: true,
+        hasOperationalItems: true,
+      },
+      squareHealth: readyHealth("square"),
+      deliverectRoutingHealth: readyHealth("deliverect"),
+      surface: "hub",
+    });
+
+    expect(model.connectedIntegrations.some((card) => card.id === "square")).toBe(true);
+    expect(model.availableIntegrations.some((card) => card.id === "square")).toBe(false);
+  });
+
+  it("hub surface adds deeper routing actions per provider", () => {
+    const manual = buildVendorSetupIntegrationsView({
+      vendorId: "v1",
+      orderRoutingMode: "manual_dashboard",
+      menuSource: "open_order",
+      readiness: readinessSummary({ routingMode: "manual_dashboard" }),
+      menuReadiness: {
+        menuSource: "open_order",
+        orderRoutingMode: "manual_dashboard",
+        hasPublishedMenuVersion: true,
+        hasOperationalItems: true,
+      },
+      squareHealth: null,
+      deliverectRoutingHealth: null,
+      surface: "hub",
+    });
+    expect(manual.activeRouting.actions.map((a) => a.href)).toEqual([
+      "/vendor/v1/kitchen",
+      "/vendor/v1/dashboard",
+    ]);
+
+    const deliverect = buildVendorSetupIntegrationsView({
+      vendorId: "v1",
+      orderRoutingMode: "deliverect",
+      menuSource: "deliverect",
+      readiness: readinessSummary({ routingMode: "deliverect" }),
+      menuReadiness: {
+        menuSource: "deliverect",
+        orderRoutingMode: "deliverect",
+        hasPublishedMenuVersion: true,
+        hasOperationalItems: true,
+      },
+      squareHealth: null,
+      deliverectRoutingHealth: readyHealth("deliverect"),
+      surface: "hub",
+    });
+    expect(deliverect.activeRouting.actions.map((a) => a.label)).toEqual([
+      "Manage POS settings",
+      "View menu imports",
+    ]);
+
+    const square = buildVendorSetupIntegrationsView({
+      vendorId: "v1",
+      orderRoutingMode: "square",
+      menuSource: "open_order",
+      readiness: readinessSummary({ routingMode: "square" }),
+      menuReadiness: {
+        menuSource: "open_order",
+        orderRoutingMode: "square",
+        hasPublishedMenuVersion: false,
+        hasOperationalItems: true,
+        hasSquarePublishedMenu: true,
+      },
+      squareHealth: readyHealth("square"),
+      deliverectRoutingHealth: null,
+      surface: "hub",
+    });
+    expect(square.activeRouting.actions.map((a) => a.href)).toEqual([
+      "/vendor/v1/integrations/square",
+      "/vendor/v1/menu/imports",
+    ]);
+  });
+});
+
+describe("inactive provider blocker rules", () => {
   it("treats inactive providers as non-blocking for setup readiness", () => {
     expect(vendorSetupPageShowsInactiveProviderAsBlocker("deliverect", "square")).toBe(false);
     expect(vendorSetupPageShowsInactiveProviderAsBlocker("square", "deliverect")).toBe(false);
@@ -190,14 +276,18 @@ describe("vendor setup integrations view", () => {
   });
 });
 
+function readIntegrationsHubPage(): string {
+  return readFileSync(join(vendorDir, "integrations/page.tsx"), "utf8");
+}
+
 describe("vendor setup page layout", () => {
   it("does not render generic Integration readiness card with Square connection row", () => {
     const setup = readSetupPage();
     expect(setup).not.toContain("VendorIntegrationReadinessCard");
     expect(setup).not.toContain("Square connection");
     expect(setup).not.toContain("VendorSquareSetupSummary");
-    expect(setup).toContain("VendorSetupIntegrationsSection");
-    expect(setup).toContain("buildVendorSetupIntegrationsView");
+    expect(setup).toContain("VendorIntegrationsSection");
+    expect(setup).toContain("loadVendorIntegrationsViewModel");
   });
 
   it("places integrations section below setup checklists", () => {
@@ -206,7 +296,7 @@ describe("vendor setup page layout", () => {
     const acceptingChecklistIndex = setup.indexOf(
       '<VendorSetupChecklist items={acceptingOrders} title="Required to accept orders" />'
     );
-    const integrationsIndex = setup.indexOf("<VendorSetupIntegrationsSection model={integrationsModel} />");
+    const integrationsIndex = setup.indexOf("<VendorIntegrationsSection model={integrations.model}");
     expect(appearanceIndex).toBeGreaterThan(-1);
     expect(acceptingChecklistIndex).toBeGreaterThan(appearanceIndex);
     expect(integrationsIndex).toBeGreaterThan(acceptingChecklistIndex);
@@ -228,6 +318,98 @@ describe("vendor setup page layout", () => {
       "utf8"
     );
     expect(section).toContain("Available integrations");
+    expect(section).toContain("Connected integrations");
     expect(section).toContain("<details");
+  });
+});
+
+describe("vendor integrations hub page", () => {
+  it("replaces VendorIntegrationReadinessCard with shared provider-aware section", () => {
+    const hub = readIntegrationsHubPage();
+    expect(hub).not.toContain("VendorIntegrationReadinessCard");
+    expect(hub).not.toContain("Square connection");
+    expect(hub).not.toContain("Provider connections");
+    expect(hub).toContain("VendorIntegrationsSection");
+    expect(hub).toContain('surface="hub"');
+    expect(hub).toContain("loadVendorIntegrationsViewModel");
+  });
+
+  it("does not show cross-provider missing warnings on deliverect hub", () => {
+    const model = buildVendorSetupIntegrationsView({
+      vendorId: "v1",
+      orderRoutingMode: "deliverect",
+      menuSource: "deliverect",
+      readiness: readinessSummary({ routingMode: "deliverect" }),
+      menuReadiness: {
+        menuSource: "deliverect",
+        orderRoutingMode: "deliverect",
+        hasPublishedMenuVersion: true,
+        hasOperationalItems: true,
+      },
+      squareHealth: notReadyHealth("square", ["Square is not connected for this vendor"]),
+      deliverectRoutingHealth: readyHealth("deliverect"),
+      surface: "hub",
+    });
+
+    expect(model.activeRouting.title).toBe("Deliverect");
+    expect(
+      [...model.connectedIntegrations, ...model.availableIntegrations].every(
+        (card) => card.status !== "needs_attention"
+      )
+    ).toBe(true);
+    expect(
+      model.availableIntegrations.find((card) => card.id === "square")?.statusLabel
+    ).not.toMatch(/Needs attention/i);
+  });
+
+  it("does not show cross-provider missing warnings on square hub", () => {
+    const model = buildVendorSetupIntegrationsView({
+      vendorId: "v1",
+      orderRoutingMode: "square",
+      menuSource: "open_order",
+      readiness: readinessSummary({ routingMode: "square" }),
+      menuReadiness: {
+        menuSource: "open_order",
+        orderRoutingMode: "square",
+        hasPublishedMenuVersion: false,
+        hasOperationalItems: true,
+        hasSquarePublishedMenu: true,
+      },
+      squareHealth: readyHealth("square"),
+      deliverectRoutingHealth: notReadyHealth("deliverect", ["Deliverect not connected"]),
+      surface: "hub",
+    });
+
+    expect(model.activeRouting.title).toBe("Square");
+    expect(
+      [...model.connectedIntegrations, ...model.availableIntegrations].every(
+        (card) => card.status !== "needs_attention"
+      )
+    ).toBe(true);
+  });
+
+  it("does not require POS providers for manual hub", () => {
+    const model = buildVendorSetupIntegrationsView({
+      vendorId: "v1",
+      orderRoutingMode: "manual_dashboard",
+      menuSource: "open_order",
+      readiness: readinessSummary({ routingMode: "manual_dashboard" }),
+      menuReadiness: {
+        menuSource: "open_order",
+        orderRoutingMode: "manual_dashboard",
+        hasPublishedMenuVersion: true,
+        hasOperationalItems: true,
+      },
+      squareHealth: notReadyHealth("square", ["Square is not connected for this vendor"]),
+      deliverectRoutingHealth: notReadyHealth("deliverect", ["Deliverect not connected"]),
+      surface: "hub",
+    });
+
+    expect(model.activeRouting.status).toBe("ready");
+    expect(
+      [...model.connectedIntegrations, ...model.availableIntegrations].every(
+        (card) => card.status !== "needs_attention"
+      )
+    ).toBe(true);
   });
 });

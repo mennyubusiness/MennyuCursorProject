@@ -8,7 +8,9 @@ Use this checklist before enabling Square connect for real vendors on production
 - Merchant profile + location discovery/selection
 - Connection health checks
 - Square catalog/menu import
-- Square order injection (when admin-enabled + prerequisites met + `SQUARE_ROUTING_LIVE=true`)
+- Square order injection (when `orderRoutingMode=square` + prerequisites met + `SQUARE_ROUTING_LIVE=true`)
+
+QA runbook: [square-order-injection-qa.md](./square-order-injection-qa.md)
 
 ## What Square connection does **not** do
 

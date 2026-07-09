@@ -40,13 +40,14 @@ Customer payment remains on Stripe. Square receives an `EXTERNAL` payment record
 
 ### Square injection gates (all required)
 
-1. `Vendor.orderRoutingMode === "square"`
-2. `Vendor.squareOrderRoutingEnabled === true` (admin toggle; **not** auto-enabled on menu publish)
-3. Square connection healthy (OAuth token valid, integration active)
-4. Selected Square location (`VendorIntegrationConnection.externalLocationId`)
-5. Published live menu with `sourcePayloadKind === "square_catalog_v1"`
-6. Per-order: every line item and modifier has an active `ProviderEntityMapping`
-7. `SQUARE_ROUTING_LIVE=true` for live API calls (otherwise payload is built and stored without send)
+1. `Vendor.orderRoutingMode === "square"` (single vendor-level control)
+2. Square connection healthy (OAuth token valid, integration active, `ORDERS_WRITE` + `PAYMENTS_WRITE` scopes)
+3. Selected Square location (`VendorIntegrationConnection.externalLocationId`)
+4. Published live menu with `sourcePayloadKind === "square_catalog_v1"`
+5. Per-order: every line item and modifier has an active `ProviderEntityMapping`
+6. `SQUARE_ROUTING_LIVE=true` for live API calls (otherwise routing fails with a clear issue; no silent fallback)
+
+> **Deprecated:** `squareOrderRoutingEnabled` is ignored. Do not reintroduce a second Square enable toggle.
 
 Hook point: `submitVendorOrder()` in `routing.service.ts`, called post-Stripe payment success.
 
@@ -126,7 +127,7 @@ After `CreateOrder`, Open Order records payment via Square Payments API:
 
 This marks the Square order as paid for POS/kitchen visibility. Stripe checkout, payouts, and pod payouts are unchanged.
 
-**Known limitation:** External payment amount uses Square-calculated `order.total_money`, which may differ slightly from the OO/Stripe charge due to catalog pricing or tax rounding.
+**Known limitation:** External payment amount uses Square-calculated `order.total_money`, which may differ slightly from the OO/Stripe charge due to catalog pricing or tax rounding. See **QA hardening — total comparison** below for admin visibility and optional block threshold.
 
 ---
 
@@ -146,9 +147,11 @@ On failure:
 
 - Paid OO order remains visible in admin/vendor tools
 - `routing_failure` issue surfaced
-- Admin **Retry routing** available when `SQUARE_ROUTING_LIVE=true` (or Deliverect live)
+- Admin **Retry Square routing** when safe (idempotency keys prevent duplicate Square orders)
+- Payment-only retry when `squareOrderId` exists but EXTERNAL payment failed
 - Manual recovery unchanged
 - No automatic refund
+- **No silent fallback** to manual or Deliverect routing
 
 ---
 
@@ -156,18 +159,50 @@ On failure:
 
 ### Admin vendor rescue (`/admin/vendors/{id}`)
 
-- Square order routing enable/disable toggle
+- Routing mode selector (`orderRoutingMode`)
 - Prerequisites checklist via `loadSquareOrderRoutingReadiness()`
+- Debug: `/admin/vendors/{vendorId}/square-routing-debug`
 
 ### Admin order detail
 
-- Operational panel: Square provider label, Square order id, routing error
-- Collapsible **Square routing details**: status, submit time, mapping issues, raw payload/response
-- Existing retry routing + manual recovery actions
+- Provider: Square, routing status, Square order/payment IDs
+- Submitted at / last attempted at, attempt count
+- Total comparison with mismatch warning
+- Contextual failure copy (scopes, kill switch, mappings)
+- Collapsible payload/response audit
+- Retry Square routing when eligible
+- Debug: `/admin/orders/{orderId}/square-routing-debug`
 
 ### Vendor dashboard
 
-- Routing status labels via existing `vendorRoutingStatusLabel()` (no Square-specific POS lock like Deliverect)
+- Square-specific labels: "Sent to Square", "Square routing failed — Open Order still has the paid order"
+- No raw Square payloads; no Deliverect POS lock language for Square vendors
+
+---
+
+## QA hardening (2026-07-08)
+
+See **`docs/reports/square-order-injection-qa-hardening.md`** for the full sprint report.
+
+### Sandbox QA runbook
+
+**`docs/integrations/square-order-injection-qa.md`** — step-by-step sandbox test plan before beta.
+
+### Total comparison
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SQUARE_TOTAL_MISMATCH_WARN_CENTS` | `1` | Admin warning when \|OO food+tax − Square total\| ≥ threshold |
+| `SQUARE_TOTAL_MISMATCH_BLOCK_CENTS` | unset | Optional hard block |
+
+Reconciliation stored in `lastSquarePayload.reconciliation`. OO/Stripe remains payment/payout source of truth.
+
+### Retry safety
+
+- Stable keys: `oo:sq:order:{vendorOrderId}`, `oo:sq:pay:{vendorOrderId}`
+- Partial persist of `squareOrderId` after CreateOrder before payment
+- Payment-only retry path when order exists but routing not `sent`
+- One `vendorOrderId` → at most one Square order
 
 ---
 
@@ -187,20 +222,18 @@ On failure:
 | 10 | Vendor OAuth token used | `square-order.service.test.ts` |
 | 11 | Idempotency prevents duplicate orders | `square-order.service.test.ts` |
 | 12 | API failure creates routing failure | `square-order.service.test.ts` |
-| 13–14 | Deliverect/manual unchanged | `routing.service.test.ts` |
-| 15 | Build passes | `npm run build` |
+| 13 | Payment-only retry (no duplicate CreateOrder) | `square-order.service.test.ts` |
+| 14 | Partial persist before payment failure | `square-order.service.test.ts` |
+| 15 | Total mismatch warning | `square-order-total-comparison.test.ts` |
+| 16 | Retry eligibility (Square) | `admin-needs-attention-actions.square.test.ts` |
+| 17–18 | Deliverect/manual unchanged | `routing.service.test.ts`, `provider-ux-regression.test.ts` |
+| 19 | Build passes | `npm run build` |
 
-**74** Square/routing-related unit tests passing.
+**112** Square/routing-related unit tests passing.
 
-### Manual QA checklist
+### Manual QA
 
-1. Connect Square sandbox vendor, import + publish menu
-2. Admin: set routing mode `square`, enable Square order routing
-3. Place test order with Stripe test card
-4. Verify `VendorOrder.squareOrderId` populated in admin
-5. Verify order visible in Square sandbox dashboard
-6. Disable `SQUARE_ROUTING_LIVE` → confirm payload-only skip (no API call)
-7. Remove a mapping → confirm `routing_failure` issue, no partial send
+Use **`docs/integrations/square-order-injection-qa.md`** for the full sandbox runbook.
 
 ---
 
@@ -209,16 +242,20 @@ On failure:
 | Variable | Purpose |
 |----------|---------|
 | `SQUARE_ROUTING_LIVE=true` | Enable live Square CreateOrder + EXTERNAL payment |
+| `SQUARE_TOTAL_MISMATCH_WARN_CENTS` | Admin warning threshold (default `1`) |
+| `SQUARE_TOTAL_MISMATCH_BLOCK_CENTS` | Optional hard block threshold |
 | Square OAuth vars | Existing Square connection (unchanged) |
+
+See **`docs/ops/order-routing-env-vars.md`** for full routing env reference.
 
 ---
 
 ## Known limitations
 
 1. One-way injection — no Square webhook reconciliation
-2. Square order total may differ from Stripe charge for EXTERNAL payment amount
+2. Square order total may differ from Stripe charge for EXTERNAL payment amount (admin comparison is advisory by default)
 3. `SQUARE_ROUTING_LIVE` must be set per environment for live sends
-4. Square order routing must be **manually enabled** by admin after menu publish
+4. `squareOrderRoutingEnabled` is deprecated — use `orderRoutingMode=square` only
 5. Deliverect and manual routing paths untouched
 
 ---

@@ -36,6 +36,15 @@ describe("vendorRoutingStatusLabel", () => {
     expect(vendorRoutingStatusLabel("sent", "pending")).toBe("Sent to POS");
     expect(vendorRoutingStatusLabel("failed", "pending")).toBe("Could not send to POS");
   });
+
+  it("uses Square-specific copy for square vendors", () => {
+    expect(vendorRoutingStatusLabel("sent", "pending", { orderRoutingMode: "square" })).toBe(
+      "Sent to Square"
+    );
+    expect(vendorRoutingStatusLabel("failed", "pending", { orderRoutingMode: "square" })).toBe(
+      "Square routing failed — Open Order still has the paid order"
+    );
+  });
 });
 
 describe("vendorFulfillmentStatusLabel", () => {

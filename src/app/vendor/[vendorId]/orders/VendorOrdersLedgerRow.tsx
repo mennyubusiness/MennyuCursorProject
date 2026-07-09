@@ -49,6 +49,7 @@ export function VendorOrdersLedgerRow({
   vendorId,
   vendorOrder,
   issues,
+  orderRoutingMode,
   isDeliverectLive,
   posManaged,
   expanded,
@@ -60,6 +61,7 @@ export function VendorOrdersLedgerRow({
   issues: VendorOrderIssueRow[];
   isDeliverectLive: boolean;
   posManaged: boolean;
+  orderRoutingMode: import("@prisma/client").VendorOrderRoutingMode;
   expanded: boolean;
   onToggleExpanded: () => void;
   onIssuesUpdated: () => void;
@@ -76,10 +78,12 @@ export function VendorOrdersLedgerRow({
     routingStatus: vendorOrder.routingStatus,
     fulfillmentStatus: vendorOrder.fulfillmentStatus,
     needsAttention,
+    orderRoutingMode,
   });
   const routingLabel = vendorRoutingStatusLabel(
     vendorOrder.routingStatus,
-    vendorOrder.fulfillmentStatus
+    vendorOrder.fulfillmentStatus,
+    { orderRoutingMode }
   );
   const phone = formatVendorCustomerPhone(vendorOrder.order.customerPhone);
   const issueLabel = issueBadgeLabel(issues);
@@ -154,6 +158,7 @@ export function VendorOrdersLedgerRow({
             }}
             posManaged={posManaged}
             isDeliverectLive={isDeliverectLive}
+            orderRoutingMode={orderRoutingMode}
           />
           {issues.length > 0 ? (
             <div className="space-y-2">

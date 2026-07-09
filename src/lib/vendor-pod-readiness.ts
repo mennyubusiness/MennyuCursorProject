@@ -6,7 +6,7 @@ import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { PosConnectionStatus, VendorMenuSource, VendorOrderRoutingMode } from "@prisma/client";
 import type { VendorAvailabilityInput } from "@/lib/vendor-availability";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
-import { hasValidVendorCustomerOrderingHours } from "@/lib/vendor-customer-ordering-hours";
+import { hasCustomerOrderingHoursConfigured } from "@/lib/vendor-customer-ordering-hours";
 import { VENDOR_HOURS_PUBLIC_COPY } from "@/lib/vendor-operational-copy";
 import {
   isDeliverectRoutingMode,
@@ -63,6 +63,8 @@ export type ReadinessChecklistItem = {
   actionHref?: string;
   actionLabel?: string;
   description?: string;
+  /** Live/informational row — excluded from setup readiness counts (e.g. currently open/closed). */
+  informational?: boolean;
 };
 
 export type ReadinessBlockingReason = {
@@ -168,7 +170,7 @@ export function isVendorMenuReady(menu: VendorMenuReadinessSummary): boolean {
 }
 
 export function isVendorCustomerOrderingHoursReady(customerOrderingHours: unknown): boolean {
-  return hasValidVendorCustomerOrderingHours(customerOrderingHours);
+  return hasCustomerOrderingHoursConfigured(customerOrderingHours);
 }
 
 /** Pod assignment is satisfied by active membership; pending invites only matter when not yet in a pod. */
@@ -468,7 +470,7 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
       complete: hoursComplete,
       owner: "vendor",
       description: hoursComplete
-        ? "Customer ordering hours set."
+        ? "Ordering hours are configured."
         : VENDOR_HOURS_PUBLIC_COPY,
       actionHref: `/vendor/${vendorId}/hours`,
       actionLabel: "Set hours",

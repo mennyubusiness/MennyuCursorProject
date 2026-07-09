@@ -52,10 +52,12 @@ export function VendorOrderDetailPanel({
   vendorOrder,
   posManaged,
   isDeliverectLive = false,
+  orderRoutingMode,
 }: {
   vendorOrder: VendorOrderDetailData;
   posManaged: boolean;
   isDeliverectLive?: boolean;
+  orderRoutingMode?: import("@prisma/client").VendorOrderRoutingMode | null;
 }) {
   const pickupCode = getPickupCode(vendorOrder.order.id);
   const operatingMode = getVendorOrderOperatingMode(
@@ -68,10 +70,12 @@ export function VendorOrderDetailPanel({
     routingStatus: vendorOrder.routingStatus,
     fulfillmentStatus: vendorOrder.fulfillmentStatus,
     needsAttention,
+    orderRoutingMode,
   });
   const routingLabel = vendorRoutingStatusLabel(
     vendorOrder.routingStatus,
-    vendorOrder.fulfillmentStatus
+    vendorOrder.fulfillmentStatus,
+    { orderRoutingMode }
   );
   const phone = formatVendorCustomerPhone(vendorOrder.order.customerPhone);
 

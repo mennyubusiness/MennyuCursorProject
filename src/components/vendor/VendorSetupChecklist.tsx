@@ -12,6 +12,7 @@ function ownerLabel(owner: ReadinessChecklistItem["owner"]): string {
 }
 
 export function vendorSetupItemStatusLabel(item: ReadinessChecklistItem): string {
+  if (item.informational) return "Live status";
   if (item.complete) return "Ready";
   if (item.key === "pod_invite" && item.description?.includes("pending invitation")) {
     return "Waiting for vendor acceptance";
@@ -105,18 +106,26 @@ export function VendorSetupChecklist({
               <li key={item.key} className="flex gap-3">
                 <span
                   className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                    item.complete ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900"
+                    item.informational
+                      ? "bg-oo-warm-white text-oo-stone-gray"
+                      : item.complete
+                        ? "bg-emerald-100 text-emerald-900"
+                        : "bg-amber-100 text-amber-900"
                   }`}
                   aria-hidden
                 >
-                  {item.complete ? "✓" : index + 1}
+                  {item.informational ? "·" : item.complete ? "✓" : index + 1}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <span className="font-medium text-oo-charcoal">{item.label}</span>
                     <span
                       className={`text-xs ${
-                        item.complete ? "text-emerald-800" : "text-amber-900"
+                        item.informational
+                          ? "text-oo-stone-gray"
+                          : item.complete
+                            ? "text-emerald-800"
+                            : "text-amber-900"
                       }`}
                     >
                       {statusLabel}

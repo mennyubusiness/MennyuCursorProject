@@ -40,6 +40,19 @@ GET /api/vendor/{vendorId}/square/oauth/start?debug=1&minimal_scope=1
 
 Admin injection diagnostics: `/admin/vendors/{vendorId}` panel or `/admin/vendors/{vendorId}/square-routing-debug`.
 
+Order-level Square debug: `/admin/orders/{orderId}/square-routing-debug`.
+
+### Total mismatch reconciliation
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `SQUARE_TOTAL_MISMATCH_WARN_CENTS` | `1` | Admin warning when OO food+tax total differs from Square `order.total_money` |
+| `SQUARE_TOTAL_MISMATCH_BLOCK_CENTS` | unset | Optional hard routing failure when mismatch ≥ threshold |
+
+OO/Stripe remains source of truth for customer payment and payouts.
+
+Sandbox QA runbook: `docs/integrations/square-order-injection-qa.md`.
+
 ## Deliverect / manual
 
 Unchanged by Square scope updates. See `ROUTING_MODE`, `DELIVERECT_*`, and Deliverect docs for Deliverect-specific routing.

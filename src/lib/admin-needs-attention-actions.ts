@@ -11,6 +11,7 @@ export type VendorOrderRecoverySnapshot = {
   routingStatus: string;
   fulfillmentStatus: string;
   deliverectOrderId?: string | null;
+  squareOrderId?: string | null;
   manuallyRecoveredAt?: Date | string | null;
   squareLastError?: string | null;
 };
@@ -65,6 +66,13 @@ export function canRetryRouting(
 
   if (vo.routingStatus === "failed") return true;
   if (vo.routingStatus === "pending") return true;
+
+  if (orderRoutingMode === "square") {
+    if (vo.routingStatus === "sent" && vo.squareOrderId) return false;
+    if (vo.routingStatus === "sent" && !vo.squareOrderId) return true;
+    return false;
+  }
+
   /** Sent without external id may still need a resubmit; sent with id must not duplicate Deliverect. */
   if (vo.routingStatus === "sent" && !vo.deliverectOrderId) return true;
 

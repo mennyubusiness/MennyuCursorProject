@@ -29,7 +29,7 @@ export function VendorOrdersLedger({
   initialVendorOrders,
   initialNowMs,
   isDeliverectLive,
-  orderRoutingMode: _orderRoutingMode,
+  orderRoutingMode,
   posManaged,
   initialPaused,
 }: {
@@ -243,6 +243,7 @@ export function VendorOrdersLedger({
               issues={issuesByVendorOrderId.get(vendorOrder.id) ?? []}
               isDeliverectLive={isDeliverectLive}
               posManaged={posManaged}
+              orderRoutingMode={orderRoutingMode}
               expanded={expandedId === vendorOrder.id}
               onToggleExpanded={() =>
                 setExpandedId((current) => (current === vendorOrder.id ? null : vendorOrder.id))

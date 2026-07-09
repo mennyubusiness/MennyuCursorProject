@@ -3,11 +3,17 @@
  * Maps internal routing/fulfillment values without exposing raw backend terms.
  */
 
+import { isSquareRoutingMode } from "@/lib/vendor-order-routing-mode";
+
 export type VendorOrderHistoryEntry = {
   routingStatus?: string | null;
   fulfillmentStatus?: string | null;
   source?: string | null;
   createdAt: string;
+};
+
+export type VendorRoutingDisplayContext = {
+  orderRoutingMode?: string | null;
 };
 
 export function vendorFulfillmentStatusLabel(fulfillmentStatus: string): string {
@@ -31,20 +37,28 @@ export function vendorFulfillmentStatusLabel(fulfillmentStatus: string): string 
 
 export function vendorRoutingStatusLabel(
   routingStatus: string,
-  fulfillmentStatus: string
+  fulfillmentStatus: string,
+  context?: VendorRoutingDisplayContext
 ): string {
+  const squareMode = isSquareRoutingMode(context?.orderRoutingMode);
+
   if (routingStatus === "failed" && fulfillmentStatus === "pending") {
-    return "Could not send to POS";
+    return squareMode
+      ? "Square routing failed — Open Order still has the paid order"
+      : "Could not send to POS";
   }
+
   switch (routingStatus) {
     case "pending":
-      return "Waiting to send to POS";
+      return squareMode ? "Sending to Square" : "Waiting to send to POS";
     case "sent":
-      return "Sent to POS";
+      return squareMode ? "Sent to Square" : "Sent to POS";
     case "confirmed":
-      return "Accepted by POS";
+      return squareMode ? "Accepted in Square" : "Accepted by POS";
     case "failed":
-      return "Could not send to POS";
+      return squareMode
+        ? "Square routing failed — Open Order still has the paid order"
+        : "Could not send to POS";
     default:
       return "Orders are routing correctly";
   }
@@ -55,20 +69,29 @@ export function vendorOrderHeadlineStatus(input: {
   routingStatus: string;
   fulfillmentStatus: string;
   needsAttention?: boolean;
+  orderRoutingMode?: string | null;
 }): string {
+  const squareMode = isSquareRoutingMode(input.orderRoutingMode);
+
   if (input.needsAttention) return "Needs attention";
   if (input.routingStatus === "failed" && input.fulfillmentStatus === "pending") {
-    return "Could not send to POS";
+    return squareMode
+      ? "Square routing failed — Open Order still has the paid order"
+      : "Could not send to POS";
   }
   if (input.fulfillmentStatus === "ready") return "Ready for pickup";
   if (input.fulfillmentStatus === "preparing") return "Preparing";
-  if (input.fulfillmentStatus === "accepted") return "Accepted by POS";
+  if (input.fulfillmentStatus === "accepted") {
+    return squareMode ? "Accepted in Square" : "Accepted by POS";
+  }
   if (input.fulfillmentStatus === "completed") return "Completed";
   if (input.fulfillmentStatus === "cancelled") return "Cancelled";
-  if (input.routingStatus === "sent") return "Sent to POS";
-  if (input.routingStatus === "confirmed") return "Accepted by POS";
+  if (input.routingStatus === "sent") return squareMode ? "Sent to Square" : "Sent to POS";
+  if (input.routingStatus === "confirmed") {
+    return squareMode ? "Accepted in Square" : "Accepted by POS";
+  }
   if (input.routingStatus === "pending" && input.fulfillmentStatus === "pending") {
-    return "Waiting for POS confirmation";
+    return squareMode ? "Sending to Square" : "Waiting for POS confirmation";
   }
   return vendorFulfillmentStatusLabel(input.fulfillmentStatus);
 }

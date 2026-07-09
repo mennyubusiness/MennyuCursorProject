@@ -175,7 +175,7 @@ describe("isVendorSetupComplete", () => {
 });
 
 describe("buildVendorOperationalSetupItems", () => {
-  it("includes pause and open-state rows for the operational checklist", () => {
+  it("includes pause row and informational live open/closed row", () => {
     const items = buildVendorOperationalSetupItems({
       vendorId: "vendor_1",
       vendorPaused: true,
@@ -191,6 +191,9 @@ describe("buildVendorOperationalSetupItems", () => {
     });
 
     expect(items.some((item) => item.key === "not_paused" && !item.complete)).toBe(true);
-    expect(items.some((item) => item.key === "currently_open" && !item.complete)).toBe(true);
+    const liveRow = items.find((item) => item.key === "currently_open");
+    expect(liveRow?.informational).toBe(true);
+    expect(liveRow?.complete).toBe(true);
+    expect(liveRow?.label).toBe("Currently closed");
   });
 });

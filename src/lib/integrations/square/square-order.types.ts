@@ -80,9 +80,18 @@ export type SquareCreatePaymentResponse = {
   errors?: Array<{ code?: string; detail?: string; category?: string }>;
 };
 
+import type { SquareOrderTotalComparison } from "@/lib/integrations/square/square-order-total-comparison";
+
 export type SquareOrderSubmitAudit = {
-  createOrderRequest: SquareCreateOrderRequest;
+  createOrderRequest?: SquareCreateOrderRequest;
   createOrderResponse?: SquareCreateOrderResponse;
   createPaymentRequest?: SquareCreateExternalPaymentRequest;
   createPaymentResponse?: SquareCreatePaymentResponse;
+  mappingIssues?: unknown;
+  squarePaymentId?: string;
+  squareOrderState?: string;
+  squarePaymentStatus?: string;
+  squareLastAttemptAt?: string;
+  reconciliation?: SquareOrderTotalComparison;
+  paymentOnlyRetry?: boolean;
 };

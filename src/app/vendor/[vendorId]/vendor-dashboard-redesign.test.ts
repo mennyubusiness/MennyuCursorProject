@@ -73,7 +73,7 @@ describe("vendor section pages", () => {
     expect(setup).toContain("VendorSetupStatusBanners");
     expect(setup).toContain("Required to appear on pod page");
     expect(setup).toContain("Required to accept orders");
-    expect(setup).toContain("VendorSetupIntegrationsSection");
+    expect(setup).toContain("VendorIntegrationsSection");
     expect(setup).not.toContain("VendorIntegrationReadinessCard");
     expect(setup).not.toContain("VendorSquareSetupSummary");
     expect(setup).not.toContain("VendorSquareConnectionCard");

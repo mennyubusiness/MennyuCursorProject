@@ -197,14 +197,15 @@ export function buildVendorOperationalSetupItems(input: {
     },
     {
       key: "currently_open",
-      label: "Currently open",
-      complete: input.currentlyOpen,
+      label: input.currentlyOpen ? "Currently open" : "Currently closed",
+      complete: true,
+      informational: true,
       owner: "vendor",
       description: input.currentlyOpen
         ? "You are inside customer ordering hours."
-        : "Outside customer ordering hours right now.",
+        : "Outside customer ordering hours right now. Customers can browse your menu, but ordering opens during your set hours.",
       actionHref: `/vendor/${input.vendorId}/hours`,
-      actionLabel: "Set hours",
+      actionLabel: "View hours",
     },
   ];
 

@@ -27,6 +27,22 @@ describe("vendorSetupChecklistSummary", () => {
     expect(summary.defaultExpanded).toBe(true);
     expect(summary.incompleteLabels).toEqual(["Stripe"]);
   });
+
+  it("excludes informational live-status rows from readiness counts", () => {
+    const summary = vendorSetupChecklistSummary([
+      item("stripe", true, "Stripe"),
+      {
+        key: "currently_open",
+        label: "Currently closed",
+        complete: true,
+        informational: true,
+        owner: "vendor",
+      },
+    ]);
+    expect(summary.readyCount).toBe(1);
+    expect(summary.total).toBe(1);
+    expect(summary.allReady).toBe(true);
+  });
 });
 
 describe("VendorSetupChecklist collapse UI", () => {

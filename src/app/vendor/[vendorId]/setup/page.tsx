@@ -3,36 +3,16 @@ import { notFound } from "next/navigation";
 
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { VendorSetupChecklist } from "@/components/vendor/VendorSetupChecklist";
-import { VendorSetupIntegrationsSection } from "@/components/vendor/VendorSetupIntegrationsSection";
+import { VendorIntegrationsSection } from "@/components/vendor/VendorSetupIntegrationsSection";
 import { VendorSetupStatusBanners } from "@/components/vendor/VendorSetupStatusBanners";
 import { buildVendorOperationalSetupItems } from "@/lib/vendor-dashboard-attention";
-import { loadVendorDashboardContext } from "@/lib/vendor-dashboard-data.server";
+import { loadVendorIntegrationsViewModel } from "@/lib/vendor-integrations-view.server";
 import {
   vendorSetupOperationalLockedDescription,
   vendorSetupPageIncompleteDescription,
-  isDeliverectRoutingMode,
 } from "@/lib/vendor-order-routing-mode";
 import { VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS } from "@/lib/vendor-pod-readiness";
-import { getVendorIntegrationObservability } from "@/lib/integrations/provider-observability.service";
-import { loadSquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
-import { buildVendorSetupIntegrationsView } from "@/lib/vendor-setup-integrations";
-import type { ProviderConnectionHealth } from "@/lib/integrations/types";
-
-function inactiveDeliverectConnectionHealth(input: {
-  posConnectionStatus: string | null | undefined;
-  deliverectChannelLinkId: string | null | undefined;
-}): ProviderConnectionHealth {
-  const connected =
-    input.posConnectionStatus === "connected" && Boolean(input.deliverectChannelLinkId?.trim());
-  return {
-    provider: "deliverect",
-    status: connected ? "connected" : "not_configured",
-    isReady: connected,
-    missingRequirements: connected ? [] : ["Deliverect is not connected for this vendor"],
-    warnings: [],
-    lastCheckedAt: new Date(),
-  };
-}
+import { loadVendorDashboardContext } from "@/lib/vendor-dashboard-data.server";
 
 export default async function VendorSetupPage({
   params,
@@ -40,13 +20,11 @@ export default async function VendorSetupPage({
   params: Promise<{ vendorId: string }>;
 }) {
   const { vendorId } = await params;
-  const ctx = await loadVendorDashboardContext(vendorId);
-  if (!ctx) notFound();
-
-  const integrationObservability = await getVendorIntegrationObservability(vendorId);
-  const squareReadiness = integrationObservability
-    ? await loadSquareOrderRoutingReadiness(vendorId)
-    : null;
+  const [ctx, integrations] = await Promise.all([
+    loadVendorDashboardContext(vendorId),
+    loadVendorIntegrationsViewModel(vendorId, "setup"),
+  ]);
+  if (!ctx || !integrations) notFound();
 
   const publicProfileReady = ctx.readiness.setupSummary.publicProfile;
   const appearance = ctx.readiness.checklist.filter((item) =>
@@ -60,29 +38,6 @@ export default async function VendorSetupPage({
         vendorId,
       })
     : [];
-
-  const integrationsModel =
-    integrationObservability &&
-    buildVendorSetupIntegrationsView({
-      vendorId,
-      orderRoutingMode: ctx.vendorRecord.orderRoutingMode,
-      menuSource: ctx.vendorRecord.menuSource,
-      readiness: integrationObservability.readiness,
-      menuReadiness: {
-        menuSource: ctx.vendorRecord.menuSource,
-        orderRoutingMode: ctx.vendorRecord.orderRoutingMode,
-        hasPublishedMenuVersion: Boolean(ctx.menuSummary.hasPublishedMenuVersion),
-        hasOperationalItems: Boolean(ctx.menuSummary.hasOperationalItems),
-        hasSquarePublishedMenu: squareReadiness?.hasSquarePublishedMenu,
-      },
-      squareHealth: integrationObservability.squareHealth,
-      deliverectRoutingHealth: isDeliverectRoutingMode(ctx.vendorRecord.orderRoutingMode)
-        ? integrationObservability.readiness.orderRouting?.health ?? null
-        : inactiveDeliverectConnectionHealth({
-            posConnectionStatus: ctx.readinessPosSummary.posConnectionStatus,
-            deliverectChannelLinkId: ctx.readinessPosSummary.deliverectChannelLinkId,
-          }),
-    });
 
   return (
     <DashboardShell tier="command" className="px-0 pb-0 pt-0">
@@ -125,7 +80,9 @@ export default async function VendorSetupPage({
           </section>
         )}
 
-        {integrationsModel ? <VendorSetupIntegrationsSection model={integrationsModel} /> : null}
+        {integrations.model ? (
+          <VendorIntegrationsSection model={integrations.model} surface="setup" />
+        ) : null}
       </div>
     </DashboardShell>
   );

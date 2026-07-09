@@ -366,7 +366,7 @@ describe("deriveVendorPodReadiness vendor checklist", () => {
 
     const hours = result.checklist.find((item) => item.key === "hours");
     expect(hours?.complete).toBe(true);
-    expect(hours?.description).toBe("Customer ordering hours set.");
+    expect(hours?.description).toBe("Ordering hours are configured.");
 
     const stripe = result.checklist.find((item) => item.key === "stripe");
     expect(stripe?.complete).toBe(false);

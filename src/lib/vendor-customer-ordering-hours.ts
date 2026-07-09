@@ -126,6 +126,14 @@ export function hasValidVendorCustomerOrderingHours(raw: unknown): boolean {
   return validateVendorCustomerOrderingWeek(week) === null;
 }
 
+/**
+ * Setup-only: whether customer ordering hours are saved and valid.
+ * Does not evaluate current time — use {@link isVendorWithinCustomerOrderingHours} for live orderability.
+ */
+export function hasCustomerOrderingHoursConfigured(raw: unknown): boolean {
+  return hasValidVendorCustomerOrderingHours(raw);
+}
+
 function parseActiveVendorCustomerOrderingWeek(raw: unknown): VendorCustomerOrderingWeek | null {
   const week = parseVendorCustomerOrderingWeek(raw);
   if (!week || validateVendorCustomerOrderingWeek(week) !== null) return null;

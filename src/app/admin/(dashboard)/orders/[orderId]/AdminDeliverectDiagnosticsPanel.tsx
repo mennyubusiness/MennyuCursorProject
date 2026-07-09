@@ -14,6 +14,11 @@ import type { AdminOrderDetail } from "@/lib/admin-order-detail-query";
 import type { DeliverectPayloadValidationSnapshot } from "@/integrations/deliverect/payload-validation";
 import type { VendorOrderStatusAuthority, VendorOrderStatusSource } from "@prisma/client";
 import { formatAdminOrderDate, isSquareRoutedVendorOrder } from "@/lib/admin-order-detail-ui";
+import {
+  parseSquareOrderAudit,
+  squareRoutingFailureGuidance,
+} from "@/lib/integrations/square/square-order-audit";
+import { SQUARE_TOTAL_MISMATCH_ADMIN_COPY } from "@/lib/integrations/square/square-order-total-comparison";
 import { AdminDeliverectRecheck } from "./AdminDeliverectRecheck";
 import { AdminVendorOrderOperationalPanel } from "./AdminVendorOrderOperationalPanel";
 
@@ -95,12 +100,12 @@ export function AdminSquareRoutingTechnicalDetails({ vo }: { vo: VoRow }) {
   if (!isSquareRoutedVendorOrder(vo)) return null;
 
   const live = isRoutingRetryAvailable();
-  const mappingIssues =
-    vo.lastSquarePayload != null &&
-    typeof vo.lastSquarePayload === "object" &&
-    "mappingIssues" in (vo.lastSquarePayload as object)
-      ? (vo.lastSquarePayload as { mappingIssues?: unknown }).mappingIssues
-      : null;
+  const audit = parseSquareOrderAudit(vo.lastSquarePayload);
+  const guidance = squareRoutingFailureGuidance({
+    error: vo.squareLastError,
+    squareRoutingLive: live,
+    hasMappingIssues: Boolean(audit.mappingIssues),
+  });
 
   return (
     <details className="mt-4 rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2">
@@ -108,6 +113,14 @@ export function AdminSquareRoutingTechnicalDetails({ vo }: { vo: VoRow }) {
         Square routing details
       </summary>
       <div className="mt-3 space-y-3 text-xs text-oo-charcoal">
+        <p className="text-oo-stone-gray">
+          Retry Square routing uses Square idempotency keys to avoid duplicate Square orders.
+        </p>
+
+        {guidance ? (
+          <p className="rounded border border-amber-200 bg-amber-50 px-2.5 py-2 text-amber-950">{guidance}</p>
+        ) : null}
+
         <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
           <div>
             <dt className="text-oo-stone-gray">Provider</dt>
@@ -122,8 +135,24 @@ export function AdminSquareRoutingTechnicalDetails({ vo }: { vo: VoRow }) {
             <dd className="break-all font-mono text-[11px]">{vo.squareOrderId ?? "—"}</dd>
           </div>
           <div>
+            <dt className="text-oo-stone-gray">Square payment id</dt>
+            <dd className="break-all font-mono text-[11px]">{audit.squarePaymentId ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-oo-stone-gray">Payment status</dt>
+            <dd>{audit.squarePaymentStatus ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-oo-stone-gray">Attempts</dt>
+            <dd>{vo.squareAttempts}</dd>
+          </div>
+          <div>
             <dt className="text-oo-stone-gray">Submitted at</dt>
             <dd>{vo.squareSubmittedAt ? formatAdminOrderDate(vo.squareSubmittedAt) : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-oo-stone-gray">Last attempted at</dt>
+            <dd>{audit.squareLastAttemptAt ? formatAdminOrderDate(new Date(audit.squareLastAttemptAt)) : "—"}</dd>
           </div>
           <div className="sm:col-span-2">
             <dt className="text-oo-stone-gray">Last error</dt>
@@ -131,11 +160,46 @@ export function AdminSquareRoutingTechnicalDetails({ vo }: { vo: VoRow }) {
           </div>
         </dl>
 
-        {mappingIssues ? (
+        {audit.reconciliation ? (
+          <div className="rounded-md border border-oo-light-stone bg-oo-warm-white px-2.5 py-2">
+            <p className="font-semibold text-oo-charcoal">Total comparison</p>
+            <dl className="mt-2 grid gap-1 sm:grid-cols-2">
+              <div>
+                <dt className="text-oo-stone-gray">OO subtotal</dt>
+                <dd>{audit.reconciliation.ooSubtotalCents}¢</dd>
+              </div>
+              <div>
+                <dt className="text-oo-stone-gray">OO tax</dt>
+                <dd>{audit.reconciliation.ooTaxCents}¢</dd>
+              </div>
+              <div>
+                <dt className="text-oo-stone-gray">OO food+tax total</dt>
+                <dd>{audit.reconciliation.ooTotalCents}¢</dd>
+              </div>
+              <div>
+                <dt className="text-oo-stone-gray">Square order total</dt>
+                <dd>{audit.reconciliation.squareOrderTotalCents ?? "—"}¢</dd>
+              </div>
+              <div>
+                <dt className="text-oo-stone-gray">Square external payment</dt>
+                <dd>{audit.reconciliation.squareExternalPaymentCents ?? "—"}¢</dd>
+              </div>
+              <div>
+                <dt className="text-oo-stone-gray">Difference</dt>
+                <dd>{audit.reconciliation.squareTotalDifferenceCents ?? "—"}¢</dd>
+              </div>
+            </dl>
+            {audit.reconciliation.mismatchWarning ? (
+              <p className="mt-2 text-amber-900">{SQUARE_TOTAL_MISMATCH_ADMIN_COPY}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {audit.mappingIssues ? (
           <div className="rounded-md border border-red-200 bg-red-50/90 px-2.5 py-2 text-xs text-red-950">
             <p className="font-semibold">Payload mapping issues</p>
             <pre className="mt-1 max-h-32 overflow-auto font-mono text-[10px]">
-              {jsonBlock(mappingIssues, 4000)}
+              {jsonBlock(audit.mappingIssues, 4000)}
             </pre>
           </div>
         ) : null}

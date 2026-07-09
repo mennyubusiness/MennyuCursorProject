@@ -73,7 +73,14 @@ describe("submitVendorOrderToSquare", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetVendorOrder.mockResolvedValue({ id: VO_ID, vendorId: "vendor_1" });
-    mockFindUnique.mockResolvedValue({ routingStatus: "pending", squareOrderId: null });
+    mockFindUnique.mockResolvedValue({
+      routingStatus: "pending",
+      squareOrderId: null,
+      lastSquarePayload: null,
+      lastSquareResponse: null,
+      subtotalCents: 1100,
+      taxCents: 100,
+    });
     mockAssertReady.mockResolvedValue({ ok: true, locationId: "LOC_1" });
     mockGetConnection.mockResolvedValue({ id: "conn_1", accessTokenRef: "ref_1" });
     mockEnsureToken.mockResolvedValue("oauth_token_vendor");
@@ -142,8 +149,15 @@ describe("submitVendorOrderToSquare", () => {
 
   it("records routing failure and issue when Square API fails", async () => {
     mockFindUnique
-      .mockResolvedValueOnce({ routingStatus: "pending", squareOrderId: null })
-      .mockResolvedValueOnce({ routingStatus: "pending", squareAttempts: 0 });
+      .mockResolvedValueOnce({
+        routingStatus: "pending",
+        squareOrderId: null,
+        lastSquarePayload: null,
+        lastSquareResponse: null,
+        subtotalCents: 1100,
+        taxCents: 100,
+      })
+      .mockResolvedValueOnce({ routingStatus: "pending", squareOrderId: null, squareAttempts: 0 });
     mockCreateOrder.mockRejectedValue(new Error("Square 503"));
 
     const result = await submitVendorOrderToSquare(VO_ID, {
@@ -170,8 +184,15 @@ describe("submitVendorOrderToSquare", () => {
 
   it("maps insufficient Square permissions to reconnect guidance and marks connection", async () => {
     mockFindUnique
-      .mockResolvedValueOnce({ routingStatus: "pending", squareOrderId: null })
-      .mockResolvedValueOnce({ routingStatus: "pending", squareAttempts: 0 });
+      .mockResolvedValueOnce({
+        routingStatus: "pending",
+        squareOrderId: null,
+        lastSquarePayload: null,
+        lastSquareResponse: null,
+        subtotalCents: 1100,
+        taxCents: 100,
+      })
+      .mockResolvedValueOnce({ routingStatus: "pending", squareOrderId: null, squareAttempts: 0 });
     mockCreateOrder.mockRejectedValue(
       new Error(
         "The merchant has not given your application sufficient permissions... required scopes: ORDERS_WRITE"
@@ -192,6 +213,94 @@ describe("submitVendorOrderToSquare", () => {
         data: expect.objectContaining({
           routingStatus: "failed",
           squareLastError: expect.stringMatching(/Reconnect Square and approve ORDERS_WRITE\/PAYMENTS_WRITE/i),
+        }),
+      })
+    );
+  });
+
+  it("retries external payment on existing Square order without duplicate CreateOrder", async () => {
+    mockFindUnique.mockResolvedValue({
+      routingStatus: "failed",
+      squareOrderId: "sq_existing",
+      lastSquarePayload: {
+        createOrderResponse: {
+          order: { id: "sq_existing", total_money: { amount: 1200, currency: "USD" } },
+        },
+      },
+      lastSquareResponse: {
+        createOrder: {
+          order: { id: "sq_existing", total_money: { amount: 1200, currency: "USD" } },
+        },
+      },
+      subtotalCents: 1100,
+      taxCents: 100,
+    });
+
+    const result = await submitVendorOrderToSquare(VO_ID, {
+      customerPhone: "+1555",
+      customerEmail: null,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockCreateOrder).not.toHaveBeenCalled();
+    expect(mockCreatePayment).toHaveBeenCalledWith(
+      "oauth_token_vendor",
+      expect.objectContaining({ order_id: "sq_existing" })
+    );
+  });
+
+  it("persists squareOrderId before payment and records failure when payment fails", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce({
+        routingStatus: "pending",
+        squareOrderId: null,
+        lastSquarePayload: null,
+        lastSquareResponse: null,
+        subtotalCents: 1100,
+        taxCents: 100,
+      })
+      .mockResolvedValueOnce({ routingStatus: "pending", squareOrderId: "sq_ord_abc", squareAttempts: 0 });
+    mockCreatePayment.mockRejectedValue(new Error("Payment failed"));
+
+    const result = await submitVendorOrderToSquare(VO_ID, {
+      customerPhone: "+1555",
+      customerEmail: null,
+    });
+
+    expect(result.success).toBe(false);
+    expect(mockCreateOrder).toHaveBeenCalled();
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: VO_ID },
+        data: expect.objectContaining({ squareOrderId: "sq_ord_abc" }),
+      })
+    );
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          routingStatus: "failed",
+          squareLastError: "Payment failed",
+        }),
+      })
+    );
+  });
+
+  it("records audit reconciliation on successful submit", async () => {
+    await submitVendorOrderToSquare(VO_ID, {
+      customerPhone: "+1555",
+      customerEmail: null,
+    });
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          lastSquarePayload: expect.objectContaining({
+            reconciliation: expect.objectContaining({
+              ooTotalCents: 1200,
+              squareOrderTotalCents: 1200,
+            }),
+            squarePaymentId: "pay_1",
+          }),
         }),
       })
     );
