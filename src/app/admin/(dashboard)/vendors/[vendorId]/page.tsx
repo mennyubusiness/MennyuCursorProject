@@ -7,6 +7,7 @@ import { loadAdminSquareOrderInjectionDiagnostics } from "@/lib/integrations/squ
 import { loadAdminVendorDetail } from "@/services/admin-vendor-detail.service";
 import { evaluateVendorCustomerOrderingHoursDebug } from "@/lib/vendor-customer-ordering-hours";
 import { buildAdminVendorSummary } from "@/lib/admin-vendor-summary";
+import { buildVendorPosReadinessFallback } from "@/lib/pos-connection-status";
 import { AdminVendorOverview } from "./AdminVendorOverview";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,14 @@ export default async function AdminVendorDetailPage({
   ]);
   if (!detail) notFound();
 
-  const posSummary = readinessBundles.get(id)?.posSummary ?? null;
+  const posSummary =
+    readinessBundles.get(id)?.posSummary ??
+    buildVendorPosReadinessFallback({
+      posConnectionStatus: detail.vendor.posConnectionStatus,
+      deliverectChannelLinkId: detail.vendor.deliverectChannelLinkId,
+      orderRoutingMode: detail.vendor.orderRoutingMode,
+      menuSource: detail.vendor.menuSource,
+    });
   const hoursDebug = evaluateVendorCustomerOrderingHoursDebug({
     customerOrderingHours: vendorHoursRow?.customerOrderingHours,
     podPickupTimezone: vendorHoursRow?.pods[0]?.pod.pickupTimezone,

@@ -13,6 +13,7 @@ import { buildOrderAdminPath } from "@/lib/admin-entity-nav-links";
 import type { AdminVendorDetailView } from "@/services/admin-vendor-detail.service";
 import type { AdminSquareRoutingStatus } from "@/lib/integrations/square/square-routing-readiness";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
+import { buildVendorPosReadinessFallback } from "@/lib/pos-connection-status";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { AdminVendorOrderRoutingSection } from "./AdminVendorOrderRoutingSection";
 import { AdminEntityDeleteDangerZone } from "@/components/admin/AdminEntityDeleteDangerZone";
@@ -93,6 +94,7 @@ export function AdminVendorOverview({
   summary: AdminVendorSummary;
   detail: AdminVendorDetailView;
   podOptions: Option[];
+  /** Prefer the readiness bundle; fall back when the loader cannot supply one. */
   posSummary: VendorPosReadinessSummary | null;
   squareStatus: AdminSquareRoutingStatus;
 }) {
@@ -106,6 +108,14 @@ export function AdminVendorOverview({
   const [slug, setSlug] = useState(detail.vendor.slug);
   const [attachPodId, setAttachPodId] = useState("");
   const [profilePending, startProfileTransition] = useTransition();
+
+  const fallbackPosSummary: VendorPosReadinessSummary = buildVendorPosReadinessFallback({
+    posConnectionStatus: detail.vendor.posConnectionStatus,
+    deliverectChannelLinkId: detail.vendor.deliverectChannelLinkId,
+    orderRoutingMode: detail.vendor.orderRoutingMode,
+    menuSource: detail.vendor.menuSource,
+  });
+  const resolvedPosSummary = posSummary ?? fallbackPosSummary;
 
   const run = (fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) =>
     fn().then((r) => {
@@ -294,21 +304,7 @@ export function AdminVendorOverview({
             <AdminVendorOrderRoutingSection
               vendorId={vendorId}
               orderRoutingMode={detail.vendor.orderRoutingMode as VendorOrderRoutingMode}
-              posSummary={
-                posSummary ?? {
-                  posConnectionStatus: detail.vendor.posConnectionStatus as
-                    | "not_connected"
-                    | "pending"
-                    | "connected"
-                    | "error",
-                  deliverectChannelLinkId: detail.vendor.deliverectChannelLinkId,
-                  deliverectAutoMapLastOutcome: null,
-                  pendingDeliverectConnectionKey: null,
-                  hasUnmatchedChannelRegistration: false,
-                  orderRoutingMode: detail.vendor.orderRoutingMode as VendorOrderRoutingMode,
-                  menuSource: detail.vendor.menuSource as "open_order" | "deliverect",
-                }
-              }
+              posSummary={resolvedPosSummary}
               squareStatus={squareStatus}
             />
           </div>
