@@ -119,25 +119,27 @@ describe("vendor menu management UX", () => {
   });
 
   it("admin vendor detail gates provider-specific diagnostics", () => {
-    const admin = readFileSync(
-      join(vendorDir, "../../../app/admin/(dashboard)/vendors/[vendorId]/AdminVendorRescueClient.tsx"),
+    const adminDiagnostics = readFileSync(
+      join(
+        vendorDir,
+        "../../../app/admin/(dashboard)/vendors/[vendorId]/AdminVendorTechnicalDiagnostics.tsx"
+      ),
       "utf8"
     );
     const adminPage = readFileSync(
       join(vendorDir, "../../../app/admin/(dashboard)/vendors/[vendorId]/page.tsx"),
       "utf8"
     );
-    expect(admin).toContain("adminSquareInjectionDiagnosticsVisible");
-    expect(admin).toContain("adminDeliverectMenuPosSectionVisible");
-    expect(admin).toContain("Routing provider");
-    expect(adminPage).toContain("getAdminVendorDetailTools");
+    expect(adminDiagnostics).toContain("adminSquareInjectionDiagnosticsVisible");
+    expect(adminDiagnostics).toContain("adminDeliverectMenuPosSectionVisible");
+    expect(adminPage).toContain("AdminVendorOverview");
+    expect(adminPage).toContain("buildAdminVendorSummary");
   });
 
   it("integrations hub page is provider-aware", () => {
     const hub = readVendor("integrations/page.tsx");
     expect(hub).toContain("vendorIntegrationsHubDescription");
-    expect(hub).toContain("isSquareRoutingMode");
-    expect(hub).toContain("isDeliverectRoutingMode");
-    expect(hub).toContain("isManualDashboardRoutingMode");
+    expect(hub).toContain("loadVendorIntegrationsViewModel");
+    expect(hub).toContain("VendorIntegrationsSection");
   });
 });

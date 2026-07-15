@@ -30,8 +30,15 @@ vi.mock("@/services/admin-vendor-rescue.service", () => ({
 import { adminPauseVendorOrderingAction } from "@/actions/admin-vendor.actions";
 import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
 
-const vendorRescueClient = readFileSync(
-  join(process.cwd(), "src/app/admin/(dashboard)/vendors/[vendorId]/AdminVendorRescueClient.tsx"),
+const vendorOverview = readFileSync(
+  join(process.cwd(), "src/app/admin/(dashboard)/vendors/[vendorId]/AdminVendorOverview.tsx"),
+  "utf8"
+);
+const vendorDiagnostics = readFileSync(
+  join(
+    process.cwd(),
+    "src/app/admin/(dashboard)/vendors/[vendorId]/AdminVendorTechnicalDiagnostics.tsx"
+  ),
   "utf8"
 );
 const podRescueClient = readFileSync(
@@ -76,13 +83,18 @@ describe("orderability pod pause", () => {
 });
 
 describe("admin rescue UI wiring", () => {
-  it("vendor rescue client includes required sections", () => {
-    expect(vendorRescueClient).toContain("Ordering controls");
-    expect(vendorRescueClient).toContain("AdminEntityDeleteDangerZone");
-    expect(vendorRescueClient).toContain("adminDeleteVendorProfileAction");
-    expect(vendorRescueClient).toContain("Menu / POS status");
-    expect(vendorRescueClient).toContain("Menu refresh is not configured yet.");
-    expect(vendorRescueClient).toContain("Audit log");
+  it("vendor overview includes required management sections", () => {
+    expect(vendorOverview).toContain("Ordering controls");
+    expect(vendorOverview).toContain("AdminEntityDeleteDangerZone");
+    expect(vendorOverview).toContain("adminDeleteVendorProfileAction");
+    expect(vendorOverview).toContain("Attention required");
+    expect(vendorOverview).toContain("Recent activity");
+  });
+
+  it("vendor technical diagnostics keep provider tooling", () => {
+    expect(vendorDiagnostics).toContain("Menu / Deliverect status");
+    expect(vendorDiagnostics).toContain("AdminSquareOrderInjectionDiagnosticsPanel");
+    expect(vendorDiagnostics).toContain("Business hours debug");
   });
 
   it("pod rescue client includes delete danger zone and roster sections", () => {

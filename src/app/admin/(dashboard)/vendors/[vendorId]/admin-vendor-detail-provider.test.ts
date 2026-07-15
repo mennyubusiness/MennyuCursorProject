@@ -9,7 +9,7 @@ function readAdminVendor(relativePath: string): string {
   return readFileSync(join(adminVendorDir, relativePath), "utf8");
 }
 
-describe("admin vendor detail provider cleanup", () => {
+describe("admin vendor detail overview hierarchy", () => {
   it("order routing section uses provider-agnostic copy", () => {
     const routing = readAdminVendor("AdminVendorOrderRoutingSection.tsx");
     expect(routing).toContain("ADMIN_ORDER_ROUTING_GENERIC_COPY");
@@ -45,49 +45,53 @@ describe("admin vendor detail provider cleanup", () => {
     expect(routing).toContain('checked={mode === "square"}');
     expect(routing).toContain("adminUpdateVendorOrderRoutingModeAction");
     expect(routing).toContain("Save order routing mode");
-    expect(routing).toContain("VENDOR_ROUTING_MODE_COPY.manualDashboard.adminHelper");
-    expect(routing).toContain("VENDOR_ROUTING_MODE_COPY.deliverect.adminHelper");
-    expect(routing).toContain("VENDOR_ROUTING_MODE_COPY.square.adminHelper");
   });
 
-  it("gates Square injection diagnostics to Square routing vendors", () => {
-    const rescue = readAdminVendor("AdminVendorRescueClient.tsx");
-    expect(rescue).toContain("adminSquareInjectionDiagnosticsVisible");
-    expect(rescue).toContain("showSquareDiagnostics && squareInjectionDiagnostics");
-    expect(rescue).toContain("AdminSquareOrderInjectionDiagnosticsPanel");
-  });
-
-  it("labels Deliverect downstream POS separately from routing provider", () => {
-    const rescue = readAdminVendor("AdminVendorRescueClient.tsx");
-    expect(rescue).toContain("Connected POS through Deliverect");
-    expect(rescue).toContain("formatAdminDownstreamPosProvider");
-    expect(rescue).not.toContain('label="POS provider"');
-  });
-
-  it("keeps detailed Deliverect diagnostics outside routing selector", () => {
-    const rescue = readAdminVendor("AdminVendorRescueClient.tsx");
-    expect(rescue).toContain('title="Menu / Deliverect status"');
-    expect(rescue).toContain('label="Deliverect connection"');
-  });
-
-  it("overview uses routing provider and menu status labels", () => {
-    const rescue = readAdminVendor("AdminVendorRescueClient.tsx");
-    expect(rescue).toContain('label="Routing provider"');
-    expect(rescue).toContain('label="Menu status"');
-    expect(rescue).toContain("adminVendorOverviewRoutingProviderLabel");
-    expect(rescue).toContain("adminVendorMenuStatusLabel");
-  });
-
-  it("collapses inactive provider diagnostics", () => {
-    const rescue = readAdminVendor("AdminVendorRescueClient.tsx");
-    expect(rescue).toContain("Other connected integrations");
-    expect(rescue).toContain("adminInactiveSquareDiagnosticsVisible");
-    expect(rescue).toContain("Square (not active routing)");
-  });
-
-  it("filters tools by routing mode on admin vendor page", () => {
+  it("main vendor page is an overview without Square env or raw mapping dumps", () => {
     const page = readAdminVendor("page.tsx");
-    expect(page).toContain("getAdminVendorDetailTools");
-    expect(page).not.toContain("adminPosMappingToolVisible");
+    const overview = readAdminVendor("AdminVendorOverview.tsx");
+    expect(page).toContain("buildAdminVendorSummary");
+    expect(page).toContain("AdminVendorOverview");
+    expect(page).not.toContain("ENABLE_SQUARE_INTEGRATION");
+    expect(page).not.toContain("SQUARE_ROUTING_LIVE");
+    expect(page).not.toContain("Business hours debug");
+    expect(page).not.toContain("AdminSquareOrderInjectionDiagnosticsPanel");
+    expect(overview).toContain("Attention required");
+    expect(overview).toContain("Status overview");
+    expect(overview).toContain("Quick actions");
+    expect(overview).toContain("Technical diagnostics");
+    expect(overview).not.toContain("ENABLE_SQUARE_INTEGRATION");
+    expect(overview).not.toContain("externalMerchantId");
+    expect(overview).not.toContain("Minutes since midnight");
+  });
+
+  it("gates Square injection diagnostics to technical diagnostics page", () => {
+    const diagnostics = readAdminVendor("AdminVendorTechnicalDiagnostics.tsx");
+    expect(diagnostics).toContain("adminSquareInjectionDiagnosticsVisible");
+    expect(diagnostics).toContain("showSquareDiagnostics && squareInjectionDiagnostics");
+    expect(diagnostics).toContain("AdminSquareOrderInjectionDiagnosticsPanel");
+    expect(diagnostics).toContain("Business hours debug");
+    expect(diagnostics).toContain("Connected POS through Deliverect");
+  });
+
+  it("keeps detailed Deliverect diagnostics outside the main overview", () => {
+    const diagnostics = readAdminVendor("AdminVendorTechnicalDiagnostics.tsx");
+    expect(diagnostics).toContain('title="Menu / Deliverect status"');
+    expect(diagnostics).toContain('label="Deliverect connection"');
+  });
+
+  it("collapses inactive provider diagnostics on technical page", () => {
+    const diagnostics = readAdminVendor("AdminVendorTechnicalDiagnostics.tsx");
+    expect(diagnostics).toContain("Other connected integrations");
+    expect(diagnostics).toContain("adminInactiveSquareDiagnosticsVisible");
+    expect(diagnostics).toContain("Square (not active routing)");
+  });
+
+  it("moves engineering tools to diagnostics route", () => {
+    const diagnosticsPage = readAdminVendor("diagnostics/page.tsx");
+    expect(diagnosticsPage).toContain("getAdminVendorDetailTools");
+    expect(diagnosticsPage).toContain("Technical diagnostics");
+    const page = readAdminVendor("page.tsx");
+    expect(page).not.toContain("getAdminVendorDetailTools");
   });
 });

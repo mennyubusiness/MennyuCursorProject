@@ -6,12 +6,16 @@ import { loadAdminSquareRoutingStatus } from "@/lib/integrations/square/square-r
 import { loadAdminSquareOrderInjectionDiagnostics } from "@/lib/integrations/square/admin-square-order-injection-diagnostics.server";
 import { loadAdminVendorDetail } from "@/services/admin-vendor-detail.service";
 import { evaluateVendorCustomerOrderingHoursDebug } from "@/lib/vendor-customer-ordering-hours";
-import { buildAdminVendorSummary } from "@/lib/admin-vendor-summary";
-import { AdminVendorOverview } from "./AdminVendorOverview";
+import { getAdminVendorDetailTools } from "@/lib/integrations/provider-display";
+import { AdminVendorTechnicalDiagnostics } from "../AdminVendorTechnicalDiagnostics";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminVendorDetailPage({
+/**
+ * Level-3 technical diagnostics for engineers / advanced troubleshooting.
+ * Not part of the default vendor management overview.
+ */
+export default async function AdminVendorDiagnosticsPage({
   params,
 }: {
   params: Promise<{ vendorId: string }>;
@@ -22,14 +26,12 @@ export default async function AdminVendorDetailPage({
 
   const [
     detail,
-    podOptions,
     readinessBundles,
     vendorHoursRow,
     squareStatus,
     squareInjectionDiagnostics,
   ] = await Promise.all([
     loadAdminVendorDetail(id),
-    prisma.pod.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: 500 }),
     loadVendorReadinessBundles([id], { includeDeliverectMappingIntegrity: true }),
     prisma.vendor.findUnique({
       where: { id },
@@ -52,14 +54,9 @@ export default async function AdminVendorDetailPage({
     customerOrderingHours: vendorHoursRow?.customerOrderingHours,
     podPickupTimezone: vendorHoursRow?.pods[0]?.pod.pickupTimezone,
   });
-
-  const summary = buildAdminVendorSummary({
-    detail,
-    posSummary,
-    squareStatus,
-    squareInjectionDiagnostics,
-    hoursDebug,
-  });
+  const hoursDebugPodName = vendorHoursRow?.pods[0]?.pod.name ?? null;
+  const tools = getAdminVendorDetailTools(id, detail.vendor.orderRoutingMode);
+  const publicPageHref = detail.pods[0]?.publicPath ?? null;
 
   return (
     <div className="space-y-6">
@@ -68,15 +65,37 @@ export default async function AdminVendorDetailPage({
           Vendors
         </Link>
         <span className="mx-1.5">/</span>
-        <span className="text-oo-charcoal">{detail.vendor.name}</span>
+        <Link
+          href={`/admin/vendors/${id}`}
+          className="hover:text-oo-charcoal hover:underline"
+        >
+          {detail.vendor.name}
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span className="text-oo-charcoal">Technical diagnostics</span>
       </nav>
 
-      <AdminVendorOverview
-        summary={summary}
+      <header className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <h1 className="text-xl font-semibold text-oo-charcoal">Technical diagnostics</h1>
+        <p className="mt-1 text-sm text-amber-950">
+          Advanced troubleshooting view for engineers. Includes raw IDs, environment flags, OAuth
+          scopes, mapping samples, and business-hours evaluation details. Use the{" "}
+          <Link href={`/admin/vendors/${id}`} className="font-semibold underline">
+            vendor overview
+          </Link>{" "}
+          for day-to-day management.
+        </p>
+      </header>
+
+      <AdminVendorTechnicalDiagnostics
         detail={detail}
-        podOptions={podOptions}
         posSummary={posSummary}
         squareStatus={squareStatus}
+        squareInjectionDiagnostics={squareInjectionDiagnostics}
+        hoursDebug={hoursDebug}
+        hoursDebugPodName={hoursDebugPodName}
+        tools={tools}
+        publicPageHref={publicPageHref}
       />
     </div>
   );
