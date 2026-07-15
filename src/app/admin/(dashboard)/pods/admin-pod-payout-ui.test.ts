@@ -10,16 +10,21 @@ function readAdminPod(relativePath: string): string {
 }
 
 describe("admin pod payout P2 UI", () => {
-  it("pod detail loads payout section with summary and expandable details", () => {
+  it("pod detail links payouts separately; payouts page hosts AdminPodPayoutSection", () => {
     const page = readAdminPod("page.tsx");
-    expect(page).toContain("AdminPodPayoutSection");
+    const payoutsPage = readAdminPod("payouts/page.tsx");
+    const overview = readAdminPod("AdminPodOverview.tsx");
+    expect(page).toContain("buildAdminPodSummary");
+    expect(page).toContain("AdminPodOverview");
     expect(page).toContain("deriveAdminPodDetailLayout");
     expect(page).toContain("getPodPayoutAllocationSummary");
-    expect(page).toContain("listRecentPodPayoutAllocationsForAdmin");
-    expect(page).toContain("getPodPayoutRecipientConnectStatusForPod");
-    expect(page).toContain("getPodPayoutTransferAdminSummary");
-    expect(page).toContain("listRecentPodPayoutTransfersForAdmin");
-    expect(page).toMatch(/Admin actions[\s\S]*Vendors[\s\S]*AdminPodPayoutSection/);
+    expect(page).not.toContain("AdminPodPayoutSection");
+    expect(page).not.toContain("listRecentPodPayoutAllocationsForAdmin");
+    expect(payoutsPage).toContain("AdminPodPayoutSection");
+    expect(payoutsPage).toContain("listRecentPodPayoutAllocationsForAdmin");
+    expect(payoutsPage).toContain("getPodPayoutTransferAdminSummary");
+    expect(payoutsPage).toContain("listRecentPodPayoutTransfersForAdmin");
+    expect(overview).toContain("summary.links.payoutsPage");
   });
 
   it("settings card shows payout account status and owner action copy", () => {
@@ -102,12 +107,16 @@ describe("admin pod payout P2 UI", () => {
     expect(service).not.toContain("PodPayoutTransferReversal");
   });
 
-  it("pod detail page prioritizes activity, actions, and vendors before payouts", () => {
+  it("pod overview hierarchy puts status and vendors before payout link", () => {
     const page = readAdminPod("page.tsx");
-    expect(page).toContain("Admin actions");
-    expect(page).toContain("adminPodReadinessLabel");
+    const overview = readAdminPod("AdminPodOverview.tsx");
+    expect(page).toContain("AdminPodOverview");
+    expect(page).not.toContain("AdminPodPayoutSection");
     expect(page).not.toContain("{pod.onboardingStatus}");
-    expect(page).toMatch(/Activity[\s\S]*Admin actions[\s\S]*Vendors[\s\S]*AdminPodPayoutSection/);
+    expect(overview).toContain("Status overview");
+    expect(overview).toContain('id="vendors"');
+    expect(overview).toContain("summary.links.payoutsPage");
+    expect(overview.indexOf("Status overview")).toBeLessThan(overview.indexOf('id="vendors"'));
   });
 });
 

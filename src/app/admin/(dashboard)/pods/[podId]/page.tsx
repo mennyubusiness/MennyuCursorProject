@@ -2,64 +2,64 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { loadAdminPodDetail } from "@/services/admin-pod-detail.service";
-import {
-  deriveAdminPodDetailLayout,
-} from "@/lib/admin-pod-detail-layout";
-import { listRecentPodPayoutAllocationsForAdmin } from "@/services/pod-payout-allocation.service";
+import { loadVendorReadinessBundles } from "@/lib/vendor-readiness-validation.server";
+import { buildAdminPodSummary } from "@/lib/admin-pod-summary";
+import { deriveAdminPodDetailLayout } from "@/lib/admin-pod-detail-layout";
 import { getPodPayoutRecipientConnectStatusForPod } from "@/services/pod-payout-connect.service";
 import {
   getPodPayoutAllocationSummary,
-  getPodPayoutRecipientOptions,
   getPodPayoutSettingsForAdmin,
 } from "@/services/pod-payout-settings.service";
-import {
-  getPodPayoutTransferAdminSummary,
-  listRecentPodPayoutTransfersForAdmin,
-} from "@/services/pod-payout-transfer.service";
-import { AdminPodPayoutSection } from "./AdminPodPayoutSection";
-import { AdminPodRescueClient } from "./AdminPodRescueClient";
+import { getPodPayoutTransferAdminSummary } from "@/services/pod-payout-transfer.service";
+import { AdminPodOverview } from "./AdminPodOverview";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminPodDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ podId: string }>;
-  searchParams: Promise<{ section?: string }>;
 }) {
   const { podId } = await params;
-  const { section } = await searchParams;
   const id = podId?.trim();
   if (!id) notFound();
 
-  const [detail, vendorOptions, payoutSettings, allocationSummary, recipientOptions, allocations, recipientConnect, transferSummary, transfers] =
+  const [detail, vendorOptions, payoutSettings, allocationSummary, recipientConnect, transferSummary, failedTransferCount] =
     await Promise.all([
       loadAdminPodDetail(id),
       prisma.vendor.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: 500 }),
       getPodPayoutSettingsForAdmin(id),
       getPodPayoutAllocationSummary(id),
-      getPodPayoutRecipientOptions(id),
-      listRecentPodPayoutAllocationsForAdmin(id),
       getPodPayoutRecipientConnectStatusForPod(id),
       getPodPayoutTransferAdminSummary(id),
-      listRecentPodPayoutTransfersForAdmin(id),
+      prisma.podPayoutTransfer.count({ where: { podId: id, status: "failed" } }),
     ]);
   if (!detail) notFound();
 
-  const failedTransferCount = transfers.filter((row) => row.status === "failed").length;
+  const vendorIds = detail.vendors.map((v) => v.vendorId);
+  const readinessByVendorId = await loadVendorReadinessBundles(vendorIds, {
+    includeDeliverectMappingIntegrity: true,
+  });
+
   const payoutLayout = deriveAdminPodDetailLayout({
     podPayoutsEnabled: payoutSettings?.podPayoutsEnabled ?? false,
     podPayoutRecipientUserId: payoutSettings?.podPayoutRecipientUserId ?? null,
     recipientConnectStatus: recipientConnect,
     allocationSummary,
     transferSummary,
-    allocationCount: allocations.length,
-    transferCount: transfers.length,
+    allocationCount: allocationSummary.total.count,
+    transferCount: transferSummary.paidTransferCount + transferSummary.blockedTransferCount,
     failedTransferCount,
-    expandedByDefault: section === "payouts",
+  });
+
+  const summary = buildAdminPodSummary({
+    detail,
+    readinessByVendorId,
+    hasPayoutIssues: payoutLayout.hasPayoutIssues,
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <nav className="text-sm text-oo-stone-gray">
         <Link href="/admin/pods" className="hover:text-oo-charcoal hover:underline">
           Pods
@@ -68,24 +68,7 @@ export default async function AdminPodDetailPage({
         <span className="text-oo-charcoal">{detail.pod.name}</span>
       </nav>
 
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-oo-charcoal">{detail.pod.name}</h1>
-        <p className="mt-1 font-mono text-sm text-oo-stone-gray">{detail.pod.slug}</p>
-      </header>
-
-      <AdminPodRescueClient detail={detail} vendorOptions={vendorOptions} />
-
-      <AdminPodPayoutSection
-        podId={id}
-        layout={payoutLayout}
-        settings={payoutSettings}
-        recipientOptions={recipientOptions}
-        allocationSummary={allocationSummary}
-        recipientConnectStatus={recipientConnect}
-        transferSummary={transferSummary}
-        transfers={transfers}
-        allocations={allocations}
-      />
+      <AdminPodOverview summary={summary} detail={detail} vendorOptions={vendorOptions} />
     </div>
   );
 }

@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition } from "react";
+import {
+  AdminAttentionSection,
+  AdminStatusBadge,
+  AdminStatusCard,
+} from "@/components/admin/AdminDetailUi";
 import type { AdminVendorSummary } from "@/lib/admin-vendor-summary";
 import {
   adminVendorPrimaryOrderState,
@@ -39,48 +44,6 @@ import {
   buildPodDashboardPath,
   buildUserAdminPath,
 } from "@/lib/admin-entity-nav-links";
-
-function StatusBadge({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "success" | "warning" | "danger" | "neutral";
-}) {
-  const classes =
-    tone === "success"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-      : tone === "warning"
-        ? "border-amber-200 bg-amber-50 text-amber-950"
-        : tone === "danger"
-          ? "border-red-200 bg-red-50 text-red-900"
-          : "border-oo-light-stone bg-oo-cream text-oo-charcoal";
-  return (
-    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${classes}`}>
-      {label}
-    </span>
-  );
-}
-
-function OverviewCard({
-  title,
-  children,
-  action,
-}: {
-  title: string;
-  children: ReactNode;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">{title}</h3>
-        {action}
-      </div>
-      <div className="mt-2 space-y-1 text-sm text-oo-charcoal">{children}</div>
-    </div>
-  );
-}
 
 type Option = { id: string; name: string };
 
@@ -143,8 +106,8 @@ export function AdminVendorOverview({
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
-              <StatusBadge label={summary.overallStatus.label} tone={summary.overallStatus.tone} />
-              <StatusBadge label={summary.routingBadge.label} tone="neutral" />
+              <AdminStatusBadge label={summary.overallStatus.label} tone={summary.overallStatus.tone} />
+              <AdminStatusBadge label={summary.routingBadge.label} tone="neutral" />
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -196,81 +159,47 @@ export function AdminVendorOverview({
         </div>
       </header>
 
-      {/* Attention */}
-      {summary.attentionItems.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-oo-charcoal">Attention required</h2>
-          <ul className="grid gap-3 md:grid-cols-2">
-            {summary.attentionItems.map((item) => (
-              <li
-                key={item.id}
-                className={`rounded-xl border p-4 ${
-                  item.tone === "danger"
-                    ? "border-red-200 bg-red-50"
-                    : "border-amber-200 bg-amber-50"
-                }`}
-              >
-                <p className="text-sm font-semibold text-oo-charcoal">{item.title}</p>
-                <p className="mt-1 text-sm text-oo-stone-gray">{item.consequence}</p>
-                {item.actionHref ? (
-                  item.actionKind === "anchor" ? (
-                    <a
-                      href={item.actionHref}
-                      className="mt-3 inline-flex rounded-lg bg-oo-charcoal px-3 py-1.5 text-xs font-semibold text-white"
-                      onClick={() => {
-                        if (item.actionHref === "#advanced-settings") setShowAdvanced(true);
-                      }}
-                    >
-                      {item.actionLabel}
-                    </a>
-                  ) : (
-                    <Link
-                      href={item.actionHref}
-                      className="mt-3 inline-flex rounded-lg bg-oo-charcoal px-3 py-1.5 text-xs font-semibold text-white"
-                    >
-                      {item.actionLabel}
-                    </Link>
-                  )
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <AdminAttentionSection
+        items={summary.attentionItems.map((item) => ({
+          ...item,
+          onActionClick:
+            item.actionHref === "#advanced-settings" ? () => setShowAdvanced(true) : undefined,
+        }))}
+      />
 
       {/* Status overview */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-oo-charcoal">Status overview</h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <OverviewCard title="Public listing">
+          <AdminStatusCard title="Public listing">
             <p className="font-medium">{summary.visibility.label}</p>
             {summary.publicUrl ? (
               <p className="truncate text-xs text-oo-stone-gray">{summary.publicUrl}</p>
             ) : null}
-          </OverviewCard>
-          <OverviewCard title="Ordering">
+          </AdminStatusCard>
+          <AdminStatusCard title="Ordering">
             <p className="font-medium">{summary.ordering.label}</p>
             <p className="text-xs text-oo-stone-gray">
               {summary.hours.statusLabel}
               {summary.hours.nextChangeLabel ? ` · ${summary.hours.nextChangeLabel}` : ""}
             </p>
-          </OverviewCard>
-          <OverviewCard title="Menu">
+          </AdminStatusCard>
+          <AdminStatusCard title="Menu">
             <p className="font-medium">{summary.menu.statusLabel}</p>
             <p className="text-xs text-oo-stone-gray">
               {summary.menu.availableItemCount} available items
               {summary.menu.lastPublishedLabel ? ` · Last sync ${summary.menu.lastPublishedLabel}` : ""}
             </p>
-          </OverviewCard>
-          <OverviewCard title="Payments">
+          </AdminStatusCard>
+          <AdminStatusCard title="Payments">
             <p className="font-medium">{summary.payments.label}</p>
             {summary.payments.issue ? (
               <p className="text-xs text-oo-stone-gray">{summary.payments.issue}</p>
             ) : (
               <p className="text-xs text-oo-stone-gray">Payouts ready</p>
             )}
-          </OverviewCard>
-          <OverviewCard
+          </AdminStatusCard>
+          <AdminStatusCard
             title="Order routing"
             action={
               <button
@@ -288,15 +217,15 @@ export function AdminVendorOverview({
                 {line}
               </p>
             ))}
-          </OverviewCard>
-          <OverviewCard title="Pod membership">
+          </AdminStatusCard>
+          <AdminStatusCard title="Pod membership">
             <p className="font-medium">{summary.pod.label}</p>
             {summary.links.podAdmin ? (
               <Link href={summary.links.podAdmin} className="text-xs font-semibold underline">
                 Open pod
               </Link>
             ) : null}
-          </OverviewCard>
+          </AdminStatusCard>
         </div>
 
         {showRoutingEditor ? (
@@ -384,7 +313,7 @@ export function AdminVendorOverview({
                       {formatAdminOrderDate(new Date(o.createdAt))} · {formatAdminMoney(o.totalCents)}
                     </p>
                   </div>
-                  <StatusBadge label={state.label} tone={state.tone} />
+                  <AdminStatusBadge label={state.label} tone={state.tone} />
                 </li>
               );
             })}

@@ -214,6 +214,16 @@ const AUDIT_LABELS: Record<string, string> = {
   [ADMIN_AUDIT_ACTION.SQUARE_LOCATION_CHANGED]: "Square location changed",
   [ADMIN_AUDIT_ACTION.SQUARE_STALE_MAPPINGS_DEACTIVATED]:
     "Stale Square mappings deactivated",
+  [ADMIN_AUDIT_ACTION.POD_ORDERING_PAUSED]: "Ordering paused",
+  [ADMIN_AUDIT_ACTION.POD_ORDERING_UNPAUSED]: "Ordering resumed",
+  [ADMIN_AUDIT_ACTION.POD_HIDDEN]: "Pod hidden from public listing",
+  [ADMIN_AUDIT_ACTION.POD_SHOWN]: "Pod shown on public listing",
+  [ADMIN_AUDIT_ACTION.POD_DELETED]: "Pod deleted",
+  [ADMIN_AUDIT_ACTION.POD_PUBLIC_PROFILE_UPDATED]: "Pod profile updated",
+  [ADMIN_AUDIT_ACTION.POD_READINESS_RECHECKED]: "Readiness rechecked",
+  [ADMIN_AUDIT_ACTION.POD_OWNER_ACCESS_ADDED]: "Pod owner access updated",
+  [ADMIN_AUDIT_ACTION.POD_OWNER_ACCESS_REMOVED]: "Pod owner access updated",
+  [ADMIN_AUDIT_ACTION.POD_OWNER_TRANSFERRED]: "Pod owner access updated",
 };
 
 export function formatAdminAuditActionLabel(

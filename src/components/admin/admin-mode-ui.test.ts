@@ -75,12 +75,11 @@ describe("admin pod detail navigation", () => {
     expect(page).not.toContain("AdminEntityContextNav");
   });
 
-  it("places pod dashboard link in overview section", () => {
-    const rescue = readSrc("app/admin/(dashboard)/pods/[podId]/AdminPodRescueClient.tsx");
-    expect(rescue).toContain('title="Overview"');
-    expect(rescue).toContain("buildPodDashboardPath(podId)");
-    expect(rescue).toContain("ADMIN_NAV_LABELS.openPodDashboard");
-    expect(rescue).not.toContain('title="Pod dashboard"');
+  it("places pod dashboard link in overview primary actions", () => {
+    const overview = readSrc("app/admin/(dashboard)/pods/[podId]/AdminPodOverview.tsx");
+    expect(overview).toContain("summary.links.podDashboard");
+    expect(overview).toContain("Open pod dashboard");
+    expect(overview).not.toContain("AdminPodContextNav");
   });
 
   it("does not render standalone related navigation on vendor or user admin detail", () => {

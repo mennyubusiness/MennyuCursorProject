@@ -8,7 +8,6 @@ import { getPublicSiteOriginFromEnv } from "@/lib/public-site-url";
 import { listSlugRedirectsForEntity } from "@/lib/slug-admin.server";
 import { adminPodReadinessLabel } from "@/lib/admin-pod-detail-layout";
 import { listAdminAuditLogsForPod } from "@/services/admin-audit-log.service";
-import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
 
 export type AdminPodDetailView = {
   pod: {
@@ -19,6 +18,7 @@ export type AdminPodDetailView = {
     address: string | null;
     contactEmail: string | null;
     imageUrl: string | null;
+    pickupTimezone: string | null;
     isActive: boolean;
     mennyuOrdersPaused: boolean;
     deletedAt: string | null;
@@ -41,11 +41,15 @@ export type AdminPodDetailView = {
     vendorId: string;
     vendorName: string;
     vendorSlug: string;
+    cuisineCategory: string | null;
+    description: string | null;
+    imageUrl: string | null;
+    deletedAt: string | null;
     podVendorActive: boolean;
     vendorActive: boolean;
     mennyuOrdersPaused: boolean;
-    orderable: boolean;
-    orderabilityLabel: string;
+    orderRoutingMode: string;
+    customerOrderingHours: unknown;
   }>;
   invites: {
     pending: number;
@@ -54,7 +58,13 @@ export type AdminPodDetailView = {
     expired: number;
     recent: Array<{ id: string; email: string; status: string; createdAt: string }>;
   };
-  recentOrders: Array<{ id: string; status: string; createdAt: string; totalCents: number }>;
+  recentOrders: Array<{
+    id: string;
+    status: string;
+    createdAt: string;
+    totalCents: number;
+    vendorOrders: Array<{ routingStatus: string; fulfillmentStatus: string }>;
+  }>;
   slugRedirects: Array<{ id: string; oldSlug: string; newSlug: string; createdAt: string }>;
   readinessLabel: string;
   activeVendorCount: number;
@@ -80,9 +90,14 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
               id: true,
               name: true,
               slug: true,
+              description: true,
+              imageUrl: true,
+              cuisineCategory: true,
               isActive: true,
               mennyuOrdersPaused: true,
               deletedAt: true,
+              orderRoutingMode: true,
+              customerOrderingHours: true,
             },
           },
         },
@@ -119,7 +134,15 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       where: { podId },
       orderBy: { createdAt: "desc" },
       take: 10,
-      select: { id: true, status: true, createdAt: true, totalCents: true },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        totalCents: true,
+        vendorOrders: {
+          select: { routingStatus: true, fulfillmentStatus: true },
+        },
+      },
     }),
     prisma.podVendorInvite.findMany({
       where: { podId },
@@ -146,6 +169,7 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       address: pod.address,
       contactEmail: pod.contactEmail,
       imageUrl: pod.imageUrl,
+      pickupTimezone: pod.pickupTimezone,
       isActive: pod.isActive,
       mennyuOrdersPaused: pod.mennyuOrdersPaused,
       deletedAt: pod.deletedAt?.toISOString() ?? null,
@@ -169,28 +193,20 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       name: m.user.name,
       role: m.role,
     })),
-    vendors: pod.vendors.map((pv) => {
-      const orderability = getVendorOrderabilityInPod({
-        podActive: pod.isActive,
-        podOrdersPaused: pod.mennyuOrdersPaused,
-        podVendorExists: true,
-        podVendorActive: pv.isActive,
-        vendor: {
-          isActive: pv.vendor.isActive,
-          mennyuOrdersPaused: pv.vendor.mennyuOrdersPaused,
-        },
-      });
-      return {
-        vendorId: pv.vendor.id,
-        vendorName: pv.vendor.name,
-        vendorSlug: pv.vendor.slug,
-        podVendorActive: pv.isActive,
-        vendorActive: pv.vendor.isActive,
-        mennyuOrdersPaused: pv.vendor.mennyuOrdersPaused,
-        orderable: orderability.orderable,
-        orderabilityLabel: orderability.orderable ? "Orderable" : orderability.message ?? "Not orderable",
-      };
-    }),
+    vendors: pod.vendors.map((pv) => ({
+      vendorId: pv.vendor.id,
+      vendorName: pv.vendor.name,
+      vendorSlug: pv.vendor.slug,
+      cuisineCategory: pv.vendor.cuisineCategory,
+      description: pv.vendor.description,
+      imageUrl: pv.vendor.imageUrl,
+      deletedAt: pv.vendor.deletedAt?.toISOString() ?? null,
+      podVendorActive: pv.isActive,
+      vendorActive: pv.vendor.isActive,
+      mennyuOrdersPaused: pv.vendor.mennyuOrdersPaused,
+      orderRoutingMode: pv.vendor.orderRoutingMode,
+      customerOrderingHours: pv.vendor.customerOrderingHours,
+    })),
     invites: {
       ...inviteCounts,
       recent: inviteRows.slice(0, 8).map((i) => ({
@@ -205,6 +221,10 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       status: o.status,
       createdAt: o.createdAt.toISOString(),
       totalCents: o.totalCents,
+      vendorOrders: o.vendorOrders.map((vo) => ({
+        routingStatus: vo.routingStatus,
+        fulfillmentStatus: vo.fulfillmentStatus,
+      })),
     })),
     slugRedirects: staleRedirects.map((r) => ({
       id: r.id,
@@ -267,7 +287,7 @@ export async function searchAdminPods(rawQuery: string, limit = 50): Promise<Adm
     include: {
       vendors: {
         include: {
-          vendor: { select: { isActive: true, mennyuOrdersPaused: true } },
+          vendor: { select: { isActive: true, mennyuOrdersPaused: true, deletedAt: true } },
         },
       },
       memberships: {
@@ -280,9 +300,12 @@ export async function searchAdminPods(rawQuery: string, limit = 50): Promise<Adm
     take: limit,
   });
 
+  const { getVendorOrderabilityInPod } = await import("@/lib/vendor-orderability-in-pod");
+
   return pods.map((pod) => {
     let orderableVendorCount = 0;
     for (const pv of pod.vendors) {
+      if (pv.vendor.deletedAt || !pv.vendor.isActive || !pv.isActive) continue;
       const orderability = getVendorOrderabilityInPod({
         podActive: pod.isActive,
         podOrdersPaused: pod.mennyuOrdersPaused,

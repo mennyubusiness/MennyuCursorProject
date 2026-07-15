@@ -41,8 +41,8 @@ const vendorDiagnostics = readFileSync(
   ),
   "utf8"
 );
-const podRescueClient = readFileSync(
-  join(process.cwd(), "src/app/admin/(dashboard)/pods/[podId]/AdminPodRescueClient.tsx"),
+const podOverview = readFileSync(
+  join(process.cwd(), "src/app/admin/(dashboard)/pods/[podId]/AdminPodOverview.tsx"),
   "utf8"
 );
 const layoutSrc = readFileSync(join(process.cwd(), "src/app/admin/(dashboard)/layout.tsx"), "utf8");
@@ -87,7 +87,7 @@ describe("admin rescue UI wiring", () => {
     expect(vendorOverview).toContain("Ordering controls");
     expect(vendorOverview).toContain("AdminEntityDeleteDangerZone");
     expect(vendorOverview).toContain("adminDeleteVendorProfileAction");
-    expect(vendorOverview).toContain("Attention required");
+    expect(vendorOverview).toContain("AdminAttentionSection");
     expect(vendorOverview).toContain("Recent activity");
   });
 
@@ -97,12 +97,15 @@ describe("admin rescue UI wiring", () => {
     expect(vendorDiagnostics).toContain("Business hours debug");
   });
 
-  it("pod rescue client includes delete danger zone and roster sections", () => {
-    expect(podRescueClient).toContain("AdminEntityDeleteDangerZone");
-    expect(podRescueClient).toContain("adminDeletePodProfileAction");
-    expect(podRescueClient).toContain("QR / public link");
-    expect(podRescueClient).toContain("Vendor roster");
-    expect(podRescueClient).toContain("Pause pod ordering");
+  it("pod overview includes delete danger zone and roster sections", () => {
+    expect(podOverview).toContain("AdminEntityDeleteDangerZone");
+    expect(podOverview).toContain("adminDeletePodProfileAction");
+    expect(podOverview).toContain("QR / public link");
+    expect(podOverview).toContain('id="vendors"');
+    expect(podOverview).toContain("Pause pod ordering");
+    expect(podOverview).toContain("AdminAttentionSection");
+    expect(podOverview).toContain("Technical diagnostics");
+    expect(podOverview).toContain("Status overview");
   });
 
   it("admin layout guards vendor and pod pages", () => {

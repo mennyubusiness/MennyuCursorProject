@@ -56,7 +56,7 @@ describe("admin vendor detail overview hierarchy", () => {
     expect(page).not.toContain("SQUARE_ROUTING_LIVE");
     expect(page).not.toContain("Business hours debug");
     expect(page).not.toContain("AdminSquareOrderInjectionDiagnosticsPanel");
-    expect(overview).toContain("Attention required");
+    expect(overview).toContain("AdminAttentionSection");
     expect(overview).toContain("Status overview");
     expect(overview).toContain("Quick actions");
     expect(overview).toContain("Technical diagnostics");
