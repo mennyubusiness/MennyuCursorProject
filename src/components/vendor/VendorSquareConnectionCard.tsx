@@ -10,6 +10,7 @@ import {
 import type { ProviderConnectionHealth } from "@/lib/integrations/types";
 import type { SquareConfigSnapshot } from "@/lib/integrations/square/square-config";
 import type { SquareConnectionView } from "@/lib/integrations/square/square-connection.service";
+import type { SquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
 import { filterSquareVendorFacingWarnings } from "@/lib/integrations/square/square-vendor-facing-health";
 
 function EnvironmentBadge({ environment }: { environment: string }) {
@@ -32,11 +33,13 @@ export function VendorSquareConnectionCard({
   snap,
   connection,
   health,
+  routingReadiness,
 }: {
   vendorId: string;
   snap: SquareConfigSnapshot;
   connection: SquareConnectionView | null;
   health: ProviderConnectionHealth;
+  routingReadiness?: SquareOrderRoutingReadiness | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -58,6 +61,17 @@ export function VendorSquareConnectionCard({
   const connectionEnvironment =
     connection?.squareEnvironment ?? connection?.capabilitiesMeta?.squareEnvironment ?? snap.environment;
   const vendorFacingWarnings = filterSquareVendorFacingWarnings(health.warnings);
+  const coverage = routingReadiness?.mappingCoverage;
+  const orderRoutingReady = routingReadiness?.prerequisitesReady === true;
+  const statusLabel = orderRoutingReady
+    ? "Ready for orders"
+    : health.isReady
+      ? "Connected — mapping incomplete"
+      : connection?.status === "error"
+        ? "Connection error"
+        : connection
+          ? "Connected — setup incomplete"
+          : "Not connected";
 
   return (
     <DashboardCard className="max-w-3xl">
@@ -65,8 +79,8 @@ export function VendorSquareConnectionCard({
         <div>
           <h3 className="text-sm font-semibold text-oo-charcoal">Square</h3>
           <p className="mt-1 text-xs text-oo-stone-gray">
-            Connect Square for future menu sync and order routing. Does not change checkout or
-            payouts.
+            Connect Square for menu sync and kitchen order routing. Customer checkout and payouts
+            stay on Open Order.
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {snap.environment ? <EnvironmentBadge environment={snap.environment} /> : null}
@@ -79,20 +93,14 @@ export function VendorSquareConnectionCard({
         </div>
         <span
           className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
-            health.isReady
+            orderRoutingReady
               ? "border-emerald-200 bg-emerald-50 text-emerald-800"
               : connection?.status === "error"
                 ? "border-red-200 bg-red-50 text-red-800"
                 : "border-amber-200 bg-amber-50 text-amber-900"
           }`}
         >
-          {health.isReady
-            ? "Ready"
-            : connection?.status === "error"
-              ? "Connection error"
-              : connection
-                ? "Connected — setup incomplete"
-                : "Not connected"}
+          {statusLabel}
         </span>
       </div>
 
@@ -180,6 +188,30 @@ export function VendorSquareConnectionCard({
           {connection.errorMessage ? (
             <p className="text-sm text-red-700">{connection.errorMessage}</p>
           ) : null}
+          {coverage && connection.externalLocationId ? (
+            <div className="rounded-lg border border-oo-light-stone bg-oo-cream/40 px-3 py-2 text-sm">
+              <p className="font-medium text-oo-charcoal">
+                Mapping coverage: {coverage.mappedSellableItems} of {coverage.totalSellableItems}{" "}
+                items mapped
+              </p>
+              {!orderRoutingReady ? (
+                <p className="mt-1 text-xs text-amber-950">
+                  This vendor cannot accept orders until every sellable item (and required modifiers)
+                  is mapped at the selected Square location.
+                  {coverage.mappingsExistForAnotherLocation
+                    ? " Some items are mapped only at another location — re-import and publish for this location."
+                    : " Import and publish your Square menu for this location."}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-oo-stone-gray">Managed in Square</p>
+              )}
+              {connection.capabilitiesMeta?.menuRequiresRepublish ? (
+                <p className="mt-1 text-xs text-amber-950">
+                  Location changed — re-import and publish the Square menu before accepting orders.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -197,6 +229,56 @@ export function VendorSquareConnectionCard({
             <li key={item}>{item}</li>
           ))}
         </ul>
+      ) : null}
+
+      {connection &&
+      !connection.needsLocationSelection &&
+      activeLocations.length > 1 &&
+      connection.externalLocationId ? (
+        <form
+          className="mt-4 space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setError(null);
+            startTransition(async () => {
+              const result = await selectSquareLocationAction(vendorId, selectedLocationId);
+              if (!result.ok) {
+                setError(result.error);
+                return;
+              }
+              router.refresh();
+            });
+          }}
+        >
+          <label className="block text-sm font-medium text-oo-charcoal" htmlFor="square-location-change">
+            Change Square location
+          </label>
+          <p className="text-xs text-amber-950">
+            Changing location deactivates mappings for other locations. Re-import and publish the
+            menu for the new location before accepting orders.
+          </p>
+          <select
+            id="square-location-change"
+            className="w-full rounded-lg border border-oo-light-stone bg-white px-3 py-2 text-sm"
+            value={selectedLocationId}
+            onChange={(e) => setSelectedLocationId(e.target.value)}
+            disabled={pending}
+          >
+            {activeLocations.map((loc) => (
+              <option key={loc.id} value={loc.id}>
+                {loc.name}
+                {loc.addressLine ? ` — ${loc.addressLine}` : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            disabled={pending || !selectedLocationId || selectedLocationId === connection.externalLocationId}
+            className="inline-flex items-center justify-center rounded-xl border border-oo-light-stone px-4 py-2 text-sm font-semibold text-oo-charcoal hover:bg-oo-cream disabled:opacity-60"
+          >
+            {pending ? "Saving…" : "Update location"}
+          </button>
+        </form>
       ) : null}
 
       {connection?.needsLocationSelection && activeLocations.length > 0 ? (

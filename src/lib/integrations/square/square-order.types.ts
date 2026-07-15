@@ -109,6 +109,8 @@ export type SquareOrderSubmitAudit = {
   mappingIssues?: unknown;
   /** Attached when readiness fails with "No active Square item mappings…". No secrets. */
   mappingFailureDiagnostics?: unknown;
+  /** Normalized machine-readable failure (readiness / mapping / create_order / create_payment). */
+  routingFailure?: unknown;
   squarePaymentId?: string;
   squareOrderState?: string;
   squarePaymentStatus?: string;

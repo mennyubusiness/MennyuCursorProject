@@ -47,6 +47,16 @@ export type AdminSquareOrderInjectionDiagnostics = {
     oauthPermissionsVersion: number | null;
     /** Expanded mapping/connection diagnostics (no secrets). */
     mapping: SquareVendorMappingDiagnostics;
+    mappingCoverage: {
+      ready: boolean;
+      totalSellableItems: number;
+      mappedSellableItems: number;
+      missingItemIds: string[];
+      missingRequiredModifierOptionIds: string[];
+      mappingsExistForAnotherLocation: boolean;
+      alternateLocationIds: string[];
+      blockers: Array<{ code: string; entityType: string; internalId: string; message: string }>;
+    };
   };
 };
 
@@ -124,6 +134,23 @@ export async function loadAdminSquareOrderInjectionDiagnostics(
       missingOAuthScopes: scopeCoverage.missingRequiredScopes,
       oauthPermissionsVersion: scopeCoverage.permissionsVersion,
       mapping,
+      mappingCoverage: {
+        ready: readiness.mappingCoverage.ready,
+        totalSellableItems: readiness.mappingCoverage.totalSellableItems,
+        mappedSellableItems: readiness.mappingCoverage.mappedSellableItems,
+        missingItemIds: readiness.mappingCoverage.missingItemIds,
+        missingRequiredModifierOptionIds:
+          readiness.mappingCoverage.missingRequiredModifierOptionIds,
+        mappingsExistForAnotherLocation:
+          readiness.mappingCoverage.mappingsExistForAnotherLocation,
+        alternateLocationIds: readiness.mappingCoverage.alternateLocationIds,
+        blockers: readiness.mappingCoverage.blockers.map((b) => ({
+          code: b.code,
+          entityType: b.entityType,
+          internalId: b.internalId,
+          message: b.message,
+        })),
+      },
     },
   };
 }

@@ -9,6 +9,7 @@ import {
 } from "@/lib/vendor-customer-ordering-hours";
 import {
   isVendorSetupPosReady,
+  isVendorSquareOrderable,
   type VendorRoutingReadinessInput,
 } from "@/lib/vendor-order-routing-mode";
 import type { VendorMenuSource, VendorOrderRoutingMode } from "@prisma/client";
@@ -104,6 +105,7 @@ export type VendorOperationalMissingKey =
   | "stripe"
   | "pos"
   | "deliverect_mapping"
+  | "square_routing"
   | "pod_membership"
   | "pod_vendor_inactive"
   | "vendor_inactive"
@@ -185,6 +187,7 @@ export function getVendorOperationalMissingItems(
   if (!isVendorStripePayoutReady(stripeSummary)) missing.push("stripe");
   if (!isVendorPosReady(posSummary)) missing.push("pos");
   if (!isVendorDeliverectMappingReady(posSummary)) missing.push("deliverect_mapping");
+  if (!isVendorSquareOrderable(posSummary)) missing.push("square_routing");
   if (!isVendorMenuReady(menuSummary, posSummary.menuSource)) missing.push("menu_unavailable");
 
   const availability = getVendorAvailability(
@@ -370,6 +373,11 @@ export function getVendorPodOwnerMissingLines(input: VendorReadinessEvaluationIn
   }
   if (operational.includes("pos")) {
     lines.push("Visible, not accepting orders: order routing setup incomplete.");
+  }
+  if (operational.includes("square_routing")) {
+    lines.push(
+      "Visible, not accepting orders: Square menu mappings incomplete for the selected location."
+    );
   }
   if (operational.includes("deliverect_mapping")) {
     lines.push("Visible, not accepting orders: Deliverect mappings incomplete.");

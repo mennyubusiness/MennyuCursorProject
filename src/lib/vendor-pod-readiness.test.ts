@@ -190,6 +190,7 @@ describe("deriveVendorPodReadiness status priority", () => {
           deliverectChannelLinkId: null,
           posConnectionStatus: "not_connected",
           squareConnectionReady: true,
+          squareOrderRoutingReady: false,
         },
         stripeSummary: baseStripe,
         customerOrderingHours: baseCustomerOrderingHours,
@@ -205,7 +206,7 @@ describe("deriveVendorPodReadiness status priority", () => {
     expect(pos?.label).toBe("Square connected");
     expect(pos?.description).toMatch(/Finish menu import/i);
     expect(pos?.actionLabel).toBe("Manage Square integration");
-    expect(result.canAcceptOrders).toBe(true);
+    expect(result.canAcceptOrders).toBe(false);
   });
 
   it("does not show Square connection requirement for manual dashboard routing", () => {

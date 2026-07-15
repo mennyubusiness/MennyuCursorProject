@@ -4,6 +4,21 @@ const mockFindFirst = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockFindUnique = vi.fn();
+const mockUpdateMany = vi.fn();
+const mockTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+  const tx = {
+    vendorIntegrationConnection: {
+      findFirst: (...args: unknown[]) => mockFindFirst(...args),
+      create: (...args: unknown[]) => mockCreate(...args),
+      update: (...args: unknown[]) => mockUpdate(...args),
+      updateMany: (...args: unknown[]) => mockUpdateMany(...args),
+    },
+    providerEntityMapping: {
+      updateMany: (...args: unknown[]) => mockUpdateMany(...args),
+    },
+  };
+  return fn(tx);
+});
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -12,13 +27,30 @@ vi.mock("@/lib/db", () => ({
       create: (...args: unknown[]) => mockCreate(...args),
       update: (...args: unknown[]) => mockUpdate(...args),
       findUnique: (...args: unknown[]) => mockFindUnique(...args),
+      updateMany: (...args: unknown[]) => mockUpdateMany(...args),
+    },
+    providerEntityMapping: {
+      updateMany: (...args: unknown[]) => mockUpdateMany(...args),
     },
     integrationProviderCredential: {
       create: vi.fn(),
       delete: vi.fn(),
     },
+    $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
 }));
+
+vi.mock("@/services/admin-audit-log.service", () => ({
+  createAdminAuditLog: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/integrations/provider-mapping.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/integrations/provider-mapping.service")>();
+  return {
+    ...actual,
+    deactivateSquareMappingsOutsideLocation: vi.fn().mockResolvedValue(2),
+  };
+});
 
 vi.mock("@/lib/integrations/square/square-api.client", () => ({
   exchangeSquareOAuthCode: vi.fn(),

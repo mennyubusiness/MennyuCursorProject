@@ -295,6 +295,20 @@ export async function importSquareCatalog(
     objects,
   });
 
+  // New-location import has written selected-location mappings; clear republish flag from location change.
+  const meta = connection.capabilitiesMeta;
+  if (meta?.menuRequiresRepublish) {
+    await prisma.vendorIntegrationConnection.update({
+      where: { id: connection.id },
+      data: {
+        capabilities: {
+          ...meta,
+          menuRequiresRepublish: false,
+        } as object,
+      },
+    });
+  }
+
   return {
     ...normalized,
     locationId,

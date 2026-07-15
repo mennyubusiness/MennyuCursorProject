@@ -4,6 +4,7 @@ const mockFindUnique = vi.fn();
 const mockUpdate = vi.fn();
 const mockGetVendorOrder = vi.fn();
 const mockAssertReady = vi.fn();
+const mockLoadReadiness = vi.fn();
 const mockGetConnection = vi.fn();
 const mockEnsureToken = vi.fn();
 const mockMap = vi.fn();
@@ -34,6 +35,17 @@ vi.mock("@/lib/integrations/square/square-order-mapper", () => ({
 
 vi.mock("@/lib/integrations/square/square-order-routing-readiness", () => ({
   assertSquareOrderRoutingReady: (...args: unknown[]) => mockAssertReady(...args),
+  loadSquareOrderRoutingReadiness: (...args: unknown[]) => mockLoadReadiness(...args),
+}));
+
+vi.mock("@/lib/integrations/square/square-mapping-diagnostics.server", () => ({
+  buildSquareVendorOrderMappingFailureDiagnostics: vi.fn().mockResolvedValue({
+    vendorOrderId: "vo_sq_1",
+    vendorId: "vendor_sq",
+    mappingLocationsFoundForVendor: [],
+    missingMappingItems: [],
+    orderedItems: [],
+  }),
 }));
 
 vi.mock("@/lib/integrations/square/square-connection.service", () => ({
@@ -76,13 +88,32 @@ describe("submitVendorOrderToSquare", () => {
     mockFindUnique.mockResolvedValue({
       routingStatus: "pending",
       squareOrderId: null,
+      squareAttempts: 0,
       lastSquarePayload: null,
       lastSquareResponse: null,
       subtotalCents: 1100,
       taxCents: 100,
     });
     mockAssertReady.mockResolvedValue({ ok: true, locationId: "LOC_1" });
-    mockGetConnection.mockResolvedValue({ id: "conn_1", accessTokenRef: "ref_1" });
+    mockLoadReadiness.mockResolvedValue({
+      injectionOperationalReady: true,
+      locationId: "LOC_1",
+      injectionBlockingReasons: [],
+      prerequisiteBlockers: [],
+      coverageBlockers: [],
+      mappingCoverage: {
+        ready: true,
+        missingItemIds: [],
+        missingRequiredModifierGroupIds: [],
+        missingRequiredModifierOptionIds: [],
+        alternateLocationIds: [],
+      },
+    });
+    mockGetConnection.mockResolvedValue({
+      id: "conn_1",
+      accessTokenRef: "ref_1",
+      externalMerchantId: "MERCH_1",
+    });
     mockEnsureToken.mockResolvedValue("oauth_token_vendor");
     mockMap.mockResolvedValue({
       ok: true,

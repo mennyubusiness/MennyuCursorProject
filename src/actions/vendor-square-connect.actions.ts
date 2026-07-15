@@ -21,7 +21,11 @@ export async function selectSquareLocationAction(
     return { ok: false, error: "You don’t have permission to manage integrations for this vendor." };
   }
 
-  const result = await selectSquareLocationForVendor({ vendorId, locationId });
+  const result = await selectSquareLocationForVendor({
+    vendorId,
+    locationId,
+    actorUserId: userId,
+  });
   if (!result.ok) return result;
 
   revalidatePath(`/vendor/${vendorId}/setup`);
@@ -52,9 +56,13 @@ export async function getSquareIntegrationUiState(vendorId: string) {
   const { getActiveSquareConnectionForVendor, evaluateSquareConnectionHealth } = await import(
     "@/lib/integrations/square/square-connection.service"
   );
-  const [connection, health] = await Promise.all([
+  const { loadSquareOrderRoutingReadiness } = await import(
+    "@/lib/integrations/square/square-order-routing-readiness"
+  );
+  const [connection, health, routingReadiness] = await Promise.all([
     getActiveSquareConnectionForVendor(vendorId),
     evaluateSquareConnectionHealth(vendorId),
+    loadSquareOrderRoutingReadiness(vendorId),
   ]);
-  return { snap, connection, health };
+  return { snap, connection, health, routingReadiness };
 }

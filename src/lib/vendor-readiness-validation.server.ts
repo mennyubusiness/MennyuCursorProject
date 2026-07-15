@@ -82,14 +82,25 @@ export async function loadVendorReadinessBundles(
     .map((vendor) => vendor.id);
 
   const squareConnectionReadyByVendor = new Map<string, boolean>();
+  const squareOrderRoutingReadyByVendor = new Map<string, boolean>();
   if (squareVendorIds.length > 0) {
     const { evaluateSquareConnectionHealth } = await import(
       "@/lib/integrations/square/square-connection.service"
     );
+    const { loadSquareOrderRoutingReadiness } = await import(
+      "@/lib/integrations/square/square-order-routing-readiness"
+    );
     await Promise.all(
       squareVendorIds.map(async (id) => {
-        const health = await evaluateSquareConnectionHealth(id);
+        const [health, routing] = await Promise.all([
+          evaluateSquareConnectionHealth(id),
+          loadSquareOrderRoutingReadiness(id),
+        ]);
         squareConnectionReadyByVendor.set(id, health.isReady);
+        // Use prerequisites (full coverage) for customer orderability — SQUARE_ROUTING_LIVE
+        // still gates post-payment injection via assertSquareOrderRoutingReady.
+        // Blocking sales when live is off is handled below when injectionOperationalReady is used.
+        squareOrderRoutingReadyByVendor.set(id, routing.injectionOperationalReady);
       })
     );
   }
@@ -131,7 +142,11 @@ export async function loadVendorReadinessBundles(
         menuSource: vendor.menuSource,
         deliverectMappingReady,
         ...(isSquareRoutingMode(vendor.orderRoutingMode)
-          ? { squareConnectionReady: squareConnectionReadyByVendor.get(vendor.id) ?? false }
+          ? {
+              squareConnectionReady: squareConnectionReadyByVendor.get(vendor.id) ?? false,
+              squareOrderRoutingReady:
+                squareOrderRoutingReadyByVendor.get(vendor.id) ?? false,
+            }
           : {}),
       },
     });

@@ -168,7 +168,7 @@ describe("orderability", () => {
     expect(state.podOwnerDisplay).toBe("live");
   });
 
-  it("is orderable for square routing when connection is ready without admin injection enablement", () => {
+  it("is orderable for square routing when connection and routing readiness are true", () => {
     const input = evaluation({
       posSummary: {
         ...basePos,
@@ -176,6 +176,7 @@ describe("orderability", () => {
         deliverectChannelLinkId: null,
         posConnectionStatus: "not_connected",
         squareConnectionReady: true,
+        squareOrderRoutingReady: true,
         squareOrderRoutingEnabled: false,
       },
     });
@@ -190,6 +191,7 @@ describe("orderability", () => {
         deliverectChannelLinkId: null,
         posConnectionStatus: "not_connected",
         squareConnectionReady: false,
+        squareOrderRoutingReady: false,
       },
     });
     const state = getVendorOrderabilityState(input);
@@ -197,16 +199,19 @@ describe("orderability", () => {
     expect(state.customerBannerLine).not.toMatch(/admin|injection/i);
   });
 
-  it("does not block square vendors solely because squareOrderRoutingReady is false", () => {
+  it("blocks square vendors when profile is complete but routing readiness is false (visible but closed)", () => {
     const input = evaluation({
       posSummary: {
         ...basePos,
         orderRoutingMode: "square",
         squareConnectionReady: true,
-          squareOrderRoutingReady: false,
+        squareOrderRoutingReady: false,
       },
     });
-    expect(getVendorOrderabilityState(input).orderable).toBe(true);
+    const state = getVendorOrderabilityState(input);
+    expect(state.visibility).toBe("visible");
+    expect(state.orderable).toBe(false);
+    expect(state.customerBannerLine).toMatch(/not accepting orders/i);
   });
 
   it("blocks ordering when manually paused", () => {

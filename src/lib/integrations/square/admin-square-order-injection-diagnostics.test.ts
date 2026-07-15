@@ -139,6 +139,16 @@ describe("loadAdminSquareOrderInjectionDiagnostics", () => {
         "Square order injection is disabled for this vendor.",
         "SQUARE_ROUTING_LIVE is not true — Square CreateOrder/CreatePayment API calls are blocked globally.",
       ],
+      mappingCoverage: {
+        ready: true,
+        totalSellableItems: 4,
+        mappedSellableItems: 4,
+        missingItemIds: [],
+        missingRequiredModifierOptionIds: [],
+        mappingsExistForAnotherLocation: false,
+        alternateLocationIds: [],
+        blockers: [],
+      },
     });
   });
 
@@ -159,6 +169,7 @@ describe("loadAdminSquareOrderInjectionDiagnostics", () => {
       prerequisitesReady: true,
       injectionOperationalReady: false,
     });
+    expect(diagnostics?.vendor.mappingCoverage.mappedSellableItems).toBe(4);
     expect(diagnostics?.vendor.mapping.activeSquareConnectionId).toBe("conn_1");
     expect(diagnostics?.vendor.mapping.externalLocationId).toBe("LOC_1");
     expect(diagnostics?.vendor.blockingReasons.some((r) => /injection is disabled/i.test(r))).toBe(
@@ -183,6 +194,16 @@ describe("loadAdminSquareOrderInjectionDiagnostics", () => {
       activeItemMappingCount: 0,
       activeModifierMappingCount: 0,
       injectionBlockingReasons: ["Order routing mode is not Square."],
+      mappingCoverage: {
+        ready: false,
+        totalSellableItems: 0,
+        mappedSellableItems: 0,
+        missingItemIds: [],
+        missingRequiredModifierOptionIds: [],
+        mappingsExistForAnotherLocation: false,
+        alternateLocationIds: [],
+        blockers: [],
+      },
     });
     mockMapping.mockResolvedValue({
       ...mappingFixture,
@@ -214,6 +235,16 @@ describe("loadAdminSquareOrderInjectionDiagnostics", () => {
       activeItemMappingCount: 0,
       activeModifierMappingCount: 0,
       injectionBlockingReasons: ["Order routing mode is not Square."],
+      mappingCoverage: {
+        ready: false,
+        totalSellableItems: 0,
+        mappedSellableItems: 0,
+        missingItemIds: [],
+        missingRequiredModifierOptionIds: [],
+        mappingsExistForAnotherLocation: false,
+        alternateLocationIds: [],
+        blockers: [],
+      },
     });
 
     const diagnostics = await loadAdminSquareOrderInjectionDiagnostics(VENDOR_ID);

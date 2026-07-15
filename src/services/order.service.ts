@@ -270,6 +270,21 @@ export async function validateCartForOrder(cart: {
     };
   }
 
+  const { validateSquareCartPreflight } = await import(
+    "@/lib/integrations/square/square-cart-preflight.server"
+  );
+  const squarePreflight = await validateSquareCartPreflight(cart.items);
+  if (!squarePreflight.valid) {
+    return {
+      valid: false,
+      code: squarePreflight.code,
+      message: squarePreflight.message,
+      cartItemId: squarePreflight.cartItemId,
+      menuItemId: squarePreflight.menuItemId,
+      menuItemName: squarePreflight.menuItemName,
+    };
+  }
+
   return { valid: true };
 }
 

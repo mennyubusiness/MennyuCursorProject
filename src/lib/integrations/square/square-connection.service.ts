@@ -46,6 +46,9 @@ export type SquareConnectionCapabilitiesMeta = SquareOAuthScopeMeta & {
   selectedLocationAddress?: string | null;
   connectedAt?: string | null;
   lastTokenRefreshAt?: string | null;
+  /** Set when selected location changes until a Square catalog re-import/publish completes. */
+  menuRequiresRepublish?: boolean;
+  previousExternalLocationId?: string | null;
 };
 
 export type SquareConnectionView = {
@@ -182,7 +185,7 @@ export async function getActiveSquareConnectionForVendor(
 ): Promise<SquareConnectionView | null> {
   const row = await prisma.vendorIntegrationConnection.findFirst({
     where: { vendorId, provider: "square", isActive: true },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
   });
   if (!row) return null;
 
@@ -230,47 +233,66 @@ async function upsertSquareConnection(input: {
   errorCode?: string | null;
   errorMessage?: string | null;
 }) {
-  const existing = await prisma.vendorIntegrationConnection.findFirst({
-    where: { vendorId: input.vendorId, provider: "square", isActive: true },
-    select: { id: true, accessTokenRef: true, capabilities: true },
-  });
-
-  const priorMeta = parseCapabilitiesMeta(existing?.capabilities);
-  const capabilities = {
-    ...input.capabilities,
-    connectedAt: priorMeta?.connectedAt ?? input.capabilities.connectedAt ?? new Date().toISOString(),
-    lastTokenRefreshAt:
-      input.capabilities.lastTokenRefreshAt ?? priorMeta?.lastTokenRefreshAt ?? null,
-  };
-
-  const data = {
-    status: input.status,
-    displayName: input.displayName ?? null,
-    externalMerchantId: input.externalMerchantId ?? null,
-    externalLocationId: input.externalLocationId ?? null,
-    externalStoreId: input.externalStoreId ?? null,
-    accessTokenRef: input.accessTokenRef ?? existing?.accessTokenRef ?? null,
-    refreshTokenRef: input.refreshTokenRef ?? null,
-    capabilities: capabilities as object,
-    lastHealthCheckAt: new Date(),
-    errorCode: input.errorCode ?? null,
-    errorMessage: input.errorMessage ?? null,
-    isActive: true,
-  };
-
-  if (existing) {
-    return prisma.vendorIntegrationConnection.update({
-      where: { id: existing.id },
-      data,
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.vendorIntegrationConnection.findFirst({
+      where: { vendorId: input.vendorId, provider: "square", isActive: true },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      select: { id: true, accessTokenRef: true, capabilities: true },
     });
-  }
 
-  return prisma.vendorIntegrationConnection.create({
-    data: {
-      vendorId: input.vendorId,
-      provider: "square",
-      ...data,
-    },
+    const priorMeta = parseCapabilitiesMeta(existing?.capabilities);
+    const capabilities = {
+      ...input.capabilities,
+      connectedAt: priorMeta?.connectedAt ?? input.capabilities.connectedAt ?? new Date().toISOString(),
+      lastTokenRefreshAt:
+        input.capabilities.lastTokenRefreshAt ?? priorMeta?.lastTokenRefreshAt ?? null,
+    };
+
+    const data = {
+      status: input.status,
+      displayName: input.displayName ?? null,
+      externalMerchantId: input.externalMerchantId ?? null,
+      externalLocationId: input.externalLocationId ?? null,
+      externalStoreId: input.externalStoreId ?? null,
+      accessTokenRef: input.accessTokenRef ?? existing?.accessTokenRef ?? null,
+      refreshTokenRef: input.refreshTokenRef ?? null,
+      capabilities: capabilities as object,
+      lastHealthCheckAt: new Date(),
+      errorCode: input.errorCode ?? null,
+      errorMessage: input.errorMessage ?? null,
+      isActive: true,
+    };
+
+    // Ensure at most one active Square connection per vendor (see partial unique index).
+    await tx.vendorIntegrationConnection.updateMany({
+      where: {
+        vendorId: input.vendorId,
+        provider: "square",
+        isActive: true,
+        ...(existing ? { id: { not: existing.id } } : {}),
+      },
+      data: {
+        isActive: false,
+        status: "disconnected",
+        accessTokenRef: null,
+        refreshTokenRef: null,
+      },
+    });
+
+    if (existing) {
+      return tx.vendorIntegrationConnection.update({
+        where: { id: existing.id },
+        data,
+      });
+    }
+
+    return tx.vendorIntegrationConnection.create({
+      data: {
+        vendorId: input.vendorId,
+        provider: "square",
+        ...data,
+      },
+    });
   });
 }
 
@@ -465,7 +487,12 @@ export async function completeSquareOAuthForVendor(input: {
 export async function selectSquareLocationForVendor(input: {
   vendorId: string;
   locationId: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+  /** Optional actor for audit (vendor user or admin). */
+  actorUserId?: string | null;
+}): Promise<
+  | { ok: true; previousLocationId: string | null; mappingsDeactivated: number; locationChanged: boolean }
+  | { ok: false; error: string }
+> {
   const connection = await getActiveSquareConnectionForVendor(input.vendorId);
   if (!connection) return { ok: false, error: "No active Square connection." };
 
@@ -530,26 +557,83 @@ export async function selectSquareLocationForVendor(input: {
     }
   }
 
+  const previousLocationId = connection.externalLocationId?.trim() || null;
+  const locationChanged = previousLocationId !== cached.id;
   const meta = connection.capabilitiesMeta ?? buildCapabilitiesJson({});
-  await prisma.vendorIntegrationConnection.update({
-    where: { id: connection.id },
-    data: {
-      status: "connected",
-      externalLocationId: cached.id,
-      externalStoreId: cached.id,
-      errorCode: null,
-      errorMessage: null,
-      lastHealthCheckAt: new Date(),
-      capabilities: {
-        ...meta,
-        pendingLocationSelection: false,
-        selectedLocationName: cached.name,
-        selectedLocationAddress: cached.addressLine,
-      } as object,
-    },
+
+  const { deactivateSquareMappingsOutsideLocation } = await import(
+    "@/lib/integrations/provider-mapping.service"
+  );
+
+  const mappingsDeactivated = await prisma.$transaction(async (tx) => {
+    await tx.vendorIntegrationConnection.update({
+      where: { id: connection.id },
+      data: {
+        status: "connected",
+        externalLocationId: cached.id,
+        externalStoreId: cached.id,
+        errorCode: null,
+        errorMessage: null,
+        lastHealthCheckAt: new Date(),
+        capabilities: {
+          ...meta,
+          pendingLocationSelection: false,
+          selectedLocationName: cached.name,
+          selectedLocationAddress: cached.addressLine,
+          ...(locationChanged
+            ? {
+                menuRequiresRepublish: true,
+                previousExternalLocationId: previousLocationId,
+              }
+            : {}),
+        } as object,
+      },
+    });
+
+    if (!locationChanged) return 0;
+    return deactivateSquareMappingsOutsideLocation({
+      vendorId: input.vendorId,
+      selectedLocationId: cached.id,
+      db: tx,
+    });
   });
 
-  return { ok: true };
+  if (locationChanged) {
+    const { createAdminAuditLog } = await import("@/services/admin-audit-log.service");
+    const { ADMIN_AUDIT_ACTION, ADMIN_AUDIT_TARGET } = await import("@/lib/admin-audit-log");
+    await createAdminAuditLog({
+      adminUserId: input.actorUserId ?? null,
+      actionType: ADMIN_AUDIT_ACTION.SQUARE_LOCATION_CHANGED,
+      targetType: ADMIN_AUDIT_TARGET.vendor,
+      targetId: input.vendorId,
+      reason: "Square location selection changed",
+      oldValue: previousLocationId,
+      newValue: cached.id,
+      metadata: {
+        vendorId: input.vendorId,
+        previousLocationId,
+        newLocationId: cached.id,
+        mappingsDeactivated,
+        connectionId: connection.id,
+        occurredAt: new Date().toISOString(),
+      },
+    });
+
+    console.info("[square-location-change]", {
+      vendorId: input.vendorId,
+      previousLocationId,
+      newLocationId: cached.id,
+      mappingsDeactivated,
+      actorUserId: input.actorUserId ?? null,
+    });
+  }
+
+  return {
+    ok: true,
+    previousLocationId,
+    mappingsDeactivated,
+    locationChanged,
+  };
 }
 
 export async function disconnectSquareForVendor(vendorId: string): Promise<void> {

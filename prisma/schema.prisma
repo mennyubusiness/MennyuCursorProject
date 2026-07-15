@@ -1558,6 +1558,8 @@ model VendorIntegrationConnection {
   @@index([vendorId, provider])
   @@index([vendorId, provider, isActive])
   @@index([provider, externalLocationId])
+  /// Partial unique index enforced in migration 20260715140000_square_one_active_connection:
+  /// one active Square connection per vendor (WHERE isActive AND provider = square).
 }
 
 /// Encrypted OAuth tokens for integration providers — referenced by VendorIntegrationConnection.accessTokenRef.

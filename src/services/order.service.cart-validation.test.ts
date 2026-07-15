@@ -51,6 +51,10 @@ vi.mock("@/lib/vendor-readiness-validation.server", () => ({
   loadVendorReadinessBundles: (...args: unknown[]) => mockLoadVendorReadinessBundles(...args),
 }));
 
+vi.mock("@/lib/integrations/square/square-cart-preflight.server", () => ({
+  validateSquareCartPreflight: vi.fn().mockResolvedValue({ valid: true }),
+}));
+
 import type { CartForValidation } from "./order.service";
 import { defaultVendorCustomerOrderingWeek } from "@/lib/vendor-customer-ordering-hours";
 

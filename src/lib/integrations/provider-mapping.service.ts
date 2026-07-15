@@ -135,3 +135,28 @@ export async function deactivateProviderMappingsNotSeen(input: {
   });
   return toDeactivate.length;
 }
+
+/**
+ * Quarantine active mappings that are not for the selected Square location.
+ * Historical rows remain for diagnostics but cannot satisfy readiness/order injection.
+ */
+export async function deactivateSquareMappingsOutsideLocation(input: {
+  vendorId: string;
+  selectedLocationId: string;
+  /** Optional transaction client. */
+  db?: Pick<typeof prisma, "providerEntityMapping">;
+}): Promise<number> {
+  const selected = input.selectedLocationId.trim();
+  if (!selected) return 0;
+  const db = input.db ?? prisma;
+  const result = await db.providerEntityMapping.updateMany({
+    where: {
+      vendorId: input.vendorId,
+      provider: "square",
+      isActive: true,
+      OR: [{ externalLocationId: null }, { externalLocationId: { not: selected } }],
+    },
+    data: { isActive: false },
+  });
+  return result.count;
+}

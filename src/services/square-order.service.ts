@@ -17,11 +17,7 @@ import {
   getActiveSquareConnectionForVendor,
   markSquareConnectionInsufficientPermissions,
 } from "@/lib/integrations/square/square-connection.service";
-import { assertSquareOrderRoutingReady } from "@/lib/integrations/square/square-order-routing-readiness";
-import {
-  buildSquareVendorOrderMappingFailureDiagnostics,
-  isSquareNoActiveItemMappingsError,
-} from "@/lib/integrations/square/square-mapping-diagnostics.server";
+import { buildSquareVendorOrderMappingFailureDiagnostics } from "@/lib/integrations/square/square-mapping-diagnostics.server";
 import {
   isSquareInsufficientPermissionsError,
   SQUARE_OAUTH_PERMISSIONS_ADMIN_MESSAGE,
@@ -303,6 +299,7 @@ export async function submitVendorOrderToSquare(
     select: {
       routingStatus: true,
       squareOrderId: true,
+      squareAttempts: true,
       lastSquarePayload: true,
       lastSquareResponse: true,
       subtotalCents: true,
@@ -324,28 +321,52 @@ export async function submitVendorOrderToSquare(
   const existingAudit = readStoredAudit(current.lastSquarePayload);
   existingAudit.squareLastAttemptAt = attemptAt;
 
-  const readiness = await assertSquareOrderRoutingReady(vendorOrder.vendorId);
-  if (!readiness.ok) {
-    let auditPayload: SquareOrderSubmitAudit = { ...existingAudit };
-    if (isSquareNoActiveItemMappingsError(readiness.error)) {
-      // Diagnostic only — does not change readiness outcome.
-      auditPayload = {
-        ...auditPayload,
-        mappingFailureDiagnostics: await buildSquareVendorOrderMappingFailureDiagnostics({
-          vendorOrderId,
-          vendorId: vendorOrder.vendorId,
-        }),
-      };
-    }
-    await recordSquareRoutingFailure(vendorOrderId, readiness.error, {
+  const { loadSquareOrderRoutingReadiness } = await import(
+    "@/lib/integrations/square/square-order-routing-readiness"
+  );
+  const { buildSquareRoutingFailurePayload } = await import(
+    "@/lib/integrations/square/square-routing-failure"
+  );
+  const fullReadiness = await loadSquareOrderRoutingReadiness(vendorOrder.vendorId);
+  if (!fullReadiness.injectionOperationalReady || !fullReadiness.locationId) {
+    const readinessError =
+      fullReadiness.injectionBlockingReasons.join("; ") || "Square order routing is not ready.";
+    const mappingFailureDiagnostics = await buildSquareVendorOrderMappingFailureDiagnostics({
+      vendorOrderId,
+      vendorId: vendorOrder.vendorId,
+    });
+    const routingFailure = buildSquareRoutingFailurePayload({
+      code: "SQUARE_ROUTING_NOT_READY",
+      stage: "readiness",
+      vendorId: vendorOrder.vendorId,
+      vendorOrderId,
+      selectedLocationId: fullReadiness.locationId,
+      missingMenuItemIds: fullReadiness.mappingCoverage.missingItemIds,
+      missingModifierGroupIds: fullReadiness.mappingCoverage.missingRequiredModifierGroupIds,
+      missingModifierOptionIds: fullReadiness.mappingCoverage.missingRequiredModifierOptionIds,
+      alternateLocationIds: fullReadiness.mappingCoverage.alternateLocationIds,
+      attempt: (current.squareAttempts ?? 0) + 1,
+      summary: readinessError,
+      providerErrors: {
+        coverageBlockers: fullReadiness.coverageBlockers,
+        prerequisiteBlockers: fullReadiness.prerequisiteBlockers,
+      },
+    });
+    const auditPayload: SquareOrderSubmitAudit = {
+      ...existingAudit,
+      mappingFailureDiagnostics,
+      routingFailure,
+    };
+    await recordSquareRoutingFailure(vendorOrderId, readinessError, {
       lastSquarePayload: auditPayload,
     });
     return {
       success: false,
-      error: readiness.error,
+      error: readinessError,
       code: "ROUTING_NOT_READY",
     };
   }
+  const readiness = { ok: true as const, locationId: fullReadiness.locationId };
 
   const connection = await getActiveSquareConnectionForVendor(vendorOrder.vendorId);
   if (!connection?.accessTokenRef) {
@@ -406,8 +427,38 @@ export async function submitVendorOrderToSquare(
 
   if (!mapped.ok) {
     const summary = mapped.issues.map((i) => i.message).join("; ");
+    const mappingFailureDiagnostics = await buildSquareVendorOrderMappingFailureDiagnostics({
+      vendorOrderId,
+      vendorId: vendorOrder.vendorId,
+    });
+    const routingFailure = buildSquareRoutingFailurePayload({
+      code: "SQUARE_MAPPING_FAILED",
+      stage: "mapping",
+      vendorId: vendorOrder.vendorId,
+      vendorOrderId,
+      merchantId: connection.externalMerchantId,
+      selectedLocationId: readiness.locationId,
+      missingMenuItemIds: mapped.issues
+        .filter((i) => i.menuItemId)
+        .map((i) => i.menuItemId!),
+      missingModifierOptionIds: mapped.issues
+        .filter((i) => i.modifierOptionId)
+        .map((i) => i.modifierOptionId!),
+      alternateLocationIds: mappingFailureDiagnostics.mappingLocationsFoundForVendor
+        .map((r) => r.externalLocationId)
+        .filter((id): id is string => Boolean(id && id !== readiness.locationId)),
+      idempotencyKey: squareOrderIdempotencyKey(vendorOrderId),
+      attempt: (current.squareAttempts ?? 0) + 1,
+      summary,
+      providerErrors: { mappingIssues: mapped.issues },
+    });
     await recordSquareRoutingFailure(vendorOrderId, summary, {
-      lastSquarePayload: { ...existingAudit, mappingIssues: mapped.issues },
+      lastSquarePayload: {
+        ...existingAudit,
+        mappingIssues: mapped.issues,
+        mappingFailureDiagnostics,
+        routingFailure,
+      },
     });
     return {
       success: false,

@@ -28,7 +28,7 @@ export default async function VendorSquareIntegrationPage({
   }
   if (!(await canViewVendor(session.user.id, vendorId))) notFound();
 
-  const { snap, connection, health } = await getSquareIntegrationUiState(vendorId);
+  const { snap, connection, health, routingReadiness } = await getSquareIntegrationUiState(vendorId);
 
   return (
     <DashboardShell tier="command" className="px-0 pb-0 pt-0">
@@ -68,13 +68,15 @@ export default async function VendorSquareIntegrationPage({
           snap={snap}
           connection={connection}
           health={health}
+          routingReadiness={routingReadiness}
         />
 
         <DashboardCard className="max-w-3xl">
           <h3 className="text-sm font-semibold text-oo-charcoal">Menu import</h3>
           <p className="mt-1 text-xs text-oo-stone-gray">
             Preview and import your Square catalog from Menu Imports. Imports create a draft menu
-            for review — they do not publish automatically.
+            for review — they do not publish automatically. After changing Square location, re-import
+            and publish before accepting orders.
           </p>
           <Link
             href={`/vendor/${vendorId}/menu/imports`}

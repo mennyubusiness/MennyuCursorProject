@@ -6,6 +6,7 @@ const mockConnection = vi.fn();
 const mockActiveMenu = vi.fn();
 const mockMenuVersionFind = vi.fn();
 const mockMappingCount = vi.fn();
+const mockCoverage = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -26,6 +27,10 @@ vi.mock("@/lib/integrations/square/square-connection.service", () => ({
 
 vi.mock("@/lib/vendor-active-menu-version.server", () => ({
   loadActiveMenuVersionForVendor: (...args: unknown[]) => mockActiveMenu(...args),
+}));
+
+vi.mock("@/lib/integrations/square/square-mapping-coverage.server", () => ({
+  evaluateSquareMenuMappingCoverage: (...args: unknown[]) => mockCoverage(...args),
 }));
 
 import {
@@ -64,6 +69,23 @@ function fullScopeConnection(overrides?: {
   };
 }
 
+function readyCoverage(overrides?: Record<string, unknown>) {
+  return {
+    ready: true,
+    totalSellableItems: 3,
+    mappedSellableItems: 3,
+    missingItemIds: [],
+    missingVariationIds: [],
+    missingRequiredModifierGroupIds: [],
+    missingRequiredModifierOptionIds: [],
+    selectedLocationId: "LOC_1",
+    mappingsExistForAnotherLocation: false,
+    alternateLocationIds: [],
+    blockers: [],
+    ...overrides,
+  };
+}
+
 describe("loadSquareOrderRoutingReadiness", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,6 +97,7 @@ describe("loadSquareOrderRoutingReadiness", () => {
     });
     mockMenuVersionFind.mockResolvedValue(null);
     mockMappingCount.mockResolvedValue(3);
+    mockCoverage.mockResolvedValue(readyCoverage());
   });
 
   it("is operational when prerequisites pass even if squareOrderRoutingEnabled is false", async () => {
@@ -136,6 +159,7 @@ describe("loadSquareOrderRoutingReadiness", () => {
   it("is not prerequisite-ready when location is missing", async () => {
     mockVendorFind.mockResolvedValue(baseVendor());
     mockConnection.mockResolvedValue({ externalLocationId: null });
+    mockCoverage.mockResolvedValue(readyCoverage({ selectedLocationId: null, ready: false }));
 
     const status = await loadSquareOrderRoutingReadiness(VENDOR_ID);
 
@@ -157,14 +181,57 @@ describe("loadSquareOrderRoutingReadiness", () => {
     expect(status.prerequisiteBlockers.some((m) => /imported from Square/i.test(m))).toBe(true);
   });
 
-  it("is not prerequisite-ready without active item mappings", async () => {
+  it("is not prerequisite-ready without complete sellable item mapping coverage", async () => {
     mockVendorFind.mockResolvedValue(baseVendor());
-    mockMappingCount.mockResolvedValue(0);
+    mockCoverage.mockResolvedValue(
+      readyCoverage({
+        ready: false,
+        totalSellableItems: 10,
+        mappedSellableItems: 1,
+        missingItemIds: ["mi_2"],
+        blockers: [
+          {
+            code: "NEVER_MAPPED",
+            entityType: "menu_item",
+            internalId: "mi_2",
+            selectedLocationId: "LOC_1",
+            message: "missing",
+          },
+        ],
+      })
+    );
 
     const status = await loadSquareOrderRoutingReadiness(VENDOR_ID);
 
     expect(status.prerequisitesReady).toBe(false);
-    expect(status.prerequisiteBlockers.some((m) => /item mappings/i.test(m))).toBe(true);
+    expect(status.prerequisiteBlockers.some((m) => /1 of 10/i.test(m))).toBe(true);
+  });
+
+  it("is not prerequisite-ready when mappings exist only at another location", async () => {
+    mockVendorFind.mockResolvedValue(baseVendor());
+    mockCoverage.mockResolvedValue(
+      readyCoverage({
+        ready: false,
+        mappedSellableItems: 0,
+        mappingsExistForAnotherLocation: true,
+        alternateLocationIds: ["LOC_OLD"],
+        blockers: [
+          {
+            code: "MAPPING_AT_DIFFERENT_LOCATION",
+            entityType: "menu_item",
+            internalId: "mi_1",
+            selectedLocationId: "LOC_1",
+            alternateLocationIds: ["LOC_OLD"],
+            message: "other loc",
+          },
+        ],
+      })
+    );
+
+    const status = await loadSquareOrderRoutingReadiness(VENDOR_ID);
+
+    expect(status.prerequisitesReady).toBe(false);
+    expect(status.prerequisiteBlockers.some((m) => /another Square location/i.test(m))).toBe(true);
   });
 
   it("is not prerequisite-ready when Square OAuth injection scopes are missing", async () => {
@@ -200,6 +267,7 @@ describe("assertSquareOrderRoutingPrerequisites", () => {
     });
     mockMenuVersionFind.mockResolvedValue(null);
     mockMappingCount.mockResolvedValue(2);
+    mockCoverage.mockResolvedValue(readyCoverage({ totalSellableItems: 2, mappedSellableItems: 2 }));
   });
 
   it("allows routing when prerequisites pass regardless of squareOrderRoutingEnabled", async () => {
@@ -222,6 +290,7 @@ describe("assertSquareOrderRoutingReady", () => {
     });
     mockMenuVersionFind.mockResolvedValue(null);
     mockMappingCount.mockResolvedValue(2);
+    mockCoverage.mockResolvedValue(readyCoverage({ totalSellableItems: 2, mappedSellableItems: 2 }));
   });
 
   it("allows submission when operational readiness passes even if squareOrderRoutingEnabled is false", async () => {

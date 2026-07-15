@@ -9,6 +9,7 @@ import {
   isVendorPosMenuManagedForUi,
   isVendorRoutingOperationalReady,
   isVendorSetupPosReady,
+  isVendorSquareOrderable,
   vendorSetupPageIncompleteDescription,
   normalizeVendorOrderRoutingMode,
   vendorKitchenStatusLine,
@@ -115,12 +116,13 @@ describe("isVendorRoutingOperationalReady", () => {
     ).toMatch(/Connect Square/i);
   });
 
-  it("square setup checklist passes on connection only without admin injection enablement", () => {
+  it("square setup checklist passes on connection only; orderability requires routing readiness", () => {
     expect(
       isVendorSetupPosReady({
         ...connectedPos,
         orderRoutingMode: "square",
         squareConnectionReady: true,
+        squareOrderRoutingReady: false,
         squareOrderRoutingEnabled: false,
       })
     ).toBe(true);
@@ -129,6 +131,25 @@ describe("isVendorRoutingOperationalReady", () => {
         ...connectedPos,
         orderRoutingMode: "square",
         squareConnectionReady: false,
+      })
+    ).toBe(false);
+  });
+
+  it("square orderability requires squareOrderRoutingReady", () => {
+    expect(
+      isVendorSquareOrderable({
+        ...connectedPos,
+        orderRoutingMode: "square",
+        squareConnectionReady: true,
+        squareOrderRoutingReady: true,
+      })
+    ).toBe(true);
+    expect(
+      isVendorSquareOrderable({
+        ...connectedPos,
+        orderRoutingMode: "square",
+        squareConnectionReady: true,
+        squareOrderRoutingReady: false,
       })
     ).toBe(false);
   });

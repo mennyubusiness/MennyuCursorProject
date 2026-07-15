@@ -20,6 +20,11 @@ vi.mock("@/lib/integrations/square/square-connection.service", () => ({
   evaluateSquareConnectionHealth: (...args: unknown[]) => mockSquareHealth(...args),
 }));
 
+const mockSquareRouting = vi.fn();
+vi.mock("@/lib/integrations/square/square-order-routing-readiness", () => ({
+  loadSquareOrderRoutingReadiness: (...args: unknown[]) => mockSquareRouting(...args),
+}));
+
 import { loadVendorReadinessBundles } from "@/lib/vendor-readiness-validation.server";
 import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
 import { defaultVendorCustomerOrderingWeek } from "@/lib/vendor-customer-ordering-hours";
@@ -40,9 +45,13 @@ describe("loadVendorReadinessBundles", () => {
       ])
     );
     mockSquareHealth.mockResolvedValue({ isReady: true });
+    mockSquareRouting.mockResolvedValue({
+      prerequisitesReady: true,
+      injectionOperationalReady: true,
+    });
   });
 
-  it("includes squareConnectionReady for square routing vendors", async () => {
+  it("includes squareConnectionReady and squareOrderRoutingReady for square routing vendors", async () => {
     mockVendorFindMany.mockResolvedValue([
       {
         id: "vendor_sq",
@@ -69,10 +78,12 @@ describe("loadVendorReadinessBundles", () => {
     const bundles = await loadVendorReadinessBundles(["vendor_sq"]);
     const bundle = bundles.get("vendor_sq");
     expect(bundle?.posSummary.squareConnectionReady).toBe(true);
+    expect(bundle?.posSummary.squareOrderRoutingReady).toBe(true);
     expect(mockSquareHealth).toHaveBeenCalledWith("vendor_sq");
+    expect(mockSquareRouting).toHaveBeenCalledWith("vendor_sq");
   });
 
-  it("powers public orderability for connected square vendors without admin injection", async () => {
+  it("powers public orderability for square vendors only when routing readiness is true", async () => {
     mockVendorFindMany.mockResolvedValue([
       {
         id: "vendor_sq",
@@ -114,5 +125,53 @@ describe("loadVendorReadinessBundles", () => {
     });
 
     expect(result.orderable).toBe(true);
+  });
+
+  it("blocks orderability when Square mapping coverage is incomplete", async () => {
+    mockSquareRouting.mockResolvedValue({
+      prerequisitesReady: false,
+      injectionOperationalReady: false,
+    });
+    mockVendorFindMany.mockResolvedValue([
+      {
+        id: "vendor_sq",
+        name: "Poke Sea",
+        slug: "poke-sea",
+        description: "Fresh poke",
+        imageUrl: "https://example.com/banner.jpg",
+        cuisineCategory: "Seafood",
+        isActive: true,
+        mennyuOrdersPaused: false,
+        customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+        stripeConnectedAccountId: "acct_1",
+        stripeChargesEnabled: true,
+        stripePayoutsEnabled: true,
+        deliverectChannelLinkId: null,
+        posConnectionStatus: "not_connected",
+        deliverectAutoMapLastOutcome: null,
+        pendingDeliverectConnectionKey: null,
+        orderRoutingMode: "square",
+        menuSource: "open_order",
+      },
+    ]);
+
+    const bundles = await loadVendorReadinessBundles(["vendor_sq"]);
+    const bundle = bundles.get("vendor_sq");
+    const result = getVendorOrderabilityInPod({
+      podActive: true,
+      podVendorExists: true,
+      podVendorActive: true,
+      vendor: { isActive: true, mennyuOrdersPaused: false, posOpen: true },
+      readiness: {
+        vendor: bundle!.vendor,
+        menuSummary: bundle!.menuSummary,
+        stripeSummary: { ...bundle!.stripeSummary, stripeConnectConfigured: true },
+        posSummary: bundle!.posSummary,
+      },
+    });
+
+    expect(bundle?.posSummary.squareConnectionReady).toBe(true);
+    expect(bundle?.posSummary.squareOrderRoutingReady).toBe(false);
+    expect(result.orderable).toBe(false);
   });
 });

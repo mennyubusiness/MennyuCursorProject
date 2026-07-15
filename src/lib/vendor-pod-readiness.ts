@@ -134,7 +134,15 @@ function toReadinessEvaluationInput(input: VendorPodReadinessInput): VendorReadi
     vendor: { ...input.vendor, customerOrderingHours: input.customerOrderingHours },
     menuSummary: input.menuSummary,
     stripeSummary: input.stripeSummary,
-    posSummary: input.posSummary,
+    posSummary: {
+      ...input.posSummary,
+      ...(input.squareConnectionReady !== undefined
+        ? { squareConnectionReady: input.squareConnectionReady }
+        : {}),
+      ...(input.squareOrderRoutingReady !== undefined
+        ? { squareOrderRoutingReady: input.squareOrderRoutingReady }
+        : {}),
+    },
     pod: input.pod,
     podVendor: input.podVendor
       ? { exists: true, isActive: input.podVendor.isActive }

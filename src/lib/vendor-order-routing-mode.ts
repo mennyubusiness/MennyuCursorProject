@@ -77,7 +77,8 @@ export type VendorRoutingReadinessInput = VendorPosConnectionSummary & {
 
 /**
  * Vendor-facing setup readiness for the POS / routing checklist row.
- * Square mode checks OAuth connection only — not admin order-injection enablement.
+ * Square mode: OAuth connection + selected location (catalog import unlocked).
+ * Full menu mapping coverage is enforced separately for public orderability.
  */
 export function isVendorSetupPosReady(input: VendorRoutingReadinessInput): boolean {
   if (isManualDashboardRoutingMode(input.orderRoutingMode)) {
@@ -90,6 +91,17 @@ export function isVendorSetupPosReady(input: VendorRoutingReadinessInput): boole
     return false;
   }
   return input.deliverectMappingReady !== false;
+}
+
+/**
+ * Public / cart orderability for Square requires complete injection prerequisites
+ * (connection, location, published Square menu, full sellable mapping coverage, live switch).
+ */
+export function isVendorSquareOrderable(input: VendorRoutingReadinessInput): boolean {
+  if (!isSquareRoutingMode(input.orderRoutingMode)) return true;
+  return (
+    input.squareConnectionReady === true && input.squareOrderRoutingReady === true
+  );
 }
 
 /**

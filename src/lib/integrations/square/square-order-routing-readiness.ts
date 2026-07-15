@@ -11,9 +11,16 @@ import {
   evaluateSquareOAuthScopeCoverageFromMeta,
   SQUARE_OAUTH_SCOPE_RECONNECT_MESSAGE,
 } from "@/lib/integrations/square/square-oauth-scopes";
+import {
+  evaluateSquareMenuMappingCoverage,
+  type SquareMenuMappingCoverage,
+  type SquareRoutingReadinessBlocker,
+} from "@/lib/integrations/square/square-mapping-coverage.server";
+
+export type { SquareMenuMappingCoverage, SquareRoutingReadinessBlocker };
 
 export type SquareOrderRoutingReadiness = {
-  /** All technical prerequisites for Square routing (connection, location, menu, mappings, scopes). */
+  /** All technical prerequisites for Square routing (connection, location, menu, full mapping coverage, scopes). */
   prerequisitesReady: boolean;
   /** Paid orders will route to Square when post-payment routing runs. */
   injectionOperationalReady: boolean;
@@ -27,8 +34,12 @@ export type SquareOrderRoutingReadiness = {
   locationId: string | null;
   activeItemMappingCount: number;
   activeModifierMappingCount: number;
+  /** Full sellable-menu mapping coverage at the selected location. */
+  mappingCoverage: SquareMenuMappingCoverage;
   prerequisiteBlockers: string[];
   injectionBlockingReasons: string[];
+  /** Structured coverage / routing blockers (machine-readable). */
+  coverageBlockers: SquareRoutingReadinessBlocker[];
   /** @deprecated Prefer injectionBlockingReasons — kept for existing callers. */
   missingRequirements: string[];
 };
@@ -54,6 +65,22 @@ async function countActiveSquareMappings(vendorId: string, locationId: string | 
   ]);
 
   return { activeItemMappingCount, activeModifierMappingCount };
+}
+
+function emptyCoverage(locationId: string | null): SquareMenuMappingCoverage {
+  return {
+    ready: false,
+    totalSellableItems: 0,
+    mappedSellableItems: 0,
+    missingItemIds: [],
+    missingVariationIds: [],
+    missingRequiredModifierGroupIds: [],
+    missingRequiredModifierOptionIds: [],
+    selectedLocationId: locationId,
+    mappingsExistForAnotherLocation: false,
+    alternateLocationIds: [],
+    blockers: [],
+  };
 }
 
 export async function loadSquareOrderRoutingReadiness(
@@ -85,8 +112,10 @@ export async function loadSquareOrderRoutingReadiness(
       locationId: null,
       activeItemMappingCount: 0,
       activeModifierMappingCount: 0,
+      mappingCoverage: emptyCoverage(null),
       prerequisiteBlockers: [message],
       injectionBlockingReasons: [message],
+      coverageBlockers: [],
       missingRequirements: [message],
     };
   }
@@ -144,14 +173,44 @@ export async function loadSquareOrderRoutingReadiness(
     prerequisiteBlockers.push("Published menu must be imported from Square before order routing.");
   }
 
-  const { activeItemMappingCount, activeModifierMappingCount } = await countActiveSquareMappings(
-    vendorId,
-    locationId
-  );
+  const [{ activeItemMappingCount, activeModifierMappingCount }, mappingCoverage] =
+    await Promise.all([
+      countActiveSquareMappings(vendorId, locationId),
+      evaluateSquareMenuMappingCoverage({
+        vendorId,
+        selectedLocationId: locationId,
+      }),
+    ]);
 
-  if (hasSquarePublishedMenu && activeItemMappingCount === 0) {
+  if (hasSquarePublishedMenu && mappingCoverage.totalSellableItems > 0 && !mappingCoverage.ready) {
+    const coverageSummary = `${mappingCoverage.mappedSellableItems} of ${mappingCoverage.totalSellableItems} sellable items have complete Square mappings at the selected location.`;
+    prerequisiteBlockers.push(coverageSummary);
+
+    if (mappingCoverage.mappingsExistForAnotherLocation) {
+      prerequisiteBlockers.push(
+        "Some sellable items are mapped only at another Square location. Re-import and publish the menu for the selected location."
+      );
+    }
+    if (mappingCoverage.missingRequiredModifierOptionIds.length > 0) {
+      prerequisiteBlockers.push(
+        `${mappingCoverage.missingRequiredModifierOptionIds.length} required modifier option(s) lack Square mappings at the selected location.`
+      );
+    }
+  }
+
+  if (
+    hasSquarePublishedMenu &&
+    mappingCoverage.totalSellableItems === 0 &&
+    activeItemMappingCount === 0
+  ) {
+    // Published Square menu with nothing sellable yet — still block injection until there is
+    // something mapped, matching prior "no mappings" gate for empty/broken menus.
     prerequisiteBlockers.push("No active Square item mappings for the selected location.");
   }
+
+  const coverageReady =
+    mappingCoverage.ready &&
+    (mappingCoverage.totalSellableItems > 0 || activeItemMappingCount > 0);
 
   const prerequisitesReady =
     squareMode &&
@@ -159,7 +218,7 @@ export async function loadSquareOrderRoutingReadiness(
     scopeCoverage.hasOrderInjectionScopes &&
     Boolean(locationId?.trim()) &&
     hasSquarePublishedMenu &&
-    activeItemMappingCount > 0;
+    coverageReady;
 
   injectionBlockingReasons.push(...prerequisiteBlockers);
   if (!globalRoutingLive) {
@@ -179,8 +238,10 @@ export async function loadSquareOrderRoutingReadiness(
     locationId,
     activeItemMappingCount,
     activeModifierMappingCount,
+    mappingCoverage,
     prerequisiteBlockers,
     injectionBlockingReasons,
+    coverageBlockers: mappingCoverage.blockers,
     missingRequirements: injectionBlockingReasons,
   };
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AdminInfoRow } from "@/components/admin/AdminReasonActionForm";
 import type { AdminSquareOrderInjectionDiagnostics } from "@/lib/integrations/square/admin-square-order-injection-diagnostics.server";
 import { vendorOrderRoutingModeAdminLabel } from "@/lib/vendor-order-routing-mode";
+import { AdminDeactivateStaleSquareMappingsButton } from "./AdminDeactivateStaleSquareMappingsButton";
 
 function boolLabel(value: boolean): string {
   return value ? "true" : "false";
@@ -118,6 +119,41 @@ export function AdminSquareOrderInjectionDiagnosticsPanel({
             value={boolLabel(mapping.mappingsExistForAnotherLocation)}
           />
           <AdminInfoRow
+            label="mapping coverage"
+            value={`${vendor.mappingCoverage.mappedSellableItems} / ${vendor.mappingCoverage.totalSellableItems} sellable items`}
+          />
+          <AdminInfoRow
+            label="coverage ready"
+            value={boolLabel(vendor.mappingCoverage.ready)}
+          />
+          <AdminInfoRow
+            label="missing sellable item ids (sample)"
+            value={
+              vendor.mappingCoverage.missingItemIds.length > 0
+                ? vendor.mappingCoverage.missingItemIds.slice(0, 8).join(", ")
+                : "none"
+            }
+          />
+          <AdminInfoRow
+            label="alternate mapping locations"
+            value={
+              vendor.mappingCoverage.alternateLocationIds.length > 0
+                ? vendor.mappingCoverage.alternateLocationIds.join(", ")
+                : "none"
+            }
+          />
+          <AdminInfoRow
+            label="coverage blockers"
+            value={
+              vendor.mappingCoverage.blockers.length > 0
+                ? vendor.mappingCoverage.blockers
+                    .slice(0, 8)
+                    .map((b) => `${b.code}:${b.internalId}`)
+                    .join("; ")
+                : "none"
+            }
+          />
+          <AdminInfoRow
             label="required OAuth scopes"
             value={vendor.requiredOAuthScopes.join(", ") || "—"}
           />
@@ -223,6 +259,11 @@ export function AdminSquareOrderInjectionDiagnosticsPanel({
       ) : (
         <p className="mt-4 text-xs text-emerald-800">No blockers — Square routing is operational.</p>
       )}
+
+      {mapping.mappingsExistForAnotherLocation ||
+      vendor.mappingCoverage.alternateLocationIds.length > 0 ? (
+        <AdminDeactivateStaleSquareMappingsButton vendorId={vendorId} />
+      ) : null}
     </section>
   );
 }
