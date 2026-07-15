@@ -12,6 +12,10 @@ import {
   evaluateSquareOAuthScopeCoverageFromMeta,
   SQUARE_OAUTH_SCOPES,
 } from "@/lib/integrations/square/square-oauth-scopes";
+import {
+  loadSquareVendorMappingDiagnostics,
+  type SquareVendorMappingDiagnostics,
+} from "@/lib/integrations/square/square-mapping-diagnostics.server";
 import { prisma } from "@/lib/db";
 
 export type AdminSquareConnectionDiagnosticStatus = "connected" | "error" | "missing";
@@ -24,6 +28,8 @@ export type AdminSquareOrderInjectionDiagnostics = {
     squareOAuthConfigured: boolean;
   };
   vendor: {
+    vendorId: string;
+    vendorName: string;
     orderRoutingMode: VendorOrderRoutingMode;
     squareOrderRoutingEnabled: boolean;
     squareConnectionStatus: AdminSquareConnectionDiagnosticStatus;
@@ -39,6 +45,8 @@ export type AdminSquareOrderInjectionDiagnostics = {
     authorizedOAuthScopes: string[];
     missingOAuthScopes: string[];
     oauthPermissionsVersion: number | null;
+    /** Expanded mapping/connection diagnostics (no secrets). */
+    mapping: SquareVendorMappingDiagnostics;
   };
 };
 
@@ -68,17 +76,22 @@ export async function loadAdminSquareOrderInjectionDiagnostics(
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
     select: {
+      id: true,
+      name: true,
       orderRoutingMode: true,
       squareOrderRoutingEnabled: true,
     },
   });
   if (!vendor) return null;
 
-  const [readiness, connection, health] = await Promise.all([
+  const [readiness, connection, health, mapping] = await Promise.all([
     loadSquareOrderRoutingReadiness(vendorId),
     getActiveSquareConnectionForVendor(vendorId),
     evaluateSquareConnectionHealth(vendorId),
+    loadSquareVendorMappingDiagnostics(vendorId),
   ]);
+
+  if (!mapping) return null;
 
   const squareConnectionStatus = deriveSquareConnectionStatus({
     hasConnection: Boolean(connection),
@@ -91,6 +104,8 @@ export async function loadAdminSquareOrderInjectionDiagnostics(
   return {
     global: loadAdminSquareEnvDiagnostics(),
     vendor: {
+      vendorId: vendor.id,
+      vendorName: vendor.name,
       orderRoutingMode: vendor.orderRoutingMode,
       squareOrderRoutingEnabled: vendor.squareOrderRoutingEnabled,
       squareConnectionStatus,
@@ -108,6 +123,7 @@ export async function loadAdminSquareOrderInjectionDiagnostics(
       authorizedOAuthScopes: scopeCoverage.authorizedScopes,
       missingOAuthScopes: scopeCoverage.missingRequiredScopes,
       oauthPermissionsVersion: scopeCoverage.permissionsVersion,
+      mapping,
     },
   };
 }

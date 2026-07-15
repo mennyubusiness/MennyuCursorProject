@@ -114,6 +114,16 @@ export function CartPageMutationProvider({
   );
 
   useEffect(() => {
+    // SSR / revalidatePath props can lag behind optimistic client edits — never regress.
+    if (
+      !shouldAcceptApiCartPayload(
+        { cart: initialCart },
+        lastAcceptedSnapshotMetaRef.current
+      )
+    ) {
+      setServerValidation(initialValidation);
+      return;
+    }
     setCart(initialCart);
     cartRef.current = initialCart;
     setServerValidation(initialValidation);

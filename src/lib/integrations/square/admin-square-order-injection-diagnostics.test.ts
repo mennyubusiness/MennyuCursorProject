@@ -5,6 +5,7 @@ const mockReadiness = vi.fn();
 const mockConnection = vi.fn();
 const mockHealth = vi.fn();
 const mockSquareConfig = vi.fn();
+const mockMapping = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -32,12 +33,42 @@ vi.mock("@/lib/integrations/square/square-connection.service", () => ({
   evaluateSquareConnectionHealth: (...args: unknown[]) => mockHealth(...args),
 }));
 
+vi.mock("@/lib/integrations/square/square-mapping-diagnostics.server", () => ({
+  loadSquareVendorMappingDiagnostics: (...args: unknown[]) => mockMapping(...args),
+}));
+
 import {
   loadAdminSquareEnvDiagnostics,
   loadAdminSquareOrderInjectionDiagnostics,
 } from "@/lib/integrations/square/admin-square-order-injection-diagnostics.server";
 
 const VENDOR_ID = "vendor_sq";
+
+const mappingFixture = {
+  vendorId: VENDOR_ID,
+  vendorName: "Poke Sea",
+  orderRoutingMode: "square",
+  activeSquareConnectionId: "conn_1",
+  externalMerchantId: "MERCH_1",
+  externalLocationId: "LOC_1",
+  connectionStatus: "connected",
+  credentialRefPresent: true,
+  activeSquareConnectionCount: 1,
+  squareConnections: [],
+  publishedMenuVersionId: "mv_1",
+  publishedSourcePayloadKind: "square_catalog_v1",
+  activePublishedItemCount: 3,
+  activeSquareProviderEntityMappingCountForVendorAndLocation: 13,
+  activeSquareItemMappingsForVendorAndLocation: 4,
+  activeSquareModifierMappingsForVendorAndLocation: 9,
+  activeSquareMappingsByLocation: [{ key: "LOC_1", totalCount: 13, itemCount: 4, modifierCount: 9 }],
+  activeSquareMappingsByConnectionId: [
+    { key: "conn_1", totalCount: 13, itemCount: 4, modifierCount: 9 },
+  ],
+  mappingsExistForAnotherLocation: false,
+  first10UnmappedPublishedItems: [],
+  first10MappingExternalIds: [],
+};
 
 describe("loadAdminSquareEnvDiagnostics", () => {
   beforeEach(() => {
@@ -89,11 +120,14 @@ describe("loadAdminSquareOrderInjectionDiagnostics", () => {
       environment: "production",
     });
     mockVendorFind.mockResolvedValue({
+      id: VENDOR_ID,
+      name: "Poke Sea",
       orderRoutingMode: "square",
       squareOrderRoutingEnabled: false,
     });
     mockConnection.mockResolvedValue({ status: "connected" });
     mockHealth.mockResolvedValue({ isReady: true, missingRequirements: [] });
+    mockMapping.mockResolvedValue(mappingFixture);
     mockReadiness.mockResolvedValue({
       prerequisitesReady: true,
       injectionOperationalReady: false,
@@ -108,10 +142,12 @@ describe("loadAdminSquareOrderInjectionDiagnostics", () => {
     });
   });
 
-  it("returns vendor diagnostics with blocking reasons and no secrets", async () => {
+  it("returns vendor diagnostics with mapping details and no secrets", async () => {
     const diagnostics = await loadAdminSquareOrderInjectionDiagnostics(VENDOR_ID);
 
     expect(diagnostics?.vendor).toMatchObject({
+      vendorId: VENDOR_ID,
+      vendorName: "Poke Sea",
       orderRoutingMode: "square",
       squareOrderRoutingEnabled: false,
       squareConnectionStatus: "connected",
@@ -123,12 +159,19 @@ describe("loadAdminSquareOrderInjectionDiagnostics", () => {
       prerequisitesReady: true,
       injectionOperationalReady: false,
     });
-    expect(diagnostics?.vendor.blockingReasons.some((r) => /injection is disabled/i.test(r))).toBe(true);
+    expect(diagnostics?.vendor.mapping.activeSquareConnectionId).toBe("conn_1");
+    expect(diagnostics?.vendor.mapping.externalLocationId).toBe("LOC_1");
+    expect(diagnostics?.vendor.blockingReasons.some((r) => /injection is disabled/i.test(r))).toBe(
+      true
+    );
     expect(JSON.stringify(diagnostics)).not.toMatch(/SQUARE_APPLICATION_SECRET/);
+    expect(JSON.stringify(diagnostics)).not.toMatch(/encryptedAccessToken/);
   });
 
   it("manual vendors still load env diagnostics without Square vendor blockers from routing mode", async () => {
     mockVendorFind.mockResolvedValue({
+      id: VENDOR_ID,
+      name: "Manual Vendor",
       orderRoutingMode: "manual_dashboard",
       squareOrderRoutingEnabled: false,
     });
@@ -141,6 +184,13 @@ describe("loadAdminSquareOrderInjectionDiagnostics", () => {
       activeModifierMappingCount: 0,
       injectionBlockingReasons: ["Order routing mode is not Square."],
     });
+    mockMapping.mockResolvedValue({
+      ...mappingFixture,
+      vendorName: "Manual Vendor",
+      orderRoutingMode: "manual_dashboard",
+      activeSquareConnectionId: null,
+      externalLocationId: null,
+    });
 
     const diagnostics = await loadAdminSquareOrderInjectionDiagnostics(VENDOR_ID);
 
@@ -151,6 +201,8 @@ describe("loadAdminSquareOrderInjectionDiagnostics", () => {
 
   it("deliverect vendors are unaffected by SQUARE_ROUTING_LIVE in vendor diagnostics", async () => {
     mockVendorFind.mockResolvedValue({
+      id: VENDOR_ID,
+      name: "Deliverect Vendor",
       orderRoutingMode: "deliverect",
       squareOrderRoutingEnabled: false,
     });

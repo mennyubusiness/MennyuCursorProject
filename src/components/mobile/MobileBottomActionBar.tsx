@@ -58,15 +58,27 @@ function PrimaryControl({
     className
   );
 
+  const label = (
+    <span className="inline-flex items-center justify-center gap-2">
+      {primaryLoading ? (
+        <span
+          className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent"
+          aria-hidden
+        />
+      ) : null}
+      <span>{primaryLabel}</span>
+    </span>
+  );
+
   if (primaryHref) {
     return (
       <Link
         href={primaryHref}
         className={shared}
         aria-label={ariaLabel ?? primaryLabel}
-        aria-disabled={primaryDisabled}
+        aria-disabled={primaryDisabled || primaryLoading}
       >
-        {primaryLoading ? "Loading…" : primaryLabel}
+        {label}
       </Link>
     );
   }
@@ -81,7 +93,7 @@ function PrimaryControl({
       aria-label={ariaLabel ?? primaryLabel}
       className={shared}
     >
-      {primaryLoading ? "Loading…" : primaryLabel}
+      {label}
     </button>
   );
 }

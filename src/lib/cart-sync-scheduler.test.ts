@@ -310,6 +310,177 @@ describe("cart-sync-scheduler", () => {
     expect(errors.some((e) => e?.includes("no longer available"))).toBe(true);
   });
 
+  it("keeps newer optimistic lines when a slow earlier batch returns a lagging server cart", async () => {
+    let current: Cart = { ...baseCart, items: [], groups: [], subtotalCents: 0 };
+    let resolveSlow!: (value: {
+      success: true;
+      cart: Cart;
+      appliedOperations: Array<{ operationId: string; status: "applied" }>;
+      rejectedOperations: [];
+    }) => void;
+    const slowFlush = new Promise<Parameters<typeof resolveSlow>[0]>((resolve) => {
+      resolveSlow = resolve;
+    });
+    let flushCount = 0;
+
+    const add = (menuItemId: string, name: string, flushImpl?: typeof slowFlush) =>
+      scheduleOptimisticCartSync({
+        cartId: current.id,
+        podId: current.podId,
+        source: "vendor-menu",
+        getCurrentCart: () => current,
+        applyLocal: (cart) => {
+          current = cart;
+        },
+        applyOptimistic: (cart) =>
+          optimisticSimpleAdd(cart, {
+            menuItemId,
+            vendorId: "v_1",
+            vendorName: "Cafe",
+            menuItemName: name,
+            unitPriceCents: 300,
+          }),
+        buildOperation: ({ operationId, clientVersion }) => ({
+          operationId,
+          type: "addItem",
+          menuItemId,
+          quantity: 1,
+          clientVersion,
+        }),
+        flush: async ({ operations }) => {
+          flushCount += 1;
+          if (flushCount === 1 && flushImpl) {
+            return flushImpl;
+          }
+          return {
+            success: true,
+            cart: current,
+            appliedOperations: operations.map((op) => ({
+              operationId: op.operationId,
+              status: "applied" as const,
+            })),
+            rejectedOperations: [],
+          };
+        },
+        debounceMs: 10,
+      });
+
+    add("mi_a", "A", slowFlush);
+    await vi.advanceTimersByTimeAsync(20);
+
+    add("mi_b", "B");
+    add("mi_c", "C");
+    expect(current.items).toHaveLength(3);
+
+    // Lagging server only knows about A — must not erase B/C from the UI.
+    resolveSlow({
+      success: true,
+      cart: optimisticSimpleAdd(
+        { ...baseCart, items: [], groups: [], subtotalCents: 0 },
+        {
+          menuItemId: "mi_a",
+          vendorId: "v_1",
+          vendorName: "Cafe",
+          menuItemName: "A",
+          unitPriceCents: 300,
+        }
+      )!,
+      appliedOperations: [{ operationId: "old", status: "applied" }],
+      rejectedOperations: [],
+    });
+
+    await Promise.resolve();
+    expect(current.items.map((i) => i.menuItemId).sort()).toEqual(["mi_a", "mi_b", "mi_c"]);
+
+    await vi.advanceTimersByTimeAsync(50);
+    await flushCartSyncScheduler("cart_1");
+    expect(current.items.map((i) => i.menuItemId).sort()).toEqual(["mi_a", "mi_b", "mi_c"]);
+  });
+
+  it("does not roll back newer optimistic items when an in-flight batch throws", async () => {
+    let current: Cart = { ...baseCart, items: [], groups: [], subtotalCents: 0 };
+    let rejectSlow!: (error: Error) => void;
+    const slowFlush = new Promise<never>((_, reject) => {
+      rejectSlow = reject;
+    });
+    let flushCount = 0;
+
+    scheduleOptimisticCartSync({
+      cartId: current.id,
+      podId: current.podId,
+      source: "vendor-menu",
+      getCurrentCart: () => current,
+      applyLocal: (cart) => {
+        current = cart;
+      },
+      applyOptimistic: (cart) =>
+        optimisticSimpleAdd(cart, {
+          menuItemId: "mi_a",
+          vendorId: "v_1",
+          vendorName: "Cafe",
+          menuItemName: "A",
+          unitPriceCents: 300,
+        }),
+      buildOperation: ({ operationId, clientVersion }) => ({
+        operationId,
+        type: "addItem",
+        menuItemId: "mi_a",
+        quantity: 1,
+        clientVersion,
+      }),
+      flush: async () => {
+        flushCount += 1;
+        if (flushCount === 1) return slowFlush;
+        return {
+          success: true,
+          cart: current,
+          appliedOperations: [],
+          rejectedOperations: [],
+        };
+      },
+      debounceMs: 10,
+    });
+
+    await vi.advanceTimersByTimeAsync(20);
+
+    scheduleOptimisticCartSync({
+      cartId: current.id,
+      podId: current.podId,
+      source: "vendor-menu",
+      getCurrentCart: () => current,
+      applyLocal: (cart) => {
+        current = cart;
+      },
+      applyOptimistic: (cart) =>
+        optimisticSimpleAdd(cart, {
+          menuItemId: "mi_b",
+          vendorId: "v_1",
+          vendorName: "Cafe",
+          menuItemName: "B",
+          unitPriceCents: 300,
+        }),
+      buildOperation: ({ operationId, clientVersion }) => ({
+        operationId,
+        type: "addItem",
+        menuItemId: "mi_b",
+        quantity: 1,
+        clientVersion,
+      }),
+      flush: async () => ({
+        success: true,
+        cart: current,
+        appliedOperations: [],
+        rejectedOperations: [],
+      }),
+      debounceMs: 10,
+    });
+
+    expect(current.items).toHaveLength(2);
+    rejectSlow(new Error("network timeout"));
+    await Promise.resolve();
+    expect(current.items.map((i) => i.menuItemId).sort()).toEqual(["mi_a", "mi_b"]);
+  });
+
   it("removes line visually at quantity zero", () => {
     let current = baseCart;
     scheduleOptimisticCartSync({

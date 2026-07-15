@@ -216,7 +216,8 @@ export function QuickCartDrawer() {
               cartId={cart.id}
               href="/cart"
               className="mt-4 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-hover"
-              onClick={closeCart}
+              loadingLabel="Opening cart…"
+              onNavigating={closeCart}
             >
               {footerCta}
             </AwaitCartNavigationLink>

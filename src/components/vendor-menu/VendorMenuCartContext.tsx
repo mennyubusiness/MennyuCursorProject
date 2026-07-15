@@ -34,6 +34,7 @@ import {
   optimisticPendingModifierLine,
   type OptimisticSimpleAddParams,
 } from "@/lib/cart-optimistic";
+import { mergeServerCartWithLocalPending } from "@/lib/cart-optimistic-merge";
 
 export const CART_MUTATION_ERROR_MESSAGE =
   "We couldn't update your cart. Please try again.";
@@ -283,17 +284,21 @@ export function VendorMenuCartProvider({
           const result = await add();
           if (result.success) {
             setCartMutationError(null);
-            publishCart(result.cart);
+            // Preserve newer optimistic simple-adds that landed while this modifier sync ran.
+            publishCart(mergeServerCartWithLocalPending(result.cart, cartRef.current));
           } else {
-            cartRef.current = snapshot;
-            setCart(snapshot);
-            dispatchCartUpdated({ cart: snapshot, source: "vendor-menu" });
+            // Roll back only this pending modifier line — keep other newer local lines.
+            const rolledBack = mergeServerCartWithLocalPending(snapshot, cartRef.current);
+            cartRef.current = rolledBack;
+            setCart(rolledBack);
+            dispatchCartUpdated({ cart: rolledBack, source: "vendor-menu" });
             reportCartMutationError({ message: result.error, code: result.code });
           }
         } catch (e) {
-          cartRef.current = snapshot;
-          setCart(snapshot);
-          dispatchCartUpdated({ cart: snapshot, source: "vendor-menu" });
+          const rolledBack = mergeServerCartWithLocalPending(snapshot, cartRef.current);
+          cartRef.current = rolledBack;
+          setCart(rolledBack);
+          dispatchCartUpdated({ cart: rolledBack, source: "vendor-menu" });
           reportCartMutationError({
             message: e instanceof Error ? e.message : CART_MUTATION_ERROR_MESSAGE,
           });

@@ -160,24 +160,27 @@ export function shouldAcceptCartSnapshot(
   return false;
 }
 
-/** Reject stale GET /api/cart payloads that would clear items after a newer mutation. */
+/**
+ * Reject stale GET /api/cart payloads that would regress displayed cart qty.
+ * Background fetches must never remove items/qty that a newer local mutation already showed.
+ */
 export function shouldAcceptApiCartPayload(
   payload: { cart: Cart | null },
   lastAccepted: CartSnapshotMeta | null
 ): boolean {
   const incomingCount = cartSnapshotItemCount(payload.cart);
-  if (!lastAccepted || incomingCount >= lastAccepted.itemCount) {
+  if (!lastAccepted) return true;
+  if (incomingCount >= lastAccepted.itemCount) {
     return true;
   }
-  if (lastAccepted.itemCount > 0 && incomingCount === 0) {
-    logIgnoredStaleCartSnapshot(
-      "stale-api-empty-after-mutation",
-      { cart: payload.cart, source: undefined },
-      lastAccepted
-    );
-    return false;
-  }
-  return true;
+  logIgnoredStaleCartSnapshot(
+    incomingCount === 0
+      ? "stale-api-empty-after-mutation"
+      : "stale-api-regressive-after-mutation",
+    { cart: payload.cart, source: undefined },
+    lastAccepted
+  );
+  return false;
 }
 
 export function rememberAcceptedCartSnapshot(cart: Cart | null): void {

@@ -12,6 +12,7 @@ export type SquareOrderAuditView = {
   squareLastAttemptAt: string | null;
   reconciliation: SquareOrderTotalComparison | null;
   mappingIssues: unknown;
+  mappingFailureDiagnostics: unknown;
   statusSync: SquareWebhookLastApplyRecord | null;
 };
 
@@ -42,6 +43,10 @@ export function parseSquareOrderAudit(payload: unknown): SquareOrderAuditView {
     mappingIssues:
       audit != null && "mappingIssues" in audit
         ? (audit as { mappingIssues?: unknown }).mappingIssues ?? null
+        : null,
+    mappingFailureDiagnostics:
+      audit != null && "mappingFailureDiagnostics" in audit
+        ? (audit as { mappingFailureDiagnostics?: unknown }).mappingFailureDiagnostics ?? null
         : null,
     statusSync: audit?.statusSync ?? null,
   };

@@ -237,6 +237,19 @@ export function AdminSquareRoutingTechnicalDetails({ vo }: { vo: VoRow }) {
           {vo.squareOrderId ? <AdminSquareStatusSync vendorOrderId={vo.id} /> : null}
         </div>
 
+        {audit.mappingFailureDiagnostics ? (
+          <div className="rounded-md border border-red-200 bg-red-50/90 px-2.5 py-2 text-xs text-red-950">
+            <p className="font-semibold">Mapping failure diagnostics</p>
+            <p className="mt-1 text-[11px] text-red-900/80">
+              Captured when readiness failed with no active Square item mappings for the selected
+              location. Includes connection/location used, mapping counts, and missing items.
+            </p>
+            <pre className="mt-1 max-h-48 overflow-auto font-mono text-[10px]">
+              {jsonBlock(audit.mappingFailureDiagnostics, 6000)}
+            </pre>
+          </div>
+        ) : null}
+
         {audit.mappingIssues ? (
           <div className="rounded-md border border-red-200 bg-red-50/90 px-2.5 py-2 text-xs text-red-950">
             <p className="font-semibold">Payload mapping issues</p>

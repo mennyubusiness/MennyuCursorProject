@@ -43,7 +43,7 @@ describe("Quick Cart final-item decrement", () => {
       "utf8"
     );
     expect(mutationSrc).toMatch(/if \(!line\)/);
-    expect(mutationSrc).toMatch(/removeFromCartAction/);
+    expect(mutationSrc).toMatch(/type: "removeLine"/);
     expect(mutationSrc).toMatch(/optimisticDecrementCartItem/);
   });
 

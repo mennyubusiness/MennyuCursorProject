@@ -17,8 +17,8 @@ import {
 import {
   applyOptimisticCartSnapshot,
   normalizeOptimisticCartSnapshot,
-  reconcileCartMutationResult,
 } from "@/lib/cart-optimistic-mutations";
+import { mergeServerCartWithLocalPending } from "@/lib/cart-optimistic-merge";
 
 export const CART_SYNC_DEBOUNCE_MS = 400;
 
@@ -107,11 +107,38 @@ type CartSyncSession = {
   clientVersion: number;
   /** Snapshot before the first pending op in the current debounce window (for full rollback). */
   snapshotBeforeWindow: Cart | null;
+  /** Last cart known confirmed by the server (never includes unresolved local-only lines). */
+  confirmedCart: Cart | null;
   flushPromise: Promise<void> | null;
   resolveFlushWaiters: Array<() => void>;
   lastFlushOk: boolean;
   lastFlushError: string | null;
 };
+
+function hasUnresolvedLocalWork(session: CartSyncSession, flushVersion: number): boolean {
+  return flushVersion < session.clientVersion || session.pendingByKey.size > 0;
+}
+
+/**
+ * Apply a server cart without letting the UI regress behind newer local intent.
+ * When local mutations are still unresolved, layer them on top of the server snapshot.
+ */
+function applyServerCartPreservingPending(
+  session: CartSyncSession,
+  serverCart: Cart
+): void {
+  const local = session.getCurrentCart();
+  session.confirmedCart = serverCart;
+  const display =
+    session.pendingByKey.size > 0
+      ? mergeServerCartWithLocalPending(serverCart, local)
+      : serverCart;
+  applyOptimisticCartSnapshot(
+    normalizeOptimisticCartSnapshot(display, local, session.source),
+    session.source,
+    session.applyLocal
+  );
+}
 
 const sessions = new Map<string, CartSyncSession>();
 
@@ -162,6 +189,7 @@ function getOrCreateSession(params: {
       debounceTimer: null,
       clientVersion: 0,
       snapshotBeforeWindow: null,
+      confirmedCart: null,
       flushPromise: null,
       resolveFlushWaiters: [],
       lastFlushOk: true,
@@ -237,8 +265,15 @@ async function flushSession(session: CartSyncSession): Promise<void> {
         operations,
       });
 
-      // Stale: newer local ops landed while this batch was in flight.
-      if (flushVersion < session.clientVersion || session.pendingByKey.size > 0) {
+      const stale = hasUnresolvedLocalWork(session, flushVersion);
+
+      // Newer local ops landed while this batch was in flight.
+      // Still adopt the server baseline when present, but keep pending local lines visible.
+      if (stale) {
+        if (result.cart) {
+          markCartSnapshotCommitted(session.cartId);
+          applyServerCartPreservingPending(session, result.cart);
+        }
         if (result.rejectedOperations.length > 0) {
           const reasons = result.rejectedOperations.map((r) => r.reason).filter(Boolean);
           const unique = [...new Set(reasons)];
@@ -257,47 +292,42 @@ async function flushSession(session: CartSyncSession): Promise<void> {
       }
 
       if (result.cart) {
-        const mutationResult: CartMutationResult = result.success
-          ? { success: true, cart: result.cart }
-          : {
-              success: false,
-              error: result.error ?? "We couldn't update your cart. Please try again.",
-              code: result.code,
-              cart: result.cart,
-            };
-        reconcileCartMutationResult({
-          cartId: session.cartId,
-          source: session.source,
-          snapshotBefore,
-          result: mutationResult,
-          applyLocal: session.applyLocal,
-          setError: (message) => {
-            if (result.rejectedOperations.length > 0 && message) {
-              const reasons = result.rejectedOperations.map((r) => r.reason).filter(Boolean);
-              const unique = [...new Set(reasons)];
-              const msg =
-                unique.length === 1
-                  ? unique[0]!
-                  : "Some items could not be added because they are no longer available.";
-              session.lastFlushOk = false;
-              session.lastFlushError = msg;
-              session.setError?.(msg);
-              return;
-            }
-            session.setError?.(message);
-          },
-        });
-        session.lastFlushOk = result.success && result.rejectedOperations.length === 0;
-        session.lastFlushError = session.lastFlushOk
-          ? null
-          : result.error ??
-            result.rejectedOperations[0]?.reason ??
-            "We couldn't update your cart. Please try again.";
+        // Prefer merge-aware apply so a partial server cart cannot drop still-visible items.
+        if (result.success && result.rejectedOperations.length === 0) {
+          markCartSnapshotCommitted(session.cartId);
+          session.confirmedCart = result.cart;
+          applyOptimisticCartSnapshot(
+            normalizeOptimisticCartSnapshot(result.cart, snapshotBefore, session.source),
+            session.source,
+            session.applyLocal
+          );
+          session.setError?.(null);
+          session.lastFlushOk = true;
+          session.lastFlushError = null;
+          return;
+        }
+
+        // Partial failure: adopt server cart for applied ops, keep unrelated local lines.
+        markCartSnapshotCommitted(session.cartId);
+        applyServerCartPreservingPending(session, result.cart);
+        const reasons = result.rejectedOperations.map((r) => r.reason).filter(Boolean);
+        const unique = [...new Set(reasons)];
+        const message =
+          unique.length === 1
+            ? unique[0]!
+            : result.error ?? "Some items could not be updated. Please try again.";
+        session.lastFlushOk = false;
+        session.lastFlushError = message;
+        session.setError?.(message);
         return;
       }
 
       if (!result.success) {
-        applyOptimisticCartSnapshot(snapshotBefore, session.source, session.applyLocal);
+        // Never wipe newer local intent — only roll back when this batch is still current.
+        if (!hasUnresolvedLocalWork(session, flushVersion)) {
+          const rollback = session.confirmedCart ?? snapshotBefore;
+          applyOptimisticCartSnapshot(rollback, session.source, session.applyLocal);
+        }
         session.lastFlushOk = false;
         session.lastFlushError = result.error ?? "We couldn't update your cart. Please try again.";
         session.setError?.(session.lastFlushError);
@@ -307,7 +337,11 @@ async function flushSession(session: CartSyncSession): Promise<void> {
         session.lastFlushError = null;
       }
     } catch (error) {
-      applyOptimisticCartSnapshot(snapshotBefore, session.source, session.applyLocal);
+      // Do not roll back the whole cart when newer local mutations exist.
+      if (!hasUnresolvedLocalWork(session, flushVersion)) {
+        const rollback = session.confirmedCart ?? snapshotBefore;
+        applyOptimisticCartSnapshot(rollback, session.source, session.applyLocal);
+      }
       session.lastFlushOk = false;
       session.lastFlushError =
         error instanceof Error ? error.message : "We couldn't update your cart. Please try again.";
@@ -355,6 +389,9 @@ export function scheduleOptimisticCartSync(params: {
   const snapshotBefore = params.getCurrentCart();
   if (!session.snapshotBeforeWindow) {
     session.snapshotBeforeWindow = snapshotBefore;
+  }
+  if (!session.confirmedCart) {
+    session.confirmedCart = snapshotBefore;
   }
 
   session.clientVersion += 1;

@@ -30,6 +30,7 @@ import {
   type CartSnapshotMeta,
   type CartUpdatedDetail,
 } from "@/lib/cart-client-sync";
+import { cartSnapshotItemCount } from "@/lib/cart-snapshot-freshness";
 import { getBrowsingPodIdFromClient, resolveQuickCartBrowsePod } from "@/lib/quick-cart-pod";
 import { buildCartPodContextForDisplay, buildBrowsingPodOnlyContext, quickCartHasActiveGroupOrder, resolveQuickCartSnapshotAfterUpdate } from "@/lib/quick-cart-display";
 import { normalizeAuthoritativeCartSnapshot, normalizeQuickCartApiCart } from "@/lib/cart-group-metadata";
@@ -41,6 +42,7 @@ import {
   shouldShowActiveRecovery,
 } from "@/lib/quick-cart-active-recovery";
 import { useCurrentPagePod } from "@/components/pod/CurrentPagePodProvider";
+import { hasAnyPendingCartWork } from "@/lib/cart-sync-scheduler";
 
 const NEUTRAL_POD_CONTEXT: CartPodContext = {
   cartScope: "neutral",
@@ -254,6 +256,12 @@ export function QuickCartProvider({
     const browsePodId = browsePod.id;
     const generationAtStart = snapshotGenerationRef.current;
     const podAtStart = browsePodId;
+    const cartIdAtStart = cartRef.current?.id ?? null;
+    // Never overwrite optimistic lines with a lagging GET while sync is in flight.
+    if (hasAnyPendingCartWork(cartIdAtStart)) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const qs = browsePodId
@@ -272,7 +280,14 @@ export function QuickCartProvider({
       ) {
         return;
       }
+      if (hasAnyPendingCartWork(cartIdAtStart ?? cartRef.current?.id)) {
+        return;
+      }
       if (!res.ok) {
+        // Do not clear a locally-filled cart on a failed background refresh.
+        if (cartRef.current && cartSnapshotItemCount(cartRef.current) > 0) {
+          return;
+        }
         setCart(null);
         setPodContext(
           browsePod.id ? buildBrowsingPodOnlyContext(browsePod) : NEUTRAL_POD_CONTEXT
@@ -292,6 +307,9 @@ export function QuickCartProvider({
       ) {
         return;
       }
+      if (hasAnyPendingCartWork(cartIdAtStart ?? cartRef.current?.id)) {
+        return;
+      }
       applyPayload(data);
     } catch {
       if (
@@ -300,7 +318,8 @@ export function QuickCartProvider({
           currentGeneration: snapshotGenerationRef.current,
           podAtStart,
           currentPodId: resolveBrowsePod().id,
-        })
+        }) &&
+        !(cartRef.current && cartSnapshotItemCount(cartRef.current) > 0)
       ) {
         setCart(null);
         setPodContext(

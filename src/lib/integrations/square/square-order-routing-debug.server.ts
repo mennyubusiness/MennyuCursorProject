@@ -13,6 +13,10 @@ import {
   type VendorOrderRecoverySnapshot,
 } from "@/lib/admin-needs-attention-actions";
 import { isSquareRoutingMode } from "@/lib/vendor-order-routing-mode";
+import {
+  buildSquareVendorOrderMappingFailureDiagnostics,
+  isSquareNoActiveItemMappingsError,
+} from "@/lib/integrations/square/square-mapping-diagnostics.server";
 
 export type SquareOrderRoutingDebug = {
   vendorOrderId: string;
@@ -33,6 +37,7 @@ export type SquareOrderRoutingDebug = {
   connectionHealthy: boolean;
   missingRequirements: string[];
   failureGuidance: string | null;
+  mappingFailureDiagnostics: unknown;
 };
 
 export async function loadSquareOrderRoutingDebug(input: {
@@ -82,6 +87,17 @@ export async function loadSquareOrderRoutingDebug(input: {
 
   const { squareRoutingFailureGuidance } = await import("@/lib/integrations/square/square-order-audit");
 
+  let mappingFailureDiagnostics = audit.mappingFailureDiagnostics;
+  if (
+    !mappingFailureDiagnostics &&
+    isSquareNoActiveItemMappingsError(input.squareLastError)
+  ) {
+    mappingFailureDiagnostics = await buildSquareVendorOrderMappingFailureDiagnostics({
+      vendorOrderId: input.vendorOrderId,
+      vendorId: input.vendorId,
+    });
+  }
+
   return {
     vendorOrderId: input.vendorOrderId,
     orderRoutingMode: input.orderRoutingMode,
@@ -105,5 +121,6 @@ export async function loadSquareOrderRoutingDebug(input: {
       squareRoutingLive: env.SQUARE_ROUTING_LIVE === "true",
       hasMappingIssues: Boolean(audit.mappingIssues),
     }),
+    mappingFailureDiagnostics,
   };
 }

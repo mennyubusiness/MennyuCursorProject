@@ -19,6 +19,10 @@ import {
 } from "@/lib/integrations/square/square-connection.service";
 import { assertSquareOrderRoutingReady } from "@/lib/integrations/square/square-order-routing-readiness";
 import {
+  buildSquareVendorOrderMappingFailureDiagnostics,
+  isSquareNoActiveItemMappingsError,
+} from "@/lib/integrations/square/square-mapping-diagnostics.server";
+import {
   isSquareInsufficientPermissionsError,
   SQUARE_OAUTH_PERMISSIONS_ADMIN_MESSAGE,
   SQUARE_ROUTING_PERMISSIONS_ERROR_CODE,
@@ -322,8 +326,19 @@ export async function submitVendorOrderToSquare(
 
   const readiness = await assertSquareOrderRoutingReady(vendorOrder.vendorId);
   if (!readiness.ok) {
+    let auditPayload: SquareOrderSubmitAudit = { ...existingAudit };
+    if (isSquareNoActiveItemMappingsError(readiness.error)) {
+      // Diagnostic only — does not change readiness outcome.
+      auditPayload = {
+        ...auditPayload,
+        mappingFailureDiagnostics: await buildSquareVendorOrderMappingFailureDiagnostics({
+          vendorOrderId,
+          vendorId: vendorOrder.vendorId,
+        }),
+      };
+    }
     await recordSquareRoutingFailure(vendorOrderId, readiness.error, {
-      lastSquarePayload: existingAudit,
+      lastSquarePayload: auditPayload,
     });
     return {
       success: false,

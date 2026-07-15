@@ -95,6 +95,18 @@ describe("cart snapshot freshness", () => {
     expect(shouldAcceptApiCartPayload({ cart: cartWithItems(1) }, last)).toBe(true);
   });
 
+  it("rejects lagging API snapshots that drop item quantity after newer local mutations", () => {
+    const add = emit({
+      cart: cartWithItems(3),
+      source: "vendor-menu",
+    });
+    const last = mergeAcceptedCartSnapshotMeta(null, add);
+
+    expect(shouldAcceptApiCartPayload({ cart: cartWithItems(1) }, last)).toBe(false);
+    expect(shouldAcceptApiCartPayload({ cart: cartWithItems(3) }, last)).toBe(true);
+    expect(shouldAcceptApiCartPayload({ cart: cartWithItems(4) }, last)).toBe(true);
+  });
+
   it("accepts newer explicit group-order-ended when no later mutation happened", () => {
     const add = emit({
       cart: cartWithItems(2),
