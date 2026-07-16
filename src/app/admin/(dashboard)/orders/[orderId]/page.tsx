@@ -17,8 +17,8 @@ import { buildAdminOrderTimeline } from "@/lib/admin-order-timeline";
 import { buildAdminOrderGroupContext } from "@/lib/admin-order-group-context";
 import { AdminOrderGroupOrderPanel } from "./AdminOrderGroupOrderPanel";
 import { canShowAdminTestToolsUi } from "@/lib/admin-test-tools";
-import { buildAdminOrderHealth } from "@/lib/admin-order-health";
 import { ADMIN_SECTION_CARD } from "@/lib/admin-order-detail-ui";
+import { buildAdminOrderOperationalSummary } from "@/lib/admin-order-operational-summary";
 import { AdminOrderAttentionCard } from "./AdminOrderAttentionCard";
 import { AdminOrderDetailHeader, AdminOrderBasicsCard } from "./AdminOrderSummarySections";
 import { AdminVendorOrderCard } from "./AdminVendorOrderCard";
@@ -67,16 +67,6 @@ export default async function AdminOrderDetailPage({
   const groupOrderContext = buildAdminOrderGroupContext(adminOrder);
   const timeline = buildAdminOrderTimeline(adminOrder);
 
-  const customerSupportForHealth = adminOrder.issues
-    .filter((i) => i.submittedByRole === "customer")
-    .map((i) => ({
-      id: i.id,
-      issueType: i.type,
-      status: i.status,
-      customerMessage: i.customerMessage,
-      vendorName: i.vendorOrder?.vendor.name ?? null,
-    }));
-
   const vendorContexts = adminOrder.vendorOrders.map((vo) => {
     const exceptionType = getExceptionType(vo);
     const actionState = getAdminActionState(vo, routingAvailable);
@@ -114,12 +104,10 @@ export default async function AdminOrderDetailPage({
       canCancel: actionState.showCancel,
     }));
 
-  const orderHealthWithRecovery = buildAdminOrderHealth({
-    orderStatus: adminOrder.status,
-    paymentRefundStatus: paymentSummary?.order.paymentRefundStatus ?? null,
+  const operationalSummary = buildAdminOrderOperationalSummary({
+    order: adminOrder,
     paymentSummary,
-    customerSupportIssues: customerSupportForHealth,
-    vendorRecoveryContexts,
+    routingAvailable,
   });
 
   return (
@@ -133,9 +121,12 @@ export default async function AdminOrderDetailPage({
         paymentRefundStatus={paymentSummary?.order.paymentRefundStatus}
         paymentSummary={paymentSummary}
         groupOrderContext={groupOrderContext}
+        operationalSummary={operationalSummary}
       />
 
-      <AdminOrderAttentionCard health={orderHealthWithRecovery} />
+      {operationalSummary.needsAttention ? (
+        <AdminOrderAttentionCard health={operationalSummary.health} />
+      ) : null}
 
       <AdminOrderBasicsCard
         adminOrder={adminOrder}
@@ -196,7 +187,8 @@ export default async function AdminOrderDetailPage({
               vendorName: vo.vendor.name,
               type: i.type,
               severity: i.severity,
-              status: i.status,
+              // Legacy open manual_recovery artifacts are not actionable.
+              status: i.type === "manual_recovery" && i.status === "OPEN" ? "RESOLVED" : i.status,
               notes: i.notes,
               createdAt: i.createdAt.toISOString(),
               resolvedAt: i.resolvedAt?.toISOString() ?? null,
@@ -225,6 +217,9 @@ export default async function AdminOrderDetailPage({
                     showRecheck={showRecheck}
                     refundAttempts={adminOrder.refundAttempts}
                     groupOrderContext={groupOrderContext}
+                    vendorSummary={
+                      operationalSummary.vendorSummaries.find((s) => s.vendorOrderId === vo.id) ?? null
+                    }
                   />
                 </div>
               )

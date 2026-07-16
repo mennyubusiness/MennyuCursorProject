@@ -69,6 +69,27 @@ function vendorRow(
 }
 
 describe("admin-order-health", () => {
+  it("does not treat clawback attention when requiredCents is 0", () => {
+    const summary = minimalPaymentSummary({
+      vendorOrders: [
+        vendorRow({
+          clawback: {
+            clawbackStatus: "manual_review",
+            clawbackRequiredCents: 0,
+            clawbackRecoveredCents: 0,
+            hasMissingReversalSetup: false,
+            adminLabel: "Vendor clawback manual review",
+            adminDetail:
+              "Vendor clawback is required, but Open Order cannot prepare the reversal automatically",
+            adminWarning: "should not surface without required cents",
+            recommendedAction: "manual_review",
+          },
+        }),
+      ],
+    });
+    expect(orderHasUnresolvedClawback(summary)).toBe(false);
+  });
+
   it("completed order with no issues shows No action needed", () => {
     const health = buildAdminOrderHealth({
       orderStatus: "completed",

@@ -42,7 +42,7 @@ const TERMINAL_FULFILLMENT = new Set<string>(["completed", "cancelled"]);
  * Returns the admin action state for a vendor order. Use this to drive exception vs progression UI.
  */
 export function getAdminActionState(
-  vo: VOForAdminActions,
+  vo: VOForAdminActions & { manuallyRecoveredAt?: Date | string | null },
   routingAvailable: boolean
 ): AdminActionState {
   const exceptionType = getExceptionType(vo);
@@ -50,6 +50,40 @@ export function getAdminActionState(
   const fulfillment = vo.fulfillmentStatus as VendorOrderFulfillmentStatus;
   const allowedProgressionTargets = getAllowedProgressionTargets(routing, fulfillment);
   const isTerminal = TERMINAL_FULFILLMENT.has(vo.fulfillmentStatus);
+  const isRecovered =
+    vo.manuallyRecoveredAt != null ||
+    ((vo.routingStatus === "failed" || vo.routingStatus === "pending") &&
+      vo.fulfillmentStatus !== "pending");
+
+  if (isTerminal) {
+    return {
+      context: isRecovered ? "manually_recovered" : "terminal",
+      exceptionType: null,
+      showExceptionActions: false,
+      showRetry: false,
+      showManualRecovery: false,
+      showCancel: false,
+      showProgression: false,
+      allowedProgressionTargets: [],
+      hasAnyExceptionAction: false,
+      hasAnyProgressionAction: false,
+    };
+  }
+
+  if (isRecovered) {
+    return {
+      context: "manually_recovered",
+      exceptionType: null,
+      showExceptionActions: true,
+      showRetry: false,
+      showManualRecovery: false,
+      showCancel: vo.fulfillmentStatus !== "cancelled",
+      showProgression: allowedProgressionTargets.length > 0,
+      allowedProgressionTargets,
+      hasAnyExceptionAction: vo.fulfillmentStatus !== "cancelled",
+      hasAnyProgressionAction: allowedProgressionTargets.length > 0,
+    };
+  }
 
   if (exceptionType === "routing_failed" || exceptionType === "routing_stuck") {
     const showRetry =
@@ -71,39 +105,6 @@ export function getAdminActionState(
       allowedProgressionTargets,
       hasAnyExceptionAction,
       hasAnyProgressionAction: allowedProgressionTargets.length > 0,
-    };
-  }
-
-  if (
-    (vo.routingStatus === "failed" || vo.routingStatus === "pending") &&
-    vo.fulfillmentStatus !== "pending"
-  ) {
-    return {
-      context: "manually_recovered",
-      exceptionType: null,
-      showExceptionActions: true,
-      showRetry: false,
-      showManualRecovery: false,
-      showCancel: vo.fulfillmentStatus !== "cancelled" && vo.fulfillmentStatus !== "completed",
-      showProgression: allowedProgressionTargets.length > 0,
-      allowedProgressionTargets,
-      hasAnyExceptionAction: vo.fulfillmentStatus !== "cancelled" && vo.fulfillmentStatus !== "completed",
-      hasAnyProgressionAction: allowedProgressionTargets.length > 0,
-    };
-  }
-
-  if (isTerminal) {
-    return {
-      context: "terminal",
-      exceptionType: null,
-      showExceptionActions: false,
-      showRetry: false,
-      showManualRecovery: false,
-      showCancel: false,
-      showProgression: false,
-      allowedProgressionTargets: [],
-      hasAnyExceptionAction: false,
-      hasAnyProgressionAction: false,
     };
   }
 

@@ -26,14 +26,28 @@ export interface VendorOrderForException {
   deliverectAttempts?: number | null;
   deliverectSubmittedAt?: Date | null;
   deliverectLastError?: string | null;
+  /** When set, historical routing failure is no longer an active ops exception. */
+  manuallyRecoveredAt?: Date | string | null;
 }
 
 /**
  * Returns the exception type for a VendorOrder, or null if it is not an exception.
+ * Historical routing failures after manual recovery (or any fulfillment progress past
+ * pending) are not active exceptions — they remain audit history only.
  */
 export function getExceptionType(vo: VendorOrderForException): ExceptionType | null {
-  if (vo.routingStatus === "failed") return "routing_failed";
-  if (vo.routingStatus === "pending" && isRoutingStuck(vo)) return "routing_stuck";
+  const recovered =
+    vo.manuallyRecoveredAt != null ||
+    (vo.fulfillmentStatus !== "pending" &&
+      (vo.routingStatus === "failed" || vo.routingStatus === "pending"));
+
+  if (vo.routingStatus === "failed") {
+    if (recovered) return null;
+    return "routing_failed";
+  }
+  if (vo.routingStatus === "pending" && !recovered && isRoutingStuck(vo)) {
+    return "routing_stuck";
+  }
   // fulfillment_stuck: skipped for v1 (no safe rule without state-entered-at).
   return null;
 }

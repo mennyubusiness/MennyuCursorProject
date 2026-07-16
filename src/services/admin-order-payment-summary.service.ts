@@ -579,9 +579,14 @@ export async function fetchAdminOrderPaymentSummary(
           blockReason: refundEvidence.prepareBlockReason,
         };
 
-        if (clawback.hasMissingReversalSetup && refundEvidence.hasSafeFullScopeSucceededRefund) {
+        if (
+          clawback.clawbackRequiredCents > 0 &&
+          clawback.hasMissingReversalSetup &&
+          refundEvidence.hasSafeFullScopeSucceededRefund
+        ) {
           reversalPrepare = { canPrepare: true, blockReason: null };
         } else if (
+          clawback.clawbackRequiredCents > 0 &&
           clawback.hasMissingReversalSetup &&
           !refundEvidence.hasSafeFullScopeSucceededRefund
         ) {
@@ -604,6 +609,7 @@ export async function fetchAdminOrderPaymentSummary(
           };
         } else if (
           paidViaConnect &&
+          vendorRefundedForClawback > 0 &&
           (refundEvidence.inconsistentLedger || refundEvidence.denormalizedOnlyRefund) &&
           voReversals.length === 0 &&
           clawback.clawbackStatus === "not_needed"

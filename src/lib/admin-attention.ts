@@ -538,6 +538,7 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
 
   for (const vo of failed) {
     if (vo.fulfillmentStatus !== "pending") continue;
+    if (vo.manuallyRecoveredAt != null) continue;
     const urgency = getExceptionUrgency(vo.createdAt);
     const reason: AdminAttentionReason = "routing_failed";
     items.push(

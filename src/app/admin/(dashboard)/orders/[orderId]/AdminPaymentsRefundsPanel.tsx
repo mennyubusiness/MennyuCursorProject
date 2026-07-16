@@ -1218,7 +1218,8 @@ export function AdminPaymentsRefundsPanel({
                 <span className="font-medium text-oo-charcoal">
                   {adminVendorConnectTransferStatusLabel(v.transferStatus ?? "missing")}
                 </span>
-                {v.clawback.clawbackStatus !== "not_needed" ? (
+                {v.clawback.clawbackRequiredCents > 0 &&
+                v.clawback.clawbackStatus !== "not_needed" ? (
                   <>
                     {" · "}
                     Vendor clawback:{" "}
@@ -1226,8 +1227,11 @@ export function AdminPaymentsRefundsPanel({
                   </>
                 ) : null}
               </p>
-              {v.clawback.adminDetail ? (
+              {v.clawback.clawbackRequiredCents > 0 && v.clawback.adminDetail ? (
                 <p className="mt-0.5 text-xs leading-snug text-oo-stone-gray">{v.clawback.adminDetail}</p>
+              ) : null}
+              {v.clawback.clawbackRequiredCents > 0 && v.clawback.adminWarning ? (
+                <p className="mt-0.5 text-xs leading-snug text-amber-900">{v.clawback.adminWarning}</p>
               ) : null}
             </li>
           ))}
@@ -1450,7 +1454,7 @@ export function AdminPaymentsRefundsPanel({
                       >
                         {v.clawback.adminLabel}
                       </span>
-                      {v.clawback.adminDetail ? (
+                      {v.clawback.clawbackRequiredCents > 0 && v.clawback.adminDetail ? (
                         <p className="text-[10px] leading-snug text-oo-stone-gray">{v.clawback.adminDetail}</p>
                       ) : null}
                       {v.clawback.clawbackRequiredCents > 0 ? (
@@ -1461,7 +1465,7 @@ export function AdminPaymentsRefundsPanel({
                             : ""}
                         </p>
                       ) : null}
-                      {v.clawback.adminWarning ? (
+                      {v.clawback.clawbackRequiredCents > 0 && v.clawback.adminWarning ? (
                         <p className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[10px] text-red-950">
                           {v.clawback.adminWarning}
                         </p>

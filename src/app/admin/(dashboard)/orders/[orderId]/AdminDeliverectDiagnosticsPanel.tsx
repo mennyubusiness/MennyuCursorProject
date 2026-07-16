@@ -126,7 +126,7 @@ export function AdminSquareRoutingTechnicalDetails({ vo }: { vo: VoRow }) {
           Retry Square routing uses Square idempotency keys to avoid duplicate Square orders.
         </p>
 
-        {guidance ? (
+        {guidance && !vo.manuallyRecoveredAt && vo.fulfillmentStatus === "pending" ? (
           <p className="rounded border border-amber-200 bg-amber-50 px-2.5 py-2 text-amber-950">{guidance}</p>
         ) : null}
 

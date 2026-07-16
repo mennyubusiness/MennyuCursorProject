@@ -5,6 +5,7 @@ import {
   adminGroupOrderLineAttributionLabel,
   type AdminOrderGroupContext,
 } from "@/lib/admin-order-group-context";
+import type { AdminVendorOrderSummary } from "@/lib/admin-order-operational-summary";
 import { AdminVendorOrderOperationalPanel } from "./AdminVendorOrderOperationalPanel";
 import { AdminVendorOrderTechnicalRoutingDetails } from "./AdminDeliverectDiagnosticsPanel";
 import { AdminVendorOrderTransition } from "./AdminVendorOrderTransition";
@@ -20,6 +21,7 @@ export function AdminVendorOrderCard({
   showRecheck,
   refundAttempts,
   groupOrderContext,
+  vendorSummary,
 }: {
   vo: VoRow;
   showRecoveredBadge: boolean;
@@ -28,8 +30,10 @@ export function AdminVendorOrderCard({
   showRecheck: boolean;
   refundAttempts: RefundAttempt[];
   groupOrderContext?: AdminOrderGroupContext | null;
+  vendorSummary?: AdminVendorOrderSummary | null;
 }) {
   const fulfillment = fulfillmentStatusBadge(vo.fulfillmentStatus);
+  const statusLabel = vendorSummary?.statusLabel ?? fulfillment.label;
 
   const voRefunds = refundAttempts.filter((ra) => ra.vendorOrderId === vo.id);
   const latestRefund = voRefunds.length > 0 ? voRefunds[voRefunds.length - 1] : null;
@@ -51,20 +55,23 @@ export function AdminVendorOrderCard({
           <p className="mt-0.5 text-sm tabular-nums text-oo-stone-gray">
             {formatAdminMoney(vo.totalCents)}
           </p>
+          {vendorSummary?.statusDetail ? (
+            <p className="mt-1 text-xs text-oo-stone-gray">{vendorSummary.statusDetail}</p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-1.5">
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${fulfillment.className}`}>
-            {fulfillment.label}
+            {statusLabel}
           </span>
-          {showRecoveredBadge && (
+          {showRecoveredBadge && !vendorSummary?.statusDetail?.includes("Recovered") ? (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
               Recovered manually
             </span>
-          )}
+          ) : null}
         </div>
       </header>
 
-      <AdminVendorOrderOperationalPanel vo={vo} />
+      <AdminVendorOrderOperationalPanel vo={vo} vendorSummary={vendorSummary} />
 
       {vo.fulfillmentStatus === "cancelled" && (
         <div className="mt-3">

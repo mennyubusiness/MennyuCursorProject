@@ -131,18 +131,17 @@ export async function POST(
   );
 
   if (result.success) {
-    const { createVendorOrderIssue, getVendorOrderIssues, resolveVendorOrderIssue } = await import(
+    // Manual recovery is a resolution event on VendorOrder metadata — not a new OPEN issue.
+    // Resolve any open routing_failure (and legacy open manual_recovery artifacts) so the
+    // order does not remain in active Issues search after successful recovery.
+    const { getVendorOrderIssues, resolveVendorOrderIssue } = await import(
       "@/services/issues.service"
     );
     const openIssues = await getVendorOrderIssues(vendorOrderId, "OPEN");
-    for (const issue of openIssues.filter((i) => i.type === "routing_failure")) {
+    for (const issue of openIssues.filter(
+      (i) => i.type === "routing_failure" || i.type === "manual_recovery"
+    )) {
       await resolveVendorOrderIssue(issue.id, { resolvedBy: "admin" });
-    }
-    if (!openIssues.some((i) => i.type === "manual_recovery")) {
-      await createVendorOrderIssue(vendorOrderId, "manual_recovery", "MEDIUM", {
-        notes,
-        createdBy: "admin",
-      });
     }
     return NextResponse.json({
       ok: true,

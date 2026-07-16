@@ -26,6 +26,14 @@ export type VendorOrderIssueType =
   | "customer_issue"
   | "order_dispute";
 
+/**
+ * VendorOrderIssue types that are historical/resolution artifacts, not actionable queue items.
+ * Legacy rows may still exist as OPEN; exclude them from active Issues search.
+ */
+export const NON_ACTIONABLE_VENDOR_ORDER_ISSUE_TYPES: readonly VendorOrderIssueType[] = [
+  "manual_recovery",
+];
+
 export async function createOrderIssue(
   orderId: string,
   type: OrderIssueType,
@@ -123,7 +131,7 @@ export async function updateVendorOrderIssueNotes(issueId: string, notes: string
   });
 }
 
-/** Get all order IDs that have at least one open OrderIssue or open VendorOrderIssue. */
+/** Get all order IDs that have at least one actionable open OrderIssue or VendorOrderIssue. */
 export async function getOrderIdsWithOpenIssues(): Promise<string[]> {
   const [orderIssues, voIssues] = await Promise.all([
     prisma.orderIssue.findMany({
@@ -131,7 +139,10 @@ export async function getOrderIdsWithOpenIssues(): Promise<string[]> {
       select: { orderId: true },
     }),
     prisma.vendorOrderIssue.findMany({
-      where: { status: "OPEN" },
+      where: {
+        status: "OPEN",
+        type: { notIn: [...NON_ACTIONABLE_VENDOR_ORDER_ISSUE_TYPES] },
+      },
       select: { vendorOrder: { select: { orderId: true } } },
     }),
   ]);

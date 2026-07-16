@@ -70,14 +70,17 @@ function vendorNeedsOpenFinancialReview(
 export function orderHasUnresolvedClawback(summary: AdminOrderPaymentSummary | null): boolean {
   if (!summary) return false;
   return summary.vendorOrders.some((v) => {
+    // Incomplete ledger / manual_review labels alone are not clawback-required without a refund amount.
+    if (v.clawback.clawbackRequiredCents <= 0) {
+      return vendorNeedsOpenFinancialReview(v);
+    }
     if (vendorNeedsOpenFinancialReview(v)) return true;
     if (v.clawback.clawbackStatus === "failed") return true;
     if (v.clawback.clawbackStatus === "pending") return true;
-    if (v.clawback.hasMissingReversalSetup && v.reversalPrepare.canPrepare) return true;
-    if (
-      v.clawback.hasMissingReversalSetup ||
-      (v.clawback.clawbackStatus === "manual_review" && v.clawback.clawbackRequiredCents > 0)
-    ) {
+    if (v.clawback.hasMissingReversalSetup && v.reversalPrepare.canPrepare) {
+      return true;
+    }
+    if (v.clawback.hasMissingReversalSetup || v.clawback.clawbackStatus === "manual_review") {
       return v.clawback.clawbackStatus !== "recovered";
     }
     return false;

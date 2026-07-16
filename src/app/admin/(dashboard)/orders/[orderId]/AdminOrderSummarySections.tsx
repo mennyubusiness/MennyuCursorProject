@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { getPickupCode } from "@/lib/pickup-code";
-import { buildOrderHeaderSubtitle } from "@/lib/admin-order-health";
 import {
   ADMIN_SECTION_CARD,
   formatAdminMoney,
   formatAdminOrderDate,
-  fulfillmentSummaryChip,
   parentStatusBadgeClass,
-  parentStatusDisplay,
   paymentChipClass,
   paymentChipLabel,
 } from "@/lib/admin-order-detail-ui";
@@ -18,13 +15,17 @@ import {
   formatAdminGroupOrderStatus,
   type AdminOrderGroupContext,
 } from "@/lib/admin-order-group-context";
+import type { AdminOrderOperationalSummary } from "@/lib/admin-order-operational-summary";
+import { orderHasUnresolvedClawback } from "@/lib/admin-order-health";
 
 function clawbackHeaderChip(summary: AdminOrderPaymentSummary | null): {
   label: string;
   className: string;
 } | null {
-  if (!summary) return null;
-  const relevant = summary.vendorOrders.filter((v) => v.clawback.clawbackStatus !== "not_needed");
+  if (!summary || !orderHasUnresolvedClawback(summary)) return null;
+  const relevant = summary.vendorOrders.filter(
+    (v) => v.clawback.clawbackStatus !== "not_needed" && v.clawback.clawbackRequiredCents > 0
+  );
   if (relevant.length === 0) return null;
   const worst = relevant.find((v) => v.clawback.clawbackStatus === "failed")
     ?? relevant.find((v) => v.legacyClawbackReview?.needsReview)
@@ -42,11 +43,11 @@ export function AdminOrderDetailHeader({
   orderId,
   createdAt,
   status,
-  vendorOrders,
   totalCents,
   paymentRefundStatus,
   paymentSummary,
   groupOrderContext,
+  operationalSummary,
 }: {
   orderId: string;
   createdAt: Date;
@@ -56,16 +57,10 @@ export function AdminOrderDetailHeader({
   paymentRefundStatus?: string | null;
   paymentSummary?: AdminOrderPaymentSummary | null;
   groupOrderContext?: AdminOrderGroupContext | null;
+  operationalSummary: AdminOrderOperationalSummary;
 }) {
-  const shortId = orderId.slice(-8).toUpperCase();
-  const statusLabel = parentStatusDisplay(status, vendorOrders);
-  const subtitle = buildOrderHeaderSubtitle({
-    orderStatus: status,
-    paymentRefundStatus: paymentRefundStatus ?? null,
-    vendorOrders,
-    paymentSummary: paymentSummary ?? null,
-  });
-  const fulfillmentChip = fulfillmentSummaryChip(vendorOrders);
+  const shortId = operationalSummary.shortRef;
+  const statusLabel = operationalSummary.statusLabel;
   const clawbackChip = clawbackHeaderChip(paymentSummary ?? null);
 
   return (
@@ -88,15 +83,14 @@ export function AdminOrderDetailHeader({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-sm text-oo-stone-gray">{formatAdminOrderDate(createdAt)}</p>
+          {operationalSummary.statusDetail ? (
+            <p className="mt-1 text-sm text-oo-stone-gray">{operationalSummary.statusDetail}</p>
+          ) : null}
           <p className="mt-1 text-sm text-oo-stone-gray">
-            {groupOrderContext ? (
-              <>
-                Group order · Host paid
-                <span className="text-oo-stone-gray"> · </span>
-              </>
-            ) : null}
-            {subtitle}
+            {formatAdminOrderDate(createdAt)}
+            {" · "}
+            {operationalSummary.vendorCount} vendor
+            {operationalSummary.vendorCount === 1 ? "" : "s"}
           </p>
         </div>
         <Link
@@ -111,9 +105,6 @@ export function AdminOrderDetailHeader({
           className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${paymentChipClass(status, paymentRefundStatus)}`}
         >
           {paymentChipLabel(status, paymentRefundStatus)}
-        </span>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${fulfillmentChip.className}`}>
-          {fulfillmentChip.label}
         </span>
         {clawbackChip ? (
           <span

@@ -16,6 +16,8 @@
     "db:studio": "prisma studio",
     "cart:cleanup": "tsx scripts/cleanup-old-empty-carts.ts",
     "cart:cleanup:execute": "tsx scripts/cleanup-old-empty-carts.ts --execute",
+    "issues:cleanup-stale-manual-recovery": "tsx scripts/cleanup-stale-manual-recovery-issues.ts",
+    "issues:cleanup-stale-manual-recovery:execute": "tsx scripts/cleanup-stale-manual-recovery-issues.ts --execute",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

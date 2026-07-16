@@ -12,9 +12,11 @@ describe("admin order detail progressive disclosure layout", () => {
   const bridgeSrc = readFileSync(join(root, "AdminOrderIssuesRefundsBridge.tsx"), "utf8");
   const deliverectSrc = readFileSync(join(root, "AdminDeliverectDiagnosticsPanel.tsx"), "utf8");
 
-  it("renders What needs attention card near top", () => {
+  it("gates What needs attention on operationalSummary.needsAttention", () => {
+    expect(pageSrc).toMatch(/operationalSummary\.needsAttention/);
+    expect(pageSrc).toMatch(/buildAdminOrderOperationalSummary/);
     expect(pageSrc).toMatch(
-      /<AdminOrderAttentionCard[\s\S]*<AdminOrderBasicsCard[\s\S]*<AdminOrderDetailClientLayout/
+      /\{operationalSummary\.needsAttention \? \(\s*<AdminOrderAttentionCard/
     );
   });
 

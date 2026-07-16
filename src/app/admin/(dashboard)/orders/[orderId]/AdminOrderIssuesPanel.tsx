@@ -391,75 +391,77 @@ export function AdminOrderIssuesPanel({
   return (
     <section id="notes-issues" className={sectionClass}>
       <div>
-        <h2 className="text-sm font-semibold text-oo-charcoal">Notes &amp; issues</h2>
+        <h2 className="text-sm font-semibold text-oo-charcoal">Activity &amp; notes</h2>
         {hasActiveWork ? (
           <p className="mt-1 text-sm text-oo-charcoal">
-            Customer reports and vendor routing recovery. Refunds are in{" "}
+            Active customer reports and unresolved vendor routing issues. Refunds are in{" "}
             <Link href="#payments-refunds" className="underline">
               Payments &amp; refunds
             </Link>
             .
           </p>
         ) : (
-          <p className="mt-1 text-xs text-oo-stone-gray">
-            No open issues. Use this section for resolution notes and history.
-          </p>
+          <p className="mt-1 text-xs text-oo-stone-gray">No active issues.</p>
         )}
       </div>
 
-      {hasActiveWork && (
-        <ul className="mt-4 space-y-3">
-          {activeSystemIssues.map((issue) => renderSystemIssue(issue, true))}
-          {activeRecoveryContexts
-            .filter((c) => !activeSystemIssues.some((i) => i.kind === "vendor" && "vendorOrderId" in i && i.vendorOrderId === c.vendorOrderId))
-            .map((c) => (
-              <li
-                key={c.vendorOrderId}
-                className="rounded-lg border border-red-200 bg-oo-warm-white p-3 text-sm shadow-sm"
-              >
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-semibold text-oo-charcoal">{c.vendorName}</span>
-                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-900">
-                    {c.exceptionType.replace(/_/g, " ")}
-                  </span>
-                </div>
-                {c.reason && <p className="mt-2 text-sm text-red-900">{c.reason}</p>}
-                <div className="mt-3">
-                  <AdminVendorOrderExceptionActions
-                    vendorOrderId={c.vendorOrderId}
-                    exceptionType={c.exceptionType}
-                    fulfillmentStatus={c.fulfillmentStatus}
-                    routingAvailable={routingAvailable}
-                    canCancel={c.canCancel}
-                  />
-                </div>
-              </li>
-            ))}
-          {activeCustomerIssues.map((issue) => renderCustomerIssue(issue, true))}
-        </ul>
-      )}
-
-      {(resolvedCustomerIssues.length > 0 || resolvedSystemIssues.length > 0) && (
-        <details className="mt-4 rounded-lg border border-oo-light-stone/80 bg-oo-cream/20 px-3 py-2">
-          <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
-            Resolved system issues ({resolvedSystemIssues.length + resolvedCustomerIssues.length})
-          </summary>
-          <ul className="mt-3 space-y-2">
-            {resolvedSystemIssues.map((issue) => renderSystemIssue(issue, false))}
-            {resolvedCustomerIssues.map((issue) => renderCustomerIssue(issue, false))}
+      <div className="mt-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
+          Active issues
+        </h3>
+        {hasActiveWork ? (
+          <ul className="mt-2 space-y-3">
+            {activeSystemIssues.map((issue) => renderSystemIssue(issue, true))}
+            {activeRecoveryContexts
+              .filter(
+                (c) =>
+                  !activeSystemIssues.some(
+                    (i) =>
+                      i.kind === "vendor" &&
+                      "vendorOrderId" in i &&
+                      i.vendorOrderId === c.vendorOrderId
+                  )
+              )
+              .map((c) => (
+                <li
+                  key={c.vendorOrderId}
+                  className="rounded-lg border border-red-200 bg-oo-warm-white p-3 text-sm shadow-sm"
+                >
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="font-semibold text-oo-charcoal">{c.vendorName}</span>
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-900">
+                      {c.exceptionType.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  {c.reason && <p className="mt-2 text-sm text-red-900">{c.reason}</p>}
+                  <div className="mt-3">
+                    <AdminVendorOrderExceptionActions
+                      vendorOrderId={c.vendorOrderId}
+                      exceptionType={c.exceptionType}
+                      fulfillmentStatus={c.fulfillmentStatus}
+                      routingAvailable={routingAvailable}
+                      canCancel={c.canCancel}
+                    />
+                  </div>
+                </li>
+              ))}
+            {activeCustomerIssues.map((issue) => renderCustomerIssue(issue, true))}
           </ul>
-        </details>
-      )}
+        ) : (
+          <p className="mt-2 text-sm text-oo-stone-gray">No active issues</p>
+        )}
+      </div>
 
-      <details className="mt-4 rounded-lg border border-oo-light-stone/60 bg-oo-warm-white/50 px-3 py-2">
-        <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
-          Order resolution notes
-        </summary>
+      <div className="mt-4 rounded-lg border border-oo-light-stone/60 bg-oo-warm-white/50 px-3 py-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
+          Resolution
+        </h3>
         <textarea
           id="admin-resolution-notes"
           className="mt-2 w-full min-h-[80px] rounded-md border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm"
           value={resolutionNotes}
           onChange={(e) => setResolutionNotes(e.target.value)}
+          placeholder="Resolution notes for this order…"
         />
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <button
@@ -472,7 +474,25 @@ export function AdminOrderIssuesPanel({
           </button>
           {notesMessage && <span className="text-xs text-oo-stone-gray">{notesMessage}</span>}
         </div>
-      </details>
+      </div>
+
+      {(resolvedCustomerIssues.length > 0 || resolvedSystemIssues.length > 0) && (
+        <details className="mt-4 rounded-lg border border-oo-light-stone/80 bg-oo-cream/20 px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium text-oo-stone-gray hover:text-oo-charcoal">
+            Resolved issues ({resolvedSystemIssues.length + resolvedCustomerIssues.length})
+          </summary>
+          <ul className="mt-3 space-y-2">
+            {resolvedSystemIssues.map((issue) => renderSystemIssue(issue, false))}
+            {resolvedCustomerIssues.map((issue) => renderCustomerIssue(issue, false))}
+          </ul>
+        </details>
+      )}
+
+      <p className="mt-4 text-xs text-oo-stone-gray">
+        <Link href="#order-timeline" className="underline hover:text-oo-charcoal">
+          View full activity
+        </Link>
+      </p>
     </section>
   );
 }
