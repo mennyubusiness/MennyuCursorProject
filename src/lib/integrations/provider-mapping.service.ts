@@ -1,10 +1,10 @@
 import { createHash } from "crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type {
   IntegrationProvider,
   ProviderEntityType,
 } from "@/lib/integrations/types";
-import type { Prisma } from "@prisma/client";
 
 /**
  * Hybrid ExternalMenuMapping contract (Phase 2):
@@ -38,6 +38,14 @@ export function hashProviderPayload(payload: unknown): string {
   return createHash("sha256").update(json).digest("hex");
 }
 
+function connectionRelationUpdate(
+  connectionId: string | null | undefined
+): Pick<Prisma.ProviderEntityMappingUpdateInput, "connection"> | Record<string, never> {
+  if (connectionId === undefined) return {};
+  if (connectionId === null) return { connection: { disconnect: true } };
+  return { connection: { connect: { id: connectionId } } };
+}
+
 export async function upsertProviderEntityMapping(input: UpsertProviderEntityMappingInput) {
   const externalLocationId = input.externalLocationId ?? null;
   const existing = await prisma.providerEntityMapping.findFirst({
@@ -51,46 +59,65 @@ export async function upsertProviderEntityMapping(input: UpsertProviderEntityMap
     select: { id: true },
   });
 
-  const additive = {
-    environment: input.environment ?? undefined,
-    externalParentId: input.externalParentId === undefined ? undefined : input.externalParentId,
-    externalAccountId: input.externalAccountId ?? undefined,
-    externalVersion: input.externalVersion ?? undefined,
-    metadata: input.metadata === undefined ? undefined : input.metadata,
-  };
-
   if (existing) {
+    const data: Prisma.ProviderEntityMappingUpdateInput = {
+      externalId: input.externalId,
+      isActive: input.isActive ?? true,
+      lastSeenAt: new Date(),
+      ...connectionRelationUpdate(input.connectionId),
+      ...(input.externalPayloadHash === undefined
+        ? {}
+        : { externalPayloadHash: input.externalPayloadHash }),
+      ...(input.environment === undefined ? {} : { environment: input.environment }),
+      ...(input.externalParentId === undefined
+        ? {}
+        : { externalParentId: input.externalParentId }),
+      ...(input.externalAccountId === undefined
+        ? {}
+        : { externalAccountId: input.externalAccountId }),
+      ...(input.externalVersion === undefined
+        ? {}
+        : { externalVersion: input.externalVersion }),
+      ...(input.metadata === undefined
+        ? {}
+        : {
+            metadata:
+              input.metadata === null ? Prisma.DbNull : input.metadata,
+          }),
+    };
+
     return prisma.providerEntityMapping.update({
       where: { id: existing.id },
-      data: {
-        connectionId: input.connectionId ?? undefined,
-        externalId: input.externalId,
-        externalPayloadHash: input.externalPayloadHash ?? undefined,
-        isActive: input.isActive ?? true,
-        lastSeenAt: new Date(),
-        ...additive,
-      },
+      data,
     });
   }
 
+  const createData: Prisma.ProviderEntityMappingCreateInput = {
+    provider: input.provider,
+    internalEntityType: input.internalEntityType,
+    internalEntityId: input.internalEntityId,
+    externalId: input.externalId,
+    externalLocationId,
+    externalParentId: input.externalParentId ?? null,
+    environment: input.environment ?? null,
+    externalAccountId: input.externalAccountId ?? null,
+    externalVersion: input.externalVersion ?? null,
+    externalPayloadHash: input.externalPayloadHash ?? null,
+    isActive: input.isActive ?? true,
+    lastSeenAt: new Date(),
+    vendor: { connect: { id: input.vendorId } },
+    ...(input.connectionId
+      ? { connection: { connect: { id: input.connectionId } } }
+      : {}),
+    ...(input.metadata === undefined
+      ? {}
+      : {
+          metadata: input.metadata === null ? Prisma.DbNull : input.metadata,
+        }),
+  };
+
   return prisma.providerEntityMapping.create({
-    data: {
-      vendorId: input.vendorId,
-      connectionId: input.connectionId ?? null,
-      provider: input.provider,
-      environment: input.environment ?? null,
-      internalEntityType: input.internalEntityType,
-      internalEntityId: input.internalEntityId,
-      externalId: input.externalId,
-      externalParentId: input.externalParentId ?? null,
-      externalLocationId,
-      externalAccountId: input.externalAccountId ?? null,
-      externalVersion: input.externalVersion ?? null,
-      externalPayloadHash: input.externalPayloadHash ?? null,
-      metadata: input.metadata ?? undefined,
-      isActive: input.isActive ?? true,
-      lastSeenAt: new Date(),
-    },
+    data: createData,
   });
 }
 
