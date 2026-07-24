@@ -1,17 +1,18 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import Link from "next/link";
-import { auth } from "@/auth";
-import { isPlatformAdmin } from "@/lib/permissions";
+import { isAdminDashboardLayoutAuthorized } from "@/lib/admin-auth";
 import { buildMenuArchitectureConsistencyReport } from "@/lib/admin-menu-architecture-consistency.server";
+import { env } from "@/lib/env";
 
 export default async function AdminMenuArchitectureConsistencyPage({
   searchParams,
 }: {
   searchParams: Promise<{ vendorId?: string }>;
 }) {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId || !(await isPlatformAdmin(userId))) notFound();
+  const allowed = await isAdminDashboardLayoutAuthorized();
+  if (!allowed && env.NODE_ENV === "production") {
+    redirect("/admin/access-denied");
+  }
 
   const { vendorId } = await searchParams;
   const report = await buildMenuArchitectureConsistencyReport({
