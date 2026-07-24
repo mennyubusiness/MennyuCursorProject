@@ -12,7 +12,7 @@ import {
   MenuVersionState,
 } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { evaluateMenuImportPublishEligibility } from "@/services/menu-publish-from-canonical.service";
 import { publishMenuImportDraftToLive } from "@/services/menu-publish-from-canonical.service";
 
@@ -77,7 +77,7 @@ export async function tryAutoPublishMenuImportJob(
     return { didPublish: false, reason: "no_draft" };
   }
 
-  const parsed = mennyuCanonicalMenuSchema.safeParse(job.draftVersion.canonicalSnapshot);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(job.draftVersion.canonicalSnapshot);
   if (!parsed.success) {
     return { didPublish: false, reason: "canonical_invalid" };
   }

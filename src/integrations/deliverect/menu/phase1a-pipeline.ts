@@ -1,4 +1,4 @@
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import {
   hasBlockingIssues,
   type MenuImportIssueRecord,
@@ -10,7 +10,7 @@ import {
 } from "@/integrations/deliverect/menu/normalize";
 
 export interface Phase1aMenuImportResult {
-  menu: MennyuCanonicalMenu | null;
+  menu: OpenOrderCanonicalMenu | null;
   normalizationIssues: MenuImportIssueRecord[];
   validationIssues: MenuImportIssueRecord[];
   allIssues: MenuImportIssueRecord[];

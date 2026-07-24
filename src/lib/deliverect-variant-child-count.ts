@@ -1,8 +1,8 @@
-import type { MennyuCanonicalProduct } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalProduct } from "@/domain/menu-import/canonical.schema";
 
 /** Count variant leaf products per parent PLU from canonical products. */
 export function variantChildCountByParentPluFromProducts(
-  products: MennyuCanonicalProduct[]
+  products: OpenOrderCanonicalProduct[]
 ): Map<string, number> {
   const counts = new Map<string, number>();
   for (const p of products) {

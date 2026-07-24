@@ -1,4 +1,4 @@
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import { formatModifierMaxSelectionsLabel } from "@/domain/modifier-selection-unbounded";
 
 function formatCents(cents: number): string {
@@ -9,14 +9,18 @@ export function MenuImportMenuPreview({
   menu,
   parseError,
   draftVersionId,
-  /** Hide internal Deliverect ids in the main preview (ids still in Advanced). */
+  /** Hide internal external/catalog ids in the main preview (ids still in Advanced). */
   hideDeliverectIds = true,
+  /** Phase 1 alias for {@link hideDeliverectIds}. */
+  hideExternalIds,
 }: {
-  menu: MennyuCanonicalMenu | null;
+  menu: OpenOrderCanonicalMenu | null;
   parseError: string | null;
   draftVersionId: string | null;
   hideDeliverectIds?: boolean;
+  hideExternalIds?: boolean;
 }) {
+  const hideIds = hideExternalIds ?? hideDeliverectIds;
   if (!draftVersionId) {
     return <p className="text-sm text-stone-600">No draft menu linked to this update.</p>;
   }
@@ -49,7 +53,7 @@ export function MenuImportMenuPreview({
         <div key={cat.deliverectId} className="border-l-2 border-stone-300 pl-3">
           <h3 className="font-medium text-stone-900">
             {cat.name}
-            {!hideDeliverectIds && (
+            {!hideIds && (
               <span className="font-mono text-xs font-normal text-stone-500"> ({cat.deliverectId})</span>
             )}
           </h3>
@@ -60,7 +64,7 @@ export function MenuImportMenuPreview({
                 return (
                   <li key={pid} className="text-sm text-amber-800">
                     Missing product reference.
-                    {!hideDeliverectIds && (
+                    {!hideIds && (
                       <>
                         {" "}
                         <span className="font-mono">{pid}</span>
@@ -75,7 +79,7 @@ export function MenuImportMenuPreview({
                     <span className="font-medium text-stone-900">{p.name}</span>
                     <span className="font-mono text-stone-700">{formatCents(p.priceCents)}</span>
                   </div>
-                  {!hideDeliverectIds && (
+                  {!hideIds && (
                     <div className="mt-0.5 font-mono text-xs text-stone-500">{p.deliverectId}</div>
                   )}
                   {!p.isAvailable && (
@@ -89,7 +93,7 @@ export function MenuImportMenuPreview({
                           return (
                             <div key={gid} className="text-xs text-amber-800">
                               Unknown modifier group
-                              {!hideDeliverectIds && (
+                              {!hideIds && (
                                 <>
                                   : <span className="font-mono">{gid}</span>
                                 </>
@@ -101,14 +105,14 @@ export function MenuImportMenuPreview({
                           <div key={gid}>
                             <div className="text-xs font-medium text-stone-700">
                               {g.name}
-                              {!hideDeliverectIds && (
+                              {!hideIds && (
                                 <span className="font-mono font-normal text-stone-500">
                                   {" "}
                                   ({g.deliverectId}) · min {g.minSelections} / max{" "}
                                   {formatModifierMaxSelectionsLabel(g.maxSelections)}
                                 </span>
                               )}
-                              {hideDeliverectIds && (
+                              {hideIds && (
                                 <span className="font-normal text-stone-500">
                                   {" "}
                                   · min {g.minSelections} / max {formatModifierMaxSelectionsLabel(g.maxSelections)}
@@ -152,7 +156,7 @@ export function MenuImportMenuPreview({
               .map((p) => (
                 <li key={p.deliverectId}>
                   <span className="font-medium text-stone-900">{p.name}</span> · {formatCents(p.priceCents)}
-                  {!hideDeliverectIds && (
+                  {!hideIds && (
                     <>
                       {" "}
                       · <span className="font-mono text-xs">{p.deliverectId}</span>

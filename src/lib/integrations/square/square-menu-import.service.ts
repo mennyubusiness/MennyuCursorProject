@@ -7,7 +7,7 @@ import {
   MenuVersionState,
   type Prisma,
 } from "@prisma/client";
-import { mennyuCanonicalMenuSchema, type MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema, type OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import {
   explainCustomerMenuBrowseExclusions,
   type CustomerMenuBrowseExclusion,
@@ -35,6 +35,8 @@ import {
 import {
   parseSquareExternalId,
 } from "@/lib/integrations/square/square-menu-ids";
+import { productSourceParentExternalId } from "@/domain/menu-import/canonical-identity";
+import { menuImportJobLocationWrite } from "@/domain/menu-import/menu-import-job-location";
 
 export type SquareCatalogPreviewReport = SquareCatalogNormalizationResult & {
   locationId: string;
@@ -126,7 +128,9 @@ async function syncSquareCatalogMappings(input: {
   vendorId: string;
   connectionId: string;
   locationId: string;
-  menu: MennyuCanonicalMenu;
+  environment: string | null;
+  externalAccountId: string | null;
+  menu: OpenOrderCanonicalMenu;
   objects: SquareCatalogObject[];
 }): Promise<{ imported: number; updated: number; inactive: number }> {
   const seenExternalIds = new Set<string>();
@@ -139,6 +143,7 @@ async function syncSquareCatalogMappings(input: {
     internalEntityType: "category" | "menu_item" | "modifier_group" | "modifier_option";
     internalEntityId: string;
     externalId: string;
+    externalParentId?: string | null;
     payload: unknown;
   }) {
     seenExternalIds.add(args.externalId);
@@ -156,9 +161,12 @@ async function syncSquareCatalogMappings(input: {
       vendorId: input.vendorId,
       connectionId: input.connectionId,
       provider: "square",
+      environment: input.environment,
+      externalAccountId: input.externalAccountId,
       internalEntityType: args.internalEntityType,
       internalEntityId: args.internalEntityId,
       externalId: args.externalId,
+      externalParentId: args.externalParentId ?? null,
       externalLocationId: input.locationId,
       externalPayloadHash: hashProviderPayload(args.payload),
       isActive: true,
@@ -185,6 +193,7 @@ async function syncSquareCatalogMappings(input: {
       internalEntityType: "menu_item",
       internalEntityId: product.deliverectId,
       externalId,
+      externalParentId: productSourceParentExternalId(product),
       payload: objectById.get(externalId) ?? product,
     });
   }
@@ -235,7 +244,7 @@ export async function importSquareCatalog(
     );
   }
 
-  const parsed = mennyuCanonicalMenuSchema.safeParse(normalized.menu);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(normalized.menu);
   if (!parsed.success) {
     throw new SquareCatalogImportError(
       "Normalized Square catalog failed validation.",
@@ -248,12 +257,18 @@ export async function importSquareCatalog(
   const rawFingerprint = payloadFingerprint(objects);
 
   const { job, draftVersionId } = await prisma.$transaction(async (tx) => {
+    const locationCols = menuImportJobLocationWrite({
+      source: "SQUARE_CATALOG_PULL",
+      locationId,
+    });
     const j = await tx.menuImportJob.create({
       data: {
         vendorId,
         source: "SQUARE_CATALOG_PULL",
         status: MenuImportJobStatus.ingested,
-        deliverectLocationId: locationId,
+        sourceLocationId: locationCols.sourceLocationId,
+        // Phase 2: Square must not write deliverectLocationId
+        deliverectLocationId: locationCols.deliverectLocationId,
         createdBy: createdBy?.trim() || undefined,
       },
     });
@@ -303,6 +318,8 @@ export async function importSquareCatalog(
     vendorId,
     connectionId: connection.id,
     locationId,
+    environment: connection.squareEnvironment ?? null,
+    externalAccountId: connection.externalMerchantId ?? null,
     menu,
     objects,
   });

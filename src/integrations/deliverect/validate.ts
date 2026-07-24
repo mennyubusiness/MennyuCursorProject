@@ -3,7 +3,7 @@
  * Prevents sending malformed payloads when product/modifier mappings are incomplete.
  */
 import { MenuVersionState } from "@prisma/client";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import {
   countSubItemsChainVariantSelections,
   deliverectSubitemsChainValidationDetail,
@@ -180,7 +180,7 @@ export async function validateLiveMenuItemsAgainstPublishedCanonicalVariantParen
   if (!published?.canonicalSnapshot) {
     return { valid: true };
   }
-  const parsed = mennyuCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
   if (!parsed.success) {
     return { valid: true };
   }

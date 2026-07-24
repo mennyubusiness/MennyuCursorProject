@@ -6,8 +6,8 @@ import "server-only";
 import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
-  mennyuCanonicalMenuSchema,
-  type MennyuCanonicalMenu,
+  openOrderCanonicalMenuSchema,
+  type OpenOrderCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
 
 export type MenuParityIssueCode =
@@ -60,7 +60,7 @@ export type LiveModifierGroupParityRow = {
  * Pure comparison for tests and reuse. Caller supplies canonical menu + live rows for one vendor.
  */
 export function analyzeMenuParity(
-  canonical: MennyuCanonicalMenu,
+  canonical: OpenOrderCanonicalMenu,
   menuItems: LiveMenuItemParityRow[],
   modifierGroups: LiveModifierGroupParityRow[]
 ): MenuParityIssue[] {
@@ -212,7 +212,7 @@ export async function runMenuParityAudit(vendorId: string): Promise<MenuParityAu
     };
   }
 
-  const parsed = mennyuCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
   if (!parsed.success) {
     return {
       ok: false,

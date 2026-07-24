@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-  mennyuCanonicalMenuSchema,
-  type MennyuCanonicalMenu,
+  openOrderCanonicalMenuSchema,
+  type OpenOrderCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
 import {
   type MenuImportIssueRecord,
@@ -10,7 +10,7 @@ import {
 
 export interface ValidateCanonicalMenuResult {
   ok: boolean;
-  menu: MennyuCanonicalMenu | null;
+  menu: OpenOrderCanonicalMenu | null;
   issues: MenuImportIssueRecord[];
 }
 
@@ -19,7 +19,7 @@ export interface ValidateCanonicalMenuResult {
  * adds non-Zod policy checks as warning/info.
  */
 export function validateCanonicalMenu(menu: unknown): ValidateCanonicalMenuResult {
-  const parsed = mennyuCanonicalMenuSchema.safeParse(menu);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(menu);
   if (!parsed.success) {
     const issues = zodErrorToValidationIssues(parsed.error);
     return { ok: false, menu: null, issues };
@@ -52,7 +52,7 @@ function pathToPointer(path: (string | number)[]): string {
   return `/${path.map((p) => String(p)).join("/")}`;
 }
 
-function collectPolicyIssues(m: MennyuCanonicalMenu): MenuImportIssueRecord[] {
+function collectPolicyIssues(m: OpenOrderCanonicalMenu): MenuImportIssueRecord[] {
   const issues: MenuImportIssueRecord[] = [];
 
   if (m.categories.length === 0 && m.products.length > 0) {

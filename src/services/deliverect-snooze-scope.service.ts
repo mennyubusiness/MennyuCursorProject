@@ -5,7 +5,7 @@
 import "server-only";
 
 import { MenuVersionState } from "@prisma/client";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { prisma } from "@/lib/db";
 
 export type DeliverectSnoozePublishedScope = {
@@ -34,7 +34,7 @@ export async function loadDeliverectSnoozePublishedScope(
       continue;
     }
 
-    const parsed = mennyuCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
+    const parsed = openOrderCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
     if (!parsed.success) {
       productDeliverectIdsByVendor.set(vendorId, new Set());
       modifierOptionDeliverectIdsByVendor.set(vendorId, new Set());

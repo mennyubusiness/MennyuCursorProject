@@ -7,7 +7,7 @@ import {
   sortMenuImportIssuesForDisplay,
 } from "@/lib/admin-menu-import-queries";
 import { diffCanonicalMenus } from "@/domain/menu-import/canonical-diff";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { parseCanonicalSnapshot } from "@/lib/menu-import-canonical-preview";
 import { env } from "@/lib/env";
 import { evaluateDraftMenuVersionDiscardEligibility } from "@/services/discard-draft-menu-version.service";
@@ -19,6 +19,7 @@ import { MenuImportWhatChanged } from "@/components/menu-import/MenuImportWhatCh
 import { MenuImportIssuesList } from "@/components/menu-import/MenuImportIssuesList";
 import { MenuImportMenuPreview } from "@/components/menu-import/MenuImportMenuPreview";
 import { MenuImportBrowseExclusionDiagnostics } from "@/components/menu-import/MenuImportBrowseExclusionDiagnostics";
+import { MenuImportProviderConsistencyDiagnostics } from "@/components/menu-import/MenuImportProviderConsistencyDiagnostics";
 import { MenuImportAdvancedDetails } from "@/components/menu-import/MenuImportAdvancedDetails";
 import { MenuImportJobNextStepsAdmin } from "@/components/menu-import/MenuImportJobNextSteps";
 import { menuImportFriendlySource } from "@/lib/menu-import-ui-labels";
@@ -27,6 +28,7 @@ import { MenuImportIssueSeverity } from "@prisma/client";
 import { runMenuParityAudit } from "@/services/menu-parity.service";
 import { MenuParityAuditBanner } from "@/components/menu-import/MenuParityAuditBanner";
 import { explainCustomerMenuBrowseExclusions } from "@/domain/menu-import/customer-menu-browse";
+import { diagnoseMenuProviderConsistency } from "@/domain/menu-import/menu-provider-consistency";
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return "—";
@@ -63,7 +65,7 @@ export default async function AdminMenuImportJobPage({
   let menuDiff = null;
   if (menu) {
     if (publishedRow) {
-      const pr = mennyuCanonicalMenuSchema.safeParse(publishedRow.canonicalSnapshot);
+      const pr = openOrderCanonicalMenuSchema.safeParse(publishedRow.canonicalSnapshot);
       if (pr.success) {
         menuDiff = diffCanonicalMenus(menu, pr.data, publishedRow.id);
       } else {
@@ -142,6 +144,7 @@ export default async function AdminMenuImportJobPage({
 
   const menuParity = await runMenuParityAudit(job.vendorId);
   const customerBrowseExclusions = menu ? explainCustomerMenuBrowseExclusions(menu) : [];
+  const providerConsistencyIssues = menu ? diagnoseMenuProviderConsistency(menu) : [];
 
   return (
     <div className="space-y-8">
@@ -173,9 +176,11 @@ export default async function AdminMenuImportJobPage({
 
       <MenuImportBrowseExclusionDiagnostics exclusions={customerBrowseExclusions} />
 
+      <MenuImportProviderConsistencyDiagnostics issues={providerConsistencyIssues} />
+
       <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
         <h2 className="font-medium text-oo-charcoal">What changed</h2>
-        <p className="mt-1 text-sm text-oo-stone-gray">Compared to your live Open Order menu (same Deliverect-linked items).</p>
+        <p className="mt-1 text-sm text-oo-stone-gray">Compared to your live Open Order menu (same source-linked items).</p>
         <div className="mt-3">
           <MenuImportWhatChanged summary={publishSummary} summaryMode={publishSummaryMode} />
         </div>
@@ -265,6 +270,7 @@ export default async function AdminMenuImportJobPage({
         draftVersionId={job.draftVersionId}
         deliverectChannelLinkId={job.deliverectChannelLinkId}
         deliverectLocationId={job.deliverectLocationId}
+        sourceLocationId={job.sourceLocationId}
         deliverectMenuId={job.deliverectMenuId}
         snapshotJson={snapshotJson}
         rawPayloadJson={rawPayloadJson}

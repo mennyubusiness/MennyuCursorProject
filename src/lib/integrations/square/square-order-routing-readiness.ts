@@ -1,7 +1,7 @@
 import "server-only";
 
 import { MenuVersionState } from "@prisma/client";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { loadActiveMenuVersionForVendor } from "@/lib/vendor-active-menu-version.server";
@@ -162,7 +162,7 @@ export async function loadSquareOrderRoutingReadiness(
       select: { canonicalSnapshot: true },
     });
     const parsed = published
-      ? mennyuCanonicalMenuSchema.safeParse(published.canonicalSnapshot)
+      ? openOrderCanonicalMenuSchema.safeParse(published.canonicalSnapshot)
       : null;
     hasSquarePublishedMenu =
       parsed?.success === true &&

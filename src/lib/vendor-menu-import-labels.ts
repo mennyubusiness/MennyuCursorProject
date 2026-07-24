@@ -105,7 +105,7 @@ export function vendorMenuImportDetailPrimaryStatus(job: {
   }
   if (job.status === "awaiting_review") {
     if (blocking > 0) {
-      return "Blocked by issues — fix in Deliverect or ask Open Order support";
+      return "Blocked by issues — fix in the source menu system or ask Open Order support";
     }
     return "Needs review — open Publish when ready";
   }

@@ -3,11 +3,11 @@ import { prisma } from "@/lib/db";
 import { ExploreHero } from "@/components/explore/ExploreHero";
 import { ExploreDiscovery } from "@/components/explore/ExploreDiscovery";
 import { PageSection, PageShell } from "@/components/layout/page-shell";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { MenuVersionState } from "@prisma/client";
 
 function extractMenuCategoryNames(snapshot: unknown): string[] {
-  const parsed = mennyuCanonicalMenuSchema.safeParse(snapshot);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(snapshot);
   if (!parsed.success) return [];
   const names = parsed.data.categories
     .map((category) => category.name.trim())

@@ -4,13 +4,13 @@ import {
   MenuImportJobStatus,
   MenuVersionState,
 } from "@prisma/client";
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import {
   evaluateMenuImportPublishEligibility,
   noPendingMenuPublishEligibility,
 } from "@/lib/menu-import-publish-eligibility";
 
-function minimalCanonical(overrides: Partial<MennyuCanonicalMenu> = {}): MennyuCanonicalMenu {
+function minimalCanonical(overrides: Partial<OpenOrderCanonicalMenu> = {}): OpenOrderCanonicalMenu {
   return {
     schemaVersion: 1,
     vendorId: "vendor_1",

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import { analyzeMenuParity, type LiveMenuItemParityRow, type LiveModifierGroupParityRow } from "./menu-parity.service";
 
-function minimalCanonical(overrides: Partial<MennyuCanonicalMenu> = {}): MennyuCanonicalMenu {
+function minimalCanonical(overrides: Partial<OpenOrderCanonicalMenu> = {}): OpenOrderCanonicalMenu {
   return {
     schemaVersion: 1,
     vendorId: "v1",

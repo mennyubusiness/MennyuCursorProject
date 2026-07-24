@@ -3,7 +3,8 @@ import { z } from "zod";
 /** Integer cents, >= 0 */
 export const canonicalMoneyCentsSchema = z.number().int().min(0);
 
-export const deliverectMenuImportMetaSchema = z.object({
+/** Source-provider metadata on a canonical menu snapshot (`menu.deliverect` JSON key is legacy). */
+export const menuSourceMetaSchema = z.object({
   channelLinkId: z.string().min(1).optional(),
   locationId: z.string().min(1).optional(),
   menuId: z.string().min(1).optional(),
@@ -15,7 +16,10 @@ export const deliverectMenuImportMetaSchema = z.object({
   ]),
 });
 
-export const mennyuCanonicalModifierOptionSchema = z.object({
+/** @deprecated Use {@link menuSourceMetaSchema} */
+export const deliverectMenuImportMetaSchema = menuSourceMetaSchema;
+
+export const openOrderCanonicalModifierOptionSchema = z.object({
   deliverectId: z.string().min(1),
   /** Deliverect `plu` when present; outbound orders must send this as modifier `plu`, not Mongo `_id`. */
   plu: z.string().min(1).nullable().optional(),
@@ -35,7 +39,7 @@ export const openOrderModifierGroupKindSchema = z.enum([
   "FREE_CHOICE_MODIFIER_GROUP",
 ]);
 
-export const mennyuCanonicalModifierGroupSchema = z.object({
+export const openOrderCanonicalModifierGroupSchema = z.object({
   deliverectId: z.string().min(1),
   name: z.string().min(1),
   minSelections: z.number().int().min(0),
@@ -47,17 +51,17 @@ export const mennyuCanonicalModifierGroupSchema = z.object({
   isVariantGroup: z.boolean().optional(),
   /** Deliverect `multiMax` on the modifier group: max selections per option (same modifier multiple times). */
   multiMax: z.number().int().positive().nullable().optional(),
-  options: z.array(mennyuCanonicalModifierOptionSchema),
+  options: z.array(openOrderCanonicalModifierOptionSchema),
 });
 
-export const mennyuCanonicalCategorySchema = z.object({
+export const openOrderCanonicalCategorySchema = z.object({
   deliverectId: z.string().min(1),
   name: z.string().min(1),
   sortOrder: z.number().int(),
   productDeliverectIds: z.array(z.string().min(1)),
 });
 
-export const mennyuCanonicalProductSchema = z.object({
+export const openOrderCanonicalProductSchema = z.object({
   deliverectId: z.string().min(1),
   /** Deliverect `plu` when present; used for snooze webhooks (distinct from `_id`-first `deliverectId`). */
   plu: z.string().min(1).nullable().optional(),
@@ -88,14 +92,14 @@ export const mennyuCanonicalProductSchema = z.object({
   modifierGroupKinds: z.record(z.string().min(1), openOrderModifierGroupKindSchema).optional(),
 });
 
-export const mennyuCanonicalMenuSchema = z
+export const openOrderCanonicalMenuSchema = z
   .object({
     schemaVersion: z.literal(1),
     vendorId: z.string().min(1),
-    deliverect: deliverectMenuImportMetaSchema,
-    categories: z.array(mennyuCanonicalCategorySchema),
-    modifierGroupDefinitions: z.array(mennyuCanonicalModifierGroupSchema),
-    products: z.array(mennyuCanonicalProductSchema),
+    deliverect: menuSourceMetaSchema,
+    categories: z.array(openOrderCanonicalCategorySchema),
+    modifierGroupDefinitions: z.array(openOrderCanonicalModifierGroupSchema),
+    products: z.array(openOrderCanonicalProductSchema),
   })
   .superRefine((val, ctx) => {
     const productIds = val.products.map((p) => p.deliverectId);
@@ -151,7 +155,7 @@ export const mennyuCanonicalMenuSchema = z
       if (g.minSelections > g.maxSelections) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `Modifier group ${g.deliverectId} has minSelections > maxSelections`,
+          message: `modifier group ${g.deliverectId} has minSelections > maxSelections`,
           path: ["modifierGroupDefinitions", gi],
         });
       }
@@ -188,10 +192,34 @@ function findDuplicates(ids: string[]): string[] {
   return [...dups];
 }
 
-export type MennyuCanonicalMenu = z.infer<typeof mennyuCanonicalMenuSchema>;
-export type MennyuCanonicalCategory = z.infer<typeof mennyuCanonicalCategorySchema>;
-export type MennyuCanonicalProduct = z.infer<typeof mennyuCanonicalProductSchema>;
-export type MennyuCanonicalModifierGroup = z.infer<typeof mennyuCanonicalModifierGroupSchema>;
-export type MennyuCanonicalModifierOption = z.infer<typeof mennyuCanonicalModifierOptionSchema>;
-export type DeliverectMenuImportMeta = z.infer<typeof deliverectMenuImportMetaSchema>;
+export type OpenOrderCanonicalMenu = z.infer<typeof openOrderCanonicalMenuSchema>;
+export type OpenOrderCanonicalCategory = z.infer<typeof openOrderCanonicalCategorySchema>;
+export type OpenOrderCanonicalProduct = z.infer<typeof openOrderCanonicalProductSchema>;
+export type OpenOrderCanonicalModifierGroup = z.infer<typeof openOrderCanonicalModifierGroupSchema>;
+export type OpenOrderCanonicalModifierOption = z.infer<typeof openOrderCanonicalModifierOptionSchema>;
+export type MenuSourceMeta = z.infer<typeof menuSourceMetaSchema>;
 export type CanonicalMoneyCents = z.infer<typeof canonicalMoneyCentsSchema>;
+
+/** @deprecated Use {@link openOrderCanonicalMenuSchema} */
+export const mennyuCanonicalMenuSchema = openOrderCanonicalMenuSchema;
+/** @deprecated Use {@link openOrderCanonicalCategorySchema} */
+export const mennyuCanonicalCategorySchema = openOrderCanonicalCategorySchema;
+/** @deprecated Use {@link openOrderCanonicalProductSchema} */
+export const mennyuCanonicalProductSchema = openOrderCanonicalProductSchema;
+/** @deprecated Use {@link openOrderCanonicalModifierGroupSchema} */
+export const mennyuCanonicalModifierGroupSchema = openOrderCanonicalModifierGroupSchema;
+/** @deprecated Use {@link openOrderCanonicalModifierOptionSchema} */
+export const mennyuCanonicalModifierOptionSchema = openOrderCanonicalModifierOptionSchema;
+
+/** @deprecated Use {@link OpenOrderCanonicalMenu} */
+export type MennyuCanonicalMenu = OpenOrderCanonicalMenu;
+/** @deprecated Use {@link OpenOrderCanonicalCategory} */
+export type MennyuCanonicalCategory = OpenOrderCanonicalCategory;
+/** @deprecated Use {@link OpenOrderCanonicalProduct} */
+export type MennyuCanonicalProduct = OpenOrderCanonicalProduct;
+/** @deprecated Use {@link OpenOrderCanonicalModifierGroup} */
+export type MennyuCanonicalModifierGroup = OpenOrderCanonicalModifierGroup;
+/** @deprecated Use {@link OpenOrderCanonicalModifierOption} */
+export type MennyuCanonicalModifierOption = OpenOrderCanonicalModifierOption;
+/** @deprecated Use {@link MenuSourceMeta} */
+export type DeliverectMenuImportMeta = MenuSourceMeta;

@@ -3,7 +3,7 @@ import "server-only";
 import { MenuImportIssueSeverity } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { fetchLatestPublishedMenuVersionForVendor } from "@/lib/admin-menu-import-queries";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { parseCanonicalSnapshot } from "@/lib/menu-import-canonical-preview";
 import {
   buildVendorMenuPublishGate,
@@ -37,7 +37,7 @@ export type VendorSquareMenuImportsPanelData = {
 };
 
 function publishedMenuSourceLabelFromSnapshot(snapshot: unknown): string | null {
-  const parsed = mennyuCanonicalMenuSchema.safeParse(snapshot);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(snapshot);
   if (!parsed.success) return null;
   const kind = parsed.data.deliverect.sourcePayloadKind;
   if (kind === "square_catalog_v1") return "Square import";

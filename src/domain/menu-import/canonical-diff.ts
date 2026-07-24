@@ -3,10 +3,10 @@
  * Used for admin review only — does not touch live menu tables.
  */
 import type {
-  MennyuCanonicalMenu,
-  MennyuCanonicalModifierGroup,
-  MennyuCanonicalModifierOption,
-  MennyuCanonicalProduct,
+  OpenOrderCanonicalMenu,
+  OpenOrderCanonicalModifierGroup,
+  OpenOrderCanonicalModifierOption,
+  OpenOrderCanonicalProduct,
 } from "@/domain/menu-import/canonical.schema";
 
 function stableJson(v: unknown): string {
@@ -14,8 +14,8 @@ function stableJson(v: unknown): string {
 }
 
 function describeProductChanges(
-  d: MennyuCanonicalProduct,
-  p: MennyuCanonicalProduct
+  d: OpenOrderCanonicalProduct,
+  p: OpenOrderCanonicalProduct
 ): { priceChanged: boolean; otherLabels: string[] } {
   const otherLabels: string[] = [];
   if (d.name !== p.name) otherLabels.push(`name (${p.name} → ${d.name})`);
@@ -40,8 +40,8 @@ function describeProductChanges(
 }
 
 function describeGroupMetaChanges(
-  d: MennyuCanonicalModifierGroup,
-  p: MennyuCanonicalModifierGroup
+  d: OpenOrderCanonicalModifierGroup,
+  p: OpenOrderCanonicalModifierGroup
 ): string[] {
   const out: string[] = [];
   if (d.name !== p.name) out.push(`name (${p.name} → ${d.name})`);
@@ -59,7 +59,7 @@ function describeGroupMetaChanges(
   return out;
 }
 
-function describeOptionChanges(d: MennyuCanonicalModifierOption, p: MennyuCanonicalModifierOption): string[] {
+function describeOptionChanges(d: OpenOrderCanonicalModifierOption, p: OpenOrderCanonicalModifierOption): string[] {
   const out: string[] = [];
   const pluD = d.plu ?? null;
   const pluP = p.plu ?? null;
@@ -78,8 +78,8 @@ function describeOptionChanges(d: MennyuCanonicalModifierOption, p: MennyuCanoni
 function diffOptionsInGroup(
   groupId: string,
   groupName: string,
-  dOpts: MennyuCanonicalModifierOption[],
-  pOpts: MennyuCanonicalModifierOption[]
+  dOpts: OpenOrderCanonicalModifierOption[],
+  pOpts: OpenOrderCanonicalModifierOption[]
 ): {
   added: CanonicalMenuDiff["modifierChanges"]["addedOptions"];
   removed: CanonicalMenuDiff["modifierChanges"]["removedOptions"];
@@ -175,8 +175,8 @@ export type CanonicalMenuDiff = {
  * Compare draft menu to published baseline. If `published` is null, all draft entities are treated as new (first publish).
  */
 export function diffCanonicalMenus(
-  draft: MennyuCanonicalMenu,
-  published: MennyuCanonicalMenu | null,
+  draft: OpenOrderCanonicalMenu,
+  published: OpenOrderCanonicalMenu | null,
   publishedVersionId: string | null
 ): CanonicalMenuDiff {
   const emptyModifier = {

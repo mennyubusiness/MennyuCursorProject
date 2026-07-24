@@ -2,8 +2,8 @@ import "server-only";
 
 import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { payloadFingerprint } from "@/lib/menu-import-payload-hash";
 import {
   getMenuPublishTransactionOptions,
@@ -87,7 +87,7 @@ export function buildOpenOrderCanonicalMenu(
   categories: Array<{ id: string; name: string; sortOrder: number; isVisible: boolean }>,
   items: OpenOrderMenuItemRow[],
   modifierGroupsByItemId: Map<string, OpenOrderBuilderModifierGroupRow[]>
-): MennyuCanonicalMenu {
+): OpenOrderCanonicalMenu {
   const visibleCategories = categories
     .filter((c) => c.isVisible && c.name.trim())
     .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -146,7 +146,7 @@ export function buildOpenOrderCanonicalMenu(
     };
   });
 
-  const menu: MennyuCanonicalMenu = {
+  const menu: OpenOrderCanonicalMenu = {
     schemaVersion: 1,
     vendorId,
     deliverect: {
@@ -157,7 +157,7 @@ export function buildOpenOrderCanonicalMenu(
     products,
   };
 
-  const parsed = mennyuCanonicalMenuSchema.safeParse(menu);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(menu);
   if (!parsed.success) {
     throw new OpenOrderMenuPublishError("INVALID_CANONICAL", "Built menu failed schema validation.");
   }

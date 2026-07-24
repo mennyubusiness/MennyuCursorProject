@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import {
   computeCustomerMenuBrowseExcludedProductIds,
   explainCustomerMenuBrowseExclusions,
 } from "./customer-menu-browse";
 
-function minimalMenu(overrides: Partial<MennyuCanonicalMenu> & Pick<MennyuCanonicalMenu, "products">): MennyuCanonicalMenu {
+function minimalMenu(overrides: Partial<OpenOrderCanonicalMenu> & Pick<OpenOrderCanonicalMenu, "products">): OpenOrderCanonicalMenu {
   return {
     schemaVersion: 1,
     vendorId: "v1",

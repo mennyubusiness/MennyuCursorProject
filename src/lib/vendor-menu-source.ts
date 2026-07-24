@@ -1,7 +1,7 @@
 import type { VendorMenuSource, VendorOrderRoutingMode } from "@prisma/client";
 import {
-  mennyuCanonicalMenuSchema,
-  type MennyuCanonicalMenu,
+  openOrderCanonicalMenuSchema,
+  type OpenOrderCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
 import { isOpenOrderProductDeliverectId } from "@/lib/open-order-menu-ids";
 import { isSquareProductDeliverectId } from "@/lib/integrations/square/square-menu-ids";
@@ -46,7 +46,7 @@ export function vendorUsesMenuBuilder(menuSource: VendorMenuSource): boolean {
   return menuSource === "open_order";
 }
 
-export function canonicalMenuSourceFromMenu(menu: MennyuCanonicalMenu): VendorMenuSource {
+export function canonicalMenuSourceFromMenu(menu: OpenOrderCanonicalMenu): VendorMenuSource {
   const kind = menu.deliverect.sourcePayloadKind;
   if (kind === "open_order_builder_v1" || kind === "square_catalog_v1") {
     return "open_order";
@@ -55,7 +55,7 @@ export function canonicalMenuSourceFromMenu(menu: MennyuCanonicalMenu): VendorMe
 }
 
 export function canonicalMenuSourceFromSnapshot(snapshot: unknown): VendorMenuSource | null {
-  const parsed = mennyuCanonicalMenuSchema.safeParse(snapshot);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(snapshot);
   if (!parsed.success) return null;
   return canonicalMenuSourceFromMenu(parsed.data);
 }

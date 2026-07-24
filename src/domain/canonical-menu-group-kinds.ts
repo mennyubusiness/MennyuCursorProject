@@ -1,7 +1,7 @@
 /**
  * Attach per-product Open Order group kinds to a canonical menu after normalization.
  */
-import type { MennyuCanonicalMenu, MennyuCanonicalProduct } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu, OpenOrderCanonicalProduct } from "@/domain/menu-import/canonical.schema";
 import {
   classifyOpenOrderModifierGroup,
   classificationInputFromCanonicalGroup,
@@ -10,13 +10,13 @@ import {
 
 import { variantChildCountByParentPluFromProducts } from "@/lib/deliverect-variant-child-count";
 
-export function buildVariantChildCountByParentPlu(products: MennyuCanonicalProduct[]): Map<string, number> {
+export function buildVariantChildCountByParentPlu(products: OpenOrderCanonicalProduct[]): Map<string, number> {
   return variantChildCountByParentPluFromProducts(products);
 }
 
 export function classifyProductModifierGroupKind(
-  menu: MennyuCanonicalMenu,
-  product: MennyuCanonicalProduct,
+  menu: OpenOrderCanonicalMenu,
+  product: OpenOrderCanonicalProduct,
   groupDeliverectId: string,
   variantChildCounts: Map<string, number>
 ): OpenOrderModifierGroupKind | null {
@@ -31,7 +31,7 @@ export function classifyProductModifierGroupKind(
   ).kind;
 }
 
-export function attachModifierGroupKindsToCanonicalMenu(menu: MennyuCanonicalMenu): MennyuCanonicalMenu {
+export function attachModifierGroupKindsToCanonicalMenu(menu: OpenOrderCanonicalMenu): OpenOrderCanonicalMenu {
   const variantChildCounts = buildVariantChildCountByParentPlu(menu.products);
   const products = menu.products.map((product) => {
     const kinds: Record<string, OpenOrderModifierGroupKind> = {};

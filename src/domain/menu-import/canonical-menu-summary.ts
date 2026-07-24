@@ -1,4 +1,4 @@
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 
 export type CanonicalMenuSummaryCounts = {
   categories: number;
@@ -10,7 +10,7 @@ export type CanonicalMenuSummaryCounts = {
 export function getCanonicalMenuSummaryCounts(snapshot: unknown):
   | { ok: true; summary: CanonicalMenuSummaryCounts }
   | { ok: false; parseError: string } {
-  const parsed = mennyuCanonicalMenuSchema.safeParse(snapshot);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(snapshot);
   if (!parsed.success) {
     return {
       ok: false,

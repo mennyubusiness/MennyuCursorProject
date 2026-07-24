@@ -19,9 +19,9 @@ import { menuItemDeliverectIdMatchesMenuSource } from "@/lib/vendor-menu-source"
 import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
-  mennyuCanonicalMenuSchema,
-  type MennyuCanonicalMenu,
-  type MennyuCanonicalProduct,
+  openOrderCanonicalMenuSchema,
+  type OpenOrderCanonicalMenu,
+  type OpenOrderCanonicalProduct,
 } from "@/domain/menu-import/canonical.schema";
 
 export type ActiveDeliverectSets = {
@@ -42,7 +42,7 @@ export function revalidateOperationalMenuCacheForVendor(vendorId: string): void 
   revalidateTag(operationalMenuCacheTag(vendorId));
 }
 
-export function buildActiveDeliverectSets(menu: MennyuCanonicalMenu): ActiveDeliverectSets {
+export function buildActiveDeliverectSets(menu: OpenOrderCanonicalMenu): ActiveDeliverectSets {
   const productDeliverectIds = new Set(menu.products.map((p) => p.deliverectId));
   const pluByProductDeliverectId = new Map<string, string | null | undefined>();
   for (const p of menu.products) {
@@ -75,7 +75,7 @@ export type MenuItemPickRow = {
  * Shared by winner selection and customer menu so behavior cannot drift.
  */
 export function computeOperationalProductPools<T extends MenuItemPickRow>(
-  menu: MennyuCanonicalMenu,
+  menu: OpenOrderCanonicalMenu,
   rows: T[],
   ctx: { vendorId: string }
 ): Map<string, T[]> {
@@ -116,7 +116,7 @@ export function computeOperationalProductPools<T extends MenuItemPickRow>(
  * Pick operational MenuItem row id per published product id (PLU filter + latest updatedAt).
  */
 export function pickOperationalMenuItemWinners(
-  menu: MennyuCanonicalMenu,
+  menu: OpenOrderCanonicalMenu,
   rows: MenuItemPickRow[],
   ctx: { vendorId: string }
 ): { winnerIds: Set<string>; duplicateProductWarnings: Array<{ deliverectProductId: string; count: number }> } {
@@ -135,7 +135,7 @@ export function pickOperationalMenuItemWinners(
 }
 
 type PublishedMenuMeta = {
-  menu: MennyuCanonicalMenu | null;
+  menu: OpenOrderCanonicalMenu | null;
   menuVersionId: string | null;
 };
 

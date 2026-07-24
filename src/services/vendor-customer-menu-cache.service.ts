@@ -9,8 +9,8 @@ import { revalidateTag } from "next/cache";
 import { MenuVersionState, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
-  mennyuCanonicalMenuSchema,
-  type MennyuCanonicalMenu,
+  openOrderCanonicalMenuSchema,
+  type OpenOrderCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
 import { computeCustomerMenuBrowseExcludedProductIds } from "@/domain/menu-import/customer-menu-browse";
 import { variantChildCountByParentPluFromProducts } from "@/lib/deliverect-variant-child-count";
@@ -54,7 +54,7 @@ function sortItems(a: CustomerVendorMenuItem, b: CustomerVendorMenuItem): number
 }
 
 function buildSectionsFromCanonical(
-  menu: MennyuCanonicalMenu,
+  menu: OpenOrderCanonicalMenu,
   byProductId: Map<string, CustomerVendorMenuItem>
 ): CustomerVendorMenuCategorySection[] {
   const sections: CustomerVendorMenuCategorySection[] = [];
@@ -176,7 +176,7 @@ async function buildPublishedMenuDisplay(
   });
   if (!published?.canonicalSnapshot) return null;
 
-  const parsed = mennyuCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
   if (!parsed.success) return null;
 
   const menu = parsed.data;

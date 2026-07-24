@@ -4,16 +4,32 @@ import type {
   IntegrationProvider,
   ProviderEntityType,
 } from "@/lib/integrations/types";
+import type { Prisma } from "@prisma/client";
 
+/**
+ * Hybrid ExternalMenuMapping contract (Phase 2):
+ * - identity: vendorId + provider + internalEntityType + internalEntityId + externalLocationId
+ * - externalId: provider catalog object id used for order injection
+ * - externalParentId: optional parent catalog id (Square ITEM for a variation)
+ * - environment / externalAccountId: optional provider context (no secrets)
+ * - metadata: optional non-secret JSON diagnostics
+ *
+ * Do not create a competing ExternalMenuMapping table; evolve this model instead.
+ */
 export type UpsertProviderEntityMappingInput = {
   vendorId: string;
   connectionId?: string | null;
   provider: IntegrationProvider;
+  environment?: string | null;
   internalEntityType: ProviderEntityType;
   internalEntityId: string;
   externalId: string;
+  externalParentId?: string | null;
   externalLocationId?: string | null;
+  externalAccountId?: string | null;
+  externalVersion?: string | null;
   externalPayloadHash?: string | null;
+  metadata?: Prisma.InputJsonValue | null;
   isActive?: boolean;
 };
 
@@ -35,6 +51,14 @@ export async function upsertProviderEntityMapping(input: UpsertProviderEntityMap
     select: { id: true },
   });
 
+  const additive = {
+    environment: input.environment ?? undefined,
+    externalParentId: input.externalParentId === undefined ? undefined : input.externalParentId,
+    externalAccountId: input.externalAccountId ?? undefined,
+    externalVersion: input.externalVersion ?? undefined,
+    metadata: input.metadata === undefined ? undefined : input.metadata,
+  };
+
   if (existing) {
     return prisma.providerEntityMapping.update({
       where: { id: existing.id },
@@ -44,6 +68,7 @@ export async function upsertProviderEntityMapping(input: UpsertProviderEntityMap
         externalPayloadHash: input.externalPayloadHash ?? undefined,
         isActive: input.isActive ?? true,
         lastSeenAt: new Date(),
+        ...additive,
       },
     });
   }
@@ -53,11 +78,16 @@ export async function upsertProviderEntityMapping(input: UpsertProviderEntityMap
       vendorId: input.vendorId,
       connectionId: input.connectionId ?? null,
       provider: input.provider,
+      environment: input.environment ?? null,
       internalEntityType: input.internalEntityType,
       internalEntityId: input.internalEntityId,
       externalId: input.externalId,
+      externalParentId: input.externalParentId ?? null,
       externalLocationId,
+      externalAccountId: input.externalAccountId ?? null,
+      externalVersion: input.externalVersion ?? null,
       externalPayloadHash: input.externalPayloadHash ?? null,
+      metadata: input.metadata ?? undefined,
       isActive: input.isActive ?? true,
       lastSeenAt: new Date(),
     },

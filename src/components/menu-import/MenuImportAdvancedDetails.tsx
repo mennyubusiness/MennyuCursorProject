@@ -1,4 +1,5 @@
 import type { MenuImportSource } from "@prisma/client";
+import { jobSourceLocationId } from "@/domain/menu-import/canonical-identity";
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return "—";
@@ -16,6 +17,7 @@ export function MenuImportAdvancedDetails({
   draftVersionId,
   deliverectChannelLinkId,
   deliverectLocationId,
+  sourceLocationId = null,
   deliverectMenuId,
   snapshotJson,
   rawPayloadJson,
@@ -30,10 +32,13 @@ export function MenuImportAdvancedDetails({
   draftVersionId: string | null;
   deliverectChannelLinkId: string | null;
   deliverectLocationId: string | null;
+  sourceLocationId?: string | null;
   deliverectMenuId: string | null;
   snapshotJson: unknown;
   rawPayloadJson: unknown;
 }) {
+  const location = jobSourceLocationId({ sourceLocationId, deliverectLocationId });
+
   return (
     <details className="rounded-lg border border-stone-200 bg-white">
       <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-stone-800">
@@ -70,18 +75,29 @@ export function MenuImportAdvancedDetails({
               <dt className="text-stone-500">Deliverect</dt>
               <dd className="text-xs text-stone-700">
                 channelLink <span className="font-mono">{deliverectChannelLinkId}</span>
-                {deliverectLocationId && (
-                  <>
-                    {" "}
-                    · location <span className="font-mono">{deliverectLocationId}</span>
-                  </>
-                )}
                 {deliverectMenuId && (
                   <>
                     {" "}
                     · menu <span className="font-mono">{deliverectMenuId}</span>
                   </>
                 )}
+              </dd>
+            </div>
+          )}
+          {location.locationId && (
+            <div className="sm:col-span-2">
+              <dt className="text-stone-500">
+                {source === "SQUARE_CATALOG_PULL"
+                  ? "Square location"
+                  : deliverectChannelLinkId
+                    ? "Source location"
+                    : "Source location"}
+              </dt>
+              <dd className="font-mono text-xs text-stone-700">
+                {location.locationId}
+                {location.usedLegacyFallback ? (
+                  <span className="ml-2 text-amber-800">(via legacy deliverectLocationId)</span>
+                ) : null}
               </dd>
             </div>
           )}
@@ -99,22 +115,22 @@ export function MenuImportAdvancedDetails({
           )}
         </dl>
 
-        <details className="rounded border border-stone-200">
-          <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-stone-800">
-            Canonical snapshot JSON
-          </summary>
-          <pre className="max-h-[24rem] overflow-auto border-t border-stone-100 p-3 text-xs leading-relaxed text-stone-800">
-            {snapshotJson === null ? "—" : JSON.stringify(snapshotJson, null, 2)}
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            Canonical snapshot (truncated)
+          </h3>
+          <pre className="mt-2 max-h-64 overflow-auto rounded bg-stone-50 p-2 text-[11px] text-stone-800">
+            {JSON.stringify(snapshotJson, null, 2)?.slice(0, 8000) ?? "—"}
           </pre>
-        </details>
-        <details className="rounded border border-stone-200">
-          <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-stone-800">
-            Raw payload JSON
-          </summary>
-          <pre className="max-h-[24rem] overflow-auto border-t border-stone-100 p-3 text-xs leading-relaxed text-stone-800">
-            {rawPayloadJson === null ? "— (no raw payload row)" : JSON.stringify(rawPayloadJson, null, 2)}
+        </div>
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            Raw payload (truncated)
+          </h3>
+          <pre className="mt-2 max-h-64 overflow-auto rounded bg-stone-50 p-2 text-[11px] text-stone-800">
+            {JSON.stringify(rawPayloadJson, null, 2)?.slice(0, 8000) ?? "—"}
           </pre>
-        </details>
+        </div>
       </div>
     </details>
   );

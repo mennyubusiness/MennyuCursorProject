@@ -27,6 +27,9 @@ export function isOpenOrderProductDeliverectId(id: string | null | undefined): b
   return Boolean(id?.startsWith(OPEN_ORDER_PRODUCT_ID_PREFIX));
 }
 
+/** Phase 1 alias — same as {@link isOpenOrderProductDeliverectId}. */
+export const isOpenOrderProductExternalId = isOpenOrderProductDeliverectId;
+
 export function isOpenOrderModifierGroupDeliverectId(id: string | null | undefined): boolean {
   return Boolean(id?.startsWith(OPEN_ORDER_MODIFIER_GROUP_ID_PREFIX));
 }

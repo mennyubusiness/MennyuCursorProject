@@ -90,7 +90,9 @@ export function MenuImportIssuesList({
       {blocking.length > 0 && (
         <div>
           <p className="text-sm font-medium text-red-900">Blocking ({blocking.length})</p>
-          <p className="mt-0.5 text-xs text-stone-600">Fix these in Deliverect (or discard this draft) before publishing.</p>
+          <p className="mt-0.5 text-xs text-stone-600">
+            Fix these in the source menu system (or discard this draft) before publishing.
+          </p>
           <ul className="mt-2 divide-y divide-stone-100 rounded-lg border border-red-100 bg-red-50/30">
             {blocking.map(renderIssue)}
           </ul>

@@ -15,14 +15,19 @@ import {
   logMenuPublish,
 } from "@/lib/menu-publish-transaction";
 import {
-  mennyuCanonicalMenuSchema,
-  type MennyuCanonicalMenu,
-  type MennyuCanonicalProduct,
+  openOrderCanonicalMenuSchema,
+  type OpenOrderCanonicalMenu,
+  type OpenOrderCanonicalProduct,
 } from "@/domain/menu-import/canonical.schema";
 import {
   explainCustomerMenuBrowseExclusions,
   type CustomerMenuBrowseExclusion,
 } from "@/domain/menu-import/customer-menu-browse";
+import {
+  productExternalId,
+  variantParentName,
+  variantParentPlu,
+} from "@/domain/menu-import/canonical-identity";
 import { orderModifierGroupsForPublish } from "@/domain/menu-import/modifier-group-publish-order";
 import { onMenuImportPublishedToLive } from "@/services/menu-deliverect-post-publish.service";
 import { runMenuParityAudit, type MenuParityAuditResult } from "@/services/menu-parity.service";
@@ -60,7 +65,7 @@ export function classifyMenuImportForPublish(job: MenuImportJobForPublish):
   | { kind: "already_published"; menuVersionId: string }
   | {
       kind: "ready";
-      menu: MennyuCanonicalMenu;
+      menu: OpenOrderCanonicalMenu;
       vendorId: string;
       draftVersionId: string;
       jobId: string;
@@ -97,7 +102,7 @@ export function classifyMenuImportForPublish(job: MenuImportJobForPublish):
     );
   }
 
-  const parsed = mennyuCanonicalMenuSchema.safeParse(job.draftVersion.canonicalSnapshot);
+  const parsed = openOrderCanonicalMenuSchema.safeParse(job.draftVersion.canonicalSnapshot);
   if (!parsed.success) {
     throw new MenuPublishValidationError("INVALID_CANONICAL", "Canonical snapshot failed schema validation");
   }
@@ -135,7 +140,7 @@ export function classifyMenuImportForPublish(job: MenuImportJobForPublish):
 export async function applyCanonicalMenuToLiveTables(
   tx: Prisma.TransactionClient,
   vendorId: string,
-  menu: MennyuCanonicalMenu,
+  menu: OpenOrderCanonicalMenu,
   logCtx?: { jobId?: string; source?: string }
 ): Promise<void> {
   const orderedGroups = orderModifierGroupsForPublish(menu.modifierGroupDefinitions);
@@ -331,14 +336,14 @@ export async function applyCanonicalMenuToLiveTables(
 async function upsertMenuItemAndLinks(
   tx: Prisma.TransactionClient,
   vendorId: string,
-  menu: MennyuCanonicalMenu,
-  p: MennyuCanonicalProduct,
+  menu: OpenOrderCanonicalMenu,
+  p: OpenOrderCanonicalProduct,
   sortOrder: number,
   deliverectCategoryId: string | null,
   groupDeliverectToDbId: Map<string, string>
 ): Promise<void> {
   const existing = await tx.menuItem.findFirst({
-    where: { vendorId, deliverectProductId: p.deliverectId },
+    where: { vendorId, deliverectProductId: productExternalId(p) },
   });
 
   const itemData = {
@@ -349,10 +354,10 @@ async function upsertMenuItemAndLinks(
     sortOrder,
     isAvailable: p.isAvailable,
     basketMaxQuantity: p.basketMaxQuantity ?? null,
-    deliverectProductId: p.deliverectId,
+    deliverectProductId: productExternalId(p),
     deliverectPlu: p.plu ?? null,
-    deliverectVariantParentPlu: p.deliverectVariantParentPlu ?? null,
-    deliverectVariantParentName: p.deliverectVariantParentName ?? null,
+    deliverectVariantParentPlu: variantParentPlu(p),
+    deliverectVariantParentName: variantParentName(p),
     deliverectCategoryId,
   };
 
@@ -373,7 +378,7 @@ async function upsertMenuItemAndLinks(
   await tx.menuItem.updateMany({
     where: {
       vendorId,
-      deliverectProductId: p.deliverectId,
+      deliverectProductId: productExternalId(p),
       NOT: { id: row.id },
     },
     data: {
@@ -385,8 +390,8 @@ async function upsertMenuItemAndLinks(
       isAvailable: itemData.isAvailable,
       basketMaxQuantity: itemData.basketMaxQuantity,
       deliverectPlu: itemData.deliverectPlu,
-      deliverectVariantParentPlu: itemData.deliverectVariantParentPlu,
-      deliverectVariantParentName: itemData.deliverectVariantParentName,
+      deliverectVariantParentPlu: variantParentPlu(p),
+      deliverectVariantParentName: variantParentName(p),
       deliverectCategoryId: itemData.deliverectCategoryId,
     },
   });
@@ -399,7 +404,7 @@ async function upsertMenuItemAndLinks(
     if (!dbGid) {
       throw new MenuPublishValidationError(
         "UNKNOWN_MODIFIER_GROUP_ON_PRODUCT",
-        `Product ${p.deliverectId} references unknown modifier group ${gid}`
+        `Product ${productExternalId(p)} references unknown modifier group ${gid}`
       );
     }
     const gdef = menu.modifierGroupDefinitions.find((x) => x.deliverectId === gid);

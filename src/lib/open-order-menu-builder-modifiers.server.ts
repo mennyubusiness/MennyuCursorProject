@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import { prisma } from "@/lib/db";
 import {
   isOpenOrderModifierGroupDeliverectId,
@@ -99,9 +99,9 @@ export async function loadOpenOrderBuilderModifierGroupsByItemId(
 
 export function buildCanonicalModifierGroupDefinitions(
   groups: OpenOrderBuilderModifierGroupRow[]
-): MennyuCanonicalMenu["modifierGroupDefinitions"] {
+): OpenOrderCanonicalMenu["modifierGroupDefinitions"] {
   const seen = new Set<string>();
-  const definitions: MennyuCanonicalMenu["modifierGroupDefinitions"] = [];
+  const definitions: OpenOrderCanonicalMenu["modifierGroupDefinitions"] = [];
 
   for (const group of groups) {
     const deliverectId = openOrderModifierGroupDeliverectId(group.id);

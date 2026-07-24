@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { diffCanonicalMenus } from "./canonical-diff";
-import type { MennyuCanonicalMenu } from "./canonical.schema";
+import type { OpenOrderCanonicalMenu } from "./canonical.schema";
 
-function baseMenu(overrides: Partial<MennyuCanonicalMenu> = {}): MennyuCanonicalMenu {
+function baseMenu(overrides: Partial<OpenOrderCanonicalMenu> = {}): OpenOrderCanonicalMenu {
   return {
     schemaVersion: 1,
     vendorId: "v1",

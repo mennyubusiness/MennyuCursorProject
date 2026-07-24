@@ -28,6 +28,9 @@ export function isSquareProductDeliverectId(id: string | null | undefined): bool
   return Boolean(id?.startsWith(SQUARE_PRODUCT_ID_PREFIX));
 }
 
+/** Phase 1 alias — same as {@link isSquareProductDeliverectId}. */
+export const isSquareProductExternalId = isSquareProductDeliverectId;
+
 export function isSquareModifierGroupDeliverectId(id: string | null | undefined): boolean {
   return Boolean(id?.startsWith(SQUARE_MODIFIER_GROUP_ID_PREFIX));
 }

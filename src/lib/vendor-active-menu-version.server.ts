@@ -2,8 +2,8 @@ import "server-only";
 
 import { MenuVersionState, type VendorMenuSource } from "@prisma/client";
 import {
-  mennyuCanonicalMenuSchema,
-  type MennyuCanonicalMenu,
+  openOrderCanonicalMenuSchema,
+  type OpenOrderCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
 import { prisma } from "@/lib/db";
 import { canonicalMatchesMenuSource } from "@/lib/vendor-menu-source";
@@ -11,7 +11,7 @@ import { canonicalMatchesMenuSource } from "@/lib/vendor-menu-source";
 export type ActiveMenuVersionMeta = {
   id: string;
   state: MenuVersionState;
-  menu: MennyuCanonicalMenu | null;
+  menu: OpenOrderCanonicalMenu | null;
 };
 
 export async function loadVendorActiveMenuSource(vendorId: string): Promise<VendorMenuSource | null> {
@@ -46,7 +46,7 @@ export async function loadActiveMenuVersionForVendor(
     for (const version of versions) {
       if (version.state !== state) continue;
       if (!canonicalMatchesMenuSource(version.canonicalSnapshot, source)) continue;
-      const parsed = mennyuCanonicalMenuSchema.safeParse(version.canonicalSnapshot);
+      const parsed = openOrderCanonicalMenuSchema.safeParse(version.canonicalSnapshot);
       return {
         id: version.id,
         state: version.state,

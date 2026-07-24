@@ -6,7 +6,7 @@ import { getSquareConfigSnapshot } from "@/lib/integrations/square/square-config
 import { prisma } from "@/lib/db";
 import { importSquareCatalog } from "@/lib/integrations/square/square-menu-import.service";
 import { parseSquareExternalId } from "@/lib/integrations/square/square-menu-ids";
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 
 async function squareConnectionHealth(vendorId?: string): Promise<ProviderConnectionHealth> {
   const snap = getSquareConfigSnapshot();
@@ -38,7 +38,7 @@ async function squareConnectionHealth(vendorId?: string): Promise<ProviderConnec
 }
 
 function canonicalMenuToNormalizedMenu(
-  menu: MennyuCanonicalMenu,
+  menu: OpenOrderCanonicalMenu,
   locationId: string,
   jobId: string
 ): NormalizedMenu {

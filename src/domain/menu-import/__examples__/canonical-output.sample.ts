@@ -3,9 +3,9 @@
  * for `deliverect-menu-fragment.sample.json` with vendorId `vendor_sample`.
  * (Simplified — run the pipeline in tests or a script to regenerate.)
  */
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 
-export const exampleCanonicalMenuSample: MennyuCanonicalMenu = {
+export const exampleCanonicalMenuSample: OpenOrderCanonicalMenu = {
   schemaVersion: 1,
   vendorId: "vendor_sample",
   deliverect: {

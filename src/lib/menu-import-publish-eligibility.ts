@@ -3,7 +3,7 @@ import {
   MenuImportJobStatus,
   MenuVersionState,
 } from "@prisma/client";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 
 export type MenuImportPublishDisplayState =
   | "live"
@@ -144,7 +144,7 @@ function evaluateAwaitingReviewDraft(input: {
   }
 
   const parsed = input.draftVersion
-    ? mennyuCanonicalMenuSchema.safeParse(input.draftVersion.canonicalSnapshot)
+    ? openOrderCanonicalMenuSchema.safeParse(input.draftVersion.canonicalSnapshot)
     : null;
   if (input.draftVersion && !parsed?.success) {
     blockers.push("Menu data could not be read. Try importing the menu again.");

@@ -660,7 +660,10 @@ model MenuImportJob {
   source                  MenuImportSource
   status                  MenuImportJobStatus @default(queued)
   deliverectChannelLinkId String?
+  /// @deprecated Prefer `sourceLocationId`. Legacy Deliverect-named column; may hold Square location ids on old rows.
   deliverectLocationId    String?
+  /// Generic provider location / store id for this import (Square location, Deliverect location, etc.).
+  sourceLocationId        String?
   deliverectMenuId        String?
   idempotencyKey          String?             @unique
   draftVersionId          String?             @unique
@@ -677,6 +680,7 @@ model MenuImportJob {
 
   @@index([vendorId, status])
   @@index([vendorId, startedAt(sort: Desc)])
+  @@index([sourceLocationId])
 }
 
 model MenuImportRawPayload {
@@ -750,14 +754,15 @@ model MenuItem {
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
   basketMaxQuantity    Int?
+  /// @deprecated Prefer reading via `menuItemSourceEntityId()`. Stable catalog entity key for upsert/mapping (`sq:prod:…`, `oo:prod:…`, or Deliverect product id). Not Deliverect-only despite the name.
   deliverectProductId  String?
-  /// Raw Deliverect `plu` from menu payload; snooze webhooks key on PLU while `deliverectProductId` is often `_id`-first.
+  /// Raw Deliverect `plu` from menu payload; snooze webhooks key on PLU while `deliverectProductId` is often `_id`-first. Deliverect-only semantics.
   deliverectPlu        String?
-  /// When this row is a Deliverect variation PLU, parent variant product PLU for outbound orders (`items[].subItems`).
+  /// @deprecated Prefer `isVariantLeafMenuItem()` / `variantParentPluFromItem()`. Deliverect variation-leaf parent PLU for outbound `subItems` nesting AND customer browse exclusion. Never set for Square flattened variations.
   deliverectVariantParentPlu   String?
-  /// Display name of the parent variant product (top-level order line `name`).
+  /// Display name of the Deliverect parent variant product (top-level order line `name`). Deliverect-only.
   deliverectVariantParentName  String?
-  /// Deliverect category id from canonical menu (ordering / future grouping).
+  /// @deprecated Prefer `menuItemSourceCategoryId()`. Stable category entity key from canonical menu (`sq:cat:…`, `oo:cat:…`, or Deliverect category id).
   deliverectCategoryId String?
   cartItems            CartItem[]
   vendor               Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
@@ -1593,21 +1598,30 @@ model IntegrationOAuthStateNonce {
   @@index([vendorId])
 }
 
-/// Provider-neutral external ID mapping (Square uses from day one; Deliverect fields remain source of truth until migrated).
+/// Provider-neutral external ID mapping (hybrid ExternalMenuMapping).
+/// Square uses this as injection SoT; Deliverect menu ids remain embedded on MenuItem until a later phase.
+/// Contract: see docs/reports/menu-architecture-phase2-migration.md
 model ProviderEntityMapping {
-  id                 String              @id @default(cuid())
-  vendorId           String
-  connectionId       String?
-  provider           IntegrationProvider
-  internalEntityType ProviderEntityType
-  internalEntityId   String
-  externalId         String
-  externalLocationId String?
+  id                  String              @id @default(cuid())
+  vendorId            String
+  connectionId        String?
+  provider            IntegrationProvider
+  /// Optional sandbox/production (or provider-specific env label). Nullable for legacy rows.
+  environment         String?
+  internalEntityType  ProviderEntityType
+  internalEntityId    String
+  externalId          String
+  /// Parent catalog object id when this entity is a child (e.g. Square ITEM id for an ITEM_VARIATION mapping).
+  externalParentId    String?
+  externalLocationId  String?
+  externalAccountId   String?
+  externalVersion     String?
   externalPayloadHash String?
-  isActive           Boolean             @default(true)
-  lastSeenAt         DateTime?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  metadata            Json?
+  isActive            Boolean             @default(true)
+  lastSeenAt          DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   vendor     Vendor                       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   connection VendorIntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
@@ -1616,6 +1630,7 @@ model ProviderEntityMapping {
   @@index([provider, externalId])
   @@index([vendorId, provider, internalEntityType])
   @@index([connectionId])
+  @@index([vendorId, provider, externalParentId])
 }
 
 /// Provider-neutral inbound webhook / event log (sanitized payload; no secrets).

@@ -5,7 +5,7 @@
 import "server-only";
 import { MenuVersionState, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import {
   applyCanonicalMenuToLiveTables,
   MenuPublishValidationError,
@@ -81,7 +81,7 @@ export async function rollbackVendorPublishedMenu(params: {
         select: { id: true },
       });
 
-      const parsed = mennyuCanonicalMenuSchema.safeParse(source.canonicalSnapshot);
+      const parsed = openOrderCanonicalMenuSchema.safeParse(source.canonicalSnapshot);
       if (!parsed.success) {
         throw new MenuPublishValidationError(
           "INVALID_CANONICAL",

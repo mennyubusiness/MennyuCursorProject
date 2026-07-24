@@ -5,7 +5,7 @@
 import "server-only";
 
 import { MenuVersionState } from "@prisma/client";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { prisma } from "@/lib/db";
 import { loadActiveMenuVersionForVendor } from "@/lib/vendor-active-menu-version.server";
 import { getActiveSquareConnectionForVendor } from "@/lib/integrations/square/square-connection.service";
@@ -184,7 +184,7 @@ export async function loadSquareVendorMappingDiagnostics(
     });
     if (published) {
       publishedMenuVersionId = published.id;
-      const parsed = mennyuCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
+      const parsed = openOrderCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
       if (parsed.success) {
         publishedSourcePayloadKind = parsed.data.deliverect.sourcePayloadKind ?? null;
         publishedProducts = parsed.data.products

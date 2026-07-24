@@ -1,5 +1,5 @@
 /**
- * Phase 1A: pure Deliverect (unknown JSON) → MennyuCanonicalMenu.
+ * Phase 1A: pure Deliverect (unknown JSON) → OpenOrderCanonicalMenu.
  *
  * Supported raw shapes (extend explicitly when API contract is fixed):
  * - `{ products: [...], categories?: [...] }` or `{ products: { id: {...}, ... } }` (string-keyed map)
@@ -26,14 +26,14 @@
  */
 
 import { attachModifierGroupKindsToCanonicalMenu } from "@/domain/canonical-menu-group-kinds";
-import type { DeliverectMenuImportMeta } from "@/domain/menu-import/canonical.schema";
+import type { MenuSourceMeta } from "@/domain/menu-import/canonical.schema";
 import { env } from "@/lib/env";
 import type {
-  MennyuCanonicalCategory,
-  MennyuCanonicalMenu,
-  MennyuCanonicalModifierGroup,
-  MennyuCanonicalModifierOption,
-  MennyuCanonicalProduct,
+  OpenOrderCanonicalCategory,
+  OpenOrderCanonicalMenu,
+  OpenOrderCanonicalModifierGroup,
+  OpenOrderCanonicalModifierOption,
+  OpenOrderCanonicalProduct,
 } from "@/domain/menu-import/canonical.schema";
 import type { MenuImportIssueRecord } from "@/domain/menu-import/issues";
 import {
@@ -51,12 +51,12 @@ import {
 export interface NormalizeDeliverectMenuInput {
   raw: unknown;
   vendorId: string;
-  deliverect: DeliverectMenuImportMeta;
+  deliverect: MenuSourceMeta;
 }
 
 export interface NormalizeDeliverectMenuResult {
   /** Null when normalization cannot produce a usable menu (e.g. no valid products). */
-  menu: MennyuCanonicalMenu | null;
+  menu: OpenOrderCanonicalMenu | null;
   issues: MenuImportIssueRecord[];
 }
 
@@ -85,8 +85,8 @@ export function normalizeDeliverectMenuToCanonical(
   const modifierLookups = buildModifierPayloadLookups(root, productsRaw, issues);
   const variantParentByDeliverectId = buildDeliverectVariantParentIndex(productsRaw, modifierLookups, issues);
 
-  const groupRegistry = new Map<string, MennyuCanonicalModifierGroup>();
-  const products: MennyuCanonicalProduct[] = [];
+  const groupRegistry = new Map<string, OpenOrderCanonicalModifierGroup>();
+  const products: OpenOrderCanonicalProduct[] = [];
 
   for (let i = 0; i < productsRaw.length; i++) {
     const pr = productsRaw[i];
@@ -119,7 +119,7 @@ export function normalizeDeliverectMenuToCanonical(
     return { menu: null, issues };
   }
 
-  const menuBase: MennyuCanonicalMenu = {
+  const menuBase: OpenOrderCanonicalMenu = {
     schemaVersion: 1,
     vendorId: input.vendorId,
     deliverect: input.deliverect,
@@ -959,11 +959,11 @@ function buildDeliverectVariantParentIndex(
 function buildProduct(
   pr: Record<string, unknown>,
   index: number,
-  registry: Map<string, MennyuCanonicalModifierGroup>,
+  registry: Map<string, OpenOrderCanonicalModifierGroup>,
   lookups: ModifierPayloadLookups,
   issues: MenuImportIssueRecord[],
   variantParentByDeliverectId: Map<string, { parentPlu: string; parentName: string }>
-): MennyuCanonicalProduct | null {
+): OpenOrderCanonicalProduct | null {
   const deliverectId = firstDeliverectId(pr);
   if (!deliverectId) {
     issues.push({
@@ -1057,7 +1057,7 @@ function walkTopLevelModifierGroups(
   productRaw: Record<string, unknown>,
   productDeliverectId: string,
   productIndex: number,
-  registry: Map<string, MennyuCanonicalModifierGroup>,
+  registry: Map<string, OpenOrderCanonicalModifierGroup>,
   lookups: ModifierPayloadLookups,
   issues: MenuImportIssueRecord[],
   sortBase: number
@@ -1159,11 +1159,11 @@ function buildModifierGroupTree(
   gid: string,
   parentOptionId: string | null,
   productDeliverectId: string,
-  registry: Map<string, MennyuCanonicalModifierGroup>,
+  registry: Map<string, OpenOrderCanonicalModifierGroup>,
   lookups: ModifierPayloadLookups,
   issues: MenuImportIssueRecord[],
   sortOrder: number
-): MennyuCanonicalModifierGroup | null {
+): OpenOrderCanonicalModifierGroup | null {
   const name = asString(g.name) ?? asString(g.title) ?? "(modifier group)";
   const { min, max } = readDeliverectModifierGroupBounds(g);
   const multiMax = readDeliverectGroupMultiMax(g);
@@ -1173,7 +1173,7 @@ function buildModifierGroupTree(
     deliverectId: gid,
   });
 
-  const options: MennyuCanonicalModifierOption[] = [];
+  const options: OpenOrderCanonicalModifierOption[] = [];
   let oi = 0;
   for (let oiLoop = 0; oiLoop < leafOptionSpecs.length; oiLoop++) {
     const { node: o, oid } = leafOptionSpecs[oiLoop]!;
@@ -1232,7 +1232,7 @@ function walkNestedModifierGroupsFromOption(
   optionRaw: Record<string, unknown>,
   parentOptionId: string,
   productDeliverectId: string,
-  registry: Map<string, MennyuCanonicalModifierGroup>,
+  registry: Map<string, OpenOrderCanonicalModifierGroup>,
   lookups: ModifierPayloadLookups,
   issues: MenuImportIssueRecord[],
   sortBase: number
@@ -1288,8 +1288,8 @@ function walkNestedModifierGroupsFromOption(
 }
 
 function modifierGroupsStructurallyEqual(
-  a: MennyuCanonicalModifierGroup,
-  b: MennyuCanonicalModifierGroup
+  a: OpenOrderCanonicalModifierGroup,
+  b: OpenOrderCanonicalModifierGroup
 ): boolean {
   if (a.deliverectId !== b.deliverectId) return false;
   if (a.name !== b.name) return false;
@@ -1308,11 +1308,11 @@ function modifierGroupsStructurallyEqual(
 
 function buildCategories(
   rawCats: unknown[],
-  products: MennyuCanonicalProduct[],
+  products: OpenOrderCanonicalProduct[],
   issues: MenuImportIssueRecord[]
-): MennyuCanonicalCategory[] {
+): OpenOrderCanonicalCategory[] {
   const productIdSet = new Set(products.map((p) => p.deliverectId));
-  const out: MennyuCanonicalCategory[] = [];
+  const out: OpenOrderCanonicalCategory[] = [];
   let ci = 0;
   for (const c of rawCats) {
     if (!isRecord(c)) {

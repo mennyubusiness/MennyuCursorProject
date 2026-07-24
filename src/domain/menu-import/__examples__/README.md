@@ -1,7 +1,7 @@
 # Menu import Phase 1A examples
 
 - **`deliverect-menu-fragment.sample.json`** — minimal Deliverect-style menu fragment (`products` + `categories` + nested `subProducts` for modifier groups/options).
-- **`canonical-output.sample.ts`** — expected `MennyuCanonicalMenu` after normalization (IDs map to `deliverectId` fields; prices are **cents**).
+- **`canonical-output.sample.ts`** — expected `OpenOrderCanonicalMenu` after normalization (IDs map to `deliverectId` fields; prices are **cents**).
 
 Run the real pipeline:
 

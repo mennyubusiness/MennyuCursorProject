@@ -10,14 +10,15 @@ import {
   type MenuImportSource,
   MenuVersionState,
 } from "@prisma/client";
-import type { DeliverectMenuImportMeta } from "@/domain/menu-import/canonical.schema";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import type { MenuSourceMeta } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import type { MenuImportIssueRecord } from "@/domain/menu-import/issues";
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import { prisma } from "@/lib/db";
 import { payloadFingerprint } from "@/lib/menu-import-payload-hash";
 import { runPhase1aDeliverectMenuImport } from "@/integrations/deliverect/menu/phase1a-pipeline";
 import { tryAutoPublishMenuImportJob } from "@/services/menu-auto-publish.service";
+import { menuImportJobLocationWrite } from "@/domain/menu-import/menu-import-job-location";
 
 export class MenuImportVendorNotFoundError extends Error {
   constructor(public readonly vendorId: string) {
@@ -37,7 +38,7 @@ export interface IngestDeliverectMenuPhase1bParams {
    * (e.g. Commerce `GET .../menus` returns an array or `{ menus: [...] }`).
    */
   normalizationRaw?: unknown;
-  deliverectMeta: DeliverectMenuImportMeta;
+  deliverectMeta: MenuSourceMeta;
   deliverectApiVersion?: string | null;
   idempotencyKey?: string | null;
   createdBy?: string | null;
@@ -47,7 +48,7 @@ export interface Phase1bIngestResult {
   jobId: string;
   rawPayloadId: string;
   draftVersionId: string | null;
-  menu: MennyuCanonicalMenu | null;
+  menu: OpenOrderCanonicalMenu | null;
   ok: boolean;
   jobStatus: MenuImportJobStatus;
   issueCount: number;
@@ -107,9 +108,9 @@ async function mapExistingJobToResult(
     },
   });
 
-  let menu: MennyuCanonicalMenu | null = null;
+  let menu: OpenOrderCanonicalMenu | null = null;
   if (job.draftVersion?.canonicalSnapshot != null) {
-    const parsed = mennyuCanonicalMenuSchema.safeParse(job.draftVersion.canonicalSnapshot);
+    const parsed = openOrderCanonicalMenuSchema.safeParse(job.draftVersion.canonicalSnapshot);
     menu = parsed.success ? parsed.data : null;
   }
 
@@ -160,13 +161,18 @@ export async function ingestDeliverectMenuImportPhase1b(
   const rawFingerprint = payloadFingerprint(params.rawPayload);
 
   const { job, rawPayload } = await client.$transaction(async (tx) => {
+    const locationCols = menuImportJobLocationWrite({
+      source: params.source,
+      locationId: params.deliverectMeta.locationId,
+    });
     const j = await tx.menuImportJob.create({
       data: {
         vendorId: params.vendorId,
         source: params.source,
         status: MenuImportJobStatus.ingested,
         deliverectChannelLinkId: params.deliverectMeta.channelLinkId ?? null,
-        deliverectLocationId: params.deliverectMeta.locationId ?? null,
+        sourceLocationId: locationCols.sourceLocationId,
+        deliverectLocationId: locationCols.deliverectLocationId,
         deliverectMenuId: params.deliverectMeta.menuId ?? null,
         idempotencyKey: params.idempotencyKey?.trim() || undefined,
         createdBy: params.createdBy?.trim() || undefined,
@@ -205,7 +211,7 @@ export async function ingestDeliverectMenuImportPhase1b(
     }
 
     if (phase1.menu) {
-      const snapshotParsed = mennyuCanonicalMenuSchema.safeParse(phase1.menu);
+      const snapshotParsed = openOrderCanonicalMenuSchema.safeParse(phase1.menu);
       if (!snapshotParsed.success) {
         await tx.menuImportJob.update({
           where: { id: job.id },

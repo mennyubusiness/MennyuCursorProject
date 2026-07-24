@@ -77,7 +77,7 @@ export function AdminMenuImportDiffView({
     <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
       <h2 className="font-medium text-oo-charcoal">Draft vs published</h2>
       <p className="mt-1 text-sm text-oo-stone-gray">
-        Comparison uses Deliverect ids in canonical snapshots only (not live `MenuItem` rows).
+        Comparison uses external catalog ids in canonical snapshots only (not live `MenuItem` rows).
       </p>
 
       {diff.isFirstPublish ? (
@@ -126,7 +126,7 @@ export function AdminMenuImportDiffView({
 
       {!diff.isFirstPublish && !hasAnyChange && (
         <p className="mt-4 text-sm text-oo-stone-gray">
-          No differences detected vs published canonical snapshot (Deliverect id–based).
+          No differences detected vs published canonical snapshot (external catalog id–based).
         </p>
       )}
 

@@ -41,7 +41,7 @@ Open Order Menu Builder uses a separate draft workspace (`VendorMenuCategory` + 
 
 **No rebuild of the import pipeline.** Square import already:
 
-- Normalizes catalog → `MennyuCanonicalMenu` (`square_catalog_v1`)
+- Normalizes catalog → `OpenOrderCanonicalMenu` (`square_catalog_v1`)
 - Creates `MenuImportJob` (`SQUARE_CATALOG_PULL`)
 - Creates draft `MenuVersion` with canonical snapshot
 - Upserts `ProviderEntityMapping` via stable `sq:*` internal ids

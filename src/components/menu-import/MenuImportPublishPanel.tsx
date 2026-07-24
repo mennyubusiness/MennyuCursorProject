@@ -123,7 +123,7 @@ export function MenuImportPublishPanel({
           : !confirmDescription && !isMinimal
             ? "Confirm manually unless the vendor has auto-publish enabled for webhook imports. "
             : null}
-        {!confirmDescription && !isMinimal && "Removed items in Deliverect are marked unavailable, not deleted."}
+        {!confirmDescription && !isMinimal && "Removed items from the imported menu are marked unavailable, not deleted."}
       </p>
 
       {!isMinimal && publishUrlOverride && (
@@ -191,7 +191,7 @@ export function MenuImportPublishPanel({
                 </tbody>
               </table>
               {summaryRows.every((r) => r.value === 0) && (
-                <p className="p-3 text-stone-600">No diff vs baseline — identical Deliverect ids and fields.</p>
+                <p className="p-3 text-stone-600">No diff vs baseline — identical external catalog ids and fields.</p>
               )}
             </div>
           ) : (

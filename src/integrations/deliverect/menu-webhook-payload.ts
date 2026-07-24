@@ -1,6 +1,6 @@
 /**
  * Best-effort extraction of Deliverect correlation fields from Menu Update webhook JSON.
- * Shapes vary by product version — treat as optional hints for `DeliverectMenuImportMeta`.
+ * Shapes vary by product version — treat as optional hints for `MenuSourceMeta`.
  */
 import { nonEmptyStringField } from "@/integrations/deliverect/webhook-inbound-shared";
 

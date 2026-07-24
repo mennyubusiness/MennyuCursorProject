@@ -14,6 +14,11 @@ import {
 } from "@/services/menu-active-scope.service";
 import { menuItemDeliverectIdMatchesMenuSource } from "@/lib/vendor-menu-source";
 import {
+  isVariantLeafMenuItem,
+  menuItemSourceEntityId,
+  variantParentPluFromItem,
+} from "@/domain/menu-import/canonical-identity";
+import {
   loadCachedCustomerVendorMenuDisplay,
   loadCustomerVendorMenuAvailabilityOverlay,
   loadPublishedMenuVersionId,
@@ -90,14 +95,14 @@ async function loadFallbackMenuDisplay(vendorId: string): Promise<CachedCustomer
   const activeRows = rows.filter(
     (r) =>
       operationalIds.has(r.id) &&
-      !r.deliverectVariantParentPlu?.trim() &&
+      !isVariantLeafMenuItem(r) &&
       (!vendor ||
-        menuItemDeliverectIdMatchesMenuSource(r.deliverectProductId, vendor.menuSource))
+        menuItemDeliverectIdMatchesMenuSource(menuItemSourceEntityId(r), vendor.menuSource))
   );
 
   const variantChildCountByParentPlu: Record<string, number> = {};
   for (const row of activeRows) {
-    const parentPlu = row.deliverectVariantParentPlu?.trim();
+    const parentPlu = variantParentPluFromItem(row);
     if (!parentPlu) continue;
     variantChildCountByParentPlu[parentPlu] =
       (variantChildCountByParentPlu[parentPlu] ?? 0) + 1;
@@ -105,8 +110,9 @@ async function loadFallbackMenuDisplay(vendorId: string): Promise<CachedCustomer
 
   const availabilityPoolByProductId: Record<string, string[]> = {};
   for (const row of activeRows) {
-    if (!row.deliverectProductId) continue;
-    availabilityPoolByProductId[row.deliverectProductId] = [row.id];
+    const entityId = menuItemSourceEntityId(row);
+    if (!entityId) continue;
+    availabilityPoolByProductId[entityId] = [row.id];
   }
 
   const sections: CustomerVendorMenuCategorySection[] =

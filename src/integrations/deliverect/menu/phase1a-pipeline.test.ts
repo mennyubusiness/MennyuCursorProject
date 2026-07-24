@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import deliverectFragment from "@/domain/menu-import/__examples__/deliverect-menu-fragment.sample.json";
 import { runPhase1aDeliverectMenuImport } from "./phase1a-pipeline";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { hasBlockingIssues } from "@/domain/menu-import/issues";
 import { MODIFIER_MAX_SELECTIONS_UNBOUNDED } from "@/domain/modifier-selection-unbounded";
 
@@ -17,7 +17,7 @@ describe("runPhase1aDeliverectMenuImport", () => {
     });
 
     expect(result.menu).not.toBeNull();
-    expect(mennyuCanonicalMenuSchema.safeParse(result.menu).success).toBe(true);
+    expect(openOrderCanonicalMenuSchema.safeParse(result.menu).success).toBe(true);
     expect(result.ok).toBe(true);
     expect(hasBlockingIssues(result.allIssues)).toBe(false);
     expect(result.menu!.products).toHaveLength(1);

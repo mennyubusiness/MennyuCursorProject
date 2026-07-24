@@ -7,8 +7,8 @@
  */
 import { PrismaClient } from "@prisma/client";
 import {
-  mennyuCanonicalMenuSchema,
-  type MennyuCanonicalMenu,
+  openOrderCanonicalMenuSchema,
+  type OpenOrderCanonicalMenu,
 } from "../src/domain/menu-import/canonical.schema";
 import { classifyProductModifierGroupKind } from "../src/domain/canonical-menu-group-kinds";
 import { buildVariantChildCountByParentPlu } from "../src/domain/canonical-menu-group-kinds";
@@ -60,7 +60,7 @@ function recommendedAction(row: AuditRow): string {
 async function auditCanonicalMenu(
   vendorId: string,
   vendorName: string,
-  menu: MennyuCanonicalMenu,
+  menu: OpenOrderCanonicalMenu,
   rows: AuditRow[]
 ) {
   const variantCounts = buildVariantChildCountByParentPlu(menu.products);
@@ -153,7 +153,7 @@ async function main() {
       select: { canonicalSnapshot: true },
     });
     if (!published?.canonicalSnapshot) continue;
-    const parsed = mennyuCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
+    const parsed = openOrderCanonicalMenuSchema.safeParse(published.canonicalSnapshot);
     if (!parsed.success) continue;
     await auditCanonicalMenu(vendor.id, vendor.name, parsed.data, flagged);
   }

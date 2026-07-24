@@ -22,7 +22,7 @@ export function MenuParityAuditBanner({ audit }: MenuParityAuditBannerProps) {
       <p className="font-medium">Menu parity warning</p>
       <p className="mt-1 text-amber-900">
         Live menu rows may not match the published canonical snapshot ({audit.issues.length}{" "}
-        issue{audit.issues.length === 1 ? "" : "s"}). Snooze and Deliverect mapping can misbehave
+        issue{audit.issues.length === 1 ? "" : "s"}). Snooze and external menu mapping can misbehave
         until resolved—try republishing from a clean import.
       </p>
       <ul className="mt-2 max-h-40 list-inside list-disc overflow-y-auto text-xs">

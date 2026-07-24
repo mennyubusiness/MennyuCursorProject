@@ -1,4 +1,4 @@
-import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 import type { SquareCatalogObject } from "@/lib/integrations/square/square-catalog.types";
 import {
   squareCategoryInternalId,
@@ -20,7 +20,7 @@ export type SquareCatalogSkippedObject = {
 };
 
 export type SquareCatalogNormalizationResult = {
-  menu: MennyuCanonicalMenu | null;
+  menu: OpenOrderCanonicalMenu | null;
   warnings: SquareCatalogImportWarning[];
   skipped: SquareCatalogSkippedObject[];
   stats: {
@@ -56,7 +56,7 @@ function indexCatalogObjects(objects: SquareCatalogObject[]) {
 }
 
 /**
- * Square → MennyuCanonicalMenu
+ * Square → OpenOrderCanonicalMenu
  *
  * Multi-variation MVP: one OO product per ITEM_VARIATION.
  * Modifier MVP: MODIFIER_LIST → group, MODIFIER → option.
@@ -83,7 +83,7 @@ export function normalizeSquareCatalogToCanonical(input: {
     if (img.id && url) imageUrlById.set(img.id, url);
   }
 
-  const canonicalGroups: MennyuCanonicalMenu["modifierGroupDefinitions"] = [];
+  const canonicalGroups: OpenOrderCanonicalMenu["modifierGroupDefinitions"] = [];
   const groupSort = new Map<string, number>();
 
   for (let gi = 0; gi < modifierLists.length; gi++) {
@@ -91,7 +91,7 @@ export function normalizeSquareCatalogToCanonical(input: {
     const listId = list.id;
     const listData = list.modifier_list_data;
     const optionRefs = listData?.modifiers ?? [];
-    const options: MennyuCanonicalMenu["modifierGroupDefinitions"][number]["options"] = [];
+    const options: OpenOrderCanonicalMenu["modifierGroupDefinitions"][number]["options"] = [];
 
     for (let oi = 0; oi < optionRefs.length; oi++) {
       const ref = optionRefs[oi]!;
@@ -174,7 +174,7 @@ export function normalizeSquareCatalogToCanonical(input: {
     variationsByItemId.set(itemId, list);
   }
 
-  const canonicalProducts: MennyuCanonicalMenu["products"] = [];
+  const canonicalProducts: OpenOrderCanonicalMenu["products"] = [];
   const productCategoryMap = new Map<string, string[]>();
 
   for (const item of items) {
@@ -265,7 +265,7 @@ export function normalizeSquareCatalogToCanonical(input: {
     }
   }
 
-  const canonicalCategories: MennyuCanonicalMenu["categories"] = [];
+  const canonicalCategories: OpenOrderCanonicalMenu["categories"] = [];
   for (let ci = 0; ci < categories.length; ci++) {
     const cat = categories[ci]!;
     const internalCatId = squareCategoryInternalId(cat.id);
@@ -322,7 +322,7 @@ export function normalizeSquareCatalogToCanonical(input: {
     };
   }
 
-  const menu: MennyuCanonicalMenu = {
+  const menu: OpenOrderCanonicalMenu = {
     schemaVersion: 1,
     vendorId: input.vendorId,
     deliverect: {

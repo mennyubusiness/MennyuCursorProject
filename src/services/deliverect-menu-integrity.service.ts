@@ -5,7 +5,7 @@
 import "server-only";
 
 import { MenuVersionState } from "@prisma/client";
-import { mennyuCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 import { prisma } from "@/lib/db";
 import {
   isTopLevelDeliverectVariantGroupModifierGroup,
@@ -477,7 +477,7 @@ export async function evaluateDeliverectMenuIntegrityForVendor(
   }
 
   if (publishedRow?.canonicalSnapshot) {
-    const parsed = mennyuCanonicalMenuSchema.safeParse(publishedRow.canonicalSnapshot);
+    const parsed = openOrderCanonicalMenuSchema.safeParse(publishedRow.canonicalSnapshot);
     if (parsed.success) {
       const byProductId = new Map(parsed.data.products.map((p) => [p.deliverectId, p]));
       for (const it of items) {

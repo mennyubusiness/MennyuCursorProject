@@ -2,16 +2,16 @@
  * Order modifier groups so parents (and their options) are created before nested groups
  * that reference `parentDeliverectOptionId`.
  */
-import type { MennyuCanonicalModifierGroup } from "@/domain/menu-import/canonical.schema";
+import type { OpenOrderCanonicalModifierGroup } from "@/domain/menu-import/canonical.schema";
 
-export function orderModifierGroupsForPublish(groups: MennyuCanonicalModifierGroup[]): MennyuCanonicalModifierGroup[] {
+export function orderModifierGroupsForPublish(groups: OpenOrderCanonicalModifierGroup[]): OpenOrderCanonicalModifierGroup[] {
   const byId = new Map(groups.map((g) => [g.deliverectId, g]));
-  const result: MennyuCanonicalModifierGroup[] = [];
+  const result: OpenOrderCanonicalModifierGroup[] = [];
   const placedGroupIds = new Set<string>();
   const placedOptionIds = new Set<string>();
   const remaining = new Set(groups.map((g) => g.deliverectId));
 
-  const place = (g: MennyuCanonicalModifierGroup): boolean => {
+  const place = (g: OpenOrderCanonicalModifierGroup): boolean => {
     if (placedGroupIds.has(g.deliverectId)) return true;
     if (g.parentDeliverectOptionId != null && !placedOptionIds.has(g.parentDeliverectOptionId)) {
       return false;
