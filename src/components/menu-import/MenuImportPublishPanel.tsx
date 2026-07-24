@@ -73,14 +73,24 @@ export function MenuImportPublishPanel({
         code?: string;
         status?: string;
         menuVersionId?: string;
+        customerBrowseExclusions?: Array<{
+          productName: string;
+          detail: string;
+          productDeliverectId: string;
+        }>;
       };
       if (res.ok && (data.status === "published" || data.status === "already_published")) {
         setOpen(false);
+        const exclusionCount = data.customerBrowseExclusions?.length ?? 0;
+        const exclusionNote =
+          exclusionCount > 0
+            ? ` Note: ${exclusionCount} draft item${exclusionCount === 1 ? "" : "s"} remain hidden from the customer browse menu (variant leaves / modifier-only SKUs).`
+            : "";
         setMessage({
           text:
             data.status === "already_published"
               ? "This draft was already published."
-              : "Published successfully. Your live menu is updated from this draft.",
+              : `Published successfully. Your live menu is updated from this draft.${exclusionNote}`,
           error: false,
         });
         router.refresh();

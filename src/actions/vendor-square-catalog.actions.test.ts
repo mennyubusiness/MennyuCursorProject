@@ -56,6 +56,7 @@ describe("vendor square catalog actions", () => {
       locationId: "LOC_1",
       locationName: "Main",
       squareEnvironment: "sandbox",
+      customerBrowseExclusions: [],
     });
 
     const result = await previewSquareCatalogAction("vendor_1");
@@ -73,6 +74,7 @@ describe("vendor square catalog actions", () => {
       locationId: "LOC_1",
       locationName: "Main",
       squareEnvironment: "sandbox",
+      customerBrowseExclusions: [],
       jobId: "job_1",
       draftVersionId: "draft_1",
       importedCount: 1,

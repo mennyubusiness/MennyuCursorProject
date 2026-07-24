@@ -19,6 +19,10 @@ import {
   type MennyuCanonicalMenu,
   type MennyuCanonicalProduct,
 } from "@/domain/menu-import/canonical.schema";
+import {
+  explainCustomerMenuBrowseExclusions,
+  type CustomerMenuBrowseExclusion,
+} from "@/domain/menu-import/customer-menu-browse";
 import { orderModifierGroupsForPublish } from "@/domain/menu-import/modifier-group-publish-order";
 import { onMenuImportPublishedToLive } from "@/services/menu-deliverect-post-publish.service";
 import { runMenuParityAudit, type MenuParityAuditResult } from "@/services/menu-parity.service";
@@ -418,6 +422,11 @@ export type PublishMenuImportDraftResult =
       menuVersionId: string;
       previousPublishedMenuVersionId: string | null;
       menuParity: MenuParityAuditResult;
+      /**
+       * Temporary safe diagnostics: draft products excluded from customer browse
+       * (same rules as the live storefront). No tokens/secrets.
+       */
+      customerBrowseExclusions: CustomerMenuBrowseExclusion[];
     }
   | { status: "already_published"; menuVersionId: string };
 
@@ -591,11 +600,25 @@ export async function publishMenuImportDraftToLive(params: {
     });
   }
 
+  const customerBrowseExclusions = explainCustomerMenuBrowseExclusions(menuPreview);
+  if (customerBrowseExclusions.length > 0) {
+    console.info("[menu-publish] customer browse exclusions after publish", {
+      jobId,
+      vendorId: result.vendorId,
+      count: customerBrowseExclusions.length,
+      sample: customerBrowseExclusions.slice(0, 12).map((e) => ({
+        productDeliverectId: e.productDeliverectId,
+        reason: e.reason,
+      })),
+    });
+  }
+
   logMenuPublish("publish_end", {
     jobId,
     menuVersionId: result.menuVersionId,
     vendorId: result.vendorId,
     parityOk: menuParity.ok,
+    customerBrowseExclusionCount: customerBrowseExclusions.length,
   });
 
   return {
@@ -603,5 +626,6 @@ export async function publishMenuImportDraftToLive(params: {
     menuVersionId: result.menuVersionId,
     previousPublishedMenuVersionId: result.previousPublishedMenuVersionId,
     menuParity,
+    customerBrowseExclusions,
   };
 }

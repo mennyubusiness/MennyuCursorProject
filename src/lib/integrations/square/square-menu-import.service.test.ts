@@ -136,6 +136,7 @@ describe("square menu import service", () => {
     expect(ensureSquareAccessToken).toHaveBeenCalled();
     expect(fetchSquareCatalogForLocation).toHaveBeenCalledWith("vendor_token_xyz", LOCATION_ID);
     expect(report.stats.items).toBe(1);
+    expect(report.customerBrowseExclusions).toEqual([]);
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(upsertProviderEntityMapping).not.toHaveBeenCalled();
   });

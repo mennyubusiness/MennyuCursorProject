@@ -64,9 +64,17 @@ export const mennyuCanonicalProductSchema = z.object({
   /**
    * When this product is a variation leaf under a Deliverect `isVariant` parent, parent product PLU/name
    * for channel orders (parent line + variation in `subItems`).
+   *
+   * Do **not** set for Square flattened ITEM_VARIATION products — those are standalone customer SKUs.
+   * Use `sourceParentExternalId` for the Square ITEM id instead.
    */
   deliverectVariantParentPlu: z.string().min(1).nullable().optional(),
   deliverectVariantParentName: z.string().min(1).nullable().optional(),
+  /**
+   * Provider parent catalog object id when this product is a flattened child SKU
+   * (e.g. Square ITEM id for an `sq:prod:{variationId}` product). Not a Deliverect variant leaf.
+   */
+  sourceParentExternalId: z.string().min(1).nullable().optional(),
   name: z.string().min(1),
   description: z.string().nullable().optional(),
   priceCents: canonicalMoneyCentsSchema,

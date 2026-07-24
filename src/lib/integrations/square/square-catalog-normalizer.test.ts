@@ -95,6 +95,23 @@ describe("normalizeSquareCatalogToCanonical", () => {
     ]);
     expect(menu.products[0]?.name).toBe("Latte — Small");
     expect(menu.products[1]?.name).toBe("Latte — Large");
+    // Standalone SKUs — must not set Deliverect variant-leaf fields (storefront would hide them).
+    expect(menu.products[0]?.deliverectVariantParentPlu).toBeNull();
+    expect(menu.products[1]?.deliverectVariantParentPlu).toBeNull();
+    expect(menu.products[0]?.sourceParentExternalId).toBe("item_latte");
+    expect(menu.products[1]?.sourceParentExternalId).toBe("item_latte");
+    expect(menu.products[0]?.priceCents).toBe(450);
+    expect(menu.products[1]?.priceCents).toBe(550);
+    expect(menu.products[0]?.modifierGroupDeliverectIds).toEqual([
+      squareModifierGroupInternalId("modlist_milk"),
+    ]);
+    expect(menu.products[1]?.modifierGroupDeliverectIds).toEqual([
+      squareModifierGroupInternalId("modlist_milk"),
+    ]);
+    expect(menu.categories[0]?.productDeliverectIds).toEqual([
+      squareProductInternalId("var_latte_sm"),
+      squareProductInternalId("var_latte_lg"),
+    ]);
     expect(menu.modifierGroupDefinitions[0]?.deliverectId).toBe(
       squareModifierGroupInternalId("modlist_milk")
     );
@@ -114,6 +131,8 @@ describe("normalizeSquareCatalogToCanonical", () => {
     });
     expect(result.menu?.products).toHaveLength(1);
     expect(result.menu?.products[0]?.name).toBe("Latte");
+    expect(result.menu?.products[0]?.deliverectVariantParentPlu).toBeNull();
+    expect(result.menu?.products[0]?.sourceParentExternalId).toBe("item_latte");
     expect(result.warnings.some((w) => w.code === "item_flattened_variations")).toBe(false);
   });
 

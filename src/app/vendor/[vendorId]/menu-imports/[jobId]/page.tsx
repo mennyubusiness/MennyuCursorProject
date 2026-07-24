@@ -20,6 +20,7 @@ import { MenuImportDiscardDraftButton } from "@/app/admin/(dashboard)/menu-impor
 import { MenuImportWhatChanged } from "@/components/menu-import/MenuImportWhatChanged";
 import { MenuImportIssuesList } from "@/components/menu-import/MenuImportIssuesList";
 import { MenuImportMenuPreview } from "@/components/menu-import/MenuImportMenuPreview";
+import { MenuImportBrowseExclusionDiagnostics } from "@/components/menu-import/MenuImportBrowseExclusionDiagnostics";
 import { MenuImportAdvancedDetails } from "@/components/menu-import/MenuImportAdvancedDetails";
 import { MenuImportJobNextStepsAdmin } from "@/components/menu-import/MenuImportJobNextSteps";
 import { menuImportFriendlySource } from "@/lib/menu-import-ui-labels";
@@ -27,6 +28,7 @@ import { vendorMenuImportDetailPrimaryStatus } from "@/lib/vendor-menu-import-la
 import { MenuImportIssueSeverity } from "@prisma/client";
 import { runMenuParityAudit } from "@/services/menu-parity.service";
 import { MenuParityAuditBanner } from "@/components/menu-import/MenuParityAuditBanner";
+import { explainCustomerMenuBrowseExclusions } from "@/domain/menu-import/customer-menu-browse";
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return "—";
@@ -138,6 +140,7 @@ export default async function VendorMenuImportJobPage({
   const rawPayloadJson = job.menuImportRawPayload?.payload ?? null;
 
   const menuParity = await runMenuParityAudit(job.vendorId);
+  const customerBrowseExclusions = menu ? explainCustomerMenuBrowseExclusions(menu) : [];
 
   return (
     <div className="space-y-8">
@@ -162,6 +165,8 @@ export default async function VendorMenuImportJobPage({
       />
 
       <MenuParityAuditBanner audit={menuParity} />
+
+      <MenuImportBrowseExclusionDiagnostics exclusions={customerBrowseExclusions} />
 
       <section className="rounded-lg border border-oo-light-stone bg-oo-warm-white p-4">
         <h2 className="font-medium text-oo-charcoal">What changed</h2>

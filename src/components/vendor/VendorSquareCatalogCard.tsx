@@ -114,6 +114,25 @@ export function VendorSquareCatalogImportControls({
               ) : null}
             </ul>
           ) : null}
+          {preview.customerBrowseExclusions.length > 0 ? (
+            <div className="rounded border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-950">
+              <p className="font-medium">
+                {preview.customerBrowseExclusions.length} item
+                {preview.customerBrowseExclusions.length === 1 ? "" : "s"} would be hidden on the
+                customer menu after publish
+              </p>
+              <ul className="mt-2 max-h-32 list-inside list-disc overflow-y-auto">
+                {preview.customerBrowseExclusions.slice(0, 8).map((e) => (
+                  <li key={e.productDeliverectId}>
+                    {e.productName} — {e.detail}
+                  </li>
+                ))}
+                {preview.customerBrowseExclusions.length > 8 ? (
+                  <li>…and {preview.customerBrowseExclusions.length - 8} more</li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
           {preview.stats.items === 0 ? (
             <p className="text-sm text-amber-900">
               No importable items found. Your current Open Order menu is unchanged.

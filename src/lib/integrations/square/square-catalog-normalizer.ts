@@ -237,6 +237,10 @@ export function normalizeSquareCatalogToCanonical(input: {
         multiVariation && variationName ? `${baseName} — ${variationName}` : baseName;
       const internalProductId = squareProductInternalId(variation.id);
 
+      // Standalone customer SKUs (one per ITEM_VARIATION). Do not set
+      // deliverectVariantParentPlu — that field marks Deliverect variant leaves and the
+      // customer storefront excludes them from browse. Parent Square ITEM id is retained
+      // on sourceParentExternalId for mapping / diagnostics; variation id is in deliverectId.
       canonicalProducts.push({
         deliverectId: internalProductId,
         name: displayName,
@@ -247,8 +251,9 @@ export function normalizeSquareCatalogToCanonical(input: {
         imageUrl,
         basketMaxQuantity: null,
         modifierGroupDeliverectIds: modifierGroupIds.filter((gid) => groupSort.has(gid)),
-        deliverectVariantParentPlu: multiVariation ? itemId : null,
-        deliverectVariantParentName: multiVariation ? baseName : null,
+        deliverectVariantParentPlu: null,
+        deliverectVariantParentName: null,
+        sourceParentExternalId: itemId,
       });
 
       for (const catId of categoryIds) {

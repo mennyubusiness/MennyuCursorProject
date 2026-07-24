@@ -11,10 +11,35 @@
  *    listed in any category’s `productDeliverectIds` (these otherwise fall into “Other” / uncategorized).
  *
  * Still shown when the merchant explicitly placed the product in a category (legitimate standalone).
+ *
+ * Square catalog imports flatten ITEM_VARIATION rows into separate products and must leave
+ * `deliverectVariantParentPlu` unset (parent Square ITEM id lives on `sourceParentExternalId`).
  */
 import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
 
+export type CustomerMenuBrowseExclusionReason =
+  | "variant_leaf"
+  | "modifier_only_uncategorized";
+
+export type CustomerMenuBrowseExclusion = {
+  productDeliverectId: string;
+  productName: string;
+  reason: CustomerMenuBrowseExclusionReason;
+  /** Safe, non-secret explanation for import review / publish diagnostics. */
+  detail: string;
+};
+
 export function computeCustomerMenuBrowseExcludedProductIds(menu: MennyuCanonicalMenu): Set<string> {
+  return new Set(explainCustomerMenuBrowseExclusions(menu).map((e) => e.productDeliverectId));
+}
+
+/**
+ * Temporary safe diagnostics: why draft products would be hidden from the customer storefront
+ * after publish (same rules as live browse). Does not include tokens or connection secrets.
+ */
+export function explainCustomerMenuBrowseExclusions(
+  menu: MennyuCanonicalMenu
+): CustomerMenuBrowseExclusion[] {
   const inAnyCategory = new Set<string>();
   for (const c of menu.categories) {
     for (const pid of c.productDeliverectIds) inAnyCategory.add(pid);
@@ -25,15 +50,26 @@ export function computeCustomerMenuBrowseExcludedProductIds(menu: MennyuCanonica
     for (const o of g.options) optionDeliverectIds.add(o.deliverectId);
   }
 
-  const excluded = new Set<string>();
+  const exclusions: CustomerMenuBrowseExclusion[] = [];
   for (const p of menu.products) {
     if (p.deliverectVariantParentPlu?.trim()) {
-      excluded.add(p.deliverectId);
+      exclusions.push({
+        productDeliverectId: p.deliverectId,
+        productName: p.name,
+        reason: "variant_leaf",
+        detail: `Marked as a Deliverect variation leaf (parent PLU present); hidden from top-level browse. Parent linkage: ${p.deliverectVariantParentPlu.trim()}.`,
+      });
       continue;
     }
     if (optionDeliverectIds.has(p.deliverectId) && !inAnyCategory.has(p.deliverectId)) {
-      excluded.add(p.deliverectId);
+      exclusions.push({
+        productDeliverectId: p.deliverectId,
+        productName: p.name,
+        reason: "modifier_only_uncategorized",
+        detail:
+          "Appears only as a modifier option and is not listed in any category; hidden from top-level browse.",
+      });
     }
   }
-  return excluded;
+  return exclusions;
 }

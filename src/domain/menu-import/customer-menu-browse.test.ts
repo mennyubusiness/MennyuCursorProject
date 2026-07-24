@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
-import { computeCustomerMenuBrowseExcludedProductIds } from "./customer-menu-browse";
+import {
+  computeCustomerMenuBrowseExcludedProductIds,
+  explainCustomerMenuBrowseExclusions,
+} from "./customer-menu-browse";
 
 function minimalMenu(overrides: Partial<MennyuCanonicalMenu> & Pick<MennyuCanonicalMenu, "products">): MennyuCanonicalMenu {
   return {
@@ -40,6 +43,13 @@ describe("computeCustomerMenuBrowseExcludedProductIds", () => {
     const ex = computeCustomerMenuBrowseExcludedProductIds(menu);
     expect(ex.has("leaf")).toBe(true);
     expect(ex.has("parent")).toBe(false);
+    const explained = explainCustomerMenuBrowseExclusions(menu);
+    expect(explained).toEqual([
+      expect.objectContaining({
+        productDeliverectId: "leaf",
+        reason: "variant_leaf",
+      }),
+    ]);
   });
 
   it("excludes modifier-only products not in any category (appear under modifier groups only)", () => {

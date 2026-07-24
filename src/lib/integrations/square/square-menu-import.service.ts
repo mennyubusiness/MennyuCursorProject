@@ -8,6 +8,10 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { mennyuCanonicalMenuSchema, type MennyuCanonicalMenu } from "@/domain/menu-import/canonical.schema";
+import {
+  explainCustomerMenuBrowseExclusions,
+  type CustomerMenuBrowseExclusion,
+} from "@/domain/menu-import/customer-menu-browse";
 import { prisma } from "@/lib/db";
 import { payloadFingerprint } from "@/lib/menu-import-payload-hash";
 import {
@@ -36,6 +40,11 @@ export type SquareCatalogPreviewReport = SquareCatalogNormalizationResult & {
   locationId: string;
   locationName: string | null;
   squareEnvironment: string | null;
+  /**
+   * Temporary safe diagnostics: draft products that would be hidden from the customer
+   * storefront after publish (same browse rules as live). No tokens/secrets.
+   */
+  customerBrowseExclusions: CustomerMenuBrowseExclusion[];
 };
 
 export type SquareCatalogImportReport = SquareCatalogPreviewReport & {
@@ -107,6 +116,9 @@ export async function previewSquareCatalogImport(
     locationId: connection.externalLocationId!,
     locationName: connection.capabilitiesMeta?.selectedLocationName ?? null,
     squareEnvironment: connection.squareEnvironment,
+    customerBrowseExclusions: normalized.menu
+      ? explainCustomerMenuBrowseExclusions(normalized.menu)
+      : [],
   };
 }
 
@@ -314,6 +326,7 @@ export async function importSquareCatalog(
     locationId,
     locationName: connection.capabilitiesMeta?.selectedLocationName ?? null,
     squareEnvironment: connection.squareEnvironment,
+    customerBrowseExclusions: explainCustomerMenuBrowseExclusions(menu),
     jobId: job.id,
     draftVersionId,
     importedCount: mappingResult.imported,
