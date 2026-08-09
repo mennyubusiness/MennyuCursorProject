@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  activeMenuProviderForOrderRoutingMode,
   canonicalMenuSourceFromSnapshot,
   getVendorMenuSourceMismatchWarning,
   menuItemDeliverectIdMatchesMenuSource,
+  menuItemMatchesActiveProvider,
   menuSourceForOrderRoutingMode,
+  resolveActiveMenuSource,
   vendorMenuSourceNavLabel,
 } from "@/lib/vendor-menu-source";
 
@@ -11,6 +14,24 @@ describe("vendor-menu-source", () => {
   it("maps routing mode to menu source predictably", () => {
     expect(menuSourceForOrderRoutingMode("manual_dashboard")).toBe("open_order");
     expect(menuSourceForOrderRoutingMode("deliverect")).toBe("deliverect");
+    expect(menuSourceForOrderRoutingMode("square")).toBe("open_order");
+  });
+
+  it("maps routing mode to a single active provider", () => {
+    expect(activeMenuProviderForOrderRoutingMode("manual_dashboard")).toBe("open_order");
+    expect(activeMenuProviderForOrderRoutingMode("deliverect")).toBe("deliverect");
+    expect(activeMenuProviderForOrderRoutingMode("square")).toBe("square");
+  });
+
+  it("resolveActiveMenuSource prefers routing over stale persisted menuSource", () => {
+    const resolved = resolveActiveMenuSource({
+      orderRoutingMode: "manual_dashboard",
+      menuSource: "deliverect",
+    });
+    expect(resolved.menuSource).toBe("open_order");
+    expect(resolved.provider).toBe("open_order");
+    expect(resolved.menuSourcePersisted).toBe("deliverect");
+    expect(resolved.isAligned).toBe(false);
   });
 
   it("labels nav by menu source", () => {
@@ -71,5 +92,14 @@ describe("vendor-menu-source", () => {
     expect(menuItemDeliverectIdMatchesMenuSource("sq:prod:abc", "deliverect")).toBe(false);
     expect(menuItemDeliverectIdMatchesMenuSource("del-123", "deliverect")).toBe(true);
     expect(menuItemDeliverectIdMatchesMenuSource("del-123", "open_order")).toBe(false);
+  });
+
+  it("matches menu item product ids to active provider without merging Square and native", () => {
+    expect(menuItemMatchesActiveProvider("oo:prod:abc", "open_order")).toBe(true);
+    expect(menuItemMatchesActiveProvider("sq:prod:abc", "open_order")).toBe(false);
+    expect(menuItemMatchesActiveProvider("sq:prod:abc", "square")).toBe(true);
+    expect(menuItemMatchesActiveProvider("oo:prod:abc", "square")).toBe(false);
+    expect(menuItemMatchesActiveProvider("del-123", "deliverect")).toBe(true);
+    expect(menuItemMatchesActiveProvider("oo:prod:abc", "deliverect")).toBe(false);
   });
 });

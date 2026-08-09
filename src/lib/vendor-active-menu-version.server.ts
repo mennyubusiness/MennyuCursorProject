@@ -6,32 +6,70 @@ import {
   type OpenOrderCanonicalMenu,
 } from "@/domain/menu-import/canonical.schema";
 import { prisma } from "@/lib/db";
-import { canonicalMatchesMenuSource } from "@/lib/vendor-menu-source";
+import {
+  activeMenuProviderFromMenuSourceHint,
+  canonicalMatchesActiveProvider,
+  resolveActiveMenuSource,
+  type ActiveMenuProvider,
+} from "@/lib/vendor-menu-source";
 
 export type ActiveMenuVersionMeta = {
   id: string;
   state: MenuVersionState;
   menu: OpenOrderCanonicalMenu | null;
+  provider: ActiveMenuProvider;
+};
+
+export type LoadActiveMenuVersionOptions = {
+  /** Legacy VendorMenuSource hint; Square vs native is disambiguated via routing mode. */
+  menuSource?: VendorMenuSource;
+  /** Explicit provider filter (wins over menuSource hint). */
+  provider?: ActiveMenuProvider;
 };
 
 export async function loadVendorActiveMenuSource(vendorId: string): Promise<VendorMenuSource | null> {
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { menuSource: true },
+    select: { menuSource: true, orderRoutingMode: true },
   });
-  return vendor?.menuSource ?? null;
+  if (!vendor) return null;
+  return resolveActiveMenuSource(vendor).menuSource;
+}
+
+function normalizeLoadOptions(
+  menuSourceOrOptions?: VendorMenuSource | LoadActiveMenuVersionOptions
+): LoadActiveMenuVersionOptions {
+  if (menuSourceOrOptions == null) return {};
+  if (typeof menuSourceOrOptions === "string") {
+    return { menuSource: menuSourceOrOptions };
+  }
+  return menuSourceOrOptions;
 }
 
 /**
- * Latest published MenuVersion for the vendor's active menu source, or the latest archived
- * snapshot for that source when nothing is currently published (e.g. after switching back).
+ * Latest published MenuVersion for the vendor's active menu provider, or the latest archived
+ * snapshot for that provider when nothing is currently published (e.g. after switching back).
+ *
+ * Active provider is derived from orderRoutingMode (one authoritative catalog per vendor).
+ * Stale published menus from other providers are never selected.
  */
 export async function loadActiveMenuVersionForVendor(
   vendorId: string,
-  menuSource?: VendorMenuSource
+  menuSourceOrOptions?: VendorMenuSource | LoadActiveMenuVersionOptions
 ): Promise<ActiveMenuVersionMeta | null> {
-  const source = menuSource ?? (await loadVendorActiveMenuSource(vendorId));
-  if (!source) return null;
+  const options = normalizeLoadOptions(menuSourceOrOptions);
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: { menuSource: true, orderRoutingMode: true },
+  });
+  if (!vendor) return null;
+
+  const resolved = resolveActiveMenuSource(vendor);
+  const provider: ActiveMenuProvider =
+    options.provider ??
+    (options.menuSource
+      ? activeMenuProviderFromMenuSourceHint(options.menuSource, vendor.orderRoutingMode)
+      : resolved.provider);
 
   const versions = await prisma.menuVersion.findMany({
     where: {
@@ -45,12 +83,13 @@ export async function loadActiveMenuVersionForVendor(
   const pick = (state: MenuVersionState) => {
     for (const version of versions) {
       if (version.state !== state) continue;
-      if (!canonicalMatchesMenuSource(version.canonicalSnapshot, source)) continue;
+      if (!canonicalMatchesActiveProvider(version.canonicalSnapshot, provider)) continue;
       const parsed = openOrderCanonicalMenuSchema.safeParse(version.canonicalSnapshot);
       return {
         id: version.id,
         state: version.state,
         menu: parsed.success ? parsed.data : null,
+        provider,
       };
     }
     return null;
@@ -61,8 +100,8 @@ export async function loadActiveMenuVersionForVendor(
 
 export async function loadActiveMenuVersionIdForVendor(
   vendorId: string,
-  menuSource?: VendorMenuSource
+  menuSourceOrOptions?: VendorMenuSource | LoadActiveMenuVersionOptions
 ): Promise<string | null> {
-  const meta = await loadActiveMenuVersionForVendor(vendorId, menuSource);
+  const meta = await loadActiveMenuVersionForVendor(vendorId, menuSourceOrOptions);
   return meta?.id ?? null;
 }

@@ -10,6 +10,10 @@ import { prisma } from "@/lib/db";
 import { revalidateCustomerVendorMenuCacheForVendor } from "@/services/vendor-customer-menu-cache.service";
 import { revalidateOperationalMenuCacheForVendor } from "@/services/menu-active-scope.service";
 import {
+  reconcileVendorMenuSourceOwnership,
+  repairInconsistentVendorMenuSourceOwnership,
+} from "@/services/vendor-menu-source-ownership.service";
+import {
   createSlugRedirect,
   listSlugRedirectsForEntity,
   normalizePublicSlug,
@@ -416,16 +420,53 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
   const menuSourceUnchanged = vendor.menuSource === nextMenuSource;
 
   if (routingUnchanged && menuSourceUnchanged) {
-    return { ok: true, message: "Order routing mode unchanged." };
+    // Still reconcile ownership in case a foreign published menu remains active.
+    const ownership = await prisma.$transaction((tx) =>
+      reconcileVendorMenuSourceOwnership(
+        {
+          vendorId: input.vendorId,
+          orderRoutingMode: input.orderRoutingMode,
+        },
+        tx
+      )
+    );
+    if (
+      ownership.archivedMenuVersionIds.length === 0 &&
+      ownership.softDisabledMenuItemCount === 0
+    ) {
+      return { ok: true, message: "Order routing mode unchanged." };
+    }
+    await createAdminAuditLog({
+      adminUserId: input.adminUserId,
+      actionType: ADMIN_AUDIT_ACTION.VENDOR_ORDER_ROUTING_MODE_UPDATED,
+      targetType: ADMIN_AUDIT_TARGET.vendor,
+      targetId: input.vendorId,
+      reason: reasonCheck.reason,
+      oldValue: `${vendor.orderRoutingMode} / menu:${vendor.menuSource}`,
+      newValue: `${input.orderRoutingMode} / menu:${nextMenuSource}`,
+      metadata: {
+        archivedMenuVersionIds: ownership.archivedMenuVersionIds,
+        softDisabledMenuItemCount: ownership.softDisabledMenuItemCount,
+        provider: ownership.provider,
+        ownershipOnly: true,
+      },
+    });
+    await revalidateVendorOrderingSurfaces(input.vendorId);
+    return {
+      ok: true,
+      message: "Order routing mode unchanged; inactive menus demoted for active source.",
+    };
   }
 
-  await prisma.vendor.update({
-    where: { id: input.vendorId },
-    data: {
-      orderRoutingMode: input.orderRoutingMode,
-      menuSource: nextMenuSource,
-    },
-  });
+  const ownership = await prisma.$transaction((tx) =>
+    reconcileVendorMenuSourceOwnership(
+      {
+        vendorId: input.vendorId,
+        orderRoutingMode: input.orderRoutingMode,
+      },
+      tx
+    )
+  );
 
   await createAdminAuditLog({
     adminUserId: input.adminUserId,
@@ -434,11 +475,61 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
     targetId: input.vendorId,
     reason: reasonCheck.reason,
     oldValue: `${vendor.orderRoutingMode} / menu:${vendor.menuSource}`,
-    newValue: `${input.orderRoutingMode} / menu:${nextMenuSource}`,
+    newValue: `${input.orderRoutingMode} / menu:${ownership.menuSource}`,
+    metadata: {
+      archivedMenuVersionIds: ownership.archivedMenuVersionIds,
+      softDisabledMenuItemCount: ownership.softDisabledMenuItemCount,
+      provider: ownership.provider,
+    },
   });
 
   await revalidateVendorOrderingSurfaces(input.vendorId);
   return { ok: true, message: "Order routing mode updated." };
+}
+
+/** Repair vendors with menuSource / published-menu ownership inconsistent with routing mode. */
+export async function adminRepairVendorMenuSourceOwnership(input: {
+  vendorId?: string;
+  adminUserId: string | null;
+  reason: string;
+  dryRun?: boolean;
+}): Promise<ActionResult & { repairedCount?: number }> {
+  const reasonCheck = requireAdminReason(input.reason);
+  if (!reasonCheck.ok) return reasonCheck;
+
+  const result = await repairInconsistentVendorMenuSourceOwnership({
+    vendorId: input.vendorId,
+    dryRun: input.dryRun,
+  });
+
+  if (!input.dryRun) {
+    for (const row of result.repaired) {
+      await createAdminAuditLog({
+        adminUserId: input.adminUserId,
+        actionType: ADMIN_AUDIT_ACTION.VENDOR_ORDER_ROUTING_MODE_UPDATED,
+        targetType: ADMIN_AUDIT_TARGET.vendor,
+        targetId: row.vendorId,
+        reason: reasonCheck.reason,
+        oldValue: `menu:${row.previousMenuSource}`,
+        newValue: `${row.orderRoutingMode} / menu:${row.menuSource}`,
+        metadata: {
+          repair: true,
+          archivedMenuVersionIds: row.archivedMenuVersionIds,
+          softDisabledMenuItemCount: row.softDisabledMenuItemCount,
+          provider: row.provider,
+        },
+      });
+      await revalidateVendorOrderingSurfaces(row.vendorId);
+    }
+  }
+
+  return {
+    ok: true,
+    repairedCount: result.repaired.length,
+    message: input.dryRun
+      ? `Dry run: ${result.repaired.length} of ${result.scanned} vendors need menu-source repair.`
+      : `Repaired menu-source ownership for ${result.repaired.length} of ${result.scanned} vendors.`,
+  };
 }
 
 export async function adminSetSquareOrderRoutingEnabled(input: {

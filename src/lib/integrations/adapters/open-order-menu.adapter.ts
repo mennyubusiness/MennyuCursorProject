@@ -1,7 +1,9 @@
 import type { MenuProviderAdapter } from "@/lib/integrations/adapters/types";
 import type { NormalizedMenu, ProviderConnectionHealth } from "@/lib/integrations/types";
 import { getProviderCapabilities } from "@/lib/integrations/provider-capabilities";
-import { isOpenOrderMenuSource } from "@/lib/vendor-menu-source";
+import { resolveActiveMenuSource } from "@/lib/vendor-menu-source";
+import { loadActiveMenuVersionForVendor } from "@/lib/vendor-active-menu-version.server";
+import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 export const openOrderMenuAdapter: MenuProviderAdapter = {
@@ -23,7 +25,7 @@ export const openOrderMenuAdapter: MenuProviderAdapter = {
 
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: { menuSource: true, isActive: true, deletedAt: true },
+      select: { menuSource: true, orderRoutingMode: true, isActive: true, deletedAt: true },
     });
 
     if (!vendor || vendor.deletedAt) {
@@ -38,15 +40,13 @@ export const openOrderMenuAdapter: MenuProviderAdapter = {
     }
 
     const missing: string[] = [];
-    if (!isOpenOrderMenuSource(vendor)) {
-      missing.push("Vendor menu source is not Open Order menu builder");
+    const active = resolveActiveMenuSource(vendor);
+    if (active.provider !== "open_order") {
+      missing.push("Vendor active menu source is not Open Order menu builder");
     }
 
-    const published = await prisma.menuVersion.findFirst({
-      where: { vendorId, state: "published" },
-      select: { id: true },
-    });
-    if (!published) {
+    const published = await loadActiveMenuVersionForVendor(vendorId, { provider: "open_order" });
+    if (!published || published.state !== MenuVersionState.published) {
       missing.push("No published menu version");
     }
 

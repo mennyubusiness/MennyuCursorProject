@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockFindUnique = vi.fn();
 const mockUpdate = vi.fn();
 const mockCreateAudit = vi.fn();
+const mockReconcile = vi.fn();
+const mockTransaction = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -26,11 +28,17 @@ vi.mock("@/lib/db", () => ({
     podVendor: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
 }));
 
 vi.mock("@/services/admin-audit-log.service", () => ({
   createAdminAuditLog: (...args: unknown[]) => mockCreateAudit(...args),
+}));
+
+vi.mock("@/services/vendor-menu-source-ownership.service", () => ({
+  reconcileVendorMenuSourceOwnership: (...args: unknown[]) => mockReconcile(...args),
+  repairInconsistentVendorMenuSourceOwnership: vi.fn(),
 }));
 
 vi.mock("@/lib/integrations/square/square-routing-readiness", () => ({
@@ -65,10 +73,31 @@ describe("adminUpdateVendorOrderRoutingMode", () => {
     });
     mockUpdate.mockResolvedValue({});
     mockCreateAudit.mockResolvedValue({});
+    mockReconcile.mockResolvedValue({
+      vendorId: "vendor_1",
+      orderRoutingMode: "deliverect",
+      previousMenuSource: "open_order",
+      menuSource: "deliverect",
+      provider: "deliverect",
+      archivedMenuVersionIds: ["mv_oo"],
+      softDisabledMenuItemCount: 2,
+      menuSourceUpdated: true,
+    });
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn({}));
     vi.mocked(assertSquareRoutingSelectable).mockResolvedValue({ ok: true });
   });
 
   it("allows manual dashboard routing", async () => {
+    mockReconcile.mockResolvedValue({
+      vendorId: "vendor_1",
+      orderRoutingMode: "manual_dashboard",
+      previousMenuSource: "open_order",
+      menuSource: "open_order",
+      provider: "open_order",
+      archivedMenuVersionIds: [],
+      softDisabledMenuItemCount: 0,
+      menuSourceUpdated: false,
+    });
     const result = await adminUpdateVendorOrderRoutingMode({
       vendorId: "vendor_1",
       orderRoutingMode: "manual_dashboard",
@@ -79,7 +108,7 @@ describe("adminUpdateVendorOrderRoutingMode", () => {
     expect(assertSquareRoutingSelectable).not.toHaveBeenCalled();
   });
 
-  it("allows deliverect routing without square validation", async () => {
+  it("reconciles menu ownership when switching to deliverect", async () => {
     mockFindUnique.mockResolvedValue({
       id: "vendor_1",
       orderRoutingMode: "manual_dashboard",
@@ -92,21 +121,40 @@ describe("adminUpdateVendorOrderRoutingMode", () => {
       reason: "test deliverect",
     });
     expect(result.ok).toBe(true);
-    expect(mockUpdate).toHaveBeenCalledWith(
+    expect(mockReconcile).toHaveBeenCalledWith(
+      {
+        vendorId: "vendor_1",
+        orderRoutingMode: "deliverect",
+      },
+      expect.anything()
+    );
+    expect(mockCreateAudit).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          orderRoutingMode: "deliverect",
-          menuSource: "deliverect",
+        newValue: "deliverect / menu:deliverect",
+        metadata: expect.objectContaining({
+          archivedMenuVersionIds: ["mv_oo"],
+          softDisabledMenuItemCount: 2,
+          provider: "deliverect",
         }),
       })
     );
   });
 
-  it("allows square routing even when Square is not connected", async () => {
+  it("allows square routing and reconciles to open_order menu source / square provider", async () => {
     mockFindUnique.mockResolvedValue({
       id: "vendor_1",
       orderRoutingMode: "manual_dashboard",
       menuSource: "open_order",
+    });
+    mockReconcile.mockResolvedValue({
+      vendorId: "vendor_1",
+      orderRoutingMode: "square",
+      previousMenuSource: "open_order",
+      menuSource: "open_order",
+      provider: "square",
+      archivedMenuVersionIds: [],
+      softDisabledMenuItemCount: 0,
+      menuSourceUpdated: false,
     });
     const result = await adminUpdateVendorOrderRoutingMode({
       vendorId: "vendor_1",
@@ -115,13 +163,12 @@ describe("adminUpdateVendorOrderRoutingMode", () => {
       reason: "test square before connect",
     });
     expect(result.ok).toBe(true);
-    expect(mockUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          orderRoutingMode: "square",
-          menuSource: "open_order",
-        }),
-      })
+    expect(mockReconcile).toHaveBeenCalledWith(
+      {
+        vendorId: "vendor_1",
+        orderRoutingMode: "square",
+      },
+      expect.anything()
     );
   });
 });

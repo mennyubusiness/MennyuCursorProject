@@ -15,7 +15,10 @@ import { unstable_cache } from "next/cache";
 import { revalidateTag } from "next/cache";
 import { requestCache } from "@/lib/request-cache";
 import { loadActiveMenuVersionForVendor } from "@/lib/vendor-active-menu-version.server";
-import { menuItemDeliverectIdMatchesMenuSource } from "@/lib/vendor-menu-source";
+import {
+  menuItemMatchesActiveProvider,
+  resolveActiveMenuSource,
+} from "@/lib/vendor-menu-source";
 import { MenuVersionState } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
@@ -197,15 +200,18 @@ export const getOperationalMenuItemIdsForVendor = requestCache(
   async (vendorId: string): Promise<Set<string>> => resolveOperationalMenuItemIds(vendorId)
 );
 
-/** When no active-source snapshot exists, use latest row per deliverectProductId (legacy). */
+/** When no active-source snapshot exists, use latest row per deliverectProductId (legacy Deliverect only). */
 async function fallbackWinnersNoPublishedMenu(vendorId: string): Promise<Set<string>> {
-  const menuSource = await prisma.vendor.findUnique({
+  const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { menuSource: true },
+    select: { menuSource: true, orderRoutingMode: true },
   });
+  if (!vendor) return new Set();
 
-  // Open Order Menu Builder requires an explicit publish before items are orderable.
-  if (menuSource?.menuSource === "open_order") {
+  const active = resolveActiveMenuSource(vendor);
+
+  // Native / Square catalogs require an explicit publish before items are orderable.
+  if (active.provider === "open_order" || active.provider === "square") {
     return new Set();
   }
 
@@ -216,10 +222,7 @@ async function fallbackWinnersNoPublishedMenu(vendorId: string): Promise<Set<str
   const byPid = new Map<string, MenuItemPickRow[]>();
   for (const r of rows) {
     if (!r.deliverectProductId) continue;
-    if (
-      menuSource &&
-      !menuItemDeliverectIdMatchesMenuSource(r.deliverectProductId, menuSource.menuSource)
-    ) {
+    if (!menuItemMatchesActiveProvider(r.deliverectProductId, active.provider)) {
       continue;
     }
     const list = byPid.get(r.deliverectProductId) ?? [];

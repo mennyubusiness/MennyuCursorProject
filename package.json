@@ -18,6 +18,8 @@
     "cart:cleanup:execute": "tsx scripts/cleanup-old-empty-carts.ts --execute",
     "issues:cleanup-stale-manual-recovery": "tsx scripts/cleanup-stale-manual-recovery-issues.ts",
     "issues:cleanup-stale-manual-recovery:execute": "tsx scripts/cleanup-stale-manual-recovery-issues.ts --execute",
+    "menu:repair-source-ownership": "tsx scripts/repair-vendor-menu-source-ownership.ts",
+    "menu:repair-source-ownership:execute": "tsx scripts/repair-vendor-menu-source-ownership.ts --execute",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

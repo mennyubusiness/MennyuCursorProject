@@ -12,7 +12,10 @@ import { prisma } from "@/lib/db";
 import {
   getOperationalMenuItemIdsForVendor,
 } from "@/services/menu-active-scope.service";
-import { menuItemDeliverectIdMatchesMenuSource } from "@/lib/vendor-menu-source";
+import {
+  menuItemMatchesActiveProvider,
+  resolveActiveMenuSource,
+} from "@/lib/vendor-menu-source";
 import {
   isVariantLeafMenuItem,
   menuItemSourceEntityId,
@@ -88,16 +91,18 @@ async function loadFallbackMenuDisplay(vendorId: string): Promise<CachedCustomer
     getOperationalMenuItemIdsForVendor(vendorId),
     prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: { menuSource: true },
+      select: { menuSource: true, orderRoutingMode: true },
     }),
   ]);
+
+  const activeProvider = vendor ? resolveActiveMenuSource(vendor).provider : null;
 
   const activeRows = rows.filter(
     (r) =>
       operationalIds.has(r.id) &&
       !isVariantLeafMenuItem(r) &&
-      (!vendor ||
-        menuItemDeliverectIdMatchesMenuSource(menuItemSourceEntityId(r), vendor.menuSource))
+      (!activeProvider ||
+        menuItemMatchesActiveProvider(menuItemSourceEntityId(r), activeProvider))
   );
 
   const variantChildCountByParentPlu: Record<string, number> = {};

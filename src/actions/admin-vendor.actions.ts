@@ -17,6 +17,7 @@ import {
   adminUpdateVendorPublicProfile,
   adminUpdateVendorOrderRoutingMode,
   adminSetSquareOrderRoutingEnabled,
+  adminRepairVendorMenuSourceOwnership,
   adminDeleteVendorProfile,
 } from "@/services/admin-vendor-rescue.service";
 
@@ -144,6 +145,19 @@ export async function adminSetSquareOrderRoutingEnabledAction(input: {
   return withAdmin(({ adminUserId }) =>
     adminSetSquareOrderRoutingEnabled({ ...input, adminUserId }).then((r) => {
       if (r.ok) revalidatePath(`/admin/vendors/${input.vendorId}`);
+      return r;
+    })
+  );
+}
+
+export async function adminRepairVendorMenuSourceOwnershipAction(input: {
+  vendorId?: string;
+  reason: string;
+  dryRun?: boolean;
+}) {
+  return withAdmin(({ adminUserId }) =>
+    adminRepairVendorMenuSourceOwnership({ ...input, adminUserId }).then((r) => {
+      if (r.ok && input.vendorId) revalidatePath(`/admin/vendors/${input.vendorId}`);
       return r;
     })
   );

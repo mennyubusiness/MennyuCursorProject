@@ -9,7 +9,8 @@ import {
   openOrderCategoryDeliverectId,
   openOrderProductDeliverectId,
 } from "@/lib/open-order-menu-ids";
-import { isOpenOrderMenuSource } from "@/lib/vendor-menu-source";
+import { resolveActiveMenuSource } from "@/lib/vendor-menu-source";
+import { usesVendorMenuBuilder } from "@/lib/vendor-menu-management";
 import { normalizeVendorLogoUrl } from "@/lib/vendor-brand";
 import { deleteSupabasePublicObjectIfInBucket } from "@/lib/supabase/storage-cleanup";
 import {
@@ -29,11 +30,19 @@ export async function authorizeOpenOrderMenuBuilder(vendorId: string): Promise<A
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { menuSource: true },
+    select: { menuSource: true, orderRoutingMode: true },
   });
   if (!vendor) return { ok: false, error: "Vendor not found." };
-  if (!isOpenOrderMenuSource(vendor)) {
-    return { ok: false, error: "This vendor uses Deliverect menu sync, not the Open Order Menu Builder." };
+  // Routing mode is the UX gate; expected active source must be Open Order builder.
+  if (!usesVendorMenuBuilder(vendor.orderRoutingMode)) {
+    return {
+      ok: false,
+      error: "This vendor uses integrated menu sync, not the Open Order Menu Builder.",
+    };
+  }
+  const active = resolveActiveMenuSource(vendor);
+  if (active.provider !== "open_order") {
+    return { ok: false, error: "This vendor uses integrated menu sync, not the Open Order Menu Builder." };
   }
   return { ok: true };
 }
