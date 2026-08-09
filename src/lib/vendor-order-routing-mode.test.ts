@@ -15,7 +15,9 @@ import {
   vendorKitchenStatusLine,
   vendorKitchenStatusWarning,
   vendorMenuSyncLabelForRouting,
+  parseAdminVendorRoutingQuery,
   vendorOrderRoutingModeAdminLabel,
+  vendorOrderRoutingModeCompactLabel,
   vendorOrderRoutingModeShortLabel,
   vendorRoutingSetupBlockerLabel,
   vendorRoutingStatusFieldLabel,
@@ -43,6 +45,21 @@ describe("routing mode labels", () => {
     expect(vendorOrderRoutingModeShortLabel("manual_dashboard")).toBe("Manual dashboard");
     expect(vendorOrderRoutingModeShortLabel("deliverect")).toBe("Deliverect");
     expect(vendorOrderRoutingModeShortLabel("square")).toBe("Square");
+    expect(vendorOrderRoutingModeCompactLabel("manual_dashboard")).toBe("Tablet");
+    expect(vendorOrderRoutingModeCompactLabel("deliverect")).toBe("Deliverect");
+    expect(vendorOrderRoutingModeCompactLabel("square")).toBe("Square");
+  });
+});
+
+describe("parseAdminVendorRoutingQuery", () => {
+  it("accepts authoritative enum values and rejects all/invalid", () => {
+    expect(parseAdminVendorRoutingQuery("manual_dashboard")).toBe("manual_dashboard");
+    expect(parseAdminVendorRoutingQuery("deliverect")).toBe("deliverect");
+    expect(parseAdminVendorRoutingQuery("square")).toBe("square");
+    expect(parseAdminVendorRoutingQuery("")).toBeNull();
+    expect(parseAdminVendorRoutingQuery("all")).toBeNull();
+    expect(parseAdminVendorRoutingQuery("Tablet")).toBeNull();
+    expect(parseAdminVendorRoutingQuery(undefined)).toBeNull();
   });
 });
 

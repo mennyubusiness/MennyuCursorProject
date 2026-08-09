@@ -39,10 +39,33 @@ export function vendorOrderRoutingModeShortLabel(mode: VendorOrderRoutingMode | 
   return "Manual dashboard";
 }
 
+/** Compact admin list / filter chip label (Tablet instead of Manual dashboard). */
+export function vendorOrderRoutingModeCompactLabel(
+  mode: VendorOrderRoutingMode | string | null | undefined
+): string {
+  if (isDeliverectRoutingMode(mode)) return "Deliverect";
+  if (isSquareRoutingMode(mode)) return "Square";
+  return "Tablet";
+}
+
 export function vendorOrderRoutingModeAdminLabel(mode: VendorOrderRoutingMode | string | null | undefined): string {
   if (isDeliverectRoutingMode(mode)) return "Deliverect / POS-connected routing";
   if (isSquareRoutingMode(mode)) return "Square / POS-connected routing";
   return "Open Order Dashboard / Tablet";
+}
+
+/**
+ * Parse admin vendor list `?routing=` query. Returns null for "all routing" / invalid values.
+ * Uses authoritative VendorOrderRoutingMode enum values only.
+ */
+export function parseAdminVendorRoutingQuery(
+  raw: string | null | undefined
+): VendorOrderRoutingMode | null {
+  const value = raw?.trim();
+  if (value === "manual_dashboard" || value === "deliverect" || value === "square") {
+    return value;
+  }
+  return null;
 }
 
 export type VendorPosConnectionSummary = {

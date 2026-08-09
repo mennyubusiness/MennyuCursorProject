@@ -1,6 +1,6 @@
 import "server-only";
 
-import { VendorMembershipRole } from "@prisma/client";
+import { VendorMembershipRole, type VendorOrderRoutingMode } from "@prisma/client";
 import { buildPodCustomerPath, buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { prisma } from "@/lib/db";
 import { listSlugRedirectsForEntity } from "@/lib/slug-admin.server";
@@ -213,23 +213,53 @@ export type AdminVendorSearchRow = {
   menuSyncLabel: string;
 };
 
-export async function searchAdminVendors(rawQuery: string, limit = 50): Promise<AdminVendorSearchRow[]> {
-  const q = rawQuery.trim();
-  if (!q) return [];
+export type AdminVendorSearchOptions = {
+  /** Authoritative Vendor.orderRoutingMode filter. Omit / null = all routing methods. */
+  orderRoutingMode?: VendorOrderRoutingMode | null;
+  limit?: number;
+};
 
-  const orConditions: object[] = [
-    { name: { contains: q, mode: "insensitive" } },
-    { slug: { contains: q, mode: "insensitive" } },
-    { deliverectChannelLinkId: { contains: q, mode: "insensitive" } },
-    { deliverectLocationId: { contains: q, mode: "insensitive" } },
-    { stripeConnectedAccountId: { contains: q, mode: "insensitive" } },
-    { pods: { some: { pod: { name: { contains: q, mode: "insensitive" } } } } },
-    { vendorMemberships: { some: { user: { email: { contains: q, mode: "insensitive" } } } } },
-  ];
-  if (q.length >= 20) orConditions.push({ id: q });
+/**
+ * Admin vendor search. Filters by text query and/or authoritative orderRoutingMode.
+ * Historical POS/menu data alone does not affect the routing filter.
+ */
+export async function searchAdminVendors(
+  rawQuery: string,
+  options: AdminVendorSearchOptions | number = {}
+): Promise<AdminVendorSearchRow[]> {
+  const opts: AdminVendorSearchOptions =
+    typeof options === "number" ? { limit: options } : options;
+  const q = rawQuery.trim();
+  const routing = opts.orderRoutingMode ?? null;
+  const limit = opts.limit ?? (q ? 50 : 200);
+
+  if (!q && !routing) return [];
+
+  const where: {
+    OR?: object[];
+    orderRoutingMode?: VendorOrderRoutingMode;
+  } = {};
+
+  if (q) {
+    const orConditions: object[] = [
+      { name: { contains: q, mode: "insensitive" } },
+      { slug: { contains: q, mode: "insensitive" } },
+      { deliverectChannelLinkId: { contains: q, mode: "insensitive" } },
+      { deliverectLocationId: { contains: q, mode: "insensitive" } },
+      { stripeConnectedAccountId: { contains: q, mode: "insensitive" } },
+      { pods: { some: { pod: { name: { contains: q, mode: "insensitive" } } } } },
+      { vendorMemberships: { some: { user: { email: { contains: q, mode: "insensitive" } } } } },
+    ];
+    if (q.length >= 20) orConditions.push({ id: q });
+    where.OR = orConditions;
+  }
+
+  if (routing) {
+    where.orderRoutingMode = routing;
+  }
 
   const vendors = await prisma.vendor.findMany({
-    where: { OR: orConditions },
+    where,
     include: {
       pods: { include: { pod: { select: { name: true, slug: true } } }, take: 3 },
       vendorMemberships: {

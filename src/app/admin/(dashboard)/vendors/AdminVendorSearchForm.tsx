@@ -2,27 +2,80 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { VendorOrderRoutingMode } from "@prisma/client";
+import { VENDOR_ORDER_ROUTING_MODES } from "@/lib/vendor-order-routing-mode";
 
-export function AdminVendorSearchForm({ initialQuery }: { initialQuery: string }) {
+const ROUTING_FILTER_OPTIONS: { value: "" | VendorOrderRoutingMode; label: string }[] = [
+  { value: "", label: "All routing" },
+  { value: "manual_dashboard", label: "Tablet" },
+  { value: "deliverect", label: "Deliverect" },
+  { value: "square", label: "Square" },
+];
+
+function buildAdminVendorsHref(query: string, routing: "" | VendorOrderRoutingMode): string {
+  const params = new URLSearchParams();
+  const q = query.trim();
+  if (q) params.set("q", q);
+  if (routing && (VENDOR_ORDER_ROUTING_MODES as readonly string[]).includes(routing)) {
+    params.set("routing", routing);
+  }
+  const qs = params.toString();
+  return qs ? `/admin/vendors?${qs}` : "/admin/vendors";
+}
+
+export function AdminVendorSearchForm({
+  initialQuery,
+  initialRouting,
+}: {
+  initialQuery: string;
+  initialRouting: "" | VendorOrderRoutingMode;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
+  const [routing, setRouting] = useState<"" | VendorOrderRoutingMode>(initialRouting);
 
   return (
     <form
-      className="flex flex-wrap gap-2"
+      className="flex flex-wrap items-end gap-2"
       onSubmit={(e) => {
         e.preventDefault();
-        const q = query.trim();
-        router.push(q ? `/admin/vendors?q=${encodeURIComponent(q)}` : "/admin/vendors");
+        router.push(buildAdminVendorsHref(query, routing));
       }}
     >
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search by name, slug, id, pod, owner email, Stripe or Deliverect id…"
-        className="min-w-[280px] flex-1 rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm"
-      />
+      <div className="min-w-[280px] flex-1">
+        <label htmlFor="admin-vendor-search" className="sr-only">
+          Search vendors
+        </label>
+        <input
+          id="admin-vendor-search"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by name, slug, id, pod, owner email, Stripe or Deliverect id…"
+          className="w-full rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm"
+        />
+      </div>
+      <div>
+        <label htmlFor="admin-vendor-routing" className="mb-1 block text-xs font-medium text-oo-stone-gray">
+          Routing
+        </label>
+        <select
+          id="admin-vendor-routing"
+          value={routing}
+          onChange={(e) => {
+            const next = e.target.value as "" | VendorOrderRoutingMode;
+            setRouting(next);
+            router.push(buildAdminVendorsHref(query, next));
+          }}
+          className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-2 text-sm text-oo-charcoal"
+        >
+          {ROUTING_FILTER_OPTIONS.map((opt) => (
+            <option key={opt.value || "all"} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
       <button type="submit" className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover">
         Search
       </button>
