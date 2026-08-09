@@ -6,6 +6,7 @@ import { PosConnectionStatus } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canManageVendor } from "@/lib/permissions";
+import { assertVendorPosRoutingConfigurationAllowed } from "@/lib/vendor-routing-availability";
 
 export type VendorPosActionResult = { ok: true } | { ok: false; error: string };
 
@@ -27,6 +28,8 @@ export async function startDeliverectPosOnboarding(input: {
   if (!(await canManageVendor(userId, input.vendorId))) {
     return { ok: false, error: "You don’t have permission to update this restaurant." };
   }
+  const posGate = assertVendorPosRoutingConfigurationAllowed();
+  if (!posGate.ok) return posGate;
 
   const email = input.deliverectAccountEmail.trim().toLowerCase();
   if (!email) {
@@ -73,6 +76,8 @@ export async function saveVendorPosConnection(input: {
   if (!(await canManageVendor(userId, input.vendorId))) {
     return { ok: false, error: "You don’t have permission to update this restaurant." };
   }
+  const posGate = assertVendorPosRoutingConfigurationAllowed();
+  if (!posGate.ok) return posGate;
 
   const channel = input.deliverectChannelLinkId?.trim() || null;
   const location = input.deliverectLocationId?.trim() || null;

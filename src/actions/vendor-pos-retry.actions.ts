@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { canManageVendor } from "@/lib/permissions";
+import { assertVendorPosRoutingConfigurationAllowed } from "@/lib/vendor-routing-availability";
 import {
   findLatestUnmatchedWebhookEventIdForVendorById,
   retryChannelRegistrationMatchForWebhookEventById,
@@ -25,6 +26,8 @@ export async function retryVendorDeliverectConnection(vendorId: string): Promise
   if (!(await canManageVendor(userId, vendorId))) {
     return { ok: false, error: "You don’t have permission to update this restaurant." };
   }
+  const posGate = assertVendorPosRoutingConfigurationAllowed();
+  if (!posGate.ok) return posGate;
 
   const webhookEventId = await findLatestUnmatchedWebhookEventIdForVendorById(vendorId);
   if (!webhookEventId) {

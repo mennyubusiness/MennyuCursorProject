@@ -6,6 +6,7 @@ import type {
   VendorSetupIntegrationStatus,
   VendorIntegrationsSurface,
 } from "@/lib/vendor-setup-integrations";
+import { vendorMayConfigurePosOrderRouting } from "@/lib/vendor-routing-availability";
 
 function statusBadgeClass(status: VendorSetupIntegrationStatus): string {
   switch (status) {
@@ -78,37 +79,43 @@ export function VendorIntegrationsSection({
   surface?: VendorIntegrationsSurface;
   showHeading?: boolean;
 }) {
-  const inactiveCards =
-    surface === "setup"
+  const posRoutingSelectable = vendorMayConfigurePosOrderRouting();
+  const inactiveCards = posRoutingSelectable
+    ? surface === "setup"
       ? [...model.connectedIntegrations, ...model.availableIntegrations]
-      : model.availableIntegrations;
+      : model.availableIntegrations
+    : [];
 
   return (
     <section id="integrations" className="max-w-3xl space-y-4">
       {showHeading ? (
         <div>
-          <h3 className="text-sm font-semibold text-oo-charcoal">Integrations</h3>
+          <h3 className="text-sm font-semibold text-oo-charcoal">
+            {posRoutingSelectable ? "Integrations" : "Orders & menu"}
+          </h3>
           <p className="mt-1 text-xs text-oo-stone-gray">
-            Manage how this vendor receives orders and keeps menus in sync.
+            {posRoutingSelectable
+              ? "Manage how this vendor receives orders and keeps menus in sync."
+              : "Orders appear in your Open Order dashboard. Build and publish your menu in Menu Builder."}
           </p>
         </div>
       ) : null}
 
       <DashboardCard className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
-          Active order routing
+          {posRoutingSelectable ? "Active order routing" : "Order management"}
         </p>
         <IntegrationCard card={model.activeRouting} />
       </DashboardCard>
 
       <DashboardCard className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
-          Active menu source
+          {posRoutingSelectable ? "Active menu source" : "Menu"}
         </p>
         <IntegrationCard card={model.activeMenuSource} />
       </DashboardCard>
 
-      {surface === "hub" && model.connectedIntegrations.length > 0 ? (
+      {posRoutingSelectable && surface === "hub" && model.connectedIntegrations.length > 0 ? (
         <DashboardCard className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
             Connected integrations

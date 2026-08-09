@@ -200,6 +200,9 @@ export async function createVendorProfile(input: {
       cuisineCategory,
       posType,
       locationSummary,
+      // Beta: tablet / Open Order only — do not leave routing/menu source ambiguous.
+      orderRoutingMode: "manual_dashboard",
+      menuSource: "open_order",
       onboardingStatus: AccountOnboardingStatus.ready_for_next_step,
       vendorMemberships: {
         create: {

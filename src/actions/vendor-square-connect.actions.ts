@@ -9,6 +9,7 @@ import {
   selectSquareLocationForVendor,
 } from "@/lib/integrations/square/square-connection.service";
 import { getSquareConfigSnapshot } from "@/lib/integrations/square/square-config";
+import { assertVendorPosRoutingConfigurationAllowed } from "@/lib/vendor-routing-availability";
 
 export async function selectSquareLocationAction(
   vendorId: string,
@@ -20,6 +21,8 @@ export async function selectSquareLocationAction(
   if (!(await canManageVendor(userId, vendorId))) {
     return { ok: false, error: "You don’t have permission to manage integrations for this vendor." };
   }
+  const posGate = assertVendorPosRoutingConfigurationAllowed();
+  if (!posGate.ok) return posGate;
 
   const result = await selectSquareLocationForVendor({
     vendorId,
@@ -43,6 +46,8 @@ export async function disconnectSquareAction(
   if (!(await canManageVendor(userId, vendorId))) {
     return { ok: false, error: "You don’t have permission." };
   }
+  const posGate = assertVendorPosRoutingConfigurationAllowed();
+  if (!posGate.ok) return posGate;
 
   await disconnectSquareForVendor(vendorId);
   revalidatePath(`/vendor/${vendorId}/setup`);

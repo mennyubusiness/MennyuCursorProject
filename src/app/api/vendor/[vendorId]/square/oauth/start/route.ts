@@ -9,6 +9,7 @@ import {
   formatSquareOAuthScopesForAuthorize,
 } from "@/lib/integrations/square/square-config";
 import { signSquareOAuthState } from "@/lib/integrations/square/square-oauth-state";
+import { assertVendorPosRoutingConfigurationAllowed } from "@/lib/vendor-routing-availability";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,10 @@ export async function GET(
   }
   if (!(await canManageVendor(userId, vendorId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const posGate = assertVendorPosRoutingConfigurationAllowed();
+  if (!posGate.ok) {
+    return NextResponse.json({ error: posGate.error }, { status: 403 });
   }
 
   const snap = getSquareConfigSnapshot();

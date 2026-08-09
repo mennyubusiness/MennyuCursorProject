@@ -9,9 +9,11 @@ import {
   isDeliverectRoutingMode,
   isManualDashboardRoutingMode,
   isSquareRoutingMode,
+  VENDOR_ROUTING_MODE_COPY,
 } from "@/lib/vendor-order-routing-mode";
 import { isDeliverectMenuSource } from "@/lib/vendor-menu-source";
 import { vendorMenuManagementPath } from "@/lib/vendor-menu-management";
+import { vendorMayConfigurePosOrderRouting } from "@/lib/vendor-routing-availability";
 
 export type VendorIntegrationsSurface = "setup" | "hub";
 
@@ -65,6 +67,9 @@ function integrationStatusLabel(status: VendorSetupIntegrationStatus): string {
 }
 
 function activeRoutingTitle(orderRoutingMode: VendorOrderRoutingMode): string {
+  if (!vendorMayConfigurePosOrderRouting()) {
+    return "Open Order dashboard";
+  }
   if (isManualDashboardRoutingMode(orderRoutingMode)) {
     return "Open Order Dashboard / Tablet";
   }
@@ -75,6 +80,12 @@ function activeRoutingTitle(orderRoutingMode: VendorOrderRoutingMode): string {
 }
 
 function activeRoutingCopy(orderRoutingMode: VendorOrderRoutingMode): string {
+  if (!vendorMayConfigurePosOrderRouting()) {
+    if (isManualDashboardRoutingMode(orderRoutingMode)) {
+      return VENDOR_ROUTING_MODE_COPY.manualDashboard.vendorHelper;
+    }
+    return "Open Order uses tablet ordering. Orders appear in your Open Order dashboard. Contact Open Order support if your kitchen setup still looks connected to a POS.";
+  }
   return getProviderDisplayProfile(orderRoutingMode).routingDescription;
 }
 
@@ -83,7 +94,8 @@ function activeRoutingActions(
   orderRoutingMode: VendorOrderRoutingMode,
   surface: VendorIntegrationsSurface
 ): VendorIntegrationAction[] {
-  if (isManualDashboardRoutingMode(orderRoutingMode)) {
+  // Beta tablet-only: never offer POS connect/manage CTAs on vendor surfaces.
+  if (!vendorMayConfigurePosOrderRouting() || isManualDashboardRoutingMode(orderRoutingMode)) {
     const actions: VendorIntegrationAction[] = [
       { href: `/vendor/${vendorId}/kitchen`, label: "Open kitchen mode" },
     ];
@@ -177,6 +189,22 @@ function menuSourceActions(
   input: { menuSource: VendorMenuSource; orderRoutingMode: VendorOrderRoutingMode },
   surface: VendorIntegrationsSurface
 ): VendorIntegrationAction[] {
+  if (!vendorMayConfigurePosOrderRouting()) {
+    // Tablet beta: Menu Builder for supported modes; no POS import management CTAs.
+    if (
+      isManualDashboardRoutingMode(input.orderRoutingMode) &&
+      !isDeliverectMenuSource(input)
+    ) {
+      return [
+        {
+          href: vendorMenuManagementPath(vendorId, "manual_dashboard"),
+          label: "Manage menu",
+        },
+      ];
+    }
+    return [{ href: `/vendor/${vendorId}/kitchen`, label: "Open kitchen mode" }];
+  }
+
   if (isDeliverectMenuSource(input) || isSquareRoutingMode(input.orderRoutingMode)) {
     const actions: VendorIntegrationAction[] = [
       { href: `/vendor/${vendorId}/menu/imports`, label: "View menu imports" },
@@ -241,18 +269,28 @@ export function buildVendorSetupIntegrationsView(input: {
   surface?: VendorIntegrationsSurface;
 }): VendorSetupIntegrationsViewModel {
   const surface = input.surface ?? "setup";
+  const posSelectable = vendorMayConfigurePosOrderRouting();
   const routingHealth = input.readiness.orderRouting?.health;
-  const routingReady = routingHealth?.isReady ?? isManualDashboardRoutingMode(input.orderRoutingMode);
-  const routingBlockers = routingHealth?.missingRequirements ?? [];
+  // Beta tablet-only: do not surface POS routing readiness blockers to vendors.
+  const routingReady = posSelectable
+    ? (routingHealth?.isReady ?? isManualDashboardRoutingMode(input.orderRoutingMode))
+    : true;
+  const routingBlockers = posSelectable ? (routingHealth?.missingRequirements ?? []) : [];
 
   const menuEval = evaluateVendorSetupMenuSourceReadiness(input.menuReadiness);
   const deliverectMenuHealth = input.readiness.menuSource?.health;
-  const menuBlockers = isDeliverectMenuSource(input)
-    ? deliverectMenuHealth?.missingRequirements ?? menuEval.blockers
-    : menuEval.blockers;
-  const menuReady = isDeliverectMenuSource(input)
-    ? (deliverectMenuHealth?.isReady ?? false) && menuEval.ready
-    : menuEval.ready;
+  const menuBlockers =
+    !posSelectable && isManualDashboardRoutingMode(input.orderRoutingMode)
+      ? menuEval.blockers
+      : isDeliverectMenuSource(input)
+        ? deliverectMenuHealth?.missingRequirements ?? menuEval.blockers
+        : menuEval.blockers;
+  const menuReady =
+    !posSelectable && isManualDashboardRoutingMode(input.orderRoutingMode)
+      ? menuEval.ready
+      : isDeliverectMenuSource(input)
+        ? (deliverectMenuHealth?.isReady ?? false) && menuEval.ready
+        : menuEval.ready;
 
   const activeRouting: VendorSetupIntegrationCardView = {
     id: "active-routing",
@@ -287,54 +325,57 @@ export function buildVendorSetupIntegrationsView(input: {
   const connectedIntegrations: VendorSetupIntegrationCardView[] = [];
   const availableIntegrations: VendorSetupIntegrationCardView[] = [];
 
-  if (!isSquareRoutingMode(input.orderRoutingMode)) {
-    const squareConnected = input.squareHealth?.isReady === true;
-    const squareCard = buildInactiveProviderCard({
-      id: "square",
-      title: "Square",
-      copy: "Route paid Open Order orders to Square as prepaid pickup orders.",
-      ctaHref: `/vendor/${input.vendorId}/integrations/square`,
-      ctaLabel: "View Square integration",
-      health: input.squareHealth,
-    });
-    pushInactiveProviderCard({
-      surface,
-      card: squareCard,
-      connected: squareConnected,
-      connectedIntegrations,
-      availableIntegrations,
+  // Beta: do not offer inactive POS providers as selectable routing options.
+  if (vendorMayConfigurePosOrderRouting()) {
+    if (!isSquareRoutingMode(input.orderRoutingMode)) {
+      const squareConnected = input.squareHealth?.isReady === true;
+      const squareCard = buildInactiveProviderCard({
+        id: "square",
+        title: "Square",
+        copy: "Route paid Open Order orders to Square as prepaid pickup orders.",
+        ctaHref: `/vendor/${input.vendorId}/integrations/square`,
+        ctaLabel: "View Square integration",
+        health: input.squareHealth,
+      });
+      pushInactiveProviderCard({
+        surface,
+        card: squareCard,
+        connected: squareConnected,
+        connectedIntegrations,
+        availableIntegrations,
+      });
+    }
+
+    if (!isDeliverectRoutingMode(input.orderRoutingMode)) {
+      const deliverectConnected = input.deliverectRoutingHealth?.isReady === true;
+      const deliverectCard = buildInactiveProviderCard({
+        id: "deliverect",
+        title: "Deliverect",
+        copy: "Send orders to Deliverect for POS and kitchen routing where supported.",
+        ctaHref: `/vendor/${input.vendorId}/connect-pos`,
+        ctaLabel: "View Deliverect connection",
+        health: input.deliverectRoutingHealth,
+      });
+      pushInactiveProviderCard({
+        surface,
+        card: deliverectCard,
+        connected: deliverectConnected,
+        connectedIntegrations,
+        availableIntegrations,
+      });
+    }
+
+    const toastProfile = getToastPlaceholderProfile();
+    availableIntegrations.push({
+      id: "toast",
+      title: toastProfile.displayName,
+      status: "not_configured",
+      statusLabel: "Coming soon",
+      copy: toastProfile.routingDescription,
+      actions: [],
+      blockers: [],
     });
   }
-
-  if (!isDeliverectRoutingMode(input.orderRoutingMode)) {
-    const deliverectConnected = input.deliverectRoutingHealth?.isReady === true;
-    const deliverectCard = buildInactiveProviderCard({
-      id: "deliverect",
-      title: "Deliverect",
-      copy: "Send orders to Deliverect for POS and kitchen routing where supported.",
-      ctaHref: `/vendor/${input.vendorId}/connect-pos`,
-      ctaLabel: "View Deliverect connection",
-      health: input.deliverectRoutingHealth,
-    });
-    pushInactiveProviderCard({
-      surface,
-      card: deliverectCard,
-      connected: deliverectConnected,
-      connectedIntegrations,
-      availableIntegrations,
-    });
-  }
-
-  const toastProfile = getToastPlaceholderProfile();
-  availableIntegrations.push({
-    id: "toast",
-    title: toastProfile.displayName,
-    status: "not_configured",
-    statusLabel: "Coming soon",
-    copy: toastProfile.routingDescription,
-    actions: [],
-    blockers: [],
-  });
 
   return {
     activeRouting,

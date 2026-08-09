@@ -175,7 +175,7 @@ describe("deriveVendorPodReadiness status priority", () => {
     expect(result.status).toBe("needs_pos");
   });
 
-  it("marks Square connected when OAuth is ready even without admin order injection", () => {
+  it("beta tablet policy: vendor checklist does not offer Square connect for square-routed vendors", () => {
     const result = deriveVendorPodReadiness(
       {
         podId: "pod_1",
@@ -203,10 +203,9 @@ describe("deriveVendorPodReadiness status priority", () => {
 
     const pos = result.checklist.find((item) => item.key === "pos");
     expect(pos?.complete).toBe(true);
-    expect(pos?.label).toBe("Square connected");
-    expect(pos?.description).toMatch(/Finish menu import/i);
-    expect(pos?.actionLabel).toBe("Manage Square integration");
-    expect(result.canAcceptOrders).toBe(false);
+    expect(pos?.label).toBe("Manual order dashboard ready");
+    expect(pos?.actionLabel).toBe("Open Kitchen Mode");
+    expect(pos?.actionHref).toBe("/vendor/vendor_1/kitchen");
   });
 
   it("does not show Square connection requirement for manual dashboard routing", () => {
@@ -236,7 +235,7 @@ describe("deriveVendorPodReadiness status priority", () => {
     expect(pos?.complete).toBe(true);
   });
 
-  it("square menu checklist links to Menu Imports when catalog import is ready", () => {
+  it("beta tablet policy: square-routed vendor menu checklist points to Menu Builder", () => {
     const result = deriveVendorPodReadiness(
       {
         podId: "pod_1",
@@ -258,11 +257,11 @@ describe("deriveVendorPodReadiness status priority", () => {
     );
 
     const menu = result.checklist.find((item) => item.key === "menu");
-    expect(menu?.actionHref).toBe("/vendor/vendor_1/menu/imports");
-    expect(menu?.actionLabel).toBe("Open Menu Imports");
+    expect(menu?.actionHref).toBe("/vendor/vendor_1/menu-builder");
+    expect(menu?.actionLabel).toBe("Open Menu Builder");
   });
 
-  it("square menu checklist links to Square integration when not connected", () => {
+  it("beta tablet policy: square-routed vendor never links checklist to Square connect", () => {
     const result = deriveVendorPodReadiness(
       {
         podId: "pod_1",
@@ -284,8 +283,8 @@ describe("deriveVendorPodReadiness status priority", () => {
     );
 
     const menu = result.checklist.find((item) => item.key === "menu");
-    expect(menu?.actionHref).toBe("/vendor/vendor_1/integrations/square");
-    expect(menu?.actionLabel).toBe("Connect Square");
+    expect(menu?.actionHref).toBe("/vendor/vendor_1/menu-builder");
+    expect(menu?.actionLabel).not.toMatch(/Square/i);
   });
 
   it("does not block manual dashboard vendors without Deliverect", () => {

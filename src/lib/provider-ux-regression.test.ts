@@ -128,9 +128,10 @@ describe("provider UX regression — remaining entry points", () => {
     );
   });
 
-  it("keeps Square OAuth detail on the dedicated Square integration page", () => {
+  it("keeps Square OAuth detail on the dedicated Square integration page (gated by beta policy)", () => {
     const squarePage = readRepo("src/app/vendor/[vendorId]/integrations/square/page.tsx");
     expect(squarePage).toContain("VendorSquareConnectionCard");
+    expect(squarePage).toContain("vendorMayConfigurePosOrderRouting");
     expect(squarePage).not.toContain("VendorIntegrationReadinessCard");
   });
 });
@@ -229,10 +230,10 @@ describe("provider UX regression — active blockers only where actionable", () 
       surface: "hub",
     });
 
-    expect(model.activeRouting.status).toBe("needs_attention");
-    expect(model.activeRouting.blockers).toContain("Connect Square OAuth");
-    expect(
-      model.availableIntegrations.find((card) => card.id === "deliverect")?.blockers
-    ).toEqual([]);
+    // Beta tablet-only: no available POS cards; POS routing blockers are not vendor-facing.
+    expect(model.activeRouting.title).toBe("Open Order dashboard");
+    expect(model.activeRouting.status).toBe("ready");
+    expect(model.activeRouting.blockers).toEqual([]);
+    expect(model.availableIntegrations).toEqual([]);
   });
 });

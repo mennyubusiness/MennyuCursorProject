@@ -15,7 +15,26 @@ import {
   VENDOR_ROUTING_MODE_COPY,
   vendorOrderRoutingModeAdminLabel,
 } from "@/lib/vendor-order-routing-mode";
+import { getAdminAvailableRoutingModes } from "@/lib/vendor-routing-availability";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
+
+const ADMIN_ROUTING_OPTION_COPY: Record<
+  VendorOrderRoutingMode,
+  { title: string; helper: string }
+> = {
+  manual_dashboard: {
+    title: "Open Order Dashboard / Tablet",
+    helper: VENDOR_ROUTING_MODE_COPY.manualDashboard.adminHelper,
+  },
+  deliverect: {
+    title: "Deliverect / POS-connected routing",
+    helper: VENDOR_ROUTING_MODE_COPY.deliverect.adminHelper,
+  },
+  square: {
+    title: "Square",
+    helper: VENDOR_ROUTING_MODE_COPY.square.adminHelper,
+  },
+};
 
 export function AdminVendorOrderRoutingSection({
   vendorId,
@@ -39,6 +58,7 @@ export function AdminVendorOrderRoutingSection({
     squareStatusMessage: squareStatus.statusMessage,
     squareConnectionStatus: squareStatus.connectionStatus,
   });
+  const availableModes = getAdminAvailableRoutingModes();
 
   return (
     <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-4">
@@ -56,53 +76,27 @@ export function AdminVendorOrderRoutingSection({
       </div>
 
       <div className="mt-4 space-y-3">
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-oo-light-stone p-3">
-          <input
-            type="radio"
-            name={`routing-mode-${vendorId}`}
-            checked={mode === "manual_dashboard"}
-            onChange={() => setMode("manual_dashboard")}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="block text-sm font-medium text-oo-charcoal">Open Order Dashboard / Tablet</span>
-            <span className="mt-1 block text-xs text-oo-stone-gray">
-              {VENDOR_ROUTING_MODE_COPY.manualDashboard.adminHelper}
-            </span>
-          </span>
-        </label>
-
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-oo-light-stone p-3">
-          <input
-            type="radio"
-            name={`routing-mode-${vendorId}`}
-            checked={mode === "deliverect"}
-            onChange={() => setMode("deliverect")}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="block text-sm font-medium text-oo-charcoal">Deliverect / POS-connected routing</span>
-            <span className="mt-1 block text-xs text-oo-stone-gray">
-              {VENDOR_ROUTING_MODE_COPY.deliverect.adminHelper}
-            </span>
-          </span>
-        </label>
-
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-oo-light-stone p-3">
-          <input
-            type="radio"
-            name={`routing-mode-${vendorId}`}
-            checked={mode === "square"}
-            onChange={() => setMode("square")}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="block text-sm font-medium text-oo-charcoal">Square</span>
-            <span className="mt-1 block text-xs text-oo-stone-gray">
-              {VENDOR_ROUTING_MODE_COPY.square.adminHelper}
-            </span>
-          </span>
-        </label>
+        {availableModes.map((option) => {
+          const copy = ADMIN_ROUTING_OPTION_COPY[option];
+          return (
+            <label
+              key={option}
+              className="flex cursor-pointer items-start gap-2 rounded-lg border border-oo-light-stone p-3"
+            >
+              <input
+                type="radio"
+                name={`routing-mode-${vendorId}`}
+                checked={mode === option}
+                onChange={() => setMode(option)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="block text-sm font-medium text-oo-charcoal">{copy.title}</span>
+                <span className="mt-1 block text-xs text-oo-stone-gray">{copy.helper}</span>
+              </span>
+            </label>
+          );
+        })}
       </div>
 
       {mode !== orderRoutingMode ? (

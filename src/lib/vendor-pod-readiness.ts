@@ -19,6 +19,7 @@ import {
   usesVendorMenuBuilder,
   vendorMenuManagementPath,
 } from "@/lib/vendor-menu-management";
+import { vendorMayConfigurePosOrderRouting } from "@/lib/vendor-routing-availability";
 import {
   getVendorOrderabilityState,
   getVendorPodOwnerMissingLines,
@@ -260,12 +261,20 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
   const { podId, podSlug, vendorId, vendor, menuSummary, posSummary, stripeSummary } = input;
   const profileComplete = isVendorProfileComplete(vendor);
   const stripeComplete = isVendorStripePayoutReady(stripeSummary);
-  const posComplete = isVendorPosReady(posSummary);
+  // Vendor beta tablet-only policy: present checklist as Open Order dashboard, never POS connect.
+  const presentAsTablet =
+    audience === "vendor" && !vendorMayConfigurePosOrderRouting();
+  const posComplete = presentAsTablet ? true : isVendorPosReady(posSummary);
   const menuComplete = isVendorMenuReady(menuSummary);
-  const deliverectMode = isDeliverectRoutingMode(posSummary.orderRoutingMode);
-  const squareMode = isSquareRoutingMode(posSummary.orderRoutingMode);
-  const builderMode = usesVendorMenuBuilder(posSummary.orderRoutingMode);
-  const menuVendorPath = vendorMenuManagementPath(vendorId, posSummary.orderRoutingMode);
+  const deliverectMode =
+    !presentAsTablet && isDeliverectRoutingMode(posSummary.orderRoutingMode);
+  const squareMode = !presentAsTablet && isSquareRoutingMode(posSummary.orderRoutingMode);
+  const builderMode =
+    presentAsTablet || usesVendorMenuBuilder(posSummary.orderRoutingMode);
+  const menuVendorPath = vendorMenuManagementPath(
+    vendorId,
+    presentAsTablet ? "manual_dashboard" : posSummary.orderRoutingMode
+  );
   const squareMenuActionHref =
     audience === "vendor" && squareMode
       ? input.squareCatalogImportReady

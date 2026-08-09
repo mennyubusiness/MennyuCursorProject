@@ -7,6 +7,7 @@ import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canViewVendor } from "@/lib/permissions";
 import { vendorIntegrationsHubDescription } from "@/lib/integrations/provider-display";
 import { loadVendorIntegrationsViewModel } from "@/lib/vendor-integrations-view.server";
+import { vendorMayConfigurePosOrderRouting } from "@/lib/vendor-routing-availability";
 
 export default async function VendorIntegrationsPage({
   params,
@@ -27,8 +28,12 @@ export default async function VendorIntegrationsPage({
     <DashboardShell tier="command" className="px-0 pb-0 pt-0">
       <DashboardPageHeader
         headingLevel={1}
-        title="Integrations"
-        description={vendorIntegrationsHubDescription(integrations.orderRoutingMode)}
+        title={vendorMayConfigurePosOrderRouting() ? "Integrations" : "Orders & menu"}
+        description={
+          vendorMayConfigurePosOrderRouting()
+            ? vendorIntegrationsHubDescription(integrations.orderRoutingMode)
+            : "Orders appear in your Open Order dashboard. Build and publish your menu in Menu Builder."
+        }
         actions={
           <Link
             href={`/vendor/${vendorId}/setup`}

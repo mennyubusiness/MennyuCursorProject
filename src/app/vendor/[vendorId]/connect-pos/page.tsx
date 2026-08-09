@@ -6,8 +6,35 @@ import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { canViewVendor } from "@/lib/permissions";
 import { isManualDashboardRoutingMode } from "@/lib/vendor-order-routing-mode";
 import { isOpenOrderMenuSource } from "@/lib/vendor-menu-source";
+import { vendorMayConfigurePosOrderRouting } from "@/lib/vendor-routing-availability";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { ConnectPosWizard } from "./ConnectPosWizard";
+
+function TabletOnlyPosBlock({ vendorId, vendorName }: { vendorId: string; vendorName: string }) {
+  return (
+    <div className="mx-auto max-w-lg space-y-4 rounded-2xl border border-oo-light-stone bg-oo-warm-white p-6 shadow-sm">
+      <h2 className="text-xl font-semibold text-oo-charcoal">POS connection not available</h2>
+      <p className="text-sm text-oo-stone-gray">
+        {vendorName} uses the Open Order dashboard for orders. Deliverect and other POS order-routing
+        setup is not available. Manage incoming orders in Kitchen mode.
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href={`/vendor/${vendorId}/kitchen`}
+          className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-hover"
+        >
+          Open kitchen mode
+        </Link>
+        <Link
+          href={`/vendor/${vendorId}/setup`}
+          className="inline-flex items-center justify-center rounded-xl border border-oo-light-stone px-4 py-2.5 text-sm font-semibold text-oo-charcoal hover:bg-oo-cream"
+        >
+          Back to setup
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 export default async function VendorConnectPosPage({
   params,
@@ -44,30 +71,12 @@ export default async function VendorConnectPosPage({
   });
   if (!vendor) notFound();
 
+  if (!vendorMayConfigurePosOrderRouting()) {
+    return <TabletOnlyPosBlock vendorId={vendorId} vendorName={vendor.name} />;
+  }
+
   if (isManualDashboardRoutingMode(vendor.orderRoutingMode) || isOpenOrderMenuSource(vendor)) {
-    return (
-      <div className="mx-auto max-w-lg space-y-4 rounded-2xl border border-oo-light-stone bg-oo-warm-white p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-oo-charcoal">POS connection not active</h2>
-        <p className="text-sm text-oo-stone-gray">
-          {vendor.name} uses Open Order Dashboard / Tablet routing. Deliverect and POS setup are not
-          required for this vendor. Manage orders in Kitchen mode instead.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href={`/vendor/${vendorId}/kitchen`}
-            className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-hover"
-          >
-            Open kitchen mode
-          </Link>
-          <Link
-            href={`/vendor/${vendorId}/setup`}
-            className="inline-flex items-center justify-center rounded-xl border border-oo-light-stone px-4 py-2.5 text-sm font-semibold text-oo-charcoal hover:bg-oo-cream"
-          >
-            Back to setup
-          </Link>
-        </div>
-      </div>
-    );
+    return <TabletOnlyPosBlock vendorId={vendorId} vendorName={vendor.name} />;
   }
 
   const hasUnmatchedChannelRegistration = await hasUnmatchedChannelRegistrationForVendorById(vendorId);

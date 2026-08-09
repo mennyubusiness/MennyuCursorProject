@@ -8,15 +8,6 @@ import { DashboardPageHeader } from "@/components/dashboard";
 import { buttonClassName } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
-const POS_OPTIONS = [
-  { value: "toast", label: "Toast" },
-  { value: "square", label: "Square" },
-  { value: "clover", label: "Clover" },
-  { value: "lightspeed", label: "Lightspeed / K" },
-  { value: "other", label: "Other" },
-  { value: "unknown", label: "Not sure yet" },
-];
-
 export function VendorSetupForm({
   nextPath = null,
   inviteContext = null,
@@ -43,7 +34,7 @@ export function VendorSetupForm({
         contactEmail: String(fd.get("contactEmail") ?? ""),
         contactPhone: String(fd.get("contactPhone") ?? ""),
         cuisineCategory: String(fd.get("cuisineCategory") ?? ""),
-        posType: String(fd.get("posType") ?? "unknown"),
+        posType: "unknown",
         description: String(fd.get("description") ?? "") || undefined,
         locationSummary: String(fd.get("locationSummary") ?? "").trim() || undefined,
         inviteToken: inviteToken ?? undefined,
@@ -73,8 +64,8 @@ export function VendorSetupForm({
         title="Restaurant profile"
         description={
           inviteContext
-            ? `Create your workspace to join ${inviteContext.podName}. Set up payments and your menu after this step.`
-            : "Create your workspace now — set up payments and connect your menu system when you're ready."
+            ? `Create your workspace to join ${inviteContext.podName}. Set up payments and your menu after this step. Orders will appear in your Open Order dashboard.`
+            : "Create your workspace now — set up payments and publish your menu when you're ready. Orders appear in your Open Order dashboard."
         }
       />
       {inviteContext ? (
@@ -140,16 +131,6 @@ export function VendorSetupForm({
           placeholder="e.g. Austin, TX"
           className="oo-input mt-1 w-full"
         />
-      </label>
-      <label className="block text-sm">
-        <span className="font-medium text-oo-charcoal">Menu system</span>
-        <select name="posType" defaultValue="unknown" className="oo-input mt-1 w-full">
-          {POS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
       </label>
       <label className="block text-sm">
         <span className="font-medium text-oo-charcoal">Short description (optional)</span>
