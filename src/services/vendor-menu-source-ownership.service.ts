@@ -13,8 +13,11 @@ import {
   activeMenuProviderForOrderRoutingMode,
   canonicalMatchesActiveProvider,
   menuSourceForOrderRoutingMode,
+  snapshotIsNativeOpenOrderBuilder,
+  snapshotServesOpenOrderAuthority,
   type ActiveMenuProvider,
 } from "@/lib/vendor-menu-source";
+import { openOrderCanonicalMenuSchema } from "@/domain/menu-import/canonical.schema";
 
 export type MenuSourceOwnershipReconcileResult = {
   vendorId: string;
@@ -23,7 +26,9 @@ export type MenuSourceOwnershipReconcileResult = {
   menuSource: VendorMenuSource;
   provider: ActiveMenuProvider;
   archivedMenuVersionIds: string[];
+  restoredMenuVersionIds: string[];
   softDisabledMenuItemCount: number;
+  restoredAvailableMenuItemCount: number;
   menuSourceUpdated: boolean;
 };
 
@@ -41,11 +46,38 @@ function menuItemShouldRemainAvailable(
   return !isOpenOrder && !isSquare;
 }
 
+async function restoreAvailabilityFromAdoptedSnapshot(
+  db: DbClient,
+  vendorId: string,
+  snapshot: unknown
+): Promise<number> {
+  const parsed = openOrderCanonicalMenuSchema.safeParse(snapshot);
+  if (!parsed.success) return 0;
+
+  const availableIds = parsed.data.products
+    .filter((p) => p.isAvailable)
+    .map((p) => p.deliverectId);
+  if (availableIds.length === 0) return 0;
+
+  const result = await db.menuItem.updateMany({
+    where: {
+      vendorId,
+      isAvailable: false,
+      deliverectProductId: { in: availableIds },
+    },
+    data: { isAvailable: true },
+  });
+  return result.count;
+}
+
 /**
- * Align Vendor.menuSource with routing, archive published MenuVersions from other providers,
- * and soft-disable live MenuItems that are not part of the active provider catalog.
+ * Align Vendor.menuSource with routing.
  *
- * Historical rows are retained (archived / unavailable) — never deleted.
+ * Switching *to* Open Order Menu Builder adopts the live Square/Deliverect catalog:
+ * origin metadata stays, published snapshot stays (or is unarchived), and
+ * MenuItem.isAvailable is restored from that snapshot — not from provider prefix.
+ *
+ * Switching *to* Square or Deliverect still retires other catalogs so menus do not merge.
  */
 export async function reconcileVendorMenuSourceOwnership(
   input: {
@@ -66,6 +98,7 @@ export async function reconcileVendorMenuSourceOwnership(
   const provider = activeMenuProviderForOrderRoutingMode(input.orderRoutingMode);
   const previousMenuSource = vendor.menuSource;
   const menuSourceUpdated = previousMenuSource !== nextMenuSource;
+  const adoptingOpenOrder = provider === "open_order";
 
   if (menuSourceUpdated || vendor.orderRoutingMode !== input.orderRoutingMode) {
     await db.vendor.update({
@@ -77,43 +110,86 @@ export async function reconcileVendorMenuSourceOwnership(
     });
   }
 
-  const published = await db.menuVersion.findMany({
+  const versions = await db.menuVersion.findMany({
     where: {
       vendorId: input.vendorId,
-      state: MenuVersionState.published,
+      state: { in: [MenuVersionState.published, MenuVersionState.archived] },
     },
-    select: { id: true, canonicalSnapshot: true },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    select: { id: true, state: true, canonicalSnapshot: true },
   });
 
-  const toArchive = published.filter(
-    (row) => !canonicalMatchesActiveProvider(row.canonicalSnapshot, provider)
-  );
+  const archivedMenuVersionIds: string[] = [];
+  const restoredMenuVersionIds: string[] = [];
+  let restoredAvailableMenuItemCount = 0;
+  let softDisabledMenuItemCount = 0;
 
-  if (toArchive.length > 0) {
-    await db.menuVersion.updateMany({
-      where: { id: { in: toArchive.map((r) => r.id) } },
-      data: { state: MenuVersionState.archived },
+  if (adoptingOpenOrder) {
+    const hasNativePublished = versions.some(
+      (row) =>
+        row.state === MenuVersionState.published &&
+        snapshotIsNativeOpenOrderBuilder(row.canonicalSnapshot)
+    );
+
+    if (!hasNativePublished) {
+      const adopted =
+        versions.find(
+          (row) =>
+            row.state === MenuVersionState.published &&
+            snapshotServesOpenOrderAuthority(row.canonicalSnapshot)
+        ) ??
+        versions.find((row) => snapshotServesOpenOrderAuthority(row.canonicalSnapshot));
+
+      if (adopted) {
+        if (adopted.state !== MenuVersionState.published) {
+          await db.menuVersion.update({
+            where: { id: adopted.id },
+            data: { state: MenuVersionState.published },
+          });
+          restoredMenuVersionIds.push(adopted.id);
+        }
+        restoredAvailableMenuItemCount = await restoreAvailabilityFromAdoptedSnapshot(
+          db,
+          input.vendorId,
+          adopted.canonicalSnapshot
+        );
+      }
+    }
+  } else {
+    const toArchive = versions.filter(
+      (row) =>
+        row.state === MenuVersionState.published &&
+        !canonicalMatchesActiveProvider(row.canonicalSnapshot, provider)
+    );
+
+    if (toArchive.length > 0) {
+      await db.menuVersion.updateMany({
+        where: { id: { in: toArchive.map((r) => r.id) } },
+        data: { state: MenuVersionState.archived },
+      });
+      archivedMenuVersionIds.push(...toArchive.map((r) => r.id));
+    }
+
+    const items = await db.menuItem.findMany({
+      where: {
+        vendorId: input.vendorId,
+        isAvailable: true,
+        deliverectProductId: { not: null },
+      },
+      select: { id: true, deliverectProductId: true },
     });
-  }
 
-  const items = await db.menuItem.findMany({
-    where: {
-      vendorId: input.vendorId,
-      isAvailable: true,
-      deliverectProductId: { not: null },
-    },
-    select: { id: true, deliverectProductId: true },
-  });
+    const staleIds = items
+      .filter((row) => !menuItemShouldRemainAvailable(row.deliverectProductId, provider))
+      .map((row) => row.id);
 
-  const staleIds = items
-    .filter((row) => !menuItemShouldRemainAvailable(row.deliverectProductId, provider))
-    .map((row) => row.id);
-
-  if (staleIds.length > 0) {
-    await db.menuItem.updateMany({
-      where: { id: { in: staleIds } },
-      data: { isAvailable: false },
-    });
+    if (staleIds.length > 0) {
+      await db.menuItem.updateMany({
+        where: { id: { in: staleIds } },
+        data: { isAvailable: false },
+      });
+      softDisabledMenuItemCount = staleIds.length;
+    }
   }
 
   return {
@@ -122,15 +198,41 @@ export async function reconcileVendorMenuSourceOwnership(
     previousMenuSource,
     menuSource: nextMenuSource,
     provider,
-    archivedMenuVersionIds: toArchive.map((r) => r.id),
-    softDisabledMenuItemCount: staleIds.length,
+    archivedMenuVersionIds,
+    restoredMenuVersionIds,
+    softDisabledMenuItemCount,
+    restoredAvailableMenuItemCount,
     menuSourceUpdated,
   };
 }
 
+function vendorNeedsOpenOrderAdoptionRepair(input: {
+  orderRoutingMode: VendorOrderRoutingMode;
+  menuSource: VendorMenuSource;
+  published: Array<{ id: string; canonicalSnapshot: unknown }>;
+}): boolean {
+  const expected = menuSourceForOrderRoutingMode(input.orderRoutingMode);
+  const provider = activeMenuProviderForOrderRoutingMode(input.orderRoutingMode);
+  if (provider !== "open_order") {
+    const menuSourceMismatch = input.menuSource !== expected;
+    const hasForeignPublished = input.published.some(
+      (row) => !canonicalMatchesActiveProvider(row.canonicalSnapshot, provider)
+    );
+    return menuSourceMismatch || hasForeignPublished;
+  }
+
+  const menuSourceMismatch = input.menuSource !== expected;
+  const hasNativePublished = input.published.some((row) =>
+    snapshotIsNativeOpenOrderBuilder(row.canonicalSnapshot)
+  );
+  // Tablet vendors without a native builder publish need adoption/restore even when
+  // a Square/Deliverect catalog is still published (items may have been origin-disabled).
+  return menuSourceMismatch || !hasNativePublished;
+}
+
 /**
- * Repair vendors whose routing mode and persisted menuSource disagree, or who still have
- * a published MenuVersion from a non-active provider.
+ * Repair vendors whose routing mode and persisted menuSource disagree, or tablet vendors
+ * whose imported Square/Deliverect catalog was archived/disabled during a prior switch.
  */
 export async function repairInconsistentVendorMenuSourceOwnership(input?: {
   vendorId?: string;
@@ -154,17 +256,21 @@ export async function repairInconsistentVendorMenuSourceOwnership(input?: {
   for (const vendor of vendors) {
     const expected = menuSourceForOrderRoutingMode(vendor.orderRoutingMode);
     const provider = activeMenuProviderForOrderRoutingMode(vendor.orderRoutingMode);
-    const menuSourceMismatch = vendor.menuSource !== expected;
 
     const published = await prisma.menuVersion.findMany({
       where: { vendorId: vendor.id, state: MenuVersionState.published },
       select: { id: true, canonicalSnapshot: true },
     });
-    const hasForeignPublished = published.some(
-      (row) => !canonicalMatchesActiveProvider(row.canonicalSnapshot, provider)
-    );
 
-    if (!menuSourceMismatch && !hasForeignPublished) continue;
+    if (
+      !vendorNeedsOpenOrderAdoptionRepair({
+        orderRoutingMode: vendor.orderRoutingMode,
+        menuSource: vendor.menuSource,
+        published,
+      })
+    ) {
+      continue;
+    }
 
     if (dryRun) {
       repaired.push({
@@ -174,10 +280,16 @@ export async function repairInconsistentVendorMenuSourceOwnership(input?: {
         menuSource: expected,
         provider,
         archivedMenuVersionIds: published
-          .filter((row) => !canonicalMatchesActiveProvider(row.canonicalSnapshot, provider))
+          .filter((row) =>
+            provider === "open_order"
+              ? false
+              : !canonicalMatchesActiveProvider(row.canonicalSnapshot, provider)
+          )
           .map((r) => r.id),
+        restoredMenuVersionIds: [],
         softDisabledMenuItemCount: 0,
-        menuSourceUpdated: menuSourceMismatch,
+        restoredAvailableMenuItemCount: 0,
+        menuSourceUpdated: vendor.menuSource !== expected,
       });
       continue;
     }

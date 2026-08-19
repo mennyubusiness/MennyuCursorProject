@@ -13,7 +13,7 @@ import {
   getOperationalMenuItemIdsForVendor,
 } from "@/services/menu-active-scope.service";
 import {
-  menuItemMatchesActiveProvider,
+  menuItemAllowedUnderCurrentAuthority,
   resolveActiveMenuSource,
 } from "@/lib/vendor-menu-source";
 import {
@@ -102,7 +102,7 @@ async function loadFallbackMenuDisplay(vendorId: string): Promise<CachedCustomer
       operationalIds.has(r.id) &&
       !isVariantLeafMenuItem(r) &&
       (!activeProvider ||
-        menuItemMatchesActiveProvider(menuItemSourceEntityId(r), activeProvider))
+        menuItemAllowedUnderCurrentAuthority(menuItemSourceEntityId(r), activeProvider))
   );
 
   const variantChildCountByParentPlu: Record<string, number> = {};

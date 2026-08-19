@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyAvailabilityOverlayToSections,
+  customerAvailabilityFromOperationalPool,
   customerVendorMenuCacheTag,
   mergeCachedDisplayWithAvailability,
   type CachedCustomerVendorMenuDisplay,
@@ -77,6 +78,19 @@ function sectionWithItem(
 describe("vendor-customer-menu-cache", () => {
   it("customerVendorMenuCacheTag is vendor-scoped", () => {
     expect(customerVendorMenuCacheTag("vendor_abc")).toBe("customer-vendor-menu:vendor_abc");
+  });
+
+  it("customerAvailabilityFromOperationalPool uses the operational winner, not every duplicate row", () => {
+    const rowAvail = new Map([
+      ["winner", true],
+      ["stale_disabled", false],
+    ]);
+    expect(customerAvailabilityFromOperationalPool(["winner", "stale_disabled"], rowAvail, "winner")).toBe(
+      true
+    );
+    expect(customerAvailabilityFromOperationalPool(["stale_disabled", "winner"], rowAvail, "winner")).toBe(
+      false
+    );
   });
 
   it("applyAvailabilityOverlayToSections marks snoozed items unavailable", () => {

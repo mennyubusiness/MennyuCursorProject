@@ -5,8 +5,11 @@ import {
   getVendorMenuSourceMismatchWarning,
   menuItemDeliverectIdMatchesMenuSource,
   menuItemMatchesActiveProvider,
+  menuItemAllowedUnderCurrentAuthority,
   menuSourceForOrderRoutingMode,
   resolveActiveMenuSource,
+  snapshotServesOpenOrderAuthority,
+  snapshotIsNativeOpenOrderBuilder,
   vendorMenuSourceNavLabel,
 } from "@/lib/vendor-menu-source";
 
@@ -91,7 +94,7 @@ describe("vendor-menu-source", () => {
     expect(menuItemDeliverectIdMatchesMenuSource("oo:prod:abc", "deliverect")).toBe(false);
     expect(menuItemDeliverectIdMatchesMenuSource("sq:prod:abc", "deliverect")).toBe(false);
     expect(menuItemDeliverectIdMatchesMenuSource("del-123", "deliverect")).toBe(true);
-    expect(menuItemDeliverectIdMatchesMenuSource("del-123", "open_order")).toBe(false);
+    expect(menuItemDeliverectIdMatchesMenuSource("del-123", "open_order")).toBe(true);
   });
 
   it("matches menu item product ids to active provider without merging Square and native", () => {
@@ -101,5 +104,37 @@ describe("vendor-menu-source", () => {
     expect(menuItemMatchesActiveProvider("oo:prod:abc", "square")).toBe(false);
     expect(menuItemMatchesActiveProvider("del-123", "deliverect")).toBe(true);
     expect(menuItemMatchesActiveProvider("oo:prod:abc", "deliverect")).toBe(false);
+  });
+
+  it("Open Order menu authority accepts Square and Deliverect origin ids", () => {
+    expect(menuItemAllowedUnderCurrentAuthority("sq:prod:abc", "open_order")).toBe(true);
+    expect(menuItemAllowedUnderCurrentAuthority("del-123", "open_order")).toBe(true);
+    expect(menuItemAllowedUnderCurrentAuthority("oo:prod:abc", "open_order")).toBe(true);
+    expect(menuItemAllowedUnderCurrentAuthority("oo:prod:abc", "square")).toBe(false);
+    expect(menuItemAllowedUnderCurrentAuthority("sq:prod:abc", "deliverect")).toBe(false);
+  });
+
+  it("treats Square and Deliverect snapshots as adoptable under Open Order authority", () => {
+    const square = {
+      schemaVersion: 1 as const,
+      vendorId: "v1",
+      categories: [],
+      products: [],
+      modifierGroupDefinitions: [],
+      deliverect: { sourcePayloadKind: "square_catalog_v1" },
+    };
+    const deliverect = {
+      ...square,
+      deliverect: { sourcePayloadKind: "deliverect_menu_api_v1" },
+    };
+    const native = {
+      ...square,
+      deliverect: { sourcePayloadKind: "open_order_builder_v1" },
+    };
+    expect(snapshotServesOpenOrderAuthority(square)).toBe(true);
+    expect(snapshotServesOpenOrderAuthority(deliverect)).toBe(true);
+    expect(snapshotServesOpenOrderAuthority(native)).toBe(true);
+    expect(snapshotIsNativeOpenOrderBuilder(square)).toBe(false);
+    expect(snapshotIsNativeOpenOrderBuilder(native)).toBe(true);
   });
 });

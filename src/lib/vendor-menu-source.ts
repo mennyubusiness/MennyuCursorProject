@@ -115,6 +115,20 @@ export function canonicalMatchesActiveProvider(
   return canonicalActiveProviderFromSnapshot(snapshot) === provider;
 }
 
+/**
+ * Native Open Order authority may keep using a previously published Square/Deliverect
+ * catalog (origin metadata stays; availability authority is Open Order).
+ * A native builder publish always wins over an adopted provider catalog.
+ */
+export function snapshotServesOpenOrderAuthority(snapshot: unknown): boolean {
+  const origin = canonicalActiveProviderFromSnapshot(snapshot);
+  return origin === "open_order" || origin === "square" || origin === "deliverect";
+}
+
+export function snapshotIsNativeOpenOrderBuilder(snapshot: unknown): boolean {
+  return canonicalActiveProviderFromSnapshot(snapshot) === "open_order";
+}
+
 export function vendorMenuSourceLabel(menuSource: VendorMenuSource): string {
   return menuSource === "open_order" ? "Open Order Menu Builder" : "Deliverect menu sync";
 }
@@ -162,12 +176,16 @@ export function menuItemDeliverectIdMatchesMenuSource(
   const isOpenOrder = isOpenOrderProductDeliverectId(deliverectProductId);
   const isSquare = isSquareProductDeliverectId(deliverectProductId);
   if (menuSource === "open_order") {
-    return isOpenOrder || isSquare;
+    // Authority is Open Order; origin prefix may still be Square or Deliverect.
+    return true;
   }
   return !isOpenOrder && !isSquare;
 }
 
-/** Provider-strict item match — does not treat Square and native Open Order as interchangeable. */
+/**
+ * Origin-strict catalog match used while Square or Deliverect still own the menu.
+ * Does not treat Square-origin and native builder ids as interchangeable.
+ */
 export function menuItemMatchesActiveProvider(
   deliverectProductId: string | null | undefined,
   provider: ActiveMenuProvider
@@ -178,6 +196,19 @@ export function menuItemMatchesActiveProvider(
   if (provider === "open_order") return isOpenOrder;
   if (provider === "square") return isSquare;
   return !isOpenOrder && !isSquare;
+}
+
+/**
+ * Whether a live row may participate under the vendor's *current* menu authority.
+ * Origin metadata (sq:/deliverect ids) stays; Open Order authority accepts those origins.
+ */
+export function menuItemAllowedUnderCurrentAuthority(
+  deliverectProductId: string | null | undefined,
+  provider: ActiveMenuProvider
+): boolean {
+  if (!deliverectProductId) return false;
+  if (provider === "open_order") return true;
+  return menuItemMatchesActiveProvider(deliverectProductId, provider);
 }
 
 export type VendorMenuSourceMismatch = {

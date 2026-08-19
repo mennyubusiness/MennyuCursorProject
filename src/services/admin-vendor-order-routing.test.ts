@@ -80,7 +80,9 @@ describe("adminUpdateVendorOrderRoutingMode", () => {
       menuSource: "deliverect",
       provider: "deliverect",
       archivedMenuVersionIds: ["mv_oo"],
+      restoredMenuVersionIds: [],
       softDisabledMenuItemCount: 2,
+      restoredAvailableMenuItemCount: 0,
       menuSourceUpdated: true,
     });
     mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn({}));
@@ -95,7 +97,9 @@ describe("adminUpdateVendorOrderRoutingMode", () => {
       menuSource: "open_order",
       provider: "open_order",
       archivedMenuVersionIds: [],
+      restoredMenuVersionIds: [],
       softDisabledMenuItemCount: 0,
+      restoredAvailableMenuItemCount: 0,
       menuSourceUpdated: false,
     });
     const result = await adminUpdateVendorOrderRoutingMode({
@@ -153,7 +157,9 @@ describe("adminUpdateVendorOrderRoutingMode", () => {
       menuSource: "open_order",
       provider: "square",
       archivedMenuVersionIds: [],
+      restoredMenuVersionIds: [],
       softDisabledMenuItemCount: 0,
+      restoredAvailableMenuItemCount: 0,
       menuSourceUpdated: false,
     });
     const result = await adminUpdateVendorOrderRoutingMode({

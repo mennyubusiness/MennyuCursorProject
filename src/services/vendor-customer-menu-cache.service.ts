@@ -48,6 +48,18 @@ export type CustomerVendorMenuAvailabilityOverlay = {
   modifierOptionAvailableById: Map<string, boolean>;
 };
 
+/** Winner-only: duplicate origin rows must not AND together and hide an available item. */
+export function customerAvailabilityFromOperationalPool(
+  pool: string[] | undefined,
+  rowAvail: Map<string, boolean>,
+  displayItemId: string
+): boolean {
+  if (pool && pool.length > 0) {
+    return rowAvail.get(pool[0]!) ?? false;
+  }
+  return rowAvail.get(displayItemId) ?? true;
+}
+
 function sortItems(a: CustomerVendorMenuItem, b: CustomerVendorMenuItem): number {
   if (a.isAvailable === b.isAvailable) return a.sortOrder - b.sortOrder;
   return a.isAvailable ? -1 : 1;
@@ -293,15 +305,14 @@ export async function loadCustomerVendorMenuAvailabilityOverlay(
   for (const section of display.sections) {
     for (const item of section.items) {
       const pid = item.deliverectProductId;
-      if (pid && display.availabilityPoolByProductId[pid]) {
-        const pool = display.availabilityPoolByProductId[pid]!;
-        itemAvailableByMenuItemId.set(
-          item.id,
-          pool.every((id) => rowAvail.get(id) ?? false)
-        );
-      } else {
-        itemAvailableByMenuItemId.set(item.id, rowAvail.get(item.id) ?? true);
-      }
+      itemAvailableByMenuItemId.set(
+        item.id,
+        customerAvailabilityFromOperationalPool(
+          pid ? display.availabilityPoolByProductId[pid] : undefined,
+          rowAvail,
+          item.id
+        )
+      );
     }
   }
 

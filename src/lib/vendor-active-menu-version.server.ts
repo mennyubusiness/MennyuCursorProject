@@ -10,6 +10,8 @@ import {
   activeMenuProviderFromMenuSourceHint,
   canonicalMatchesActiveProvider,
   resolveActiveMenuSource,
+  snapshotIsNativeOpenOrderBuilder,
+  snapshotServesOpenOrderAuthority,
   type ActiveMenuProvider,
 } from "@/lib/vendor-menu-source";
 
@@ -80,22 +82,45 @@ export async function loadActiveMenuVersionForVendor(
     select: { id: true, state: true, canonicalSnapshot: true },
   });
 
-  const pick = (state: MenuVersionState) => {
+  const toMeta = (version: (typeof versions)[number]) => {
+    const parsed = openOrderCanonicalMenuSchema.safeParse(version.canonicalSnapshot);
+    return {
+      id: version.id,
+      state: version.state,
+      menu: parsed.success ? parsed.data : null,
+      provider,
+    };
+  };
+
+  const pickMatching = (
+    state: MenuVersionState,
+    matches: (snapshot: unknown) => boolean
+  ) => {
     for (const version of versions) {
       if (version.state !== state) continue;
-      if (!canonicalMatchesActiveProvider(version.canonicalSnapshot, provider)) continue;
-      const parsed = openOrderCanonicalMenuSchema.safeParse(version.canonicalSnapshot);
-      return {
-        id: version.id,
-        state: version.state,
-        menu: parsed.success ? parsed.data : null,
-        provider,
-      };
+      if (!matches(version.canonicalSnapshot)) continue;
+      return toMeta(version);
     }
     return null;
   };
 
-  return pick(MenuVersionState.published) ?? pick(MenuVersionState.archived);
+  if (provider === "open_order") {
+    return (
+      pickMatching(MenuVersionState.published, snapshotIsNativeOpenOrderBuilder) ??
+      pickMatching(MenuVersionState.published, snapshotServesOpenOrderAuthority) ??
+      pickMatching(MenuVersionState.archived, snapshotIsNativeOpenOrderBuilder) ??
+      pickMatching(MenuVersionState.archived, snapshotServesOpenOrderAuthority)
+    );
+  }
+
+  return (
+    pickMatching(MenuVersionState.published, (snapshot) =>
+      canonicalMatchesActiveProvider(snapshot, provider)
+    ) ??
+    pickMatching(MenuVersionState.archived, (snapshot) =>
+      canonicalMatchesActiveProvider(snapshot, provider)
+    )
+  );
 }
 
 export async function loadActiveMenuVersionIdForVendor(

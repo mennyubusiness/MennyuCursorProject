@@ -65,7 +65,7 @@ describe("loadActiveMenuVersionForVendor", () => {
     expect(active?.provider).toBe("deliverect");
   });
 
-  it("Case 2 — manual routing ignores published Deliverect even if menuSource pointer is stale", async () => {
+  it("Case 2 — tablet adopts published Deliverect catalog when no native builder publish exists", async () => {
     mockVendorFindUnique.mockResolvedValue({
       menuSource: "deliverect",
       orderRoutingMode: "manual_dashboard",
@@ -79,7 +79,48 @@ describe("loadActiveMenuVersionForVendor", () => {
     ]);
 
     const active = await loadActiveMenuVersionForVendor("v1");
-    expect(active).toBeNull();
+    expect(active?.id).toBe("mv_del");
+    expect(active?.provider).toBe("open_order");
+  });
+
+  it("prefers native Open Order builder publish over adopted Square catalog", async () => {
+    mockVendorFindUnique.mockResolvedValue({
+      menuSource: "open_order",
+      orderRoutingMode: "manual_dashboard",
+    });
+    mockMenuVersionFindMany.mockResolvedValue([
+      {
+        id: "mv_sq",
+        state: MenuVersionState.published,
+        canonicalSnapshot: snapshot("square_catalog_v1", "sq:prod:1"),
+      },
+      {
+        id: "mv_oo",
+        state: MenuVersionState.published,
+        canonicalSnapshot: snapshot("open_order_builder_v1", "oo:prod:1"),
+      },
+    ]);
+
+    const active = await loadActiveMenuVersionForVendor("v1");
+    expect(active?.id).toBe("mv_oo");
+  });
+
+  it("tablet adopts archived Square catalog when it is the only remaining menu", async () => {
+    mockVendorFindUnique.mockResolvedValue({
+      menuSource: "open_order",
+      orderRoutingMode: "manual_dashboard",
+    });
+    mockMenuVersionFindMany.mockResolvedValue([
+      {
+        id: "mv_sq",
+        state: MenuVersionState.archived,
+        canonicalSnapshot: snapshot("square_catalog_v1", "sq:prod:1"),
+      },
+    ]);
+
+    const active = await loadActiveMenuVersionForVendor("v1");
+    expect(active?.id).toBe("mv_sq");
+    expect(active?.provider).toBe("open_order");
   });
 
   it("Case 3 — after Open Order publish, only OO menu is selected", async () => {

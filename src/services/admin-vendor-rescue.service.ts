@@ -432,7 +432,9 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
     );
     if (
       ownership.archivedMenuVersionIds.length === 0 &&
-      ownership.softDisabledMenuItemCount === 0
+      ownership.softDisabledMenuItemCount === 0 &&
+      ownership.restoredMenuVersionIds.length === 0 &&
+      ownership.restoredAvailableMenuItemCount === 0
     ) {
       return { ok: true, message: "Order routing mode unchanged." };
     }
@@ -446,7 +448,9 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
       newValue: `${input.orderRoutingMode} / menu:${nextMenuSource}`,
       metadata: {
         archivedMenuVersionIds: ownership.archivedMenuVersionIds,
+        restoredMenuVersionIds: ownership.restoredMenuVersionIds,
         softDisabledMenuItemCount: ownership.softDisabledMenuItemCount,
+        restoredAvailableMenuItemCount: ownership.restoredAvailableMenuItemCount,
         provider: ownership.provider,
         ownershipOnly: true,
       },
@@ -478,7 +482,9 @@ export async function adminUpdateVendorOrderRoutingMode(input: {
     newValue: `${input.orderRoutingMode} / menu:${ownership.menuSource}`,
     metadata: {
       archivedMenuVersionIds: ownership.archivedMenuVersionIds,
+      restoredMenuVersionIds: ownership.restoredMenuVersionIds,
       softDisabledMenuItemCount: ownership.softDisabledMenuItemCount,
+      restoredAvailableMenuItemCount: ownership.restoredAvailableMenuItemCount,
       provider: ownership.provider,
     },
   });
@@ -515,7 +521,9 @@ export async function adminRepairVendorMenuSourceOwnership(input: {
         metadata: {
           repair: true,
           archivedMenuVersionIds: row.archivedMenuVersionIds,
+          restoredMenuVersionIds: row.restoredMenuVersionIds,
           softDisabledMenuItemCount: row.softDisabledMenuItemCount,
+          restoredAvailableMenuItemCount: row.restoredAvailableMenuItemCount,
           provider: row.provider,
         },
       });
