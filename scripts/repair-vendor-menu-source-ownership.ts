@@ -7,7 +7,7 @@
  *   npx tsx scripts/repair-vendor-menu-source-ownership.ts --vendor=<id> --execute
  */
 import "dotenv/config";
-import { repairInconsistentVendorMenuSourceOwnership } from "../src/services/vendor-menu-source-ownership.service";
+import { repairInconsistentVendorMenuSourceOwnership } from "../src/services/vendor-menu-source-ownership";
 
 async function main() {
   const args = process.argv.slice(2);

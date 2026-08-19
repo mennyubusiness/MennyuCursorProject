@@ -28,7 +28,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { reconcileVendorMenuSourceOwnership } from "@/services/vendor-menu-source-ownership.service";
+import { reconcileVendorMenuSourceOwnership } from "@/services/vendor-menu-source-ownership";
 
 function deliverectSnapshot(productAvailable = true) {
   return {
