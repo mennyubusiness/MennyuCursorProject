@@ -174,7 +174,13 @@ export async function reconcileVendorMenuSourceOwnership(
       state: { in: [MenuVersionState.published, MenuVersionState.archived] },
     },
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-    select: { id: true, state: true, canonicalSnapshot: true },
+    select: {
+      id: true,
+      state: true,
+      publishedAt: true,
+      createdAt: true,
+      canonicalSnapshot: true,
+    },
   });
 
   const archivedMenuVersionIds: string[] = [];
