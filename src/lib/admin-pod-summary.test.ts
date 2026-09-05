@@ -36,6 +36,8 @@ function baseDetail(overrides?: Partial<AdminPodDetailView>): AdminPodDetailView
       note: "note",
     },
     owners: [{ userId: "u1", email: "owner@example.com", name: "Owner", role: "owner" }],
+    claimState: { key: "claimed", label: "Claimed", claimed: true, ownerCount: 1 },
+    claimInvite: null,
     vendors: [],
     invites: { pending: 0, accepted: 0, revoked: 0, expired: 0, recent: [] },
     recentOrders: [],

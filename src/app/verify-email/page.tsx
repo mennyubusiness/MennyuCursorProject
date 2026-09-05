@@ -2,7 +2,10 @@ import Link from "next/link";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { verifyEmailWithToken } from "@/services/email-verification.service";
 import { sanitizeLoginReturnPath } from "@/lib/auth/login-return-path";
-import { isVendorClaimPath } from "@/lib/auth/vendor-claim-path";
+import {
+  isOwnershipClaimPath,
+  ownershipClaimContinueLabel,
+} from "@/lib/auth/ownership-claim-path";
 
 export default async function VerifyEmailPage({
   searchParams,
@@ -27,7 +30,7 @@ export default async function VerifyEmailPage({
   const result = await verifyEmailWithToken(token);
   const requestedNext = sanitizeLoginReturnPath(params.next);
   const continueHref =
-    result.ok && isVendorClaimPath(result.returnPath ?? requestedNext)
+    result.ok && isOwnershipClaimPath(result.returnPath ?? requestedNext)
       ? result.returnPath ?? requestedNext ?? undefined
       : undefined;
 
@@ -39,6 +42,7 @@ export default async function VerifyEmailPage({
         success={result.ok}
         showResend={!result.ok}
         continueHref={continueHref}
+        continueLabel={ownershipClaimContinueLabel(continueHref)}
       />
     </AuthShell>
   );
@@ -50,12 +54,14 @@ function VerifyEmailPanel({
   success,
   showResend,
   continueHref,
+  continueLabel,
 }: {
   title: string;
   message: string;
   success?: boolean;
   showResend?: boolean;
   continueHref?: string;
+  continueLabel?: string;
 }) {
   return (
     <div className="mx-auto w-full max-w-md rounded-xl border border-oo-light-stone bg-oo-warm-white p-6 shadow-sm">
@@ -64,7 +70,7 @@ function VerifyEmailPanel({
       <div className="mt-4 flex flex-wrap gap-3 text-sm">
         {success && continueHref ? (
           <Link href={continueHref} className="font-semibold text-brand underline-offset-4 hover:underline">
-            Continue to claim vendor
+            {continueLabel ?? "Continue"}
           </Link>
         ) : null}
         {showResend ? (

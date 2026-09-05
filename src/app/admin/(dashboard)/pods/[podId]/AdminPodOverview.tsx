@@ -30,6 +30,9 @@ import {
   adminUpdatePodPublicProfileAction,
   adminDeletePodProfileAction,
   adminCreateUnclaimedVendorAction,
+  adminResendPodClaimInviteAction,
+  adminRevokePodClaimInviteAction,
+  adminSendPodClaimInviteAction,
 } from "@/actions/admin-pod.actions";
 import { adminSetVendorOrderingModeAction } from "@/actions/admin-vendor.actions";
 import {
@@ -103,6 +106,9 @@ export function AdminPodOverview({
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createMessage, setCreateMessage] = useState<string | null>(null);
+  const [claimEmail, setClaimEmail] = useState(
+    detail.claimInvite?.invitedEmail ?? detail.pod.contactEmail ?? ""
+  );
 
   const run = (fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) =>
     fn().then((result) => {
@@ -290,14 +296,102 @@ export function AdminPodOverview({
             </Link>
           </AdminStatusCard>
           <AdminStatusCard title="Ownership">
-            <p className="font-medium">{summary.access.label}</p>
-            {summary.access.ownerLabel ? (
-              <p className="text-xs text-oo-stone-gray">{summary.access.ownerLabel}</p>
+            <p className="font-medium">{detail.claimState.label}</p>
+            {detail.claimState.claimed ? (
+              <p className="text-xs text-oo-stone-gray">
+                {detail.owners
+                  .filter((owner) => owner.role === "owner")
+                  .map((owner) => owner.email)
+                  .join(", ")}
+              </p>
             ) : (
-              <p className="text-xs text-oo-stone-gray">No pod owner assigned</p>
+              <p className="text-xs text-oo-stone-gray">No pod owner has claimed this pod yet.</p>
             )}
           </AdminStatusCard>
         </div>
+      </section>
+
+      <section id="ownership" className="scroll-mt-6">
+        <AdminSection title="Ownership">
+          <div className="space-y-1 text-sm">
+            <p className="font-semibold text-oo-charcoal">{detail.claimState.label}</p>
+            {detail.claimState.claimed ? (
+              <ul className="space-y-1 text-oo-stone-gray">
+                {detail.owners
+                  .filter((owner) => owner.role === "owner")
+                  .map((owner) => (
+                    <li key={owner.userId}>
+                      {owner.name ? `${owner.name} · ` : ""}
+                      {owner.email}
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              <p className="text-oo-stone-gray">No pod owner has claimed this pod yet.</p>
+            )}
+          </div>
+
+          {!detail.claimState.claimed &&
+          (!detail.claimInvite || Boolean(detail.claimInvite.revokedAt)) ? (
+            <div className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-cream/40 p-3">
+              <label className="block text-sm font-medium text-oo-charcoal">
+                Claim invitation email
+                <input
+                  type="email"
+                  value={claimEmail}
+                  onChange={(event) => setClaimEmail(event.target.value)}
+                  className="oo-input mt-1"
+                  placeholder="owner@example.com"
+                />
+              </label>
+              <AdminReasonActionForm
+                label="Send claim invite"
+                description="Invites this person to claim the existing pod, vendors, and menus."
+                confirmLabel="Send invite"
+                onSubmit={(reason) =>
+                  run(() =>
+                    adminSendPodClaimInviteAction({
+                      podId,
+                      invitedEmail: claimEmail,
+                      reason,
+                    })
+                  )
+                }
+              />
+            </div>
+          ) : null}
+
+          {!detail.claimState.claimed &&
+          detail.claimInvite &&
+          !detail.claimInvite.revokedAt &&
+          !detail.claimInvite.claimedAt ? (
+            <div className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-cream/40 p-3">
+              <p className="text-sm text-oo-stone-gray">
+                Sent to{" "}
+                <span className="font-medium text-oo-charcoal">{detail.claimInvite.invitedEmail}</span>
+              </p>
+              <AdminReasonActionForm
+                label={detail.claimState.key === "invite_expired" ? "Send new invite" : "Resend invite"}
+                description="Generates a new link and invalidates the previous token."
+                confirmLabel={
+                  detail.claimState.key === "invite_expired" ? "Send new invite" : "Resend invite"
+                }
+                onSubmit={(reason) =>
+                  run(() => adminResendPodClaimInviteAction({ podId, reason }))
+                }
+              />
+              <AdminReasonActionForm
+                label="Revoke invite"
+                description="Makes the current claim link unusable."
+                confirmLabel="Revoke invite"
+                danger
+                onSubmit={(reason) =>
+                  run(() => adminRevokePodClaimInviteAction({ podId, reason }))
+                }
+              />
+            </div>
+          ) : null}
+        </AdminSection>
       </section>
 
       {/* Quick actions */}

@@ -19,7 +19,7 @@ import {
 } from "@/lib/auth/login-return-path";
 import { AuthFormCard } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
-import { isVendorClaimPath } from "@/lib/auth/vendor-claim-path";
+import { isOwnershipClaimPath } from "@/lib/auth/ownership-claim-path";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -29,7 +29,9 @@ export function RegisterForm() {
 
   const returnPathRaw = readLoginReturnParam(searchParams);
   const returnPathSafe = sanitizeLoginReturnPath(returnPathRaw);
-  const registrationIntent = searchParams.get("intent") === "vendor" ? "vendor" : null;
+  const intentParam = searchParams.get("intent");
+  const registrationIntent =
+    intentParam === "vendor" ? "vendor" : intentParam === "pod_owner" ? "pod_owner" : null;
   const loginHref = returnPathSafe ? buildLoginHrefWithReturn(returnPathSafe) : "/login";
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -46,7 +48,7 @@ export function RegisterForm() {
         password,
         name: name || undefined,
         verificationReturnPath:
-          returnPathSafe && isVendorClaimPath(returnPathSafe) ? returnPathSafe : undefined,
+          returnPathSafe && isOwnershipClaimPath(returnPathSafe) ? returnPathSafe : undefined,
       });
       if (!reg.ok) {
         setError(reg.error);
@@ -62,7 +64,7 @@ export function RegisterForm() {
         return;
       }
 
-      if (returnPathSafe && isVendorClaimPath(returnPathSafe)) {
+      if (returnPathSafe && isOwnershipClaimPath(returnPathSafe)) {
         router.push(returnPathSafe);
         router.refresh();
         return;
@@ -87,6 +89,17 @@ export function RegisterForm() {
             ? appendNextQueryParam(setupPath, returnPathSafe)
             : setupPath
         );
+        router.refresh();
+        return;
+      }
+
+      if (registrationIntent === "pod_owner") {
+        const role = await setRegistrationRole(RegistrationIntent.pod_owner);
+        if (!role.ok) {
+          setError(role.error);
+          return;
+        }
+        router.push(role.nextPath ?? "/account/setup/pod");
         router.refresh();
         return;
       }

@@ -83,6 +83,7 @@ model Pod {
   vendorInvites      PodVendorInvite[]
   vendors            PodVendor[]
   memberships        PodMembership[]
+  claimInvite        PodClaimInvite?
   groupOrderSessions GroupOrderSession[]
   payoutSettings     PodPayoutSettings?
   podPayoutAllocations PodPayoutAllocation[]
@@ -274,6 +275,32 @@ model VendorClaimInvite {
   @@index([claimedByUserId])
 }
 
+/// Secure invitation to claim ownership of an existing concierge-created pod.
+/// Raw tokens are never stored. One lifecycle row per pod is rotated on resend/reissue.
+model PodClaimInvite {
+  id              String    @id @default(cuid())
+  podId           String    @unique
+  invitedEmail    String
+  tokenHash       String    @unique
+  expiresAt       DateTime
+  claimedAt       DateTime?
+  revokedAt       DateTime?
+  invitedByUserId String?
+  claimedByUserId String?
+  lastSentAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  pod       Pod   @relation(fields: [podId], references: [id], onDelete: Cascade)
+  invitedBy User? @relation("PodClaimInviteInvitedBy", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  claimedBy User? @relation("PodClaimInviteClaimedBy", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([invitedEmail])
+  @@index([expiresAt])
+  @@index([invitedByUserId])
+  @@index([claimedByUserId])
+}
+
 enum RegistrationIntent {
   customer
   vendor
@@ -358,6 +385,8 @@ model User {
   pendingVendorInvite                  PodVendorInvite?  @relation("UserPendingVendorInvite", fields: [pendingVendorInviteId], references: [id], onDelete: SetNull)
   vendorClaimInvitesCreated            VendorClaimInvite[] @relation("VendorClaimInviteInvitedBy")
   vendorClaimInvitesAccepted           VendorClaimInvite[] @relation("VendorClaimInviteClaimedBy")
+  podClaimInvitesCreated               PodClaimInvite[] @relation("PodClaimInviteInvitedBy")
+  podClaimInvitesAccepted              PodClaimInvite[] @relation("PodClaimInviteClaimedBy")
   adminAuditLogs                       AdminAuditLog[]   @relation("AdminAuditLogActor")
   slugRedirectsCreated                 SlugRedirect[]    @relation("SlugRedirectCreatedBy")
   /// When set, credentials login and active JWT sessions are blocked.

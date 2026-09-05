@@ -11,10 +11,13 @@ import { PodVendorReadinessSection } from "./PodVendorReadinessSection";
 
 export default async function PodDashboardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ podId: string }>;
+  searchParams: Promise<{ claimed?: string }>;
 }) {
   const { podId } = await params;
+  const query = await searchParams;
   const ctx = await loadPodDashboardContext(podId);
   if (!ctx) notFound();
 
@@ -37,6 +40,15 @@ export default async function PodDashboardPage({
       />
 
       <div className="mt-8 space-y-8">
+        {query.claimed === "1" ? (
+          <div
+            className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"
+            role="status"
+          >
+            <span className="font-semibold">Pod claimed.</span> You can now manage your pod,
+            vendors, and sharing tools.
+          </div>
+        ) : null}
         {!ctx.setupComplete ? (
           <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 px-4 py-3 text-sm text-oo-charcoal">
             <Link href={`/pod/${podId}/setup`} className="font-semibold underline">

@@ -9,6 +9,7 @@ import { listSlugRedirectsForEntity } from "@/lib/slug-admin.server";
 import { adminPodReadinessLabel } from "@/lib/admin-pod-detail-layout";
 import { listAdminAuditLogsForPod } from "@/services/admin-audit-log.service";
 import { getVendorClaimState, type VendorClaimState } from "@/lib/vendor-claim-state";
+import { getPodClaimState, type PodClaimState } from "@/lib/pod-claim-state";
 
 export type AdminPodDetailView = {
   pod: {
@@ -40,6 +41,13 @@ export type AdminPodDetailView = {
     note: string;
   };
   owners: Array<{ userId: string; email: string; name: string | null; role: string }>;
+  claimState: PodClaimState;
+  claimInvite: {
+    invitedEmail: string;
+    expiresAt: string;
+    claimedAt: string | null;
+    revokedAt: string | null;
+  } | null;
   vendors: Array<{
     vendorId: string;
     vendorName: string;
@@ -129,6 +137,7 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
         where: { role: PodMembershipRole.owner },
         include: { user: { select: { id: true, email: true, name: true } } },
       },
+      claimInvite: true,
     },
   });
   if (!pod) return null;
@@ -220,6 +229,18 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       name: m.user.name,
       role: m.role,
     })),
+    claimState: getPodClaimState({
+      memberships: pod.memberships,
+      claimInvite: pod.claimInvite,
+    }),
+    claimInvite: pod.claimInvite
+      ? {
+          invitedEmail: pod.claimInvite.invitedEmail,
+          expiresAt: pod.claimInvite.expiresAt.toISOString(),
+          claimedAt: pod.claimInvite.claimedAt?.toISOString() ?? null,
+          revokedAt: pod.claimInvite.revokedAt?.toISOString() ?? null,
+        }
+      : null,
     vendors: pod.vendors.map((pv) => ({
       vendorId: pv.vendor.id,
       vendorName: pv.vendor.name,
@@ -295,28 +316,57 @@ export type AdminPodSearchRow = {
   readinessLabel: string;
 };
 
-export async function searchAdminPods(rawQuery: string, limit = 50): Promise<AdminPodSearchRow[]> {
-  const q = rawQuery.trim();
-  if (!q) return [];
+export type AdminPodOwnershipFilter = "claimed" | "unclaimed";
 
-  const orConditions: object[] = [
-    { name: { contains: q, mode: "insensitive" } },
-    { slug: { contains: q, mode: "insensitive" } },
-    { address: { contains: q, mode: "insensitive" } },
-    { vendors: { some: { vendor: { name: { contains: q, mode: "insensitive" } } } } },
-    {
-      memberships: {
-        some: {
-          role: PodMembershipRole.owner,
-          user: { email: { contains: q, mode: "insensitive" } },
+export function parseAdminPodOwnershipQuery(
+  raw: string | null | undefined
+): AdminPodOwnershipFilter | null {
+  const value = raw?.trim();
+  return value === "claimed" || value === "unclaimed" ? value : null;
+}
+
+export async function searchAdminPods(
+  rawQuery: string,
+  options: { ownership?: AdminPodOwnershipFilter | null; limit?: number } = {}
+): Promise<AdminPodSearchRow[]> {
+  const q = rawQuery.trim();
+  const ownership = options.ownership ?? null;
+  const limit = options.limit ?? 50;
+  if (!q && !ownership) return [];
+
+  const where: {
+    OR?: object[];
+    memberships?: object;
+  } = {};
+
+  if (q) {
+    const orConditions: object[] = [
+      { name: { contains: q, mode: "insensitive" } },
+      { slug: { contains: q, mode: "insensitive" } },
+      { address: { contains: q, mode: "insensitive" } },
+      { vendors: { some: { vendor: { name: { contains: q, mode: "insensitive" } } } } },
+      {
+        memberships: {
+          some: {
+            role: PodMembershipRole.owner,
+            user: { email: { contains: q, mode: "insensitive" } },
+          },
         },
       },
-    },
-  ];
-  if (q.length >= 20) orConditions.push({ id: q });
+    ];
+    if (q.length >= 20) orConditions.push({ id: q });
+    where.OR = orConditions;
+  }
+
+  if (ownership) {
+    where.memberships =
+      ownership === "claimed"
+        ? { some: { role: PodMembershipRole.owner } }
+        : { none: { role: PodMembershipRole.owner } };
+  }
 
   const pods = await prisma.pod.findMany({
-    where: { OR: orConditions },
+    where,
     include: {
       vendors: {
         include: {

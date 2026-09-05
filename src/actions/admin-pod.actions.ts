@@ -19,6 +19,12 @@ import {
   adminDeletePodProfile,
 } from "@/services/admin-pod-rescue.service";
 import { adminCreateUnclaimedVendor } from "@/services/admin-concierge-vendor.service";
+import { adminCreateUnclaimedPod } from "@/services/admin-concierge-pod.service";
+import {
+  resendPodClaimInvite,
+  revokePodClaimInvite,
+  sendPodClaimInvite,
+} from "@/services/pod-claim-invite.service";
 
 type ActionResult =
   | { ok: true; message?: string }
@@ -32,6 +38,62 @@ async function withAdmin<T extends ActionResult>(
   const result = await fn(ctx);
   if (result.ok) revalidatePath("/admin/pods");
   return result;
+}
+
+export async function adminCreateUnclaimedPodAction(input: {
+  name: string;
+  address?: string;
+  ownerContactName?: string;
+  contactEmail?: string;
+  description?: string;
+  reason: string;
+  allowDuplicate?: boolean;
+}) {
+  return withAdmin(({ adminUserId }) =>
+    adminCreateUnclaimedPod({ ...input, adminUserId }).then((result) => {
+      if (result.ok) {
+        revalidatePath(`/admin/pods/${result.pod.id}`);
+      }
+      return result;
+    })
+  );
+}
+
+export async function adminSendPodClaimInviteAction(input: {
+  podId: string;
+  invitedEmail: string;
+  reason: string;
+}) {
+  return withAdmin(({ adminUserId }) =>
+    sendPodClaimInvite({ ...input, adminUserId }).then((result) => {
+      if (result.ok) revalidatePath(`/admin/pods/${input.podId}`);
+      return result;
+    })
+  );
+}
+
+export async function adminResendPodClaimInviteAction(input: {
+  podId: string;
+  reason: string;
+}) {
+  return withAdmin(({ adminUserId }) =>
+    resendPodClaimInvite({ ...input, adminUserId }).then((result) => {
+      if (result.ok) revalidatePath(`/admin/pods/${input.podId}`);
+      return result;
+    })
+  );
+}
+
+export async function adminRevokePodClaimInviteAction(input: {
+  podId: string;
+  reason: string;
+}) {
+  return withAdmin(({ adminUserId }) =>
+    revokePodClaimInvite({ ...input, adminUserId }).then((result) => {
+      if (result.ok) revalidatePath(`/admin/pods/${input.podId}`);
+      return result;
+    })
+  );
 }
 
 export async function adminCreateUnclaimedVendorAction(input: {

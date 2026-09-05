@@ -95,22 +95,23 @@ describe("public and ordering behavior", () => {
 describe("claim authentication and first login", () => {
   it("allows claim paths through safe post-login routing", () => {
     const routing = read("lib/auth/post-login-destination.ts");
-    expect(routing).toContain("isVendorClaimPath");
-    expect(routing).toMatch(/pendingSetup[\s\S]{0,200}?isVendorClaimPath/);
+    expect(routing).toContain("isOwnershipClaimPath");
+    expect(routing).toMatch(/pendingSetup[\s\S]{0,200}?isOwnershipClaimPath/);
   });
 
   it("returns new registrations directly to the claim page", () => {
     const register = read("app/register/RegisterForm.tsx");
     expect(register).toContain("verificationReturnPath");
-    expect(register).toMatch(/isVendorClaimPath\(returnPathSafe\)[\s\S]{0,250}?router\.push\(returnPathSafe\)/);
+    expect(register).toMatch(
+      /isOwnershipClaimPath\(returnPathSafe\)[\s\S]{0,250}?router\.push\(returnPathSafe\)/
+    );
   });
 
   it("preserves the claim path through email verification", () => {
     const service = read("services/email-verification.service.ts");
     const page = read("app/verify-email/page.tsx");
-    expect(service).toContain("returnPath");
-    expect(service).toContain("isVendorClaimPath");
-    expect(page).toContain("Continue to claim vendor");
+    expect(service).toContain("isOwnershipClaimPath");
+    expect(page).toContain("ownershipClaimContinueLabel");
   });
 
   it("shows only one concise claimed success message", () => {

@@ -17,7 +17,7 @@ import { sendTransactionalEmail } from "@/lib/email/email.service";
 import { ADMIN_AUDIT_ACTION, ADMIN_AUDIT_TARGET } from "@/lib/admin-audit-log";
 import { createAdminAuditLog } from "@/services/admin-audit-log.service";
 import { sanitizeLoginReturnPath } from "@/lib/auth/login-return-path";
-import { isVendorClaimPath } from "@/lib/auth/vendor-claim-path";
+import { isOwnershipClaimPath } from "@/lib/auth/ownership-claim-path";
 
 export const EMAIL_VERIFICATION_SENT_MESSAGE =
   "Verification email sent. Check your inbox for the link.";
@@ -122,7 +122,7 @@ export async function sendEmailVerificationEmail(input: {
   const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
   const now = new Date();
   const safeReturnPath = sanitizeLoginReturnPath(input.returnPath);
-  const claimReturnPath = isVendorClaimPath(safeReturnPath) ? safeReturnPath : null;
+  const claimReturnPath = isOwnershipClaimPath(safeReturnPath) ? safeReturnPath : null;
 
   await prisma.$transaction([
     prisma.emailVerificationToken.deleteMany({
@@ -280,7 +280,7 @@ function verificationReturnPath(metadata: unknown): string | undefined {
   const value = (metadata as { returnPath?: unknown }).returnPath;
   if (typeof value !== "string") return undefined;
   const safe = sanitizeLoginReturnPath(value);
-  return isVendorClaimPath(safe) ? safe ?? undefined : undefined;
+  return isOwnershipClaimPath(safe) ? safe ?? undefined : undefined;
 }
 
 export async function revokeEmailVerificationTokens(input: {

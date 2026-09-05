@@ -146,4 +146,12 @@ describe("resolvePostLoginDestination", () => {
     expect(dest).toEqual({ kind: "redirect", path: claimPath });
     expect(mockFindUnique).not.toHaveBeenCalled();
   });
+
+  it("returns directly to pod claim instead of forcing duplicate pod setup", async () => {
+    mockGetPendingSetup.mockResolvedValue("/account/setup/pod");
+    const claimPath = "/claim/pod/secure_token";
+    const dest = await resolvePostLoginDestination("user_1", claimPath);
+    expect(dest).toEqual({ kind: "redirect", path: claimPath });
+    expect(mockFindUnique).not.toHaveBeenCalled();
+  });
 });
