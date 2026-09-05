@@ -13,6 +13,10 @@ import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
 import type { AdminPodDetailView } from "@/services/admin-pod-detail.service";
 import type { VendorReadinessBundle } from "@/lib/vendor-readiness-validation.server";
 import {
+  deriveAdminOrderIssueAttention,
+  historicalFailedVendorReceiveDetail,
+} from "@/lib/admin-order-issue-attention";
+import {
   isSquareRoutingMode,
   vendorOrderRoutingModeShortLabel,
 } from "@/lib/vendor-order-routing-mode";
@@ -141,9 +145,16 @@ export { formatAdminAuditActionLabel };
 
 export function adminPodPrimaryOrderState(input: {
   status: string;
-  vendorOrders: Array<{ routingStatus: string; fulfillmentStatus: string }>;
+  vendorOrders: Array<{
+    routingStatus: string;
+    fulfillmentStatus: string;
+    /** When present, drives Needs attention from active issues (not routingStatus alone). */
+    issues?: Array<{ status: string; type: string }>;
+  }>;
+  /** Parent OrderIssue rows when available. */
+  orderIssues?: Array<{ status: string; submittedByRole?: string | null; type?: string }>;
 }): { label: string; tone: AdminDetailStatusTone; detail?: string } {
-  const { status, vendorOrders } = input;
+  const { status, vendorOrders, orderIssues } = input;
   if (status === "cancelled" || status === "refunded") {
     return { label: "Cancelled", tone: "neutral" };
   }
@@ -151,39 +162,64 @@ export function adminPodPrimaryOrderState(input: {
   const failed = vendorOrders.filter((vo) => vo.routingStatus === "failed").length;
   const ready = vendorOrders.filter((vo) => vo.fulfillmentStatus === "ready").length;
   const completed = vendorOrders.filter((vo) => vo.fulfillmentStatus === "completed").length;
+  const cancelled = vendorOrders.filter((vo) => vo.fulfillmentStatus === "cancelled").length;
   const total = vendorOrders.length;
 
-  if (failed > 0) {
-    if (completed === total - failed && failed < total) {
-      return {
-        label: "Needs attention",
-        tone: "danger",
-        detail: `${failed} of ${total} vendors failed to receive the order`,
-      };
-    }
+  const issueAttention = deriveAdminOrderIssueAttention({
+    vendorOrderIssues: vendorOrders.flatMap((vo) => vo.issues ?? []),
+    orderIssues,
+  });
+  const failureDetail = historicalFailedVendorReceiveDetail(vendorOrders, {
+    resolved: issueAttention.hasResolvedIssueHistory && !issueAttention.hasActiveIssues,
+  });
+
+  // Source of truth: active tracked issues — not routingStatus === "failed" alone.
+  if (issueAttention.hasActiveIssues) {
     return {
       label: "Needs attention",
       tone: "danger",
       detail:
-        total > 0
-          ? `${failed} of ${total} vendors failed to receive the order`
-          : "Order routing needs attention",
+        failureDetail ??
+        (issueAttention.activeCount === 1
+          ? "1 open issue"
+          : `${issueAttention.activeCount} open issues`),
     };
   }
 
   if (total > 0 && completed === total) {
-    return { label: "Completed", tone: "success" };
+    return {
+      label: "Completed",
+      tone: "success",
+      detail: failureDetail,
+    };
+  }
+  if (total > 0 && completed + cancelled === total && completed > 0) {
+    return {
+      label: issueAttention.hasResolvedIssueHistory ? "Resolved" : "Completed",
+      tone: "success",
+      detail: failureDetail,
+    };
+  }
+  if (total > 0 && cancelled === total) {
+    return { label: "Cancelled", tone: "neutral", detail: failureDetail };
   }
   if (total > 0 && ready === total) {
-    return { label: "Ready for pickup", tone: "success" };
+    return { label: "Ready for pickup", tone: "success", detail: failureDetail };
   }
   if (total > 1 && ready > 0 && ready < total) {
-    return { label: "Partially ready", tone: "warning" };
+    return { label: "Partially ready", tone: "warning", detail: failureDetail };
+  }
+  if (issueAttention.hasResolvedIssueHistory && failed > 0) {
+    return {
+      label: "Resolved",
+      tone: "neutral",
+      detail: failureDetail,
+    };
   }
   if (status === "paid" || status === "submitted" || vendorOrders.some((vo) => vo.routingStatus === "sent" || vo.routingStatus === "confirmed")) {
-    return { label: "In progress", tone: "neutral" };
+    return { label: "In progress", tone: "neutral", detail: failureDetail };
   }
-  return { label: "In progress", tone: "neutral" };
+  return { label: "In progress", tone: "neutral", detail: failureDetail };
 }
 
 function profileMissingFields(pod: AdminPodDetailView["pod"]): string[] {
@@ -423,7 +459,9 @@ export function buildAdminPodSummary(input: {
     : null;
 
   const recentNeedsAttention = detail.recentOrders.filter((o) =>
-    o.vendorOrders.some((vo) => vo.routingStatus === "failed")
+    deriveAdminOrderIssueAttention({
+      vendorOrderIssues: o.vendorOrders.flatMap((vo) => vo.issues ?? []),
+    }).hasActiveIssues
   ).length;
 
   const attentionItems: AdminPodAttentionItem[] = [];

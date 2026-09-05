@@ -118,13 +118,17 @@ function attachVendor(
 }
 
 describe("adminPodPrimaryOrderState", () => {
-  it("collapses multi-vendor failures into needs attention", () => {
+  it("collapses multi-vendor failures into needs attention when issue is open", () => {
     const state = adminPodPrimaryOrderState({
       status: "paid",
       vendorOrders: [
-        { routingStatus: "failed", fulfillmentStatus: "pending" },
-        { routingStatus: "sent", fulfillmentStatus: "completed" },
-        { routingStatus: "confirmed", fulfillmentStatus: "completed" },
+        {
+          routingStatus: "failed",
+          fulfillmentStatus: "pending",
+          issues: [{ status: "OPEN", type: "routing_failure" }],
+        },
+        { routingStatus: "sent", fulfillmentStatus: "completed", issues: [] },
+        { routingStatus: "confirmed", fulfillmentStatus: "completed", issues: [] },
       ],
     });
     expect(state.label).toBe("Needs attention");

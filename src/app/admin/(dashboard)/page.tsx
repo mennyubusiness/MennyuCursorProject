@@ -60,7 +60,12 @@ export default async function AdminDashboardPage() {
   const [ordersToday, failedRoutingCount, stuckRoutingCount, activeVendors] = await Promise.all([
     prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
     prisma.vendorOrder.count({
-      where: { routingStatus: VendorRoutingStatus.failed, fulfillmentStatus: VendorFulfillmentStatus.pending },
+      where: {
+        routingStatus: VendorRoutingStatus.failed,
+        fulfillmentStatus: VendorFulfillmentStatus.pending,
+        manuallyRecoveredAt: null,
+        issues: { some: { status: "OPEN", type: { not: "manual_recovery" } } },
+      },
     }),
     prisma.vendorOrder.count({
       where: {

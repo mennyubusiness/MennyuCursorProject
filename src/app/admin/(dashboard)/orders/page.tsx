@@ -83,7 +83,17 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
       if (vendorId) voWhere.vendorId = vendorId;
       if (attentionOnly) {
         voWhere.OR = [
-          { routingStatus: VendorRoutingStatus.failed },
+          {
+            routingStatus: VendorRoutingStatus.failed,
+            fulfillmentStatus: VendorFulfillmentStatus.pending,
+            manuallyRecoveredAt: null,
+            issues: {
+              some: {
+                status: "OPEN",
+                type: { not: "manual_recovery" },
+              },
+            },
+          },
           {
             fulfillmentStatus: VendorFulfillmentStatus.pending,
             routingStatus: {

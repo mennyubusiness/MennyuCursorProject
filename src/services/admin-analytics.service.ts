@@ -144,6 +144,8 @@ export async function getAdminAnalytics(range: AdminAnalyticsRange): Promise<Adm
       where: {
         routingStatus: "failed",
         fulfillmentStatus: "pending",
+        manuallyRecoveredAt: null,
+        issues: { some: { status: "OPEN", type: { not: "manual_recovery" } } },
       },
     }),
     prisma.vendorOrder.count({

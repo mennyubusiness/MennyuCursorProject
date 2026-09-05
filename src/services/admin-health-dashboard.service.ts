@@ -103,6 +103,8 @@ export async function getAdminHealthDashboard(): Promise<AdminHealthDashboard> {
       where: {
         routingStatus: VendorRoutingStatus.failed,
         fulfillmentStatus: VendorFulfillmentStatus.pending,
+        manuallyRecoveredAt: null,
+        issues: { some: { status: "OPEN", type: { not: "manual_recovery" } } },
       },
     }),
     prisma.vendorOrder.count({

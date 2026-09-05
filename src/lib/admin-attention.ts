@@ -21,7 +21,7 @@ import {
   ACTIVE_ORDER_ISSUE_STATUSES,
   customerSupportIssueTypeLabel,
 } from "@/domain/order-support-issue";
-import { getOrderIdsWithOpenIssues } from "@/services/issues.service";
+import { getOrderIdsWithOpenIssues, NON_ACTIONABLE_VENDOR_ORDER_ISSUE_TYPES } from "@/services/issues.service";
 import { ageMinutes as ageMinutesUtil } from "@/lib/date-utils";
 import {
   computeVendorClawbackSummary,
@@ -181,6 +181,12 @@ const TAKE_OPEN_ISSUE_ORDERS = 500;
 const TAKE_REFUND_FAILED = 100;
 const TAKE_ORDER_REFUND_ATTENTION = 100;
 const TAKE_VENDOR_CLAWBACK_ATTENTION = 100;
+
+/** Routing-failed VOs only stay in the active queue while an actionable VendorOrderIssue is OPEN. */
+const OPEN_ACTIONABLE_VENDOR_ORDER_ISSUE = {
+  status: "OPEN" as const,
+  type: { notIn: [...NON_ACTIONABLE_VENDOR_ORDER_ISSUE_TYPES] },
+};
 
 function paymentsRefundsHref(orderId: string): string {
   return `/admin/orders/${orderId}#payments-refunds`;
@@ -483,7 +489,12 @@ async function fetchVendorOrderAttentionItems(now: Date): Promise<AdminAttention
 
   const [failed, stuckPending, deliverectReconciliationOverdue, stuckSentConfirmed] = await Promise.all([
     prisma.vendorOrder.findMany({
-      where: { routingStatus: VendorRoutingStatus.failed },
+      where: {
+        routingStatus: VendorRoutingStatus.failed,
+        fulfillmentStatus: VendorFulfillmentStatus.pending,
+        manuallyRecoveredAt: null,
+        issues: { some: OPEN_ACTIONABLE_VENDOR_ORDER_ISSUE },
+      },
       include: VO_INCLUDE,
       orderBy: { createdAt: "desc" },
       take: TAKE_VO,
@@ -1362,7 +1373,8 @@ export function partitionAttentionItemsForWorkbench(items: AdminAttentionItem[])
 /**
  * Returns order IDs that need attention (for Orders page "Needs attention only" filter).
  * Uses minimal queries (orderId-only) to avoid building full attention items.
- * Matches getAttentionItems scope: failed/stuck VO + open issues + refund failed.
+ * Matches getAttentionItems scope: failed routing only while actionable VendorOrderIssue is OPEN,
+ * stuck VO + open issues + refund/clawback attention.
  */
 export async function getOrderIdsNeedingAttention(): Promise<string[]> {
   const now = new Date();
@@ -1385,6 +1397,8 @@ export async function getOrderIdsNeedingAttention(): Promise<string[]> {
       where: {
         routingStatus: VendorRoutingStatus.failed,
         fulfillmentStatus: VendorFulfillmentStatus.pending,
+        manuallyRecoveredAt: null,
+        issues: { some: OPEN_ACTIONABLE_VENDOR_ORDER_ISSUE },
       },
       select: { orderId: true },
       take: TAKE_VO,

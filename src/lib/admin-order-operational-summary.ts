@@ -9,9 +9,13 @@ import { getExceptionType, getExceptionReason, type ExceptionType } from "@/lib/
 import { isManuallyRecovered } from "@/lib/admin-manual-recovery";
 import {
   buildAdminOrderHealth,
-  orderHasUnresolvedClawback,
   type AdminOrderHealthState,
 } from "@/lib/admin-order-health";
+import {
+  deriveAdminOrderIssueAttention,
+  historicalFailedVendorReceiveDetail,
+  isActionableOpenVendorOrderIssue,
+} from "@/lib/admin-order-issue-attention";
 import { fulfillmentStatusBadge, providerLabel } from "@/lib/admin-order-detail-ui";
 import type { AdminOrderDetail } from "@/lib/admin-order-detail-query";
 import type { AdminOrderPaymentSummary } from "@/services/admin-order-payment-summary.service";
@@ -95,6 +99,8 @@ export type AdminOrderOperationalSummary = {
   statusLabel: string;
   statusDetail?: string;
   needsAttention: boolean;
+  /** hasActiveIssues | hasResolvedIssueHistory | noIssues */
+  issueAttentionKind: "hasActiveIssues" | "hasResolvedIssueHistory" | "noIssues";
   activeIssueCount: number;
   recoveryState: AdminOrderRecoveryState;
   vendorSummaries: AdminVendorOrderSummary[];
@@ -240,7 +246,7 @@ export function buildAdminOrderOperationalSummary(input: {
         resolvedVendorIssues.push({ ...entry, status: "resolved" });
         continue;
       }
-      if (issue.status === "OPEN") activeVendorIssues.push(entry);
+      if (isActionableOpenVendorOrderIssue(issue)) activeVendorIssues.push(entry);
       else resolvedVendorIssues.push(entry);
     }
   }
@@ -287,8 +293,17 @@ export function buildAdminOrderOperationalSummary(input: {
     ...resolvedVendorIssues,
   ];
 
+  const issueAttention = deriveAdminOrderIssueAttention({
+    vendorOrderIssues: order.vendorOrders.flatMap((vo) => vo.issues ?? []),
+    orderIssues: order.issues,
+  });
+
   const vendorRecoveryContexts = vendorSummaries
     .filter((v) => v.exceptionType != null)
+    .filter((v) => {
+      const vo = order.vendorOrders.find((x) => x.id === v.vendorOrderId);
+      return (vo?.issues ?? []).some(isActionableOpenVendorOrderIssue);
+    })
     .map((v) => {
       const vo = order.vendorOrders.find((x) => x.id === v.vendorOrderId)!;
       return {
@@ -314,7 +329,6 @@ export function buildAdminOrderOperationalSummary(input: {
   });
 
   const anyRecovered = vendorSummaries.some((v) => v.recoveryState === "recovered_manually");
-  const anyActiveRouting = vendorSummaries.some((v) => v.statusKey === "routing_failed");
   const allCompleted =
     order.vendorOrders.length > 0 &&
     order.vendorOrders.every((v) => v.fulfillmentStatus === "completed");
@@ -322,6 +336,16 @@ export function buildAdminOrderOperationalSummary(input: {
   const allCancelled =
     order.vendorOrders.length > 0 &&
     order.vendorOrders.every((v) => v.fulfillmentStatus === "cancelled");
+  const completedOrCancelled =
+    order.vendorOrders.length > 0 &&
+    order.vendorOrders.every(
+      (v) => v.fulfillmentStatus === "completed" || v.fulfillmentStatus === "cancelled"
+    );
+  const anyCompleted = order.vendorOrders.some((v) => v.fulfillmentStatus === "completed");
+
+  const historicalFailureDetail = historicalFailedVendorReceiveDetail(order.vendorOrders, {
+    resolved: issueAttention.hasResolvedIssueHistory && !issueAttention.hasActiveIssues,
+  });
 
   let overallStatus: AdminOrderOverallStatus = "in_progress";
   let statusLabel = "In progress";
@@ -333,40 +357,44 @@ export function buildAdminOrderOperationalSummary(input: {
   } else if (order.status === "cancelled" || allCancelled) {
     overallStatus = "cancelled";
     statusLabel = "Cancelled";
-  } else if (health.status === "attention" || anyActiveRouting) {
+    statusDetail = historicalFailureDetail;
+  } else if (issueAttention.hasActiveIssues) {
     overallStatus = "needs_attention";
     statusLabel = "Needs attention";
-    statusDetail = health.title;
-  } else if (order.status === "completed" || allCompleted) {
+    statusDetail =
+      health.status === "attention"
+        ? health.title
+        : historicalFailureDetail ??
+          (issueAttention.activeCount === 1
+            ? "1 open issue"
+            : `${issueAttention.activeCount} open issues`);
+  } else if (order.status === "completed" || allCompleted || (completedOrCancelled && anyCompleted)) {
     overallStatus = "completed";
-    statusLabel = "Completed";
+    statusLabel =
+      issueAttention.hasResolvedIssueHistory && !allCompleted ? "Resolved" : "Completed";
     if (anyRecovered) {
       statusDetail = "Recovered manually after a routing issue";
+    } else if (historicalFailureDetail) {
+      statusDetail = historicalFailureDetail;
     }
-  } else if (anyReady && order.vendorOrders.every((v) => v.fulfillmentStatus === "ready" || v.fulfillmentStatus === "completed")) {
+  } else if (anyReady && order.vendorOrders.every((v) => v.fulfillmentStatus === "ready" || v.fulfillmentStatus === "completed" || v.fulfillmentStatus === "cancelled")) {
     overallStatus = "ready";
     statusLabel = "Ready for pickup";
     if (anyRecovered) statusDetail = "Recovered manually after a routing issue";
+    else if (historicalFailureDetail) statusDetail = historicalFailureDetail;
   } else if (anyRecovered) {
     overallStatus = "in_progress";
     statusLabel = "In progress";
     statusDetail = "Recovered manually after a routing issue";
+  } else if (issueAttention.hasResolvedIssueHistory && historicalFailureDetail) {
+    overallStatus = "in_progress";
+    statusLabel = "Resolved";
+    statusDetail = historicalFailureDetail;
   } else if (
     order.vendorOrders.some((v) => v.routingStatus === "pending" || v.routingStatus === "failed")
   ) {
     overallStatus = "routing";
     statusLabel = "Routing";
-  }
-
-  // Financial clawback-only attention without other ops issues still needs_attention
-  if (
-    overallStatus !== "needs_attention" &&
-    orderHasUnresolvedClawback(paymentSummary) &&
-    health.status === "attention"
-  ) {
-    overallStatus = "needs_attention";
-    statusLabel = "Needs attention";
-    statusDetail = health.title;
   }
 
   return {
@@ -375,7 +403,8 @@ export function buildAdminOrderOperationalSummary(input: {
     overallStatus,
     statusLabel,
     statusDetail,
-    needsAttention: health.status === "attention" || overallStatus === "needs_attention",
+    needsAttention: issueAttention.hasActiveIssues,
+    issueAttentionKind: issueAttention.kind,
     activeIssueCount: activeIssues.length,
     recoveryState: anyRecovered ? "recovered_manually" : "none",
     vendorSummaries,

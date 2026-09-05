@@ -69,7 +69,11 @@ export type AdminPodDetailView = {
     status: string;
     createdAt: string;
     totalCents: number;
-    vendorOrders: Array<{ routingStatus: string; fulfillmentStatus: string }>;
+    vendorOrders: Array<{
+      routingStatus: string;
+      fulfillmentStatus: string;
+      issues: Array<{ status: string; type: string }>;
+    }>;
   }>;
   slugRedirects: Array<{ id: string; oldSlug: string; newSlug: string; createdAt: string }>;
   readinessLabel: string;
@@ -158,7 +162,11 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
         createdAt: true,
         totalCents: true,
         vendorOrders: {
-          select: { routingStatus: true, fulfillmentStatus: true },
+          select: {
+            routingStatus: true,
+            fulfillmentStatus: true,
+            issues: { select: { status: true, type: true } },
+          },
         },
       },
     }),
@@ -248,6 +256,7 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       vendorOrders: o.vendorOrders.map((vo) => ({
         routingStatus: vo.routingStatus,
         fulfillmentStatus: vo.fulfillmentStatus,
+        issues: vo.issues.map((i) => ({ status: i.status, type: i.type })),
       })),
     })),
     slugRedirects: staleRedirects.map((r) => ({
