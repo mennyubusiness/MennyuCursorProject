@@ -21,6 +21,7 @@ import {
   summarizeVendorCustomerOrderingHours,
 } from "@/lib/vendor-customer-ordering-hours";
 import { loadVendorMenuReadinessSummaries } from "@/lib/vendor-menu-readiness.server";
+import { resolveVendorOrderingIntent } from "@/lib/vendor-ordering-mode";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { hasUnmatchedChannelRegistrationForVendorById } from "@/services/deliverect-channel-registration-retry.service";
 import { getPodAnalytics } from "@/services/pod-analytics.service";
@@ -43,6 +44,7 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
       imageUrl: true,
       address: true,
       isActive: true,
+      orderingEnabled: true,
       announcementText: true,
       announcementIsActive: true,
       pickupInstructions: true,
@@ -61,6 +63,7 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
               contactPhone: true,
               isActive: true,
               mennyuOrdersPaused: true,
+              orderingEnabled: true,
               stripeConnectedAccountId: true,
               stripeChargesEnabled: true,
               stripePayoutsEnabled: true,
@@ -139,15 +142,20 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
       mennyuOrdersPaused: vendor.mennyuOrdersPaused ?? false,
       posOpen: hoursSummary.posOpen,
     };
+    const orderingIntent = resolveVendorOrderingIntent({
+      podOrderingEnabled: pod.orderingEnabled,
+      vendorOrderingEnabled: vendor.orderingEnabled,
+    });
     const readiness = deriveVendorPodReadinessForRoster({
       podId: pod.id,
       podSlug: pod.slug,
       vendorId: vendor.id,
-      pod: { isActive: pod.isActive },
+      pod: { isActive: pod.isActive, orderingEnabled: pod.orderingEnabled },
       podVendor: { isActive: pv.isActive },
       vendor: {
         isActive: vendor.isActive,
         mennyuOrdersPaused: vendor.mennyuOrdersPaused ?? false,
+        orderingEnabled: vendor.orderingEnabled,
         name: vendor.name,
         slug: vendor.slug,
         description: vendor.description,
@@ -191,11 +199,14 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
       vendorGloballyActive: vendor.isActive,
       mennyuOrdersPaused: vendor.mennyuOrdersPaused ?? false,
       orderRoutingMode: vendor.orderRoutingMode,
+      menuOnly: orderingIntent.menuOnly,
       readiness: {
         status: readiness.status,
         label: readiness.label,
         description: readiness.description,
         canAcceptOrders: readiness.canAcceptOrders,
+        menuOnly: orderingIntent.menuOnly,
+        menuOnlyByPod: orderingIntent.menuOnlyByPod,
         orderRoutingMode: vendor.orderRoutingMode,
         setupSummary: readiness.setupSummary,
         primaryBlocker: readiness.blockingReasons[0]
@@ -209,6 +220,19 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
       },
     };
   });
+
+  /** Listed = publicly browsable. Distinct from orderable so menu-only pods do not read as empty. */
+  const podMenuOnly = !pod.orderingEnabled;
+  const menuOnlyVendorCount = rosterRows.filter((row) => row.menuOnly).length;
+  const listedRosterRows = rosterRows.filter(
+    (row) =>
+      row.podVendorActive &&
+      row.vendorGloballyActive &&
+      row.readiness.setupSummary.publicProfile !== false &&
+      row.readiness.setupSummary.menu
+  );
+  const listedVendorIds = new Set(listedRosterRows.map((row) => row.vendorId));
+  const listedVendorCount = listedRosterRows.length;
 
   const podSetupChecklist = derivePodSetupChecklist({
     podId: pod.id,
@@ -224,9 +248,12 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
     vendorStatuses: rosterRows.map((row) => ({
       status: row.readiness.status,
       canAcceptOrders: row.readiness.canAcceptOrders,
+      menuOnly: row.menuOnly,
+      publiclyListed: listedVendorIds.has(row.vendorId),
     })),
     podPayoutsEnabled: payoutContext?.podPayoutsEnabled ?? false,
     payoutSetupReady: payoutSummary?.payoutSetupReady ?? false,
+    podMenuOnly,
   });
 
   const setupComplete = isPodSetupComplete(
@@ -284,6 +311,8 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
   const attentionItems = derivePodAttentionItems({
     podId: pod.id,
     orderableVendorCount,
+    menuOnlyVendorCount,
+    podMenuOnly,
     vendorCount: rosterRows.length,
     addressSet: Boolean(pod.address?.trim()),
     pendingInviteCount: pendingEmailInvites.length,
@@ -306,6 +335,9 @@ export const loadPodDashboardContext = cache(async (podId: string) => {
     podSetupChecklist,
     setupComplete,
     orderableVendorCount,
+    menuOnlyVendorCount,
+    listedVendorCount,
+    podMenuOnly,
     launchSummary,
     adoptionAttentionRows,
     layout,

@@ -7,6 +7,7 @@ import { getVendorPayoutSummary } from "@/services/vendor-payout-summary.service
 import { prisma } from "@/lib/db";
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
 import { VENDOR_STRIPE_COPY } from "@/lib/vendor-operational-copy";
+import { loadVendorDashboardOrderingMode } from "@/lib/vendor-dashboard-ordering-mode.server";
 import { vendorStripeConnectionLabel } from "@/lib/vendor-payout-vendor-display";
 import { VendorStripePayoutCard } from "../settings/VendorStripePayoutCard";
 import { VendorPayoutTransferHistory } from "./VendorPayoutTransferHistory";
@@ -41,7 +42,7 @@ export default async function VendorPayoutsPage({
     redirect(`/vendor/${vendorId}/payouts${qs}`);
   }
 
-  const [vendor, payoutSummary] = await Promise.all([
+  const [vendor, payoutSummary, orderingMode] = await Promise.all([
     prisma.vendor.findUnique({
       where: { id: vendorId },
       select: {
@@ -55,6 +56,7 @@ export default async function VendorPayoutsPage({
       },
     }),
     getVendorPayoutSummary(vendorId),
+    loadVendorDashboardOrderingMode(vendorId),
   ]);
   if (!vendor) notFound();
 
@@ -71,14 +73,20 @@ export default async function VendorPayoutsPage({
       <DashboardPageHeader
         headingLevel={1}
         title="Payouts"
-        description="Payment setup and transfer history. This stays out of your daily order flow on purpose."
+        description={
+          orderingMode.menuOnly
+            ? "Payment setup and transfer history. Ordering is off for this vendor, so nothing here is required."
+            : "Payment setup and transfer history. This stays out of your daily order flow on purpose."
+        }
       />
 
       <div className="mt-8 space-y-8">
         <section className="rounded-xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
           <p className="text-sm text-oo-stone-gray">{VENDOR_STRIPE_COPY}</p>
           <p className="mt-2 text-sm font-medium text-oo-charcoal">{stripeStatus}</p>
-          {!vendor.stripeChargesEnabled || !vendor.stripePayoutsEnabled ? (
+          {/* Menu-only vendors are never nagged about payment setup they do not need. */}
+          {!orderingMode.menuOnly &&
+          (!vendor.stripeChargesEnabled || !vendor.stripePayoutsEnabled) ? (
             <p className="mt-2 text-sm text-amber-950">
               Finish payment setup before accepting paid orders.
             </p>

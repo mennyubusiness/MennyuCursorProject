@@ -15,6 +15,13 @@ import {
   cartLineOrderabilityCode,
   cartLineOrderabilityMessage,
 } from "@/lib/vendor-orderability-in-pod";
+import {
+  POD_ORDERING_DISABLED_CART_MESSAGE,
+  POD_ORDERING_DISABLED_CODE,
+  resolveVendorOrderingIntent,
+  VENDOR_ORDERING_DISABLED_CART_MESSAGE,
+  VENDOR_ORDERING_DISABLED_CODE,
+} from "@/lib/vendor-ordering-mode";
 import { loadVendorReadinessBundles } from "@/lib/vendor-readiness-validation.server";
 import { selectCartForSessionAndPod } from "@/lib/cart-selection";
 import { isMenuItemEffectivelyAvailable } from "@/services/menu-item-availability.service";
@@ -378,6 +385,49 @@ function findMatchingCartLine<
   );
 }
 
+/**
+ * Rejects a cart mutation when durable ordering intent is off for the pod or the vendor.
+ *
+ * Intent-only by design: pause, hours, Stripe, and routing are evaluated elsewhere so a
+ * menu-only vendor is never reported as paused, closed, or misconfigured.
+ */
+async function assertOrderingIntentAllowsCartLine(input: {
+  cartId: string;
+  vendorId: string;
+  cartItemId?: string;
+}): Promise<void> {
+  const [cartRow, vendorRow] = await Promise.all([
+    prisma.cart.findUnique({
+      where: { id: input.cartId },
+      select: { pod: { select: { orderingEnabled: true } } },
+    }),
+    prisma.vendor.findUnique({
+      where: { id: input.vendorId },
+      select: { orderingEnabled: true },
+    }),
+  ]);
+
+  const intent = resolveVendorOrderingIntent({
+    podOrderingEnabled: cartRow?.pod?.orderingEnabled,
+    vendorOrderingEnabled: vendorRow?.orderingEnabled,
+  });
+  if (intent.effectiveOrderingEnabled) return;
+
+  const context = input.cartItemId ? { cartItemId: input.cartItemId } : undefined;
+  if (intent.menuOnlyByPod) {
+    throw new CartValidationError(
+      POD_ORDERING_DISABLED_CART_MESSAGE,
+      POD_ORDERING_DISABLED_CODE,
+      context
+    );
+  }
+  throw new CartValidationError(
+    VENDOR_ORDERING_DISABLED_CART_MESSAGE,
+    VENDOR_ORDERING_DISABLED_CODE,
+    context
+  );
+}
+
 export async function addCartItem(
   cartId: string,
   menuItemId: string,
@@ -445,7 +495,7 @@ export async function addCartItem(
     }),
     prisma.pod.findUnique({
       where: { id: cart.podId },
-      select: { isActive: true, mennyuOrdersPaused: true },
+      select: { isActive: true, mennyuOrdersPaused: true, orderingEnabled: true },
     }),
     loadVendorReadinessBundles([menuItemInitial.vendorId], { includeDeliverectMappingIntegrity: true }),
   ]);
@@ -453,6 +503,8 @@ export async function addCartItem(
   const podOrderability = getVendorOrderabilityInPod({
     podActive: pod?.isActive ?? false,
     podOrdersPaused: pod?.mennyuOrdersPaused ?? false,
+    podOrderingEnabled: pod?.orderingEnabled ?? true,
+    vendorOrderingEnabled: menuItemInitial.vendor.orderingEnabled ?? true,
     podVendorExists: Boolean(vendorInPod),
     podVendorActive: vendorInPod?.isActive ?? false,
     vendor: vendorForOrderability,
@@ -695,6 +747,17 @@ export async function updateCartItem(
 
   await enforceGroupOrderCartMutation(cartId, groupOrderActor ?? null, {
     kind: "mutate",
+    cartItemId,
+  });
+
+  /**
+   * Menu-only enforcement on the shallow path. Quantity/selection edits skip the full readiness
+   * bundle for latency, but they must never let a stale client keep working a line for a vendor
+   * or pod that has been switched to menu-only.
+   */
+  await assertOrderingIntentAllowsCartLine({
+    cartId,
+    vendorId: existingItem.menuItem.vendorId,
     cartItemId,
   });
 

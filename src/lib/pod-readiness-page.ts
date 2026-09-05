@@ -4,6 +4,7 @@ import {
   getVendorPodOwnerDisplayStateFromSetup,
   getVendorPodOwnerMissingLinesFromSetup,
 } from "@/lib/vendor-readiness-states";
+import { MENU_ONLY_BADGE } from "@/lib/vendor-ordering-mode";
 
 export type PodReadinessPageSummary = {
   podCompleteCount: number;
@@ -23,10 +24,11 @@ export function derivePodReadinessPageSummary(input: {
   const podCompleteCount = input.requiredPodItems.filter((item) => item.complete).length;
   const podTotalCount = input.requiredPodItems.length;
   const vendorTotalCount = input.rosterRows.length;
-  const vendorsReadyCount = input.rosterRows.filter((row) => row.readiness.canAcceptOrders).length;
-  const vendorsNeedingAttention = input.rosterRows.filter(
-    (row) => !row.readiness.canAcceptOrders
+  /** Menu-only vendors count as ready once they are publicly live; ordering is not their goal. */
+  const vendorsReadyCount = input.rosterRows.filter((row) =>
+    isMenuOnly(row) ? rowDisplayState(row) !== "hidden" : row.readiness.canAcceptOrders
   ).length;
+  const vendorsNeedingAttention = vendorTotalCount - vendorsReadyCount;
   const incompletePodChecks = podTotalCount - podCompleteCount;
   const needsAttentionCount = vendorsNeedingAttention + incompletePodChecks;
 
@@ -34,6 +36,11 @@ export function derivePodReadinessPageSummary(input: {
     vendorTotalCount > 0 &&
     podCompleteCount === podTotalCount &&
     vendorsReadyCount === vendorTotalCount;
+
+  const everyVendorMenuOnly = vendorTotalCount > 0 && input.rosterRows.every(isMenuOnly);
+  const attentionConsequence = everyVendorMenuOnly
+    ? "before their menus appear to customers"
+    : "before customers can order";
 
   let headline: string;
   let detail: string;
@@ -45,10 +52,10 @@ export function derivePodReadinessPageSummary(input: {
     headline = "All pod and vendor readiness checks are complete.";
     detail = "Your pod and vendors are ready for customers.";
   } else if (vendorsNeedingAttention === 1) {
-    headline = "1 vendor needs attention before customers can order.";
+    headline = `1 vendor needs attention ${attentionConsequence}.`;
     detail = `${vendorsReadyCount} of ${vendorTotalCount} vendors are ready for customers.`;
   } else if (vendorsNeedingAttention > 1) {
-    headline = `${vendorsNeedingAttention} vendors need attention before customers can order.`;
+    headline = `${vendorsNeedingAttention} vendors need attention ${attentionConsequence}.`;
     detail = `${vendorsReadyCount} of ${vendorTotalCount} vendors are ready for customers.`;
   } else if (incompletePodChecks > 0) {
     headline = "Pod readiness checks still need attention.";
@@ -70,11 +77,16 @@ export function derivePodReadinessPageSummary(input: {
   };
 }
 
+function isMenuOnly(row: PodRosterVendorRow): boolean {
+  return Boolean(row.readiness.menuOnly ?? row.menuOnly);
+}
+
 function rowDisplayState(row: PodRosterVendorRow) {
   return getVendorPodOwnerDisplayStateFromSetup({
     podVendorActive: row.podVendorActive,
     canAcceptOrders: row.readiness.canAcceptOrders,
     setupSummary: row.readiness.setupSummary,
+    menuOnly: isMenuOnly(row),
   });
 }
 
@@ -85,6 +97,9 @@ export function vendorReadinessBadge(row: PodRosterVendorRow): {
   const state = rowDisplayState(row);
   if (state === "live") {
     return { label: "Live", className: "bg-emerald-50 text-emerald-900" };
+  }
+  if (state === "menu_only") {
+    return { label: MENU_ONLY_BADGE, className: "bg-oo-cream text-oo-charcoal" };
   }
   if (state === "hidden") {
     return { label: "Hidden", className: "bg-zinc-100 text-zinc-800" };
@@ -98,6 +113,8 @@ export function deriveVendorMissingLines(row: PodRosterVendorRow): string[] {
     canAcceptOrders: row.readiness.canAcceptOrders,
     setupSummary: row.readiness.setupSummary,
     status: row.readiness.status,
+    menuOnly: isMenuOnly(row),
+    menuOnlyByPod: Boolean(row.readiness.menuOnlyByPod),
   });
 }
 

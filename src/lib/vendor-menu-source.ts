@@ -183,6 +183,19 @@ export function menuItemDeliverectIdMatchesMenuSource(
 }
 
 /**
+ * Origin of a live catalog entity id. Used so publishing/retiring one catalog
+ * cannot rewrite authoring availability on another origin.
+ */
+export function catalogOriginFromEntityId(
+  deliverectId: string | null | undefined
+): ActiveMenuProvider | "unknown" {
+  if (!deliverectId) return "unknown";
+  if (isOpenOrderProductDeliverectId(deliverectId)) return "open_order";
+  if (isSquareProductDeliverectId(deliverectId)) return "square";
+  return "deliverect";
+}
+
+/**
  * Origin-strict catalog match used while Square or Deliverect still own the menu.
  * Does not treat Square-origin and native builder ids as interchangeable.
  */

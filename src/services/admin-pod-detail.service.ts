@@ -21,6 +21,8 @@ export type AdminPodDetailView = {
     pickupTimezone: string | null;
     isActive: boolean;
     mennyuOrdersPaused: boolean;
+    /** Durable pod-wide menu-only intent. */
+    orderingEnabled: boolean;
     deletedAt: string | null;
     deletedByUserId: string | null;
     deletedByEmail: string | null;
@@ -48,6 +50,8 @@ export type AdminPodDetailView = {
     podVendorActive: boolean;
     vendorActive: boolean;
     mennyuOrdersPaused: boolean;
+    /** Durable menu-only intent for this vendor, independent of the pod-wide setting. */
+    orderingEnabled: boolean;
     orderRoutingMode: string;
     customerOrderingHours: unknown;
   }>;
@@ -95,6 +99,7 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
               cuisineCategory: true,
               isActive: true,
               mennyuOrdersPaused: true,
+              orderingEnabled: true,
               deletedAt: true,
               orderRoutingMode: true,
               customerOrderingHours: true,
@@ -172,6 +177,7 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       pickupTimezone: pod.pickupTimezone,
       isActive: pod.isActive,
       mennyuOrdersPaused: pod.mennyuOrdersPaused,
+      orderingEnabled: pod.orderingEnabled,
       deletedAt: pod.deletedAt?.toISOString() ?? null,
       deletedByUserId: pod.deletedByUserId,
       deletedByEmail: deletedByUser?.email ?? null,
@@ -204,6 +210,7 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       podVendorActive: pv.isActive,
       vendorActive: pv.vendor.isActive,
       mennyuOrdersPaused: pv.vendor.mennyuOrdersPaused,
+      orderingEnabled: pv.vendor.orderingEnabled,
       orderRoutingMode: pv.vendor.orderRoutingMode,
       customerOrderingHours: pv.vendor.customerOrderingHours,
     })),
@@ -287,7 +294,14 @@ export async function searchAdminPods(rawQuery: string, limit = 50): Promise<Adm
     include: {
       vendors: {
         include: {
-          vendor: { select: { isActive: true, mennyuOrdersPaused: true, deletedAt: true } },
+          vendor: {
+            select: {
+              isActive: true,
+              mennyuOrdersPaused: true,
+              orderingEnabled: true,
+              deletedAt: true,
+            },
+          },
         },
       },
       memberships: {
@@ -309,6 +323,8 @@ export async function searchAdminPods(rawQuery: string, limit = 50): Promise<Adm
       const orderability = getVendorOrderabilityInPod({
         podActive: pod.isActive,
         podOrdersPaused: pod.mennyuOrdersPaused,
+        podOrderingEnabled: pod.orderingEnabled,
+        vendorOrderingEnabled: pv.vendor.orderingEnabled,
         podVendorExists: true,
         podVendorActive: pv.isActive,
         vendor: {

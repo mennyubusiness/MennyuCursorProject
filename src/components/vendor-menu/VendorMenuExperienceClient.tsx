@@ -26,6 +26,8 @@ export type VendorMenuExperienceClientProps = {
   /** Serializable variant counts (from server Map). */
   variantChildCountByParentPlu: Record<string, number>;
   orderingDisabled: boolean;
+  /** Vendor or pod is menu-only: browse the menu, no ordering controls at all. */
+  menuOnly?: boolean;
   vendorUsesDeliverect: boolean;
 };
 
@@ -35,6 +37,7 @@ function MenuSectionGrid({
   vendorId,
   vendorName,
   orderingDisabled,
+  menuOnly,
   vendorUsesDeliverect,
   vendorAccentColor,
   variantChildCountByParentPlu,
@@ -45,6 +48,7 @@ function MenuSectionGrid({
   vendorId: string;
   vendorName: string;
   orderingDisabled: boolean;
+  menuOnly?: boolean;
   vendorUsesDeliverect: boolean;
   vendorAccentColor: string | null;
   variantChildCountByParentPlu: Record<string, number>;
@@ -90,6 +94,7 @@ function MenuSectionGrid({
               vendorId={vendorId}
               vendorName={vendorName}
               orderingDisabled={orderingDisabled}
+              menuOnly={menuOnly}
               vendorUsesDeliverect={vendorUsesDeliverect}
               variantChildMenuItemCount={
                 item.deliverectPlu
@@ -114,6 +119,7 @@ export function VendorMenuExperienceClient({
   sections,
   variantChildCountByParentPlu,
   orderingDisabled,
+  menuOnly,
   vendorUsesDeliverect,
 }: VendorMenuExperienceClientProps) {
   const { spotlightSections, mainSections } = partitionMenuSections(sections);
@@ -162,6 +168,7 @@ export function VendorMenuExperienceClient({
                         vendorId={vendorId}
                         vendorName={vendorName}
                         orderingDisabled={orderingDisabled}
+                        menuOnly={menuOnly}
                         vendorUsesDeliverect={vendorUsesDeliverect}
                         vendorAccentColor={vendorAccentColor}
                         variantChildCountByParentPlu={variantChildCountByParentPlu}
@@ -193,6 +200,7 @@ export function VendorMenuExperienceClient({
                       vendorId={vendorId}
                       vendorName={vendorName}
                       orderingDisabled={orderingDisabled}
+                      menuOnly={menuOnly}
                       vendorUsesDeliverect={vendorUsesDeliverect}
                       vendorAccentColor={vendorAccentColor}
                       variantChildCountByParentPlu={variantChildCountByParentPlu}

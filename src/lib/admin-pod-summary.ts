@@ -16,6 +16,11 @@ import {
   isSquareRoutingMode,
   vendorOrderRoutingModeShortLabel,
 } from "@/lib/vendor-order-routing-mode";
+import {
+  ORDERING_MODE_COPY,
+  resolveVendorOrderingIntent,
+  VENDOR_ORDERING_MODE_LABELS,
+} from "@/lib/vendor-ordering-mode";
 
 export type AdminPodAttentionItem = {
   id: string;
@@ -29,6 +34,7 @@ export type AdminPodAttentionItem = {
 
 export type AdminPodOverallStatus =
   | "open"
+  | "menu_only"
   | "closed_by_hours"
   | "paused"
   | "setup_required"
@@ -38,6 +44,8 @@ export type AdminPodOverallStatus =
 
 export type AdminPodVendorRowStatus =
   | "accepting_orders"
+  | "menu_only"
+  | "menu_only_pod_disabled"
   | "closed_by_hours"
   | "paused"
   | "setup_required"
@@ -77,6 +85,14 @@ export type AdminPodSummary = {
     label: string;
     detail?: string;
   };
+  /** Durable pod-wide menu-only vs orderable intent. Separate from pause. */
+  orderingMode: {
+    podOrderingEnabled: boolean;
+    /** Pod switch is off, or every attached vendor is individually menu-only. */
+    effectivelyMenuOnly: boolean;
+    label: string;
+    description: string;
+  };
   hours: {
     statusLabel: string;
     nextChangeLabel?: string;
@@ -90,6 +106,8 @@ export type AdminPodSummary = {
     totalAttached: number;
     visible: number;
     orderable: number;
+    /** Visible and browsable but intentionally not orderable. Not a failure. */
+    menuOnly: number;
     open: number;
     hidden: number;
     needsAttention: number;
@@ -185,9 +203,28 @@ function vendorStatusFromEvaluation(input: {
   closedByHours: boolean;
   routingIssue: boolean;
   setupBlocked: boolean;
+  menuOnlyByVendor: boolean;
+  menuOnlyByPod: boolean;
 }): { key: AdminPodVendorRowStatus; label: string; tone: AdminDetailStatusTone; issueLabel: string | null } {
   if (!input.visible) {
     return { key: "hidden", label: "Hidden", tone: "neutral", issueLabel: null };
+  }
+  /** Menu-only outranks pause/hours/setup: it is why ordering is off, and it is intentional. */
+  if (input.menuOnlyByVendor) {
+    return {
+      key: "menu_only",
+      label: VENDOR_ORDERING_MODE_LABELS.menu_only,
+      tone: "neutral",
+      issueLabel: null,
+    };
+  }
+  if (input.menuOnlyByPod) {
+    return {
+      key: "menu_only_pod_disabled",
+      label: VENDOR_ORDERING_MODE_LABELS.menu_only_pod_disabled,
+      tone: "neutral",
+      issueLabel: null,
+    };
   }
   if (input.paused) {
     return { key: "paused", label: "Paused", tone: "warning", issueLabel: "Ordering paused" };
@@ -238,10 +275,13 @@ export function buildAdminPodSummary(input: {
 
   let visible = 0;
   let orderable = 0;
+  let menuOnlyCount = 0;
   let open = 0;
   let hidden = 0;
   let needsAttention = 0;
   let closedByHoursCount = 0;
+
+  const podOrderingEnabled = detail.pod.orderingEnabled !== false;
 
   const vendorRows: AdminPodVendorRow[] = detail.vendors.map((v) => {
     const bundle = readinessByVendorId.get(v.vendorId);
@@ -261,6 +301,7 @@ export function buildAdminPodSummary(input: {
           vendor: {
             isActive: v.vendorActive && !v.deletedAt,
             mennyuOrdersPaused: v.mennyuOrdersPaused,
+            orderingEnabled: v.orderingEnabled,
             name: v.vendorName,
             slug: v.vendorSlug,
             description: v.description,
@@ -274,16 +315,23 @@ export function buildAdminPodSummary(input: {
           pod: {
             isActive: detail.pod.isActive && !detail.pod.deletedAt,
             mennyuOrdersPaused: detail.pod.mennyuOrdersPaused,
+            orderingEnabled: podOrderingEnabled,
           },
           podVendor: { exists: true, isActive: v.podVendorActive },
           vendorAvailability,
         }
       : null;
 
+    const intent = resolveVendorOrderingIntent({
+      podOrderingEnabled,
+      vendorOrderingEnabled: v.orderingEnabled,
+    });
     const state = evaluation ? getVendorOrderabilityState(evaluation) : null;
     const shallowOrderable = getVendorOrderabilityInPod({
       podActive: detail.pod.isActive && !detail.pod.deletedAt,
       podOrdersPaused: detail.pod.mennyuOrdersPaused,
+      podOrderingEnabled,
+      vendorOrderingEnabled: v.orderingEnabled,
       podVendorExists: true,
       podVendorActive: v.podVendorActive,
       vendor: {
@@ -298,13 +346,21 @@ export function buildAdminPodSummary(input: {
       : v.vendorActive && v.podVendorActive && !v.deletedAt && detail.pod.isActive && !detail.pod.deletedAt;
     const isOrderable = evaluation ? Boolean(state?.orderable) : shallowOrderable;
     const missing = evaluation ? getVendorOperationalMissingItems(evaluation) : [];
+    /**
+     * Menu-only suppresses hours, pause, setup, and routing findings: none of them apply
+     * while the vendor is deliberately not selling, and surfacing them would make an
+     * intentional configuration look like a broken one.
+     */
+    const isMenuOnly = isVisible && intent.menuOnly;
     const closedByHours =
       isVisible &&
+      !isMenuOnly &&
       !v.mennyuOrdersPaused &&
       (missing.includes("outside_hours") ||
         (!evaluation && vendorAvailability.posOpen === false && shallowOrderable === false));
     const setupBlocked =
       isVisible &&
+      !isMenuOnly &&
       !isOrderable &&
       !closedByHours &&
       !v.mennyuOrdersPaused &&
@@ -313,6 +369,7 @@ export function buildAdminPodSummary(input: {
         : true);
     const routingIssue =
       isVisible &&
+      !isMenuOnly &&
       isSquareRoutingMode(v.orderRoutingMode) &&
       bundle != null &&
       bundle.posSummary.squareOrderRoutingReady === false;
@@ -323,8 +380,11 @@ export function buildAdminPodSummary(input: {
       orderable += 1;
       open += 1;
     }
+    if (isMenuOnly) menuOnlyCount += 1;
     if (closedByHours) closedByHoursCount += 1;
-    if (isVisible && (setupBlocked || routingIssue || v.mennyuOrdersPaused)) needsAttention += 1;
+    if (isVisible && (setupBlocked || routingIssue || (v.mennyuOrdersPaused && !isMenuOnly))) {
+      needsAttention += 1;
+    }
 
     const status = vendorStatusFromEvaluation({
       visible: isVisible,
@@ -333,6 +393,8 @@ export function buildAdminPodSummary(input: {
       closedByHours,
       routingIssue,
       setupBlocked: setupBlocked || routingIssue,
+      menuOnlyByVendor: isMenuOnly && intent.menuOnlyByVendor,
+      menuOnlyByPod: isMenuOnly && intent.menuOnlyByPod,
     });
 
     return {
@@ -378,7 +440,10 @@ export function buildAdminPodSummary(input: {
     });
   }
 
-  if (detail.pod.mennyuOrdersPaused) {
+  const effectivelyMenuOnly =
+    !podOrderingEnabled || (detail.vendors.length > 0 && menuOnlyCount === visible && visible > 0);
+
+  if (detail.pod.mennyuOrdersPaused && podOrderingEnabled) {
     attentionItems.push({
       id: "paused",
       title: "Pod ordering is paused",
@@ -422,7 +487,13 @@ export function buildAdminPodSummary(input: {
       actionKind: "anchor",
       tone: "warning",
     });
-  } else if (orderable === 0 && !detail.pod.mennyuOrdersPaused && !podHidden) {
+  } else if (
+    orderable === 0 &&
+    !effectivelyMenuOnly &&
+    !detail.pod.mennyuOrdersPaused &&
+    !podHidden
+  ) {
+    /** Suppressed for menu-only pods: zero orderable vendors is the intended state there. */
     attentionItems.push({
       id: "no-orderable",
       title: "No vendors are currently accepting orders",
@@ -511,6 +582,11 @@ export function buildAdminPodSummary(input: {
     overallKey = "hidden";
     overallLabel = "Hidden";
     overallTone = "danger";
+  } else if (effectivelyMenuOnly) {
+    /** Browsable by design — never "no orderable vendors" or "setup required". */
+    overallKey = "menu_only";
+    overallLabel = "Menu only";
+    overallTone = "neutral";
   } else if (detail.pod.mennyuOrdersPaused) {
     overallKey = "paused";
     overallLabel = "Paused";
@@ -542,6 +618,9 @@ export function buildAdminPodSummary(input: {
   let orderingDetail: string | undefined;
   if (podHidden) {
     orderingLabel = "Hidden";
+  } else if (effectivelyMenuOnly) {
+    orderingLabel = "Menu only";
+    orderingDetail = `${visible} vendor${visible === 1 ? "" : "s"} browsable`;
   } else if (detail.pod.mennyuOrdersPaused) {
     orderingLabel = "Paused";
   } else if (orderable > 0) {
@@ -571,7 +650,9 @@ export function buildAdminPodSummary(input: {
       detail: acceptingOrders ? undefined : orderingDetail,
     },
     secondaryBadge: {
-      label: `${detail.vendors.length} vendor${detail.vendors.length === 1 ? "" : "s"} · ${open} open`,
+      label: effectivelyMenuOnly
+        ? `${detail.vendors.length} vendor${detail.vendors.length === 1 ? "" : "s"} · menu only`
+        : `${detail.vendors.length} vendor${detail.vendors.length === 1 ? "" : "s"} · ${open} open`,
     },
     visibility: {
       visible: !podHidden,
@@ -581,6 +662,16 @@ export function buildAdminPodSummary(input: {
       acceptingOrders,
       label: orderingLabel,
       detail: orderingDetail,
+    },
+    orderingMode: {
+      podOrderingEnabled,
+      effectivelyMenuOnly,
+      label: podOrderingEnabled
+        ? ORDERING_MODE_COPY.enabledLabel
+        : ORDERING_MODE_COPY.menuOnlyLabel,
+      description: podOrderingEnabled
+        ? ORDERING_MODE_COPY.podEnabledDescription
+        : ORDERING_MODE_COPY.podMenuOnlyDescription,
     },
     hours: {
       statusLabel:
@@ -596,6 +687,7 @@ export function buildAdminPodSummary(input: {
       totalAttached: detail.vendors.length,
       visible,
       orderable,
+      menuOnly: menuOnlyCount,
       open,
       hidden,
       needsAttention,

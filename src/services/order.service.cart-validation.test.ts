@@ -15,11 +15,15 @@ const mockVariantCharge = vi.fn();
 const mockMenuItemFindUnique = vi.fn();
 const mockMenuItemFindMany = vi.fn();
 const mockModifierOptionFindMany = vi.fn();
+const mockVendorFindMany = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     pod: {
       findUnique: (...args: unknown[]) => mockPodFindUnique(...args),
+    },
+    vendor: {
+      findMany: (...args: unknown[]) => mockVendorFindMany(...args),
     },
     podVendor: {
       findUnique: (...args: unknown[]) => mockPodVendorFindUnique(...args),
@@ -90,7 +94,14 @@ function baseCart(items: CartForValidation["items"]): CartForValidation {
 beforeEach(() => {
   vi.clearAllMocks();
   mockLoadVendorReadinessBundles.mockResolvedValue(new Map());
-  mockPodFindUnique.mockResolvedValue({ isActive: true, pickupTimezone: "America/Chicago" });
+  mockPodFindUnique.mockResolvedValue({
+    isActive: true,
+    orderingEnabled: true,
+    pickupTimezone: "America/Chicago",
+  });
+  mockVendorFindMany.mockImplementation(async ({ where }: { where: { id: { in: string[] } } }) =>
+    where.id.in.map((id) => ({ id, orderingEnabled: true }))
+  );
   mockPodVendorFindUnique.mockResolvedValue({ isActive: true });
   mockPodVendorFindMany.mockResolvedValue([{ vendorId: "v_1", isActive: true }]);
   mockOperationalMenuIds.mockResolvedValue(new Set(["mi_1", "mi_2"]));
@@ -279,6 +290,46 @@ describe("validateCartForOrder", () => {
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.code).toBe("VENDOR_PAUSED_IN_POD");
   });
+
+  /**
+   * These cover the stale-cart path: the customer's client still shows ordering controls, but the
+   * vendor or pod flipped to menu-only before checkout.
+   */
+  it("rejects checkout when the vendor is menu-only", async () => {
+    mockVendorFindMany.mockResolvedValue([{ id: "v_1", orderingEnabled: false }]);
+    const result = await validateCartForOrder(baseCart([baseLine()]));
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe("VENDOR_ORDERING_DISABLED");
+  });
+
+  it("rejects checkout when the pod is menu-only", async () => {
+    mockPodFindUnique.mockResolvedValue({
+      isActive: true,
+      orderingEnabled: false,
+      pickupTimezone: "America/Chicago",
+    });
+    const result = await validateCartForOrder(baseCart([baseLine()]));
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe("POD_ORDERING_DISABLED");
+  });
+
+  it("keeps menu-only distinct from pause when both are set", async () => {
+    mockVendorFindMany.mockResolvedValue([{ id: "v_1", orderingEnabled: false }]);
+    const result = await validateCartForOrder(
+      baseCart([
+        baseLine({
+          vendor: {
+            isActive: true,
+            mennyuOrdersPaused: true,
+            customerOrderingHours: defaultVendorCustomerOrderingWeek(),
+            posOpen: true,
+          },
+        }),
+      ])
+    );
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe("VENDOR_ORDERING_DISABLED");
+  });
 });
 
 describe("validateCartItemsForDisplay multi-vendor", () => {
@@ -335,6 +386,72 @@ describe("validateCartItemsForDisplay multi-vendor", () => {
     const result = await validateCartItemsForDisplay(baseCart([baseLine()]));
     expect(result.valid).toBe(false);
     expect(result.errors[0]?.code).toBe("VENDOR_PAUSED_IN_POD");
+  });
+
+  /**
+   * A mixed cart must survive: only the menu-only vendor's lines are blocked so the customer can
+   * remove them and check out the rest.
+   */
+  it("flags only the menu-only vendor lines and leaves other vendor lines valid", async () => {
+    mockOperationalMenuIds.mockImplementation(async (vendorId: string) =>
+      vendorId === "v_1" ? new Set(["mi_1"]) : new Set(["mi_2"])
+    );
+    mockPodVendorFindMany.mockResolvedValue([
+      { vendorId: "v_1", isActive: true },
+      { vendorId: "v_2", isActive: true },
+    ]);
+    mockVendorFindMany.mockResolvedValue([
+      { id: "v_1", orderingEnabled: true },
+      { id: "v_2", orderingEnabled: false },
+    ]);
+    mockShellBase.mockImplementation(async (item: { priceCents: number }) => item.priceCents);
+    mockMenuItemFindMany.mockResolvedValue([
+      {
+        id: "mi_1",
+        vendorId: "v_1",
+        name: "Burger",
+        isAvailable: true,
+        basketMaxQuantity: null,
+        modifierGroups: [],
+      },
+      {
+        id: "mi_2",
+        vendorId: "v_2",
+        name: "Fries",
+        isAvailable: true,
+        basketMaxQuantity: null,
+        modifierGroups: [],
+      },
+    ]);
+
+    const result = await validateCartItemsForDisplay(
+      baseCart([
+        baseLine({ id: "line_1", menuItemId: "mi_1", vendorId: "v_1" }),
+        baseLine({
+          id: "line_2",
+          menuItemId: "mi_2",
+          vendorId: "v_2",
+          menuItem: { priceCents: 300, isAvailable: true, name: "Fries" },
+          priceCents: 300,
+        }),
+      ])
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]?.cartItemId).toBe("line_2");
+    expect(result.errors[0]?.code).toBe("VENDOR_ORDERING_DISABLED");
+  });
+
+  it("flags every line when the whole pod is menu-only", async () => {
+    mockPodFindUnique.mockResolvedValue({
+      isActive: true,
+      orderingEnabled: false,
+      pickupTimezone: "America/Chicago",
+    });
+    const result = await validateCartItemsForDisplay(baseCart([baseLine()]));
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]?.code).toBe("POD_ORDERING_DISABLED");
   });
 });
 

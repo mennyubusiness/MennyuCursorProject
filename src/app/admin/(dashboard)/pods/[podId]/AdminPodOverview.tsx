@@ -23,12 +23,14 @@ import {
   adminPausePodOrderingAction,
   adminRecheckPodReadinessAction,
   adminRemovePodOwnerFromPodAction,
+  adminSetPodOrderingModeAction,
   adminSetPodVendorActiveAction,
   adminShowPodAction,
   adminUnpausePodOrderingAction,
   adminUpdatePodPublicProfileAction,
   adminDeletePodProfileAction,
 } from "@/actions/admin-pod.actions";
+import { adminSetVendorOrderingModeAction } from "@/actions/admin-vendor.actions";
 import {
   ADMIN_NAV_LABELS,
   buildOrderAdminPath,
@@ -47,12 +49,16 @@ import type { AdminPodDetailView } from "@/services/admin-pod-detail.service";
 
 type Option = { id: string; name: string };
 
-type VendorFilter = "all" | "open" | "needs_attention" | "hidden";
+type VendorFilter = "all" | "open" | "menu_only" | "needs_attention" | "hidden";
 
 function filterVendorRows(rows: AdminPodVendorRow[], filter: VendorFilter): AdminPodVendorRow[] {
   switch (filter) {
     case "open":
       return rows.filter((row) => row.statusKey === "accepting_orders");
+    case "menu_only":
+      return rows.filter(
+        (row) => row.statusKey === "menu_only" || row.statusKey === "menu_only_pod_disabled"
+      );
     case "needs_attention":
       return rows.filter((row) =>
         row.statusKey === "paused" ||
@@ -112,6 +118,10 @@ export function AdminPodOverview({
   const vendorFilterTabs: Array<{ key: VendorFilter; label: string; count: number }> = [
     { key: "all", label: "All", count: summary.vendors.totalAttached },
     { key: "open", label: "Open", count: summary.vendors.open },
+    /** Only offered once at least one vendor is menu only, to keep the tab row short. */
+    ...(summary.vendors.menuOnly > 0
+      ? [{ key: "menu_only" as const, label: "Menu only", count: summary.vendors.menuOnly }]
+      : []),
     { key: "needs_attention", label: "Needs attention", count: summary.vendors.needsAttention },
     { key: "hidden", label: "Hidden", count: summary.vendors.hidden },
   ];
@@ -264,7 +274,11 @@ export function AdminPodOverview({
             href="#ordering-controls"
             className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm font-semibold text-oo-charcoal hover:bg-oo-cream"
           >
-            {detail.pod.mennyuOrdersPaused ? "Resume ordering" : "Pause ordering"}
+            {!summary.orderingMode.podOrderingEnabled
+              ? "Enable ordering"
+              : detail.pod.mennyuOrdersPaused
+                ? "Resume ordering"
+                : "Pause ordering"}
           </a>
           <a
             href="#ordering-controls"
@@ -352,6 +366,30 @@ export function AdminPodOverview({
                         Roster management
                       </summary>
                       <div className="mt-2 space-y-2 rounded-lg border border-dashed border-oo-light-stone bg-oo-cream/40 p-3">
+                        {/* Per-vendor ordering intent. The pod-wide switch lives in Ordering mode. */}
+                        {detailVendor.orderingEnabled ? (
+                          <AdminReasonActionForm
+                            label="Switch to menu only"
+                            description="Customers keep browsing this vendor's menu but cannot order."
+                            confirmLabel="Switch to menu only"
+                            onSubmit={(reason) =>
+                              run(() =>
+                                adminSetVendorOrderingModeAction(detailVendor.vendorId, false, reason)
+                              )
+                            }
+                          />
+                        ) : (
+                          <AdminReasonActionForm
+                            label="Enable ordering"
+                            description="Restores ordering for this vendor using its existing menu and setup."
+                            confirmLabel="Enable ordering"
+                            onSubmit={(reason) =>
+                              run(() =>
+                                adminSetVendorOrderingModeAction(detailVendor.vendorId, true, reason)
+                              )
+                            }
+                          />
+                        )}
                         {detailVendor.podVendorActive ? (
                           <AdminReasonActionForm
                             label="Pause vendor in pod"
@@ -526,8 +564,31 @@ export function AdminPodOverview({
 
       {/* Ordering controls */}
       <section id="ordering-controls" className="scroll-mt-6">
+        <AdminSection title="Ordering mode">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+            <span className="font-semibold text-oo-charcoal">{summary.orderingMode.label}</span>
+            <span className="text-oo-stone-gray">{summary.orderingMode.description}</span>
+          </div>
+          {summary.orderingMode.podOrderingEnabled ? (
+            <AdminReasonActionForm
+              label="Switch pod to menu only"
+              description="Disables ordering across the pod. Each vendor's own ordering setting is kept and resumes when this is turned back on."
+              confirmLabel="Switch to menu only"
+              onSubmit={(reason) => run(() => adminSetPodOrderingModeAction(podId, false, reason))}
+            />
+          ) : (
+            <AdminReasonActionForm
+              label="Enable pod ordering"
+              description="Vendors resume ordering based on their own ordering setting and existing setup."
+              confirmLabel="Enable pod ordering"
+              onSubmit={(reason) => run(() => adminSetPodOrderingModeAction(podId, true, reason))}
+            />
+          )}
+        </AdminSection>
+
         <AdminSection title="Ordering controls">
-          {detail.pod.mennyuOrdersPaused ? (
+          {/* Pause is a temporary intake stop — irrelevant while the pod is menu only. */}
+          {!summary.orderingMode.podOrderingEnabled ? null : detail.pod.mennyuOrdersPaused ? (
             <AdminReasonActionForm
               label="Unpause pod ordering"
               description="Allows all vendors under this pod to accept orders again (subject to vendor-level state)."

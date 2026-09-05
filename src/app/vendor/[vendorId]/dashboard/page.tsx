@@ -18,12 +18,19 @@ export default async function VendorDashboardPage({
   const ctx = await loadVendorDashboardContext(vendorId);
   if (!ctx) notFound();
 
+  const hasActiveOrders =
+    ctx.activeCounts.new + ctx.activeCounts.preparing + ctx.activeCounts.ready > 0;
+
   return (
     <DashboardShell tier="command" className="px-0 pb-0 pt-0">
       <DashboardPageHeader
         headingLevel={1}
         title="Dashboard"
-        description="Store status, live orders, and what needs your attention today."
+        description={
+          ctx.menuOnly
+            ? "Your menu, hours, and public listing."
+            : "Store status, live orders, and what needs your attention today."
+        }
       />
 
       <div className="mt-8 space-y-8">
@@ -34,7 +41,9 @@ export default async function VendorDashboardPage({
             </Link>
             <span className="text-oo-stone-gray">
               {" "}
-              — finish the checklist so customers can order without surprises.
+              {ctx.menuOnly
+                ? "— finish the checklist so your menu appears on the pod page."
+                : "— finish the checklist so customers can order without surprises."}
             </span>
           </div>
         ) : null}
@@ -52,19 +61,23 @@ export default async function VendorDashboardPage({
           todayHoursLabel={ctx.hoursSummary.todayLabel}
           ordersPaused={ctx.vendorRecord.mennyuOrdersPaused ?? false}
           posManaged={ctx.posManaged}
+          menuOnly={ctx.menuOnly}
         />
 
-        <VendorDashboardActiveOrdersSection
-          vendorId={vendorId}
-          vendorDeliverectChannelLinkId={ctx.vendor.deliverectChannelLinkId}
-          initialVendorOrders={ctx.initialVendorOrdersForClient}
-          initialNowMs={ctx.initialNowMs}
-          isDeliverectLive={ctx.isDeliverectLive}
-          squareStatusSyncConfigured={ctx.squareStatusSyncConfigured}
-          orderRoutingMode={ctx.vendorRecord.orderRoutingMode}
-          posManaged={ctx.posManaged}
-          activeCounts={ctx.activeCounts}
-        />
+        {/* Menu-only keeps live-order tooling only while a ticket still needs finishing. */}
+        {!ctx.menuOnly || hasActiveOrders ? (
+          <VendorDashboardActiveOrdersSection
+            vendorId={vendorId}
+            vendorDeliverectChannelLinkId={ctx.vendor.deliverectChannelLinkId}
+            initialVendorOrders={ctx.initialVendorOrdersForClient}
+            initialNowMs={ctx.initialNowMs}
+            isDeliverectLive={ctx.isDeliverectLive}
+            squareStatusSyncConfigured={ctx.squareStatusSyncConfigured}
+            orderRoutingMode={ctx.vendorRecord.orderRoutingMode}
+            posManaged={ctx.posManaged}
+            activeCounts={ctx.activeCounts}
+          />
+        ) : null}
 
         <VendorNeedsAttentionSection
           vendorId={vendorId}
@@ -72,9 +85,9 @@ export default async function VendorDashboardPage({
           setupComplete={ctx.setupComplete}
         />
 
-        <VendorTodayPerformanceSection stats={ctx.todayStats} />
+        {!ctx.menuOnly ? <VendorTodayPerformanceSection stats={ctx.todayStats} /> : null}
 
-        <VendorQuickLinksSection vendorId={vendorId} />
+        <VendorQuickLinksSection vendorId={vendorId} menuOnly={ctx.menuOnly} />
       </div>
     </DashboardShell>
   );

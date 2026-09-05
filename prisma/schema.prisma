@@ -69,6 +69,11 @@ model Pod {
   deletedByUserId    String?
   /// When true, pod remains public but customer ordering is paused for all vendors.
   mennyuOrdersPaused Boolean                @default(false)
+  /// Durable product mode: when false, this is a menu-only pod — published vendor menus stay
+  /// public and browsable but no vendor can accept customer orders. Vendor.orderingEnabled is
+  /// preserved and resumes when this is turned back on. Distinct from `mennyuOrdersPaused`
+  /// (temporary intake pause) and `isActive` (public visibility).
+  orderingEnabled    Boolean                @default(true)
   onboardingStatus   AccountOnboardingStatus @default(ready_for_next_step)
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
@@ -542,6 +547,11 @@ model Vendor {
   locationSummary         String?
   /// When true, block new Mennyu orders for this vendor (intake only); existing orders still visible.
   mennyuOrdersPaused      Boolean                @default(false)
+  /// Durable product mode: when false, this vendor is menu-only — its published menu stays public
+  /// and browsable but customers cannot add items to cart. Menu, menu source, routing, and Stripe
+  /// state are preserved so ordering can resume unchanged. Distinct from `mennyuOrdersPaused`
+  /// (temporary intake pause), `isActive` (public visibility), and MenuItem.isAvailable (sold out).
+  orderingEnabled         Boolean                @default(true)
   /// Deliverect busy-mode ORANGE: minimum extra lead time (minutes) merged into outbound prep for new orders. Null = not in orange busy.
   deliverectBusyDelayMinutes Int?
   /// When true, Deliverect menu webhook imports may auto-publish when eligibility rules pass (see menu-auto-publish.service).

@@ -39,11 +39,18 @@ export type PodRosterVendorRow = {
   /** Vendor-controlled global pause across Open Order. */
   mennyuOrdersPaused: boolean;
   orderRoutingMode: VendorOrderRoutingMode;
+  /** Effective menu-only intent (pod-wide or vendor-level) for this vendor in this pod. */
+  menuOnly: boolean;
   readiness: PodRosterReadinessSnapshot;
 };
 
 function rosterStatusBadge(readiness: PodRosterReadinessSnapshot) {
-  const displayStatus = podOwnerVendorDisplayStatus(readiness.status, readiness.canAcceptOrders);
+  const displayStatus = podOwnerVendorDisplayStatus(
+    readiness.status,
+    readiness.canAcceptOrders,
+    readiness.setupSummary,
+    { menuOnly: Boolean(readiness.menuOnly), menuOnlyByPod: Boolean(readiness.menuOnlyByPod) }
+  );
   if (displayStatus === "Live") {
     return { label: displayStatus, className: "rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-900" };
   }

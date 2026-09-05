@@ -19,6 +19,7 @@ import type { AdminVendorDetailView } from "@/services/admin-vendor-detail.servi
 import type { AdminSquareRoutingStatus } from "@/lib/integrations/square/square-routing-readiness";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 import { buildVendorPosReadinessFallback } from "@/lib/pos-connection-status";
+import { ORDERING_MODE_COPY } from "@/lib/vendor-ordering-mode";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { AdminVendorOrderRoutingSection } from "./AdminVendorOrderRoutingSection";
 import { AdminEntityDeleteDangerZone } from "@/components/admin/AdminEntityDeleteDangerZone";
@@ -33,6 +34,7 @@ import {
   adminPauseVendorOrderingAction,
   adminRecheckVendorReadinessAction,
   adminRestoreVendorSlugAction,
+  adminSetVendorOrderingModeAction,
   adminShowVendorAction,
   adminUnpauseVendorOrderingAction,
   adminUpdateVendorPublicProfileAction,
@@ -177,7 +179,14 @@ export function AdminVendorOverview({
               <p className="truncate text-xs text-oo-stone-gray">{summary.publicUrl}</p>
             ) : null}
           </AdminStatusCard>
-          <AdminStatusCard title="Ordering">
+          <AdminStatusCard
+            title="Ordering"
+            action={
+              <a href="#ordering-controls" className="text-xs font-semibold text-oo-charcoal underline">
+                Manage
+              </a>
+            }
+          >
             <p className="font-medium">{summary.ordering.label}</p>
             <p className="text-xs text-oo-stone-gray">
               {summary.hours.statusLabel}
@@ -284,7 +293,11 @@ export function AdminVendorOverview({
             href="#ordering-controls"
             className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-3 py-2 text-sm font-semibold text-oo-charcoal hover:bg-oo-cream"
           >
-            {detail.vendor.mennyuOrdersPaused ? "Resume ordering" : "Pause ordering"}
+            {summary.orderingMode.menuOnly
+              ? "Enable ordering"
+              : detail.vendor.mennyuOrdersPaused
+                ? "Resume ordering"
+                : "Pause ordering"}
           </a>
         </div>
       </section>
@@ -361,8 +374,45 @@ export function AdminVendorOverview({
 
       {/* Ordering controls (targeted by quick actions) */}
       <section id="ordering-controls" className="scroll-mt-6">
+        <AdminSection title="Ordering mode">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+            <span className="font-semibold text-oo-charcoal">
+              {summary.orderingMode.vendorOrderingEnabled
+                ? ORDERING_MODE_COPY.enabledLabel
+                : ORDERING_MODE_COPY.menuOnlyLabel}
+            </span>
+            <span className="text-oo-stone-gray">{summary.orderingMode.description}</span>
+          </div>
+          {summary.orderingMode.menuOnlyByPod ? (
+            <p className="text-sm text-oo-stone-gray">
+              Ordering is disabled pod-wide, so this vendor is menu only regardless of this
+              setting.
+            </p>
+          ) : null}
+          {summary.orderingMode.vendorOrderingEnabled ? (
+            <AdminReasonActionForm
+              label="Switch to menu only"
+              description="Customers keep browsing this menu but cannot order. Menu, routing, and Stripe setup are preserved."
+              confirmLabel="Switch to menu only"
+              onSubmit={(reason) =>
+                run(() => adminSetVendorOrderingModeAction(vendorId, false, reason))
+              }
+            />
+          ) : (
+            <AdminReasonActionForm
+              label="Enable ordering"
+              description="Restores ordering using the existing menu and integrations. No menu republish needed."
+              confirmLabel="Enable ordering"
+              onSubmit={(reason) =>
+                run(() => adminSetVendorOrderingModeAction(vendorId, true, reason))
+              }
+            />
+          )}
+        </AdminSection>
+
         <AdminSection title="Ordering controls">
-          {detail.vendor.mennyuOrdersPaused ? (
+          {/* Pause is a temporary intake stop — irrelevant while the vendor is menu only. */}
+          {summary.orderingMode.menuOnly ? null : detail.vendor.mennyuOrdersPaused ? (
             <AdminReasonActionForm
               label="Resume ordering"
               description="Allows customers to place new orders again."

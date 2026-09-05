@@ -8,6 +8,8 @@ const mockMenuVersionUpdateMany = vi.fn();
 const mockMenuItemFindMany = vi.fn();
 const mockMenuItemUpdateMany = vi.fn();
 
+const mockApplyCanonical = vi.fn();
+
 vi.mock("@/lib/db", () => ({
   prisma: {
     vendor: {
@@ -26,6 +28,10 @@ vi.mock("@/lib/db", () => ({
     },
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn((await import("@/lib/db")).prisma),
   },
+}));
+
+vi.mock("@/services/menu-apply-canonical-live", () => ({
+  applyCanonicalMenuToLiveTables: (...args: unknown[]) => mockApplyCanonical(...args),
 }));
 
 import { reconcileVendorMenuSourceOwnership } from "@/services/vendor-menu-source-ownership";
@@ -105,6 +111,7 @@ describe("reconcileVendorMenuSourceOwnership", () => {
     mockMenuVersionUpdateMany.mockResolvedValue({ count: 1 });
     mockMenuItemUpdateMany.mockResolvedValue({ count: 1 });
     mockMenuItemFindMany.mockResolvedValue([]);
+    mockApplyCanonical.mockResolvedValue(undefined);
   });
 
   it("Square → tablet: adopts Square catalog and restores snapshot-available items", async () => {
@@ -198,7 +205,7 @@ describe("reconcileVendorMenuSourceOwnership", () => {
     expect(restoreArg?.where?.deliverectProductId?.in).not.toContain("sq:prod:soldout");
   });
 
-  it("Case 4 — tablet → Deliverect: archives Open Order published and soft-disables oo items", async () => {
+  it("Case 4 — tablet → Deliverect: archives Open Order published without rewriting native isAvailable", async () => {
     mockVendorFindUnique.mockResolvedValue({
       id: "v1",
       orderRoutingMode: "manual_dashboard",
@@ -207,10 +214,6 @@ describe("reconcileVendorMenuSourceOwnership", () => {
     mockMenuVersionFindMany.mockResolvedValue([
       { id: "mv_oo", state: MenuVersionState.published, canonicalSnapshot: openOrderSnapshot() },
       { id: "mv_del", state: MenuVersionState.published, canonicalSnapshot: deliverectSnapshot() },
-    ]);
-    mockMenuItemFindMany.mockResolvedValue([
-      { id: "item_oo", deliverectProductId: "oo:prod:1" },
-      { id: "item_del", deliverectProductId: "del-1" },
     ]);
 
     const result = await reconcileVendorMenuSourceOwnership({
@@ -221,15 +224,11 @@ describe("reconcileVendorMenuSourceOwnership", () => {
     expect(result.menuSource).toBe("deliverect");
     expect(result.provider).toBe("deliverect");
     expect(result.archivedMenuVersionIds).toEqual(["mv_oo"]);
-    expect(mockMenuItemUpdateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: { in: ["item_oo"] } },
-        data: { isAvailable: false },
-      })
-    );
+    expect(result.softDisabledMenuItemCount).toBe(0);
+    expect(mockMenuItemUpdateMany).not.toHaveBeenCalled();
   });
 
-  it("Case 5 — Square: switching to square archives Deliverect and soft-disables non-Square items", async () => {
+  it("Case 5 — Square: switching to square archives other catalogs without disabling native items", async () => {
     mockVendorFindUnique.mockResolvedValue({
       id: "v1",
       orderRoutingMode: "manual_dashboard",
@@ -240,11 +239,6 @@ describe("reconcileVendorMenuSourceOwnership", () => {
       { id: "mv_sq", state: MenuVersionState.published, canonicalSnapshot: squareSnapshot() },
       { id: "mv_oo", state: MenuVersionState.published, canonicalSnapshot: openOrderSnapshot() },
     ]);
-    mockMenuItemFindMany.mockResolvedValue([
-      { id: "item_del", deliverectProductId: "del-1" },
-      { id: "item_sq", deliverectProductId: "sq:prod:1" },
-      { id: "item_oo", deliverectProductId: "oo:prod:1" },
-    ]);
 
     const result = await reconcileVendorMenuSourceOwnership({
       vendorId: "v1",
@@ -254,12 +248,105 @@ describe("reconcileVendorMenuSourceOwnership", () => {
     expect(result.menuSource).toBe("open_order");
     expect(result.provider).toBe("square");
     expect(result.archivedMenuVersionIds.sort()).toEqual(["mv_del", "mv_oo"].sort());
-    expect(mockMenuItemUpdateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: { in: expect.arrayContaining(["item_del", "item_oo"]) } },
-        data: { isAvailable: false },
-      })
-    );
+    expect(result.softDisabledMenuItemCount).toBe(0);
+    expect(mockMenuItemUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("A — Native → Square → Native keeps authoring availability on oo:prod items", async () => {
+    const nativeTwo = {
+      schemaVersion: 1,
+      vendorId: "v1",
+      categories: [],
+      products: [
+        {
+          deliverectId: "oo:prod:A",
+          name: "A",
+          priceCents: 100,
+          isAvailable: true,
+          sortOrder: 0,
+          modifierGroupDeliverectIds: [],
+        },
+        {
+          deliverectId: "oo:prod:B",
+          name: "B",
+          priceCents: 100,
+          isAvailable: false,
+          sortOrder: 1,
+          modifierGroupDeliverectIds: [],
+        },
+      ],
+      modifierGroupDefinitions: [],
+      deliverect: { sourcePayloadKind: "open_order_builder_v1" },
+    };
+
+    mockVendorFindUnique.mockResolvedValue({
+      id: "v1",
+      orderRoutingMode: "manual_dashboard",
+      menuSource: "open_order",
+    });
+    mockMenuVersionFindMany.mockResolvedValue([
+      { id: "mv_oo", state: MenuVersionState.published, canonicalSnapshot: nativeTwo },
+      { id: "mv_sq", state: MenuVersionState.published, canonicalSnapshot: squareSnapshot() },
+    ]);
+
+    await reconcileVendorMenuSourceOwnership({
+      vendorId: "v1",
+      orderRoutingMode: "square",
+    });
+    expect(mockMenuItemUpdateMany).not.toHaveBeenCalled();
+
+    mockVendorFindUnique.mockResolvedValue({
+      id: "v1",
+      orderRoutingMode: "square",
+      menuSource: "open_order",
+    });
+    mockMenuVersionFindMany.mockResolvedValue([
+      { id: "mv_oo", state: MenuVersionState.archived, canonicalSnapshot: nativeTwo },
+      { id: "mv_sq", state: MenuVersionState.published, canonicalSnapshot: squareSnapshot() },
+    ]);
+
+    const back = await reconcileVendorMenuSourceOwnership({
+      vendorId: "v1",
+      orderRoutingMode: "manual_dashboard",
+    });
+    expect(back.provider).toBe("open_order");
+    expect(back.restoredMenuVersionIds).toEqual(["mv_oo"]);
+    expect(mockApplyCanonical).toHaveBeenCalled();
+  });
+
+  it("B — Native → Deliverect → Native does not rewrite native isAvailable", async () => {
+    mockVendorFindUnique.mockResolvedValue({
+      id: "v1",
+      orderRoutingMode: "manual_dashboard",
+      menuSource: "open_order",
+    });
+    mockMenuVersionFindMany.mockResolvedValue([
+      { id: "mv_oo", state: MenuVersionState.published, canonicalSnapshot: openOrderSnapshot() },
+      { id: "mv_del", state: MenuVersionState.published, canonicalSnapshot: deliverectSnapshot() },
+    ]);
+
+    await reconcileVendorMenuSourceOwnership({
+      vendorId: "v1",
+      orderRoutingMode: "deliverect",
+    });
+    expect(mockMenuItemUpdateMany).not.toHaveBeenCalled();
+    expect(mockApplyCanonical).not.toHaveBeenCalled();
+
+    mockVendorFindUnique.mockResolvedValue({
+      id: "v1",
+      orderRoutingMode: "deliverect",
+      menuSource: "deliverect",
+    });
+    mockMenuVersionFindMany.mockResolvedValue([
+      { id: "mv_oo", state: MenuVersionState.archived, canonicalSnapshot: openOrderSnapshot() },
+      { id: "mv_del", state: MenuVersionState.published, canonicalSnapshot: deliverectSnapshot() },
+    ]);
+
+    await reconcileVendorMenuSourceOwnership({
+      vendorId: "v1",
+      orderRoutingMode: "manual_dashboard",
+    });
+    expect(mockApplyCanonical).toHaveBeenCalled();
   });
 
   it("does not archive the active provider published menu", async () => {
@@ -328,6 +415,7 @@ describe("reconcileVendorMenuSourceOwnership", () => {
     });
 
     expect(result.restoredMenuVersionIds).toEqual([]);
+    expect(result.archivedMenuVersionIds).toEqual(["mv_sq"]);
     expect(mockMenuItemUpdateMany).not.toHaveBeenCalled();
   });
 

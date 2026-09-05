@@ -28,6 +28,7 @@ export function StandardPodPageView({
   hasAboutSection,
   contactDetails,
   groupOrderHref,
+  hasOrderableVendor,
   navItems,
   isQrEntry,
   highlightVendor,
@@ -48,6 +49,7 @@ export function StandardPodPageView({
         accentColor={pod.accentColor}
         orderingStatus={orderingStatus}
         hasVendors={vendorRows.length > 0}
+        showGroupOrderCta={hasOrderableVendor}
       />
 
       <PodPageStickyNav items={navItems} podId={pod.id} podName={pod.name} />
@@ -58,10 +60,21 @@ export function StandardPodPageView({
             className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-oo-charcoal"
             role="status"
           >
-            <p className="font-semibold">You&apos;re ordering from {pod.name}</p>
-            <p className="mt-0.5 text-oo-stone-gray">
-              Pick a vendor below — one cart, one checkout, one pickup.
-            </p>
+            {hasOrderableVendor ? (
+              <>
+                <p className="font-semibold">You&apos;re ordering from {pod.name}</p>
+                <p className="mt-0.5 text-oo-stone-gray">
+                  Pick a vendor below — one cart, one checkout, one pickup.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold">Welcome to {pod.name}</p>
+                <p className="mt-0.5 text-oo-stone-gray">
+                  Browse the menus below to see what each kitchen is serving.
+                </p>
+              </>
+            )}
           </div>
         </PageShell>
       )}
@@ -104,7 +117,7 @@ export function StandardPodPageView({
       <PodPageStickyCta
         podName={pod.name}
         showVendorsCta={vendorRows.length > 0}
-        showGroupOrderCta={vendorRows.length > 0}
+        showGroupOrderCta={vendorRows.length > 0 && hasOrderableVendor}
         groupOrderHref={groupOrderHref}
       />
     </div>

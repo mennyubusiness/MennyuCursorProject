@@ -36,10 +36,16 @@ function toGridRow(
       cuisineCategory: string | null;
       isActive: boolean;
       mennyuOrdersPaused: boolean;
+      orderingEnabled: boolean;
       customerOrderingHours: unknown;
     };
   },
-  pod: { isActive: boolean; mennyuOrdersPaused: boolean; pickupTimezone: string | null },
+  pod: {
+    isActive: boolean;
+    mennyuOrdersPaused: boolean;
+    orderingEnabled: boolean;
+    pickupTimezone: string | null;
+  },
   menuSummary: VendorMenuReadinessSummary,
   stripeSummary: VendorStripeReadinessSummary,
   posSummary: VendorPosReadinessSummary
@@ -58,6 +64,7 @@ function toGridRow(
     vendor: {
       isActive: pv.vendor.isActive,
       mennyuOrdersPaused: pv.vendor.mennyuOrdersPaused,
+      orderingEnabled: pv.vendor.orderingEnabled,
       name: pv.vendor.name,
       slug: pv.vendor.slug,
       description: pv.vendor.description,
@@ -68,7 +75,11 @@ function toGridRow(
     menuSummary,
     stripeSummary,
     posSummary,
-    pod: { isActive: pod.isActive, mennyuOrdersPaused: pod.mennyuOrdersPaused },
+    pod: {
+      isActive: pod.isActive,
+      mennyuOrdersPaused: pod.mennyuOrdersPaused,
+      orderingEnabled: pod.orderingEnabled,
+    },
     podVendor: { exists: true, isActive: pv.isActive },
     vendorAvailability,
   };
@@ -128,6 +139,8 @@ export type PodCustomerPageData = {
   hasVisitSection: boolean;
   contactDetails: PodContactInfo;
   groupOrderHref: string;
+  /** False when no vendor in the pod has ordering intent — group-order CTAs are hidden. */
+  hasOrderableVendor: boolean;
   navItems: ReturnType<typeof buildPodPageNavItems>;
 };
 
@@ -147,6 +160,7 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
                 description: true,
                 isActive: true,
                 mennyuOrdersPaused: true,
+                orderingEnabled: true,
                 imageUrl: true,
                 cuisineCategory: true,
                 customerOrderingHours: true,
@@ -171,7 +185,12 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
       if (!bundle) return null;
       return toGridRow(
         pv,
-        { isActive: pod.isActive, mennyuOrdersPaused: pod.mennyuOrdersPaused, pickupTimezone: pod.pickupTimezone },
+        {
+          isActive: pod.isActive,
+          mennyuOrdersPaused: pod.mennyuOrdersPaused,
+          orderingEnabled: pod.orderingEnabled,
+          pickupTimezone: pod.pickupTimezone,
+        },
         bundle.menuSummary,
         bundle.stripeSummary,
         bundle.posSummary
@@ -180,14 +199,23 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
     .filter((row): row is PodVendorGridRow => row != null);
   const amenities = parsePodAmenities(pod.amenities);
   const customAmenities = parsePodCustomAmenities(pod.customAmenities);
-  const orderingStatus = pod.mennyuOrdersPaused
-    ? {
-        label: "Pod ordering paused",
-        tone: "closed" as const,
-        openVendorCount: 0,
-        totalVendorCount: vendorRows.length,
-      }
-    : getPodOrderingStatus(vendorRows.map((r) => r.availability));
+  /**
+   * Menu-only outranks the pause banner: a pod that never intends to take orders should read as
+   * a browsing destination, not a paused ordering system.
+   */
+  const orderingStatus =
+    pod.mennyuOrdersPaused && pod.orderingEnabled
+      ? {
+          label: "Pod ordering paused",
+          tone: "closed" as const,
+          openVendorCount: 0,
+          totalVendorCount: vendorRows.length,
+        }
+      : getPodOrderingStatus(vendorRows.map((r) => r.availability));
+
+  /** Group ordering is an ordering feature: it needs at least one vendor with ordering intent. */
+  const hasOrderableVendor =
+    pod.orderingEnabled && vendorRows.some((r) => !r.availability.menuOnly);
 
   const hasLocationSection = Boolean(pod.address?.trim());
   const hasContactSection = Boolean(
@@ -254,6 +282,7 @@ export async function loadPodCustomerPageData(podId: string): Promise<PodCustome
     hasVisitSection,
     contactDetails,
     groupOrderHref,
+    hasOrderableVendor,
     navItems,
   };
 }

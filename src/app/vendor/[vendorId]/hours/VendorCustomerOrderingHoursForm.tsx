@@ -19,9 +19,15 @@ const ERROR_COPY = "We couldn't update your hours. Please try again.";
 type Props = {
   vendorId: string;
   initialCustomHours: VendorCustomerOrderingWeek;
+  /** Menu-only vendors still publish hours — the wording just drops "ordering". */
+  menuOnly?: boolean;
 };
 
-export function VendorCustomerOrderingHoursForm({ vendorId, initialCustomHours }: Props) {
+export function VendorCustomerOrderingHoursForm({
+  vendorId,
+  initialCustomHours,
+  menuOnly = false,
+}: Props) {
   const router = useRouter();
   const [customHours, setCustomHours] = useState<VendorCustomerOrderingWeek>(initialCustomHours);
   const [pending, setPending] = useState(false);
@@ -69,9 +75,13 @@ export function VendorCustomerOrderingHoursForm({ vendorId, initialCustomHours }
   return (
     <div className="space-y-8">
       <section className="rounded-2xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-oo-charcoal">Customer ordering hours</h2>
+        <h2 className="text-lg font-semibold text-oo-charcoal">
+          {menuOnly ? "Hours" : "Customer ordering hours"}
+        </h2>
         <p className="mt-1 text-sm text-oo-stone-gray">
-          Set when customers can place orders through Open Order for each day of the week.
+          {menuOnly
+            ? "Set the hours customers see on your public menu page for each day of the week."
+            : "Set when customers can place orders through Open Order for each day of the week."}
         </p>
 
         <ul className="mt-5 space-y-3">

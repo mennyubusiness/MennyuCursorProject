@@ -24,6 +24,13 @@ import {
   cartLineOrderabilityCode,
   cartLineOrderabilityMessage,
 } from "@/lib/vendor-orderability-in-pod";
+import {
+  POD_ORDERING_DISABLED_CART_MESSAGE,
+  POD_ORDERING_DISABLED_CODE,
+  resolveVendorOrderingIntent,
+  VENDOR_ORDERING_DISABLED_CART_MESSAGE,
+  VENDOR_ORDERING_DISABLED_CODE,
+} from "@/lib/vendor-ordering-mode";
 import { loadVendorReadinessBundles } from "@/lib/vendor-readiness-validation.server";
 import {
   getOperationalMenuItemIdsForVendor,
@@ -129,6 +136,8 @@ export async function validateCartForOrder(cart: {
     vendor: {
       isActive?: boolean;
       mennyuOrdersPaused?: boolean;
+      /** Durable menu-only intent. Undefined is treated as enabled. */
+      orderingEnabled?: boolean;
       posOpen?: boolean;
       menuSource?: import("@prisma/client").VendorMenuSource;
       deliverectChannelLinkId?: string | null;
@@ -141,7 +150,12 @@ export async function validateCartForOrder(cart: {
 }): Promise<CartValidationResult> {
   const pod = await prisma.pod.findUnique({
     where: { id: cart.podId },
-    select: { isActive: true, mennyuOrdersPaused: true, pickupTimezone: true },
+    select: {
+      isActive: true,
+      mennyuOrdersPaused: true,
+      orderingEnabled: true,
+      pickupTimezone: true,
+    },
   });
   if (!pod?.isActive) {
     return {
@@ -161,7 +175,7 @@ export async function validateCartForOrder(cart: {
   const hoursTimezone = resolveVendorHoursTimezone(pod.pickupTimezone);
 
   const vendorIds = [...new Set(cart.items.map((i) => i.vendorId))];
-  const [operationalByVendor, readinessBundles, podVendors] = await Promise.all([
+  const [operationalByVendor, readinessBundles, podVendors, vendorIntentRows] = await Promise.all([
     (async () => {
       const map = new Map<string, Set<string>>();
       for (const vid of vendorIds) {
@@ -174,8 +188,16 @@ export async function validateCartForOrder(cart: {
       where: { podId: cart.podId, vendorId: { in: vendorIds } },
       select: { vendorId: true, isActive: true },
     }),
+    /** Read intent from the database so a stale client payload cannot bypass menu-only. */
+    prisma.vendor.findMany({
+      where: { id: { in: vendorIds } },
+      select: { id: true, orderingEnabled: true },
+    }),
   ]);
   const podVendorActive = new Map(podVendors.map((row) => [row.vendorId, row.isActive]));
+  const vendorOrderingEnabledById = new Map(
+    vendorIntentRows.map((row) => [row.id, row.orderingEnabled])
+  );
 
   for (const item of cart.items) {
     const operational = operationalByVendor.get(item.vendorId)?.has(item.menuItemId) ?? false;
@@ -203,6 +225,11 @@ export async function validateCartForOrder(cart: {
     const podOrderability = getVendorOrderabilityInPod({
       podActive: pod.isActive,
       podOrdersPaused: pod.mennyuOrdersPaused,
+      podOrderingEnabled: pod.orderingEnabled,
+      vendorOrderingEnabled:
+        vendorOrderingEnabledById.get(item.vendorId) ??
+        readinessBundle?.vendor.orderingEnabled ??
+        item.vendor.orderingEnabled,
       podVendorExists: podVendorActive.has(item.vendorId),
       podVendorActive: podVendorActive.get(item.vendorId) === true,
       vendor: { ...item.vendor, posOpen },
@@ -477,6 +504,8 @@ export type CartForValidation = {
     vendor: {
       isActive?: boolean;
       mennyuOrdersPaused?: boolean;
+      /** Durable menu-only intent. Undefined is treated as enabled. */
+      orderingEnabled?: boolean;
       posOpen?: boolean;
       menuSource?: import("@prisma/client").VendorMenuSource;
       deliverectChannelLinkId?: string | null;
@@ -500,7 +529,12 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
 
   const pod = await prisma.pod.findUnique({
     where: { id: cart.podId },
-    select: { isActive: true, mennyuOrdersPaused: true, pickupTimezone: true },
+    select: {
+      isActive: true,
+      mennyuOrdersPaused: true,
+      orderingEnabled: true,
+      pickupTimezone: true,
+    },
   });
   if (!pod?.isActive) {
     errors.push({
@@ -522,20 +556,29 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
   const vendorIdsDisplay = [...new Set(cart.items.map((i) => i.vendorId))];
   const menuItemIds = [...new Set(cart.items.map((i) => i.menuItemId))];
 
-  const [podVendors, menuItemsLoaded, opMenuResults, opModResults] = await Promise.all([
-    prisma.podVendor.findMany({
-      where: { podId: cart.podId, vendorId: { in: vendorIdsDisplay } },
-      select: { vendorId: true, isActive: true },
-    }),
-    prisma.menuItem.findMany({
-      where: { id: { in: menuItemIds } },
-      include: MODIFIER_VALIDATION_MENU_ITEM_INCLUDE,
-    }),
-    Promise.all(vendorIdsDisplay.map((vid) => getOperationalMenuItemIdsForVendor(vid))),
-    Promise.all(vendorIdsDisplay.map((vid) => getOperationalModifierOptionIdsForVendor(vid))),
-  ]);
+  const [podVendors, vendorIntentRows, menuItemsLoaded, opMenuResults, opModResults] =
+    await Promise.all([
+      prisma.podVendor.findMany({
+        where: { podId: cart.podId, vendorId: { in: vendorIdsDisplay } },
+        select: { vendorId: true, isActive: true },
+      }),
+      /** Read intent from the database so a stale client payload cannot bypass menu-only. */
+      prisma.vendor.findMany({
+        where: { id: { in: vendorIdsDisplay } },
+        select: { id: true, orderingEnabled: true },
+      }),
+      prisma.menuItem.findMany({
+        where: { id: { in: menuItemIds } },
+        include: MODIFIER_VALIDATION_MENU_ITEM_INCLUDE,
+      }),
+      Promise.all(vendorIdsDisplay.map((vid) => getOperationalMenuItemIdsForVendor(vid))),
+      Promise.all(vendorIdsDisplay.map((vid) => getOperationalModifierOptionIdsForVendor(vid))),
+    ]);
 
   const podVendorActive = new Map(podVendors.map((pv) => [pv.vendorId, pv.isActive]));
+  const vendorOrderingEnabledById = new Map(
+    vendorIntentRows.map((row) => [row.id, row.orderingEnabled])
+  );
   const menuItemById = new Map(menuItemsLoaded.map((m) => [m.id, m]));
 
   const operationalByVendorDisplay = new Map<string, Set<string>>();
@@ -552,6 +595,28 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
   const expectedPriceByCartItemId = new Map(priceChecks.map((p) => [p.item.id, p.cents]));
 
   for (const item of cart.items) {
+    /**
+     * Menu-only is checked first and per line: lines from other, still-orderable vendors stay
+     * valid, and the customer gets a remove-to-continue message instead of a pause/outage error.
+     */
+    const orderingIntent = resolveVendorOrderingIntent({
+      podOrderingEnabled: pod.orderingEnabled,
+      vendorOrderingEnabled: vendorOrderingEnabledById.get(item.vendorId),
+    });
+    if (!orderingIntent.effectiveOrderingEnabled) {
+      errors.push({
+        code: orderingIntent.menuOnlyByPod
+          ? POD_ORDERING_DISABLED_CODE
+          : VENDOR_ORDERING_DISABLED_CODE,
+        message: orderingIntent.menuOnlyByPod
+          ? POD_ORDERING_DISABLED_CART_MESSAGE
+          : VENDOR_ORDERING_DISABLED_CART_MESSAGE,
+        cartItemId: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+      });
+      continue;
+    }
     const operational = operationalByVendorDisplay.get(item.vendorId)?.has(item.menuItemId) ?? false;
     if (!operational) {
       errors.push({
@@ -611,6 +676,8 @@ export async function validateCartItemsForDisplay(cart: CartForValidation): Prom
       const podOrderability = getVendorOrderabilityInPod({
         podActive: pod.isActive,
         podOrdersPaused: pod.mennyuOrdersPaused,
+        podOrderingEnabled: pod.orderingEnabled,
+        vendorOrderingEnabled: vendorOrderingEnabledById.get(item.vendorId),
         podVendorExists: podVendorActive.has(item.vendorId),
         podVendorActive: podVendorActive.get(item.vendorId) === true,
         vendor: { ...item.vendor, posOpen },

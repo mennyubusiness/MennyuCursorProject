@@ -2,6 +2,10 @@ import Link from "next/link";
 
 import { DashboardStatusBadge, type DashboardStatusTone } from "@/components/dashboard";
 import { vendorIntakeStatusTone, type VendorIntakeStatusLabel } from "@/lib/vendor-operational-copy";
+import {
+  VENDOR_MENU_ONLY_DASHBOARD_BODY,
+  VENDOR_MENU_ONLY_DASHBOARD_TITLE,
+} from "@/lib/vendor-ordering-mode";
 import { VendorKitchenPauseToggle } from "../kitchen/VendorKitchenPauseToggle";
 
 type VendorStoreStatusCardProps = {
@@ -17,6 +21,8 @@ type VendorStoreStatusCardProps = {
   todayHoursLabel: string;
   ordersPaused: boolean;
   posManaged: boolean;
+  /** Ordering is intentionally off: no pause control, no routing/payments tiles. */
+  menuOnly?: boolean;
 };
 
 export function VendorStoreStatusCard({
@@ -32,6 +38,7 @@ export function VendorStoreStatusCard({
   todayHoursLabel,
   ordersPaused,
   posManaged,
+  menuOnly = false,
 }: VendorStoreStatusCardProps) {
   const tone: DashboardStatusTone = vendorIntakeStatusTone(intakeLabel);
 
@@ -39,7 +46,9 @@ export function VendorStoreStatusCard({
     <section className="rounded-2xl border border-oo-light-stone bg-oo-warm-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">Store status</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-oo-stone-gray">
+            {menuOnly ? "Menu status" : "Store status"}
+          </p>
           <h2 className="mt-1 text-2xl font-bold text-oo-charcoal">{vendorName}</h2>
           {podName ? (
             <p className="mt-1 text-sm text-oo-stone-gray">Serving in {podName}</p>
@@ -47,15 +56,23 @@ export function VendorStoreStatusCard({
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <DashboardStatusBadge tone={tone}>{intakeLabel}</DashboardStatusBadge>
           </div>
+          {menuOnly ? (
+            <p className="mt-3 max-w-md text-sm text-oo-stone-gray">
+              {VENDOR_MENU_ONLY_DASHBOARD_TITLE} — {VENDOR_MENU_ONLY_DASHBOARD_BODY}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 flex-wrap items-end gap-3">
-          <VendorKitchenPauseToggle
-            vendorId={vendorId}
-            initialPaused={ordersPaused}
-            variant="orders"
-            posManaged={posManaged}
-          />
+          {/* Pausing intake is meaningless when ordering is already off by configuration. */}
+          {menuOnly ? null : (
+            <VendorKitchenPauseToggle
+              vendorId={vendorId}
+              initialPaused={ordersPaused}
+              variant="orders"
+              posManaged={posManaged}
+            />
+          )}
           {storefrontHref ? (
             <Link
               href={storefrontHref}
@@ -80,18 +97,22 @@ export function VendorStoreStatusCard({
           <dt className="text-xs font-medium text-oo-stone-gray">Today</dt>
           <dd className="mt-1 text-sm font-medium text-oo-charcoal">{todayHoursLabel}</dd>
         </div>
-        <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
-          <dt className="text-xs font-medium text-oo-stone-gray">{routingStatusFieldLabel}</dt>
-          <dd className="mt-1 text-sm font-medium text-oo-charcoal">{posConnectionLabel}</dd>
-        </div>
+        {menuOnly ? null : (
+          <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
+            <dt className="text-xs font-medium text-oo-stone-gray">{routingStatusFieldLabel}</dt>
+            <dd className="mt-1 text-sm font-medium text-oo-charcoal">{posConnectionLabel}</dd>
+          </div>
+        )}
         <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
           <dt className="text-xs font-medium text-oo-stone-gray">Menu</dt>
           <dd className="mt-1 text-sm font-medium text-oo-charcoal">{menuSyncLabel}</dd>
         </div>
-        <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
-          <dt className="text-xs font-medium text-oo-stone-gray">Payments</dt>
-          <dd className="mt-1 text-sm font-medium text-oo-charcoal">{paymentsLabel}</dd>
-        </div>
+        {menuOnly ? null : (
+          <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
+            <dt className="text-xs font-medium text-oo-stone-gray">Payments</dt>
+            <dd className="mt-1 text-sm font-medium text-oo-charcoal">{paymentsLabel}</dd>
+          </div>
+        )}
       </dl>
     </section>
   );

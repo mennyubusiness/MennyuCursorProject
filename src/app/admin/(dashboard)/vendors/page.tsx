@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { searchAdminVendors } from "@/services/admin-vendor-detail.service";
+import {
+  parseAdminVendorOrderingModeQuery,
+  searchAdminVendors,
+} from "@/services/admin-vendor-detail.service";
 import { AdminVendorSearchForm } from "./AdminVendorSearchForm";
 import { vendorDashboardPresenceLabel } from "@/lib/vendor-dashboard-presence";
 import {
@@ -19,21 +22,25 @@ function RoutingBadge({ mode }: { mode: string }) {
 export default async function AdminVendorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; routing?: string }>;
+  searchParams: Promise<{ q?: string; routing?: string; ordering?: string }>;
 }) {
   const sp = await searchParams;
   const query = sp.q?.trim() ?? "";
   const routing = parseAdminVendorRoutingQuery(sp.routing);
-  const hasFilter = Boolean(query || routing);
+  const orderingMode = parseAdminVendorOrderingModeQuery(sp.ordering);
+  const orderingModeLabel = orderingMode === "menu_only" ? "Menu only" : "Orderable";
+  const hasFilter = Boolean(query || routing || orderingMode);
   const results = hasFilter
-    ? await searchAdminVendors(query, { orderRoutingMode: routing })
+    ? await searchAdminVendors(query, { orderRoutingMode: routing, orderingMode })
     : [];
 
   const emptyMessage = query
     ? `No vendors matched “${query}”${routing ? ` with ${vendorOrderRoutingModeCompactLabel(routing)} routing` : ""}.`
     : routing
       ? `No vendors currently use ${vendorOrderRoutingModeCompactLabel(routing)} routing.`
-      : null;
+      : orderingMode
+        ? `No vendors are currently ${orderingModeLabel.toLowerCase()}.`
+        : null;
 
   return (
     <div className="space-y-6">
@@ -47,9 +54,10 @@ export default async function AdminVendorsPage({
       </div>
 
       <AdminVendorSearchForm
-        key={`${query}|${routing ?? "all"}`}
+        key={`${query}|${routing ?? "all"}|${orderingMode ?? "all"}`}
         initialQuery={query}
         initialRouting={routing ?? ""}
+        initialOrderingMode={orderingMode ?? ""}
       />
 
       {hasFilter ? (
@@ -90,7 +98,13 @@ export default async function AdminVendorsPage({
                       {vendorDashboardPresenceLabel(row.vendorDashboardLastSeenAt)}
                     </td>
                     <td className="px-4 py-3 text-xs">
-                      {!row.isActive ? "Hidden" : row.mennyuOrdersPaused ? "Ordering paused" : "Public"}
+                      {!row.isActive
+                        ? "Hidden"
+                        : !row.orderingEnabled
+                          ? "Menu only"
+                          : row.mennyuOrdersPaused
+                            ? "Ordering paused"
+                            : "Public"}
                     </td>
                     <td className="px-4 py-3 text-xs text-oo-stone-gray">
                       {row.podNames.length > 0 ? row.podNames.join(", ") : "None"}
@@ -112,6 +126,7 @@ export default async function AdminVendorsPage({
             <p className="border-t border-oo-light-stone px-4 py-2 text-xs text-oo-stone-gray">
               Showing {results.length} vendor{results.length === 1 ? "" : "s"}
               {routing ? ` · ${vendorOrderRoutingModeCompactLabel(routing)} routing` : ""}
+              {orderingMode ? ` · ${orderingModeLabel}` : ""}
               {query ? ` · matching “${query}”` : ""}.
             </p>
           ) : null}

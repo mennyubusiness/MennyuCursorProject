@@ -8,6 +8,7 @@ import type { VendorAvailabilityInput } from "@/lib/vendor-availability";
 import { deriveVendorPosUiState } from "@/lib/vendor-pos-ui-state";
 import { hasCustomerOrderingHoursConfigured } from "@/lib/vendor-customer-ordering-hours";
 import { VENDOR_HOURS_PUBLIC_COPY } from "@/lib/vendor-operational-copy";
+import { isEffectiveOrderingEnabled } from "@/lib/vendor-ordering-mode";
 import {
   isDeliverectRoutingMode,
   isSquareRoutingMode,
@@ -81,7 +82,11 @@ export type VendorPodReadinessInput = {
   podId: string;
   podSlug?: string;
   vendorId: string;
-  pod: { isActive: boolean };
+  pod: {
+    isActive: boolean;
+    /** `Pod.orderingEnabled`. Undefined is treated as enabled. */
+    orderingEnabled?: boolean;
+  };
   podVendor: { isActive: boolean } | null;
   vendor: VendorReadinessVendorFields;
   menuSummary: VendorMenuReadinessSummary;
@@ -208,10 +213,23 @@ export const VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS = [
   "pod_invite",
 ] as const;
 
+/**
+ * Commerce-only checklist keys. Dropped entirely while a vendor is menu-only so intentional
+ * configuration never reads as an unfinished checklist. `pod_invite` is not here: pod membership
+ * is required for public visibility too.
+ */
+const VENDOR_COMMERCE_CHECKLIST_KEYS = new Set<string>(["stripe", "pos", "menu_available"]);
+
 /** Vendor self-serve setup checklist keys required before setup is considered complete. */
 export const VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS = [
   ...VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS,
   ...VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS,
+] as const;
+
+/** Setup completion for a menu-only vendor: public presence and pod membership only. */
+export const VENDOR_MENU_ONLY_SETUP_REQUIRED_CHECKLIST_KEYS = [
+  ...VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS,
+  "pod_invite",
 ] as const;
 
 export function vendorPodReadinessStatusLabel(
@@ -476,6 +494,15 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
     },
   ];
 
+  /**
+   * Menu-only vendors are not mid-setup: commerce prerequisites are removed from the checklist
+   * rather than shown as failures. They reappear intact when ordering is re-enabled.
+   */
+  const menuOnly = !isEffectiveOrderingEnabled({
+    podOrderingEnabled: input.pod.orderingEnabled,
+    vendorOrderingEnabled: input.vendor.orderingEnabled,
+  });
+
   if (audience === "vendor") {
     const pendingPodInviteCount = input.pendingPodInviteCount ?? 0;
     const hasPodMembership = Boolean(input.hasPodMembership);
@@ -507,15 +534,21 @@ function buildSetupChecklist(input: VendorPodReadinessInput, audience: "pod_owne
       actionHref: `${settingsBase}#pod-invites`,
       actionLabel: "View invitations",
     });
-    items.push({
-      key: "kitchen",
-      label: "Use Kitchen Mode for orders",
-      complete: true,
-      owner: "vendor",
-      description: "Manage live orders from the vendor Orders board.",
-      actionHref: `/vendor/${vendorId}/kitchen`,
-      actionLabel: "Open Kitchen Mode",
-    });
+    if (!menuOnly) {
+      items.push({
+        key: "kitchen",
+        label: "Use Kitchen Mode for orders",
+        complete: true,
+        owner: "vendor",
+        description: "Manage live orders from the vendor Orders board.",
+        actionHref: `/vendor/${vendorId}/kitchen`,
+        actionLabel: "Open Kitchen Mode",
+      });
+    }
+  }
+
+  if (menuOnly) {
+    return items.filter((item) => !VENDOR_COMMERCE_CHECKLIST_KEYS.has(item.key));
   }
 
   return items;
@@ -709,9 +742,17 @@ export type PodSetupChecklistInput = {
     slug: string;
     pickupInstructions: string | null;
   };
-  vendorStatuses: Array<{ canAcceptOrders: boolean; status: VendorPodReadinessStatus }>;
+  vendorStatuses: Array<{
+    canAcceptOrders: boolean;
+    status: VendorPodReadinessStatus;
+    /** Durable menu-only intent: this vendor counts as ready once it is publicly listed. */
+    menuOnly?: boolean;
+    publiclyListed?: boolean;
+  }>;
   podPayoutsEnabled?: boolean;
   payoutSetupReady?: boolean;
+  /** Pod-wide ordering is off: the roster check asks for listed menus, not orderable vendors. */
+  podMenuOnly?: boolean;
 };
 
 /** Pod self-serve checklist keys required before the pod is ready for customers. */
@@ -736,6 +777,10 @@ export function derivePodSetupChecklist(input: PodSetupChecklistInput): Readines
     (v) => v.canAcceptOrders || v.status === "ready" || v.status === "active"
   );
   const qrComplete = Boolean(pod.slug?.trim());
+  const menuOnlyRoster =
+    Boolean(input.podMenuOnly) ||
+    (vendorStatuses.length > 0 && vendorStatuses.every((v) => v.menuOnly));
+  const hasListedVendor = vendorStatuses.some((v) => v.publiclyListed);
 
   const items: ReadinessChecklistItem[] = [
     {
@@ -762,20 +807,36 @@ export function derivePodSetupChecklist(input: PodSetupChecklistInput): Readines
       complete: pod.isActive,
       owner: "open_order",
       description: pod.isActive
-        ? "This pod is active for customer ordering."
-        : "Open Order activates pods for public ordering.",
+        ? menuOnlyRoster
+          ? "This pod is active on the public site."
+          : "This pod is active for customer ordering."
+        : menuOnlyRoster
+          ? "Open Order activates pods for public listing."
+          : "Open Order activates pods for public ordering.",
     },
-    {
-      key: "vendor_ready",
-      label: "At least one orderable vendor",
-      complete: hasOrderableVendor,
-      owner: "pod_owner",
-      description: hasOrderableVendor
-        ? "A vendor can accept orders in this pod."
-        : "Invite vendors and help them finish setup.",
-      actionHref: `/pod/${podId}/vendors`,
-      actionLabel: "Manage vendors",
-    },
+    menuOnlyRoster
+      ? {
+          key: "vendor_ready",
+          label: "At least one listed vendor",
+          complete: hasListedVendor,
+          owner: "pod_owner",
+          description: hasListedVendor
+            ? "A vendor menu is live on this pod page."
+            : "Invite vendors and help them publish a menu.",
+          actionHref: `/pod/${podId}/vendors`,
+          actionLabel: "Manage vendors",
+        }
+      : {
+          key: "vendor_ready",
+          label: "At least one orderable vendor",
+          complete: hasOrderableVendor,
+          owner: "pod_owner",
+          description: hasOrderableVendor
+            ? "A vendor can accept orders in this pod."
+            : "Invite vendors and help them finish setup.",
+          actionHref: `/pod/${podId}/vendors`,
+          actionLabel: "Manage vendors",
+        },
     {
       key: "qr_signage",
       label: "QR and signage available",

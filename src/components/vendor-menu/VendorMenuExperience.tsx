@@ -15,6 +15,8 @@ type VendorMenuExperienceProps = {
   variantChildCountByParentPlu: Map<string, number>;
   cart: Cart;
   orderingDisabled: boolean;
+  /** Vendor or pod is menu-only: browse the menu, no ordering controls at all. */
+  menuOnly?: boolean;
   vendorUsesDeliverect: boolean;
 };
 

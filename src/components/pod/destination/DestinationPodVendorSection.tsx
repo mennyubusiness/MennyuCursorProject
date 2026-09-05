@@ -23,6 +23,10 @@ export function DestinationPodVendorSection({
   showContactLink,
   contactAnchorId,
 }: DestinationPodVendorSectionProps) {
+  const podMenuOnly = orderingStatus.tone === "menu_only";
+  /** Only worth labelling menu-only cards when some vendors in the pod are orderable. */
+  const showMenuOnlyBadge = !podMenuOnly && rows.some((row) => row.availability.menuOnly);
+
   return (
     <PageSection className="!py-8 sm:!py-10">
       <PageShell>
@@ -35,7 +39,9 @@ export function DestinationPodVendorSection({
               Check out our vendors
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-oo-stone-gray sm:text-base">
-              Add from multiple vendors to one cart and check out once.
+              {podMenuOnly
+                ? "Browse each kitchen's menu to see what they're serving."
+                : "Add from multiple vendors to one cart and check out once."}
             </p>
           </header>
 
@@ -97,6 +103,7 @@ export function DestinationPodVendorSection({
                         vendor={vendor}
                         isFeatured={isFeatured}
                         availability={availability}
+                        showMenuOnlyBadge={showMenuOnlyBadge}
                         hoursDisplay={hoursDisplay}
                       />
                     </li>

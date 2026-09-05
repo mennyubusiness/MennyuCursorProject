@@ -82,6 +82,7 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
       slug: true,
       isActive: true,
       mennyuOrdersPaused: true,
+      orderingEnabled: true,
       accentColor: true,
       pickupTimezone: true,
     },
@@ -111,13 +112,19 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
   );
   const evaluationWithAvailability = {
     ...readinessEvaluation,
-    pod: { isActive: podRow.isActive, mennyuOrdersPaused: podRow.mennyuOrdersPaused },
+    pod: {
+      isActive: podRow.isActive,
+      mennyuOrdersPaused: podRow.mennyuOrdersPaused,
+      orderingEnabled: podRow.orderingEnabled,
+    },
     vendorAvailability: vendorForOrderability,
   };
 
   const orderability = getVendorOrderabilityInPod({
     podActive: podRow.isActive,
     podOrdersPaused: podRow.mennyuOrdersPaused,
+    podOrderingEnabled: podRow.orderingEnabled,
+    vendorOrderingEnabled: vendor.orderingEnabled,
     podVendorExists: Boolean(pv),
     podVendorActive: pv?.isActive ?? false,
     vendor: vendorForOrderability,
@@ -129,15 +136,21 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
     },
   });
   const orderState = getVendorOrderabilityState(evaluationWithAvailability);
+  const menuOnly = orderState.menuOnly;
   const orderingDisabled = !orderability.orderable;
-  const bannerLine = orderingDisabled ? orderState.customerBannerLine : null;
-  const availabilityStatus = orderingDisabled
-    ? orderState.customerStatusLabel === "Closed right now"
+  /** Menu-only shows one hero status and no banner: the page is meant to feel browsable. */
+  const bannerLine = orderingDisabled && !menuOnly ? orderState.customerBannerLine : null;
+  const availabilityStatus = menuOnly
+    ? vendorForOrderability.posOpen === false
       ? ("closed" as const)
-      : orderState.customerStatusLabel === "Not accepting orders right now"
-        ? ("mennyu_paused" as const)
-        : ("inactive" as const)
-    : ("open" as const);
+      : ("open" as const)
+    : orderingDisabled
+      ? orderState.customerStatusLabel === "Closed right now"
+        ? ("closed" as const)
+        : orderState.customerStatusLabel === "Not accepting orders right now"
+          ? ("mennyu_paused" as const)
+          : ("inactive" as const)
+      : ("open" as const);
 
   const hoursDisplay = buildVendorHoursDisplay({
     customerOrderingHours: vendor.customerOrderingHours,
@@ -166,6 +179,7 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
         vendorAccentColor={vendor.accentColor}
         cuisineCategory={vendor.cuisineCategory}
         availabilityStatus={availabilityStatus}
+        menuOnly={menuOnly}
         bannerLine={bannerLine}
         hoursDisplay={hoursDisplay}
       />
@@ -190,6 +204,7 @@ export async function renderVendorMenuCustomerPage(podRef: string, vendorRef: st
           variantChildCountByParentPlu={variantChildCountByParentPlu}
           cart={cart}
           orderingDisabled={orderingDisabled}
+          menuOnly={menuOnly}
           vendorUsesDeliverect={Boolean(vendor.deliverectChannelLinkId?.trim())}
         />
       )}

@@ -1,5 +1,6 @@
 import { DashboardStatusBadge } from "@/components/dashboard";
 import { podPublicStatusLabel, podPublicStatusTone } from "@/lib/pod-operational-copy";
+import { MENU_ONLY_BADGE, POD_MENU_ONLY_DASHBOARD_BODY } from "@/lib/vendor-ordering-mode";
 import { PodPublicPageActions } from "./PodPublicPageActions";
 
 type PodStatusCardProps = {
@@ -8,6 +9,10 @@ type PodStatusCardProps = {
   isActive: boolean;
   hasPublicProfile: boolean;
   orderableVendorCount: number;
+  /** Vendors publicly listed and browsable. Used instead of orderable count when menu-only. */
+  listedVendorCount?: number;
+  /** Pod-wide ordering is off: commerce counts are replaced with listing counts. */
+  podMenuOnly?: boolean;
   announcementActive: boolean;
   publicPageHref: string;
 };
@@ -18,6 +23,8 @@ export function PodStatusCard({
   isActive,
   hasPublicProfile,
   orderableVendorCount,
+  listedVendorCount = 0,
+  podMenuOnly = false,
   announcementActive,
   publicPageHref,
 }: PodStatusCardProps) {
@@ -32,7 +39,15 @@ export function PodStatusCard({
           <h2 className="mt-1 text-2xl font-bold text-oo-charcoal">{podName}</h2>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <DashboardStatusBadge tone={tone}>{status}</DashboardStatusBadge>
+            {podMenuOnly ? (
+              <DashboardStatusBadge tone="neutral">{MENU_ONLY_BADGE}</DashboardStatusBadge>
+            ) : null}
           </div>
+          {podMenuOnly ? (
+            <p className="mt-3 max-w-md text-sm text-oo-stone-gray">
+              {POD_MENU_ONLY_DASHBOARD_BODY}
+            </p>
+          ) : null}
         </div>
         <PodPublicPageActions
           publicPageHref={publicPageHref}
@@ -42,8 +57,12 @@ export function PodStatusCard({
 
       <dl className="mt-6 grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
-          <dt className="text-xs font-medium text-oo-stone-gray">Orderable vendors</dt>
-          <dd className="mt-1 text-sm font-medium text-oo-charcoal">{orderableVendorCount}</dd>
+          <dt className="text-xs font-medium text-oo-stone-gray">
+            {podMenuOnly ? "Listed vendors" : "Orderable vendors"}
+          </dt>
+          <dd className="mt-1 text-sm font-medium text-oo-charcoal">
+            {podMenuOnly ? listedVendorCount : orderableVendorCount}
+          </dd>
         </div>
         <div className="rounded-xl bg-oo-cream/70 px-4 py-3">
           <dt className="text-xs font-medium text-oo-stone-gray">Announcement</dt>

@@ -20,6 +20,7 @@ function rosterRow(overrides: Partial<PodRosterVendorRow> = {}): PodRosterVendor
     vendorGloballyActive: true,
     mennyuOrdersPaused: false,
     orderRoutingMode: "manual_dashboard",
+    menuOnly: false,
     readiness: {
       status: "needs_hours",
       label: "Needs hours",

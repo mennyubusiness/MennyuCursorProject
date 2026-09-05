@@ -10,11 +10,13 @@ import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import type { PodVendorCardVendor } from "@/components/pod/PodVendorCard";
 import { VendorHoursDisclosure } from "@/components/vendor/VendorHoursDisclosure";
 import type { VendorHoursDisplayModel } from "@/lib/vendor-hours-display";
+import { MENU_ONLY_BADGE } from "@/lib/vendor-ordering-mode";
 
 type AvailabilityLabel = {
   unavailable: boolean;
   statusLabel: string;
   showBrowseHint: boolean;
+  menuOnly?: boolean;
 };
 
 type DestinationPodVendorCardProps = {
@@ -22,6 +24,8 @@ type DestinationPodVendorCardProps = {
   vendor: PodVendorCardVendor;
   isFeatured: boolean;
   availability: AvailabilityLabel;
+  /** Label menu-only cards on mixed pods only; a fully menu-only pod says so once, up top. */
+  showMenuOnlyBadge?: boolean;
   hoursDisplay: VendorHoursDisplayModel;
 };
 
@@ -78,12 +82,19 @@ export function DestinationPodVendorCard({
   vendor,
   isFeatured,
   availability,
+  showMenuOnlyBadge = false,
   hoursDisplay,
 }: DestinationPodVendorCardProps) {
   const href = buildVendorMenuCustomerPath(podSlug, vendor.slug);
   const cuisine = vendor.cuisineCategory?.trim();
   const description = vendor.description?.trim();
   const unavailable = availability.unavailable;
+  /** Menu-only is not unavailable: the card stays full-colour and only gains a small label. */
+  const statusNote = unavailable
+    ? availability.statusLabel
+    : availability.menuOnly && showMenuOnlyBadge
+      ? MENU_ONLY_BADGE
+      : null;
 
   return (
     <div
@@ -112,15 +123,15 @@ export function DestinationPodVendorCard({
 
         {cuisine && <p className="mt-1 text-sm font-medium text-oo-stone-gray">{cuisine}</p>}
 
-        {unavailable && (
-          <p className="mt-2 text-xs font-medium text-oo-stone-gray">{availability.statusLabel}</p>
+        {statusNote && (
+          <p className="mt-2 text-xs font-medium text-oo-stone-gray">{statusNote}</p>
         )}
 
         {description && (
           <p
             className={cn(
               "line-clamp-3 flex-1 text-sm leading-relaxed text-oo-stone-gray",
-              unavailable ? "mt-2" : "mt-3"
+              statusNote ? "mt-2" : "mt-3"
             )}
           >
             {description}

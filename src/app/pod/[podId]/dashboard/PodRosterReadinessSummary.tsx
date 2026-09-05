@@ -11,6 +11,9 @@ export type PodRosterReadinessSnapshot = {
   label: string;
   description: string;
   canAcceptOrders: boolean;
+  /** Durable menu-only intent — distinct from an unfinished ordering setup. */
+  menuOnly?: boolean;
+  menuOnlyByPod?: boolean;
   orderRoutingMode?: VendorOrderRoutingMode;
   setupSummary: {
     profile: boolean;
@@ -56,7 +59,8 @@ export function PodRosterReadinessSummary({
   orderRoutingMode?: VendorOrderRoutingMode;
 }) {
   const mode = orderRoutingMode ?? readiness.orderRoutingMode;
-  const routingLabel = mode ? vendorOrderRoutingModeShortLabel(mode) : null;
+  const menuOnly = Boolean(readiness.menuOnly);
+  const routingLabel = mode && !menuOnly ? vendorOrderRoutingModeShortLabel(mode) : null;
   const routingIncomplete =
     mode && isDeliverectRoutingMode(mode) && !readiness.canAcceptOrders && readiness.setupSummary.pos === false;
 
@@ -64,8 +68,9 @@ export function PodRosterReadinessSummary({
     <div className="mt-2 space-y-2">
       <div className="flex flex-wrap gap-1">
         <SetupFlag label="Profile" complete={readiness.setupSummary.profile} />
-        <SetupFlag label="Stripe" complete={readiness.setupSummary.stripe} />
-        {mode && isDeliverectRoutingMode(mode) ? (
+        {/* Stripe and routing are only requirements when this vendor is meant to take orders. */}
+        {menuOnly ? null : <SetupFlag label="Stripe" complete={readiness.setupSummary.stripe} />}
+        {menuOnly ? null : mode && isDeliverectRoutingMode(mode) ? (
           <SetupFlag label="Deliverect" complete={readiness.setupSummary.pos} />
         ) : (
           <SetupFlag label="Dashboard" complete={true} />
@@ -80,11 +85,16 @@ export function PodRosterReadinessSummary({
       ) : null}
       <p className="text-xs text-oo-stone-gray">
         <span className="font-medium text-oo-charcoal">
-          {podOwnerVendorDisplayStatus(readiness.status, readiness.canAcceptOrders)}
+          {podOwnerVendorDisplayStatus(
+            readiness.status,
+            readiness.canAcceptOrders,
+            readiness.setupSummary,
+            { menuOnly, menuOnlyByPod: Boolean(readiness.menuOnlyByPod) }
+          )}
         </span>
         {readiness.canAcceptOrders ? " · Accepting orders" : null}
       </p>
-      {readiness.primaryBlocker ? (
+      {readiness.primaryBlocker && !menuOnly ? (
         <p className="text-xs text-oo-stone-gray">
           Next: {readiness.primaryBlocker.label}
           <span className="text-oo-stone-gray"> · {ownerHint(readiness.primaryBlocker.owner)}</span>

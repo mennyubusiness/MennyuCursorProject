@@ -5,21 +5,36 @@ import { podOwnerVendorDisplayStatus } from "@/lib/pod-vendor-adoption";
 import { VendorLogo } from "@/components/images/VendorLogo";
 import type { PodRosterVendorRow } from "./PodVendorRosterPanel";
 
+function orderingIntentOf(row: PodRosterVendorRow) {
+  return {
+    menuOnly: Boolean(row.readiness.menuOnly ?? row.menuOnly),
+    menuOnlyByPod: Boolean(row.readiness.menuOnlyByPod),
+  };
+}
+
 function readinessDetail(row: PodRosterVendorRow): string {
   if (row.readiness.canAcceptOrders) return "Accepting orders";
   const blocker = row.readiness.primaryBlocker?.label;
   if (blocker) return blocker;
-  return podOwnerVendorDisplayStatus(row.readiness.status, row.readiness.canAcceptOrders);
+  return podOwnerVendorDisplayStatus(
+    row.readiness.status,
+    row.readiness.canAcceptOrders,
+    undefined,
+    orderingIntentOf(row)
+  );
 }
 
 export function PodVendorReadinessSection({
   podId,
   podSlug,
   rows,
+  podMenuOnly = false,
 }: {
   podId: string;
   podSlug: string;
   rows: PodRosterVendorRow[];
+  /** Pod-wide ordering is off: this section describes browsing, not order readiness. */
+  podMenuOnly?: boolean;
 }) {
   const previewRows = rows.slice(0, 6);
 
@@ -27,9 +42,13 @@ export function PodVendorReadinessSection({
     <section className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-oo-charcoal">Vendor readiness</h2>
+          <h2 className="text-lg font-semibold text-oo-charcoal">
+            {podMenuOnly ? "Vendor menus" : "Vendor readiness"}
+          </h2>
           <p className="mt-1 text-sm text-oo-stone-gray">
-            See which vendors are live, blocked, or paused in your pod.
+            {podMenuOnly
+              ? "See which vendor menus customers can browse in your pod."
+              : "See which vendors are live, blocked, or paused in your pod."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -53,9 +72,12 @@ export function PodVendorReadinessSection({
       ) : (
         <ul className="space-y-2">
           {previewRows.map((row) => {
+            const intent = orderingIntentOf(row);
             const displayStatus = podOwnerVendorDisplayStatus(
               row.readiness.status,
-              row.readiness.canAcceptOrders
+              row.readiness.canAcceptOrders,
+              undefined,
+              intent
             );
             const isLive = row.readiness.canAcceptOrders;
             return (
@@ -74,7 +96,11 @@ export function PodVendorReadinessSection({
                     <p className="truncate font-medium text-oo-charcoal">{row.name}</p>
                     <p className="mt-0.5 text-sm text-oo-stone-gray">
                       {displayStatus}
-                      {!isLive ? ` · ${readinessDetail(row)}` : " · Accepting orders"}
+                      {intent.menuOnly
+                        ? ""
+                        : !isLive
+                          ? ` · ${readinessDetail(row)}`
+                          : " · Accepting orders"}
                     </p>
                     <p className="mt-0.5 text-xs text-oo-stone-gray">
                       {row.isFeatured ? "Featured · " : ""}

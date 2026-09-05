@@ -24,6 +24,7 @@ export function DestinationPodPageView({
   amenities,
   customAmenities,
   orderingStatus,
+  hasOrderableVendor,
   hasVisitSection,
   contactDetails,
   isQrEntry,
@@ -74,10 +75,21 @@ export function DestinationPodPageView({
             className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-oo-charcoal"
             role="status"
           >
-            <p className="font-semibold">You&apos;re ordering from {pod.name}</p>
-            <p className="mt-0.5 text-oo-stone-gray">
-              Pick a vendor below — one cart, one checkout, one pickup.
-            </p>
+            {hasOrderableVendor ? (
+              <>
+                <p className="font-semibold">You&apos;re ordering from {pod.name}</p>
+                <p className="mt-0.5 text-oo-stone-gray">
+                  Pick a vendor below — one cart, one checkout, one pickup.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold">Welcome to {pod.name}</p>
+                <p className="mt-0.5 text-oo-stone-gray">
+                  Browse the menus below to see what each kitchen is serving.
+                </p>
+              </>
+            )}
           </div>
         </PageShell>
       )}

@@ -72,6 +72,62 @@ async function revalidateVendorOrderingSurfaces(vendorId: string) {
   }
 }
 
+/**
+ * Sets durable ordering intent (orderable vs menu-only) for a vendor.
+ *
+ * Intent-only by design. This deliberately does not touch menu items, menu versions,
+ * `menuSource`, `orderRoutingMode`, Stripe/Square/Deliverect configuration, or
+ * `mennyuOrdersPaused`, so re-enabling ordering restores the prior setup untouched.
+ */
+export async function adminSetVendorOrderingMode(input: {
+  vendorId: string;
+  orderingEnabled: boolean;
+  adminUserId: string | null;
+  reason: string;
+}): Promise<ActionResult> {
+  const reasonCheck = requireAdminReason(input.reason);
+  if (!reasonCheck.ok) return reasonCheck;
+
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: input.vendorId },
+    select: { id: true, name: true, orderingEnabled: true },
+  });
+  if (!vendor) return { ok: false, error: "Vendor not found." };
+  if (vendor.orderingEnabled === input.orderingEnabled) {
+    return {
+      ok: false,
+      error: input.orderingEnabled
+        ? "Ordering is already enabled for this vendor."
+        : "This vendor is already menu only.",
+    };
+  }
+
+  await prisma.vendor.update({
+    where: { id: vendor.id },
+    data: { orderingEnabled: input.orderingEnabled },
+  });
+
+  await createAdminAuditLog({
+    adminUserId: input.adminUserId,
+    actionType: input.orderingEnabled
+      ? ADMIN_AUDIT_ACTION.VENDOR_ORDERING_MODE_ENABLED
+      : ADMIN_AUDIT_ACTION.VENDOR_ORDERING_MODE_MENU_ONLY,
+    targetType: ADMIN_AUDIT_TARGET.vendor,
+    targetId: vendor.id,
+    reason: reasonCheck.reason,
+    oldValue: { orderingEnabled: vendor.orderingEnabled },
+    newValue: { orderingEnabled: input.orderingEnabled },
+  });
+
+  await revalidateVendorOrderingSurfaces(vendor.id);
+  return {
+    ok: true,
+    message: input.orderingEnabled
+      ? `${vendor.name} ordering enabled.`
+      : `${vendor.name} is now menu only.`,
+  };
+}
+
 export async function adminPauseVendorOrdering(input: {
   vendorId: string;
   adminUserId: string | null;

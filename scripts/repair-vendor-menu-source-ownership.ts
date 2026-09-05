@@ -1,5 +1,6 @@
 /**
- * Repair vendors whose orderRoutingMode and active/published menu source disagree.
+ * Repair vendors whose orderRoutingMode and published menu source disagree,
+ * or whose native Open Order availability was poisoned by catalog retirement.
  *
  * Usage:
  *   npx tsx scripts/repair-vendor-menu-source-ownership.ts
@@ -26,16 +27,36 @@ async function main() {
         dryRun: result.dryRun,
         scanned: result.scanned,
         repairedCount: result.repaired.length,
-        repaired: result.repaired.map((r) => ({
+        reports: result.reports.map((r) => ({
           vendorId: r.vendorId,
+          vendorName: r.vendorName,
+          repairType: r.repairType,
+          reason: r.reason,
           orderRoutingMode: r.orderRoutingMode,
-          previousMenuSource: r.previousMenuSource,
           menuSource: r.menuSource,
-          provider: r.provider,
+          currentAuthority: r.currentAuthority,
+          adoptionSource: r.adoptionSource,
+          adoptionSourceLabel: r.adoptionSourceLabel,
+          selectedCatalog: r.selectedCatalog,
+          matchingLiveMenuItemCount: r.matchingLiveMenuItemCount,
+          menuItemsThatWouldBeRestored: r.menuItemsThatWouldBeRestored,
           archivedMenuVersionIds: r.archivedMenuVersionIds,
           restoredMenuVersionIds: r.restoredMenuVersionIds,
-          softDisabledMenuItemCount: r.softDisabledMenuItemCount,
+          multiplePlausibleProviderCatalogs: r.multiplePlausibleProviderCatalogs,
+          plausibleProviderOrigins: r.plausibleProviderOrigins,
+          selectionReason: r.selectionReason,
+          currentPublishedVersionId: r.currentPublishedVersionId,
+          historicalSnapshotId: r.historicalSnapshotId,
+          historicalPublishedAt: r.historicalPublishedAt,
+          nativeItemCount: r.nativeItemCount,
+          currentAvailable: r.currentAvailable,
+          historicalAvailable: r.historicalAvailable,
+          productsToRestore: r.productsToRestore,
           restoredAvailableMenuItemCount: r.restoredAvailableMenuItemCount,
+          liveAvailableCount: r.liveAvailableCount,
+          liveRowsToCreate: r.liveRowsToCreate,
+          liveRowsToUpdateAvailability: r.liveRowsToUpdateAvailability,
+          expectedAvailableItemCount: r.expectedAvailableItemCount,
         })),
       },
       null,

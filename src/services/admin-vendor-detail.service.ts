@@ -18,6 +18,8 @@ export type AdminVendorDetailView = {
     imageUrl: string | null;
     isActive: boolean;
     mennyuOrdersPaused: boolean;
+    /** Durable menu-only intent for this vendor. */
+    orderingEnabled: boolean;
     deletedAt: string | null;
     deletedByUserId: string | null;
     deletedByEmail: string | null;
@@ -43,6 +45,8 @@ export type AdminVendorDetailView = {
     podName: string;
     podSlug: string;
     podVendorActive: boolean;
+    /** Pod-wide ordering intent. When false, this vendor is effectively menu-only. */
+    podOrderingEnabled: boolean;
     publicPath: string;
   }>;
   owners: Array<{ userId: string; email: string; name: string | null; role: string }>;
@@ -71,7 +75,20 @@ export async function loadAdminVendorDetail(vendorId: string): Promise<AdminVend
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
     include: {
-      pods: { include: { pod: { select: { id: true, name: true, slug: true, isActive: true, mennyuOrdersPaused: true } } } },
+      pods: {
+        include: {
+          pod: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              isActive: true,
+              mennyuOrdersPaused: true,
+              orderingEnabled: true,
+            },
+          },
+        },
+      },
       vendorMemberships: {
         include: { user: { select: { id: true, email: true, name: true } } },
         orderBy: { role: "asc" },
@@ -112,6 +129,8 @@ export async function loadAdminVendorDetail(vendorId: string): Promise<AdminVend
     const orderability = getVendorOrderabilityInPod({
       podActive: primaryPod.isActive,
       podOrdersPaused: primaryPod.mennyuOrdersPaused ?? false,
+      podOrderingEnabled: primaryPod.orderingEnabled,
+      vendorOrderingEnabled: vendor.orderingEnabled,
       podVendorExists: true,
       podVendorActive: vendor.pods[0].isActive,
       vendor: {
@@ -135,6 +154,7 @@ export async function loadAdminVendorDetail(vendorId: string): Promise<AdminVend
       imageUrl: vendor.imageUrl,
       isActive: vendor.isActive,
       mennyuOrdersPaused: vendor.mennyuOrdersPaused,
+      orderingEnabled: vendor.orderingEnabled,
       deletedAt: vendor.deletedAt?.toISOString() ?? null,
       deletedByUserId: vendor.deletedByUserId,
       deletedByEmail: deletedByUser?.email ?? null,
@@ -162,6 +182,7 @@ export async function loadAdminVendorDetail(vendorId: string): Promise<AdminVend
       podName: pv.pod.name,
       podSlug: pv.pod.slug,
       podVendorActive: pv.isActive,
+      podOrderingEnabled: pv.pod.orderingEnabled,
       publicPath: buildVendorMenuCustomerPath(pv.pod.slug, vendor.slug),
     })),
     owners: vendor.vendorMemberships.map((m) => ({
@@ -203,6 +224,8 @@ export type AdminVendorSearchRow = {
   slug: string;
   isActive: boolean;
   mennyuOrdersPaused: boolean;
+  /** Durable menu-only intent for this vendor. */
+  orderingEnabled: boolean;
   posConnectionStatus: string;
   orderRoutingMode: string;
   vendorDashboardLastSeenAt: string | null;
@@ -216,8 +239,23 @@ export type AdminVendorSearchRow = {
 export type AdminVendorSearchOptions = {
   /** Authoritative Vendor.orderRoutingMode filter. Omit / null = all routing methods. */
   orderRoutingMode?: VendorOrderRoutingMode | null;
+  /**
+   * Durable ordering intent filter, deliberately separate from `orderRoutingMode`:
+   * routing describes *how* orders travel, ordering mode describes *whether* they are taken.
+   */
+  orderingMode?: AdminVendorOrderingModeFilter | null;
   limit?: number;
 };
+
+export type AdminVendorOrderingModeFilter = "orderable" | "menu_only";
+
+export function parseAdminVendorOrderingModeQuery(
+  raw: string | null | undefined
+): AdminVendorOrderingModeFilter | null {
+  const value = raw?.trim();
+  if (value === "orderable" || value === "menu_only") return value;
+  return null;
+}
 
 /**
  * Admin vendor search. Filters by text query and/or authoritative orderRoutingMode.
@@ -231,13 +269,15 @@ export async function searchAdminVendors(
     typeof options === "number" ? { limit: options } : options;
   const q = rawQuery.trim();
   const routing = opts.orderRoutingMode ?? null;
+  const orderingMode = opts.orderingMode ?? null;
   const limit = opts.limit ?? (q ? 50 : 200);
 
-  if (!q && !routing) return [];
+  if (!q && !routing && !orderingMode) return [];
 
   const where: {
     OR?: object[];
     orderRoutingMode?: VendorOrderRoutingMode;
+    orderingEnabled?: boolean;
   } = {};
 
   if (q) {
@@ -256,6 +296,10 @@ export async function searchAdminVendors(
 
   if (routing) {
     where.orderRoutingMode = routing;
+  }
+
+  if (orderingMode) {
+    where.orderingEnabled = orderingMode === "orderable";
   }
 
   const vendors = await prisma.vendor.findMany({
@@ -278,6 +322,7 @@ export async function searchAdminVendors(
     slug: v.slug,
     isActive: v.isActive,
     mennyuOrdersPaused: v.mennyuOrdersPaused,
+    orderingEnabled: v.orderingEnabled,
     posConnectionStatus: v.posConnectionStatus,
     orderRoutingMode: v.orderRoutingMode,
     vendorDashboardLastSeenAt: v.vendorDashboardLastSeenAt?.toISOString() ?? null,

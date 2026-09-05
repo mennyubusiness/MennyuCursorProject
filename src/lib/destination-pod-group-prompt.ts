@@ -65,6 +65,8 @@ export function shouldOfferDestinationGroupOrderPrompt(input: {
   if (input.hasExplicitJoinIntent) return false;
   if (input.ctaStateKind !== "start") return false;
   if (input.orderingTone === "empty") return false;
+  /** Group ordering is an ordering feature; a menu-only pod has nothing to group-order from. */
+  if (input.orderingTone === "menu_only") return false;
   return true;
 }
 

@@ -5,13 +5,17 @@ export type VendorIntakeStatusLabel =
   | "Accepting orders"
   | "Paused"
   | "Closed"
+  | "Menu only"
   | "Not ready";
 
 export function vendorIntakeStatusLabel(input: {
   availabilityStatus: VendorAvailabilityStatus;
   setupComplete: boolean;
   canAcceptOrders: boolean;
+  /** Ordering is intentionally off — outranks setup and pause states. */
+  menuOnly?: boolean;
 }): VendorIntakeStatusLabel {
+  if (input.menuOnly) return "Menu only";
   if (!input.setupComplete) return "Not ready";
   if (input.availabilityStatus === "mennyu_paused") return "Paused";
   if (input.availabilityStatus === "closed" || input.availabilityStatus === "inactive") {
@@ -30,6 +34,8 @@ export function vendorIntakeStatusTone(label: VendorIntakeStatusLabel): VendorIn
     case "Paused":
       return "warning";
     case "Closed":
+      return "neutral";
+    case "Menu only":
       return "neutral";
     case "Not ready":
       return "danger";

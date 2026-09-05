@@ -1,6 +1,15 @@
 import type { VendorAvailabilityInput } from "@/lib/vendor-availability";
 import { getVendorAvailability } from "@/lib/vendor-availability";
 import {
+  POD_ORDERING_DISABLED_CART_MESSAGE,
+  POD_ORDERING_DISABLED_CODE,
+  POD_ORDERING_DISABLED_MESSAGE,
+  resolveVendorOrderingIntent,
+  VENDOR_ORDERING_DISABLED_CART_MESSAGE,
+  VENDOR_ORDERING_DISABLED_CODE,
+  VENDOR_ORDERING_DISABLED_MESSAGE,
+} from "@/lib/vendor-ordering-mode";
+import {
   getVendorOrderabilityState,
   vendorOrderabilityValidationError,
   type VendorReadinessEvaluationInput,
@@ -9,6 +18,8 @@ import {
 export type VendorOrderabilityBlockReason =
   | "pod_inactive"
   | "pod_orders_paused"
+  | "pod_ordering_disabled"
+  | "vendor_ordering_disabled"
   | "pod_vendor_missing"
   | "pod_vendor_paused"
   | "vendor_inactive"
@@ -27,6 +38,10 @@ export type VendorOrderabilityInPodResult = {
 export type VendorOrderabilityInPodInput = {
   podActive: boolean;
   podOrdersPaused?: boolean;
+  /** `Pod.orderingEnabled`. Undefined is treated as enabled. */
+  podOrderingEnabled?: boolean;
+  /** `Vendor.orderingEnabled`. Undefined is treated as enabled. */
+  vendorOrderingEnabled?: boolean;
   podVendorExists: boolean;
   podVendorActive: boolean;
   vendor: VendorAvailabilityInput;
@@ -46,6 +61,10 @@ function mapValidationCodeToReason(code: string): VendorOrderabilityBlockReason 
       return "pod_inactive";
     case "POD_ORDERS_PAUSED":
       return "pod_orders_paused";
+    case POD_ORDERING_DISABLED_CODE:
+      return "pod_ordering_disabled";
+    case VENDOR_ORDERING_DISABLED_CODE:
+      return "vendor_ordering_disabled";
     case "VENDOR_NOT_IN_POD":
       return "pod_vendor_missing";
     case "VENDOR_PAUSED_IN_POD":
@@ -57,13 +76,31 @@ function mapValidationCodeToReason(code: string): VendorOrderabilityBlockReason 
   }
 }
 
+/**
+ * Ordering intent, resolved from either the explicit flags or the readiness bundle.
+ * Checked on both the readiness and shallow paths so a stale client can never bypass menu-only.
+ */
+function resolveIntent(input: VendorOrderabilityInPodInput) {
+  return resolveVendorOrderingIntent({
+    podOrderingEnabled: input.podOrderingEnabled,
+    vendorOrderingEnabled:
+      input.vendorOrderingEnabled ?? input.readiness?.vendor?.orderingEnabled,
+  });
+}
+
 function buildReadinessEvaluation(
   input: VendorOrderabilityInPodInput
 ): VendorReadinessEvaluationInput | null {
   if (!input.readiness) return null;
+  const intent = resolveIntent(input);
   return {
     ...input.readiness,
-    pod: { isActive: input.podActive, mennyuOrdersPaused: input.podOrdersPaused },
+    vendor: { ...input.readiness.vendor, orderingEnabled: intent.vendorOrderingEnabled },
+    pod: {
+      isActive: input.podActive,
+      mennyuOrdersPaused: input.podOrdersPaused,
+      orderingEnabled: intent.podOrderingEnabled,
+    },
     podVendor: { exists: input.podVendorExists, isActive: input.podVendorActive },
     vendorAvailability: input.vendor,
   };
@@ -104,6 +141,27 @@ export function getVendorOrderabilityInPod(
       reason: "pod_inactive",
       code: "POD_INACTIVE",
       message: "This pod is not currently accepting orders.",
+    };
+  }
+  /**
+   * Ordering intent is enforced on the shallow path too: callers that skip the readiness
+   * bundle (cart display, quantity updates) must still reject menu-only vendors/pods.
+   */
+  const intent = resolveIntent(input);
+  if (!intent.podOrderingEnabled) {
+    return {
+      orderable: false,
+      reason: "pod_ordering_disabled",
+      code: POD_ORDERING_DISABLED_CODE,
+      message: POD_ORDERING_DISABLED_MESSAGE,
+    };
+  }
+  if (!intent.vendorOrderingEnabled) {
+    return {
+      orderable: false,
+      reason: "vendor_ordering_disabled",
+      code: VENDOR_ORDERING_DISABLED_CODE,
+      message: VENDOR_ORDERING_DISABLED_MESSAGE,
     };
   }
   if (input.podOrdersPaused) {
@@ -172,6 +230,13 @@ export function cartLineOrderabilityMessage(result: VendorOrderabilityInPodResul
   }
   if (result.reason === "pod_orders_paused") {
     return "This pod is paused and not accepting orders right now.";
+  }
+  /** Menu-only cart copy is action-oriented: the customer must remove the lines. */
+  if (result.reason === "pod_ordering_disabled") {
+    return POD_ORDERING_DISABLED_CART_MESSAGE;
+  }
+  if (result.reason === "vendor_ordering_disabled") {
+    return VENDOR_ORDERING_DISABLED_CART_MESSAGE;
   }
   if (result.reason === "pod_vendor_missing" || result.reason === "pod_vendor_paused") {
     return "This vendor is no longer accepting orders at this pod.";

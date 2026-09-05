@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard";
+import { loadVendorDashboardOrderingMode } from "@/lib/vendor-dashboard-ordering-mode.server";
 import { loadVendorHoursPageData } from "@/lib/vendor-hours-page-data.server";
 import { VendorCustomerOrderingHoursForm } from "./VendorCustomerOrderingHoursForm";
 
@@ -10,7 +11,10 @@ export default async function VendorHoursPage({
   params: Promise<{ vendorId: string }>;
 }) {
   const { vendorId } = await params;
-  const data = await loadVendorHoursPageData(vendorId);
+  const [data, orderingMode] = await Promise.all([
+    loadVendorHoursPageData(vendorId),
+    loadVendorDashboardOrderingMode(vendorId),
+  ]);
   if (!data) notFound();
 
   return (
@@ -18,11 +22,19 @@ export default async function VendorHoursPage({
       <DashboardPageHeader
         headingLevel={1}
         title="Hours"
-        description="Set the customer ordering hours for this vendor."
+        description={
+          orderingMode.menuOnly
+            ? "Set the hours shown on this vendor's public menu page."
+            : "Set the customer ordering hours for this vendor."
+        }
       />
 
       <div className="mt-8">
-        <VendorCustomerOrderingHoursForm vendorId={data.vendorId} initialCustomHours={data.customHours} />
+        <VendorCustomerOrderingHoursForm
+          vendorId={data.vendorId}
+          initialCustomHours={data.customHours}
+          menuOnly={orderingMode.menuOnly}
+        />
       </div>
     </DashboardShell>
   );

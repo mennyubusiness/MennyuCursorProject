@@ -5,6 +5,12 @@ import { usePathname } from "next/navigation";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { vendorKitchenNavLabel } from "@/lib/integrations/provider-display";
 import {
+  DEFAULT_VENDOR_DASHBOARD_NAV_MODE,
+  isVendorNavHrefVisible,
+  vendorNavShowsKitchen,
+  type VendorDashboardNavMode,
+} from "@/lib/vendor-dashboard-nav-mode";
+import {
   vendorMenuManagementNavLabel,
   vendorMenuManagementPath,
 } from "@/lib/vendor-menu-management";
@@ -43,10 +49,12 @@ function navLinkIsActive(pathname: string, base: string, href: string): boolean 
 export function VendorAreaNav({
   vendorId,
   orderRoutingMode,
+  navMode = DEFAULT_VENDOR_DASHBOARD_NAV_MODE,
   wide = false,
 }: {
   vendorId: string;
   orderRoutingMode: VendorOrderRoutingMode;
+  navMode?: VendorDashboardNavMode;
   wide?: boolean;
 }) {
   const pathname = usePathname();
@@ -59,7 +67,8 @@ export function VendorAreaNav({
     BASE_NAV_LINKS[1],
     { href: menuHref, label: menuLabel },
     ...BASE_NAV_LINKS.slice(2),
-  ];
+  ].filter(({ href }) => isVendorNavHrefVisible(href, navMode));
+  const showKitchen = vendorNavShowsKitchen(navMode);
   const widthClass = wide
     ? "mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-2"
     : "mx-auto flex max-w-2xl flex-wrap items-center gap-2 px-4 py-2";
@@ -82,11 +91,13 @@ export function VendorAreaNav({
             );
           })}
         </div>
-        <div className="ml-auto hidden gap-1 sm:flex">
-          <Link href={`${base}/kitchen`} className="oo-dash-nav-link">
-            {vendorKitchenNavLabel(orderRoutingMode)}
-          </Link>
-        </div>
+        {showKitchen && (
+          <div className="ml-auto hidden gap-1 sm:flex">
+            <Link href={`${base}/kitchen`} className="oo-dash-nav-link">
+              {vendorKitchenNavLabel(orderRoutingMode)}
+            </Link>
+          </div>
+        )}
       </div>
     </nav>
   );

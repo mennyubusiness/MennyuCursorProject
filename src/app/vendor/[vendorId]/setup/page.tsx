@@ -30,7 +30,11 @@ export default async function VendorSetupPage({
   const appearance = ctx.readiness.checklist.filter((item) =>
     (VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS as readonly string[]).includes(item.key)
   );
-  const acceptingOrders = publicProfileReady
+  /**
+   * Menu-only setup is public-presence only. Commerce requirements are not shown at all — an
+   * intentional configuration should never look like an unfinished checklist.
+   */
+  const acceptingOrders = publicProfileReady && !ctx.menuOnly
     ? buildVendorOperationalSetupItems({
         checklist: ctx.readiness.checklist,
         vendorPaused: Boolean(ctx.vendorRecord.mennyuOrdersPaused),
@@ -45,9 +49,11 @@ export default async function VendorSetupPage({
         headingLevel={1}
         title="Setup"
         description={
-          ctx.setupComplete
-            ? "Readiness checklist — everything required before customers can order."
-            : vendorSetupPageIncompleteDescription()
+          ctx.menuOnly
+            ? "Everything required for your menu to appear on the pod page."
+            : ctx.setupComplete
+              ? "Readiness checklist — everything required before customers can order."
+              : vendorSetupPageIncompleteDescription()
         }
         actions={
           ctx.setupComplete ? (
@@ -62,7 +68,7 @@ export default async function VendorSetupPage({
       />
 
       <div className="mt-8 space-y-8">
-        {!ctx.setupComplete ? (
+        {!ctx.setupComplete && !ctx.menuOnly ? (
           <VendorSetupStatusBanners
             publicProfileReady={publicProfileReady}
             canAcceptOrders={ctx.readiness.canAcceptOrders}
@@ -71,7 +77,7 @@ export default async function VendorSetupPage({
 
         <VendorSetupChecklist items={appearance} title="Required to appear on pod page" />
 
-        {publicProfileReady ? (
+        {ctx.menuOnly ? null : publicProfileReady ? (
           <VendorSetupChecklist items={acceptingOrders} title="Required to accept orders" />
         ) : (
           <section className="rounded-xl border border-dashed border-oo-light-stone bg-oo-cream/40 px-4 py-4 text-sm text-oo-stone-gray">
@@ -80,7 +86,7 @@ export default async function VendorSetupPage({
           </section>
         )}
 
-        {integrations.model ? (
+        {integrations.model && !ctx.menuOnly ? (
           <VendorIntegrationsSection model={integrations.model} surface="setup" />
         ) : null}
       </div>

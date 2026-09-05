@@ -9,6 +9,8 @@ export type PodVendorGridRow = {
     unavailable: boolean;
     statusLabel: string;
     showBrowseHint: boolean;
+    /** Vendor (or pod) is menu-only: card links to the menu instead of an order CTA. */
+    menuOnly: boolean;
   };
   hoursDisplay: VendorHoursDisplayModel;
 };
@@ -18,6 +20,7 @@ type PodVendorGridProps = {
   rows: PodVendorGridRow[];
   highlightVendorId?: string | null;
   listClassName?: string;
+  showMenuOnlyBadge?: boolean;
 };
 
 export function PodVendorGrid({
@@ -25,6 +28,7 @@ export function PodVendorGrid({
   rows,
   highlightVendorId = null,
   listClassName,
+  showMenuOnlyBadge = false,
 }: PodVendorGridProps) {
   return (
     <ul
@@ -51,6 +55,7 @@ export function PodVendorGrid({
               vendor={vendor}
               isFeatured={isFeatured}
               availability={availability}
+              showMenuOnlyBadge={showMenuOnlyBadge}
               hoursDisplay={hoursDisplay}
             />
           </li>

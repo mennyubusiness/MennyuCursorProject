@@ -15,10 +15,26 @@ describe("VendorMenuItemCard tappable surface", () => {
   );
 
   it("renders card body as an accessible button separate from overlay controls", () => {
-    expect(cardSrc).toMatch(/role=\{itemUnavailable \? undefined : "button"\}/);
+    expect(cardSrc).toMatch(/role=\{interactive \? "button" : undefined\}/);
     expect(cardSrc).toMatch(/handleMenuItemCardKeyDown/);
     expect(cardSrc).toMatch(/addAction=\{addAction\}/);
     expect(cardSrc).toMatch(/pointer-events-auto/);
+  });
+
+  it("separates sold out from menu-only so an available menu-only item looks normal", () => {
+    expect(cardSrc).toMatch(/const itemUnavailable = !item\.isAvailable/);
+    expect(cardSrc).toMatch(/const dimmed = menuOnly \? itemUnavailable :/);
+    expect(cardSrc).toMatch(/const interactive = !menuOnly &&/);
+  });
+
+  it("removes add-to-cart controls entirely when menu-only rather than disabling them", () => {
+    expect(cardSrc).toMatch(/\{menuOnly \? null : \(/);
+    expect(cardSrc).not.toMatch(/Menu only/);
+  });
+
+  it("still shows the sold out badge for a menu-only item that is unavailable", () => {
+    expect(cardSrc).toMatch(/\{itemUnavailable && \(/);
+    expect(cardSrc).toMatch(/Unavailable/);
   });
 
   it("stops overlay clicks from bubbling to the card surface", () => {

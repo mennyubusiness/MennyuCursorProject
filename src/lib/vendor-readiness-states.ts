@@ -1,9 +1,20 @@
 /**
  * Single source of truth for vendor public visibility vs orderability.
  * Public profile readiness controls customer-facing visibility.
- * Operational readiness controls whether orders can be placed (after visible).
+ * Ordering intent (`orderingEnabled`) controls whether ordering is offered at all.
+ * Operational readiness controls whether orders can be placed (after visible + intent on).
  */
 import { getVendorAvailability, type VendorAvailabilityInput } from "@/lib/vendor-availability";
+import {
+  MENU_ONLY_BADGE,
+  POD_ORDERING_DISABLED_CODE,
+  POD_ORDERING_DISABLED_MESSAGE,
+  resolveVendorOrderingIntent,
+  VENDOR_ORDERING_DISABLED_CODE,
+  VENDOR_ORDERING_DISABLED_MESSAGE,
+  type VendorOrderingBlockedReason,
+  type VendorOrderingIntent,
+} from "@/lib/vendor-ordering-mode";
 import {
   hasValidVendorCustomerOrderingHours,
 } from "@/lib/vendor-customer-ordering-hours";
@@ -35,6 +46,8 @@ export type VendorPosReadinessSummary = VendorRoutingReadinessInput & {
 export type VendorReadinessVendorFields = {
   isActive: boolean;
   mennyuOrdersPaused: boolean;
+  /** `Vendor.orderingEnabled`. Undefined is treated as enabled. */
+  orderingEnabled?: boolean;
   name: string;
   slug: string;
   description: string | null;
@@ -113,11 +126,27 @@ export type VendorOperationalMissingKey =
   | "pod_inactive"
   | "pod_orders_paused"
   | "outside_hours"
-  | "menu_unavailable";
+  | "menu_unavailable"
+  /** Pod is configured menu-only. Not a setup failure. */
+  | "pod_ordering_disabled"
+  /** Vendor is configured menu-only. Not a setup failure. */
+  | "vendor_ordering_disabled";
+
+/** Payment/routing setup keys — reported as "ordering setup incomplete", never as menu-only. */
+const ORDERING_SETUP_KEYS: VendorOperationalMissingKey[] = [
+  "stripe",
+  "pos",
+  "deliverect_mapping",
+  "square_routing",
+];
 
 export type VendorPublicVisibilityState = "hidden" | "visible";
 
-export type VendorPodOwnerDisplayState = "hidden" | "visible_not_accepting" | "live";
+export type VendorPodOwnerDisplayState =
+  | "hidden"
+  | "visible_not_accepting"
+  | "menu_only"
+  | "live";
 
 export type VendorReadinessEvaluationInput = {
   vendor: VendorReadinessVendorFields & { customerOrderingHours?: unknown };
@@ -127,6 +156,8 @@ export type VendorReadinessEvaluationInput = {
   pod: {
     isActive: boolean;
     mennyuOrdersPaused?: boolean;
+    /** `Pod.orderingEnabled`. Undefined is treated as enabled. */
+    orderingEnabled?: boolean;
   };
   podVendor: {
     exists: boolean;
@@ -135,6 +166,16 @@ export type VendorReadinessEvaluationInput = {
   /** Vendor availability including resolved posOpen (hours + pause). */
   vendorAvailability?: VendorAvailabilityInput;
 };
+
+/** Durable menu-only vs orderable intent for this pod/vendor pair. */
+export function getVendorOrderingIntent(
+  input: VendorReadinessEvaluationInput
+): VendorOrderingIntent {
+  return resolveVendorOrderingIntent({
+    podOrderingEnabled: input.pod.orderingEnabled,
+    vendorOrderingEnabled: input.vendor.orderingEnabled,
+  });
+}
 
 export function isVendorPublicProfileReady(input: VendorReadinessEvaluationInput): boolean {
   return getVendorPublicProfileMissingItems(input).length === 0;
@@ -172,23 +213,56 @@ export function isVendorPublicProfileFieldsComplete(
   );
 }
 
-export function getVendorOperationalMissingItems(
+/**
+ * Commerce prerequisites (Stripe, routing, mappings, available menu).
+ * Evaluated regardless of ordering intent so admins can see whether re-enabling
+ * ordering would work — but only *enforced* when intent is on.
+ */
+export function getVendorOrderingPrerequisiteMissingItems(
   input: VendorReadinessEvaluationInput
 ): VendorOperationalMissingKey[] {
   const missing: VendorOperationalMissingKey[] = [];
-  const { vendor, menuSummary, stripeSummary, posSummary, pod, podVendor } = input;
+  const { menuSummary, stripeSummary, posSummary } = input;
 
-  if (!pod.isActive) missing.push("pod_inactive");
-  if (pod.mennyuOrdersPaused) missing.push("pod_orders_paused");
-  if (!vendor.isActive) missing.push("vendor_inactive");
-  if (vendor.mennyuOrdersPaused) missing.push("vendor_paused");
-  if (!podVendor?.exists) missing.push("pod_membership");
-  if (podVendor && !podVendor.isActive) missing.push("pod_vendor_inactive");
   if (!isVendorStripePayoutReady(stripeSummary)) missing.push("stripe");
   if (!isVendorPosReady(posSummary)) missing.push("pos");
   if (!isVendorDeliverectMappingReady(posSummary)) missing.push("deliverect_mapping");
   if (!isVendorSquareOrderable(posSummary)) missing.push("square_routing");
   if (!isVendorMenuReady(menuSummary, posSummary.menuSource)) missing.push("menu_unavailable");
+
+  return missing;
+}
+
+/** True when Stripe/routing/menu prerequisites would allow paid orders once intent is on. */
+export function isVendorOrderingPrerequisitesReady(
+  input: VendorReadinessEvaluationInput
+): boolean {
+  return getVendorOrderingPrerequisiteMissingItems(input).length === 0;
+}
+
+export function getVendorOperationalMissingItems(
+  input: VendorReadinessEvaluationInput
+): VendorOperationalMissingKey[] {
+  const missing: VendorOperationalMissingKey[] = [];
+  const { vendor, pod, podVendor } = input;
+  const intent = getVendorOrderingIntent(input);
+
+  // Structural state is reported either way — an inactive pod/vendor is a real problem.
+  if (!pod.isActive) missing.push("pod_inactive");
+  if (!vendor.isActive) missing.push("vendor_inactive");
+  if (!podVendor?.exists) missing.push("pod_membership");
+  if (podVendor && !podVendor.isActive) missing.push("pod_vendor_inactive");
+
+  // Menu-only is intentional: pause, hours, Stripe, and routing are not blockers.
+  if (!intent.effectiveOrderingEnabled) {
+    if (intent.menuOnlyByPod) missing.push("pod_ordering_disabled");
+    if (intent.menuOnlyByVendor) missing.push("vendor_ordering_disabled");
+    return missing;
+  }
+
+  if (pod.mennyuOrdersPaused) missing.push("pod_orders_paused");
+  if (vendor.mennyuOrdersPaused) missing.push("vendor_paused");
+  missing.push(...getVendorOrderingPrerequisiteMissingItems(input));
 
   const availability = getVendorAvailability(
     input.vendorAvailability ?? {
@@ -203,6 +277,13 @@ export function getVendorOperationalMissingItems(
 
 export function isVendorOperationallyReady(input: VendorReadinessEvaluationInput): boolean {
   return getVendorOperationalMissingItems(input).length === 0;
+}
+
+/** Menu-only vendors never surface Stripe/routing/POS as launch blockers. */
+export function shouldSurfaceOrderingPrerequisites(
+  input: VendorReadinessEvaluationInput
+): boolean {
+  return getVendorOrderingIntent(input).effectiveOrderingEnabled;
 }
 
 export function getVendorPublicVisibilityState(input: VendorReadinessEvaluationInput): VendorPublicVisibilityState {
@@ -221,7 +302,42 @@ export type VendorOrderabilityState = {
   showBrowseHint: boolean;
   /** Internal/dashboard label for the primary blocker bucket. */
   internalSummaryLabel: string;
+  /** Ordering is off by configuration (pod and/or vendor), not by readiness or pause. */
+  menuOnly: boolean;
+  /** Single most specific reason a customer cannot order. Null when orderable. */
+  blockedReason: VendorOrderingBlockedReason | null;
 };
+
+/**
+ * Effective commerce state for a vendor in a pod context.
+ * Use this instead of reading `orderingEnabled` directly in UI code.
+ */
+export type VendorCommerceState = VendorOrderingIntent & {
+  visibility: VendorPublicVisibilityState;
+  customerCanOrder: boolean;
+  /** Stripe/routing/menu prerequisites satisfied (independent of intent). */
+  orderingPrerequisitesReady: boolean;
+  blockedReason: VendorOrderingBlockedReason | null;
+  customerStatusLabel: string;
+  customerBannerLine: string | null;
+};
+
+export function getVendorCommerceState(
+  input: VendorReadinessEvaluationInput
+): VendorCommerceState {
+  const intent = getVendorOrderingIntent(input);
+  const state = getVendorOrderabilityState(input);
+
+  return {
+    ...intent,
+    visibility: state.visibility,
+    customerCanOrder: state.orderable,
+    orderingPrerequisitesReady: isVendorOrderingPrerequisitesReady(input),
+    blockedReason: state.blockedReason,
+    customerStatusLabel: state.customerStatusLabel,
+    customerBannerLine: state.customerBannerLine,
+  };
+}
 
 export function getVendorPodOwnerMissingLinesFromSetup(input: {
   podVendorActive: boolean;
@@ -235,6 +351,9 @@ export function getVendorPodOwnerMissingLinesFromSetup(input: {
     pos: boolean;
   };
   status: string;
+  /** Durable menu-only intent: commerce prerequisites are not gaps to report. */
+  menuOnly?: boolean;
+  menuOnlyByPod?: boolean;
 }): string[] {
   if (!input.podVendorActive) {
     return ["Not visible on pod page."];
@@ -258,6 +377,14 @@ export function getVendorPodOwnerMissingLinesFromSetup(input: {
       lines.push("Hidden: customer ordering hours missing.");
     }
     return [...new Set(lines)];
+  }
+
+  if (input.menuOnly) {
+    return [
+      input.menuOnlyByPod
+        ? "Live: menu only — ordering is off pod-wide."
+        : "Live: menu only — customers can browse this menu.",
+    ];
   }
 
   if (input.canAcceptOrders) {
@@ -292,6 +419,8 @@ export function getVendorPodOwnerDisplayStateFromSetup(input: {
     menu: boolean;
     hours?: boolean;
   };
+  /** Durable menu-only intent: publicly live, just not orderable. */
+  menuOnly?: boolean;
 }): VendorPodOwnerDisplayState {
   if (!input.podVendorActive) return "hidden";
   const publicReady = input.setupSummary.publicProfile ?? (
@@ -300,6 +429,7 @@ export function getVendorPodOwnerDisplayStateFromSetup(input: {
     (input.setupSummary.hours ?? true)
   );
   if (!publicReady) return "hidden";
+  if (input.menuOnly) return "menu_only";
   if (input.canAcceptOrders) return "live";
   return "visible_not_accepting";
 }
@@ -320,7 +450,9 @@ function resolveVendorAvailability(input: VendorReadinessEvaluationInput): Retur
 export function getVendorPodOwnerDisplayState(input: VendorReadinessEvaluationInput): VendorPodOwnerDisplayState {
   const visibility = getVendorPublicVisibilityState(input);
   if (visibility === "hidden") return "hidden";
-  if (getVendorOrderabilityState(input).orderable) return "live";
+  const state = getVendorOrderabilityState(input);
+  if (state.orderable) return "live";
+  if (state.menuOnly) return "menu_only";
   return "visible_not_accepting";
 }
 
@@ -335,8 +467,10 @@ export function getVendorPodOwnerDisplaySummary(input: VendorReadinessEvaluation
   if (state === "live") {
     return { state, headline: "Live — accepting orders", missingLines: [] };
   }
+  if (state === "menu_only") {
+    return { state, headline: "Live — menu only", missingLines };
+  }
   if (state === "hidden") {
-    const firstMissing = missingLines[0];
     return {
       state,
       headline: "Hidden — public profile incomplete",
@@ -368,6 +502,12 @@ export function getVendorPodOwnerMissingLines(input: VendorReadinessEvaluationIn
   if (publicMissing.length > 0) return [...new Set(lines)];
 
   const operational = getVendorOperationalMissingItems(input);
+  if (operational.includes("pod_ordering_disabled")) {
+    lines.push("Menu only: ordering is disabled for this pod.");
+  }
+  if (operational.includes("vendor_ordering_disabled")) {
+    lines.push("Menu only: customers can browse this menu but cannot order.");
+  }
   if (operational.includes("stripe")) {
     lines.push("Visible, not accepting orders: vendor needs payment setup.");
   }
@@ -411,9 +551,30 @@ export function isVendorCustomerOrderable(input: VendorReadinessEvaluationInput)
   return getVendorOrderabilityState(input).orderable;
 }
 
+function resolveBlockedReason(
+  operationalMissing: VendorOperationalMissingKey[],
+  availability: ReturnType<typeof getVendorAvailability>
+): VendorOrderingBlockedReason {
+  if (operationalMissing.includes("pod_ordering_disabled")) return "pod_ordering_disabled";
+  if (operationalMissing.includes("vendor_ordering_disabled")) return "vendor_ordering_disabled";
+  if (operationalMissing.includes("pod_orders_paused")) return "pod_orders_paused";
+  if (operationalMissing.includes("vendor_paused") || availability.status === "mennyu_paused") {
+    return "vendor_paused";
+  }
+  if (operationalMissing.includes("outside_hours") || availability.status === "closed") {
+    return "vendor_closed";
+  }
+  if (ORDERING_SETUP_KEYS.some((key) => operationalMissing.includes(key))) {
+    return "ordering_setup_incomplete";
+  }
+  if (operationalMissing.includes("menu_unavailable")) return "item_unavailable";
+  return "ordering_setup_incomplete";
+}
+
 export function getVendorOrderabilityState(input: VendorReadinessEvaluationInput): VendorOrderabilityState {
   const visibility = getVendorPublicVisibilityState(input);
   const availability = resolveVendorAvailability(input);
+  const intent = getVendorOrderingIntent(input);
 
   if (visibility === "hidden") {
     return {
@@ -424,6 +585,8 @@ export function getVendorOrderabilityState(input: VendorReadinessEvaluationInput
       customerBannerLine: null,
       showBrowseHint: false,
       internalSummaryLabel: PUBLIC_PROFILE_INCOMPLETE_LABEL,
+      menuOnly: intent.menuOnly,
+      blockedReason: "vendor_not_public_ready",
     };
   }
 
@@ -439,12 +602,34 @@ export function getVendorOrderabilityState(input: VendorReadinessEvaluationInput
       customerBannerLine: null,
       showBrowseHint: false,
       internalSummaryLabel: "Accepting orders",
+      menuOnly: false,
+      blockedReason: null,
+    };
+  }
+
+  /**
+   * Menu-only is a deliberate product state, not a failure: the vendor stays visible and
+   * browsable, and we do not show "not accepting orders" banners or a browse hint.
+   */
+  if (intent.menuOnly) {
+    return {
+      orderable: false,
+      visibility,
+      podOwnerDisplay: "menu_only",
+      customerStatusLabel: MENU_ONLY_BADGE,
+      customerBannerLine: null,
+      showBrowseHint: false,
+      internalSummaryLabel: MENU_ONLY_BADGE,
+      menuOnly: true,
+      blockedReason: intent.menuOnlyByVendor
+        ? "vendor_ordering_disabled"
+        : "pod_ordering_disabled",
     };
   }
 
   let customerStatusLabel = CUSTOMER_NOT_ACCEPTING;
   let customerBannerLine: string | null = CUSTOMER_NOT_ACCEPTING;
-  let showBrowseHint = true;
+  const showBrowseHint = true;
 
   if (operationalMissing.includes("outside_hours") && !operationalMissing.includes("vendor_paused")) {
     customerStatusLabel = CUSTOMER_CLOSED;
@@ -462,6 +647,8 @@ export function getVendorOrderabilityState(input: VendorReadinessEvaluationInput
     customerBannerLine,
     showBrowseHint,
     internalSummaryLabel: "Not accepting orders",
+    menuOnly: false,
+    blockedReason: resolveBlockedReason(operationalMissing, availability),
   };
 }
 
@@ -469,15 +656,18 @@ export function getVendorCustomerPodCardAvailability(input: VendorReadinessEvalu
   unavailable: boolean;
   statusLabel: string;
   showBrowseHint: boolean;
+  menuOnly: boolean;
 } {
   const state = getVendorOrderabilityState(input);
   if (state.visibility === "hidden") {
-    return { unavailable: true, statusLabel: "", showBrowseHint: false };
+    return { unavailable: true, statusLabel: "", showBrowseHint: false, menuOnly: false };
   }
+  /** Menu-only vendors are not "unavailable" — they browse normally with a View menu CTA. */
   return {
-    unavailable: !state.orderable,
-    statusLabel: state.orderable ? state.customerStatusLabel : state.customerStatusLabel,
+    unavailable: !state.orderable && !state.menuOnly,
+    statusLabel: state.customerStatusLabel,
     showBrowseHint: state.showBrowseHint,
+    menuOnly: state.menuOnly,
   };
 }
 
@@ -494,6 +684,14 @@ export function vendorOrderabilityValidationError(input: VendorReadinessEvaluati
       code: "VENDOR_NOT_PUBLIC_READY",
       message: "This vendor is not available right now.",
     };
+  }
+
+  /** Ordering intent is checked before pause/hours so menu-only never reads as an outage. */
+  if (state.blockedReason === "pod_ordering_disabled") {
+    return { code: POD_ORDERING_DISABLED_CODE, message: POD_ORDERING_DISABLED_MESSAGE };
+  }
+  if (state.blockedReason === "vendor_ordering_disabled") {
+    return { code: VENDOR_ORDERING_DISABLED_CODE, message: VENDOR_ORDERING_DISABLED_MESSAGE };
   }
 
   const availability = resolveVendorAvailability(input);

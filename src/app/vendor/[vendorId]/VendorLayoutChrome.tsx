@@ -4,6 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import type { VendorOrderRoutingMode } from "@prisma/client";
+import {
+  DEFAULT_VENDOR_DASHBOARD_NAV_MODE,
+  type VendorDashboardNavMode,
+} from "@/lib/vendor-dashboard-nav-mode";
 import { VendorAreaNav } from "./VendorAreaNav";
 import { VendorInactiveMenuSourceNotice } from "./VendorInactiveMenuSourceNotice";
 
@@ -11,11 +15,13 @@ export function VendorLayoutChrome({
   vendorId,
   vendorName,
   orderRoutingMode,
+  navMode = DEFAULT_VENDOR_DASHBOARD_NAV_MODE,
   children,
 }: {
   vendorId: string;
   vendorName: string;
   orderRoutingMode: VendorOrderRoutingMode;
+  navMode?: VendorDashboardNavMode;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -49,7 +55,12 @@ export function VendorLayoutChrome({
         <div className={headerWidth}>
           <h1 className="oo-dash-titlebar-heading">{vendorName}</h1>
         </div>
-        <VendorAreaNav vendorId={vendorId} orderRoutingMode={orderRoutingMode} wide={isWideWorkspace} />
+        <VendorAreaNav
+          vendorId={vendorId}
+          orderRoutingMode={orderRoutingMode}
+          navMode={navMode}
+          wide={isWideWorkspace}
+        />
       </header>
       <main className={mainWidth}>
         <Suspense fallback={null}>

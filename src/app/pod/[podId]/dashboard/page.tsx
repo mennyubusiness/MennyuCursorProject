@@ -29,7 +29,11 @@ export default async function PodDashboardPage({
       <DashboardPageHeader
         headingLevel={1}
         title="Dashboard"
-        description="Public pod status, vendor readiness, and how your pod is performing."
+        description={
+          ctx.podMenuOnly
+            ? "Public pod status, vendor menus, and how your pod page looks to customers."
+            : "Public pod status, vendor readiness, and how your pod is performing."
+        }
       />
 
       <div className="mt-8 space-y-8">
@@ -40,7 +44,9 @@ export default async function PodDashboardPage({
             </Link>
             <span className="text-oo-stone-gray">
               {" "}
-              — finish required checks so customers can order from your pod.
+              {ctx.podMenuOnly
+                ? "— finish required checks so your pod and vendor menus appear publicly."
+                : "— finish required checks so customers can order from your pod."}
             </span>
           </div>
         ) : null}
@@ -51,11 +57,18 @@ export default async function PodDashboardPage({
           isActive={ctx.pod.isActive}
           hasPublicProfile={hasPublicProfile}
           orderableVendorCount={ctx.orderableVendorCount}
+          listedVendorCount={ctx.listedVendorCount}
+          podMenuOnly={ctx.podMenuOnly}
           announcementActive={ctx.announcementState.initialIsActive && Boolean(ctx.announcementState.initialText.trim())}
           publicPageHref={ctx.publicPageHref}
         />
 
-        <PodVendorReadinessSection podId={podId} podSlug={ctx.pod.slug} rows={ctx.rosterRows} />
+        <PodVendorReadinessSection
+          podId={podId}
+          podSlug={ctx.pod.slug}
+          rows={ctx.rosterRows}
+          podMenuOnly={ctx.podMenuOnly}
+        />
 
         <PodNeedsAttentionSection podId={podId} items={ctx.attentionItems} />
 
@@ -63,6 +76,10 @@ export default async function PodDashboardPage({
           summary={ctx.analytics.summary}
           participation={ctx.analytics.participation}
           orderableVendorCount={ctx.orderableVendorCount}
+          podMenuOnly={ctx.podMenuOnly}
+          listedVendorCount={ctx.listedVendorCount}
+          activeVendorCount={ctx.rosterRows.length}
+          promoteHref={`/pod/${podId}/promote`}
         />
 
         <PodRecentActivitySection feed={ctx.activityFeed} />

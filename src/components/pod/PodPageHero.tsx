@@ -17,9 +17,12 @@ type PodPageHeroProps = {
   accentColor: string | null;
   orderingStatus: PodOrderingStatus;
   hasVendors: boolean;
+  /** False on a fully menu-only pod: there is nothing to group-order. */
+  showGroupOrderCta?: boolean;
 };
 
 const DEFAULT_TAGLINE = "Mix vendors in one cart — one payment, one trip.";
+const DEFAULT_MENU_ONLY_TAGLINE = "Browse every kitchen's menu in one place.";
 
 const heroMetaBadge =
   "rounded-full border border-white/25 bg-white/90 px-3 py-1 text-xs font-semibold text-oo-charcoal shadow-sm";
@@ -34,12 +37,14 @@ export function PodPageHero({
   accentColor,
   orderingStatus,
   hasVendors,
+  showGroupOrderCta = true,
 }: PodPageHeroProps) {
   const hasImage = isHttpsImageUrl(imageUrl);
+  const menuOnly = orderingStatus.tone === "menu_only";
   const heroTagline =
     tagline?.trim() ||
     description?.trim()?.split(/\n/)[0]?.slice(0, 160) ||
-    DEFAULT_TAGLINE;
+    (menuOnly ? DEFAULT_MENU_ONLY_TAGLINE : DEFAULT_TAGLINE);
   const location = address?.trim();
 
   return (
@@ -128,11 +133,15 @@ export function PodPageHero({
                 {orderingStatus.totalVendorCount === 1 ? "" : "s"}
               </span>
             )}
-            <span className={heroMetaBadge}>One cart · One pickup</span>
+            {!menuOnly && <span className={heroMetaBadge}>One cart · One pickup</span>}
           </div>
 
           <div className="mt-6">
-            <PodPageHeroActions podId={podId} hasVendors={hasVendors} />
+            <PodPageHeroActions
+              podId={podId}
+              hasVendors={hasVendors}
+              showGroupOrderCta={showGroupOrderCta}
+            />
           </div>
         </div>
       </PageShell>

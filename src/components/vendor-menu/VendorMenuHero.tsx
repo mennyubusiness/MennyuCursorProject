@@ -5,14 +5,24 @@ import { PageShell } from "@/components/layout/page-shell";
 import { VendorHoursDisclosure } from "@/components/vendor/VendorHoursDisclosure";
 import type { VendorHoursDisplayModel } from "@/lib/vendor-hours-display";
 import type { VendorAvailabilityStatus } from "@/lib/vendor-availability";
+import { MENU_ONLY_BADGE } from "@/lib/vendor-ordering-mode";
 import { cn } from "@/lib/cn";
 
-function VendorStatusBadge({ status }: { status: VendorAvailabilityStatus }) {
+function VendorStatusBadge({
+  status,
+  menuOnly,
+}: {
+  status: VendorAvailabilityStatus;
+  menuOnly?: boolean;
+}) {
+  /** Menu-only is intentional, so it reads as a neutral suffix on the open/closed status. */
+  const menuOnlySuffix = menuOnly ? ` · ${MENU_ONLY_BADGE}` : "";
+
   if (status === "open") {
     return (
       <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
-        Open
+        Open{menuOnlySuffix}
       </span>
     );
   }
@@ -22,6 +32,15 @@ function VendorStatusBadge({ status }: { status: VendorAvailabilityStatus }) {
       : status === "mennyu_paused"
         ? "Not accepting orders"
         : "Unavailable";
+
+  if (menuOnly) {
+    return (
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-oo-stone-gray">
+        Closed{menuOnlySuffix}
+      </span>
+    );
+  }
+
   return (
     <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">
       {label}
@@ -43,6 +62,8 @@ type VendorMenuHeroProps = {
   vendorAccentColor: string | null;
   cuisineCategory: string | null;
   availabilityStatus: VendorAvailabilityStatus;
+  /** Durable menu-only mode: shown once here, never repeated per menu item. */
+  menuOnly?: boolean;
   bannerLine: string | null;
   hoursDisplay: VendorHoursDisplayModel;
 };
@@ -59,6 +80,7 @@ export function VendorMenuHero({
   vendorAccentColor,
   cuisineCategory,
   availabilityStatus,
+  menuOnly,
   bannerLine,
   hoursDisplay,
 }: VendorMenuHeroProps) {
@@ -105,7 +127,7 @@ export function VendorMenuHero({
 
             <ul className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <li>
-                <VendorStatusBadge status={availabilityStatus} />
+                <VendorStatusBadge status={availabilityStatus} menuOnly={menuOnly} />
               </li>
               {cuisineCategory?.trim() ? (
                 <li className="text-oo-stone-gray">{cuisineCategory.trim()}</li>

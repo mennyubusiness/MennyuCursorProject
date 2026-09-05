@@ -42,6 +42,7 @@ import {
 import { evaluateSquareConnectionHealth } from "@/lib/integrations/square/square-connection.service";
 import { loadSquareOrderRoutingReadiness } from "@/lib/integrations/square/square-order-routing-readiness";
 import { isDeliverectMenuSource } from "@/lib/vendor-menu-source";
+import { resolveVendorOrderingIntent } from "@/lib/vendor-ordering-mode";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 
 function startOfToday(): Date {
@@ -66,6 +67,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
       contactPhone: true,
       isActive: true,
       mennyuOrdersPaused: true,
+      orderingEnabled: true,
       deliverectChannelLinkId: true,
       deliverectLocationId: true,
       posConnectionStatus: true,
@@ -95,7 +97,16 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
         where: { vendorId },
         select: {
           isActive: true,
-          pod: { select: { id: true, name: true, slug: true, isActive: true, pickupTimezone: true } },
+          pod: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              isActive: true,
+              orderingEnabled: true,
+              pickupTimezone: true,
+            },
+          },
         },
       }),
       hasUnmatchedChannelRegistrationForVendorById(vendorId),
@@ -183,16 +194,30 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     posOpen: hoursSummary.posOpen,
   };
 
+  /**
+   * Durable ordering intent for this vendor in its pod. Everything commerce-shaped on the
+   * dashboard keys off this, so menu-only never renders as a broken ordering dashboard.
+   */
+  const orderingIntent = resolveVendorOrderingIntent({
+    podOrderingEnabled: currentPod?.pod.orderingEnabled,
+    vendorOrderingEnabled: vendorRecord.orderingEnabled,
+  });
+  const menuOnly = orderingIntent.menuOnly;
+
   const readiness = deriveVendorPodReadiness(
     {
       podId: currentPod?.pod.id ?? vendorId,
       vendorId,
       menuSource: vendorRecord.menuSource,
-      pod: { isActive: currentPod?.pod.isActive ?? true },
+      pod: {
+        isActive: currentPod?.pod.isActive ?? true,
+        orderingEnabled: currentPod?.pod.orderingEnabled,
+      },
       podVendor: currentPod ? { isActive: currentPod.isActive } : null,
       vendor: {
         isActive: vendorRecord.isActive,
         mennyuOrdersPaused: vendorRecord.mennyuOrdersPaused ?? false,
+        orderingEnabled: vendorRecord.orderingEnabled,
         name: vendorRecord.name,
         slug: vendorRecord.slug,
         description: vendorRecord.description,
@@ -221,7 +246,8 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
   );
 
   const setupComplete = isVendorSetupComplete(
-    readiness.checklist.filter((item) => item.complete).map((item) => item.key)
+    readiness.checklist.filter((item) => item.complete).map((item) => item.key),
+    { menuOnly }
   );
 
   const availability = getVendorAvailability(vendorAvailabilityInput);
@@ -230,6 +256,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     availabilityStatus: availability.status,
     setupComplete,
     canAcceptOrders: readiness.canAcceptOrders,
+    menuOnly,
   });
 
   const initialNowMs = Date.now();
@@ -253,6 +280,7 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     failedOrdersToday: todayStats.failedOrCancelled,
     vendorPaused: Boolean(vendorRecord.mennyuOrdersPaused),
     currentlyOpen: availability.status === "open",
+    menuOnly,
   }).map((item) => {
     if (item.id === "stripe" && !item.actionHref) {
       return { ...item, actionHref: `/vendor/${vendorId}/payouts`, actionLabel: "Finish setup" };
@@ -306,6 +334,8 @@ export const loadVendorDashboardContext = cache(async (vendorId: string) => {
     vendorRecord,
     readiness,
     readinessPosSummary,
+    orderingIntent,
+    menuOnly,
     setupComplete,
     posState,
     posConnected,

@@ -13,6 +13,7 @@ import {
   adminRefreshVendorMenu,
   adminRestoreVendorSlug,
   adminShowVendor,
+  adminSetVendorOrderingMode,
   adminUnpauseVendorOrdering,
   adminUpdateVendorPublicProfile,
   adminUpdateVendorOrderRoutingMode,
@@ -33,6 +34,20 @@ async function withAdmin<T extends ActionResult>(
   const result = await fn(ctx);
   if (result.ok) revalidatePath("/admin/vendors");
   return result;
+}
+
+/** Platform-admin only (enforced by `withAdmin`). Menu-only is durable product intent. */
+export async function adminSetVendorOrderingModeAction(
+  vendorId: string,
+  orderingEnabled: boolean,
+  reason: string
+) {
+  return withAdmin(({ adminUserId }) =>
+    adminSetVendorOrderingMode({ vendorId, orderingEnabled, adminUserId, reason }).then((r) => {
+      if (r.ok) revalidatePath(`/admin/vendors/${vendorId}`);
+      return r;
+    })
+  );
 }
 
 export async function adminPauseVendorOrderingAction(vendorId: string, reason: string) {

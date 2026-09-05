@@ -11,6 +11,7 @@ import {
   adminLogPodReadinessRecheck,
   adminPausePodOrdering,
   adminRemovePodOwnerFromPod,
+  adminSetPodOrderingMode,
   adminSetPodVendorActive,
   adminShowPod,
   adminUnpausePodOrdering,
@@ -30,6 +31,20 @@ async function withAdmin<T extends ActionResult>(
   const result = await fn(ctx);
   if (result.ok) revalidatePath("/admin/pods");
   return result;
+}
+
+/** Platform-admin only (enforced by `withAdmin`). Pod owners cannot change ordering mode. */
+export async function adminSetPodOrderingModeAction(
+  podId: string,
+  orderingEnabled: boolean,
+  reason: string
+) {
+  return withAdmin(({ adminUserId }) =>
+    adminSetPodOrderingMode({ podId, orderingEnabled, adminUserId, reason }).then((r) => {
+      if (r.ok) revalidatePath(`/admin/pods/${podId}`);
+      return r;
+    })
+  );
 }
 
 export async function adminPausePodOrderingAction(podId: string, reason: string) {

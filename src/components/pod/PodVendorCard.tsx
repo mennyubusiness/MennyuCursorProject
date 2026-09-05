@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { buildVendorMenuCustomerPath } from "@/lib/customer-public-url";
 import { VendorHoursDisclosure } from "@/components/vendor/VendorHoursDisclosure";
 import type { VendorHoursDisplayModel } from "@/lib/vendor-hours-display";
+import { MENU_ONLY_BADGE, VENDOR_MENU_ONLY_CTA } from "@/lib/vendor-ordering-mode";
 
 export type PodVendorCardVendor = {
   id: string;
@@ -24,6 +25,7 @@ type AvailabilityLabel = {
   unavailable: boolean;
   statusLabel: string;
   showBrowseHint: boolean;
+  menuOnly?: boolean;
 };
 
 type PodVendorCardProps = {
@@ -32,6 +34,11 @@ type PodVendorCardProps = {
   vendor: PodVendorCardVendor;
   isFeatured: boolean;
   availability: AvailabilityLabel;
+  /**
+   * Label menu-only cards. Set on mixed pods where the distinction matters; left off when the
+   * whole pod is menu-only, since the pod status already says so.
+   */
+  showMenuOnlyBadge?: boolean;
   hoursDisplay?: VendorHoursDisplayModel;
 };
 
@@ -88,12 +95,15 @@ export function PodVendorCard({
   vendor,
   isFeatured,
   availability,
+  showMenuOnlyBadge = false,
   hoursDisplay,
 }: PodVendorCardProps) {
   const href = buildVendorMenuCustomerPath(podSlug, vendor.slug);
   const grid = variant === "grid";
   const cuisine = vendor.cuisineCategory?.trim();
-  const ctaLabel = availability.unavailable ? "View menu" : "Order now";
+  const menuOnly = Boolean(availability.menuOnly);
+  /** Menu-only never gets an order CTA — the card leads to the menu instead. */
+  const ctaLabel = menuOnly || availability.unavailable ? VENDOR_MENU_ONLY_CTA : "Order now";
 
   return (
     <div
@@ -142,7 +152,13 @@ export function PodVendorCard({
         )}
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          {!availability.unavailable ? (
+          {menuOnly ? (
+            showMenuOnlyBadge ? (
+              <span className="inline-flex rounded-full bg-oo-cream px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-oo-charcoal ring-1 ring-oo-light-stone">
+                {MENU_ONLY_BADGE}
+              </span>
+            ) : null
+          ) : !availability.unavailable ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-900 ring-1 ring-emerald-200">
               <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
               Open

@@ -17,6 +17,12 @@ import {
 import type { AdminVendorDetailView } from "@/services/admin-vendor-detail.service";
 import type { VendorPosReadinessSummary } from "@/lib/vendor-readiness-states";
 import { ADMIN_AUDIT_ACTION } from "@/lib/admin-audit-log";
+import {
+  ORDERING_MODE_COPY,
+  resolveVendorOrderingIntent,
+  VENDOR_ORDERING_MODE_LABELS,
+  vendorOrderingModeLabel,
+} from "@/lib/vendor-ordering-mode";
 
 export type AdminStatusTone = "success" | "warning" | "danger" | "neutral";
 
@@ -32,6 +38,7 @@ export type AdminVendorAttentionItem = {
 
 export type AdminVendorOverallStatus =
   | "accepting_orders"
+  | "menu_only"
   | "paused"
   | "closed_by_hours"
   | "setup_required"
@@ -62,6 +69,16 @@ export type AdminVendorSummary = {
     acceptingOrders: boolean;
     label: string;
     reason?: string;
+  };
+  /** Durable menu-only vs orderable intent. Separate from `ordering` (live acceptance). */
+  orderingMode: {
+    vendorOrderingEnabled: boolean;
+    podOrderingEnabled: boolean;
+    menuOnly: boolean;
+    /** Pod-wide switch is off; the vendor's own setting is preserved. */
+    menuOnlyByPod: boolean;
+    label: string;
+    description: string;
   };
   hours: {
     statusLabel: string;
@@ -269,6 +286,15 @@ export function buildAdminVendorSummary(input: {
   const primaryPod = detail.pods[0] ?? null;
   const hours = formatAdminBusinessHoursStatus(hoursDebug);
   const payReady = paymentsReady(detail);
+  /**
+   * Menu-only is intentional, so commerce prerequisites (Stripe, Square, Deliverect, kitchen
+   * presence) are not surfaced as attention items while ordering intent is off.
+   */
+  const intent = resolveVendorOrderingIntent({
+    podOrderingEnabled: primaryPod?.podOrderingEnabled,
+    vendorOrderingEnabled: detail.vendor.orderingEnabled,
+  });
+  const showCommerceAttention = intent.effectiveOrderingEnabled;
   const coverage = squareInjectionDiagnostics?.vendor.mappingCoverage;
   const squarePrereqReady =
     squareInjectionDiagnostics?.vendor.prerequisitesReady === true;
@@ -292,7 +318,7 @@ export function buildAdminVendorSummary(input: {
     });
   }
 
-  if (detail.vendor.mennyuOrdersPaused) {
+  if (detail.vendor.mennyuOrdersPaused && showCommerceAttention) {
     attentionItems.push({
       id: "paused",
       title: "Ordering is paused",
@@ -304,7 +330,7 @@ export function buildAdminVendorSummary(input: {
     });
   }
 
-  if (!payReady) {
+  if (!payReady && showCommerceAttention) {
     attentionItems.push({
       id: "stripe",
       title: "Payment setup needs attention",
@@ -316,7 +342,7 @@ export function buildAdminVendorSummary(input: {
     });
   }
 
-  if (isSquareRoutingMode(mode)) {
+  if (isSquareRoutingMode(mode) && showCommerceAttention) {
     if (!squareStatus.hasConnection || !squareStatus.health.isReady) {
       attentionItems.push({
         id: "square-disconnected",
@@ -368,7 +394,11 @@ export function buildAdminVendorSummary(input: {
     }
   }
 
-  if (isDeliverectRoutingMode(mode) && detail.vendor.posConnectionStatus !== "connected") {
+  if (
+    isDeliverectRoutingMode(mode) &&
+    detail.vendor.posConnectionStatus !== "connected" &&
+    showCommerceAttention
+  ) {
     attentionItems.push({
       id: "deliverect",
       title: "Deliverect connection needs attention",
@@ -395,7 +425,7 @@ export function buildAdminVendorSummary(input: {
 
   const presence = resolveVendorDashboardPresenceStatus(detail.vendor.vendorDashboardLastSeenAt);
   const showDashboardAttention =
-    isManualDashboardRoutingMode(mode) && presence === "offline";
+    isManualDashboardRoutingMode(mode) && presence === "offline" && showCommerceAttention;
   if (showDashboardAttention) {
     attentionItems.push({
       id: "dashboard-offline",
@@ -416,6 +446,13 @@ export function buildAdminVendorSummary(input: {
     overallKey = "hidden";
     overallLabel = "Hidden";
     overallTone = "danger";
+  } else if (intent.menuOnly) {
+    /** Not a failure: the menu is public and browsable, ordering is intentionally off. */
+    overallKey = "menu_only";
+    overallLabel = intent.menuOnlyByVendor
+      ? VENDOR_ORDERING_MODE_LABELS.menu_only
+      : VENDOR_ORDERING_MODE_LABELS.menu_only_pod_disabled;
+    overallTone = "neutral";
   } else if (detail.vendor.mennyuOrdersPaused) {
     overallKey = "paused";
     overallLabel = "Paused";
@@ -449,7 +486,13 @@ export function buildAdminVendorSummary(input: {
 
   let routingSummaryLines: string[] = [];
   let routingIssue: string | undefined;
-  if (isSquareRoutingMode(mode)) {
+  if (intent.menuOnly) {
+    /**
+     * Routing configuration is preserved but not validated while menu-only: showing
+     * "Action required" here would frame an intentional state as a broken integration.
+     */
+    routingSummaryLines = [`${adminVendorRoutingManagedLabel(mode)} · not used while menu only`];
+  } else if (isSquareRoutingMode(mode)) {
     if (squareReady && coverage?.ready) {
       routingSummaryLines = [
         "Connected",
@@ -498,14 +541,30 @@ export function buildAdminVendorSummary(input: {
     },
     ordering: {
       acceptingOrders,
-      label: detail.vendor.mennyuOrdersPaused
-        ? "Paused"
-        : acceptingOrders
-          ? "Accepting orders"
-          : !hours.isOpen
-            ? "Closed by hours"
-            : "Not accepting orders",
-      reason: acceptingOrders ? undefined : detail.readinessSummary.label,
+      label: intent.menuOnly
+        ? VENDOR_ORDERING_MODE_LABELS.menu_only
+        : detail.vendor.mennyuOrdersPaused
+          ? "Ordering paused"
+          : acceptingOrders
+            ? "Accepting orders"
+            : !hours.isOpen
+              ? "Closed by hours"
+              : "Not accepting orders",
+      reason: intent.menuOnly || acceptingOrders ? undefined : detail.readinessSummary.label,
+    },
+    orderingMode: {
+      vendorOrderingEnabled: intent.vendorOrderingEnabled,
+      podOrderingEnabled: intent.podOrderingEnabled,
+      menuOnly: intent.menuOnly,
+      menuOnlyByPod: intent.menuOnlyByPod && intent.vendorOrderingEnabled,
+      label: vendorOrderingModeLabel({
+        podOrderingEnabled: intent.podOrderingEnabled,
+        vendorOrderingEnabled: intent.vendorOrderingEnabled,
+        orderingReady: payReady,
+      }),
+      description: intent.vendorOrderingEnabled
+        ? ORDERING_MODE_COPY.vendorEnabledDescription
+        : ORDERING_MODE_COPY.vendorMenuOnlyDescription,
     },
     hours: {
       statusLabel: hours.statusLabel,
@@ -525,8 +584,13 @@ export function buildAdminVendorSummary(input: {
     },
     payments: {
       ready: payReady,
-      label: payReady ? "Ready" : "Action required",
-      issue: payReady ? undefined : "Stripe payouts are not fully enabled.",
+      label: payReady
+        ? "Ready"
+        : intent.menuOnly
+          ? "Not required — menu only"
+          : "Action required",
+      /** Menu-only vendors are never nagged about payouts they do not need yet. */
+      issue: payReady || intent.menuOnly ? undefined : "Stripe payouts are not fully enabled.",
     },
     routing: {
       providerLabel: isSquareRoutingMode(mode)
@@ -535,7 +599,9 @@ export function buildAdminVendorSummary(input: {
           ? "Deliverect"
           : "Open Order",
       managedInLabel: adminVendorRoutingManagedLabel(mode),
-      ready: isSquareRoutingMode(mode)
+      ready: intent.menuOnly
+        ? true
+        : isSquareRoutingMode(mode)
         ? Boolean(squareReady && coverage?.ready !== false)
         : isDeliverectRoutingMode(mode)
           ? detail.vendor.posConnectionStatus === "connected"

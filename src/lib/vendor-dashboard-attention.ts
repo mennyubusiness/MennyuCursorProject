@@ -1,5 +1,6 @@
 import {
   VENDOR_ACCEPTING_ORDERS_CHECKLIST_KEYS,
+  VENDOR_MENU_ONLY_SETUP_REQUIRED_CHECKLIST_KEYS,
   VENDOR_PUBLIC_APPEARANCE_CHECKLIST_KEYS,
   type ReadinessChecklistItem,
   VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS,
@@ -64,6 +65,8 @@ export function deriveVendorAttentionItems(input: {
   failedOrdersToday: number;
   vendorPaused: boolean;
   currentlyOpen: boolean;
+  /** Effective ordering intent is off. Commerce readiness is not this vendor's problem. */
+  menuOnly?: boolean;
 }): VendorAttentionItem[] {
   const items: VendorAttentionItem[] = [];
   const incompletePublic = input.checklist.filter(
@@ -108,7 +111,12 @@ export function deriveVendorAttentionItems(input: {
   }
 
   const hasOperationalSetupGaps = incompleteOperational.length > 0;
+  /**
+   * Menu-only vendors never see ordering/payment/routing attention: not being able to accept
+   * orders is the configured intent, not something to fix.
+   */
   const showOrderabilityAttention =
+    !input.menuOnly &&
     !input.canAcceptOrders &&
     (!input.setupComplete || hasOperationalSetupGaps || input.vendorPaused);
 
@@ -172,8 +180,18 @@ export function deriveVendorAttentionItems(input: {
   return items;
 }
 
-export function isVendorSetupComplete(checklistCompleteKeys: string[]): boolean {
-  return VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS.every((key) => checklistCompleteKeys.includes(key));
+/**
+ * Menu-only vendors are complete once they are publicly present: Stripe, routing, and menu
+ * availability are not requirements they have opted into.
+ */
+export function isVendorSetupComplete(
+  checklistCompleteKeys: string[],
+  opts?: { menuOnly?: boolean }
+): boolean {
+  const required = opts?.menuOnly
+    ? VENDOR_MENU_ONLY_SETUP_REQUIRED_CHECKLIST_KEYS
+    : VENDOR_SETUP_REQUIRED_CHECKLIST_KEYS;
+  return required.every((key) => checklistCompleteKeys.includes(key));
 }
 
 export function buildVendorOperationalSetupItems(input: {

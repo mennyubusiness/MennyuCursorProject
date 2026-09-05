@@ -23,6 +23,7 @@ const vendorReadinessSelect = {
   cuisineCategory: true,
   isActive: true,
   mennyuOrdersPaused: true,
+  orderingEnabled: true,
   customerOrderingHours: true,
   stripeConnectedAccountId: true,
   stripeChargesEnabled: true,
@@ -114,6 +115,7 @@ export async function loadVendorReadinessBundles(
       vendor: {
         isActive: vendor.isActive,
         mennyuOrdersPaused: vendor.mennyuOrdersPaused ?? false,
+        orderingEnabled: vendor.orderingEnabled ?? true,
         name: vendor.name,
         slug: vendor.slug,
         description: vendor.description,
@@ -158,7 +160,7 @@ export async function loadVendorReadinessBundles(
 export function buildVendorReadinessEvaluationInput(
   bundle: VendorReadinessBundle,
   input: {
-    pod: { isActive: boolean; mennyuOrdersPaused?: boolean };
+    pod: { isActive: boolean; mennyuOrdersPaused?: boolean; orderingEnabled?: boolean };
     podVendor: { exists: boolean; isActive: boolean };
     vendorAvailability?: VendorAvailabilityInput;
   }

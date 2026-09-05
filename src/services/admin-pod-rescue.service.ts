@@ -20,6 +20,64 @@ function revalidatePodPaths(podId: string) {
   revalidatePath("/explore");
 }
 
+/**
+ * Sets durable pod-wide ordering intent (orderable vs menu-only).
+ *
+ * Vendor-level `orderingEnabled` is intentionally left untouched: while the pod is menu-only
+ * every vendor is effectively menu-only, and each vendor's own setting resumes when the pod
+ * switches back. Menus, routing, and payment configuration are never modified here.
+ */
+export async function adminSetPodOrderingMode(input: {
+  podId: string;
+  orderingEnabled: boolean;
+  adminUserId: string | null;
+  reason: string;
+}): Promise<ActionResult> {
+  const reasonCheck = requireAdminReason(input.reason);
+  if (!reasonCheck.ok) return reasonCheck;
+
+  const pod = await prisma.pod.findUnique({
+    where: { id: input.podId },
+    select: { id: true, name: true, slug: true, orderingEnabled: true },
+  });
+  if (!pod) return { ok: false, error: "Pod not found." };
+  if (pod.orderingEnabled === input.orderingEnabled) {
+    return {
+      ok: false,
+      error: input.orderingEnabled
+        ? "Ordering is already enabled for this pod."
+        : "This pod is already menu only.",
+    };
+  }
+
+  await prisma.pod.update({
+    where: { id: pod.id },
+    data: { orderingEnabled: input.orderingEnabled },
+  });
+
+  await createAdminAuditLog({
+    adminUserId: input.adminUserId,
+    actionType: input.orderingEnabled
+      ? ADMIN_AUDIT_ACTION.POD_ORDERING_MODE_ENABLED
+      : ADMIN_AUDIT_ACTION.POD_ORDERING_MODE_MENU_ONLY,
+    targetType: ADMIN_AUDIT_TARGET.pod,
+    targetId: pod.id,
+    reason: reasonCheck.reason,
+    oldValue: { orderingEnabled: pod.orderingEnabled },
+    newValue: { orderingEnabled: input.orderingEnabled },
+  });
+
+  revalidatePodPaths(pod.id);
+  revalidatePath(`/pod/${pod.id}`);
+  if (pod.slug) revalidatePath(buildPodCustomerPath(pod.slug));
+  return {
+    ok: true,
+    message: input.orderingEnabled
+      ? `${pod.name} ordering enabled.`
+      : `${pod.name} is now menu only.`,
+  };
+}
+
 export async function adminPausePodOrdering(input: {
   podId: string;
   adminUserId: string | null;

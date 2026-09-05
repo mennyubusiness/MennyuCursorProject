@@ -1,10 +1,19 @@
+import { VENDOR_ORDERING_MODE_LABELS } from "@/lib/vendor-ordering-mode";
 import type { VendorPodReadinessStatus } from "@/lib/vendor-pod-readiness";
+
+/** Durable ordering intent as the pod owner sees it for one vendor. */
+export type PodOwnerVendorOrderingIntent = {
+  menuOnly: boolean;
+  /** Menu-only because the pod-wide switch is off, not the vendor's own setting. */
+  menuOnlyByPod: boolean;
+};
 
 /** Simple owner-facing status label derived from existing readiness state. */
 export function podOwnerVendorDisplayStatus(
   status: VendorPodReadinessStatus,
   canAcceptOrders: boolean,
-  setupSummary?: { publicProfile?: boolean; profile?: boolean; menu?: boolean; hours?: boolean }
+  setupSummary?: { publicProfile?: boolean; profile?: boolean; menu?: boolean; hours?: boolean },
+  orderingIntent?: PodOwnerVendorOrderingIntent
 ): string {
   if (canAcceptOrders) {
     return "Live";
@@ -15,6 +24,16 @@ export function podOwnerVendorDisplayStatus(
   );
   if (publicReady === false) {
     return "Hidden";
+  }
+
+  /**
+   * Menu-only outranks every setup status: the vendor is working as configured, so it must not
+   * read as "Needs Stripe" or "Not orderable".
+   */
+  if (orderingIntent?.menuOnly) {
+    return orderingIntent.menuOnlyByPod
+      ? VENDOR_ORDERING_MODE_LABELS.menu_only_pod_disabled
+      : VENDOR_ORDERING_MODE_LABELS.menu_only;
   }
 
   switch (status) {
@@ -67,16 +86,21 @@ export function vendorAdoptionAttentionSortKey(status: VendorPodReadinessStatus)
   }
 }
 
+/** Menu-only vendors are configured, not unfinished, so they never need adoption chasing. */
 export function vendorNeedsAdoptionAttention(
   status: VendorPodReadinessStatus,
-  canAcceptOrders: boolean
+  canAcceptOrders: boolean,
+  menuOnly?: boolean
 ): boolean {
+  if (menuOnly) return false;
   return !canAcceptOrders;
 }
 
 export type PodLaunchReadinessSummary = {
   activeVendorCount: number;
   orderableCount: number;
+  /** Active vendors that are intentionally menu-only. Excluded from orderable counts. */
+  menuOnlyCount: number;
   allOrderable: boolean;
   headline: string;
   detail: string;
@@ -86,19 +110,39 @@ export function computePodLaunchReadinessSummary(
   rows: Array<{
     podVendorActive: boolean;
     vendorGloballyActive: boolean;
+    menuOnly?: boolean;
     readiness: { canAcceptOrders: boolean };
   }>
 ): PodLaunchReadinessSummary {
   const activeVendors = rows.filter((row) => row.podVendorActive && row.vendorGloballyActive);
   const activeVendorCount = activeVendors.length;
-  const orderableCount = activeVendors.filter((row) => row.readiness.canAcceptOrders).length;
-  const allOrderable = activeVendorCount > 0 && orderableCount === activeVendorCount;
+  const menuOnlyVendors = activeVendors.filter((row) => row.menuOnly);
+  const menuOnlyCount = menuOnlyVendors.length;
+  /** Only vendors with ordering intent belong in the orderable ratio. */
+  const orderingVendors = activeVendors.filter((row) => !row.menuOnly);
+  const orderableCount = orderingVendors.filter((row) => row.readiness.canAcceptOrders).length;
+  const allOrderable = orderingVendors.length > 0 && orderableCount === orderingVendors.length;
+  const allMenuOnly = activeVendorCount > 0 && menuOnlyCount === activeVendorCount;
+
+  if (allMenuOnly) {
+    return {
+      activeVendorCount,
+      orderableCount: 0,
+      menuOnlyCount,
+      allOrderable: false,
+      headline: `${activeVendorCount} vendor${activeVendorCount === 1 ? "" : "s"} listed as menu only`,
+      detail: "Customers can browse published menus. Ordering is off across this pod.",
+    };
+  }
 
   let detail: string;
   if (activeVendorCount === 0) {
     detail = "Add vendors to your pod to start taking customer orders.";
   } else if (allOrderable) {
-    detail = "All active vendors are ready for customer orders.";
+    detail =
+      menuOnlyCount > 0
+        ? "All vendors set up for ordering are ready for customer orders."
+        : "All active vendors are ready for customer orders.";
   } else {
     detail = "Some vendors still need setup before customers can order from them.";
   }
@@ -106,8 +150,12 @@ export function computePodLaunchReadinessSummary(
   return {
     activeVendorCount,
     orderableCount,
+    menuOnlyCount,
     allOrderable,
-    headline: `${orderableCount} of ${activeVendorCount} active vendors are orderable`,
+    headline:
+      menuOnlyCount > 0
+        ? `${orderableCount} of ${orderingVendors.length} ordering vendors are orderable`
+        : `${orderableCount} of ${activeVendorCount} active vendors are orderable`,
     detail,
   };
 }
@@ -216,6 +264,7 @@ export function buildPodAdoptionAttentionRows(
     vendorSlug: string;
     name: string;
     imageUrl: string | null;
+    menuOnly?: boolean;
     readiness: {
       status: VendorPodReadinessStatus;
       canAcceptOrders: boolean;
@@ -224,7 +273,9 @@ export function buildPodAdoptionAttentionRows(
   }>
 ): PodAdoptionAttentionRow[] {
   return rows
-    .filter((row) => vendorNeedsAdoptionAttention(row.readiness.status, row.readiness.canAcceptOrders))
+    .filter((row) =>
+      vendorNeedsAdoptionAttention(row.readiness.status, row.readiness.canAcceptOrders, row.menuOnly)
+    )
     .map((row) => {
       const blockerCode = row.readiness.primaryBlocker?.code ?? null;
       return {

@@ -26,19 +26,30 @@ export function derivePodAttentionItems(input: {
   pendingRequestCount: number;
   adoptionAttentionRows: PodAdoptionAttentionRow[];
   incompleteSetupItems: ReadinessChecklistItem[];
+  /** Active vendors that are intentionally menu-only. */
+  menuOnlyVendorCount?: number;
+  /** Pod-wide ordering is off: zero orderable vendors is the configured outcome. */
+  podMenuOnly?: boolean;
 }): PodAttentionItem[] {
   const items: PodAttentionItem[] = [];
+  const menuOnlyVendorCount = input.menuOnlyVendorCount ?? 0;
+  /** No vendor in this pod is meant to take orders, so ordering gaps are not problems. */
+  const noOrderingIntent =
+    Boolean(input.podMenuOnly) ||
+    (input.vendorCount > 0 && menuOnlyVendorCount === input.vendorCount);
 
   if (input.vendorCount === 0) {
     items.push({
       id: "no_vendors",
       title: "No vendors in pod",
-      description: "Invite vendors so customers can order from your pod page.",
+      description: noOrderingIntent
+        ? "Invite vendors so customers can browse menus on your pod page."
+        : "Invite vendors so customers can order from your pod page.",
       actionHref: `/pod/${input.podId}/vendors#invite`,
       actionLabel: "Invite vendors",
       severity: "warning",
     });
-  } else if (input.orderableVendorCount === 0) {
+  } else if (input.orderableVendorCount === 0 && !noOrderingIntent) {
     items.push({
       id: "no_orderable_vendors",
       title: "No vendors are currently orderable",
@@ -53,7 +64,9 @@ export function derivePodAttentionItems(input: {
     items.push({
       id: "location",
       title: "Pod location not set",
-      description: "Add an address so customers know where to pick up orders.",
+      description: noOrderingIntent
+        ? "Add an address so customers know where to find your pod."
+        : "Add an address so customers know where to pick up orders.",
       actionHref: readinessHref(input.podId),
       actionLabel: "View readiness",
       severity: "info",
@@ -63,11 +76,15 @@ export function derivePodAttentionItems(input: {
   const hoursBlocked = input.adoptionAttentionRows.filter(
     (row) => row.status === "needs_hours" || row.primaryBlockerCode === "hours"
   );
+  /** Hours gate public visibility too, so the ask survives menu-only — only the reason changes. */
+  const hoursConsequence = noOrderingIntent
+    ? "before appearing on your pod page"
+    : "before accepting orders";
   if (hoursBlocked.length === 1) {
     items.push({
       id: "vendor_hours",
       title: "Vendor needs customer ordering hours",
-      description: `${hoursBlocked[0]!.name} needs customer ordering hours before accepting orders.`,
+      description: `${hoursBlocked[0]!.name} needs customer ordering hours ${hoursConsequence}.`,
       actionHref: readinessHref(input.podId),
       actionLabel: "View readiness",
       severity: "warning",
@@ -76,16 +93,19 @@ export function derivePodAttentionItems(input: {
     items.push({
       id: "vendor_hours",
       title: "Vendors need customer ordering hours",
-      description: `${hoursBlocked.length} vendors need customer ordering hours before accepting orders.`,
+      description: `${hoursBlocked.length} vendors need customer ordering hours ${hoursConsequence}.`,
       actionHref: readinessHref(input.podId),
       actionLabel: "View readiness",
       severity: "warning",
     });
   }
 
-  const stripeBlocked = input.adoptionAttentionRows.filter(
-    (row) => row.status === "needs_payment" || row.primaryBlockerCode === "stripe"
-  );
+  /** Payment setup is never chased when nothing in this pod is meant to take orders. */
+  const stripeBlocked = noOrderingIntent
+    ? []
+    : input.adoptionAttentionRows.filter(
+        (row) => row.status === "needs_payment" || row.primaryBlockerCode === "stripe"
+      );
   if (stripeBlocked.length === 1) {
     items.push({
       id: "vendor_stripe",
@@ -116,7 +136,9 @@ export function derivePodAttentionItems(input: {
       description:
         menuBlocked.length === 1
           ? `${menuBlocked[0]!.name} needs at least one available menu item.`
-          : `${menuBlocked.length} vendors need menu setup before customers can order.`,
+          : noOrderingIntent
+            ? `${menuBlocked.length} vendors need menu setup before they appear on your pod page.`
+            : `${menuBlocked.length} vendors need menu setup before customers can order.`,
       actionHref: readinessHref(input.podId),
       actionLabel: "View readiness",
       severity: "warning",

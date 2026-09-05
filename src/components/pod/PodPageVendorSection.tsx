@@ -22,6 +22,10 @@ export function PodPageVendorSection({
   showContactLink,
   contactAnchorId,
 }: PodPageVendorSectionProps) {
+  const podMenuOnly = orderingStatus.tone === "menu_only";
+  /** Only worth labelling menu-only cards when some vendors in the pod are orderable. */
+  const showMenuOnlyBadge = !podMenuOnly && rows.some((row) => row.availability.menuOnly);
+
   return (
     <PageSection className="!py-8 sm:!py-10">
       <PageShell>
@@ -31,10 +35,12 @@ export function PodPageVendorSection({
               id="pod-vendors-heading"
               className="text-xl font-bold tracking-tight text-oo-charcoal sm:text-2xl"
             >
-              Order from vendors at {podName}
+              {podMenuOnly ? `Browse menus at ${podName}` : `Order from vendors at ${podName}`}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-oo-stone-gray sm:text-base">
-              Choose from participating vendors and check out once across the pod.
+              {podMenuOnly
+                ? "See what each kitchen is serving today."
+                : "Choose from participating vendors and check out once across the pod."}
             </p>
           </header>
 
@@ -78,7 +84,12 @@ export function PodPageVendorSection({
                   {orderingStatus.label}. Open kitchens below — pickup timing may vary by vendor.
                 </div>
               )}
-              <PodVendorGrid podSlug={podSlug} rows={rows} highlightVendorId={highlightVendorId} />
+              <PodVendorGrid
+                podSlug={podSlug}
+                rows={rows}
+                highlightVendorId={highlightVendorId}
+                showMenuOnlyBadge={showMenuOnlyBadge}
+              />
             </>
           )}
         </section>

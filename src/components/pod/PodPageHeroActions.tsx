@@ -13,6 +13,11 @@ import { cn } from "@/lib/cn";
 type PodPageHeroActionsProps = {
   podId: string;
   hasVendors: boolean;
+  /**
+   * False on a fully menu-only pod. An already-active group cart still gets its CTA so nobody
+   * loses access to in-flight work — only the start/join affordances go away.
+   */
+  showGroupOrderCta?: boolean;
 };
 
 const heroPrimaryCta = cn(
@@ -25,7 +30,11 @@ const heroSecondaryCta = cn(
   "min-h-11 border-white/80 bg-oo-warm-white/90 text-oo-charcoal shadow-sm hover:border-oo-warm-white hover:bg-oo-warm-white"
 );
 
-export async function PodPageHeroActions({ podId, hasVendors }: PodPageHeroActionsProps) {
+export async function PodPageHeroActions({
+  podId,
+  hasVendors,
+  showGroupOrderCta = true,
+}: PodPageHeroActionsProps) {
   if (!hasVendors) {
     return (
       <ButtonLink href="/explore" className={heroPrimaryCta}>
@@ -85,6 +94,18 @@ export async function PodPageHeroActions({ podId, hasVendors }: PodPageHeroActio
         </span>
         {joinButton}
       </div>
+    );
+  }
+
+  /**
+   * Nothing in this pod is orderable, and no group cart is in flight, so starting or joining one
+   * would go nowhere. Point at the menus instead.
+   */
+  if (!showGroupOrderCta) {
+    return (
+      <ButtonLink href="#pod-vendors" className={heroPrimaryCta}>
+        Browse menus
+      </ButtonLink>
     );
   }
 

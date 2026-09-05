@@ -10,6 +10,7 @@ import {
 import { buildLoginHrefWithReturn } from "@/lib/auth/login-return-path";
 import { shouldShowAdminModeBannerForVendor } from "@/lib/admin-mode-context";
 import { canAccessVendorDashboard, isVendorDashboardDevOpen } from "@/lib/vendor-dashboard-auth";
+import { loadVendorDashboardOrderingMode } from "@/lib/vendor-dashboard-ordering-mode.server";
 import { VendorLayoutChrome } from "./VendorLayoutChrome";
 
 export default async function VendorAreaLayout({
@@ -60,7 +61,10 @@ export default async function VendorAreaLayout({
     }
   }
 
-  const showAdminBanner = await shouldShowAdminModeBannerForVendor(vendorId);
+  const [showAdminBanner, orderingMode] = await Promise.all([
+    shouldShowAdminModeBannerForVendor(vendorId),
+    loadVendorDashboardOrderingMode(vendorId),
+  ]);
 
   return (
     <>
@@ -69,6 +73,11 @@ export default async function VendorAreaLayout({
         vendorId={vendor.id}
         vendorName={vendor.name}
         orderRoutingMode={vendor.orderRoutingMode}
+        navMode={{
+          menuOnly: orderingMode.menuOnly,
+          hasActiveOrders: orderingMode.hasActiveOrders,
+          hasOrderHistory: orderingMode.hasOrderHistory,
+        }}
       >
         {children}
       </VendorLayoutChrome>
