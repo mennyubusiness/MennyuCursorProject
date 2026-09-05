@@ -8,6 +8,7 @@ import { getPublicSiteOriginFromEnv } from "@/lib/public-site-url";
 import { listSlugRedirectsForEntity } from "@/lib/slug-admin.server";
 import { adminPodReadinessLabel } from "@/lib/admin-pod-detail-layout";
 import { listAdminAuditLogsForPod } from "@/services/admin-audit-log.service";
+import { getVendorClaimState, type VendorClaimState } from "@/lib/vendor-claim-state";
 
 export type AdminPodDetailView = {
   pod: {
@@ -54,6 +55,7 @@ export type AdminPodDetailView = {
     orderingEnabled: boolean;
     orderRoutingMode: string;
     customerOrderingHours: unknown;
+    claimState: VendorClaimState;
   }>;
   invites: {
     pending: number;
@@ -103,6 +105,17 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
               deletedAt: true,
               orderRoutingMode: true,
               customerOrderingHours: true,
+              vendorMemberships: {
+                where: { role: "owner" },
+                select: { role: true },
+              },
+              claimInvite: {
+                select: {
+                  expiresAt: true,
+                  claimedAt: true,
+                  revokedAt: true,
+                },
+              },
             },
           },
         },
@@ -213,6 +226,10 @@ export async function loadAdminPodDetail(podId: string): Promise<AdminPodDetailV
       orderingEnabled: pv.vendor.orderingEnabled,
       orderRoutingMode: pv.vendor.orderRoutingMode,
       customerOrderingHours: pv.vendor.customerOrderingHours,
+      claimState: getVendorClaimState({
+        memberships: pv.vendor.vendorMemberships,
+        claimInvite: pv.vendor.claimInvite,
+      }),
     })),
     invites: {
       ...inviteCounts,

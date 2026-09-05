@@ -112,6 +112,7 @@ function attachVendor(
     orderingEnabled: true,
     orderRoutingMode: "manual_dashboard",
     customerOrderingHours: [...ALWAYS_OPEN_HOURS],
+    claimState: { key: "claimed", label: "Claimed", claimed: true, ownerCount: 1 },
     ...overrides,
   };
 }

@@ -18,6 +18,8 @@ export type SendTransactionalEmailInput = {
   text: string;
   html?: string;
   eventType: string;
+  /** Omit body previews from log/dry-run output (for emails containing bearer tokens). */
+  sensitiveContent?: boolean;
 };
 
 export type SendTransactionalEmailResult = {
@@ -94,7 +96,7 @@ export async function sendTransactionalEmail(
       to: maskEmail(input.to),
       subject: input.subject,
       mode: isEmailLogOnly() ? "log_only" : "dry_run",
-      preview: input.text.slice(0, 240),
+      preview: input.sensitiveContent ? "[redacted]" : input.text.slice(0, 240),
     });
     return {
       status: isEmailLogOnly() ? "log_only" : "dry_run",

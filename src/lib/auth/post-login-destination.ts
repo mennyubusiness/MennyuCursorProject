@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth/login-return-path";
 import { prisma } from "@/lib/db";
 import { canViewPod, canViewVendor, getUserAccessContext, isAdminUser } from "@/lib/permissions";
+import { isVendorClaimPath } from "@/lib/auth/vendor-claim-path";
 
 export type PostLoginDestinationResult = { kind: "redirect"; path: string };
 
@@ -27,6 +28,7 @@ async function canRedirectToPath(userId: string, path: string): Promise<boolean>
   if (!clean.startsWith("/")) return false;
 
   if (isPublicCustomerSafePath(clean)) return true;
+  if (isVendorClaimPath(clean)) return true;
 
   if (clean === "/admin" || clean.startsWith("/admin/")) {
     return isAdminUser(userId);
@@ -112,6 +114,9 @@ export async function resolvePostLoginDestination(
   const safeReturn = sanitizeLoginReturnPath(returnPath);
   const pendingSetup = await getPendingAccountSetupRedirect(userId);
   if (pendingSetup) {
+    if (safeReturn && isVendorClaimPath(safeReturn)) {
+      return { kind: "redirect", path: safeReturn };
+    }
     if (safeReturn && isVendorInvitePath(safeReturn)) {
       return { kind: "redirect", path: appendNextQueryParam(pendingSetup, safeReturn) };
     }

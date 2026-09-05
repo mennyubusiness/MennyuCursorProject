@@ -248,6 +248,32 @@ model PodVendorInvite {
   @@index([podId, invitedEmail, status])
 }
 
+/// Secure invitation to claim ownership of an existing concierge-created vendor.
+/// Raw tokens are never stored. One lifecycle row per vendor is rotated on resend/reissue.
+model VendorClaimInvite {
+  id              String    @id @default(cuid())
+  vendorId        String    @unique
+  invitedEmail    String
+  tokenHash       String    @unique
+  expiresAt       DateTime
+  claimedAt       DateTime?
+  revokedAt       DateTime?
+  invitedByUserId String?
+  claimedByUserId String?
+  lastSentAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  vendor    Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  invitedBy User?  @relation("VendorClaimInviteInvitedBy", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  claimedBy User?  @relation("VendorClaimInviteClaimedBy", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([invitedEmail])
+  @@index([expiresAt])
+  @@index([invitedByUserId])
+  @@index([claimedByUserId])
+}
+
 enum RegistrationIntent {
   customer
   vendor
@@ -330,6 +356,8 @@ model User {
   podVendorInvitesCreated              PodVendorInvite[] @relation("PodVendorInviteCreatedBy")
   podVendorInvitesAccepted             PodVendorInvite[] @relation("PodVendorInviteAcceptedBy")
   pendingVendorInvite                  PodVendorInvite?  @relation("UserPendingVendorInvite", fields: [pendingVendorInviteId], references: [id], onDelete: SetNull)
+  vendorClaimInvitesCreated            VendorClaimInvite[] @relation("VendorClaimInviteInvitedBy")
+  vendorClaimInvitesAccepted           VendorClaimInvite[] @relation("VendorClaimInviteClaimedBy")
   adminAuditLogs                       AdminAuditLog[]   @relation("AdminAuditLogActor")
   slugRedirectsCreated                 SlugRedirect[]    @relation("SlugRedirectCreatedBy")
   /// When set, credentials login and active JWT sessions are blocked.
@@ -593,6 +621,7 @@ model Vendor {
   podMembershipRequests   PodMembershipRequest[]
   podVendorInvitesAccepted PodVendorInvite[] @relation("PodVendorInviteAcceptedVendor")
   podVendorInvitesTarget   PodVendorInvite[] @relation("PodVendorInviteTargetVendor")
+  claimInvite              VendorClaimInvite?
   pods                    PodVendor[]
   vendorOrders            VendorOrder[]
   vendorPayoutTransfers   VendorPayoutTransfer[]

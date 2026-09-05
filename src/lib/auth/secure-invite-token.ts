@@ -2,6 +2,8 @@ import { createHash, randomBytes } from "crypto";
 
 /** Pod vendor email invites expire after 14 days. */
 export const POD_VENDOR_INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+/** Vendor ownership claim links expire after seven days. */
+export const VENDOR_CLAIM_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function generateSecureInviteToken(): string {
   return randomBytes(32).toString("base64url");
@@ -22,4 +24,12 @@ export function isUrlSafeSecureInviteToken(token: string): boolean {
 export function buildPodVendorInviteUrl(origin: string, token: string): string {
   const base = origin.replace(/\/$/, "");
   return `${base}/vendor/invite/${encodeURIComponent(token)}`;
+}
+
+export function buildVendorClaimInvitePath(token: string): string {
+  return `/claim/vendor/${encodeURIComponent(token)}`;
+}
+
+export function buildVendorClaimInviteUrl(origin: string, token: string): string {
+  return `${origin.replace(/\/$/, "")}${buildVendorClaimInvitePath(token)}`;
 }

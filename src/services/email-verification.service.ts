@@ -16,6 +16,8 @@ import { prisma } from "@/lib/db";
 import { sendTransactionalEmail } from "@/lib/email/email.service";
 import { ADMIN_AUDIT_ACTION, ADMIN_AUDIT_TARGET } from "@/lib/admin-audit-log";
 import { createAdminAuditLog } from "@/services/admin-audit-log.service";
+import { sanitizeLoginReturnPath } from "@/lib/auth/login-return-path";
+import { isVendorClaimPath } from "@/lib/auth/vendor-claim-path";
 
 export const EMAIL_VERIFICATION_SENT_MESSAGE =
   "Verification email sent. Check your inbox for the link.";
@@ -40,7 +42,7 @@ export type SendEmailVerificationResult =
   | { ok: false; error: string };
 
 export type VerifyEmailTokenResult =
-  | { ok: true; status: "verified" | "already_verified"; message: string }
+  | { ok: true; status: "verified" | "already_verified"; message: string; returnPath?: string }
   | { ok: false; status: "invalid" | "expired" | "used"; message: string };
 
 export type EmailVerificationInitiator = "signup" | "user" | "admin";
@@ -91,6 +93,7 @@ export async function sendEmailVerificationEmail(input: {
   initiator?: EmailVerificationInitiator;
   adminUserId?: string | null;
   adminReason?: string;
+  returnPath?: string | null;
 }): Promise<SendEmailVerificationResult> {
   const user = await prisma.user.findUnique({
     where: { id: input.userId },
@@ -118,6 +121,8 @@ export async function sendEmailVerificationEmail(input: {
   const tokenHash = hashEmailVerificationToken(rawToken);
   const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
   const now = new Date();
+  const safeReturnPath = sanitizeLoginReturnPath(input.returnPath);
+  const claimReturnPath = isVendorClaimPath(safeReturnPath) ? safeReturnPath : null;
 
   await prisma.$transaction([
     prisma.emailVerificationToken.deleteMany({
@@ -134,12 +139,13 @@ export async function sendEmailVerificationEmail(input: {
         email: user.email,
         expiresAt,
         sentAt: null,
+        metadata: claimReturnPath ? { returnPath: claimReturnPath } : undefined,
       },
     }),
   ]);
 
   const siteOrigin = resolveVerificationLinkOrigin(input.requestOrigin);
-  const verifyUrl = buildEmailVerificationUrl(siteOrigin, rawToken);
+  const verifyUrl = buildEmailVerificationUrl(siteOrigin, rawToken, claimReturnPath);
   const { text, html } = buildVerificationEmailBody(verifyUrl);
 
   const emailResult = await sendTransactionalEmail({
@@ -207,6 +213,7 @@ export async function verifyEmailWithToken(tokenRaw: string): Promise<VerifyEmai
       email: true,
       expiresAt: true,
       usedAt: true,
+      metadata: true,
       user: { select: { email: true, emailVerified: true } },
     },
   });
@@ -217,7 +224,12 @@ export async function verifyEmailWithToken(tokenRaw: string): Promise<VerifyEmai
   }
 
   if (isUserEmailVerified(row.user.emailVerified)) {
-    return { ok: true, status: "already_verified", message: EMAIL_VERIFICATION_SUCCESS_MESSAGE };
+    return {
+      ok: true,
+      status: "already_verified",
+      message: EMAIL_VERIFICATION_SUCCESS_MESSAGE,
+      returnPath: verificationReturnPath(row.metadata),
+    };
   }
 
   if (row.usedAt) {
@@ -255,7 +267,20 @@ export async function verifyEmailWithToken(tokenRaw: string): Promise<VerifyEmai
     }),
   ]);
 
-  return { ok: true, status: "verified", message: EMAIL_VERIFICATION_SUCCESS_MESSAGE };
+  return {
+    ok: true,
+    status: "verified",
+    message: EMAIL_VERIFICATION_SUCCESS_MESSAGE,
+    returnPath: verificationReturnPath(row.metadata),
+  };
+}
+
+function verificationReturnPath(metadata: unknown): string | undefined {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return undefined;
+  const value = (metadata as { returnPath?: unknown }).returnPath;
+  if (typeof value !== "string") return undefined;
+  const safe = sanitizeLoginReturnPath(value);
+  return isVendorClaimPath(safe) ? safe ?? undefined : undefined;
 }
 
 export async function revokeEmailVerificationTokens(input: {

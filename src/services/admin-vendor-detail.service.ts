@@ -7,6 +7,7 @@ import { listSlugRedirectsForEntity } from "@/lib/slug-admin.server";
 import { listAdminAuditLogsForVendor } from "@/services/admin-audit-log.service";
 import { loadVendorMenuSyncSummary } from "@/services/admin-vendor-rescue.service";
 import { getVendorOrderabilityInPod } from "@/lib/vendor-orderability-in-pod";
+import { getVendorClaimState, type VendorClaimState } from "@/lib/vendor-claim-state";
 
 export type AdminVendorDetailView = {
   vendor: {
@@ -50,6 +51,13 @@ export type AdminVendorDetailView = {
     publicPath: string;
   }>;
   owners: Array<{ userId: string; email: string; name: string | null; role: string }>;
+  claimState: VendorClaimState;
+  claimInvite: {
+    invitedEmail: string;
+    expiresAt: string;
+    claimedAt: string | null;
+    revokedAt: string | null;
+  } | null;
   menuSync: Awaited<ReturnType<typeof loadVendorMenuSyncSummary>>;
   readinessSummary: { label: string; canAcceptOrders: boolean };
   recentOrders: Array<{
@@ -93,6 +101,7 @@ export async function loadAdminVendorDetail(vendorId: string): Promise<AdminVend
         include: { user: { select: { id: true, email: true, name: true } } },
         orderBy: { role: "asc" },
       },
+      claimInvite: true,
     },
   });
   if (!vendor) return null;
@@ -191,6 +200,18 @@ export async function loadAdminVendorDetail(vendorId: string): Promise<AdminVend
       name: m.user.name,
       role: m.role,
     })),
+    claimState: getVendorClaimState({
+      memberships: vendor.vendorMemberships,
+      claimInvite: vendor.claimInvite,
+    }),
+    claimInvite: vendor.claimInvite
+      ? {
+          invitedEmail: vendor.claimInvite.invitedEmail,
+          expiresAt: vendor.claimInvite.expiresAt.toISOString(),
+          claimedAt: vendor.claimInvite.claimedAt?.toISOString() ?? null,
+          revokedAt: vendor.claimInvite.revokedAt?.toISOString() ?? null,
+        }
+      : null,
     menuSync,
     readinessSummary,
     recentOrders: recentOrders.map((o) => ({
@@ -244,10 +265,12 @@ export type AdminVendorSearchOptions = {
    * routing describes *how* orders travel, ordering mode describes *whether* they are taken.
    */
   orderingMode?: AdminVendorOrderingModeFilter | null;
+  ownership?: AdminVendorOwnershipFilter | null;
   limit?: number;
 };
 
 export type AdminVendorOrderingModeFilter = "orderable" | "menu_only";
+export type AdminVendorOwnershipFilter = "claimed" | "unclaimed";
 
 export function parseAdminVendorOrderingModeQuery(
   raw: string | null | undefined
@@ -255,6 +278,13 @@ export function parseAdminVendorOrderingModeQuery(
   const value = raw?.trim();
   if (value === "orderable" || value === "menu_only") return value;
   return null;
+}
+
+export function parseAdminVendorOwnershipQuery(
+  raw: string | null | undefined
+): AdminVendorOwnershipFilter | null {
+  const value = raw?.trim();
+  return value === "claimed" || value === "unclaimed" ? value : null;
 }
 
 /**
@@ -270,14 +300,16 @@ export async function searchAdminVendors(
   const q = rawQuery.trim();
   const routing = opts.orderRoutingMode ?? null;
   const orderingMode = opts.orderingMode ?? null;
+  const ownership = opts.ownership ?? null;
   const limit = opts.limit ?? (q ? 50 : 200);
 
-  if (!q && !routing && !orderingMode) return [];
+  if (!q && !routing && !orderingMode && !ownership) return [];
 
   const where: {
     OR?: object[];
     orderRoutingMode?: VendorOrderRoutingMode;
     orderingEnabled?: boolean;
+    vendorMemberships?: object;
   } = {};
 
   if (q) {
@@ -300,6 +332,12 @@ export async function searchAdminVendors(
 
   if (orderingMode) {
     where.orderingEnabled = orderingMode === "orderable";
+  }
+  if (ownership) {
+    where.vendorMemberships =
+      ownership === "claimed"
+        ? { some: { role: VendorMembershipRole.owner } }
+        : { none: { role: VendorMembershipRole.owner } };
   }
 
   const vendors = await prisma.vendor.findMany({

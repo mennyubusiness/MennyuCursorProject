@@ -39,6 +39,9 @@ import {
   adminUnpauseVendorOrderingAction,
   adminUpdateVendorPublicProfileAction,
   adminDeleteVendorProfileAction,
+  adminResendVendorClaimInviteAction,
+  adminRevokeVendorClaimInviteAction,
+  adminSendVendorClaimInviteAction,
 } from "@/actions/admin-vendor.actions";
 import {
   ADMIN_NAV_LABELS,
@@ -70,6 +73,9 @@ export function AdminVendorOverview({
   const [name, setName] = useState(detail.vendor.name);
   const [description, setDescription] = useState(detail.vendor.description ?? "");
   const [contactEmail, setContactEmail] = useState(detail.vendor.contactEmail ?? "");
+  const [claimEmail, setClaimEmail] = useState(
+    detail.claimInvite?.invitedEmail ?? detail.vendor.contactEmail ?? ""
+  );
   const [slug, setSlug] = useState(detail.vendor.slug);
   const [attachPodId, setAttachPodId] = useState("");
   const [profilePending, startProfileTransition] = useTransition();
@@ -370,6 +376,90 @@ export function AdminVendorOverview({
             ))}
           </ul>
         )}
+      </section>
+
+      <section id="ownership" className="scroll-mt-6">
+        <AdminSection title="Ownership">
+          <div className="space-y-1 text-sm">
+            <p className="font-semibold text-oo-charcoal">{detail.claimState.label}</p>
+            {detail.claimState.claimed ? (
+              <ul className="space-y-1 text-oo-stone-gray">
+                {detail.owners
+                  .filter((owner) => owner.role === "owner")
+                  .map((owner) => (
+                    <li key={owner.userId}>
+                      {owner.name ? `${owner.name} · ` : ""}
+                      {owner.email}
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              <p className="text-oo-stone-gray">
+                No vendor owner has claimed this profile yet.
+              </p>
+            )}
+          </div>
+
+          {!detail.claimState.claimed &&
+          (!detail.claimInvite || Boolean(detail.claimInvite.revokedAt)) ? (
+            <div className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-cream/40 p-3">
+              <label className="block text-sm font-medium text-oo-charcoal">
+                Claim invitation email
+                <input
+                  type="email"
+                  value={claimEmail}
+                  onChange={(event) => setClaimEmail(event.target.value)}
+                  className="oo-input mt-1"
+                  placeholder="owner@example.com"
+                />
+              </label>
+              <AdminReasonActionForm
+                label="Send claim invite"
+                description="Invites this person to claim the existing profile and menu."
+                confirmLabel="Send invite"
+                onSubmit={(reason) =>
+                  run(() =>
+                    adminSendVendorClaimInviteAction({
+                      vendorId,
+                      invitedEmail: claimEmail,
+                      reason,
+                    })
+                  )
+                }
+              />
+            </div>
+          ) : null}
+
+          {!detail.claimState.claimed &&
+          detail.claimInvite &&
+          !detail.claimInvite.revokedAt &&
+          !detail.claimInvite.claimedAt ? (
+            <div className="space-y-3 rounded-xl border border-oo-light-stone bg-oo-cream/40 p-3">
+              <p className="text-sm text-oo-stone-gray">
+                Sent to <span className="font-medium text-oo-charcoal">{detail.claimInvite.invitedEmail}</span>
+              </p>
+              <AdminReasonActionForm
+                label={detail.claimState.key === "invite_expired" ? "Send new invite" : "Resend invite"}
+                description="Generates a new link and invalidates the previous token."
+                confirmLabel={detail.claimState.key === "invite_expired" ? "Send new invite" : "Resend invite"}
+                onSubmit={(reason) =>
+                  run(() => adminResendVendorClaimInviteAction({ vendorId, reason }))
+                }
+              />
+              {!detail.claimInvite.revokedAt ? (
+                <AdminReasonActionForm
+                  label="Revoke invite"
+                  description="Makes the current claim link unusable."
+                  confirmLabel="Revoke invite"
+                  danger
+                  onSubmit={(reason) =>
+                    run(() => adminRevokeVendorClaimInviteAction({ vendorId, reason }))
+                  }
+                />
+              ) : null}
+            </div>
+          ) : null}
+        </AdminSection>
       </section>
 
       {/* Ordering controls (targeted by quick actions) */}

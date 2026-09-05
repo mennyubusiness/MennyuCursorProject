@@ -212,6 +212,11 @@ export function adminVendorPrimaryOrderState(input: {
 }
 
 const AUDIT_LABELS: Record<string, string> = {
+  [ADMIN_AUDIT_ACTION.UNCLAIMED_VENDOR_CREATED]: "Unclaimed vendor created",
+  [ADMIN_AUDIT_ACTION.VENDOR_CLAIM_INVITE_SENT]: "Claim invitation sent",
+  [ADMIN_AUDIT_ACTION.VENDOR_CLAIM_INVITE_RESENT]: "Claim invitation resent",
+  [ADMIN_AUDIT_ACTION.VENDOR_CLAIM_INVITE_REVOKED]: "Claim invitation revoked",
+  [ADMIN_AUDIT_ACTION.VENDOR_CLAIMED]: "Vendor claimed",
   [ADMIN_AUDIT_ACTION.VENDOR_ORDERING_PAUSED]: "Ordering paused",
   [ADMIN_AUDIT_ACTION.VENDOR_ORDERING_UNPAUSED]: "Ordering resumed",
   [ADMIN_AUDIT_ACTION.VENDOR_HIDDEN]: "Vendor hidden from public listing",

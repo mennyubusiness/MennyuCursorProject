@@ -18,6 +18,7 @@ import {
   adminUpdatePodPublicProfile,
   adminDeletePodProfile,
 } from "@/services/admin-pod-rescue.service";
+import { adminCreateUnclaimedVendor } from "@/services/admin-concierge-vendor.service";
 
 type ActionResult =
   | { ok: true; message?: string }
@@ -31,6 +32,26 @@ async function withAdmin<T extends ActionResult>(
   const result = await fn(ctx);
   if (result.ok) revalidatePath("/admin/pods");
   return result;
+}
+
+export async function adminCreateUnclaimedVendorAction(input: {
+  podId: string;
+  name: string;
+  cuisineCategory?: string;
+  contactName?: string;
+  contactEmail?: string;
+  reason: string;
+  allowDuplicateName?: boolean;
+}) {
+  return withAdmin(({ adminUserId }) =>
+    adminCreateUnclaimedVendor({ ...input, adminUserId }).then((result) => {
+      if (result.ok) {
+        revalidatePath(`/admin/pods/${input.podId}`);
+        revalidatePath(`/admin/vendors/${result.vendor.id}`);
+      }
+      return result;
+    })
+  );
 }
 
 /** Platform-admin only (enforced by `withAdmin`). Pod owners cannot change ordering mode. */

@@ -29,6 +29,7 @@ import {
   adminUnpausePodOrderingAction,
   adminUpdatePodPublicProfileAction,
   adminDeletePodProfileAction,
+  adminCreateUnclaimedVendorAction,
 } from "@/actions/admin-pod.actions";
 import { adminSetVendorOrderingModeAction } from "@/actions/admin-vendor.actions";
 import {
@@ -93,6 +94,15 @@ export function AdminPodOverview({
   const [attachVendorId, setAttachVendorId] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
   const [profilePending, startProfileTransition] = useTransition();
+  const [createPending, startCreateTransition] = useTransition();
+  const [createVendorName, setCreateVendorName] = useState("");
+  const [createCuisine, setCreateCuisine] = useState("");
+  const [createContactName, setCreateContactName] = useState("");
+  const [createContactEmail, setCreateContactEmail] = useState("");
+  const [createReason, setCreateReason] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createMessage, setCreateMessage] = useState<string | null>(null);
 
   const run = (fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) =>
     fn().then((result) => {
@@ -114,6 +124,38 @@ export function AdminPodOverview({
   );
 
   const filteredVendorRows = filterVendorRows(summary.vendorRows, vendorFilter);
+
+  const createConciergeVendor = (allowDuplicateName: boolean) => {
+    setCreateError(null);
+    setCreateMessage(null);
+    startCreateTransition(async () => {
+      const result = await adminCreateUnclaimedVendorAction({
+        podId,
+        name: createVendorName,
+        cuisineCategory: createCuisine,
+        contactName: createContactName,
+        contactEmail: createContactEmail,
+        reason: createReason,
+        allowDuplicateName,
+      });
+      if (!result.ok) {
+        setCreateError(result.error);
+        setDuplicateWarning(
+          "duplicateWarning" in result && result.duplicateWarning ? result.error : null
+        );
+        return;
+      }
+      setDuplicateWarning(null);
+      setCreateMessage(result.message);
+      setCreateVendorName("");
+      setCreateCuisine("");
+      setCreateContactName("");
+      setCreateContactEmail("");
+      setCreateReason("");
+      router.push(`/admin/vendors/${result.vendor.id}`);
+      router.refresh();
+    });
+  };
 
   const vendorFilterTabs: Array<{ key: VendorFilter; label: string; count: number }> = [
     { key: "all", label: "All", count: summary.vendors.totalAttached },
@@ -339,6 +381,7 @@ export function AdminPodOverview({
                         {row.cuisineLabel ? <span>{row.cuisineLabel}</span> : null}
                         <span>{row.visibilityLabel}</span>
                         <span>{row.routingLabel}</span>
+                        {detailVendor ? <span>{detailVendor.claimState.label}</span> : null}
                         {row.issueLabel ? <span className="text-amber-800">{row.issueLabel}</span> : null}
                       </div>
                     </div>
@@ -480,6 +523,82 @@ export function AdminPodOverview({
           />
           <button type="submit" className="rounded bg-brand px-3 py-1.5 text-xs font-semibold text-white">
             Attach vendor
+          </button>
+        </form>
+
+        <form
+          className="mt-4 space-y-3 rounded-lg border border-dashed border-oo-light-stone p-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            createConciergeVendor(false);
+          }}
+        >
+          <div>
+            <p className="text-xs font-semibold text-oo-charcoal">Create vendor for this pod</p>
+            <p className="mt-1 text-xs text-oo-stone-gray">
+              Creates an unclaimed, menu-only profile. No user or payment setup is required.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input
+              value={createVendorName}
+              onChange={(event) => setCreateVendorName(event.target.value)}
+              required
+              placeholder="Vendor name"
+              className="oo-input"
+            />
+            <input
+              value={createCuisine}
+              onChange={(event) => setCreateCuisine(event.target.value)}
+              placeholder="Cuisine / category (optional)"
+              className="oo-input"
+            />
+            <input
+              value={createContactName}
+              onChange={(event) => setCreateContactName(event.target.value)}
+              placeholder="Contact name (optional)"
+              className="oo-input"
+            />
+            <input
+              type="email"
+              value={createContactEmail}
+              onChange={(event) => setCreateContactEmail(event.target.value)}
+              placeholder="Claim email (optional)"
+              className="oo-input"
+            />
+          </div>
+          <textarea
+            value={createReason}
+            onChange={(event) => setCreateReason(event.target.value)}
+            rows={2}
+            required
+            minLength={3}
+            placeholder="Admin reason"
+            className="oo-input"
+          />
+          {duplicateWarning ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+              <p>{duplicateWarning}</p>
+              <button
+                type="button"
+                disabled={createPending}
+                onClick={() => createConciergeVendor(true)}
+                className="mt-2 font-semibold underline"
+              >
+                Create separate vendor anyway
+              </button>
+            </div>
+          ) : null}
+          {createError && !duplicateWarning ? (
+            <p className="text-xs text-red-700" role="alert">{createError}</p>
+          ) : null}
+          {createMessage ? <p className="text-xs text-emerald-700">{createMessage}</p> : null}
+          <button
+            type="submit"
+            disabled={createPending}
+            className="rounded bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+          >
+            {createPending ? "Creating…" : "Create unclaimed vendor"}
           </button>
         </form>
       </section>

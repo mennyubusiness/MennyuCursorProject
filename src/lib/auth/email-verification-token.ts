@@ -27,7 +27,8 @@ export function isUrlSafeEmailVerificationToken(token: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(token);
 }
 
-export function buildEmailVerificationUrl(origin: string, token: string): string {
+export function buildEmailVerificationUrl(origin: string, token: string, returnPath?: string | null): string {
   const base = origin.replace(/\/$/, "");
-  return `${base}/verify-email?token=${encodeURIComponent(token)}`;
+  const next = returnPath ? `&next=${encodeURIComponent(returnPath)}` : "";
+  return `${base}/verify-email?token=${encodeURIComponent(token)}${next}`;
 }

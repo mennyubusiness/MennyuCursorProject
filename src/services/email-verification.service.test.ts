@@ -252,5 +252,54 @@ describe("email-verification.service", () => {
         })
       );
     });
+
+    it("stores only a sanitized vendor claim return path in token metadata", async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: "user_1",
+        email: "a@example.com",
+        emailVerified: null,
+        emailVerificationLastSentAt: null,
+        disabledAt: null,
+      } as never);
+      await sendEmailVerificationEmail({
+        userId: "user_1",
+        initiator: "signup",
+        returnPath: "/claim/vendor/secure_token",
+      });
+      expect(prisma.emailVerificationToken.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            metadata: { returnPath: "/claim/vendor/secure_token" },
+          }),
+        })
+      );
+      expect(mockSendTransactionalEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(
+            "next=%2Fclaim%2Fvendor%2Fsecure_token"
+          ),
+        })
+      );
+    });
+
+    it("drops unsafe verification return URLs", async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: "user_1",
+        email: "a@example.com",
+        emailVerified: null,
+        emailVerificationLastSentAt: null,
+        disabledAt: null,
+      } as never);
+      await sendEmailVerificationEmail({
+        userId: "user_1",
+        initiator: "signup",
+        returnPath: "https://evil.example/claim/vendor/token",
+      });
+      const data = vi.mocked(prisma.emailVerificationToken.create).mock.calls[0]![0].data;
+      expect(data.metadata).toBeUndefined();
+      expect(mockSendTransactionalEmail).not.toHaveBeenCalledWith(
+        expect.objectContaining({ text: expect.stringContaining("evil.example") })
+      );
+    });
   });
 });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   parseAdminVendorOrderingModeQuery,
+  parseAdminVendorOwnershipQuery,
   searchAdminVendors,
 } from "@/services/admin-vendor-detail.service";
 import { AdminVendorSearchForm } from "./AdminVendorSearchForm";
@@ -22,16 +23,17 @@ function RoutingBadge({ mode }: { mode: string }) {
 export default async function AdminVendorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; routing?: string; ordering?: string }>;
+  searchParams: Promise<{ q?: string; routing?: string; ordering?: string; ownership?: string }>;
 }) {
   const sp = await searchParams;
   const query = sp.q?.trim() ?? "";
   const routing = parseAdminVendorRoutingQuery(sp.routing);
   const orderingMode = parseAdminVendorOrderingModeQuery(sp.ordering);
+  const ownership = parseAdminVendorOwnershipQuery(sp.ownership);
   const orderingModeLabel = orderingMode === "menu_only" ? "Menu only" : "Orderable";
-  const hasFilter = Boolean(query || routing || orderingMode);
+  const hasFilter = Boolean(query || routing || orderingMode || ownership);
   const results = hasFilter
-    ? await searchAdminVendors(query, { orderRoutingMode: routing, orderingMode })
+    ? await searchAdminVendors(query, { orderRoutingMode: routing, orderingMode, ownership })
     : [];
 
   const emptyMessage = query
@@ -40,7 +42,9 @@ export default async function AdminVendorsPage({
       ? `No vendors currently use ${vendorOrderRoutingModeCompactLabel(routing)} routing.`
       : orderingMode
         ? `No vendors are currently ${orderingModeLabel.toLowerCase()}.`
-        : null;
+        : ownership
+          ? `No ${ownership} vendors were found.`
+          : null;
 
   return (
     <div className="space-y-6">
@@ -54,10 +58,11 @@ export default async function AdminVendorsPage({
       </div>
 
       <AdminVendorSearchForm
-        key={`${query}|${routing ?? "all"}|${orderingMode ?? "all"}`}
+        key={`${query}|${routing ?? "all"}|${orderingMode ?? "all"}|${ownership ?? "all"}`}
         initialQuery={query}
         initialRouting={routing ?? ""}
         initialOrderingMode={orderingMode ?? ""}
+        initialOwnership={ownership ?? ""}
       />
 
       {hasFilter ? (
@@ -110,7 +115,9 @@ export default async function AdminVendorsPage({
                       {row.podNames.length > 0 ? row.podNames.join(", ") : "None"}
                     </td>
                     <td className="px-4 py-3 text-xs text-oo-stone-gray">
-                      {row.ownerEmails.length > 0 ? row.ownerEmails.join(", ") : "—"}
+                      {row.ownerEmails.length > 0
+                        ? `Claimed · ${row.ownerEmails.join(", ")}`
+                        : "Unclaimed"}
                     </td>
                     <td className="px-4 py-3 text-xs text-oo-stone-gray">
                       {row.menuSyncLabel}
@@ -127,6 +134,7 @@ export default async function AdminVendorsPage({
               Showing {results.length} vendor{results.length === 1 ? "" : "s"}
               {routing ? ` · ${vendorOrderRoutingModeCompactLabel(routing)} routing` : ""}
               {orderingMode ? ` · ${orderingModeLabel}` : ""}
+              {ownership ? ` · ${ownership === "claimed" ? "Claimed" : "Unclaimed"}` : ""}
               {query ? ` · matching “${query}”` : ""}.
             </p>
           ) : null}

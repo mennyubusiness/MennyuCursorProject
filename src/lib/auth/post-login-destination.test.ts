@@ -138,4 +138,12 @@ describe("resolvePostLoginDestination", () => {
       path: "/account/setup/vendor?next=%2Fvendor%2Finvite%2Ftok_abc",
     });
   });
+
+  it("returns directly to vendor claim instead of forcing duplicate vendor setup", async () => {
+    mockGetPendingSetup.mockResolvedValue("/account/role");
+    const claimPath = "/claim/vendor/secure_token";
+    const dest = await resolvePostLoginDestination("user_1", claimPath);
+    expect(dest).toEqual({ kind: "redirect", path: claimPath });
+    expect(mockFindUnique).not.toHaveBeenCalled();
+  });
 });

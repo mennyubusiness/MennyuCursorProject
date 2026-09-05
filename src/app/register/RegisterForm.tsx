@@ -13,11 +13,13 @@ import {
   isVendorInvitePath,
 } from "@/lib/auth/invite-token-path";
 import {
+  buildLoginHrefWithReturn,
   readLoginReturnParam,
   sanitizeLoginReturnPath,
 } from "@/lib/auth/login-return-path";
 import { AuthFormCard } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
+import { isVendorClaimPath } from "@/lib/auth/vendor-claim-path";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -28,6 +30,7 @@ export function RegisterForm() {
   const returnPathRaw = readLoginReturnParam(searchParams);
   const returnPathSafe = sanitizeLoginReturnPath(returnPathRaw);
   const registrationIntent = searchParams.get("intent") === "vendor" ? "vendor" : null;
+  const loginHref = returnPathSafe ? buildLoginHrefWithReturn(returnPathSafe) : "/login";
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -42,6 +45,8 @@ export function RegisterForm() {
         email,
         password,
         name: name || undefined,
+        verificationReturnPath:
+          returnPathSafe && isVendorClaimPath(returnPathSafe) ? returnPathSafe : undefined,
       });
       if (!reg.ok) {
         setError(reg.error);
@@ -54,6 +59,12 @@ export function RegisterForm() {
       });
       if (sign?.error) {
         setError("Account created but sign-in failed. Try signing in from the login page.");
+        return;
+      }
+
+      if (returnPathSafe && isVendorClaimPath(returnPathSafe)) {
+        router.push(returnPathSafe);
+        router.refresh();
         return;
       }
 
@@ -146,7 +157,7 @@ export function RegisterForm() {
       </form>
       <p className="border-t border-zinc-100 pt-4 text-center text-sm text-zinc-600">
         Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-brand underline-offset-4 hover:underline">
+        <Link href={loginHref} className="font-semibold text-brand underline-offset-4 hover:underline">
           Sign in
         </Link>
       </p>

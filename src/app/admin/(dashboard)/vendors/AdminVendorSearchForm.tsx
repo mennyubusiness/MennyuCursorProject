@@ -4,7 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { VendorOrderRoutingMode } from "@prisma/client";
 import { VENDOR_ORDER_ROUTING_MODES } from "@/lib/vendor-order-routing-mode";
-import type { AdminVendorOrderingModeFilter } from "@/services/admin-vendor-detail.service";
+import type {
+  AdminVendorOrderingModeFilter,
+  AdminVendorOwnershipFilter,
+} from "@/services/admin-vendor-detail.service";
 
 const ROUTING_FILTER_OPTIONS: { value: "" | VendorOrderRoutingMode; label: string }[] = [
   { value: "", label: "All routing" },
@@ -20,10 +23,17 @@ const ORDERING_FILTER_OPTIONS: { value: "" | AdminVendorOrderingModeFilter; labe
   { value: "menu_only", label: "Menu only" },
 ];
 
+const OWNERSHIP_FILTER_OPTIONS: { value: "" | AdminVendorOwnershipFilter; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "claimed", label: "Claimed" },
+  { value: "unclaimed", label: "Unclaimed" },
+];
+
 function buildAdminVendorsHref(
   query: string,
   routing: "" | VendorOrderRoutingMode,
-  orderingMode: "" | AdminVendorOrderingModeFilter
+  orderingMode: "" | AdminVendorOrderingModeFilter,
+  ownership: "" | AdminVendorOwnershipFilter
 ): string {
   const params = new URLSearchParams();
   const q = query.trim();
@@ -32,6 +42,7 @@ function buildAdminVendorsHref(
     params.set("routing", routing);
   }
   if (orderingMode) params.set("ordering", orderingMode);
+  if (ownership) params.set("ownership", ownership);
   const qs = params.toString();
   return qs ? `/admin/vendors?${qs}` : "/admin/vendors";
 }
@@ -40,10 +51,12 @@ export function AdminVendorSearchForm({
   initialQuery,
   initialRouting,
   initialOrderingMode,
+  initialOwnership,
 }: {
   initialQuery: string;
   initialRouting: "" | VendorOrderRoutingMode;
   initialOrderingMode: "" | AdminVendorOrderingModeFilter;
+  initialOwnership: "" | AdminVendorOwnershipFilter;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
@@ -51,13 +64,14 @@ export function AdminVendorSearchForm({
   const [orderingMode, setOrderingMode] = useState<"" | AdminVendorOrderingModeFilter>(
     initialOrderingMode
   );
+  const [ownership, setOwnership] = useState<"" | AdminVendorOwnershipFilter>(initialOwnership);
 
   return (
     <form
       className="flex flex-wrap items-end gap-2"
       onSubmit={(e) => {
         e.preventDefault();
-        router.push(buildAdminVendorsHref(query, routing, orderingMode));
+        router.push(buildAdminVendorsHref(query, routing, orderingMode, ownership));
       }}
     >
       <div className="min-w-[280px] flex-1">
@@ -83,11 +97,32 @@ export function AdminVendorSearchForm({
           onChange={(e) => {
             const next = e.target.value as "" | AdminVendorOrderingModeFilter;
             setOrderingMode(next);
-            router.push(buildAdminVendorsHref(query, routing, next));
+            router.push(buildAdminVendorsHref(query, routing, next, ownership));
           }}
           className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-2 text-sm text-oo-charcoal"
         >
           {ORDERING_FILTER_OPTIONS.map((opt) => (
+            <option key={opt.value || "all"} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor="admin-vendor-ownership" className="mb-1 block text-xs font-medium text-oo-stone-gray">
+          Ownership
+        </label>
+        <select
+          id="admin-vendor-ownership"
+          value={ownership}
+          onChange={(e) => {
+            const next = e.target.value as "" | AdminVendorOwnershipFilter;
+            setOwnership(next);
+            router.push(buildAdminVendorsHref(query, routing, orderingMode, next));
+          }}
+          className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-2 text-sm text-oo-charcoal"
+        >
+          {OWNERSHIP_FILTER_OPTIONS.map((opt) => (
             <option key={opt.value || "all"} value={opt.value}>
               {opt.label}
             </option>
@@ -104,7 +139,7 @@ export function AdminVendorSearchForm({
           onChange={(e) => {
             const next = e.target.value as "" | VendorOrderRoutingMode;
             setRouting(next);
-            router.push(buildAdminVendorsHref(query, next, orderingMode));
+            router.push(buildAdminVendorsHref(query, next, orderingMode, ownership));
           }}
           className="rounded-lg border border-oo-light-stone bg-oo-warm-white px-2 py-2 text-sm text-oo-charcoal"
         >

@@ -11,10 +11,13 @@ import { VendorTodayPerformanceSection } from "./VendorTodayPerformanceSection";
 
 export default async function VendorDashboardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ vendorId: string }>;
+  searchParams: Promise<{ claimed?: string }>;
 }) {
   const { vendorId } = await params;
+  const query = await searchParams;
   const ctx = await loadVendorDashboardContext(vendorId);
   if (!ctx) notFound();
 
@@ -34,6 +37,15 @@ export default async function VendorDashboardPage({
       />
 
       <div className="mt-8 space-y-8">
+        {query.claimed === "1" ? (
+          <div
+            className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"
+            role="status"
+          >
+            <span className="font-semibold">Vendor claimed.</span>{" "}
+            You can now manage your menu, hours, and profile.
+          </div>
+        ) : null}
         {!ctx.setupComplete ? (
           <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 px-4 py-3 text-sm text-oo-charcoal">
             <Link href={`/vendor/${vendorId}/setup`} className="font-semibold underline">

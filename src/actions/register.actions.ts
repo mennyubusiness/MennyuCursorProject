@@ -24,6 +24,7 @@ export async function registerWithEmailPassword(input: {
   email: string;
   password: string;
   name?: string;
+  verificationReturnPath?: string | null;
 }): Promise<RegisterResult> {
   const headersList = await headers();
   const limited = enforceRateLimits([
@@ -66,7 +67,11 @@ export async function registerWithEmailPassword(input: {
   });
 
   const { sendEmailVerificationEmail } = await import("@/services/email-verification.service");
-  await sendEmailVerificationEmail({ userId: user.id, initiator: "signup" }).catch(() => {
+  await sendEmailVerificationEmail({
+    userId: user.id,
+    initiator: "signup",
+    returnPath: input.verificationReturnPath,
+  }).catch(() => {
     /* signup succeeds even if email provider is unavailable */
   });
 

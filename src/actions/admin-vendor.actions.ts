@@ -21,6 +21,11 @@ import {
   adminRepairVendorMenuSourceOwnership,
   adminDeleteVendorProfile,
 } from "@/services/admin-vendor-rescue.service";
+import {
+  resendVendorClaimInvite,
+  revokeVendorClaimInvite,
+  sendVendorClaimInvite,
+} from "@/services/vendor-claim-invite.service";
 
 type ActionResult =
   | { ok: true; message?: string }
@@ -34,6 +39,43 @@ async function withAdmin<T extends ActionResult>(
   const result = await fn(ctx);
   if (result.ok) revalidatePath("/admin/vendors");
   return result;
+}
+
+export async function adminSendVendorClaimInviteAction(input: {
+  vendorId: string;
+  invitedEmail: string;
+  reason: string;
+}) {
+  return withAdmin(({ adminUserId }) =>
+    sendVendorClaimInvite({ ...input, adminUserId }).then((result) => {
+      if (result.ok) revalidatePath(`/admin/vendors/${input.vendorId}`);
+      return result;
+    })
+  );
+}
+
+export async function adminResendVendorClaimInviteAction(input: {
+  vendorId: string;
+  reason: string;
+}) {
+  return withAdmin(({ adminUserId }) =>
+    resendVendorClaimInvite({ ...input, adminUserId }).then((result) => {
+      if (result.ok) revalidatePath(`/admin/vendors/${input.vendorId}`);
+      return result;
+    })
+  );
+}
+
+export async function adminRevokeVendorClaimInviteAction(input: {
+  vendorId: string;
+  reason: string;
+}) {
+  return withAdmin(({ adminUserId }) =>
+    revokeVendorClaimInvite({ ...input, adminUserId }).then((result) => {
+      if (result.ok) revalidatePath(`/admin/vendors/${input.vendorId}`);
+      return result;
+    })
+  );
 }
 
 /** Platform-admin only (enforced by `withAdmin`). Menu-only is durable product intent. */
